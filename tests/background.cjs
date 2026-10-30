@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-empty-function */
 // Loaded into the test app's main process, so test runs don't take over the developer's screen.
 // The window opens far off-screen and the app never becomes the active one, with no Dock icon.
 // Sampled during a run with `lsappinfo front`, which is how to check this still holds.
