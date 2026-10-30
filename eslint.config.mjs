@@ -24,7 +24,13 @@ export default tseslint.config(
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules
+      ...eslintPluginReactRefresh.configs.vite.rules,
+      // Handlers and components infer their return types, so requiring them only adds noise.
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      // `node` is destructured out of react-markdown props so it isn't spread onto the DOM.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
+      // Contexts export a provider and its hook from one file on purpose.
+      'react-refresh/only-export-components': 'warn'
     }
   },
   eslintConfigPrettier

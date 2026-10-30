@@ -141,8 +141,8 @@ export class EventManager {
           id: activeTab.id,
           url: activeTab.url,
           title: activeTab.title,
-          canGoBack: activeTab.webContents.canGoBack(),
-          canGoForward: activeTab.webContents.canGoForward(),
+          canGoBack: activeTab.webContents.navigationHistory.canGoBack(),
+          canGoForward: activeTab.webContents.navigationHistory.canGoForward(),
         };
       }
       return null;

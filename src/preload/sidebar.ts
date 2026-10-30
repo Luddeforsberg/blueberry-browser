@@ -31,7 +31,7 @@ const sidebarAPI = {
     electronAPI.ipcRenderer.on("chat-response", (_, data) => callback(data));
   },
 
-  onMessagesUpdated: (callback: (messages: any[]) => void) => {
+  onMessagesUpdated: (callback: (messages: unknown[]) => void) => {
     electronAPI.ipcRenderer.on("chat-messages-updated", (_, messages) =>
       callback(messages)
     );

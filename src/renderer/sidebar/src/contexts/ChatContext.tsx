@@ -22,6 +22,8 @@ interface ChatContextType {
     getCurrentUrl: () => Promise<string | null>
 }
 
+type StoredMessage = Awaited<ReturnType<Window['sidebarAPI']['getMessages']>>[number]
+
 const ChatContext = createContext<ChatContextType | null>(null)
 
 export const useChat = () => {
@@ -43,12 +45,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const storedMessages = await window.sidebarAPI.getMessages()
                 if (storedMessages && storedMessages.length > 0) {
                     // Convert CoreMessage format to our frontend Message format
-                    const convertedMessages = storedMessages.map((msg: any, index: number) => ({
+                    const convertedMessages = storedMessages.map((msg, index) => ({
                         id: `msg-${index}`,
                         role: msg.role,
                         content: typeof msg.content === 'string' 
                             ? msg.content 
-                            : msg.content.find((p: any) => p.type === 'text')?.text || '',
+                            : msg.content.find((p) => p.type === 'text')?.text || '',
                         timestamp: Date.now(),
                         isStreaming: false
                     }))
@@ -127,14 +129,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // Listen for message updates from main process
-        const handleMessagesUpdated = (updatedMessages: any[]) => {
+        const handleMessagesUpdated = (updatedMessages: StoredMessage[]) => {
             // Convert CoreMessage format to our frontend Message format
-            const convertedMessages = updatedMessages.map((msg: any, index: number) => ({
+            const convertedMessages = updatedMessages.map((msg, index) => ({
                 id: `msg-${index}`,
                 role: msg.role,
                 content: typeof msg.content === 'string' 
                     ? msg.content 
-                    : msg.content.find((p: any) => p.type === 'text')?.text || '',
+                    : msg.content.find((p) => p.type === 'text')?.text || '',
                 timestamp: Date.now(),
                 isStreaming: false
             }))

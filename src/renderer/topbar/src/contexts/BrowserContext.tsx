@@ -26,7 +26,7 @@ interface BrowserContextType {
 
     // Tab actions
     takeScreenshot: (tabId: string) => Promise<string | null>
-    runJavaScript: (tabId: string, code: string) => Promise<any>
+    runJavaScript: (tabId: string, code: string) => Promise<unknown>
 }
 
 const BrowserContext = createContext<BrowserContextType | null>(null)
