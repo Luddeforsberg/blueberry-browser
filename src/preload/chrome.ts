@@ -51,6 +51,12 @@ const chromeAPI: ChromeAPI = {
     updateSettings: (patch) => invoke("settings:update", patch),
     onSettingsUpdated: (callback) => subscribe("settings:updated", callback),
   },
+  library: {
+    getLibrary: () => invoke("library:get"),
+    getChat: (chatId) => invoke("library:chat", chatId),
+    sendChat: (chatId, text) => invoke("library:send-chat", chatId, text),
+    onLibraryUpdated: (callback) => subscribe("library:updated", callback),
+  },
   chat: {
     sendChatMessage: (request) => invoke("chat:send", request),
     clearChat: () => invoke("chat:clear"),

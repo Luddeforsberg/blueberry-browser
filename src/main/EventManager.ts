@@ -97,6 +97,14 @@ export class EventManager {
   private handleThemeEvents(): void {
     this.handle("theme:get", () => this.mainWindow.theme);
 
+    this.handle("library:get", () => this.mainWindow.library.snapshot());
+
+    this.handle("library:chat", (chatId) => this.mainWindow.library.chat(chatId));
+
+    this.handle("library:send-chat", (chatId, text) =>
+      typeof text === "string" ? this.mainWindow.library.send(chatId, text) : null
+    );
+
     this.handle("settings:get", () => this.mainWindow.settings);
 
     this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));

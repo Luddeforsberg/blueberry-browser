@@ -3,6 +3,7 @@ import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
 import { History } from "./History";
+import { MockLibrary } from "./MockLibrary";
 import type { SettingsStore } from "./SettingsStore";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { LLMClient } from "./LLMClient";
@@ -58,6 +59,7 @@ export class Window {
   private chatOpen = false;
   private readonly glassSupported = supportsGlass();
   private readonly history = new History();
+  readonly library = new MockLibrary(() => this.broadcast("library:updated", this.library.snapshot()));
 
   constructor(private readonly settingsStore: SettingsStore) {
     nativeTheme.themeSource = settingsStore.get().appearance;

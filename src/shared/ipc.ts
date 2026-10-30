@@ -1,6 +1,8 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
+import type { ChatThread, LibrarySnapshot } from "./library";
+
 // The chrome view under the tabs, and the overlay view that floats the collapsed sidebar over a page.
 export type ChromeRegion = "chrome" | "overlay";
 
@@ -116,6 +118,13 @@ export interface InvokeChannels {
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "theme:get": { region: "chrome" | "overlay"; args: []; result: ThemeState };
+  "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
+  "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
+  "library:send-chat": {
+    region: "chrome";
+    args: [chatId: string | null, text: string];
+    result: ChatThread | null;
+  };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
   "chat:send": { region: "chrome"; args: [request: ChatRequest]; result: void };
@@ -132,6 +141,7 @@ export interface EventChannels {
   "layout:updated": Layout;
   "theme:updated": ThemeState;
   "settings:updated": Settings;
+  "library:updated": LibrarySnapshot;
   "toolbar:focus-address": null;
   "chat:chunk": ChatChunk;
   "chat:messages-updated": ChatMessage[];
@@ -185,10 +195,18 @@ export interface ChatAPI {
   onMessagesUpdated: (callback: (messages: ChatMessage[]) => void) => Unsubscribe;
 }
 
+export interface LibraryAPI {
+  getLibrary: () => Promise<LibrarySnapshot>;
+  getChat: (chatId: string) => Promise<ChatThread | null>;
+  sendChat: (chatId: string | null, text: string) => Promise<ChatThread | null>;
+  onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;
+}
+
 export interface ChromeAPI {
   browser: BrowserAPI;
   layout: LayoutAPI;
   theme: ThemeAPI;
   settings: SettingsAPI;
+  library: LibraryAPI;
   chat: ChatAPI;
 }
