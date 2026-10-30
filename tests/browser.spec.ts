@@ -84,7 +84,7 @@ test("a new tab becomes the active tab", async () => {
   expect((await activeTab()).id).toBe(created?.id);
 });
 
-test("links that open a new window become tabs, from every tab and from chat", async () => {
+test("links that open a new window become tabs, from every tab and from the chrome", async () => {
   const page = await openFixture();
   const windows = () =>
     app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
@@ -96,7 +96,10 @@ test("links that open a new window become tabs, from every tab and from chat", a
   await sidebar.evaluate((url) => void window.open(url), `${origin}/from-chat`);
   await expect.poll(async () => (await activeTab()).url).toContain("/from-chat");
 
-  expect(await getTabs()).toHaveLength(count + 2);
+  await topBar.evaluate((url) => void window.open(url), `${origin}/from-topbar`);
+  await expect.poll(async () => (await activeTab()).url).toContain("/from-topbar");
+
+  expect(await getTabs()).toHaveLength(count + 3);
   expect(await windows()).toBe(1);
 });
 
@@ -148,7 +151,7 @@ test("chat markdown gets typography styles", async () => {
     webContents
       .getAllWebContents()
       .find((contents) => contents.getURL().includes("sidebar/index.html"))
-      ?.send("chat-messages-updated", [
+      ?.send("chat:messages-updated", [
         { role: "assistant", content: "# Heading\n\n- item" },
       ]);
   });
@@ -163,12 +166,12 @@ test("streamed chunks appear in the chat as they arrive", async () => {
     const chat = webContents
       .getAllWebContents()
       .find((contents) => contents.getURL().includes("sidebar/index.html"));
-    chat?.send("chat-messages-updated", [
+    chat?.send("chat:messages-updated", [
       { role: "user", content: "hello" },
       { role: "assistant", content: "" },
     ]);
     for (const content of ["first ", "second"]) {
-      chat?.send("chat-response", { messageId: "1", content, isComplete: false });
+      chat?.send("chat:chunk", { messageId: "1", content, isComplete: false });
     }
   });
 
@@ -180,6 +183,30 @@ test("chrome renderers get no raw IPC or code execution in tabs", async () => {
     expect(await view.evaluate(() => "electron" in window)).toBe(false);
   }
   expect(await topBar.evaluate(() => "tabRunJs" in window.topBarAPI)).toBe(false);
+});
+
+test("chrome renderers run sandboxed", async () => {
+  const sandboxed = await app.evaluate(({ app, webContents }) => {
+    const metrics = app.getAppMetrics();
+    return webContents
+      .getAllWebContents()
+      .filter((contents) => /\/(topbar|sidebar)\//.test(contents.getURL()))
+      .map((contents) => metrics.find((metric) => metric.pid === contents.getOSProcessId())?.sandboxed);
+  });
+
+  expect(sandboxed).toEqual([true, true]);
+});
+
+test("chrome renderers can't be navigated away from their own page", async () => {
+  for (const view of [topBar, sidebar]) {
+    const own = view.url();
+    await view.evaluate((url) => {
+      window.location.href = url;
+    }, `${origin}/elsewhere`);
+    await view.waitForTimeout(300);
+
+    expect(await view.evaluate(() => window.location.href)).toBe(own);
+  }
 });
 
 test("dark mode still syncs between the chrome renderers", async () => {

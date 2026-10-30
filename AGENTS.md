@@ -21,7 +21,9 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 
 - `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one `WebContentsView` per region and tab.
 - `src/main/Layout.ts`: the only place that decides where views go. `Window` applies it, so don't hard-code sizes anywhere else.
-- `src/preload`: one preload per chrome renderer. The `.d.ts` files beside them type what each renderer sees, so keep the two in sync.
+- `src/shared/ipc.ts`: the one IPC contract. Every channel, its arguments, its result and which chrome view may call it live here. Add a channel here first, then to `CHANNEL_REGIONS` in `src/main/ipc.ts`, and then to the preload.
+- `src/preload`: one sandboxed preload per chrome renderer, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.
+- `src/main/EventManager.ts`: registers every IPC handler, and rejects calls from any view or frame other than the one the contract names.
 - `src/renderer/topbar` and `src/renderer/sidebar`: the chrome renderers. Shared code lives in `src/renderer/common`.
 - Web pages run in `Tab` views with no preload and no Node access.
 
@@ -31,5 +33,6 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 - **Packaged app stuck with no window:** a load error in the main process shows a modal dialog, which can sit behind other windows. Declare every runtime import in `dependencies`, including peer dependencies such as `zod` for `ai`. pnpm can resolve an undeclared package in development that packaging leaves out.
 - **Electron starts as Node:** some shells, including agent shells, export `ELECTRON_RUN_AS_NODE=1`. Unset it to run Electron by hand. `tests/app.ts` already removes it.
 - **`executeJavaScript`:** the code is a script, not a function body, so a top-level `return` is a syntax error.
+- **Preloads load nothing but `electron`:** they're sandboxed, so a shared runtime import becomes a chunk the preload can't `require`, and the chrome loses its API. Preloads may only `import type` from other files.
 - **Views stack by order:** a tab view covers the chrome beneath it, so CSS in the chrome can't draw over a page.
 - **Formatting:** existing files aren't Prettier-clean, which is most of the lint warnings. Don't run `pnpm format` over files you aren't otherwise rewriting.

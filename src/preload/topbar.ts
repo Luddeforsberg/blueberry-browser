@@ -1,50 +1,49 @@
-import { contextBridge, ipcRenderer } from "electron";
-import { darkModeAPI } from "./darkMode";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type {
+  DarkModeAPI,
+  EventChannels,
+  InvokeChannel,
+  InvokeChannels,
+  SendChannels,
+  TopBarAPI,
+} from "../shared/ipc";
 
-// TopBar specific APIs
-const topBarAPI = {
-  // Tab management
-  createTab: (url?: string) =>
-    ipcRenderer.invoke("create-tab", url),
-  closeTab: (tabId: string) =>
-    ipcRenderer.invoke("close-tab", tabId),
-  switchTab: (tabId: string) =>
-    ipcRenderer.invoke("switch-tab", tabId),
-  getTabs: () => ipcRenderer.invoke("get-tabs"),
+// Repeated in each preload, because a sandboxed preload can't require a shared chunk.
+const invoke = <C extends InvokeChannel>(
+  channel: C,
+  ...args: InvokeChannels[C]["args"]
+): Promise<InvokeChannels[C]["result"]> => ipcRenderer.invoke(channel, ...args);
 
-  // Tab navigation
-  navigateTab: (tabId: string, url: string) =>
-    ipcRenderer.invoke("navigate-tab", tabId, url),
-  goBack: (tabId: string) =>
-    ipcRenderer.invoke("tab-go-back", tabId),
-  goForward: (tabId: string) =>
-    ipcRenderer.invoke("tab-go-forward", tabId),
-  reload: (tabId: string) =>
-    ipcRenderer.invoke("tab-reload", tabId),
+const send = <C extends keyof SendChannels>(channel: C, ...args: SendChannels[C]) =>
+  ipcRenderer.send(channel, ...args);
 
-  // Tab actions
-  tabScreenshot: (tabId: string) =>
-    ipcRenderer.invoke("tab-screenshot", tabId),
-
-  // Sidebar
-  toggleSidebar: () =>
-    ipcRenderer.invoke("toggle-sidebar"),
+const subscribe = <C extends keyof EventChannels>(
+  channel: C,
+  callback: (payload: EventChannels[C]) => void
+) => {
+  const listener = (_: IpcRendererEvent, payload: EventChannels[C]) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
 };
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld("darkModeAPI", darkModeAPI);
-    contextBridge.exposeInMainWorld("topBarAPI", topBarAPI);
-  } catch (error) {
-    console.error(error);
-  }
-} else {
-  // @ts-ignore (define in dts)
-  window.darkModeAPI = darkModeAPI;
-  // @ts-ignore (define in dts)
-  window.topBarAPI = topBarAPI;
-}
+const darkModeAPI: DarkModeAPI = {
+  notifyChanged: (isDarkMode) => send("theme:dark-changed", isDarkMode),
+  onUpdated: (callback) => subscribe("theme:dark-updated", callback),
+};
 
+const topBarAPI: TopBarAPI = {
+  getTabs: () => invoke("tabs:list"),
+  createTab: (url) => invoke("tabs:create", url),
+  closeTab: (tabId) => invoke("tabs:close", tabId),
+  switchTab: (tabId) => invoke("tabs:switch", tabId),
+  navigateTab: (tabId, url) => invoke("tab:navigate", tabId, url),
+  goBack: (tabId) => invoke("tab:back", tabId),
+  goForward: (tabId) => invoke("tab:forward", tabId),
+  reload: (tabId) => invoke("tab:reload", tabId),
+  toggleSidebar: () => invoke("sidebar:toggle"),
+};
+
+contextBridge.exposeInMainWorld("darkModeAPI", darkModeAPI);
+contextBridge.exposeInMainWorld("topBarAPI", topBarAPI);

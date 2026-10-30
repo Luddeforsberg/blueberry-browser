@@ -1,47 +1,22 @@
-import { is } from "@electron-toolkit/utils";
 import { BaseWindow, WebContentsView } from "electron";
-import { join } from "path";
+import { createChromeView } from "./chromeView";
 import { LLMClient } from "./LLMClient";
 import type { Rect } from "./Layout";
 
 export class SideBar {
   private webContentsView: WebContentsView;
+  private _url: string;
   private llmClient: LLMClient;
   private isVisible: boolean = true;
 
   constructor(baseWindow: BaseWindow) {
-    this.webContentsView = this.createWebContentsView();
+    const { view, url } = createChromeView("sidebar");
+    this.webContentsView = view;
+    this._url = url;
     baseWindow.contentView.addChildView(this.webContentsView);
 
     // Initialize LLM client
     this.llmClient = new LLMClient(this.webContentsView.webContents);
-  }
-
-  private createWebContentsView(): WebContentsView {
-    const webContentsView = new WebContentsView({
-      webPreferences: {
-        preload: join(__dirname, "../preload/sidebar.js"),
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: false, // Need to disable sandbox for preload to work
-      },
-    });
-
-    // Load the Sidebar React app
-    if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-      // In development, load through Vite dev server
-      const sidebarUrl = new URL(
-        "/sidebar/",
-        process.env["ELECTRON_RENDERER_URL"]
-      );
-      webContentsView.webContents.loadURL(sidebarUrl.toString());
-    } else {
-      webContentsView.webContents.loadFile(
-        join(__dirname, "../renderer/sidebar/index.html")
-      );
-    }
-
-    return webContentsView;
   }
 
   setBounds(bounds: Rect): void {
@@ -50,6 +25,10 @@ export class SideBar {
 
   get view(): WebContentsView {
     return this.webContentsView;
+  }
+
+  get url(): string {
+    return this._url;
   }
 
   get client(): LLMClient {

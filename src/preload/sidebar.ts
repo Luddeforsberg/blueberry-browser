@@ -1,72 +1,46 @@
-import { contextBridge, ipcRenderer } from "electron";
-import { darkModeAPI } from "./darkMode";
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import type {
+  DarkModeAPI,
+  EventChannels,
+  InvokeChannel,
+  InvokeChannels,
+  SendChannels,
+  SidebarAPI,
+} from "../shared/ipc";
 
-interface ChatRequest {
-  message: string;
-  context: {
-    url: string | null;
-    content: string | null;
-    text: string | null;
+// Repeated in each preload, because a sandboxed preload can't require a shared chunk.
+const invoke = <C extends InvokeChannel>(
+  channel: C,
+  ...args: InvokeChannels[C]["args"]
+): Promise<InvokeChannels[C]["result"]> => ipcRenderer.invoke(channel, ...args);
+
+const send = <C extends keyof SendChannels>(channel: C, ...args: SendChannels[C]) =>
+  ipcRenderer.send(channel, ...args);
+
+const subscribe = <C extends keyof EventChannels>(
+  channel: C,
+  callback: (payload: EventChannels[C]) => void
+) => {
+  const listener = (_: IpcRendererEvent, payload: EventChannels[C]) => callback(payload);
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
   };
-  messageId: string;
-}
-
-interface ChatResponse {
-  messageId: string;
-  content: string;
-  isComplete: boolean;
-}
-
-// Sidebar specific APIs
-const sidebarAPI = {
-  // Chat functionality
-  sendChatMessage: (request: Partial<ChatRequest>) =>
-    ipcRenderer.invoke("sidebar-chat-message", request),
-
-  clearChat: () => ipcRenderer.invoke("sidebar-clear-chat"),
-
-  getMessages: () => ipcRenderer.invoke("sidebar-get-messages"),
-
-  onChatResponse: (callback: (data: ChatResponse) => void) => {
-    ipcRenderer.on("chat-response", (_, data) => callback(data));
-  },
-
-  onMessagesUpdated: (callback: (messages: unknown[]) => void) => {
-    ipcRenderer.on("chat-messages-updated", (_, messages) =>
-      callback(messages)
-    );
-  },
-
-  removeChatResponseListener: () => {
-    ipcRenderer.removeAllListeners("chat-response");
-  },
-
-  removeMessagesUpdatedListener: () => {
-    ipcRenderer.removeAllListeners("chat-messages-updated");
-  },
-
-  // Page content access
-  getPageContent: () => ipcRenderer.invoke("get-page-content"),
-  getPageText: () => ipcRenderer.invoke("get-page-text"),
-  getCurrentUrl: () => ipcRenderer.invoke("get-current-url"),
-
-  // Tab information
-  getActiveTabInfo: () => ipcRenderer.invoke("get-active-tab-info"),
 };
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld("darkModeAPI", darkModeAPI);
-    contextBridge.exposeInMainWorld("sidebarAPI", sidebarAPI);
-  } catch (error) {
-    console.error(error);
-  }
-} else {
-  // @ts-ignore (define in dts)
-  window.darkModeAPI = darkModeAPI;
-  // @ts-ignore (define in dts)
-  window.sidebarAPI = sidebarAPI;
-}
+const darkModeAPI: DarkModeAPI = {
+  notifyChanged: (isDarkMode) => send("theme:dark-changed", isDarkMode),
+  onUpdated: (callback) => subscribe("theme:dark-updated", callback),
+};
+
+const sidebarAPI: SidebarAPI = {
+  sendChatMessage: (request) => invoke("chat:send", request),
+  clearChat: () => invoke("chat:clear"),
+  getMessages: () => invoke("chat:messages"),
+  getPageText: () => invoke("page:text"),
+  onChatChunk: (callback) => subscribe("chat:chunk", callback),
+  onMessagesUpdated: (callback) => subscribe("chat:messages-updated", callback),
+};
+
+contextBridge.exposeInMainWorld("darkModeAPI", darkModeAPI);
+contextBridge.exposeInMainWorld("sidebarAPI", sidebarAPI);

@@ -39,16 +39,9 @@ export class Window {
     // Set up window resize handler
     this._baseWindow.on("resize", () => {
       this.updateAllBounds();
-      // Notify renderer of resize through active tab
-      const bounds = this._baseWindow.getBounds();
-      if (this.activeTab) {
-        this.activeTab.webContents.send("window-resized", {
-          width: bounds.width,
-          height: bounds.height,
-        });
-      }
     });
 
+    this.openLinksInTabs(this._topBar.view.webContents);
     this.openLinksInTabs(this._sideBar.view.webContents);
 
     this.setupEventListeners();

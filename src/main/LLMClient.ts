@@ -11,14 +11,11 @@ import { anthropic } from "@ai-sdk/anthropic";
 import * as dotenv from "dotenv";
 import { join } from "path";
 import type { Window } from "./Window";
+import { sendToRenderer } from "./ipc";
+import type { ChatMessage, ChatRequest } from "../shared/ipc";
 
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
-
-interface ChatRequest {
-  message: string;
-  messageId: string;
-}
 
 interface StreamChunk {
   content: string;
@@ -41,6 +38,13 @@ const withoutImages = (message: CoreMessage): CoreMessage => {
   }
   const text = message.content.find((part) => part.type === "text");
   return { ...message, content: text?.text ?? "" };
+};
+
+// Only user messages carry parts (a screenshot and text), and the renderer only shows the text.
+const toChatMessage = (message: CoreMessage): ChatMessage[] => {
+  if (message.role !== "user" && message.role !== "assistant") return [];
+  const { content } = withoutImages(message);
+  return [{ role: message.role, content: typeof content === "string" ? content : "" }];
 };
 
 export class LLMClient {
@@ -182,12 +186,12 @@ export class LLMClient {
     this.sendMessagesToRenderer();
   }
 
-  getMessages(): CoreMessage[] {
-    return this.messages.map(withoutImages);
+  getMessages(): ChatMessage[] {
+    return this.messages.flatMap(toChatMessage);
   }
 
   private sendMessagesToRenderer(): void {
-    this.webContents.send("chat-messages-updated", this.getMessages());
+    sendToRenderer(this.webContents, "chat:messages-updated", this.getMessages());
   }
 
   private async prepareMessagesWithContext(): Promise<CoreMessage[]> {
@@ -356,7 +360,7 @@ export class LLMClient {
   }
 
   private sendStreamChunk(messageId: string, chunk: StreamChunk): void {
-    this.webContents.send("chat-response", {
+    sendToRenderer(this.webContents, "chat:chunk", {
       messageId,
       content: chunk.content,
       isComplete: chunk.isComplete,

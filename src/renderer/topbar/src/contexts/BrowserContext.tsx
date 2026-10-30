@@ -1,12 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-
-interface TabInfo {
-    id: string
-    title: string
-    url: string
-    favicon?: string | null
-    isActive: boolean
-}
+import type { TabInfo } from '@shared/ipc'
 
 interface BrowserContextType {
     tabs: TabInfo[]
@@ -24,9 +17,6 @@ interface BrowserContextType {
     goBack: () => Promise<void>
     goForward: () => Promise<void>
     reload: () => Promise<void>
-
-    // Tab actions
-    takeScreenshot: (tabId: string) => Promise<string | null>
 }
 
 const BrowserContext = createContext<BrowserContextType | null>(null)
@@ -138,15 +128,6 @@ export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [activeTab, refreshTabs])
 
-    const takeScreenshot = useCallback(async (tabId: string) => {
-        try {
-            return await window.topBarAPI.tabScreenshot(tabId)
-        } catch (error) {
-            console.error('Failed to take screenshot:', error)
-            return null
-        }
-    }, [])
-
     // Initialize tabs on mount
     useEffect(() => {
         refreshTabs()
@@ -169,8 +150,7 @@ export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ child
         navigateToUrl,
         goBack,
         goForward,
-        reload,
-        takeScreenshot
+        reload
     }
 
     return (
