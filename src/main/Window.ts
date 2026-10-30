@@ -1,14 +1,15 @@
 import { BaseWindow, Menu, nativeTheme, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
+import { InternalTab } from "./InternalTab";
+import { History } from "./History";
+import { MockLibrary } from "./MockLibrary";
+import type { SettingsStore } from "./SettingsStore";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { LLMClient } from "./LLMClient";
 import {
-  CHAT_WIDTH,
-  clampWidth,
   computeLayout,
   MIN_WINDOW,
-  SIDEBAR_WIDTH,
   TAB_ROW_HEIGHT,
   TOOLBAR_HEIGHT,
   type Layout,
@@ -16,11 +17,19 @@ import {
 import { sendToRenderer } from "./ipc";
 import type {
   EventChannels,
+  InternalPage,
   LayoutMode,
   ResizablePanel,
+  Settings,
   TabInfo,
   ThemeState,
+  Visit,
 } from "../shared/ipc";
+
+export type BrowserTab = Tab | InternalTab;
+
+// Only one of these pages is open at a time, so opening it again switches to it.
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -39,21 +48,22 @@ export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 
 export class Window {
   private _baseWindow: BaseWindow;
-  private tabsMap: Map<string, Tab> = new Map();
+  private tabsMap: Map<string, BrowserTab> = new Map();
   private activeTabId: string | null = null;
   private tabCounter: number = 0;
   private chrome: ChromeView;
   private overlay: ChromeView;
   private floatingSidebarVisible = false;
   private llmClient: LLMClient;
-  private mode: LayoutMode = "vertical";
   private sidebarOpen = true;
   private chatOpen = false;
-  private sidebarWidth = SIDEBAR_WIDTH.default;
-  private chatWidth = CHAT_WIDTH.default;
   private readonly glassSupported = supportsGlass();
+  private readonly history = new History();
+  readonly library = new MockLibrary(() => this.broadcast("library:updated", this.library.snapshot()));
 
-  constructor() {
+  constructor(private readonly settingsStore: SettingsStore) {
+    nativeTheme.themeSource = settingsStore.get().appearance;
+
     this._baseWindow = new BaseWindow({
       width: 1280,
       height: 800,
@@ -97,6 +107,7 @@ export class Window {
 
     this._baseWindow.on("closed", () => {
       nativeTheme.off("updated", onThemeUpdated);
+      this.settingsStore.flush();
       this.tabsMap.forEach((tab) => tab.destroy());
       this.tabsMap.clear();
       this.chrome.view.webContents.close();
@@ -120,6 +131,10 @@ export class Window {
       symbolColor: nativeTheme.shouldUseDarkColors ? CAPTION_SYMBOL.dark : CAPTION_SYMBOL.light,
       height: this.topRowHeight,
     };
+  }
+
+  private get mode(): LayoutMode {
+    return this.settingsStore.get().layoutMode;
   }
 
   private get topRowHeight(): number {
@@ -150,14 +165,21 @@ export class Window {
     return this.llmClient;
   }
 
+  // The active web tab. Internal pages have no page for Berry to read.
   get activeTab(): Tab | null {
-    if (this.activeTabId) {
-      return this.tabsMap.get(this.activeTabId) || null;
-    }
-    return null;
+    const entry = this.activeEntry;
+    return entry instanceof Tab ? entry : null;
+  }
+
+  get activeEntry(): BrowserTab | null {
+    return (this.activeTabId && this.tabsMap.get(this.activeTabId)) || null;
   }
 
   get allTabs(): Tab[] {
+    return this.entries.filter((tab): tab is Tab => tab instanceof Tab);
+  }
+
+  private get entries(): BrowserTab[] {
     return Array.from(this.tabsMap.values());
   }
 
@@ -166,10 +188,18 @@ export class Window {
   }
 
   get tabInfos(): TabInfo[] {
-    return this.allTabs.map((tab) => this.tabInfo(tab));
+    return this.entries.map((tab) => this.tabInfo(tab));
   }
 
-  tabInfo(tab: Tab): TabInfo {
+  get recentVisits(): Visit[] {
+    return this.history.recent();
+  }
+
+  get settings(): Settings {
+    return this.settingsStore.get();
+  }
+
+  tabInfo(tab: BrowserTab): TabInfo {
     return {
       id: tab.id,
       title: tab.title,
@@ -179,6 +209,8 @@ export class Window {
       isLoading: tab.isLoading,
       canGoBack: tab.canGoBack,
       canGoForward: tab.canGoForward,
+      page: tab instanceof InternalTab ? tab.page : null,
+      pageParam: tab instanceof InternalTab ? tab.param : null,
     };
   }
 
@@ -195,18 +227,67 @@ export class Window {
     };
   }
 
-  createTab(url?: string): Tab {
-    const tabId = `tab-${++this.tabCounter}`;
-    const tab = new Tab(tabId, url, () => this.notifyTabs());
+  // With no address, a tab opens on the new tab page.
+  createTab(url?: string): BrowserTab {
+    if (!url) return this.openPage("new-tab");
+    const tab = this.createWebTab(`tab-${++this.tabCounter}`, url);
+    this.tabsMap.set(tab.id, tab);
+    this.switchActiveTab(tab.id);
+    return tab;
+  }
 
+  openPage(page: InternalPage, options: { param?: string; title?: string } = {}): BrowserTab {
+    const param = options.param ?? null;
+    const existing = this.entries.find(
+      (tab) =>
+        tab instanceof InternalTab &&
+        tab.page === page &&
+        (SINGLE_INSTANCE_PAGES.includes(page) || (param !== null && tab.param === param))
+    );
+    if (existing) {
+      this.switchActiveTab(existing.id);
+      return existing;
+    }
+
+    const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, options.title);
+    this.tabsMap.set(tab.id, tab);
+    this.switchActiveTab(tab.id);
+    return tab;
+  }
+
+  // Typing an address on an internal page turns that tab into a web tab, in the same place.
+  async navigateTab(tabId: string, url: string): Promise<boolean> {
+    const entry = this.tabsMap.get(tabId);
+    if (!entry) return false;
+    if (entry instanceof Tab) {
+      await entry.loadURL(url);
+      return true;
+    }
+
+    const tab = this.createWebTab(tabId, url);
+    this.tabsMap = new Map(
+      this.entries.map((existing) => [existing.id, existing.id === tabId ? tab : existing])
+    );
+    if (this.activeTabId === tabId) tab.show();
+    else tab.hide();
+    this.notifyTabs();
+    return true;
+  }
+
+  private createWebTab(tabId: string, url: string): Tab {
+    // Loading starts inside the constructor, so these can run before `tab` is assigned.
+    let tab: Tab | null = null;
+    tab = new Tab(tabId, url, {
+      onChange: () => {
+        if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
+        this.notifyTabs();
+      },
+      onNavigate: (address) => this.history.record(address, tab?.title ?? "", null),
+    });
+    tab.hide();
     this._baseWindow.contentView.addChildView(tab.view);
     tab.view.setBounds(this.layout.page);
-
-    this.tabsMap.set(tabId, tab);
-
     this.openLinksInTabs(tab.webContents);
-    this.switchActiveTab(tabId);
-
     return tab;
   }
 
@@ -216,7 +297,7 @@ export class Window {
       return false;
     }
 
-    this._baseWindow.contentView.removeChildView(tab.view);
+    if (tab instanceof Tab) this._baseWindow.contentView.removeChildView(tab.view);
     tab.destroy();
     this.tabsMap.delete(tabId);
 
@@ -249,14 +330,14 @@ export class Window {
 
     tab.show();
     this.activeTabId = tabId;
-    this._baseWindow.setTitle(tab.title || "Blueberry Browser");
     this.notifyTabs();
 
     return true;
   }
 
   getTab(tabId: string): Tab | null {
-    return this.tabsMap.get(tabId) || null;
+    const tab = this.tabsMap.get(tabId);
+    return tab instanceof Tab ? tab : null;
   }
 
   toggleSidebar(): void {
@@ -265,27 +346,30 @@ export class Window {
     this.updateAllBounds();
   }
 
-  setMode(mode: LayoutMode): void {
-    if (mode !== "vertical" && mode !== "horizontal") return;
-    this.hideFloatingSidebar();
-    this.mode = mode;
+  updateSettings(patch: Partial<Settings>): Settings {
+    const before = this.settingsStore.get();
+    const after = this.settingsStore.update(patch);
 
-    if (process.platform === "darwin") {
-      this._baseWindow.setWindowButtonPosition(this.windowButtonPosition());
-    } else if (process.platform === "win32") {
-      this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
+    if (after.layoutMode !== before.layoutMode) {
+      this.hideFloatingSidebar();
+      if (process.platform === "darwin") {
+        this._baseWindow.setWindowButtonPosition(this.windowButtonPosition());
+      } else if (process.platform === "win32") {
+        this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
+      }
     }
     const item = Menu.getApplicationMenu()?.getMenuItemById(HORIZONTAL_TABS_MENU_ID);
-    if (item) item.checked = mode === "horizontal";
+    if (item) item.checked = after.layoutMode === "horizontal";
+    if (after.appearance !== before.appearance) nativeTheme.themeSource = after.appearance;
 
+    this.broadcast("settings:updated", after);
     this.updateAllBounds();
+    return after;
   }
 
   resizePanel(panel: ResizablePanel, width: number): void {
-    if (!Number.isFinite(width)) return;
-    if (panel === "sidebar") this.sidebarWidth = clampWidth(width, SIDEBAR_WIDTH);
-    else if (panel === "chat") this.chatWidth = clampWidth(width, CHAT_WIDTH);
-    this.updateAllBounds();
+    if (panel === "sidebar") this.updateSettings({ sidebarWidth: width });
+    else if (panel === "chat") this.updateSettings({ chatWidth: width });
   }
 
   showFloatingSidebar(): void {
@@ -307,10 +391,6 @@ export class Window {
   toggleChat(): void {
     this.chatOpen = !this.layout.chatOpen;
     this.updateAllBounds();
-  }
-
-  toggleDarkMode(): void {
-    nativeTheme.themeSource = nativeTheme.shouldUseDarkColors ? "light" : "dark";
   }
 
   focusAddressBar(): void {
@@ -338,8 +418,8 @@ export class Window {
         mode: this.mode,
         sidebarOpen: this.sidebarOpen,
         chatOpen: this.chatOpen,
-        sidebarWidth: this.sidebarWidth,
-        chatWidth: this.chatWidth,
+        sidebarWidth: this.settings.sidebarWidth,
+        chatWidth: this.settings.chatWidth,
         platform: process.platform,
       }
     );
@@ -349,14 +429,14 @@ export class Window {
     const { width, height } = this._baseWindow.getContentBounds();
     const layout = this.layout;
     this.chrome.view.setBounds({ x: 0, y: 0, width, height });
-    this.tabsMap.forEach((tab) => tab.view.setBounds(layout.page));
+    this.allTabs.forEach((tab) => tab.view.setBounds(layout.page));
     if (layout.floatingSidebar.width === 0) this.hideFloatingSidebar();
     else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
     this.broadcast("layout:updated", layout);
   }
 
   private notifyTabs(): void {
-    const active = this.activeTab;
+    const active = this.activeEntry;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
     this.broadcast("tabs:updated", this.tabInfos);
   }

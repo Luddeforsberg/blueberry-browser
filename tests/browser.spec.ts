@@ -4,6 +4,9 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { findView, launchApp } from "./app";
 
 const PNG = Buffer.from(
@@ -235,17 +238,14 @@ test("the chrome renderer can't be navigated away from its own page", async () =
   expect(await chrome.evaluate(() => window.location.href)).toBe(own);
 });
 
-test("the appearance toggle switches the chrome between light and dark", async () => {
+test("the appearance setting switches the chrome between light and dark", async () => {
   const html = chrome.locator("html");
-  const startsDark = await chrome.evaluate(() =>
-    document.documentElement.classList.contains("dark")
-  );
 
-  await chrome.evaluate(() => window.chromeAPI.theme.toggleDark());
-  await expect(html).toHaveClass(startsDark ? /^(?!.*dark)/ : /dark/);
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "dark" }));
+  await expect(html).toHaveClass(/dark/);
 
-  await chrome.evaluate(() => window.chromeAPI.theme.toggleDark());
-  await expect(html).toHaveClass(startsDark ? /dark/ : /^(?!.*dark)/);
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  await expect(html).not.toHaveClass(/dark/);
 });
 
 test("the page card follows the sidebar and chat as they open and close", async () => {
@@ -315,7 +315,7 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   expect(width).toBe(1200);
   const page = await openFixture();
 
-  await chrome.evaluate(() => window.chromeAPI.layout.setMode("horizontal"));
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
 
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
   const tab = chrome
@@ -329,7 +329,7 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
   ).toBe(true);
 
-  await chrome.evaluate(() => window.chromeAPI.layout.setMode("vertical"));
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "vertical" }));
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
 });
 
@@ -389,4 +389,94 @@ test("the collapsed sidebar floats over the page when the pointer reaches the le
   await overlay.getByRole("button", { name: "Keep sidebar open" }).click();
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
   expect(await overlayVisible()).toBe(false);
+});
+
+test("the app starts on the new tab page, and typing an address opens it in that tab", async () => {
+  const [first] = await getTabs();
+  expect(first).toMatchObject({ page: "new-tab", isActive: true });
+  await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
+
+  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  await input.fill(`${origin}/typed`);
+  await input.press("Enter");
+
+  await expect.poll(async () => (await activeTab()).url).toBe(`${origin}/typed`);
+  expect((await activeTab()).id).toBe(first.id);
+  expect((await activeTab()).page).toBeNull();
+});
+
+test("recent on the new tab page lists pages really visited", async () => {
+  await openFixture("/visited");
+  await expect.poll(async () => (await activeTab()).title).toBe("Fixture");
+
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  const recent = chrome.getByRole("region", { name: "Recent" });
+  await expect(recent.getByRole("button", { name: /Fixture/ })).toBeVisible();
+});
+
+test("asking Berry from the new tab page opens a chat that the sidebar lists", async () => {
+  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  await input.fill("Plan a trip to Porto");
+  await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+
+  await expect.poll(async () => (await activeTab()).page).toBe("chat");
+  expect((await getTabs()).some((tab) => tab.page === "new-tab")).toBe(false);
+  await expect(chrome.getByText("Plan a trip to Porto").first()).toBeVisible();
+  await expect(chrome.getByText(/This is sample data/)).toBeVisible();
+
+  const chats = chrome.getByRole("region", { name: "Chats" });
+  await expect(chats.getByRole("button", { name: "Plan a trip to Porto" })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+});
+
+test("the sidebar opens Routines and Settings as tabs, once each", async () => {
+  const places = chrome.getByRole("list", { name: "Places" });
+
+  await places.getByRole("button", { name: "Routines" }).click();
+  await expect(chrome.getByRole("heading", { name: "Routines", level: 1 })).toBeVisible();
+  await expect(chrome.getByText("Needs your OK")).toBeVisible();
+
+  await places.getByRole("button", { name: "Settings" }).click();
+  await places.getByRole("button", { name: "Routines" }).click();
+
+  const pages = (await getTabs()).map((tab) => tab.page).filter(Boolean);
+  expect(pages.filter((page) => page === "routines")).toHaveLength(1);
+  expect(pages.filter((page) => page === "settings")).toHaveLength(1);
+  expect((await activeTab()).page).toBe("routines");
+});
+
+test("settings are saved and come back after a restart", async () => {
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-settings-"));
+  await app.close();
+  app = await launchApp(profile);
+  chrome = await findView(app, "view=chrome");
+
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+  await chrome.getByRole("button", { name: "Layout" }).click();
+  await chrome.getByRole("radio", { name: "Horizontal" }).click();
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+
+  await app.close();
+  app = await launchApp(profile);
+  chrome = await findView(app, "view=chrome");
+
+  await expect
+    .poll(() => chrome.evaluate(() => window.chromeAPI.settings.getSettings().then((s) => s.layoutMode)))
+    .toBe("horizontal");
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+});
+
+test("Close Tab in the menu closes internal pages too", async () => {
+  await openFixture();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+  expect((await activeTab()).page).toBe("settings");
+
+  await app.evaluate(({ Menu }) => {
+    const file = Menu.getApplicationMenu()?.items.find((item) => item.label === "File");
+    file?.submenu?.items.find((item) => item.label === "Close Tab")?.click();
+  });
+
+  await expect.poll(async () => (await getTabs()).some((tab) => tab.page === "settings")).toBe(false);
 });

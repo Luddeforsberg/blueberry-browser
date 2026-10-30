@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import type { InternalPage, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
 import { cn } from '@common/lib/utils'
-
-const toUrl = (input: string): string => {
-    if (input.startsWith('http://') || input.startsWith('https://')) return input
-    if (input.includes('.') && !input.includes(' ')) return `https://${input}`
-    return `https://www.google.com/search?q=${encodeURIComponent(input)}`
-}
+import { toUrl } from '@common/lib/url'
 
 const splitUrl = (url: string) => {
     try {
@@ -20,28 +16,36 @@ const splitUrl = (url: string) => {
     }
 }
 
+const PAGE_LABELS: Record<InternalPage, string | null> = {
+    'new-tab': null,
+    chat: 'Chat',
+    routines: 'Routines',
+    settings: 'Settings'
+}
+
+// Internal pages have no address worth editing, so the field starts empty there.
+const editableUrl = (tab: TabInfo | null) => (tab && !tab.page ? tab.url : '')
+
 export const AddressBar: React.FC = () => {
     const { activeTab, navigateToUrl } = useBrowser()
     const [url, setUrl] = useState('')
     const [isFocused, setIsFocused] = useState(false)
 
     useEffect(() => {
-        if (activeTab && !isFocused) {
-            setUrl(activeTab.url || '')
-        }
+        if (!isFocused) setUrl(editableUrl(activeTab))
     }, [activeTab, isFocused])
 
     useEffect(() => window.chromeAPI.browser.onFocusAddress(() => setIsFocused(true)), [])
 
     const cancel = () => {
         setIsFocused(false)
-        if (activeTab) setUrl(activeTab.url || '')
+        setUrl(editableUrl(activeTab))
     }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (!url.trim()) return
-        navigateToUrl(toUrl(url.trim()))
+        navigateToUrl(toUrl(url))
         setIsFocused(false)
     }
 
@@ -70,6 +74,7 @@ export const AddressBar: React.FC = () => {
     }
 
     const { domain, path } = splitUrl(activeTab?.url ?? '')
+    const pageLabel = activeTab?.page ? PAGE_LABELS[activeTab.page] : null
 
     return (
         <button
@@ -83,7 +88,14 @@ export const AddressBar: React.FC = () => {
             )}
         >
             <span className="text-13 truncate flex-1">
-                {activeTab?.url ? (
+                {pageLabel ? (
+                    <>
+                        <span className="text-foreground">{pageLabel}</span>
+                        {activeTab?.page === 'chat' && activeTab.pageParam && (
+                            <span className="text-muted-foreground">{` / ${activeTab.title}`}</span>
+                        )}
+                    </>
+                ) : activeTab?.url && !activeTab.page ? (
                     <>
                         <span className="text-foreground">{domain}</span>
                         <span className="group-hover/address-bar:hidden text-muted-foreground">

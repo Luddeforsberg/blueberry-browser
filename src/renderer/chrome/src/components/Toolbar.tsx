@@ -38,19 +38,19 @@ export const Toolbar: React.FC = () => {
             {activeTab?.isLoading ? (
                 <ToolBarButton Icon={X} label="Stop loading" onClick={stop} />
             ) : (
-                <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null} />
+                <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null && !activeTab.page} />
             )}
 
             <div className="flex-1 min-w-0 flex px-1">
                 <AddressBar />
             </div>
 
-            <ToolBarButton
+            {activeTab?.page !== 'chat' && <ToolBarButton
                 Icon={PanelRight}
                 label={layout.chatOpen ? "Hide Berry" : "Show Berry"}
                 onClick={toggleChat}
                 toggled={layout.chatOpen}
-            />
+            />}
         </div>
     )
 }

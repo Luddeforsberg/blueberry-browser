@@ -72,7 +72,7 @@ const StreamingText: React.FC<{ content: string }> = ({ content }) => {
 }
 
 // Markdown Renderer Component
-const Markdown: React.FC<{ content: string }> = ({ content }) => (
+export const Markdown: React.FC<{ content: string }> = ({ content }) => (
     <div className="prose max-w-none prose-pre:p-3 prose-pre:overflow-x-auto">
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}

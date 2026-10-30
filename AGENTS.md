@@ -24,7 +24,9 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 - `src/shared/ipc.ts`: the one IPC contract. Every channel, its arguments, its result and which chrome view may call it live here. Add a channel here first, then to `CHANNEL_REGIONS` in `src/main/ipc.ts`, and then to the preload.
 - `src/preload`: one sandboxed preload per chrome view, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.
 - `src/main/EventManager.ts`: registers every IPC handler, and rejects calls from any view or frame other than the one the contract names.
-- `src/renderer/chrome`: the one chrome renderer, drawing the sidebar or tab row, toolbar, chat panel and glass. The overlay view loads the same page with `?view=overlay`. Shared code lives in `src/renderer/common`.
+- `src/shared/library.ts` and `src/main/MockLibrary.ts`: bookmarks, chats and routines. The mock serves sample data from the Paper mockups through the same IPC the real local store will use, so replacing it doesn't touch the UI.
+- `src/main/SettingsStore.ts`: saved settings in the user data folder. Validate anything new in `sanitizeSettings`.
+- `src/renderer/chrome`: the one chrome renderer, drawing the sidebar or tab row, toolbar, chat panel, glass, and internal pages such as the new tab page, which open as tabs with no web view. The overlay view loads the same page with `?view=overlay`. Shared code lives in `src/renderer/common`.
 - Web pages run in `Tab` views with no preload and no Node access.
 
 ## Traps

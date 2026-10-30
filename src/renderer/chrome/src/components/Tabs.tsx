@@ -2,7 +2,7 @@ import React from 'react'
 import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
-import { Favicon } from './Favicon'
+import { TabIcon } from './TabIcon'
 import { cn } from '@common/lib/utils'
 
 const TabItem: React.FC<{
@@ -24,7 +24,7 @@ const TabItem: React.FC<{
             onClick={onActivate}
             className="flex flex-1 min-w-0 items-center gap-2 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
         >
-            <Favicon src={tab.favicon} />
+            <TabIcon tab={tab} />
             <span className="text-13 truncate">{tab.title || 'New Tab'}</span>
         </button>
         <button
