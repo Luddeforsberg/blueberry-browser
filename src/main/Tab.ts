@@ -3,18 +3,28 @@ import { NativeImage, WebContentsView } from "electron";
 // The page card radius from DESIGN.md.
 const PAGE_RADIUS = 8;
 
+export interface TabEvents {
+  onChange: () => void;
+  onNavigate: (url: string) => void;
+}
+
 export class Tab {
+  readonly kind = "web";
   private webContentsView: WebContentsView;
   private _id: string;
   private _title: string;
   private _url: string;
   private _favicon: string | null = null;
   private _isVisible: boolean = false;
-  private onChange: () => void;
+  private events: TabEvents;
 
-  constructor(id: string, url: string = "https://www.google.com", onChange: () => void = () => {}) {
+  constructor(
+    id: string,
+    url: string,
+    events: TabEvents = { onChange: () => {}, onNavigate: () => {} }
+  ) {
     this._id = id;
-    this.onChange = onChange;
+    this.events = events;
     this._url = url;
     this._title = "New Tab";
 
@@ -41,27 +51,28 @@ export class Tab {
 
     contents.on("page-title-updated", (_, title) => {
       this._title = title;
-      this.onChange();
+      this.events.onChange();
     });
 
     contents.on("did-navigate", (_, url) => {
       this._url = url;
       this._favicon = null;
-      this.onChange();
+      this.events.onNavigate(url);
+      this.events.onChange();
     });
 
     contents.on("page-favicon-updated", (_, favicons) => {
       this._favicon = favicons[0] ?? null;
-      this.onChange();
+      this.events.onChange();
     });
 
     contents.on("did-navigate-in-page", (_, url) => {
       this._url = url;
-      this.onChange();
+      this.events.onChange();
     });
 
-    contents.on("did-start-loading", () => this.onChange());
-    contents.on("did-stop-loading", () => this.onChange());
+    contents.on("did-start-loading", () => this.events.onChange());
+    contents.on("did-stop-loading", () => this.events.onChange());
   }
 
   // Getters

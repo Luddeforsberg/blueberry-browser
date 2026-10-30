@@ -28,6 +28,8 @@ const chromeAPI: ChromeAPI = {
     goForward: (tabId) => invoke("tab:forward", tabId),
     reload: (tabId) => invoke("tab:reload", tabId),
     stop: (tabId) => invoke("tab:stop", tabId),
+    openPage: (page, options) => invoke("tabs:open-page", page, options),
+    getRecent: () => invoke("history:recent"),
     onTabsUpdated: (callback) => subscribe("tabs:updated", callback),
     onFocusAddress: (callback) => subscribe("toolbar:focus-address", () => callback()),
   },
@@ -35,7 +37,6 @@ const chromeAPI: ChromeAPI = {
     getLayout: () => invoke("layout:get"),
     toggleSidebar: () => invoke("layout:toggle-sidebar"),
     toggleChat: () => invoke("layout:toggle-chat"),
-    setMode: (mode) => invoke("layout:set-mode", mode),
     resize: (panel, width) => invoke("layout:resize", panel, width),
     showFloatingSidebar: () => invoke("overlay:show-sidebar"),
     hideFloatingSidebar: () => invoke("overlay:hide"),
@@ -43,8 +44,12 @@ const chromeAPI: ChromeAPI = {
   },
   theme: {
     getTheme: () => invoke("theme:get"),
-    toggleDark: () => invoke("theme:toggle-dark"),
     onThemeUpdated: (callback) => subscribe("theme:updated", callback),
+  },
+  settings: {
+    getSettings: () => invoke("settings:get"),
+    updateSettings: (patch) => invoke("settings:update", patch),
+    onSettingsUpdated: (callback) => subscribe("settings:updated", callback),
   },
   chat: {
     sendChatMessage: (request) => invoke("chat:send", request),

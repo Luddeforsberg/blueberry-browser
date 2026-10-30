@@ -63,12 +63,13 @@ export class EventManager {
 
     this.handle("tabs:switch", (tabId) => this.mainWindow.switchActiveTab(tabId));
 
-    this.handle("tab:navigate", async (tabId, url) => {
-      const tab = this.mainWindow.getTab(tabId);
-      if (!tab) return false;
-      await tab.loadURL(url);
-      return true;
-    });
+    this.handle("tabs:open-page", (page, options) =>
+      this.mainWindow.tabInfo(this.mainWindow.openPage(page, options))
+    );
+
+    this.handle("tab:navigate", (tabId, url) => this.mainWindow.navigateTab(tabId, url));
+
+    this.handle("history:recent", () => this.mainWindow.recentVisits);
 
     this.handle("tab:back", (tabId) => this.withTab(tabId, (tab) => tab.goBack()));
 
@@ -86,8 +87,6 @@ export class EventManager {
 
     this.handle("layout:toggle-chat", () => this.mainWindow.toggleChat());
 
-    this.handle("layout:set-mode", (mode) => this.mainWindow.setMode(mode));
-
     this.handle("layout:resize", (panel, width) => this.mainWindow.resizePanel(panel, width));
 
     this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
@@ -98,7 +97,9 @@ export class EventManager {
   private handleThemeEvents(): void {
     this.handle("theme:get", () => this.mainWindow.theme);
 
-    this.handle("theme:toggle-dark", () => this.mainWindow.toggleDarkMode());
+    this.handle("settings:get", () => this.mainWindow.settings);
+
+    this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));
   }
 
   private handleChatEvents(): void {

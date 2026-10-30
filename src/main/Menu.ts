@@ -15,6 +15,11 @@ export class AppMenu {
         label: "File",
         submenu: [
           {
+            label: "Settings…",
+            accelerator: "CmdOrCtrl+,",
+            click: () => this.mainWindow.openPage("settings"),
+          },
+          {
             label: "Open Location",
             accelerator: "CmdOrCtrl+L",
             click: () => this.mainWindow.focusAddressBar(),
@@ -81,12 +86,9 @@ export class AppMenu {
             id: HORIZONTAL_TABS_MENU_ID,
             label: "Horizontal Tabs",
             type: "checkbox",
-            checked: false,
-            click: (item) => this.mainWindow.setMode(item.checked ? "horizontal" : "vertical"),
-          },
-          {
-            label: "Toggle Light and Dark",
-            click: () => this.mainWindow.toggleDarkMode(),
+            checked: this.mainWindow.settings.layoutMode === "horizontal",
+            click: (item) =>
+              this.mainWindow.updateSettings({ layoutMode: item.checked ? "horizontal" : "vertical" }),
           },
           { type: "separator" },
           {
@@ -126,7 +128,7 @@ export class AppMenu {
 
   // Menu action handlers
   private handleNewTab(): void {
-    this.mainWindow.createTab("https://www.google.com");
+    this.mainWindow.createTab();
   }
 
   private handleCloseTab(): void {
