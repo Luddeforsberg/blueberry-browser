@@ -1,42 +1,77 @@
-const TOP_BAR_HEIGHT = 88;
-const SIDEBAR_WIDTH = 400;
+import type { Layout, Rect } from "../shared/ipc";
 
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export type { Layout, Rect };
+
+// DESIGN.md section 2, to tune.
+export const SIDEBAR_WIDTH = 240;
+export const CHAT_WIDTH = 360;
+export const TOOLBAR_HEIGHT = 44;
+export const FRAME_INSET = 8;
+export const MIN_PAGE_WIDTH = 480;
+export const MIN_WINDOW = { width: 900, height: 600 };
+
+// Room kept clear for the system's window buttons.
+const MAC_CONTROLS_WIDTH = 80;
+const WINDOWS_CONTROLS_WIDTH = 138;
+
+export interface LayoutOptions {
+  sidebarOpen: boolean;
+  chatOpen: boolean;
+  platform: NodeJS.Platform;
 }
 
-export interface Layout {
-  topBar: Rect;
-  sidebar: Rect;
-  tab: Rect;
-}
+const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
-// The only place that decides where the window's views go.
+const pageWidth = (windowWidth: number, sidebar: boolean, chat: boolean) =>
+  windowWidth -
+  (sidebar ? SIDEBAR_WIDTH : FRAME_INSET) -
+  (chat ? CHAT_WIDTH : FRAME_INSET);
+
+// The only place that decides where the window's regions go.
 export function computeLayout(
   window: { width: number; height: number },
-  { sidebarVisible }: { sidebarVisible: boolean }
+  { sidebarOpen, chatOpen, platform }: LayoutOptions
 ): Layout {
-  const contentHeight = Math.max(window.height - TOP_BAR_HEIGHT, 0);
-  const sidebarWidth = sidebarVisible ? Math.min(SIDEBAR_WIDTH, window.width) : 0;
+  // When space runs out, the sidebar collapses first and the chat closes next.
+  let sidebar = sidebarOpen;
+  let chat = chatOpen;
+  if (sidebar && pageWidth(window.width, sidebar, chat) < MIN_PAGE_WIDTH) sidebar = false;
+  if (chat && pageWidth(window.width, sidebar, chat) < MIN_PAGE_WIDTH) chat = false;
+
+  const left = sidebar ? SIDEBAR_WIDTH : 0;
+  const right = chat ? CHAT_WIDTH : 0;
+  const height = window.height;
+
+  const controls: Rect =
+    platform === "darwin"
+      ? { x: 0, y: 0, width: MAC_CONTROLS_WIDTH, height: TOOLBAR_HEIGHT }
+      : {
+          x: Math.max(window.width - WINDOWS_CONTROLS_WIDTH, 0),
+          y: 0,
+          width: Math.min(WINDOWS_CONTROLS_WIDTH, window.width),
+          height: TOOLBAR_HEIGHT,
+        };
+
+  const pageX = sidebar ? left : FRAME_INSET;
+  const pageRight = window.width - (chat ? right : FRAME_INSET);
 
   return {
-    topBar: { x: 0, y: 0, width: window.width, height: TOP_BAR_HEIGHT },
-    sidebar: sidebarVisible
-      ? {
-          x: window.width - sidebarWidth,
-          y: TOP_BAR_HEIGHT,
-          width: sidebarWidth,
-          height: contentHeight,
-        }
-      : { x: 0, y: 0, width: 0, height: 0 },
-    tab: {
-      x: 0,
-      y: TOP_BAR_HEIGHT,
-      width: window.width - sidebarWidth,
-      height: contentHeight,
+    sidebarOpen: sidebar,
+    chatOpen: chat,
+    controls,
+    sidebar: sidebar ? { x: 0, y: 0, width: left, height } : EMPTY,
+    toolbar: {
+      x: left,
+      y: 0,
+      width: Math.max(window.width - left - right, 0),
+      height: TOOLBAR_HEIGHT,
+    },
+    chat: chat ? { x: window.width - right, y: 0, width: right, height } : EMPTY,
+    page: {
+      x: pageX,
+      y: TOOLBAR_HEIGHT,
+      width: Math.max(pageRight - pageX, 0),
+      height: Math.max(height - TOOLBAR_HEIGHT - FRAME_INSET, 0),
     },
   };
 }

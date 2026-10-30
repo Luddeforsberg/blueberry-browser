@@ -15,6 +15,11 @@ export class AppMenu {
         label: "File",
         submenu: [
           {
+            label: "Open Location",
+            accelerator: "CmdOrCtrl+L",
+            click: () => this.mainWindow.focusAddressBar(),
+          },
+          {
             label: "New Tab",
             accelerator: "CmdOrCtrl+T",
             click: () => this.handleNewTab(),
@@ -64,8 +69,13 @@ export class AppMenu {
           { type: "separator" },
           {
             label: "Toggle Sidebar",
+            accelerator: "CmdOrCtrl+S",
+            click: () => this.mainWindow.toggleSidebar(),
+          },
+          {
+            label: "Toggle Chat",
             accelerator: "CmdOrCtrl+E",
-            click: () => this.handleToggleSidebar(),
+            click: () => this.mainWindow.toggleChat(),
           },
           { type: "separator" },
           {
@@ -124,11 +134,6 @@ export class AppMenu {
     if (this.mainWindow.activeTab) {
       this.mainWindow.activeTab.webContents.reloadIgnoringCache();
     }
-  }
-
-  private handleToggleSidebar(): void {
-    this.mainWindow.sidebar.toggle();
-    this.mainWindow.updateAllBounds();
   }
 
   private handleToggleDevTools(): void {

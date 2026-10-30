@@ -25,6 +25,9 @@ export const createChromeView = (region: ChromeRegion): ChromeView => {
     },
   });
 
+  // Transparent, so the window material shows through wherever the renderer draws glass.
+  view.setBackgroundColor("#00000000");
+
   // The chrome keeps its preload for its whole life, so it must never show anything but our own page.
   view.webContents.on("will-navigate", (event) => event.preventDefault());
   view.webContents.loadURL(url);

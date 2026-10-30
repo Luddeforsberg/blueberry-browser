@@ -1,5 +1,8 @@
 import { NativeImage, WebContentsView } from "electron";
 
+// The page card radius from DESIGN.md.
+const PAGE_RADIUS = 8;
+
 export class Tab {
   private webContentsView: WebContentsView;
   private _id: string;
@@ -7,9 +10,11 @@ export class Tab {
   private _url: string;
   private _favicon: string | null = null;
   private _isVisible: boolean = false;
+  private onChange: () => void;
 
-  constructor(id: string, url: string = "https://www.google.com") {
+  constructor(id: string, url: string = "https://www.google.com", onChange: () => void = () => {}) {
     this._id = id;
+    this.onChange = onChange;
     this._url = url;
     this._title = "New Tab";
 
@@ -22,6 +27,7 @@ export class Tab {
         webSecurity: true,
       },
     });
+    this.webContentsView.setBorderRadius(PAGE_RADIUS);
 
     // Set up event listeners
     this.setupEventListeners();
@@ -31,24 +37,31 @@ export class Tab {
   }
 
   private setupEventListeners(): void {
-    // Update title when page title changes
-    this.webContentsView.webContents.on("page-title-updated", (_, title) => {
+    const contents = this.webContentsView.webContents;
+
+    contents.on("page-title-updated", (_, title) => {
       this._title = title;
+      this.onChange();
     });
 
-    // Update URL when navigation occurs
-    this.webContentsView.webContents.on("did-navigate", (_, url) => {
+    contents.on("did-navigate", (_, url) => {
       this._url = url;
       this._favicon = null;
+      this.onChange();
     });
 
-    this.webContentsView.webContents.on("page-favicon-updated", (_, favicons) => {
+    contents.on("page-favicon-updated", (_, favicons) => {
       this._favicon = favicons[0] ?? null;
+      this.onChange();
     });
 
-    this.webContentsView.webContents.on("did-navigate-in-page", (_, url) => {
+    contents.on("did-navigate-in-page", (_, url) => {
       this._url = url;
+      this.onChange();
     });
+
+    contents.on("did-start-loading", () => this.onChange());
+    contents.on("did-stop-loading", () => this.onChange());
   }
 
   // Getters
@@ -66,6 +79,18 @@ export class Tab {
 
   get favicon(): string | null {
     return this._favicon;
+  }
+
+  get isLoading(): boolean {
+    return this.webContentsView.webContents.isLoading();
+  }
+
+  get canGoBack(): boolean {
+    return this.webContentsView.webContents.navigationHistory.canGoBack();
+  }
+
+  get canGoForward(): boolean {
+    return this.webContentsView.webContents.navigationHistory.canGoForward();
   }
 
   get isVisible(): boolean {

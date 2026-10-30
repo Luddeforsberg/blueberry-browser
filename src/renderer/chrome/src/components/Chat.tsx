@@ -2,10 +2,9 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import { ArrowUp, Plus } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
 import { useChat } from '../contexts/ChatContext'
 import { cn } from '@common/lib/utils'
-import { Button } from '@common/components/Button'
 
 interface Message {
     id: string
@@ -197,6 +196,7 @@ const ChatInput: React.FC<{
                             onFocus={() => setIsFocused(true)}
                             onBlur={() => setIsFocused(false)}
                             onKeyDown={handleKeyDown}
+                            aria-label="Message"
                             placeholder="Send a message..."
                             className="w-full resize-none outline-none bg-transparent 
                                      text-15 text-foreground placeholder:text-muted-foreground
@@ -212,6 +212,8 @@ const ChatInput: React.FC<{
             <div className="w-full flex items-center gap-1.5 px-1 mt-2 mb-1">
                 <div className="flex-1" />
                 <button
+                    type="button"
+                    aria-label="Send"
                     onClick={handleSubmit}
                     disabled={disabled || !value.trim()}
                     className={cn(
@@ -256,7 +258,7 @@ const ConversationTurnComponent: React.FC<{
 
 // Main Chat Component
 export const Chat: React.FC = () => {
-    const { messages, isLoading, sendMessage, clearChat } = useChat()
+    const { messages, isLoading, sendMessage } = useChat()
     const scrollRef = useAutoScroll(messages)
 
     // Group messages into conversation turns
@@ -281,23 +283,9 @@ export const Chat: React.FC = () => {
         messages[messages.length - 1]?.role === 'user'
 
     return (
-        <div className="flex flex-col h-full bg-background">
+        <div className="flex flex-col h-full">
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto">
-                <div className="h-8 max-w-3xl mx-auto px-4">
-                    {/* New Chat Button - Floating */}
-                    {messages.length > 0 && (
-                        <Button
-                            onClick={clearChat}
-                            title="Start new chat"
-                            variant="ghost"
-                        >
-                            <Plus className="size-4" />
-                            New Chat
-                        </Button>
-                    )}
-                </div>
-
                 <div className="pb-4 relative max-w-3xl mx-auto px-4">
 
                     {messages.length === 0 ? (
@@ -306,7 +294,7 @@ export const Chat: React.FC = () => {
                             <div className="text-center animate-fade-in max-w-md mx-auto gap-2 flex flex-col">
                                 <h3 className="text-20 font-semibold">🫐</h3>
                                 <p className="text-muted-foreground text-12">
-                                    Press ⌘E to toggle the sidebar
+                                    Ask anything about this page
                                 </p>
                             </div>
                         </div>

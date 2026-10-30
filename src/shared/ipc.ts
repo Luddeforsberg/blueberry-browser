@@ -1,7 +1,25 @@
-// The one IPC contract between main and the chrome renderers.
+// The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-export type ChromeRegion = "topbar" | "sidebar";
+export type ChromeRegion = "chrome";
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Where each region of the window goes, in window coordinates. Closed regions have no size.
+export interface Layout {
+  sidebarOpen: boolean;
+  chatOpen: boolean;
+  controls: Rect;
+  sidebar: Rect;
+  toolbar: Rect;
+  chat: Rect;
+  page: Rect;
+}
 
 export interface TabInfo {
   id: string;
@@ -9,6 +27,16 @@ export interface TabInfo {
   url: string;
   favicon: string | null;
   isActive: boolean;
+  isLoading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+}
+
+export interface ThemeState {
+  isDark: boolean;
+  // False when the system asks for reduced transparency, or the platform has no window material.
+  glass: boolean;
+  platform: "mac" | "windows" | "other";
 }
 
 export interface ChatRequest {
@@ -27,45 +55,43 @@ export interface ChatMessage {
   content: string;
 }
 
-// Renderer asks, main answers. `region` is the only chrome view main accepts the call from.
+// Renderer asks, main answers. `region` is the only view main accepts the call from.
 export interface InvokeChannels {
-  "tabs:list": { region: "topbar"; args: []; result: TabInfo[] };
-  "tabs:create": { region: "topbar"; args: [url?: string]; result: TabInfo };
-  "tabs:close": { region: "topbar"; args: [tabId: string]; result: boolean };
-  "tabs:switch": { region: "topbar"; args: [tabId: string]; result: boolean };
-  "tab:navigate": { region: "topbar"; args: [tabId: string, url: string]; result: boolean };
-  "tab:back": { region: "topbar"; args: [tabId: string]; result: boolean };
-  "tab:forward": { region: "topbar"; args: [tabId: string]; result: boolean };
-  "tab:reload": { region: "topbar"; args: [tabId: string]; result: boolean };
-  "sidebar:toggle": { region: "topbar"; args: []; result: void };
-  "chat:send": { region: "sidebar"; args: [request: ChatRequest]; result: void };
-  "chat:clear": { region: "sidebar"; args: []; result: void };
-  "chat:messages": { region: "sidebar"; args: []; result: ChatMessage[] };
-  "page:text": { region: "sidebar"; args: []; result: string | null };
+  "tabs:list": { region: "chrome"; args: []; result: TabInfo[] };
+  "tabs:create": { region: "chrome"; args: [url?: string]; result: TabInfo };
+  "tabs:close": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tabs:switch": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
+  "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tab:reload": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tab:stop": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "layout:get": { region: "chrome"; args: []; result: Layout };
+  "layout:toggle-sidebar": { region: "chrome"; args: []; result: void };
+  "layout:toggle-chat": { region: "chrome"; args: []; result: void };
+  "theme:get": { region: "chrome"; args: []; result: ThemeState };
+  "theme:toggle-dark": { region: "chrome"; args: []; result: void };
+  "chat:send": { region: "chrome"; args: [request: ChatRequest]; result: void };
+  "chat:clear": { region: "chrome"; args: []; result: void };
+  "chat:messages": { region: "chrome"; args: []; result: ChatMessage[] };
+  "page:text": { region: "chrome"; args: []; result: string | null };
 }
 
 export type InvokeChannel = keyof InvokeChannels;
 
-// Renderer tells main, with no answer. Any chrome region may send these.
-export interface SendChannels {
-  "theme:dark-changed": [isDarkMode: boolean];
-}
-
 // Main tells renderers.
 export interface EventChannels {
-  "theme:dark-updated": boolean;
+  "tabs:updated": TabInfo[];
+  "layout:updated": Layout;
+  "theme:updated": ThemeState;
+  "toolbar:focus-address": null;
   "chat:chunk": ChatChunk;
   "chat:messages-updated": ChatMessage[];
 }
 
 export type Unsubscribe = () => void;
 
-export interface DarkModeAPI {
-  notifyChanged: (isDarkMode: boolean) => void;
-  onUpdated: (callback: (isDarkMode: boolean) => void) => Unsubscribe;
-}
-
-export interface TopBarAPI {
+export interface BrowserAPI {
   getTabs: () => Promise<TabInfo[]>;
   createTab: (url?: string) => Promise<TabInfo>;
   closeTab: (tabId: string) => Promise<boolean>;
@@ -74,14 +100,36 @@ export interface TopBarAPI {
   goBack: (tabId: string) => Promise<boolean>;
   goForward: (tabId: string) => Promise<boolean>;
   reload: (tabId: string) => Promise<boolean>;
-  toggleSidebar: () => Promise<void>;
+  stop: (tabId: string) => Promise<boolean>;
+  onTabsUpdated: (callback: (tabs: TabInfo[]) => void) => Unsubscribe;
+  onFocusAddress: (callback: () => void) => Unsubscribe;
 }
 
-export interface SidebarAPI {
+export interface LayoutAPI {
+  getLayout: () => Promise<Layout>;
+  toggleSidebar: () => Promise<void>;
+  toggleChat: () => Promise<void>;
+  onLayoutUpdated: (callback: (layout: Layout) => void) => Unsubscribe;
+}
+
+export interface ThemeAPI {
+  getTheme: () => Promise<ThemeState>;
+  toggleDark: () => Promise<void>;
+  onThemeUpdated: (callback: (theme: ThemeState) => void) => Unsubscribe;
+}
+
+export interface ChatAPI {
   sendChatMessage: (request: ChatRequest) => Promise<void>;
   clearChat: () => Promise<void>;
   getMessages: () => Promise<ChatMessage[]>;
   getPageText: () => Promise<string | null>;
   onChatChunk: (callback: (chunk: ChatChunk) => void) => Unsubscribe;
   onMessagesUpdated: (callback: (messages: ChatMessage[]) => void) => Unsubscribe;
+}
+
+export interface ChromeAPI {
+  browser: BrowserAPI;
+  layout: LayoutAPI;
+  theme: ThemeAPI;
+  chat: ChatAPI;
 }

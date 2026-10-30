@@ -45,7 +45,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const loadMessages = async () => {
             try {
-                const storedMessages = await window.sidebarAPI.getMessages()
+                const storedMessages = await window.chromeAPI.chat.getMessages()
                 if (storedMessages.length > 0) {
                     setMessages(toMessages(storedMessages))
                 }
@@ -63,7 +63,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const messageId = Date.now().toString()
 
             // Send message to main process (which will handle context)
-            await window.sidebarAPI.sendChatMessage({
+            await window.chromeAPI.chat.sendChatMessage({
                 message: content,
                 messageId: messageId
             })
@@ -78,7 +78,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const clearChat = useCallback(async () => {
         try {
-            await window.sidebarAPI.clearChat()
+            await window.chromeAPI.chat.clearChat()
             setMessages([])
         } catch (error) {
             console.error('Failed to clear chat:', error)
@@ -105,8 +105,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setMessages(toMessages(updatedMessages))
         }
 
-        const unsubscribeChunks = window.sidebarAPI.onChatChunk(handleChatChunk)
-        const unsubscribeMessages = window.sidebarAPI.onMessagesUpdated(handleMessagesUpdated)
+        const unsubscribeChunks = window.chromeAPI.chat.onChatChunk(handleChatChunk)
+        const unsubscribeMessages = window.chromeAPI.chat.onMessagesUpdated(handleMessagesUpdated)
 
         return () => {
             unsubscribeChunks()

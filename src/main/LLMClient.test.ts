@@ -16,7 +16,7 @@ const setup = async () => {
   const { LLMClient } = await import("./LLMClient");
 
   const send = vi.fn();
-  const client = new LLMClient({ send } as unknown as WebContents);
+  const client = new LLMClient({ send, isDestroyed: () => false } as unknown as WebContents);
   client.setWindow({
     activeTab: {
       url: "https://example.com/",
