@@ -1,50 +1,75 @@
-import { BaseWindow, type WebContents } from "electron";
+import { BaseWindow, nativeTheme, type WebContents } from "electron";
+import { release } from "os";
 import { Tab } from "./Tab";
-import { TopBar } from "./TopBar";
-import { SideBar } from "./SideBar";
-import { computeLayout, type Layout } from "./Layout";
+import { createChromeView, type ChromeView } from "./chromeView";
+import { LLMClient } from "./LLMClient";
+import { computeLayout, MIN_WINDOW, TOOLBAR_HEIGHT, type Layout } from "./Layout";
+import { sendToRenderer } from "./ipc";
+import type { TabInfo, ThemeState } from "../shared/ipc";
+
+// Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
+const supportsGlass = (): boolean => {
+  if (process.platform === "darwin") return true;
+  if (process.platform !== "win32") return false;
+  return Number(release().split(".")[2]) >= 22621;
+};
+
+// The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach.
+const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
 
 export class Window {
   private _baseWindow: BaseWindow;
   private tabsMap: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
   private tabCounter: number = 0;
-  private _topBar: TopBar;
-  private _sideBar: SideBar;
+  private chrome: ChromeView;
+  private llmClient: LLMClient;
+  private sidebarOpen = true;
+  private chatOpen = false;
+  private readonly glassSupported = supportsGlass();
 
   constructor() {
-    // Create the browser window.
     this._baseWindow = new BaseWindow({
-      width: 1000,
+      width: 1280,
       height: 800,
+      minWidth: MIN_WINDOW.width,
+      minHeight: MIN_WINDOW.height,
       show: true,
       autoHideMenuBar: false,
       titleBarStyle: "hidden",
-      ...(process.platform !== "darwin" ? { titleBarOverlay: true } : {}),
-      trafficLightPosition: { x: 15, y: 13 },
+      trafficLightPosition: { x: 16, y: 15 },
+      ...(process.platform === "darwin" && this.glassSupported
+        ? { vibrancy: "sidebar" as const }
+        : {}),
+      ...(process.platform === "win32"
+        ? {
+            titleBarOverlay: this.titleBarOverlay(),
+            ...(this.glassSupported ? { backgroundMaterial: "mica" as const } : {}),
+          }
+        : {}),
     });
 
-    this._baseWindow.setMinimumSize(1000, 800);
+    this.chrome = createChromeView("chrome");
+    this._baseWindow.contentView.addChildView(this.chrome.view);
+    this.openLinksInTabs(this.chrome.view.webContents);
 
-    this._topBar = new TopBar(this._baseWindow);
-    this._sideBar = new SideBar(this._baseWindow);
+    this.llmClient = new LLMClient(this.chrome.view.webContents);
+    this.llmClient.setWindow(this);
 
-    // Set the window reference on the LLM client to avoid circular dependency
-    this._sideBar.client.setWindow(this);
-
-    // Create the first tab
     this.createTab();
     this.updateAllBounds();
 
-    // Set up window resize handler
-    this._baseWindow.on("resize", () => {
-      this.updateAllBounds();
+    this._baseWindow.on("resize", () => this.updateAllBounds());
+
+    const onThemeUpdated = () => this.notifyTheme();
+    nativeTheme.on("updated", onThemeUpdated);
+
+    this._baseWindow.on("closed", () => {
+      nativeTheme.off("updated", onThemeUpdated);
+      this.tabsMap.forEach((tab) => tab.destroy());
+      this.tabsMap.clear();
+      this.chrome.view.webContents.close();
     });
-
-    this.openLinksInTabs(this._topBar.view.webContents);
-    this.openLinksInTabs(this._sideBar.view.webContents);
-
-    this.setupEventListeners();
   }
 
   // Without a handler, window.open starts a new window that inherits the opener's preload.
@@ -57,17 +82,28 @@ export class Window {
     });
   }
 
-  private setupEventListeners(): void {
-    this._baseWindow.on("closed", () => {
-      // Clean up all tabs when window is closed
-      this.tabsMap.forEach((tab) => tab.destroy());
-      this.tabsMap.clear();
-    });
+  private titleBarOverlay() {
+    return {
+      color: "#00000000",
+      symbolColor: nativeTheme.shouldUseDarkColors ? CAPTION_SYMBOL.dark : CAPTION_SYMBOL.light,
+      height: TOOLBAR_HEIGHT,
+    };
   }
 
-  // Getters
   get window(): BaseWindow {
     return this._baseWindow;
+  }
+
+  get baseWindow(): BaseWindow {
+    return this._baseWindow;
+  }
+
+  get chromeView(): ChromeView {
+    return this.chrome;
+  }
+
+  get chat(): LLMClient {
+    return this.llmClient;
   }
 
   get activeTab(): Tab | null {
@@ -85,17 +121,43 @@ export class Window {
     return this.tabsMap.size;
   }
 
-  // Tab management methods
+  get tabInfos(): TabInfo[] {
+    return this.allTabs.map((tab) => this.tabInfo(tab));
+  }
+
+  tabInfo(tab: Tab): TabInfo {
+    return {
+      id: tab.id,
+      title: tab.title,
+      url: tab.url,
+      favicon: tab.favicon,
+      isActive: this.activeTabId === tab.id,
+      isLoading: tab.isLoading,
+      canGoBack: tab.canGoBack,
+      canGoForward: tab.canGoForward,
+    };
+  }
+
+  get theme(): ThemeState {
+    return {
+      isDark: nativeTheme.shouldUseDarkColors,
+      glass: this.glassSupported && !nativeTheme.prefersReducedTransparency,
+      platform:
+        process.platform === "darwin"
+          ? "mac"
+          : process.platform === "win32"
+            ? "windows"
+            : "other",
+    };
+  }
+
   createTab(url?: string): Tab {
     const tabId = `tab-${++this.tabCounter}`;
-    const tab = new Tab(tabId, url);
+    const tab = new Tab(tabId, url, () => this.notifyTabs());
 
-    // Add the tab's WebContentsView to the window
     this._baseWindow.contentView.addChildView(tab.view);
+    tab.view.setBounds(this.layout.page);
 
-    tab.view.setBounds(this.layout.tab);
-
-    // Store the tab
     this.tabsMap.set(tabId, tab);
 
     this.openLinksInTabs(tab.webContents);
@@ -110,16 +172,10 @@ export class Window {
       return false;
     }
 
-    // Remove the WebContentsView from the window
     this._baseWindow.contentView.removeChildView(tab.view);
-
-    // Destroy the tab
     tab.destroy();
-
-    // Remove from our tabs map
     this.tabsMap.delete(tabId);
 
-    // If this was the active tab, switch to another tab
     if (this.activeTabId === tabId) {
       this.activeTabId = null;
       const remainingTabs = Array.from(this.tabsMap.keys());
@@ -128,9 +184,10 @@ export class Window {
       }
     }
 
-    // If no tabs left, close the window
     if (this.tabsMap.size === 0) {
       this._baseWindow.close();
+    } else {
+      this.notifyTabs();
     }
 
     return true;
@@ -142,20 +199,14 @@ export class Window {
       return false;
     }
 
-    // Hide the currently active tab
     if (this.activeTabId && this.activeTabId !== tabId) {
-      const currentTab = this.tabsMap.get(this.activeTabId);
-      if (currentTab) {
-        currentTab.hide();
-      }
+      this.tabsMap.get(this.activeTabId)?.hide();
     }
 
-    // Show the new active tab
     tab.show();
     this.activeTabId = tabId;
-
-    // Update the window title to match the tab title
     this._baseWindow.setTitle(tab.title || "Blueberry Browser");
+    this.notifyTabs();
 
     return true;
   }
@@ -164,13 +215,27 @@ export class Window {
     return this.tabsMap.get(tabId) || null;
   }
 
-  // Window methods
-  show(): void {
-    this._baseWindow.show();
+  toggleSidebar(): void {
+    this.sidebarOpen = !this.layout.sidebarOpen;
+    this.updateAllBounds();
   }
 
-  hide(): void {
-    this._baseWindow.hide();
+  toggleChat(): void {
+    this.chatOpen = !this.layout.chatOpen;
+    this.updateAllBounds();
+  }
+
+  toggleDarkMode(): void {
+    nativeTheme.themeSource = nativeTheme.shouldUseDarkColors ? "light" : "dark";
+  }
+
+  focusAddressBar(): void {
+    this.chrome.view.webContents.focus();
+    sendToRenderer(this.chrome.view.webContents, "toolbar:focus-address", null);
+  }
+
+  show(): void {
+    this._baseWindow.show();
   }
 
   close(): void {
@@ -181,70 +246,36 @@ export class Window {
     this._baseWindow.focus();
   }
 
-  minimize(): void {
-    this._baseWindow.minimize();
+  get layout(): Layout {
+    const { width, height } = this._baseWindow.getContentBounds();
+    return computeLayout(
+      { width, height },
+      {
+        sidebarOpen: this.sidebarOpen,
+        chatOpen: this.chatOpen,
+        platform: process.platform,
+      }
+    );
   }
 
-  maximize(): void {
-    this._baseWindow.maximize();
-  }
-
-  unmaximize(): void {
-    this._baseWindow.unmaximize();
-  }
-
-  isMaximized(): boolean {
-    return this._baseWindow.isMaximized();
-  }
-
-  setTitle(title: string): void {
-    this._baseWindow.setTitle(title);
-  }
-
-  setBounds(bounds: {
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-  }): void {
-    this._baseWindow.setBounds(bounds);
-  }
-
-  getBounds(): { x: number; y: number; width: number; height: number } {
-    return this._baseWindow.getBounds();
-  }
-
-  private get layout(): Layout {
-    return computeLayout(this._baseWindow.getContentBounds(), {
-      sidebarVisible: this._sideBar.getIsVisible(),
-    });
-  }
-
-  // Public method to update all bounds when sidebar is toggled
   updateAllBounds(): void {
-    const { topBar, sidebar, tab } = this.layout;
-    this._topBar.setBounds(topBar);
-    this._sideBar.setBounds(sidebar);
-    this.tabsMap.forEach((existing) => existing.view.setBounds(tab));
+    const { width, height } = this._baseWindow.getContentBounds();
+    const layout = this.layout;
+    this.chrome.view.setBounds({ x: 0, y: 0, width, height });
+    this.tabsMap.forEach((tab) => tab.view.setBounds(layout.page));
+    sendToRenderer(this.chrome.view.webContents, "layout:updated", layout);
   }
 
-  // Getter for sidebar to access from main process
-  get sidebar(): SideBar {
-    return this._sideBar;
+  private notifyTabs(): void {
+    const active = this.activeTab;
+    if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
+    sendToRenderer(this.chrome.view.webContents, "tabs:updated", this.tabInfos);
   }
 
-  // Getter for topBar to access from main process
-  get topBar(): TopBar {
-    return this._topBar;
-  }
-
-  // Getter for all tabs as array
-  get tabs(): Tab[] {
-    return Array.from(this.tabsMap.values());
-  }
-
-  // Getter for baseWindow to access from Menu
-  get baseWindow(): BaseWindow {
-    return this._baseWindow;
+  private notifyTheme(): void {
+    if (process.platform === "win32") {
+      this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
+    }
+    sendToRenderer(this.chrome.view.webContents, "theme:updated", this.theme);
   }
 }

@@ -1,20 +1,25 @@
 import type { WebContents, WebFrameMain } from "electron";
-import type { ChromeRegion, EventChannels, InvokeChannel, InvokeChannels } from "../shared/ipc";
+import type { EventChannels, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
 export const CHANNEL_REGIONS: { [C in InvokeChannel]: InvokeChannels[C]["region"] } = {
-  "tabs:list": "topbar",
-  "tabs:create": "topbar",
-  "tabs:close": "topbar",
-  "tabs:switch": "topbar",
-  "tab:navigate": "topbar",
-  "tab:back": "topbar",
-  "tab:forward": "topbar",
-  "tab:reload": "topbar",
-  "sidebar:toggle": "topbar",
-  "chat:send": "sidebar",
-  "chat:clear": "sidebar",
-  "chat:messages": "sidebar",
-  "page:text": "sidebar",
+  "tabs:list": "chrome",
+  "tabs:create": "chrome",
+  "tabs:close": "chrome",
+  "tabs:switch": "chrome",
+  "tab:navigate": "chrome",
+  "tab:back": "chrome",
+  "tab:forward": "chrome",
+  "tab:reload": "chrome",
+  "tab:stop": "chrome",
+  "layout:get": "chrome",
+  "layout:toggle-sidebar": "chrome",
+  "layout:toggle-chat": "chrome",
+  "theme:get": "chrome",
+  "theme:toggle-dark": "chrome",
+  "chat:send": "chrome",
+  "chat:clear": "chrome",
+  "chat:messages": "chrome",
+  "page:text": "chrome",
 };
 
 export interface ChromeEndpoint {
@@ -50,16 +55,10 @@ export const isTrustedSender = (
   return actual !== null && actual === withoutHashOrQuery(endpoint.url);
 };
 
-export const findTrustedRegion = (
-  event: IpcSender,
-  endpoints: Record<ChromeRegion, ChromeEndpoint>
-): ChromeRegion | null =>
-  (Object.keys(endpoints) as ChromeRegion[]).find((region) =>
-    isTrustedSender(event, endpoints[region])
-  ) ?? null;
-
 export const sendToRenderer = <C extends keyof EventChannels>(
-  webContents: Pick<WebContents, "send">,
+  webContents: Pick<WebContents, "send" | "isDestroyed">,
   channel: C,
   payload: EventChannels[C]
-): void => webContents.send(channel, payload);
+): void => {
+  if (!webContents.isDestroyed()) webContents.send(channel, payload);
+};

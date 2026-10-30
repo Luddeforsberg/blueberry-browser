@@ -11,8 +11,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          topbar: resolve(__dirname, "src/preload/topbar.ts"),
-          sidebar: resolve(__dirname, "src/preload/sidebar.ts"),
+          chrome: resolve(__dirname, "src/preload/chrome.ts"),
         },
       },
     },
@@ -22,8 +21,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          topbar: resolve(__dirname, "src/renderer/topbar/index.html"),
-          sidebar: resolve(__dirname, "src/renderer/sidebar/index.html"),
+          chrome: resolve(__dirname, "src/renderer/chrome/index.html"),
         },
       },
     },

@@ -11,10 +11,16 @@
 }
 
 @layer base {
+  /* Transparent, so the window material shows wherever the app draws glass. */
+  html,
+  body {
+    background: transparent;
+  }
+
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    @apply bg-background font-sans text-13 text-foreground;
+    @apply font-sans text-13 text-foreground;
     height: 100vh;
     overflow: hidden;
   }
@@ -33,7 +39,21 @@
 
 #root {
   height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted-foreground));
+}

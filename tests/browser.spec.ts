@@ -1,8 +1,6 @@
 // Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
 /* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/topbar.d.ts" />
-/// <reference path="../src/preload/sidebar.d.ts" />
-/// <reference path="../src/preload/darkMode.d.ts" />
+/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -16,8 +14,7 @@ const PNG = Buffer.from(
 let server: Server;
 let origin: string;
 let app: ElectronApplication;
-let topBar: Page;
-let sidebar: Page;
+let chrome: Page;
 
 test.beforeAll(async () => {
   server = createServer((request, response) => {
@@ -41,15 +38,14 @@ test.afterAll(() => {
 
 test.beforeEach(async () => {
   app = await launchApp();
-  topBar = await findView(app, "topbar/index.html");
-  sidebar = await findView(app, "sidebar/index.html");
+  chrome = await findView(app, "chrome/index.html");
 });
 
 test.afterEach(async () => {
   await app.close();
 });
 
-const getTabs = () => topBar.evaluate(() => window.topBarAPI.getTabs());
+const getTabs = () => chrome.evaluate(() => window.chromeAPI.browser.getTabs());
 
 const activeTab = async () => {
   const active = (await getTabs()).filter((tab) => tab.isActive);
@@ -57,17 +53,33 @@ const activeTab = async () => {
   return active[0];
 };
 
-const openFixture = async () => {
-  await topBar.evaluate((url) => window.topBarAPI.createTab(url), `${origin}/`);
-  const page = await findView(app, origin);
+const openFixture = async (path = "/") => {
+  await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${origin}${path}`);
+  const page = await findView(app, `${origin}${path}`);
   await page.waitForLoadState();
   return page;
+};
+
+const sendToChrome = (channel: string, payload: unknown) =>
+  app.evaluate(
+    ({ webContents }, [channel, payload]) => {
+      webContents
+        .getAllWebContents()
+        .find((contents) => contents.getURL().includes("chrome/index.html"))
+        ?.send(channel as string, payload);
+    },
+    [channel, payload] as const
+  );
+
+const openChat = async () => {
+  await chrome.getByRole("button", { name: "Open chat" }).click();
+  await expect(chrome.getByRole("complementary", { name: "Chat" })).toBeVisible();
 };
 
 test("page text reaches the chat", async () => {
   await openFixture();
 
-  const text = await sidebar.evaluate(() => window.sidebarAPI.getPageText());
+  const text = await chrome.evaluate(() => window.chromeAPI.chat.getPageText());
 
   expect(text).toContain("hello from the page");
 });
@@ -75,13 +87,41 @@ test("page text reaches the chat", async () => {
 test("a new tab becomes the active tab", async () => {
   const before = await getTabs();
 
-  const created = await topBar.evaluate(
-    (url) => window.topBarAPI.createTab(url),
+  const created = await chrome.evaluate(
+    (url) => window.chromeAPI.browser.createTab(url),
     `${origin}/`
   );
 
   expect(await getTabs()).toHaveLength(before.length + 1);
-  expect((await activeTab()).id).toBe(created?.id);
+  expect((await activeTab()).id).toBe(created.id);
+});
+
+test("the sidebar lists tabs as they change, without being asked", async () => {
+  await openFixture();
+
+  const tab = chrome
+    .getByRole("list", { name: "Tabs" })
+    .getByRole("button", { name: "Fixture", exact: true });
+  await expect(tab).toBeVisible();
+  await expect(tab).toHaveAttribute("aria-current", "page");
+});
+
+test("back and forward reflect the page's real history", async () => {
+  const page = await openFixture("/first");
+  const back = chrome.getByRole("button", { name: "Back", exact: true });
+  const forward = chrome.getByRole("button", { name: "Forward", exact: true });
+
+  await expect(back).toBeDisabled();
+  await expect(forward).toBeDisabled();
+
+  await page.evaluate((url) => {
+    window.location.href = url;
+  }, `${origin}/second`);
+  await expect(back).toBeEnabled();
+
+  await back.click();
+  await expect(forward).toBeEnabled();
+  await expect.poll(async () => (await activeTab()).url).toContain("/first");
 });
 
 test("links that open a new window become tabs, from every tab and from the chrome", async () => {
@@ -93,13 +133,10 @@ test("links that open a new window become tabs, from every tab and from the chro
   await page.evaluate((url) => void window.open(url), `${origin}/from-page`);
   await expect.poll(async () => (await activeTab()).url).toContain("/from-page");
 
-  await sidebar.evaluate((url) => void window.open(url), `${origin}/from-chat`);
-  await expect.poll(async () => (await activeTab()).url).toContain("/from-chat");
+  await chrome.evaluate((url) => void window.open(url), `${origin}/from-chrome`);
+  await expect.poll(async () => (await activeTab()).url).toContain("/from-chrome");
 
-  await topBar.evaluate((url) => void window.open(url), `${origin}/from-topbar`);
-  await expect.poll(async () => (await activeTab()).url).toContain("/from-topbar");
-
-  expect(await getTabs()).toHaveLength(count + 3);
+  expect(await getTabs()).toHaveLength(count + 2);
   expect(await windows()).toBe(1);
 });
 
@@ -142,109 +179,111 @@ test("favicons come from the page, not from Google", async () => {
   await openFixture();
 
   await expect.poll(async () => (await activeTab()).favicon).toBe(`${origin}/icon.png`);
-  await expect(topBar.locator(`img[src="${origin}/icon.png"]`).first()).toBeAttached();
-  await expect(topBar.locator('img[src*="google.com/s2/favicons"]')).toHaveCount(0);
+  await expect(chrome.locator(`img[src="${origin}/icon.png"]`).first()).toBeAttached();
+  await expect(chrome.locator('img[src*="google.com/s2/favicons"]')).toHaveCount(0);
 });
 
 test("chat markdown gets typography styles", async () => {
-  await app.evaluate(({ webContents }) => {
-    webContents
-      .getAllWebContents()
-      .find((contents) => contents.getURL().includes("sidebar/index.html"))
-      ?.send("chat:messages-updated", [
-        { role: "assistant", content: "# Heading\n\n- item" },
-      ]);
-  });
+  await openChat();
+  await sendToChrome("chat:messages-updated", [
+    { role: "assistant", content: "# Heading\n\n- item" },
+  ]);
 
-  const list = sidebar.locator(".prose ul");
+  const list = chrome.locator(".prose ul");
   await expect(list).toBeVisible();
   await expect(list).toHaveCSS("list-style-type", "disc");
 });
 
 test("streamed chunks appear in the chat as they arrive", async () => {
-  await app.evaluate(({ webContents }) => {
-    const chat = webContents
-      .getAllWebContents()
-      .find((contents) => contents.getURL().includes("sidebar/index.html"));
-    chat?.send("chat:messages-updated", [
-      { role: "user", content: "hello" },
-      { role: "assistant", content: "" },
-    ]);
-    for (const content of ["first ", "second"]) {
-      chat?.send("chat:chunk", { messageId: "1", content, isComplete: false });
-    }
-  });
-
-  await expect(sidebar.getByText("first second")).toBeVisible();
-});
-
-test("chrome renderers get no raw IPC or code execution in tabs", async () => {
-  for (const view of [topBar, sidebar]) {
-    expect(await view.evaluate(() => "electron" in window)).toBe(false);
+  await openChat();
+  await sendToChrome("chat:messages-updated", [
+    { role: "user", content: "hello" },
+    { role: "assistant", content: "" },
+  ]);
+  for (const content of ["first ", "second"]) {
+    await sendToChrome("chat:chunk", { messageId: "1", content, isComplete: false });
   }
-  expect(await topBar.evaluate(() => "tabRunJs" in window.topBarAPI)).toBe(false);
+
+  await expect(chrome.getByText("first second")).toBeVisible();
 });
 
-test("chrome renderers run sandboxed", async () => {
+test("the chrome renderer gets no raw IPC or code execution in tabs", async () => {
+  expect(await chrome.evaluate(() => "electron" in window)).toBe(false);
+  expect(await chrome.evaluate(() => "tabRunJs" in window.chromeAPI.browser)).toBe(false);
+});
+
+test("the chrome renderer runs sandboxed", async () => {
   const sandboxed = await app.evaluate(({ app, webContents }) => {
     const metrics = app.getAppMetrics();
     return webContents
       .getAllWebContents()
-      .filter((contents) => /\/(topbar|sidebar)\//.test(contents.getURL()))
+      .filter((contents) => contents.getURL().includes("/chrome/"))
       .map((contents) => metrics.find((metric) => metric.pid === contents.getOSProcessId())?.sandboxed);
   });
 
-  expect(sandboxed).toEqual([true, true]);
+  expect(sandboxed).toEqual([true]);
 });
 
-test("chrome renderers can't be navigated away from their own page", async () => {
-  for (const view of [topBar, sidebar]) {
-    const own = view.url();
-    await view.evaluate((url) => {
-      window.location.href = url;
-    }, `${origin}/elsewhere`);
-    await view.waitForTimeout(300);
+test("the chrome renderer can't be navigated away from its own page", async () => {
+  const own = chrome.url();
+  await chrome.evaluate((url) => {
+    window.location.href = url;
+  }, `${origin}/elsewhere`);
+  await chrome.waitForTimeout(300);
 
-    expect(await view.evaluate(() => window.location.href)).toBe(own);
-  }
+  expect(await chrome.evaluate(() => window.location.href)).toBe(own);
 });
 
-test("dark mode still syncs between the chrome renderers", async () => {
-  await topBar.evaluate(() => window.darkModeAPI.notifyChanged(true));
+test("the appearance toggle switches the chrome between light and dark", async () => {
+  const html = chrome.locator("html");
+  const startsDark = await chrome.evaluate(() =>
+    document.documentElement.classList.contains("dark")
+  );
 
-  await expect(sidebar.locator("html")).toHaveClass(/dark/);
+  await chrome.evaluate(() => window.chromeAPI.theme.toggleDark());
+  await expect(html).toHaveClass(startsDark ? /^(?!.*dark)/ : /dark/);
+
+  await chrome.evaluate(() => window.chromeAPI.theme.toggleDark());
+  await expect(html).toHaveClass(startsDark ? /dark/ : /^(?!.*dark)/);
 });
 
-test("the sidebar and tabs fill the window, whether the sidebar is open or not", async () => {
-  const page = await openFixture();
-  const width = (view: Page) => view.evaluate(() => window.innerWidth);
-  const windowWidth = await width(topBar);
-
-  expect(await width(sidebar)).toBe(400);
-  expect(await width(page)).toBe(windowWidth - 400);
-
-  await topBar.evaluate(() => window.topBarAPI.toggleSidebar());
-  await expect.poll(() => width(page)).toBe(windowWidth);
-
-  // A tab opened while the sidebar is hidden gets the same space as the others.
-  await topBar.evaluate((url) => window.topBarAPI.createTab(url), `${origin}/second`);
-  const second = await findView(app, `${origin}/second`);
-  await expect.poll(() => width(second)).toBe(windowWidth);
-
-  await topBar.evaluate(() => window.topBarAPI.toggleSidebar());
-  await expect.poll(() => width(sidebar)).toBe(400);
-  await expect.poll(() => width(second)).toBe(windowWidth - 400);
-});
-
-test("views follow the window when it resizes", async () => {
+test("the page card follows the sidebar and chat as they open and close", async () => {
   // The window may not get the size it asks for on a small screen, such as a CI runner.
   const [width, height] = await app.evaluate(({ BaseWindow }) => {
     const baseWindow = BaseWindow.getAllWindows()[0];
-    baseWindow.setContentSize(1100, 800);
+    baseWindow.setContentSize(1200, 700);
+    return baseWindow.getContentSize();
+  });
+  expect(width).toBe(1200);
+
+  const page = await openFixture();
+  const size = () => page.evaluate(() => [window.innerWidth, window.innerHeight]);
+
+  // Sidebar open and chat closed, which is how the app starts.
+  await expect.poll(size).toEqual([width - 240 - 8, height - 44 - 8]);
+
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
+  await expect.poll(size).toEqual([width - 240 - 360, height - 44 - 8]);
+
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
+  await expect.poll(size).toEqual([width - 8 - 360, height - 44 - 8]);
+
+  // A tab opened now gets the same space as the others.
+  const second = await openFixture("/second");
+  await expect
+    .poll(() => second.evaluate(() => window.innerWidth))
+    .toBe(width - 8 - 360);
+});
+
+test("the chrome fills the window as it resizes", async () => {
+  const [width, height] = await app.evaluate(({ BaseWindow }) => {
+    const baseWindow = BaseWindow.getAllWindows()[0];
+    baseWindow.setContentSize(1100, 700);
     return baseWindow.getContentSize();
   });
   expect(width).toBe(1100);
 
-  await expect.poll(() => topBar.evaluate(() => window.innerWidth)).toBe(width);
-  await expect.poll(() => sidebar.evaluate(() => window.innerHeight)).toBe(height - 88);
+  await expect
+    .poll(() => chrome.evaluate(() => [window.innerWidth, window.innerHeight]))
+    .toEqual([width, height]);
 });

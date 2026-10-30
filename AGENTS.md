@@ -19,12 +19,12 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 
 ## Architecture
 
-- `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one `WebContentsView` per region and tab.
-- `src/main/Layout.ts`: the only place that decides where views go. `Window` applies it, so don't hard-code sizes anywhere else.
+- `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one window-sized chrome view underneath, and one `WebContentsView` per tab on top.
+- `src/main/Layout.ts`: the only place that decides where regions go. `Window` places the tab views with it and sends it to the chrome renderer, which draws each region at those rects. Don't hard-code sizes anywhere else.
 - `src/shared/ipc.ts`: the one IPC contract. Every channel, its arguments, its result and which chrome view may call it live here. Add a channel here first, then to `CHANNEL_REGIONS` in `src/main/ipc.ts`, and then to the preload.
-- `src/preload`: one sandboxed preload per chrome renderer, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.
+- `src/preload`: one sandboxed preload per chrome view, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.
 - `src/main/EventManager.ts`: registers every IPC handler, and rejects calls from any view or frame other than the one the contract names.
-- `src/renderer/topbar` and `src/renderer/sidebar`: the chrome renderers. Shared code lives in `src/renderer/common`.
+- `src/renderer/chrome`: the one chrome renderer, drawing the sidebar, toolbar, chat panel and glass. Shared code lives in `src/renderer/common`.
 - Web pages run in `Tab` views with no preload and no Node access.
 
 ## Traps
