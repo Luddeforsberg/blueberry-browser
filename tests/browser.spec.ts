@@ -187,3 +187,37 @@ test("dark mode still syncs between the chrome renderers", async () => {
 
   await expect(sidebar.locator("html")).toHaveClass(/dark/);
 });
+
+test("the sidebar and tabs fill the window, whether the sidebar is open or not", async () => {
+  const page = await openFixture();
+  const width = (view: Page) => view.evaluate(() => window.innerWidth);
+  const windowWidth = await width(topBar);
+
+  expect(await width(sidebar)).toBe(400);
+  expect(await width(page)).toBe(windowWidth - 400);
+
+  await topBar.evaluate(() => window.topBarAPI.toggleSidebar());
+  await expect.poll(() => width(page)).toBe(windowWidth);
+
+  // A tab opened while the sidebar is hidden gets the same space as the others.
+  await topBar.evaluate((url) => window.topBarAPI.createTab(url), `${origin}/second`);
+  const second = await findView(app, `${origin}/second`);
+  await expect.poll(() => width(second)).toBe(windowWidth);
+
+  await topBar.evaluate(() => window.topBarAPI.toggleSidebar());
+  await expect.poll(() => width(sidebar)).toBe(400);
+  await expect.poll(() => width(second)).toBe(windowWidth - 400);
+});
+
+test("views follow the window when it resizes", async () => {
+  // The window may not get the size it asks for on a small screen, such as a CI runner.
+  const [width, height] = await app.evaluate(({ BaseWindow }) => {
+    const baseWindow = BaseWindow.getAllWindows()[0];
+    baseWindow.setContentSize(1100, 800);
+    return baseWindow.getContentSize();
+  });
+  expect(width).toBe(1100);
+
+  await expect.poll(() => topBar.evaluate(() => window.innerWidth)).toBe(width);
+  await expect.poll(() => sidebar.evaluate(() => window.innerHeight)).toBe(height - 88);
+});

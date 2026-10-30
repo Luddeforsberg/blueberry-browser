@@ -2,18 +2,16 @@ import { is } from "@electron-toolkit/utils";
 import { BaseWindow, WebContentsView } from "electron";
 import { join } from "path";
 import { LLMClient } from "./LLMClient";
+import type { Rect } from "./Layout";
 
 export class SideBar {
   private webContentsView: WebContentsView;
-  private baseWindow: BaseWindow;
   private llmClient: LLMClient;
   private isVisible: boolean = true;
 
   constructor(baseWindow: BaseWindow) {
-    this.baseWindow = baseWindow;
     this.webContentsView = this.createWebContentsView();
     baseWindow.contentView.addChildView(this.webContentsView);
-    this.setupBounds();
 
     // Initialize LLM client
     this.llmClient = new LLMClient(this.webContentsView.webContents);
@@ -46,30 +44,8 @@ export class SideBar {
     return webContentsView;
   }
 
-  private setupBounds(): void {
-    if (!this.isVisible) return;
-
-    const bounds = this.baseWindow.getBounds();
-    this.webContentsView.setBounds({
-      x: bounds.width - 400, // 400px width sidebar on the right
-      y: 88, // Start below the topbar
-      width: 400,
-      height: bounds.height - 88, // Subtract topbar height
-    });
-  }
-
-  updateBounds(): void {
-    if (this.isVisible) {
-      this.setupBounds();
-    } else {
-      // Hide the sidebar
-      this.webContentsView.setBounds({
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-      });
-    }
+  setBounds(bounds: Rect): void {
+    this.webContentsView.setBounds(bounds);
   }
 
   get view(): WebContentsView {
@@ -80,27 +56,8 @@ export class SideBar {
     return this.llmClient;
   }
 
-  show(): void {
-    this.isVisible = true;
-    this.setupBounds();
-  }
-
-  hide(): void {
-    this.isVisible = false;
-    this.webContentsView.setBounds({
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-    });
-  }
-
   toggle(): void {
-    if (this.isVisible) {
-      this.hide();
-    } else {
-      this.show();
-    }
+    this.isVisible = !this.isVisible;
   }
 
   getIsVisible(): boolean {

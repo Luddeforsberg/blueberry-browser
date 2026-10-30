@@ -2,6 +2,7 @@ import { BaseWindow, type WebContents } from "electron";
 import { Tab } from "./Tab";
 import { TopBar } from "./TopBar";
 import { SideBar } from "./SideBar";
+import { computeLayout, type Layout } from "./Layout";
 
 export class Window {
   private _baseWindow: BaseWindow;
@@ -33,12 +34,11 @@ export class Window {
 
     // Create the first tab
     this.createTab();
+    this.updateAllBounds();
 
     // Set up window resize handler
     this._baseWindow.on("resize", () => {
-      this.updateTabBounds();
-      this._topBar.updateBounds();
-      this._sideBar.updateBounds();
+      this.updateAllBounds();
       // Notify renderer of resize through active tab
       const bounds = this._baseWindow.getBounds();
       if (this.activeTab) {
@@ -100,14 +100,7 @@ export class Window {
     // Add the tab's WebContentsView to the window
     this._baseWindow.contentView.addChildView(tab.view);
 
-    // Set the bounds to fill the window below the topbar and to the left of sidebar
-    const bounds = this._baseWindow.getBounds();
-    tab.view.setBounds({
-      x: 0,
-      y: 88, // Start below the topbar
-      width: bounds.width - 400, // Subtract sidebar width
-      height: bounds.height - 88, // Subtract topbar height
-    });
+    tab.view.setBounds(this.layout.tab);
 
     // Store the tab
     this.tabsMap.set(tabId, tab);
@@ -228,26 +221,18 @@ export class Window {
     return this._baseWindow.getBounds();
   }
 
-  // Handle window resize to update tab bounds
-  private updateTabBounds(): void {
-    const bounds = this._baseWindow.getBounds();
-    // Only subtract sidebar width if it's visible
-    const sidebarWidth = this._sideBar.getIsVisible() ? 400 : 0;
-
-    this.tabsMap.forEach((tab) => {
-      tab.view.setBounds({
-        x: 0,
-        y: 88, // Start below the topbar
-        width: bounds.width - sidebarWidth,
-        height: bounds.height - 88, // Subtract topbar height
-      });
+  private get layout(): Layout {
+    return computeLayout(this._baseWindow.getContentBounds(), {
+      sidebarVisible: this._sideBar.getIsVisible(),
     });
   }
 
   // Public method to update all bounds when sidebar is toggled
   updateAllBounds(): void {
-    this.updateTabBounds();
-    this._sideBar.updateBounds();
+    const { topBar, sidebar, tab } = this.layout;
+    this._topBar.setBounds(topBar);
+    this._sideBar.setBounds(sidebar);
+    this.tabsMap.forEach((existing) => existing.view.setBounds(tab));
   }
 
   // Getter for sidebar to access from main process
