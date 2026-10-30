@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { computeLayout, MIN_PAGE_WIDTH } from "./Layout";
 
-const mac = { platform: "darwin" as const };
+const mac = {
+  platform: "darwin" as const,
+  mode: "vertical" as const,
+  sidebarWidth: 240,
+  chatWidth: 360,
+};
 const both = { sidebarOpen: true, chatOpen: true, ...mac };
 
 describe("computeLayout", () => {
@@ -62,11 +67,62 @@ describe("computeLayout", () => {
     ]) {
       const layout = computeLayout({ width, height }, both);
 
-      for (const rect of [layout.sidebar, layout.toolbar, layout.chat, layout.page, layout.controls]) {
+      for (const rect of [
+        layout.sidebar,
+        layout.floatingSidebar,
+        layout.tabStrip,
+        layout.toolbar,
+        layout.chat,
+        layout.page,
+        layout.controls,
+      ]) {
         expect(rect.width).toBeGreaterThanOrEqual(0);
         expect(rect.height).toBeGreaterThanOrEqual(0);
         expect(rect.x).toBeGreaterThanOrEqual(0);
       }
     }
+  });
+
+  it("puts a tab row above the toolbar in horizontal mode, with no sidebar", () => {
+    const layout = computeLayout(
+      { width: 1280, height: 800 },
+      { ...both, mode: "horizontal" }
+    );
+
+    expect(layout.sidebarOpen).toBe(false);
+    expect(layout.floatingSidebar.width).toBe(0);
+    expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 920, height: 40 });
+    expect(layout.toolbar).toEqual({ x: 0, y: 40, width: 920, height: 44 });
+    expect(layout.page).toEqual({ x: 8, y: 84, width: 912, height: 708 });
+    expect(layout.controls.height).toBe(40);
+  });
+
+  it("uses resized panel widths, kept within their limits", () => {
+    const resized = computeLayout(
+      { width: 1400, height: 800 },
+      { ...both, sidebarWidth: 300, chatWidth: 400 }
+    );
+    expect(resized.sidebar.width).toBe(300);
+    expect(resized.chat).toEqual({ x: 1000, y: 0, width: 400, height: 800 });
+    expect(resized.page.width).toBe(700);
+
+    const extreme = computeLayout(
+      { width: 1400, height: 800 },
+      { ...both, sidebarWidth: 10, chatWidth: 9999 }
+    );
+    expect(extreme.sidebarWidth).toBe(200);
+    expect(extreme.chatWidth).toBe(480);
+  });
+
+  it("offers the floating sidebar only while the vertical sidebar is collapsed", () => {
+    const size = { width: 1280, height: 800 };
+
+    expect(computeLayout(size, both).floatingSidebar.width).toBe(0);
+    expect(computeLayout(size, { ...both, sidebarOpen: false }).floatingSidebar).toEqual({
+      x: 0,
+      y: 0,
+      width: 256,
+      height: 800,
+    });
   });
 });

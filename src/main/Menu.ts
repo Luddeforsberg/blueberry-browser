@@ -1,5 +1,5 @@
 import { Menu, app } from "electron";
-import type { Window } from "./Window";
+import { HORIZONTAL_TABS_MENU_ID, type Window } from "./Window";
 
 export class AppMenu {
   private mainWindow: Window;
@@ -76,6 +76,13 @@ export class AppMenu {
             label: "Toggle Chat",
             accelerator: "CmdOrCtrl+E",
             click: () => this.mainWindow.toggleChat(),
+          },
+          {
+            id: HORIZONTAL_TABS_MENU_ID,
+            label: "Horizontal Tabs",
+            type: "checkbox",
+            checked: false,
+            click: (item) => this.mainWindow.setMode(item.checked ? "horizontal" : "vertical"),
           },
           {
             label: "Toggle Light and Dark",
