@@ -9,7 +9,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
-export async function launchApp(): Promise<ElectronApplication> {
+// Pass a profile folder to launch again with the same saved settings.
+export async function launchApp(
+  userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-"))
+): Promise<ElectronApplication> {
   // Some shells export ELECTRON_RUN_AS_NODE, which would start Node instead of the app.
   const env = { ...process.env } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
@@ -17,7 +20,7 @@ export async function launchApp(): Promise<ElectronApplication> {
   return electron.launch({
     executablePath: electronPath as unknown as string,
     // A fresh profile keeps tests apart and away from the developer's real browsing data.
-    args: [".", `--user-data-dir=${mkdtempSync(join(tmpdir(), "blueberry-test-"))}`],
+    args: [".", `--user-data-dir=${userDataDir}`],
     env,
   });
 }

@@ -29,9 +29,16 @@ export class InternalTab {
     return `blueberry://${this.page}${this.param ? `/${encodeURIComponent(this.param)}` : ""}`;
   }
 
-  show(): void {}
+  // The chrome draws internal pages, so there is no view to show, hide or close.
+  show(): void {
+    return;
+  }
 
-  hide(): void {}
+  hide(): void {
+    return;
+  }
 
-  destroy(): void {}
+  destroy(): void {
+    return;
+  }
 }

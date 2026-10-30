@@ -275,12 +275,14 @@ export class Window {
   }
 
   private createWebTab(tabId: string, url: string): Tab {
-    const tab = new Tab(tabId, url, {
+    // Loading starts inside the constructor, so these can run before `tab` is assigned.
+    let tab: Tab | null = null;
+    tab = new Tab(tabId, url, {
       onChange: () => {
-        this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
+        if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
         this.notifyTabs();
       },
-      onNavigate: (address) => this.history.record(address, tab.title, null),
+      onNavigate: (address) => this.history.record(address, tab?.title ?? "", null),
     });
     tab.hide();
     this._baseWindow.contentView.addChildView(tab.view);

@@ -1,6 +1,8 @@
 import React from 'react'
 import type { Rect } from '@shared/ipc'
-import { BrowserProvider } from './contexts/BrowserContext'
+import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
+import { LibraryProvider } from './contexts/LibraryContext'
+import { InternalPageView } from './pages/InternalPageView'
 import { ChatProvider } from './contexts/ChatContext'
 import { ShellProvider, useShell } from './contexts/ShellContext'
 import { Sidebar } from './components/Sidebar'
@@ -28,12 +30,15 @@ const Region: React.FC<{
 
 const Shell: React.FC = () => {
     const { layout, theme } = useShell()
+    const { activeTab } = useBrowser()
     const { page, floatingSidebar } = layout
 
     return (
         <div className={cn("relative h-full", theme.glass ? "bg-glass-tint" : "bg-background")}>
-            {/* Shows until the page paints, and wherever the tab view isn't. */}
-            <Region rect={page} className="bg-surface rounded-card" />
+            {/* Internal pages draw here. For web pages it shows until the tab view paints. */}
+            <Region rect={page} className="bg-surface rounded-card overflow-hidden">
+                {activeTab?.page && <InternalPageView tab={activeTab} />}
+            </Region>
             {layout.sidebarOpen && (
                 <Region rect={layout.sidebar}>
                     <Sidebar />
@@ -68,9 +73,11 @@ const Shell: React.FC = () => {
 export const ChromeApp: React.FC = () => (
     <ShellProvider>
         <BrowserProvider>
-            <ChatProvider>
-                <Shell />
-            </ChatProvider>
+            <LibraryProvider>
+                <ChatProvider>
+                    <Shell />
+                </ChatProvider>
+            </LibraryProvider>
         </BrowserProvider>
     </ShellProvider>
 )

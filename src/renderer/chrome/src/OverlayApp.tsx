@@ -1,5 +1,6 @@
 import React from 'react'
 import { BrowserProvider } from './contexts/BrowserContext'
+import { LibraryProvider } from './contexts/LibraryContext'
 import { ShellProvider, useShell } from './contexts/ShellContext'
 import { Sidebar } from './components/Sidebar'
 import { cn } from '@common/lib/utils'
@@ -26,7 +27,9 @@ const FloatingSidebar: React.FC = () => {
 export const OverlayApp: React.FC = () => (
     <ShellProvider>
         <BrowserProvider>
-            <FloatingSidebar />
+            <LibraryProvider>
+                <FloatingSidebar />
+            </LibraryProvider>
         </BrowserProvider>
     </ShellProvider>
 )
