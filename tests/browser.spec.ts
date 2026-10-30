@@ -72,8 +72,8 @@ const sendToChrome = (channel: string, payload: unknown) =>
   );
 
 const openChat = async () => {
-  await chrome.getByRole("button", { name: "Open chat" }).click();
-  await expect(chrome.getByRole("complementary", { name: "Chat" })).toBeVisible();
+  await chrome.getByRole("button", { name: "Show Berry" }).click();
+  await expect(chrome.getByRole("complementary", { name: "Berry" })).toBeVisible();
 };
 
 test("page text reaches the chat", async () => {

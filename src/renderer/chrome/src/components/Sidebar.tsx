@@ -1,5 +1,5 @@
 import React from 'react'
-import { PanelLeftClose, Plus, X } from 'lucide-react'
+import { PanelLeft, Plus, X } from 'lucide-react'
 import type { TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useShell } from '../contexts/ShellContext'
@@ -56,22 +56,14 @@ export const Sidebar: React.FC = () => {
                     paddingLeft: theme.platform === 'mac' ? layout.controls.width : undefined
                 }}
             >
-                <ToolBarButton Icon={PanelLeftClose} label="Hide sidebar" onClick={toggleSidebar} />
+                <ToolBarButton Icon={PanelLeft} label="Hide sidebar" onClick={toggleSidebar} />
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
-                <button
-                    type="button"
-                    onClick={() => createTab()}
-                    className={cn(
-                        "w-full flex items-center gap-2 h-8 px-2 rounded-control text-13 text-muted-foreground",
-                        "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                    )}
-                >
-                    <Plus className="size-4" />
-                    New Tab
-                </button>
-                <ul aria-label="Tabs" className="flex flex-col gap-0.5 mt-1">
+                <h2 id="sidebar-tabs" className="px-2 pt-2 pb-1 text-11 text-muted-foreground">
+                    Tabs
+                </h2>
+                <ul aria-labelledby="sidebar-tabs" className="flex flex-col gap-0.5">
                     {tabs.map(tab => (
                         <TabItem
                             key={tab.id}
@@ -81,6 +73,17 @@ export const Sidebar: React.FC = () => {
                         />
                     ))}
                 </ul>
+                <button
+                    type="button"
+                    onClick={() => createTab()}
+                    className={cn(
+                        "w-full flex items-center gap-2 h-8 px-2 mt-0.5 rounded-control text-13 text-muted-foreground",
+                        "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+                    )}
+                >
+                    <Plus className="size-4" />
+                    New tab
+                </button>
             </div>
         </nav>
     )

@@ -1,9 +1,8 @@
 import React from 'react'
-import { ArrowLeft, ArrowRight, MessageCircle, PanelLeft, RotateCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, PanelLeft, PanelRight, RotateCw, X } from 'lucide-react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useShell } from '../contexts/ShellContext'
 import { AddressBar } from './AddressBar'
-import { DarkModeToggle } from './DarkModeToggle'
 import { ToolBarButton } from './ToolBarButton'
 
 export const Toolbar: React.FC = () => {
@@ -44,10 +43,9 @@ export const Toolbar: React.FC = () => {
                 <AddressBar />
             </div>
 
-            <DarkModeToggle />
             <ToolBarButton
-                Icon={MessageCircle}
-                label={layout.chatOpen ? "Close chat" : "Open chat"}
+                Icon={PanelRight}
+                label={layout.chatOpen ? "Hide Berry" : "Show Berry"}
                 onClick={toggleChat}
                 toggled={layout.chatOpen}
             />
