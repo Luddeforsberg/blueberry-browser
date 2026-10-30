@@ -20,6 +20,7 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 ## Architecture
 
 - `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one `WebContentsView` per region and tab.
+- `src/main/Layout.ts`: the only place that decides where views go. `Window` applies it, so don't hard-code sizes anywhere else.
 - `src/preload`: one preload per chrome renderer. The `.d.ts` files beside them type what each renderer sees, so keep the two in sync.
 - `src/renderer/topbar` and `src/renderer/sidebar`: the chrome renderers. Shared code lives in `src/renderer/common`.
 - Web pages run in `Tab` views with no preload and no Node access.
