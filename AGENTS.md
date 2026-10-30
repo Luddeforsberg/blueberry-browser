@@ -28,6 +28,7 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 - `src/main/SettingsStore.ts`: saved settings in the user data folder. Validate anything new in `sanitizeSettings`.
 - `src/renderer/chrome`: the one chrome renderer, drawing the sidebar or tab row, toolbar, chat panel, glass, and internal pages such as the new tab page, which open as tabs with no web view. The overlay view loads the same page with `?view=overlay`. Shared code lives in `src/renderer/common`.
 - `src/renderer/common/components/Mascot.tsx`: Berry, behind `<Mascot mood size>`. Screens use the chrome's `Berry` wrapper, which applies Show Berry and Keep Berry still. Replace the artwork here without touching screens, and add new components to the gallery page (View > Component Gallery).
+- `src/renderer/chrome/src/components/Composer.tsx` and `ChatMessage.tsx`: the one composer and message layout, used by the new tab page, the main chat and the chat panel. Change them here so the chats stay alike.
 - Web pages run in `Tab` views with no preload and no Node access.
 
 ## Traps

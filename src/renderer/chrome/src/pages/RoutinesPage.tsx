@@ -18,21 +18,23 @@ export const RoutinesPage: React.FC = () => {
 
     return (
         <div className="h-full overflow-y-auto">
-            <div className="max-w-4xl px-12 py-10">
+            <div className="max-w-3xl mx-auto px-8 py-10">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-34 font-semibold">Routines</h1>
+                    <div>
+                        <h1 className="text-20 font-semibold">Routines</h1>
+                        <p className="mt-1 text-14 text-muted-foreground">Work Berry does for you on a schedule.</p>
+                    </div>
                     <Button disabled title="Creating routines arrives with the backend">
                         New routine
                     </Button>
                 </div>
 
-                <ul aria-label="Routines" className="mt-6">
+                <ul aria-label="Routines" className="mt-6 rounded-panel border bg-surface divide-y overflow-hidden">
                     {routines.map((routine) => (
                         <li
                             key={routine.id}
                             className={cn(
-                                "grid grid-cols-[1.4fr_1fr_1.4fr_120px] items-center gap-4 h-12 px-2 rounded-card text-13",
-                                routine.status === 'running' && "bg-muted"
+                                "grid grid-cols-[1.4fr_1fr_1.4fr_120px] items-center gap-4 min-h-14 px-5 text-14",
                             )}
                         >
                             <span className={cn(routine.status === 'running' && "font-semibold")}>{routine.name}</span>
@@ -46,12 +48,12 @@ export const RoutinesPage: React.FC = () => {
                 </ul>
 
                 {todaysRun.length > 0 && (
-                    <section aria-labelledby="todays-run" className="mt-10 relative">
+                    <section aria-labelledby="todays-run" className="mt-10 relative min-h-24">
                         <Berry mood={running ? 'fetching' : 'delivered'} size={88} className="absolute right-4 top-0" />
-                        <h2 id="todays-run" className="text-20 font-semibold">{"Today's run"}</h2>
+                        <h2 id="todays-run" className="text-15 font-semibold">{"Today's run"}</h2>
                         <ol className="mt-3 flex flex-col gap-2">
                             {todaysRun.map((step) => (
-                                <li key={step.time} className="flex gap-6 text-13">
+                                <li key={step.time} className="flex gap-6 text-14">
                                     <span className="w-12 text-muted-foreground tabular-nums">{step.time}</span>
                                     <span className={cn(step.isCurrent && "font-semibold")}>{step.text}</span>
                                 </li>

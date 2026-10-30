@@ -1,17 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ArrowUp } from 'lucide-react'
 import type { TabInfo } from '@shared/ipc'
 import type { ChatThread } from '@shared/library'
 import { useLibrary } from '../contexts/LibraryContext'
-import { Markdown } from '../components/Chat'
-import { Berry } from '../components/Berry'
-import { cn } from '@common/lib/utils'
+import { AssistantMessage, UserMessage } from '../components/ChatMessage'
+import { BerryHero, useAssistantName } from '../components/Berry'
+import { ChatComposer } from '../components/Composer'
 
 // A full page for talking to Berry about anything, not about a web page.
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const library = useLibrary()
     const [thread, setThread] = useState<ChatThread | null>(null)
-    const [text, setText] = useState('')
+    const name = useAssistantName()
     const endRef = useRef<HTMLDivElement>(null)
     const chatId = tab.pageParam
     const updatedAt = library.chats.find((chat) => chat.id === chatId)?.updatedAt
@@ -28,10 +27,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         endRef.current?.scrollIntoView({ block: 'end' })
     }, [thread?.messages.length])
 
-    const send = async () => {
-        const message = text.trim()
-        if (!message) return
-        setText('')
+    const send = async (message: string) => {
         const chat = await window.chromeAPI.library.sendChat(chatId, message)
         // A new chat gets its own tab, so it can be found again in the sidebar.
         if (chat && !chatId) {
@@ -40,68 +36,43 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         }
     }
 
+    const empty = !thread || thread.messages.length === 0
+    const composer = (
+        <ChatComposer
+            onSend={(message) => void send(message)}
+            placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}
+            autoFocus
+        />
+    )
+
+    // A new chat looks like the new tab page. Once it has messages, the composer moves to the bottom.
+    if (empty) {
+        return (
+            <div className="h-full overflow-y-auto">
+                <div className="max-w-[640px] mx-auto px-6 pt-[18vh] pb-12">
+                    <BerryHero title="What are you working on?" />
+                    {composer}
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="h-full flex flex-col">
             <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="max-w-[680px] mx-auto px-6 py-8 flex flex-col gap-6">
-                    {!thread || thread.messages.length === 0 ? (
-                        <p className="pt-[18vh] text-center text-15 text-muted-foreground">
-                            What are you working on?
-                        </p>
-                    ) : (
-                        thread.messages.map((message, index) =>
-                            message.role === 'user' ? (
-                                <div key={index} className="ml-auto max-w-[85%] bg-muted rounded-panel px-3 py-2 text-15 whitespace-pre-wrap">
-                                    {message.content}
-                                </div>
-                            ) : (
-                                <div key={index} className="flex gap-3 -ml-9">
-                                    <Berry mood="rest" size={24} className="mt-0.5" />
-                                    <div className="min-w-0 flex-1">
-                                        <Markdown content={message.content} />
-                                    </div>
-                                </div>
-                            )
+                <div className="max-w-[640px] mx-auto px-6 pt-8 pb-4 flex flex-col gap-6">
+                    {thread.messages.map((message, index) =>
+                        message.role === 'user' ? (
+                            <UserMessage key={index} content={message.content} />
+                        ) : (
+                            <AssistantMessage key={index} content={message.content} avatar />
                         )
                     )}
                     <div ref={endRef} />
                 </div>
             </div>
 
-            <div className="max-w-[680px] w-full mx-auto px-6 pb-6">
-                <div className="rounded-panel border bg-surface px-3 pt-2 pb-2 focus-within:border-transparent focus-within:ring-2 focus-within:ring-ring">
-                    <textarea
-                        aria-label="Message"
-                        placeholder="Ask Berry"
-                        value={text}
-                        rows={1}
-                        onChange={(e) => setText(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault()
-                                void send()
-                            }
-                        }}
-                        className="w-full resize-none bg-transparent text-15 outline-none placeholder:text-muted-foreground"
-                    />
-                    <div className="flex items-center gap-2">
-                        <span className="flex-1 text-12 text-muted-foreground">Can see: no pages</span>
-                        <button
-                            type="button"
-                            aria-label="Send"
-                            onClick={() => void send()}
-                            disabled={!text.trim()}
-                            className={cn(
-                                "size-7 rounded-full flex items-center justify-center outline-none transition-colors",
-                                "bg-primary text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring",
-                                "disabled:bg-muted disabled:text-muted-foreground"
-                            )}
-                        >
-                            <ArrowUp className="size-4" />
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <div className="max-w-[640px] w-full mx-auto px-6 pb-5">{composer}</div>
         </div>
     )
 }

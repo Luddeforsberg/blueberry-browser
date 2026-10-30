@@ -79,7 +79,7 @@ export const Mascot: React.FC<MascotProps> = ({
   const berryInBeak = mood === "fetching" || mood === "asking";
   const berryOnGround = !simplified && (mood === "rest" || mood === "delivered" || mood === "curious" || mood === "thinking");
   const eyeClosed = mood === "off-duty";
-  const pupilY = mood === "thinking" ? 16.6 : mood === "oops" ? 19.4 : 18;
+  const pupilY = mood === "thinking" ? 14.3 : mood === "oops" ? 16.9 : 15.6;
   const headTilt = mood === "curious" ? -14 : mood === "off-duty" ? 10 : mood === "oops" ? 8 : 0;
   const bodySlump = mood === "oops" ? 4 : 0;
 
@@ -106,52 +106,54 @@ export const Mascot: React.FC<MascotProps> = ({
         transform={`translate(0 ${flying ? -4 : bodySlump})`}
       >
         {/* Tail and body */}
-        {!simplified && <path d="M18 43 L5 52 L20 47 Z" className="fill-berry-ink" />}
         <path
-          d="M15 44 C11 33 19 21 32 20 C42 19 48 26 47 35 C46 44 37 50 26 49 C21 48.5 17 47 15 44 Z"
+          d={
+            simplified
+              ? "M26 22 C19 28 15 36 15 43 C15 48 20 51 27 50 C37 49 45 41 46 26 Z"
+              : "M27 20 C20 26 15.5 34 13.5 41 L4 53.5 L9.5 54.5 L19 47.5 C23 50 30 50.5 35 47.5 C43 43 46 34 44 24 Z"
+          }
           className="fill-berry-ink"
         />
 
         {/* Wing: folded at rest, raised in flight */}
         {!simplified && (
-          <path
-            d="M20 31 C27 27 37 31 37 38 C33 44 23 44 19 40 C18 37 18 34 20 31 Z"
-            className="fill-berry-wing"
-            transform={flying ? "rotate(-38 26 32)" : undefined}
-          />
+          <g transform={flying ? "rotate(62 24 34)" : undefined}>
+            <path d="M22 30 C28 26.5 35.5 29 37 35 C36 40 31 44 24 46 L9.5 53 C12.5 45 16.5 35.5 22 30 Z" className="fill-berry-wing" />
+            <path d="M16 45 C21 42 26 41 31 37.5 M19 39.5 C23 37.5 27 36.5 31 33.5" className="stroke-berry-ink" strokeWidth={0.9} strokeLinecap="round" fill="none" opacity={0.55} />
+          </g>
         )}
 
         {/* Legs, tucked away in flight */}
         {!simplified && !flying && (
-          <g className="stroke-berry-ink" strokeWidth={2.2} strokeLinecap="round">
-            <line x1={28} y1={48} x2={27} y2={58} />
-            <line x1={34} y1={47} x2={34} y2={58} />
+          <g className="stroke-berry-ink" strokeWidth={1.8} strokeLinecap="round" fill="none">
+            <path d="M27 49 L26.5 59.5 L30 59.5" />
+            <path d="M33 48 L33 59.5 L36.5 59.5" />
           </g>
         )}
 
         {/* Head */}
         <g transform={`rotate(${headTilt} 40 21)`}>
-          <circle cx={40} cy={20} r={simplified ? 12 : 11} className="fill-berry-ink" />
+          <circle cx={38.5} cy={17.5} r={simplified ? 12 : 10.5} className="fill-berry-ink" />
           {!simplified && (
-            <path d="M31.5 13 C29 19 30 26 34.5 30 C33 24 33.5 18 37 11.5 C35 11.6 33 12.2 31.5 13 Z" className="fill-berry-nape" />
+            <path d="M32.5 9.6 C28 13 27.5 19 26.2 23 C28.5 27 32.5 29.5 36.5 28.5 C33.5 24 33.2 16 36.2 8.2 C35 8.4 33.6 8.9 32.5 9.6 Z" className="fill-berry-nape" />
           )}
-          <path d="M50 18.5 L58.5 21.5 L50 24 Z" className="fill-berry-beak" />
+          <path d={simplified ? "M49 13 L60 18 L49 22 Z" : "M47.8 14 L57.5 18.4 L47.8 21 Z"} className="fill-berry-beak" />
           {eyeClosed ? (
-            <path d="M40 18.5 Q43.5 20.5 47 18.5" className="stroke-berry-eye" strokeWidth={1.8} fill="none" strokeLinecap="round" />
+            <path d="M39 15.8 Q42.5 17.8 46 15.8" className="stroke-berry-eye" strokeWidth={1.8} fill="none" strokeLinecap="round" />
           ) : (
             <>
-              <circle cx={43.5} cy={18} r={simplified ? 5 : 4} className="fill-berry-eye" />
-              <circle cx={44.3} cy={pupilY} r={simplified ? 2.2 : 1.8} className="fill-berry-ink" />
+              <circle cx={42.3} cy={15.6} r={simplified ? 5 : 3.7} className="fill-berry-eye" />
+              <circle cx={43} cy={pupilY} r={simplified ? 2.2 : 1.7} className="fill-berry-ink" />
               {mood === "delivered" && (
-                <path d="M39.4 15.6 Q43.5 14.2 47.6 15.6 L47.6 17 Q43.5 15.8 39.4 17 Z" className="fill-berry-ink" />
+                <path d="M38.4 13.2 Q42.3 11.8 46.2 13.2 L46.2 14.6 Q42.3 13.4 38.4 14.6 Z" className="fill-berry-ink" />
               )}
             </>
           )}
-          {berryInBeak && !simplified && <Berry x={60} y={22} r={5} gradientId={gradientId} />}
+          {berryInBeak && !simplified && <Berry x={59} y={20} r={5} gradientId={gradientId} />}
         </g>
       </g>
 
-      {berryOnGround && <Berry x={50} y={55} r={4.5} gradientId={gradientId} />}
+      {berryOnGround && <Berry x={47} y={55} r={5} gradientId={gradientId} />}
 
       {mood === "oops" && !simplified && (
         <path

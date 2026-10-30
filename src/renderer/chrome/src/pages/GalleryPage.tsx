@@ -3,6 +3,10 @@ import { Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
+import { AssistantMessage, ThinkingMessage, UserMessage } from '../components/ChatMessage'
+import { BerryHero } from '../components/Berry'
+import { ChatComposer } from '../components/Composer'
+import { PageCard } from '../components/PageCard'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 
@@ -21,8 +25,8 @@ export const GalleryPage: React.FC = () => {
 
     return (
         <div className="h-full overflow-y-auto">
-            <div className="max-w-5xl px-12 py-10">
-                <h1 className="text-34 font-semibold">Component gallery</h1>
+            <div className="max-w-4xl mx-auto px-8 py-10">
+                <h1 className="text-20 font-semibold">Component gallery</h1>
 
                 <Section title="Berry">
                     <label className="flex items-center gap-2 text-13">
@@ -44,6 +48,24 @@ export const GalleryPage: React.FC = () => {
                     </div>
                     <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
+                    </div>
+                </Section>
+
+                <Section title="Chat">
+                    <div className="max-w-xl flex flex-col gap-5">
+                        <UserMessage content="What did the Monday digest find?" />
+                        <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." />
+                        <ThinkingMessage />
+                        <div>
+                            <BerryHero title="Example" />
+                            <ChatComposer onSend={() => undefined} placeholder="Ask Berry" />
+                        </div>
+                        <ChatComposer
+                            onSend={() => undefined}
+                            placeholder="With a page attached"
+                            attachment={<PageCard title="Jackdaw" host="en.wikipedia.org" onRemove={() => undefined} />}
+                        />
+                        <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
                     </div>
                 </Section>
 

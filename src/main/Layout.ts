@@ -3,11 +3,15 @@ import type { Layout, LayoutMode, Rect } from "../shared/ipc";
 export type { Layout, LayoutMode, Rect };
 
 // DESIGN.md section 2, to tune.
-export const SIDEBAR_WIDTH = { default: 240, min: 200, max: 360 };
-export const CHAT_WIDTH = { default: 360, min: 320, max: 480 };
-export const TOOLBAR_HEIGHT = 44;
+export const SIDEBAR_WIDTH = { default: 280, min: 200, max: 360 };
+export const CHAT_WIDTH = { default: 400, min: 320, max: 480 };
+// The toolbar region holds the address row and the bookmarks bar under it.
+export const ADDRESS_ROW_HEIGHT = 40;
+export const TOOLBAR_HEIGHT = 76;
 export const TAB_ROW_HEIGHT = 40;
-export const FRAME_INSET = 8;
+// The page reaches the window's edges, except for a sliver on the left that brings back a collapsed sidebar.
+export const COLLAPSED_GUTTER = 4;
+export const FLOATING_INSET = 8;
 export const MIN_PAGE_WIDTH = 480;
 export const MIN_WINDOW = { width: 900, height: 600 };
 
@@ -40,7 +44,7 @@ export function computeLayout(
   const vertical = mode === "vertical";
 
   const pageWidth = (sidebar: boolean, chat: boolean) =>
-    window.width - (sidebar ? sidebarWidth : FRAME_INSET) - (chat ? chatWidth : FRAME_INSET);
+    window.width - (sidebar ? sidebarWidth : COLLAPSED_GUTTER) - (chat ? chatWidth : 0);
 
   // When space runs out, the sidebar collapses first and the chat closes next.
   let sidebar = vertical && options.sidebarOpen;
@@ -54,7 +58,7 @@ export function computeLayout(
   const middleWidth = Math.max(window.width - left - right, 0);
 
   // The top row holds the window buttons: the toolbar when vertical, the tab row when horizontal.
-  const topRow = vertical ? TOOLBAR_HEIGHT : TAB_ROW_HEIGHT;
+  const topRow = vertical ? ADDRESS_ROW_HEIGHT : TAB_ROW_HEIGHT;
   const controls: Rect =
     platform === "darwin"
       ? { x: 0, y: 0, width: MAC_CONTROLS_WIDTH, height: topRow }
@@ -68,8 +72,8 @@ export function computeLayout(
   const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: middleWidth, height: TAB_ROW_HEIGHT };
   const toolbarY = vertical ? 0 : TAB_ROW_HEIGHT;
   const pageY = toolbarY + TOOLBAR_HEIGHT;
-  const pageX = sidebar ? left : FRAME_INSET;
-  const pageRight = window.width - (chat ? right : FRAME_INSET);
+  const pageX = sidebar ? left : vertical ? COLLAPSED_GUTTER : 0;
+  const pageRight = window.width - right;
 
   return {
     mode,
@@ -85,7 +89,7 @@ export function computeLayout(
     sidebar: sidebar ? { x: 0, y: 0, width: left, height } : EMPTY,
     // The collapsed sidebar floats over the page, with room around its card for the shadow.
     floatingSidebar: vertical && !sidebar
-      ? { x: 0, y: 0, width: Math.min(sidebarWidth + 2 * FRAME_INSET, window.width), height }
+      ? { x: 0, y: 0, width: Math.min(sidebarWidth + 2 * FLOATING_INSET, window.width), height }
       : EMPTY,
     tabStrip,
     toolbar: { x: left, y: toolbarY, width: middleWidth, height: TOOLBAR_HEIGHT },
@@ -94,7 +98,7 @@ export function computeLayout(
       x: pageX,
       y: pageY,
       width: Math.max(pageRight - pageX, 0),
-      height: Math.max(height - pageY - FRAME_INSET, 0),
+      height: Math.max(height - pageY, 0),
     },
   };
 }

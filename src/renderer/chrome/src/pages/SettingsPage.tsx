@@ -10,10 +10,10 @@ const Row: React.FC<{ id: string; title: string; description?: string; children?
     description,
     children
 }) => (
-    <div className="flex items-center gap-6 py-3 border-b last:border-b-0">
+    <div className="flex items-center gap-6 min-h-16 py-4 border-b last:border-b-0">
         <div className="flex-1">
-            <h3 id={id} className="text-13 font-semibold">{title}</h3>
-            {description && <p className="mt-0.5 text-12 text-muted-foreground">{description}</p>}
+            <h3 id={id} className="text-14 font-semibold">{title}</h3>
+            {description && <p className="mt-0.5 text-13 text-muted-foreground">{description}</p>}
         </div>
         {children}
     </div>
@@ -27,10 +27,9 @@ export const SettingsPage: React.FC = () => {
     const [section, setSection] = useState<Section>('Layout')
 
     return (
-        <div className="h-full overflow-y-auto">
-            <div className="max-w-4xl px-12 py-10">
-                <h1 className="text-34 font-semibold">Settings</h1>
-                <div className="mt-8 grid grid-cols-[180px_1fr] gap-10">
+        <div className="h-full grid grid-cols-[240px_1fr]">
+            <div className="border-r overflow-y-auto px-3 py-6">
+                <h1 className="px-3 pb-4 text-20 font-semibold">Settings</h1>
                     <nav aria-label="Settings sections">
                         <ul className="flex flex-col gap-0.5">
                             {SECTIONS.map((name) => (
@@ -40,9 +39,9 @@ export const SettingsPage: React.FC = () => {
                                         aria-current={section === name ? 'page' : undefined}
                                         onClick={() => setSection(name)}
                                         className={cn(
-                                            "w-full h-8 px-2 rounded-control text-13 text-left outline-none transition-colors",
+                                            "w-full h-9 px-3 rounded-card text-14 text-left outline-none transition-colors",
                                             "focus-visible:ring-2 focus-visible:ring-ring",
-                                            section === name ? "bg-muted font-semibold" : "hover:bg-muted"
+                                            section === name ? "bg-muted" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                         )}
                                     >
                                         {name}
@@ -51,10 +50,12 @@ export const SettingsPage: React.FC = () => {
                             ))}
                         </ul>
                     </nav>
+            </div>
+            <div className="overflow-y-auto">
+                    <section aria-label={section} className="max-w-[680px] mx-auto px-8 py-8">
+                        <h2 className="text-20 font-semibold mb-5">{section}</h2>
 
-                    <section aria-label={section}>
-                        <h2 className="text-20 font-semibold mb-2">{section}</h2>
-
+                        <div className="rounded-panel border bg-surface px-5">
                         {section === 'Layout' && (
                             <Row id="setting-tabs" title="Tabs" description="Vertical tabs live in the sidebar. Horizontal tabs sit in a row above the address bar.">
                                 <Choice<LayoutMode>
@@ -114,8 +115,8 @@ export const SettingsPage: React.FC = () => {
                         {section === 'Account' && (
                             <Row id="setting-account" title="No account" description="Browsing, tabs and bookmarks never need one. Berry will ask you to sign in the first time you use it." />
                         )}
+                        </div>
                     </section>
-                </div>
             </div>
         </div>
     )

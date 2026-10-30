@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
+import { Search } from 'lucide-react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { cn } from '@common/lib/utils'
 import { toUrl } from '@common/lib/url'
+
+export const FOCUS_ADDRESS_EVENT = 'blueberry:focus-address'
 
 const splitUrl = (url: string) => {
     try {
@@ -38,6 +41,13 @@ export const AddressBar: React.FC = () => {
 
     useEffect(() => window.chromeAPI.browser.onFocusAddress(() => setIsFocused(true)), [])
 
+    // The sidebar's search button lives in the same renderer.
+    useEffect(() => {
+        const focus = () => setIsFocused(true)
+        window.addEventListener(FOCUS_ADDRESS_EVENT, focus)
+        return () => window.removeEventListener(FOCUS_ADDRESS_EVENT, focus)
+    }, [])
+
     const cancel = () => {
         setIsFocused(false)
         setUrl(editableUrl(activeTab))
@@ -52,7 +62,8 @@ export const AddressBar: React.FC = () => {
 
     if (isFocused) {
         return (
-            <form onSubmit={handleSubmit} className="flex-1 min-w-0 app-region-no-drag">
+            <form onSubmit={handleSubmit} className="relative w-full max-w-[600px] min-w-0 app-region-no-drag">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <input
                     type="text"
                     aria-label="Address"
@@ -62,7 +73,7 @@ export const AddressBar: React.FC = () => {
                     onBlur={cancel}
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}
                     className={cn(
-                        "w-full h-8 px-3 rounded-card bg-surface text-13 text-foreground",
+                        "w-full h-8 pl-8 pr-3 rounded-card bg-surface text-14 text-foreground",
                         "outline-none ring-2 ring-ring placeholder:text-muted-foreground"
                     )}
                     placeholder="Search or enter a URL"
@@ -83,12 +94,12 @@ export const AddressBar: React.FC = () => {
             aria-label="Address"
             onClick={() => setIsFocused(true)}
             className={cn(
-                "flex-1 min-w-0 h-8 px-3 flex items-center gap-2 rounded-card cursor-text group/address-bar",
+                "w-full max-w-[600px] min-w-0 h-8 px-3 flex items-center justify-center gap-2 rounded-card cursor-text group/address-bar",
                 "bg-muted hover:bg-border text-left app-region-no-drag outline-none transition-colors",
                 "focus-visible:ring-2 focus-visible:ring-ring"
             )}
         >
-            <span className="text-13 truncate flex-1">
+            <span className="text-14 truncate">
                 {pageLabel ? (
                     <>
                         <span className="text-foreground">{pageLabel}</span>

@@ -1,7 +1,7 @@
 import { NativeImage, WebContentsView } from "electron";
 
 // The page card radius from DESIGN.md.
-const PAGE_RADIUS = 8;
+const PAGE_RADIUS = 0;
 
 export interface TabEvents {
   onChange: () => void;

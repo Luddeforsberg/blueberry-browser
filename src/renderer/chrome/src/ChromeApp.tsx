@@ -38,8 +38,13 @@ const Shell: React.FC = () => {
 
     return (
         <div className={cn("relative h-full", theme.glass ? "bg-glass-tint" : "bg-background")}>
+            {/* One card holds the toolbar, bookmarks bar and page, so they read as one surface. */}
+            <Region
+                rect={{ ...layout.toolbar, height: page.y + page.height - layout.toolbar.y }}
+                className={cn("bg-canvas", layout.sidebarOpen && "rounded-tl-card", layout.chatOpen && "rounded-tr-card")}
+            />
             {/* Internal pages draw here. For web pages it shows until the tab view paints. */}
-            <Region rect={page} className="bg-surface rounded-card overflow-hidden">
+            <Region rect={page} className="overflow-hidden">
                 {activeTab?.page && <InternalPageView tab={activeTab} />}
             </Region>
             {layout.sidebarOpen && (

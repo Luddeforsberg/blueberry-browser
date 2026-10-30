@@ -1,12 +1,10 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkBreaks from 'remark-breaks'
-import { ArrowUp } from 'lucide-react'
+import React, { useEffect, useRef, useLayoutEffect, useState } from 'react'
+import { useBrowser } from '../contexts/BrowserContext'
 import { useChat } from '../contexts/ChatContext'
-import { useShell } from '../contexts/ShellContext'
-import { Berry } from './Berry'
-import { cn } from '@common/lib/utils'
+import { Berry, useAssistantName } from './Berry'
+import { AssistantMessage, ThinkingMessage, UserMessage } from './ChatMessage'
+import { PageCard } from './PageCard'
+import { ChatComposer } from './Composer'
 
 interface Message {
     id: string
@@ -36,177 +34,6 @@ const useAutoScroll = (messages: Message[]) => {
     return scrollRef
 }
 
-// User Message Component - appears on the right
-const UserMessage: React.FC<{ content: string }> = ({ content }) => (
-    <div className="relative max-w-[85%] ml-auto animate-fade-in">
-        <div className="bg-muted rounded-panel px-3 py-2">
-            <div className="text-15 text-foreground" style={{ whiteSpace: 'pre-wrap' }}>
-                {content}
-            </div>
-        </div>
-    </div>
-)
-
-// Streaming Text Component
-const StreamingText: React.FC<{ content: string }> = ({ content }) => {
-    const [displayedContent, setDisplayedContent] = useState('')
-    const [currentIndex, setCurrentIndex] = useState(0)
-
-    useEffect(() => {
-        if (currentIndex < content.length) {
-            const timer = setTimeout(() => {
-                setDisplayedContent(content.slice(0, currentIndex + 1))
-                setCurrentIndex(currentIndex + 1)
-            }, 10)
-            return () => clearTimeout(timer)
-        }
-        return undefined
-    }, [content, currentIndex])
-
-    return (
-        <div className="whitespace-pre-wrap text-15 text-foreground">
-            {displayedContent}
-            {currentIndex < content.length && (
-                <span className="inline-block w-2 h-5 bg-accent-ink ml-0.5 animate-pulse" />
-            )}
-        </div>
-    )
-}
-
-// Markdown Renderer Component
-export const Markdown: React.FC<{ content: string }> = ({ content }) => (
-    <div className="prose max-w-none prose-pre:p-3 prose-pre:overflow-x-auto">
-        <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks]}
-            components={{
-                // Custom code block styling
-                code: ({ node, className, children, ...props }) => {
-                    const inline = !className
-                    return inline ? (
-                        <code className="bg-muted px-1 py-0.5 rounded-control" {...props}>
-                            {children}
-                        </code>
-                    ) : (
-                        <code className={className} {...props}>
-                            {children}
-                        </code>
-                    )
-                },
-                // Custom link styling
-                a: ({ children, href }) => (
-                    <a
-                        href={href}
-                        className="text-accent-ink hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        {children}
-                    </a>
-                ),
-            }}
-        >
-            {content}
-        </ReactMarkdown>
-    </div>
-)
-
-// Assistant Message Component - appears on the left
-const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = ({
-    content,
-    isStreaming
-}) => (
-    <div className="relative w-full animate-fade-in">
-        <div className="py-1">
-            {isStreaming ? (
-                <StreamingText content={content} />
-            ) : (
-                <Markdown content={content} />
-            )}
-        </div>
-    </div>
-)
-
-// Berry's working state while a reply is on its way.
-const LoadingIndicator: React.FC = () => (
-    <div role="status" className="flex items-center gap-2 text-13 text-muted-foreground animate-fade-in">
-        <Berry mood="thinking" size={24} />
-        Thinking
-    </div>
-)
-
-// Chat Input Component with pill design
-const ChatInput: React.FC<{
-    onSend: (message: string) => void
-    disabled: boolean
-}> = ({ onSend, disabled }) => {
-    const [value, setValue] = useState('')
-    const [isFocused, setIsFocused] = useState(false)
-    const placeholder = useShell().settings.showBerry ? 'Ask Berry' : 'Ask a question'
-    const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-    // Auto-resize textarea
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'
-            const scrollHeight = textareaRef.current.scrollHeight
-            const newHeight = Math.min(scrollHeight, 200) // Max 200px
-            textareaRef.current.style.height = `${newHeight}px`
-        }
-    }, [value])
-
-    const handleSubmit = () => {
-        if (value.trim() && !disabled) {
-            onSend(value.trim())
-            setValue('')
-            // Reset textarea height
-            if (textareaRef.current) {
-                textareaRef.current.style.height = '24px'
-            }
-        }
-    }
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            handleSubmit()
-        }
-    }
-
-    return (
-        <div className={cn(
-            "w-full flex items-end gap-2 py-1.5 pl-3 pr-1.5 rounded-panel bg-surface border transition-colors",
-            isFocused ? "border-transparent ring-2 ring-ring" : "border-border"
-        )}>
-            <textarea
-                ref={textareaRef}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                onKeyDown={handleKeyDown}
-                aria-label="Message"
-                placeholder={placeholder}
-                className="flex-1 py-1 resize-none outline-none bg-transparent text-15 text-foreground placeholder:text-muted-foreground min-h-[24px] max-h-[200px]"
-                rows={1}
-                style={{ lineHeight: '24px' }}
-            />
-            <button
-                type="button"
-                aria-label="Send"
-                onClick={handleSubmit}
-                disabled={disabled || !value.trim()}
-                className={cn(
-                    "size-7 shrink-0 mb-0.5 rounded-full flex items-center justify-center transition-colors outline-none",
-                    "bg-primary text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring",
-                    "disabled:bg-muted disabled:text-muted-foreground"
-                )}
-            >
-                <ArrowUp className="size-4" />
-            </button>
-        </div>
-    )
-}
-
 // Conversation Turn Component
 interface ConversationTurn {
     user?: Message
@@ -217,7 +44,7 @@ const ConversationTurnComponent: React.FC<{
     turn: ConversationTurn
     isLoading?: boolean
 }> = ({ turn, isLoading }) => (
-    <div className="pt-4 flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
         {turn.user && <UserMessage content={turn.user.content} />}
         {turn.assistant && (
             <AssistantMessage
@@ -225,18 +52,42 @@ const ConversationTurnComponent: React.FC<{
                 isStreaming={turn.assistant.isStreaming}
             />
         )}
-        {isLoading && (
-            <div className="flex justify-start">
-                <LoadingIndicator />
-            </div>
-        )}
+        {isLoading && <ThinkingMessage />}
     </div>
 )
+
+const hostOf = (url: string) => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, '')
+    } catch {
+        return null
+    }
+}
+
+// Whether Berry can see the open page. The card on the composer is the signal, and + brings it back.
+const usePageAccess = () => {
+    const [enabled, setEnabled] = useState(true)
+
+    useEffect(() => {
+        window.chromeAPI.chat.getPageAccess().then(setEnabled)
+    }, [])
+
+    const change = (next: boolean) => {
+        setEnabled(next)
+        window.chromeAPI.chat.setPageAccess(next).then(setEnabled)
+    }
+
+    return { enabled, change }
+}
 
 // Main Chat Component
 export const Chat: React.FC = () => {
     const { messages, isLoading, sendMessage } = useChat()
     const scrollRef = useAutoScroll(messages)
+    const name = useAssistantName()
+    const { activeTab } = useBrowser()
+    const { enabled, change } = usePageAccess()
+    const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
 
     // Group messages into conversation turns
     const conversationTurns: ConversationTurn[] = []
@@ -261,40 +112,49 @@ export const Chat: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full">
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto">
-                <div className="pb-4 relative px-3">
-
-                    {messages.length === 0 ? (
-                        // Empty State
-                        <p className="pt-4 px-1 text-13 text-muted-foreground animate-fade-in">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+                {messages.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
+                        {name === 'Berry' && <Berry mood="rest" size={72} />}
+                        <p className="text-14 text-muted-foreground">
                             Ask about this page, or anything else.
                         </p>
-                    ) : (
-                        <>
-
-                            {/* Render conversation turns */}
-                            {conversationTurns.map((turn, index) => (
-                                <ConversationTurnComponent
-                                    key={`turn-${index}`}
-                                    turn={turn}
-                                    isLoading={
-                                        showLoadingAfterLastTurn &&
-                                        index === conversationTurns.length - 1
-                                    }
-                                />
-                            ))}
-                        </>
-                    )}
-
-                    {/* Scroll anchor */}
-                    <div ref={scrollRef} />
-                </div>
+                    </div>
+                ) : (
+                    <div className="px-5 pt-3 pb-4 flex flex-col gap-6">
+                        {conversationTurns.map((turn, index) => (
+                            <ConversationTurnComponent
+                                key={`turn-${index}`}
+                                turn={turn}
+                                isLoading={
+                                    showLoadingAfterLastTurn &&
+                                    index === conversationTurns.length - 1
+                                }
+                            />
+                        ))}
+                        <div ref={scrollRef} />
+                    </div>
+                )}
             </div>
 
-            {/* Input Area */}
-            <div className="p-3">
-                <ChatInput onSend={sendMessage} disabled={isLoading} />
+            <div className="p-3 pt-1">
+                <ChatComposer
+                    onSend={sendMessage}
+                    disabled={isLoading}
+                    placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}
+                    attachment={
+                        enabled && host ? (
+                            <PageCard
+                                title={activeTab?.title || host}
+                                host={host}
+                                favicon={activeTab?.favicon}
+                                onRemove={() => change(false)}
+                            />
+                        ) : undefined
+                    }
+                    onAdd={!enabled && host ? () => change(true) : undefined}
+                    addLabel={!enabled && host ? 'Add this page' : undefined}
+                />
             </div>
         </div>
     )

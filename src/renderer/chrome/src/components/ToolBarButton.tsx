@@ -30,15 +30,15 @@ export const ToolBarButton: React.FC<ToolBarButtonProps> = ({
             disabled={!active}
             className={cn(
                 "size-8 flex shrink-0 items-center justify-center rounded-control",
-                "text-foreground app-region-no-drag outline-none transition-colors",
+                "text-muted-foreground hover:text-foreground app-region-no-drag outline-none transition-colors",
                 "focus-visible:ring-2 focus-visible:ring-ring",
-                "hover:bg-muted active:brightness-95 disabled:opacity-50 disabled:hover:bg-transparent",
-                toggled && "bg-muted",
+                "hover:bg-muted active:brightness-95 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+                toggled && "bg-muted text-foreground",
                 className
             )}
             onClick={onClick}
         >
-            {children || (Icon && <Icon className="size-4.5" />)}
+            {children || (Icon && <Icon className="size-4" />)}
         </button>
     );
 };

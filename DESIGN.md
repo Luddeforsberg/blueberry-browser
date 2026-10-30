@@ -2,6 +2,8 @@
 
 Blueberry is an AI browser that should feel like a good Mac app with one capable colleague inside it. The direction is **Ink on glass**: solid web pages, quiet tinted glass around them, and one deep blue ink.
 
+**Current phase:** the layout, proportions and interaction patterns closely follow Strawberry on purpose, as a reference to iterate away from. Blueberry keeps its own mascot, wording, icons and background art, and uses no Strawberry assets. Where this document and the older principles below disagree, the values here win.
+
 This document is the source of truth for the UI. Values marked *to tune* are starting points, to be adjusted on real windows without changing the intent.
 
 ## 1. Principles
@@ -16,7 +18,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 ### What we reject
 
 - A team of humanoid companions, or characters assigned to job roles.
-- Promo cards, upsells and "ideas for you" on the new tab.
+- Promo cards and upsells on the new tab. The idea cards there only link to real features.
 - Glass that makes text harder to read, or glass on web pages.
 - Beige neutrals and blue-tinted dark mode.
 - Bounce in the chrome, and decorative loops that run when no work is happening.
@@ -33,22 +35,25 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 | Tabs | Left sidebar (see below) | Top row |
 | Address bar and navigation | Row above the page | Row below the tabs |
 | Chat panel | Right, pushes the page | Same |
-| Web page | Solid rounded card, inset 8px from the frame | Same |
+| Web page | Reaches the window edges, in one card with the toolbar and bookmarks bar | Same |
 
 Sizes (*to tune*):
 
 | Item | Value |
 |---|---|
-| Sidebar | 240px default, resizable 200–360px, collapses fully |
-| Chat panel | 360px default, resizable 320–480px |
-| Toolbar row | 44px |
+| Sidebar | 280px default, resizable 200–360px, collapses fully |
+| Chat panel | 400px default, resizable 320–480px |
+| Address row | 40px |
+| Bookmarks bar | 36px, with a hairline under it |
+| Sidebar row | 34px |
 | Horizontal tab row | 40px |
 | Minimum window | 900×600 |
 | Minimum page width | 480px |
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It floats over the page, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and collapse buttons, pinned sites, bookmarks, chats with a new chat button, tabs with a new tab button, and Routines and Settings at the bottom.
+- **Sidebar contents, top to bottom:** window controls with search, then New Tab, New chat, Routines and Settings, then chats, then tabs. The collapse button is in the toolbar.
+- **Bookmarks bar:** pinned sites and bookmarks, under the address bar.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
@@ -64,7 +69,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Routines, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on a solid `surface` card in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **Internal pages** (new tab, main chat, Routines, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -107,7 +112,7 @@ Components use tokens only, never raw colours. Keep the existing names in `index
 
 For our own chrome (web pages do not count), this is a guideline and not a measurement:
 
-- **70, base:** `background` and `surface`.
+- **70, base:** `background`, `canvas` and `surface`.
 - **20, gray:** `muted` and `border`.
 - **10, ink and Berry:** the accent and the character. Nothing else in the chrome has colour, except status colours when they mean something.
 
@@ -115,53 +120,57 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `background` | `#f8f8f9` | `#1c1c1e` | Frame, sidebar, chat panel |
-| `surface` | `#ffffff` | `#2a2a2d` | Inputs, raised content |
-| `muted` | `#ececee` | `#38383b` | Selected tab, address bar, bubbles, hover |
-| `border` | `#e2e2e6` | `#3a3a3d` | Separators |
-| `foreground` | `#1b1b1e` | `#f2f2f3` | Main text |
-| `muted-foreground` | `#5e5e66` | `#a9a9b0` | Secondary text |
-| `primary` | `#2f3aa8` | `#3d4bc7` | Primary button fill |
+| `background` | `#eeeeee` | `#2b2b2b` | Frame, sidebar, chat panel |
+| `canvas` | `#fcfcfc` | `#1f1f1f` | Internal pages, the card a web page sits on |
+| `surface` | `#ffffff` | `#242424` | Composer, inputs, raised content |
+| `tray` | `#f4f4f4` | `#181818` | Tray under the composer, page card, code blocks |
+| `card` | `#f3f3f3` | `#2a2a2a` | Idea cards |
+| `selected` | `#ffffff` | `#565656` | Selected rows in the sidebar, selected segments |
+| `muted` | `#ececec` | `#303030` | Address bar, bubbles, hover, selected rows on `canvas` |
+| `border` | `#e4e4e4` | `#404040` | Separators |
+| `foreground` | `#1a1a1a` | `#f2f2f2` | Main text |
+| `muted-foreground` | `#5a5a5a` | `#b0b0b0` | Secondary text |
+| `primary` | `#4f568e` | `#4f568e` | Primary button fill |
 | `primary-foreground` | `#ffffff` | `#ffffff` | Primary button text |
 | `accent-ink` | `#2f3aa8` | `#a3aefb` | Links, focus rings, selected states |
-| `success` | `#18693f` | `#6fcf97` | Status |
-| `warning` | `#7a4f00` | `#e0b050` | Status |
-| `destructive` | `#b3261e` | `#f28b82` | Status, destructive actions |
+| `success` | `#17653c` | `#6fcf97` | Status |
+| `warning` | `#744b00` | `#e0b050` | Status |
+| `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
 | `glass-tint` | `background` at 88% | `background` at 88% | All glass |
 
 Worst-case contrast is calculated with pure black (light mode) or pure white (dark mode) behind the glass, ignoring blur. Re-measure on real glass.
 
 | Text colour | Light on background | Light on worst-case glass | Dark on background | Dark on worst-case glass |
 |---|---|---|---|---|
-| `foreground` | 16.2:1 | 12.3:1 | 15.2:1 | 10.6:1 |
-| `muted-foreground` | 6.1:1 | 4.6:1 | 7.3:1 | 5.1:1 |
-| `accent-ink` | 8.6:1 | 6.6:1 | 8.1:1 | 5.6:1 |
-| `success` | 6.3:1 | 4.8:1 | 9.0:1 | 6.2:1 |
-| `warning` | 6.7:1 | 5.1:1 | 8.5:1 | 5.9:1 |
-| `destructive` | 6.2:1 | 4.7:1 | 7.1:1 | 5.0:1 |
+| `foreground` | 15.0:1 | 11.4:1 | 12.6:1 | 8.7:1 |
+| `muted-foreground` | 5.9:1 | 4.5:1 | 6.5:1 | 4.5:1 |
+| `accent-ink` | 7.9:1 | 6.0:1 | 6.7:1 | 4.6:1 |
+| `success` | 6.1:1 | 4.6:1 | 7.4:1 | 5.1:1 |
+| `warning` | 6.6:1 | 5.0:1 | 7.1:1 | 4.9:1 |
+| `destructive` | 6.0:1 | 4.6:1 | 6.9:1 | 4.7:1 |
 
-White on `primary` is 9.2:1 in light mode and 6.9:1 in dark mode.
+White on `primary` is 6.9:1 in both modes.
 
 Berry has separate tokens and never uses the UI accent:
 
 | Token | Light | Dark |
 |---|---|---|
-| `berry-ink` (body) | `#1a2240` | `#7585c6` |
-| `berry-wing` | `#2d3a68` | `#93a1d8` |
-| `berry-nape` | `#98a5c3` | `#bcc7e3` |
-| `berry-eye` | `#f4f1e6` | `#fbf9f0` |
-| `berry-beak` | `#10152b` | `#28335f` |
+| `berry-ink` (body) | `#1a2240` | `#4a5896` |
+| `berry-wing` | `#2d3a68` | `#5e6caa` |
+| `berry-nape` | `#98a5c3` | `#98a3c8` |
+| `berry-eye` | `#f4f1e6` | `#f4f1e6` |
+| `berry-beak` | `#10152b` | `#161c3a` |
 | `berry-fruit` (gradient) | `#5a6db8`, `#34458f`, `#1b2560` | Same |
 | `berry-fruit-bloom` | `#d5dcf2` | Same |
 | `berry-fruit-crown` | `#1a2358` | Same |
 
-Dark `berry-ink` is at least 3.3:1 against `background`, `surface`, `muted` and worst-case glass.
+Dark `berry-ink` is deliberately deep, about 2.0–2.5:1 against the dark surfaces and 1.5:1 on worst-case glass. That is below the 3:1 for meaningful graphics, so nothing may rely on Berry alone: moods have text labels, and the pale eye and nape carry the shape.
 
 ### Spacing, radius, elevation
 
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
-- **Radius:** 6px for controls, 8px for the page card and inputs, 12px for panels and popovers.
-- **Elevation:** a soft shadow only on things that float. Chrome regions are separated by tone, not shadow.
+- **Radius:** 8px for controls, 10px for sidebar rows and inputs, 20px for cards and panels, 24px for the composer, and full for buttons and segmented controls.
+- **Elevation:** chrome regions are separated by tone, not shadow. Three things get a shadow: things that float, the composer, and selected rows in the sidebar.
 
 ## 5. Typography
 
@@ -171,10 +180,11 @@ The system font only: SF Pro on macOS and Segoe UI Variable on Windows. No fonts
 |---|---|---|
 | 11px | Regular | Captions, the smallest text allowed |
 | 12px | Regular | Secondary text |
-| 13px | Regular, semibold | Sidebar, tabs, toolbar |
-| 15px | Regular | Chat and reading text |
-| 20px | Semibold | Section titles |
-| 34px | Semibold, tight tracking | Big moments: onboarding, new tab heading, large empty states |
+| 13px | Regular | Bookmarks bar, card text |
+| 14px | Regular, semibold | Sidebar, tabs, address bar, settings |
+| 16px | Regular | Chat and the composer |
+| 20px | Semibold | Page titles |
+| 34px | Semibold, tight tracking | Onboarding only |
 
 - Use regular and semibold only.
 - Use tabular figures wherever numbers line up, such as times and counts.
@@ -207,8 +217,8 @@ Every interactive component defines these, shown in light and dark in the compon
 | Default | Neutral, with no colour unless it is the primary action |
 | Hover | `muted` background |
 | Pressed | Slightly darker than hover, in about 100ms |
-| Focused | A visible 2px `accent-ink` ring, never removed |
-| Selected | `muted` background and semibold text |
+| Focused | A visible 2px `accent-ink` ring, never removed. The composer is the exception: it only darkens its border, and the caret marks focus |
+| Selected | A `selected` row in the sidebar, or a `muted` row on `canvas`. The text stays regular, so rows don't shift |
 | Disabled | Reduced emphasis, with a reason where possible, and based on real state |
 | Loading | Only while work is really happening |
 | Error | Status colour plus an icon or text, with a way forward |
@@ -272,7 +282,7 @@ Every mood has a text label for assistive technology.
 | Place | What it does |
 |---|---|
 | Onboarding | Large, guides setup |
-| New tab | Perches on the edge of the input |
+| New tab and an empty main chat | Large, centred above the composer |
 | Browsing | Small in the chrome, and its mood shows what it is doing |
 | Chat | Working and waiting states beside its replies |
 | Routines | Flies off when a routine runs and returns with the result |
@@ -312,9 +322,9 @@ Four short, skippable steps: meet Berry, choose layout and appearance, import fr
 
 ### New tab
 
-A heading, one input and recent work. Nothing appears in the recent list unless it is real. There are no promos or idea cards.
+Berry, large and centred, above a 640px composer with a tray under it linking to Routines, a new chat and Settings. Below that are two idea cards linking to real features, then recent pages if there are any. A faint scatter of berries and leaves fills the background. Nothing appears in the recent list unless it is real.
 
-The input is one smart field. `Enter` goes to a URL or runs a search. `⌘Enter` (`Ctrl+Enter` on Windows) asks Berry and opens the main chat, and the input shows a small hint saying so.
+`Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
 
 ### Browsing
 
@@ -324,14 +334,14 @@ The page gets the space. The address bar shows the real URL and real navigation 
 
 A full page for talking to Berry about anything, not about a particular web page. It opens as a tab, and past chats are listed in the sidebar.
 
-- A centred conversation of about 680px, with the composer fixed at the bottom.
+- A centred conversation of about 680px, with the composer fixed at the bottom. A new chat with no messages looks like the new tab page instead.
+- Messages and the composer are the same components as the chat panel, so the two sizes look like one chat.
 - Berry's working state says what it is doing and offers to show the work in a tab.
-- The composer always shows what Berry can see, such as "Can see: no pages".
 
 ### Chat panel
 
 - Opens on the right with `⌘E` (`Ctrl+E` on Windows) and pushes the page.
-- Always shows what Berry can see, such as "Can see: wikipedia.org", with a toggle to remove it.
+- A card on the composer, with the page's icon, title and address, shows the page Berry can see. Removing it takes the page away from Berry, and the composer's + brings it back. No card means Berry sees no page.
 - Approval requests are cards showing exactly what will happen.
 - Using Berry requires an account, requested the first time someone uses it. Browsing, tabs and bookmarks never need one.
 

@@ -13,19 +13,19 @@ const TabItem: React.FC<{
 }> = ({ tab, mode, onActivate, onClose }) => (
     <li
         className={cn(
-            "group/tab flex items-center h-8 pl-2 pr-1 gap-2 rounded-control transition-colors app-region-no-drag",
+            "group/tab flex items-center h-[34px] pl-3 pr-1.5 gap-2 rounded-card transition-colors app-region-no-drag",
             mode === 'horizontal' && "flex-1 min-w-12 max-w-56",
-            tab.isActive ? "bg-muted font-semibold" : "hover:bg-muted"
+            tab.isActive ? "bg-selected shadow-selected" : "hover:bg-foreground/5"
         )}
     >
         <button
             type="button"
             aria-current={tab.isActive ? 'page' : undefined}
             onClick={onActivate}
-            className="flex flex-1 min-w-0 items-center gap-2 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
         >
             <TabIcon tab={tab} />
-            <span className="text-13 truncate">{tab.title || 'New Tab'}</span>
+            <span className="text-14 truncate">{tab.title || 'New Tab'}</span>
         </button>
         <button
             type="button"
@@ -33,7 +33,7 @@ const TabItem: React.FC<{
             onClick={onClose}
             className={cn(
                 "size-6 shrink-0 flex items-center justify-center rounded-control outline-none transition-opacity",
-                "hover:bg-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
+                "hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
                 "opacity-0 group-hover/tab:opacity-100",
                 tab.isActive && "opacity-100"
             )}
@@ -44,10 +44,12 @@ const TabItem: React.FC<{
 )
 
 // One tab list for both layouts: a column in the sidebar, a row in the horizontal tab strip.
-export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: string }> = ({
+// The sidebar puts its new tab button in the section heading, so it passes showNew={false}.
+export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: string; showNew?: boolean }> = ({
     mode,
     labelledBy,
-    label
+    label,
+    showNew = true
 }) => {
     const { tabs, createTab, closeTab, switchTab } = useBrowser()
     const vertical = mode === 'vertical'
@@ -69,19 +71,21 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     />
                 ))}
             </ul>
-            <button
-                type="button"
-                aria-label="New tab"
-                onClick={() => createTab()}
-                className={cn(
-                    "flex items-center gap-2 h-8 rounded-control text-13 text-muted-foreground app-region-no-drag",
-                    "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                    vertical ? "w-full px-2 mt-0.5" : "w-8 shrink-0 justify-center"
-                )}
-            >
-                <Plus className="size-4" />
-                {vertical && 'New tab'}
-            </button>
+            {showNew && (
+                <button
+                    type="button"
+                    aria-label="New tab"
+                    onClick={() => createTab()}
+                    className={cn(
+                        "flex items-center gap-2 h-8 rounded-control text-14 text-muted-foreground app-region-no-drag",
+                        "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                        vertical ? "w-full px-2 mt-0.5" : "w-8 shrink-0 justify-center"
+                    )}
+                >
+                    <Plus className="size-4" />
+                    {vertical && 'New tab'}
+                </button>
+            )}
         </>
     )
 }

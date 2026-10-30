@@ -5,11 +5,11 @@ import * as React from "react";
 import { cn } from "../lib/utils";
 
 const buttonVariants = cva(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-13 font-regular disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive [.native-page_&]:cursor-pointer select-none",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-14 font-regular disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-destructive [.native-page_&]:cursor-pointer select-none",
     {
         variants: {
             variant: {
-                default: "bg-primary text-primary-foreground hover:bg-primary/90",
+                default: "bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100",
                 destructive:
                     "bg-destructive text-destructive-foreground hover:brightness-95 active:brightness-90",
                 outline: "border bg-surface text-foreground hover:bg-muted active:brightness-95",
@@ -47,8 +47,7 @@ const Button = React.forwardRef<
         <Comp
             ref={ref}
             data-slot="button"
-            tabIndex={-1}
-            className={cn(buttonVariants({ variant, size, className }))}
+                        className={cn(buttonVariants({ variant, size, className }))}
             {...props}
         />
     );

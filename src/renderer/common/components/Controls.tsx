@@ -21,7 +21,7 @@ export const Switch: React.FC<{
     >
         <span
             className={cn(
-                "absolute top-0.5 left-0.5 size-4 rounded-full bg-surface transition-transform",
+                "absolute top-0.5 left-0.5 size-4 rounded-full bg-primary-foreground transition-transform",
                 checked && "translate-x-4"
             )}
         />
@@ -39,7 +39,7 @@ export const Choice = <T extends string>({
     options: { value: T; label: string }[]
     onChange: (value: T) => void
 }) => (
-    <div role="radiogroup" aria-label={label} className="inline-flex p-0.5 rounded-card bg-muted">
+    <div role="radiogroup" aria-label={label} className="inline-flex p-1 rounded-full bg-tray">
         {options.map((option) => (
             <button
                 key={option.value}
@@ -48,8 +48,8 @@ export const Choice = <T extends string>({
                 aria-checked={value === option.value}
                 onClick={() => onChange(option.value)}
                 className={cn(
-                    "h-7 px-3 rounded-control text-13 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                    value === option.value ? "bg-surface font-semibold" : "text-muted-foreground hover:text-foreground"
+                    "h-8 px-4 rounded-full text-14 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    value === option.value ? "bg-selected shadow-selected" : "text-muted-foreground hover:text-foreground"
                 )}
             >
                 {option.label}

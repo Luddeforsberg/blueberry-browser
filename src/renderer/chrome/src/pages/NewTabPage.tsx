@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from 'react'
+import { ArrowRight, Lightbulb, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
-import { useShell } from '../contexts/ShellContext'
 import { Favicon } from '../components/Favicon'
-import { Berry, useAssistantName } from '../components/Berry'
-import { toUrl } from '@common/lib/url'
+import { BerryHero, useAssistantName } from '../components/Berry'
+import { Composer } from '../components/Composer'
+import { Backdrop } from '../components/Backdrop'
+import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { cn } from '@common/lib/utils'
+
+const TRAY_BUTTON = cn(
+    "flex items-center gap-2 h-8 px-2.5 rounded-control text-14 text-muted-foreground outline-none transition-colors",
+    "hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+)
 
 const timeOf = (visitedAt: number) =>
     new Date(visitedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
 // A heading, one smart input and recent work. Recent only lists pages really visited.
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
-    const { theme } = useShell()
     const [text, setText] = useState('')
     const [recent, setRecent] = useState<Visit[]>([])
     const browser = window.chromeAPI.browser
@@ -27,45 +33,112 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         await browser.closeTab(tab.id)
     }
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key !== 'Enter' || !text.trim()) return
-        e.preventDefault()
-        if (e.metaKey || e.ctrlKey) void askBerry(text.trim())
+    const ask = () => {
+        if (text.trim()) void askBerry(text.trim())
+    }
+
+    // Plain Enter opens an address and asks Berry anything else. ⌘Enter always asks.
+    const submit = (alwaysAsk: boolean) => {
+        if (!text.trim()) return
+        if (alwaysAsk || !looksLikeUrl(text)) ask()
         else void browser.navigateTab(tab.id, toUrl(text))
     }
 
-    const askKey = theme.platform === 'mac' ? '⌘↵' : 'Ctrl+↵'
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key !== 'Enter') return
+        e.preventDefault()
+        submit(e.metaKey || e.ctrlKey)
+    }
+
     const name = useAssistantName()
+    const isBerry = name === 'Berry'
+
+    const TRAY = [
+        { label: 'Routines', Icon: RefreshCw, onClick: () => browser.openPage('routines') },
+        { label: 'New chat', Icon: MessageCircle, onClick: () => browser.openPage('chat') }
+    ]
+
+    const IDEAS = [
+        {
+            Icon: RefreshCw,
+            title: 'Put something on a schedule',
+            text: isBerry ? 'Hand Berry a task that repeats, and it reports back when it’s done.' : 'Set up a task that repeats, with results waiting for you.',
+            action: 'See routines',
+            onClick: () => browser.openPage('routines')
+        },
+        {
+            Icon: SlidersHorizontal,
+            title: 'Make the browser yours',
+            text: 'Choose your tab layout and theme, and what stays on this computer.',
+            action: 'Open settings',
+            onClick: () => browser.openPage('settings')
+        }
+    ]
 
     return (
-        <div className="h-full overflow-y-auto">
-            <div className="max-w-xl mx-auto px-6 pt-[18vh] pb-12">
-                <h1 className="text-34 font-semibold">Where shall we start today?</h1>
-                <div className="relative mt-6">
-                    {/* Berry perches on the input's top edge. */}
-                    <Berry mood="rest" size={56} className="absolute right-6 -top-[50px]" />
-                    <input
-                        type="text"
-                        aria-label={`Search, enter a URL, or ask ${name === 'Berry' ? 'Berry' : 'a question'}`}
-                        placeholder={`Search, enter a URL, or ask ${name === 'Berry' ? 'Berry' : 'a question'}`}
+        <div className="relative h-full overflow-y-auto">
+            <Backdrop />
+            <div className="relative max-w-[640px] mx-auto px-6 pt-[13vh] pb-12">
+                <BerryHero title="Where shall we start today?" />
+
+                <div className="rounded-composer bg-tray">
+                    <Composer
+                        label={`Search, enter a URL, or ask ${isBerry ? 'Berry' : 'a question'}`}
+                        placeholder={isBerry ? 'Ask Berry anything, or enter a URL…' : 'Ask anything, or enter a URL…'}
                         value={text}
-                        onChange={(e) => setText(e.target.value)}
+                        onChange={setText}
                         onKeyDown={handleKeyDown}
                         spellCheck={false}
                         autoFocus
-                        className={cn(
-                            "w-full h-12 pl-4 pr-32 rounded-panel bg-surface border text-15",
-                            "outline-none placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
-                        )}
+                        canSend={text.trim().length > 0}
+                        onSend={() => submit(false)}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-12 text-muted-foreground pointer-events-none">
-                        {askKey} {name === 'Berry' ? 'Ask Berry' : 'Ask'}
-                    </span>
+                    <div className="flex items-center gap-1 h-11 px-3">
+                        {TRAY.map(({ label, Icon, onClick }) => (
+                            <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
+                                <Icon className="size-4" />
+                                {label}
+                            </button>
+                        ))}
+                        <div className="flex-1" />
+                        <button type="button" onClick={() => void browser.openPage('settings')} className={TRAY_BUTTON}>
+                            <SlidersHorizontal className="size-4" />
+                            Settings
+                        </button>
+                    </div>
                 </div>
 
+                <section aria-labelledby="ideas-heading" className="mt-6">
+                    <h2 id="ideas-heading" className="flex items-center gap-2 px-1 pb-2.5 text-14 text-muted-foreground">
+                        <Lightbulb className="size-4" />
+                        Some ideas
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {IDEAS.map(({ Icon, title, text: body, action, onClick }) => (
+                            <button
+                                key={title}
+                                type="button"
+                                onClick={() => void onClick()}
+                                className={cn(
+                                    "group/idea p-4 rounded-panel bg-card border border-transparent dark:border-border text-left outline-none",
+                                    "hover:border-border transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+                                )}
+                            >
+                                <Icon className="size-5 text-muted-foreground" />
+                                <span className="mt-2.5 block text-14 font-semibold">{title}</span>
+                                <span className="mt-1 block text-13 text-muted-foreground">{body}</span>
+                                <span className="mt-2.5 flex items-center gap-1.5 text-13">
+                                    {action}
+                                    <ArrowRight className="size-3.5 transition-transform group-hover/idea:translate-x-0.5" />
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
                 {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className="mt-8">
-                        <h2 id="recent-heading" className="px-2 pb-1 text-12 text-muted-foreground">
+                    <section aria-labelledby="recent-heading" className="mt-6">
+                        <h2 id="recent-heading" className="px-1 pb-1.5 text-14 text-muted-foreground">
                             Recent
                         </h2>
                         <ul>
@@ -75,7 +148,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         type="button"
                                         onClick={() => void browser.navigateTab(tab.id, visit.url)}
                                         className={cn(
-                                            "w-full h-8 px-2 flex items-center gap-3 rounded-control text-13 text-left",
+                                            "w-full h-9 px-2 flex items-center gap-3 rounded-control text-14 text-left",
                                             "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
                                         )}
                                     >

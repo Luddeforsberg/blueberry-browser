@@ -261,19 +261,19 @@ test("the page card follows the sidebar and chat as they open and close", async 
   const size = () => page.evaluate(() => [window.innerWidth, window.innerHeight]);
 
   // Sidebar open and chat closed, which is how the app starts.
-  await expect.poll(size).toEqual([width - 240 - 8, height - 44 - 8]);
+  await expect.poll(size).toEqual([width - 280, height - 76]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
-  await expect.poll(size).toEqual([width - 240 - 360, height - 44 - 8]);
+  await expect.poll(size).toEqual([width - 280 - 400, height - 76]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
-  await expect.poll(size).toEqual([width - 8 - 360, height - 44 - 8]);
+  await expect.poll(size).toEqual([width - 4 - 400, height - 76]);
 
   // A tab opened now gets the same space as the others.
   const second = await openFixture("/second");
   await expect
     .poll(() => second.evaluate(() => window.innerWidth))
-    .toBe(width - 8 - 360);
+    .toBe(width - 4 - 400);
 });
 
 test("the chrome fills the window as it resizes", async () => {
@@ -324,7 +324,7 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect
     .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
-    .toEqual([width - 16, height - 40 - 44 - 8]);
+    .toEqual([width, height - 40 - 76]);
   expect(
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
   ).toBe(true);
@@ -340,10 +340,10 @@ test("the sidebar and chat resize within their limits, by pointer or keyboard", 
   const pageWidth = () => page.evaluate(() => window.innerWidth);
 
   await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 300));
-  await expect.poll(pageWidth).toBe(width - 300 - 8);
+  await expect.poll(pageWidth).toBe(width - 300);
 
   await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 9999));
-  await expect.poll(pageWidth).toBe(width - 360 - 8);
+  await expect.poll(pageWidth).toBe(width - 360);
 
   const handle = chrome.getByRole("separator", { name: "Resize sidebar" });
   await handle.focus();
@@ -504,16 +504,52 @@ test("first launch shows onboarding until it's finished or skipped", async () =>
   await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
 });
 
-test("the chat says what Berry can see, and the switch takes the page away", async () => {
+test("the new tab composer sends only when there is text, and asks Berry unless it's an address", async () => {
+  const send = chrome.getByRole("button", { name: "Send" });
+  await expect(send).toBeDisabled();
+
+  await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" }).fill("Plan a trip to Porto");
+  await send.click();
+
+  await expect.poll(async () => (await activeTab()).page).toBe("chat");
+  await expect(chrome.getByText(/This is sample data/)).toBeVisible();
+});
+
+test("the main chat and the chat panel share one composer", async () => {
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  const main = chrome.getByRole("textbox", { name: "Message" });
+  await expect(main).toBeVisible();
+  const mainClass = await main.getAttribute("class");
+
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" }).getByRole("textbox", { name: "Message" });
+  await expect(panel).toBeVisible();
+  expect(await panel.getAttribute("class")).toBe(mainClass);
+});
+
+test("the sidebar's search button focuses the address bar", async () => {
+  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Search" }).click();
+
+  await expect(chrome.getByRole("textbox", { name: "Address" })).toBeFocused();
+});
+
+test("a card on the composer shows the page Berry can see, and removing it takes the page away", async () => {
   await openFixture();
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const card = panel.getByRole("group", { name: "Berry can see 127.0.0.1" });
 
-  await expect(panel.getByText("Can see: 127.0.0.1")).toBeVisible();
-  await panel.getByRole("switch", { name: "Let Berry see this page" }).click();
+  await expect(card).toBeVisible();
+  await card.hover();
+  await panel.getByRole("button", { name: "Remove this page" }).click();
 
-  await expect(panel.getByText("Can see: no pages")).toBeVisible();
+  await expect(card).toHaveCount(0);
   expect(await chrome.evaluate(() => window.chromeAPI.chat.getPageAccess())).toBe(false);
+
+  await panel.getByRole("button", { name: "Add this page" }).click();
+  await expect(card).toBeVisible();
+  expect(await chrome.evaluate(() => window.chromeAPI.chat.getPageAccess())).toBe(true);
 });
 
 test("Hide Berry swaps the character for a plain icon and neutral words", async () => {
