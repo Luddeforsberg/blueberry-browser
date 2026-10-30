@@ -24,7 +24,7 @@ interface TopBarAPI {
 
   // Tab actions
   tabScreenshot: (tabId: string) => Promise<string | null>;
-  tabRunJs: (tabId: string, code: string) => Promise<any>;
+  tabRunJs: (tabId: string, code: string) => Promise<unknown>;
 
   // Sidebar
   toggleSidebar: () => Promise<void>;

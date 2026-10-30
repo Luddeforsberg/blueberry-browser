@@ -85,16 +85,16 @@ export class Tab {
     return await this.webContentsView.webContents.capturePage();
   }
 
-  async runJs(code: string): Promise<any> {
+  async runJs<T = unknown>(code: string): Promise<T> {
     return await this.webContentsView.webContents.executeJavaScript(code);
   }
 
   async getTabHtml(): Promise<string> {
-    return await this.runJs("return document.documentElement.outerHTML");
+    return await this.runJs<string>("return document.documentElement.outerHTML");
   }
 
   async getTabText(): Promise<string> {
-    return await this.runJs("return document.documentElement.innerText");
+    return await this.runJs<string>("return document.documentElement.innerText");
   }
 
   loadURL(url: string): Promise<void> {
