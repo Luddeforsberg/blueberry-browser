@@ -1,7 +1,4 @@
-interface DarkModeAPI {
-  notifyChanged: (isDarkMode: boolean) => void;
-  onUpdated: (callback: (isDarkMode: boolean) => void) => () => void;
-}
+import type { DarkModeAPI } from "../shared/ipc";
 
 declare global {
   interface Window {

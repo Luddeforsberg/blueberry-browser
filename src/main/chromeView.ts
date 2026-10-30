@@ -1,0 +1,33 @@
+import { is } from "@electron-toolkit/utils";
+import { WebContentsView } from "electron";
+import { join } from "path";
+import { pathToFileURL } from "url";
+import type { ChromeRegion } from "../shared/ipc";
+
+export interface ChromeView {
+  view: WebContentsView;
+  url: string;
+}
+
+const rendererUrl = (region: ChromeRegion): string =>
+  is.dev && process.env["ELECTRON_RENDERER_URL"]
+    ? new URL(`/${region}/`, process.env["ELECTRON_RENDERER_URL"]).href
+    : pathToFileURL(join(__dirname, `../renderer/${region}/index.html`)).href;
+
+export const createChromeView = (region: ChromeRegion): ChromeView => {
+  const url = rendererUrl(region);
+  const view = new WebContentsView({
+    webPreferences: {
+      preload: join(__dirname, `../preload/${region}.js`),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+
+  // The chrome keeps its preload for its whole life, so it must never show anything but our own page.
+  view.webContents.on("will-navigate", (event) => event.preventDefault());
+  view.webContents.loadURL(url);
+
+  return { view, url };
+};

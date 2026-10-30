@@ -1,258 +1,163 @@
-import { ipcMain, WebContents } from "electron";
+import { ipcMain } from "electron";
 import type { Window } from "./Window";
+import type { Tab } from "./Tab";
+import {
+  CHANNEL_REGIONS,
+  findTrustedRegion,
+  isTrustedSender,
+  sendToRenderer,
+  type ChromeEndpoint,
+} from "./ipc";
+import type {
+  ChromeRegion,
+  InvokeChannel,
+  InvokeChannels,
+  SendChannels,
+  TabInfo,
+} from "../shared/ipc";
+
+type Result<C extends InvokeChannel> =
+  | InvokeChannels[C]["result"]
+  | Promise<InvokeChannels[C]["result"]>;
 
 export class EventManager {
   private mainWindow: Window;
   private handledChannels: string[] = [];
+  private listenedChannels: string[] = [];
 
   constructor(mainWindow: Window) {
     this.mainWindow = mainWindow;
     this.setupEventHandlers();
   }
 
-  private handle(
-    channel: string,
-    listener: Parameters<typeof ipcMain.handle>[1]
+  private get endpoints(): Record<ChromeRegion, ChromeEndpoint> {
+    return {
+      topbar: {
+        webContents: this.mainWindow.topBar.view.webContents,
+        url: this.mainWindow.topBar.url,
+      },
+      sidebar: {
+        webContents: this.mainWindow.sidebar.view.webContents,
+        url: this.mainWindow.sidebar.url,
+      },
+    };
+  }
+
+  private handle<C extends InvokeChannel>(
+    channel: C,
+    listener: (...args: InvokeChannels[C]["args"]) => Result<C>
   ): void {
-    ipcMain.handle(channel, listener);
+    ipcMain.handle(channel, (event, ...args) => {
+      if (!isTrustedSender(event, this.endpoints[CHANNEL_REGIONS[channel]])) {
+        throw new Error(`Rejected ${channel} from ${event.senderFrame?.url ?? "an unknown frame"}`);
+      }
+      return listener(...(args as InvokeChannels[C]["args"]));
+    });
     this.handledChannels.push(channel);
   }
 
+  private on<C extends keyof SendChannels>(
+    channel: C,
+    listener: (from: ChromeRegion, ...args: SendChannels[C]) => void
+  ): void {
+    ipcMain.on(channel, (event, ...args) => {
+      const from = findTrustedRegion(event, this.endpoints);
+      if (!from) {
+        console.warn(`Rejected ${channel} from ${event.senderFrame?.url ?? "an unknown frame"}`);
+        return;
+      }
+      listener(from, ...(args as SendChannels[C]));
+    });
+    this.listenedChannels.push(channel);
+  }
+
   private setupEventHandlers(): void {
-    // Tab management events
     this.handleTabEvents();
-
-    // Sidebar events
     this.handleSidebarEvents();
-
-    // Page content events
-    this.handlePageContentEvents();
-
-    // Dark mode events
     this.handleDarkModeEvents();
+  }
 
-    // Debug events
-    this.handleDebugEvents();
+  private withTab(tabId: string, action: (tab: Tab) => unknown): boolean {
+    const tab = this.mainWindow.getTab(tabId);
+    if (!tab) return false;
+    action(tab);
+    return true;
+  }
+
+  private tabInfo(tab: Tab): TabInfo {
+    return {
+      id: tab.id,
+      title: tab.title,
+      url: tab.url,
+      favicon: tab.favicon,
+      isActive: this.mainWindow.activeTab?.id === tab.id,
+    };
   }
 
   private handleTabEvents(): void {
-    // Create new tab
-    this.handle("create-tab", (_, url?: string) => {
-      const newTab = this.mainWindow.createTab(url);
-      return { id: newTab.id, title: newTab.title, url: newTab.url };
-    });
+    this.handle("tabs:list", () =>
+      this.mainWindow.allTabs.map((tab) => this.tabInfo(tab))
+    );
 
-    // Close tab
-    this.handle("close-tab", (_, id: string) => {
-      this.mainWindow.closeTab(id);
-    });
+    this.handle("tabs:create", (url) => this.tabInfo(this.mainWindow.createTab(url)));
 
-    // Switch tab
-    this.handle("switch-tab", (_, id: string) => {
-      this.mainWindow.switchActiveTab(id);
-    });
+    this.handle("tabs:close", (tabId) => this.mainWindow.closeTab(tabId));
 
-    // Get tabs
-    this.handle("get-tabs", () => {
-      const activeTabId = this.mainWindow.activeTab?.id;
-      return this.mainWindow.allTabs.map((tab) => ({
-        id: tab.id,
-        title: tab.title,
-        url: tab.url,
-        favicon: tab.favicon,
-        isActive: activeTabId === tab.id,
-      }));
-    });
+    this.handle("tabs:switch", (tabId) => this.mainWindow.switchActiveTab(tabId));
 
-    // Navigation (for compatibility with existing code)
-    this.handle("navigate-to", (_, url: string) => {
-      if (this.mainWindow.activeTab) {
-        this.mainWindow.activeTab.loadURL(url);
-      }
-    });
-
-    this.handle("navigate-tab", async (_, tabId: string, url: string) => {
+    this.handle("tab:navigate", async (tabId, url) => {
       const tab = this.mainWindow.getTab(tabId);
-      if (tab) {
-        await tab.loadURL(url);
-        return true;
-      }
-      return false;
+      if (!tab) return false;
+      await tab.loadURL(url);
+      return true;
     });
 
-    this.handle("go-back", () => {
-      if (this.mainWindow.activeTab) {
-        this.mainWindow.activeTab.goBack();
-      }
-    });
+    this.handle("tab:back", (tabId) => this.withTab(tabId, (tab) => tab.goBack()));
 
-    this.handle("go-forward", () => {
-      if (this.mainWindow.activeTab) {
-        this.mainWindow.activeTab.goForward();
-      }
-    });
+    this.handle("tab:forward", (tabId) => this.withTab(tabId, (tab) => tab.goForward()));
 
-    this.handle("reload", () => {
-      if (this.mainWindow.activeTab) {
-        this.mainWindow.activeTab.reload();
-      }
-    });
-
-    // Tab-specific navigation handlers
-    this.handle("tab-go-back", (_, tabId: string) => {
-      const tab = this.mainWindow.getTab(tabId);
-      if (tab) {
-        tab.goBack();
-        return true;
-      }
-      return false;
-    });
-
-    this.handle("tab-go-forward", (_, tabId: string) => {
-      const tab = this.mainWindow.getTab(tabId);
-      if (tab) {
-        tab.goForward();
-        return true;
-      }
-      return false;
-    });
-
-    this.handle("tab-reload", (_, tabId: string) => {
-      const tab = this.mainWindow.getTab(tabId);
-      if (tab) {
-        tab.reload();
-        return true;
-      }
-      return false;
-    });
-
-    this.handle("tab-screenshot", async (_, tabId: string) => {
-      const tab = this.mainWindow.getTab(tabId);
-      if (tab) {
-        const image = await tab.screenshot();
-        return image.toDataURL();
-      }
-      return null;
-    });
-
-    // Tab info
-    this.handle("get-active-tab-info", () => {
-      const activeTab = this.mainWindow.activeTab;
-      if (activeTab) {
-        return {
-          id: activeTab.id,
-          url: activeTab.url,
-          title: activeTab.title,
-          canGoBack: activeTab.webContents.navigationHistory.canGoBack(),
-          canGoForward: activeTab.webContents.navigationHistory.canGoForward(),
-        };
-      }
-      return null;
-    });
+    this.handle("tab:reload", (tabId) => this.withTab(tabId, (tab) => tab.reload()));
   }
 
   private handleSidebarEvents(): void {
-    // Toggle sidebar
-    this.handle("toggle-sidebar", () => {
+    this.handle("sidebar:toggle", () => {
       this.mainWindow.sidebar.toggle();
       this.mainWindow.updateAllBounds();
-      return true;
     });
 
-    // Chat message
-    this.handle("sidebar-chat-message", async (_, request) => {
-      // The LLMClient now handles getting the screenshot and context directly
-      await this.mainWindow.sidebar.client.sendChatMessage(request);
-    });
+    this.handle("chat:send", (request) =>
+      this.mainWindow.sidebar.client.sendChatMessage(request)
+    );
 
-    // Clear chat
-    this.handle("sidebar-clear-chat", () => {
-      this.mainWindow.sidebar.client.clearMessages();
-      return true;
-    });
+    this.handle("chat:clear", () => this.mainWindow.sidebar.client.clearMessages());
 
-    // Get messages
-    this.handle("sidebar-get-messages", () => {
-      return this.mainWindow.sidebar.client.getMessages();
-    });
-  }
+    this.handle("chat:messages", () => this.mainWindow.sidebar.client.getMessages());
 
-  private handlePageContentEvents(): void {
-    // Get page content
-    this.handle("get-page-content", async () => {
-      if (this.mainWindow.activeTab) {
-        try {
-          return await this.mainWindow.activeTab.getTabHtml();
-        } catch (error) {
-          console.error("Error getting page content:", error);
-          return null;
-        }
+    this.handle("page:text", async () => {
+      const tab = this.mainWindow.activeTab;
+      if (!tab) return null;
+      try {
+        return await tab.getTabText();
+      } catch (error) {
+        console.error("Error getting page text:", error);
+        return null;
       }
-      return null;
-    });
-
-    // Get page text
-    this.handle("get-page-text", async () => {
-      if (this.mainWindow.activeTab) {
-        try {
-          return await this.mainWindow.activeTab.getTabText();
-        } catch (error) {
-          console.error("Error getting page text:", error);
-          return null;
-        }
-      }
-      return null;
-    });
-
-    // Get current URL
-    this.handle("get-current-url", () => {
-      if (this.mainWindow.activeTab) {
-        return this.mainWindow.activeTab.url;
-      }
-      return null;
     });
   }
 
   private handleDarkModeEvents(): void {
-    // Dark mode broadcasting
-    ipcMain.on("dark-mode-changed", (event, isDarkMode) => {
-      this.broadcastDarkMode(event.sender, isDarkMode);
+    this.on("theme:dark-changed", (from, isDarkMode) => {
+      const endpoints = this.endpoints;
+      (Object.keys(endpoints) as ChromeRegion[])
+        .filter((region) => region !== from)
+        .forEach((region) =>
+          sendToRenderer(endpoints[region].webContents, "theme:dark-updated", isDarkMode)
+        );
     });
   }
 
-  private handleDebugEvents(): void {
-    // Ping test
-    ipcMain.on("ping", () => console.log("pong"));
-  }
-
-  private broadcastDarkMode(sender: WebContents, isDarkMode: boolean): void {
-    // Send to topbar
-    if (this.mainWindow.topBar.view.webContents !== sender) {
-      this.mainWindow.topBar.view.webContents.send(
-        "dark-mode-updated",
-        isDarkMode
-      );
-    }
-
-    // Send to sidebar
-    if (this.mainWindow.sidebar.view.webContents !== sender) {
-      this.mainWindow.sidebar.view.webContents.send(
-        "dark-mode-updated",
-        isDarkMode
-      );
-    }
-
-    // Send to all tabs
-    this.mainWindow.allTabs.forEach((tab) => {
-      if (tab.webContents !== sender) {
-        tab.webContents.send("dark-mode-updated", isDarkMode);
-      }
-    });
-  }
-
-  // Clean up event listeners
   public cleanup(): void {
-    ipcMain.removeAllListeners();
     this.handledChannels.forEach((channel) => ipcMain.removeHandler(channel));
+    this.listenedChannels.forEach((channel) => ipcMain.removeAllListeners(channel));
   }
 }

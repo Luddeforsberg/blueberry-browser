@@ -62,7 +62,7 @@ describe("LLMClient", () => {
 
     await client.sendChatMessage({ message: "first", messageId: "1" });
 
-    const updates: CoreMessage[][] = sentOn("chat-messages-updated");
+    const updates: CoreMessage[][] = sentOn("chat:messages-updated");
     expect(updates.length).toBeGreaterThan(0);
     expect(updates.flat().some(hasImage)).toBe(false);
     expect(client.getMessages().some(hasImage)).toBe(false);
@@ -73,11 +73,11 @@ describe("LLMClient", () => {
 
     await client.sendChatMessage({ message: "first", messageId: "1" });
 
-    const chunks = sentOn("chat-response").filter((chunk) => !chunk.isComplete);
+    const chunks = sentOn("chat:chunk").filter((chunk) => !chunk.isComplete);
     expect(chunks.map((chunk) => chunk.content)).toEqual(["one ", "two ", "three"]);
 
     // The user message, the empty reply, and the finished reply.
-    const updates: CoreMessage[][] = sentOn("chat-messages-updated");
+    const updates: CoreMessage[][] = sentOn("chat:messages-updated");
     expect(updates).toHaveLength(3);
     expect(updates[2].at(-1)).toEqual({ role: "assistant", content: "one two three" });
   });

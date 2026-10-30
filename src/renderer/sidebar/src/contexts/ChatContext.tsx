@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import type { ChatChunk, ChatMessage } from '@shared/ipc'
 
 interface Message {
     id: string
@@ -15,14 +16,16 @@ interface ChatContextType {
     // Chat actions
     sendMessage: (content: string) => Promise<void>
     clearChat: () => void
-
-    // Page content access
-    getPageContent: () => Promise<string | null>
-    getPageText: () => Promise<string | null>
-    getCurrentUrl: () => Promise<string | null>
 }
 
-type StoredMessage = Awaited<ReturnType<Window['sidebarAPI']['getMessages']>>[number]
+const toMessages = (stored: ChatMessage[]): Message[] =>
+    stored.map((msg, index) => ({
+        id: `msg-${index}`,
+        role: msg.role,
+        content: msg.content,
+        timestamp: Date.now(),
+        isStreaming: false
+    }))
 
 const ChatContext = createContext<ChatContextType | null>(null)
 
@@ -43,18 +46,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const loadMessages = async () => {
             try {
                 const storedMessages = await window.sidebarAPI.getMessages()
-                if (storedMessages && storedMessages.length > 0) {
-                    // Convert CoreMessage format to our frontend Message format
-                    const convertedMessages = storedMessages.map((msg, index) => ({
-                        id: `msg-${index}`,
-                        role: msg.role,
-                        content: typeof msg.content === 'string' 
-                            ? msg.content 
-                            : msg.content.find((p) => p.type === 'text')?.text || '',
-                        timestamp: Date.now(),
-                        isStreaming: false
-                    }))
-                    setMessages(convertedMessages)
+                if (storedMessages.length > 0) {
+                    setMessages(toMessages(storedMessages))
                 }
             } catch (error) {
                 console.error('Failed to load messages:', error)
@@ -92,37 +85,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [])
 
-    const getPageContent = useCallback(async () => {
-        try {
-            return await window.sidebarAPI.getPageContent()
-        } catch (error) {
-            console.error('Failed to get page content:', error)
-            return null
-        }
-    }, [])
-
-    const getPageText = useCallback(async () => {
-        try {
-            return await window.sidebarAPI.getPageText()
-        } catch (error) {
-            console.error('Failed to get page text:', error)
-            return null
-        }
-    }, [])
-
-    const getCurrentUrl = useCallback(async () => {
-        try {
-            return await window.sidebarAPI.getCurrentUrl()
-        } catch (error) {
-            console.error('Failed to get current URL:', error)
-            return null
-        }
-    }, [])
-
     // Set up message listeners
     useEffect(() => {
         // Listen for streaming response updates
-        const handleChatResponse = (data: { messageId: string; content: string; isComplete: boolean }) => {
+        const handleChatChunk = (data: ChatChunk) => {
             if (data.isComplete) {
                 setIsLoading(false)
                 return
@@ -135,26 +101,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // Listen for message updates from main process
-        const handleMessagesUpdated = (updatedMessages: StoredMessage[]) => {
-            // Convert CoreMessage format to our frontend Message format
-            const convertedMessages = updatedMessages.map((msg, index) => ({
-                id: `msg-${index}`,
-                role: msg.role,
-                content: typeof msg.content === 'string' 
-                    ? msg.content 
-                    : msg.content.find((p) => p.type === 'text')?.text || '',
-                timestamp: Date.now(),
-                isStreaming: false
-            }))
-            setMessages(convertedMessages)
+        const handleMessagesUpdated = (updatedMessages: ChatMessage[]) => {
+            setMessages(toMessages(updatedMessages))
         }
 
-        window.sidebarAPI.onChatResponse(handleChatResponse)
-        window.sidebarAPI.onMessagesUpdated(handleMessagesUpdated)
+        const unsubscribeChunks = window.sidebarAPI.onChatChunk(handleChatChunk)
+        const unsubscribeMessages = window.sidebarAPI.onMessagesUpdated(handleMessagesUpdated)
 
         return () => {
-            window.sidebarAPI.removeChatResponseListener()
-            window.sidebarAPI.removeMessagesUpdatedListener()
+            unsubscribeChunks()
+            unsubscribeMessages()
         }
     }, [])
 
@@ -162,10 +118,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         messages,
         isLoading,
         sendMessage,
-        clearChat,
-        getPageContent,
-        getPageText,
-        getCurrentUrl
+        clearChat
     }
 
     return (
