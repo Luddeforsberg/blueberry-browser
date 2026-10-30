@@ -4,7 +4,7 @@ import { findView, launchApp } from "./app";
 test("the built app renders its sidebar, toolbar and chat", async () => {
   const app = await launchApp();
   try {
-    const chrome = await findView(app, "chrome/index.html");
+    const chrome = await findView(app, "view=chrome");
     await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
     await expect(chrome.getByRole("button", { name: "Address" })).toBeVisible();
 

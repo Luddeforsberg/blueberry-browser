@@ -38,7 +38,7 @@ test.afterAll(() => {
 
 test.beforeEach(async () => {
   app = await launchApp();
-  chrome = await findView(app, "chrome/index.html");
+  chrome = await findView(app, "view=chrome");
 });
 
 test.afterEach(async () => {
@@ -65,7 +65,7 @@ const sendToChrome = (channel: string, payload: unknown) =>
     ({ webContents }, [channel, payload]) => {
       webContents
         .getAllWebContents()
-        .find((contents) => contents.getURL().includes("chrome/index.html"))
+        .find((contents) => contents.getURL().includes("view=chrome"))
         ?.send(channel as string, payload);
     },
     [channel, payload] as const
@@ -212,7 +212,7 @@ test("the chrome renderer gets no raw IPC or code execution in tabs", async () =
   expect(await chrome.evaluate(() => "tabRunJs" in window.chromeAPI.browser)).toBe(false);
 });
 
-test("the chrome renderer runs sandboxed", async () => {
+test("the chrome renderers run sandboxed", async () => {
   const sandboxed = await app.evaluate(({ app, webContents }) => {
     const metrics = app.getAppMetrics();
     return webContents
@@ -221,7 +221,8 @@ test("the chrome renderer runs sandboxed", async () => {
       .map((contents) => metrics.find((metric) => metric.pid === contents.getOSProcessId())?.sandboxed);
   });
 
-  expect(sandboxed).toEqual([true]);
+  // The chrome view, and the overlay view for the floating sidebar.
+  expect(sandboxed).toEqual([true, true]);
 });
 
 test("the chrome renderer can't be navigated away from its own page", async () => {
@@ -286,4 +287,106 @@ test("the chrome fills the window as it resizes", async () => {
   await expect
     .poll(() => chrome.evaluate(() => [window.innerWidth, window.innerHeight]))
     .toEqual([width, height]);
+});
+
+const setContentSize = (width: number, height: number) =>
+  app.evaluate(
+    ({ BaseWindow }, [width, height]) => {
+      const baseWindow = BaseWindow.getAllWindows()[0];
+      baseWindow.setContentSize(width, height);
+      return baseWindow.getContentSize();
+    },
+    [width, height]
+  );
+
+const overlayVisible = () =>
+  app.evaluate(({ BaseWindow }) =>
+    BaseWindow.getAllWindows()[0]
+      .contentView.children.find((view) =>
+        "webContents" in view
+          ? (view as Electron.WebContentsView).webContents.getURL().includes("view=overlay")
+          : false
+      )
+      ?.getVisible()
+  );
+
+test("horizontal tabs put a tab row above the toolbar, with the same tabs", async () => {
+  const [width, height] = await setContentSize(1200, 700);
+  expect(width).toBe(1200);
+  const page = await openFixture();
+
+  await chrome.evaluate(() => window.chromeAPI.layout.setMode("horizontal"));
+
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+  const tab = chrome
+    .getByRole("list", { name: "Tabs" })
+    .getByRole("button", { name: "Fixture", exact: true });
+  await expect(tab).toHaveAttribute("aria-current", "page");
+  await expect
+    .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
+    .toEqual([width - 16, height - 40 - 44 - 8]);
+  expect(
+    await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
+  ).toBe(true);
+
+  await chrome.evaluate(() => window.chromeAPI.layout.setMode("vertical"));
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
+});
+
+test("the sidebar and chat resize within their limits, by pointer or keyboard", async () => {
+  const [width] = await setContentSize(1400, 700);
+  expect(width).toBe(1400);
+  const page = await openFixture();
+  const pageWidth = () => page.evaluate(() => window.innerWidth);
+
+  await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 300));
+  await expect.poll(pageWidth).toBe(width - 300 - 8);
+
+  await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 9999));
+  await expect.poll(pageWidth).toBe(width - 360 - 8);
+
+  const handle = chrome.getByRole("separator", { name: "Resize sidebar" });
+  await handle.focus();
+  await chrome.keyboard.press("ArrowLeft");
+  await expect(handle).toHaveAttribute("aria-valuenow", "352");
+
+  const box = (await handle.boundingBox())!;
+  await chrome.mouse.move(box.x + 2, box.y + 200);
+  await chrome.mouse.down();
+  await chrome.mouse.move(250, box.y + 200);
+  await chrome.mouse.up();
+  await expect(handle).toHaveAttribute("aria-valuenow", "250");
+
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
+  await chrome.evaluate(() => window.chromeAPI.layout.resize("chat", 400));
+  await expect(chrome.getByRole("separator", { name: "Resize Berry" })).toHaveAttribute(
+    "aria-valuenow",
+    "400"
+  );
+  await expect.poll(pageWidth).toBe(width - 250 - 400);
+});
+
+test("the collapsed sidebar floats over the page when the pointer reaches the left edge", async () => {
+  await openFixture();
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+  expect(await overlayVisible()).toBe(false);
+
+  const { y, height } = await chrome.evaluate(async () => (await window.chromeAPI.layout.getLayout()).page);
+  await chrome.mouse.move(3, y + height / 2);
+  await expect.poll(overlayVisible).toBe(true);
+
+  const overlay = await findView(app, "view=overlay");
+  await expect(
+    overlay.getByRole("list", { name: "Tabs" }).getByRole("button", { name: "Fixture", exact: true })
+  ).toBeVisible();
+
+  await overlay.evaluate(() => window.chromeAPI.layout.hideFloatingSidebar());
+  await expect.poll(overlayVisible).toBe(false);
+
+  // Pinning it from the floating sidebar opens the real one.
+  await chrome.evaluate(() => window.chromeAPI.layout.showFloatingSidebar());
+  await overlay.getByRole("button", { name: "Keep sidebar open" }).click();
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
+  expect(await overlayVisible()).toBe(false);
 });
