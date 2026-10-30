@@ -130,7 +130,7 @@ export const AddressBar: React.FC = () => {
             {isFocused ? (
                 // Expanded State
                 <form onSubmit={handleSubmit} className="flex-1 min-w-0 max-w-full">
-                    <div className="bg-background rounded-lg shadow-md p-1 dark:bg-secondary">
+                    <div className="bg-surface rounded-card p-1 ring-2 ring-ring">
                         <input
                             type="text"
                             value={url}
@@ -138,7 +138,7 @@ export const AddressBar: React.FC = () => {
                             onFocus={handleFocus}
                             onBlur={handleBlur}
                             onKeyDown={handleKeyDown}
-                            className="w-full px-1 py-0.5 text-xs outline-none bg-transparent text-foreground truncate"
+                            className="w-full px-1 py-0.5 text-13 outline-none bg-transparent text-foreground truncate"
                             placeholder={activeTab ? "Enter URL or search term" : "No active tab"}
                             disabled={!activeTab}
                             spellCheck={false}
@@ -151,10 +151,9 @@ export const AddressBar: React.FC = () => {
                 <div
                     onClick={handleFocus}
                     className={cn(
-                        "flex-1 px-3 h-8 rounded-md cursor-text group/address-bar",
-                        "hover:bg-muted text-muted-foreground app-region-no-drag",
-                        "transition-colors duration-200",
-                        "dark:hover:bg-muted/50"
+                        "flex-1 px-3 h-8 rounded-card cursor-text group/address-bar",
+                        "bg-muted hover:bg-border text-muted-foreground app-region-no-drag",
+                        "transition-colors"
                     )}
                 >
                     <div className="flex h-full items-center">
@@ -164,14 +163,14 @@ export const AddressBar: React.FC = () => {
                         </div>
 
                         {/* URL Display */}
-                        <div className="text-[0.8rem] leading-normal truncate flex-1">
+                        <div className="text-13 truncate flex-1">
                             {activeTab ? (
                                 <>
-                                    <span className="text-foreground dark:text-foreground">{getDomain()}</span>
-                                    <span className="group-hover/address-bar:hidden text-muted-foreground/60">
+                                    <span className="text-foreground">{getDomain()}</span>
+                                    <span className="group-hover/address-bar:hidden text-muted-foreground">
                                         {activeTab.title && ` / ${activeTab.title}`}
                                     </span>
-                                    <span className="group-hover/address-bar:inline hidden text-muted-foreground/60">
+                                    <span className="group-hover/address-bar:inline hidden text-muted-foreground">
                                         {getPath()}
                                     </span>
                                 </>

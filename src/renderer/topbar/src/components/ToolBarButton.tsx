@@ -22,9 +22,9 @@ export const ToolBarButton: React.FC<ToolBarButtonProps> = ({
     return (
         <div
             className={cn(
-                "size-8 flex items-center justify-center rounded-md",
+                "size-8 flex items-center justify-center rounded-control",
                 "text-secondary-foreground app-region-no-drag",
-                "transition-all duration-200",
+                "transition-colors",
                 !active ? "opacity-50" : "hover:bg-muted active:brightness-95 cursor-pointer",
                 toggled && "bg-muted",
                 className

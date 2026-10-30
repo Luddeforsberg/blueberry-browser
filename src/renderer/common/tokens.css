@@ -1,0 +1,65 @@
+/* DESIGN.md section 4. Components use these through Tailwind, never raw colours. */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --background: 248 248 249;
+    --surface: 255 255 255;
+    --muted: 236 236 238;
+    --border: 226 226 230;
+    --foreground: 27 27 30;
+    --muted-foreground: 94 94 102;
+    --primary: 47 58 168;
+    --primary-foreground: 255 255 255;
+    --accent-ink: 47 58 168;
+    --success: 24 105 63;
+    --warning: 122 79 0;
+    --destructive: 179 38 30;
+    --destructive-foreground: 255 255 255;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --background: 28 28 30;
+    --surface: 42 42 45;
+    --muted: 56 56 59;
+    --border: 58 58 61;
+    --foreground: 242 242 243;
+    --muted-foreground: 169 169 176;
+    --primary: 61 75 199;
+    --primary-foreground: 255 255 255;
+    --accent-ink: 163 174 251;
+    --success: 111 207 151;
+    --warning: 224 176 80;
+    --destructive: 242 139 130;
+    --destructive-foreground: 28 28 30;
+  }
+
+  :root,
+  .dark {
+    --glass-tint: rgb(var(--background) / 0.88);
+
+    /* Names kept from the starter theme, as aliases of the tokens above. */
+    --card: var(--surface);
+    --card-foreground: var(--foreground);
+    --popover: var(--surface);
+    --popover-foreground: var(--foreground);
+    --secondary: var(--muted);
+    --secondary-foreground: var(--foreground);
+    --accent: var(--muted);
+    --accent-foreground: var(--foreground);
+    --input: var(--border);
+    --ring: var(--accent-ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
