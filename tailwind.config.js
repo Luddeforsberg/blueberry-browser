@@ -65,8 +65,10 @@ module.exports = {
       panel: "12px",
       full: "9999px",
     },
+    // Only things that float over a page get a shadow.
     boxShadow: {
       none: "none",
+      float: "0 8px 24px rgb(0 0 0 / 0.16)",
     },
     fontFamily: {
       sans: [

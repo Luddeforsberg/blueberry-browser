@@ -10,15 +10,17 @@ export const Toolbar: React.FC = () => {
     const { layout, theme, toggleSidebar, toggleChat } = useShell()
 
     // With no sidebar, the toolbar is the window's top-left corner, where macOS puts its buttons.
-    const leftClear = !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 8
-    const rightClear = !layout.chatOpen && theme.platform === 'windows' ? layout.controls.width : 8
+    // In horizontal mode the tab row above takes the window buttons instead.
+    const vertical = layout.mode === 'vertical'
+    const leftClear = vertical && !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 8
+    const rightClear = vertical && !layout.chatOpen && theme.platform === 'windows' ? layout.controls.width : 8
 
     return (
         <div
             className="h-full flex items-center gap-1 app-region-drag"
             style={{ paddingLeft: leftClear, paddingRight: rightClear }}
         >
-            {!layout.sidebarOpen && (
+            {vertical && !layout.sidebarOpen && (
                 <ToolBarButton Icon={PanelLeft} label="Show sidebar" onClick={toggleSidebar} />
             )}
             <ToolBarButton
