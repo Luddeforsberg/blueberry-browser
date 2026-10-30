@@ -33,6 +33,9 @@ export const CHANNEL_REGIONS: {
   "chat:clear": ["chrome"],
   "chat:messages": ["chrome"],
   "page:text": ["chrome"],
+  "chat:page-access": ["chrome"],
+  "chat:set-page-access": ["chrome"],
+  "berry:context-menu": ["chrome"],
 };
 
 export interface ChromeEndpoint {

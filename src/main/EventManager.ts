@@ -117,6 +117,12 @@ export class EventManager {
 
     this.handle("chat:messages", () => this.mainWindow.chat.getMessages());
 
+    this.handle("chat:page-access", () => this.mainWindow.chat.canSeePage);
+
+    this.handle("chat:set-page-access", (enabled) => this.mainWindow.chat.setPageAccess(enabled));
+
+    this.handle("berry:context-menu", () => this.mainWindow.showBerryMenu());
+
     this.handle("page:text", async () => {
       const tab = this.mainWindow.activeTab;
       if (!tab) return null;

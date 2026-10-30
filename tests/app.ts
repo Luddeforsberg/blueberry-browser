@@ -4,15 +4,22 @@ import {
   type Page,
 } from "@playwright/test";
 import electronPath from "electron";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
 // Pass a profile folder to launch again with the same saved settings.
+// Tests skip onboarding unless they ask for a first launch.
 export async function launchApp(
-  userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-"))
+  userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
+  { firstLaunch = false }: { firstLaunch?: boolean } = {}
 ): Promise<ElectronApplication> {
+  const settingsFile = join(userDataDir, "settings.json");
+  if (!firstLaunch && !existsSync(settingsFile)) {
+    writeFileSync(settingsFile, JSON.stringify({ onboarded: true }));
+  }
+
   // Some shells export ELECTRON_RUN_AS_NODE, which would start Node instead of the app.
   const env = { ...process.env } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;

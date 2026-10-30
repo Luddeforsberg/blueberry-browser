@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatWidth: CHAT_WIDTH.default,
   showBerry: true,
   keepBerryStill: false,
+  onboarded: false,
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -31,6 +32,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     chatWidth: width(input.chatWidth, CHAT_WIDTH, base.chatWidth),
     showBerry: bool(input.showBerry, base.showBerry),
     keepBerryStill: bool(input.keepBerryStill, base.keepBerryStill),
+    onboarded: bool(input.onboarded, base.onboarded),
   };
 }
 
