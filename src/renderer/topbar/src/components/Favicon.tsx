@@ -14,7 +14,7 @@ export const Favicon: React.FC<FaviconProps> = ({ src, className }) => {
     }
 
     return (
-        <div className="size-4 overflow-hidden rounded-sm flex items-center justify-center">
+        <div className="size-4 overflow-hidden rounded-none flex items-center justify-center">
             <img
                 src={src}
                 className="object-contain size-full"

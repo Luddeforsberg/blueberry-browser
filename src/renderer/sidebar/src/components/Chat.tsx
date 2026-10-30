@@ -38,8 +38,8 @@ const useAutoScroll = (messages: Message[]) => {
 // User Message Component - appears on the right
 const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     <div className="relative max-w-[85%] ml-auto animate-fade-in">
-        <div className="bg-muted dark:bg-muted/50 rounded-3xl px-6 py-4">
-            <div className="text-foreground" style={{ whiteSpace: 'pre-wrap' }}>
+        <div className="bg-muted rounded-panel px-4 py-2">
+            <div className="text-15 text-foreground" style={{ whiteSpace: 'pre-wrap' }}>
                 {content}
             </div>
         </div>
@@ -63,10 +63,10 @@ const StreamingText: React.FC<{ content: string }> = ({ content }) => {
     }, [content, currentIndex])
 
     return (
-        <div className="whitespace-pre-wrap text-foreground">
+        <div className="whitespace-pre-wrap text-15 text-foreground">
             {displayedContent}
             {currentIndex < content.length && (
-                <span className="inline-block w-2 h-5 bg-primary/60 dark:bg-primary/40 ml-0.5 animate-pulse" />
+                <span className="inline-block w-2 h-5 bg-accent-ink ml-0.5 animate-pulse" />
             )}
         </div>
     )
@@ -74,15 +74,7 @@ const StreamingText: React.FC<{ content: string }> = ({ content }) => {
 
 // Markdown Renderer Component
 const Markdown: React.FC<{ content: string }> = ({ content }) => (
-    <div className="prose prose-sm dark:prose-invert max-w-none 
-                    prose-headings:text-foreground prose-p:text-foreground 
-                    prose-strong:text-foreground prose-ul:text-foreground 
-                    prose-ol:text-foreground prose-li:text-foreground
-                    prose-a:text-primary hover:prose-a:underline
-                    prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 
-                    prose-code:rounded prose-code:text-sm prose-code:text-foreground
-                    prose-pre:bg-muted dark:prose-pre:bg-muted/50 prose-pre:p-3 
-                    prose-pre:rounded-lg prose-pre:overflow-x-auto">
+    <div className="prose max-w-none prose-pre:p-3 prose-pre:overflow-x-auto">
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
@@ -90,7 +82,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
                 code: ({ node, className, children, ...props }) => {
                     const inline = !className
                     return inline ? (
-                        <code className="bg-muted dark:bg-muted/50 px-1 py-0.5 rounded text-sm text-foreground" {...props}>
+                        <code className="bg-muted px-1 py-0.5 rounded-control" {...props}>
                             {children}
                         </code>
                     ) : (
@@ -103,7 +95,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => (
                 a: ({ children, href }) => (
                     <a
                         href={href}
-                        className="text-primary hover:underline"
+                        className="text-accent-ink hover:underline"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -143,7 +135,7 @@ const LoadingIndicator: React.FC = () => {
 
     return (
         <div className={cn(
-            "transition-transform duration-300 ease-in-out",
+            "transition-transform duration-layout",
             isVisible ? "scale-100" : "scale-0"
         )}>
             ...
@@ -190,9 +182,9 @@ const ChatInput: React.FC<{
 
     return (
         <div className={cn(
-            "w-full border p-3 rounded-3xl bg-background dark:bg-secondary",
-            "shadow-chat animate-spring-scale outline-none transition-all duration-200",
-            isFocused ? "border-primary/20 dark:border-primary/30" : "border-border"
+            "w-full border p-3 rounded-panel bg-surface",
+            "outline-none transition-colors",
+            isFocused ? "border-transparent ring-2 ring-ring" : "border-border"
         )}>
             {/* Input Area */}
             <div className="w-full px-3 py-2">
@@ -207,7 +199,7 @@ const ChatInput: React.FC<{
                             onKeyDown={handleKeyDown}
                             placeholder="Send a message..."
                             className="w-full resize-none outline-none bg-transparent 
-                                     text-foreground placeholder:text-muted-foreground
+                                     text-15 text-foreground placeholder:text-muted-foreground
                                      min-h-[24px] max-h-[200px]"
                             rows={1}
                             style={{ lineHeight: '24px' }}
@@ -224,7 +216,7 @@ const ChatInput: React.FC<{
                     disabled={disabled || !value.trim()}
                     className={cn(
                         "size-9 rounded-full flex items-center justify-center",
-                        "transition-all duration-200",
+                        "transition-colors",
                         "bg-primary text-primary-foreground",
                         "hover:opacity-80 disabled:opacity-50"
                     )}
@@ -312,8 +304,8 @@ export const Chat: React.FC = () => {
                         // Empty State
                         <div className="flex items-center justify-center h-full min-h-[400px]">
                             <div className="text-center animate-fade-in max-w-md mx-auto gap-2 flex flex-col">
-                                <h3 className="text-2xl font-bold">🫐</h3>
-                                <p className="text-muted-foreground text-sm">
+                                <h3 className="text-20 font-semibold">🫐</h3>
+                                <p className="text-muted-foreground text-12">
                                     Press ⌘E to toggle the sidebar
                                 </p>
                             </div>

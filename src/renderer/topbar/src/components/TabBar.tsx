@@ -24,12 +24,12 @@ const TabItem: React.FC<TabItemProps> = ({
     onActivate
 }) => {
     const baseClassName = cn(
-        "relative flex items-center h-8 pl-2 pr-1.5 select-none rounded-md",
-        "text-primary group/tab transition-all duration-200 cursor-pointer",
+        "relative flex items-center h-8 pl-2 pr-1.5 select-none rounded-control",
+        "text-foreground group/tab transition-colors cursor-pointer",
         "app-region-no-drag", // Make tabs clickable
         isActive
-            ? "bg-background shadow-tab dark:bg-secondary dark:shadow-none"
-            : "bg-transparent hover:bg-muted/50 dark:hover:bg-muted/30",
+            ? "bg-muted font-semibold"
+            : "hover:bg-muted",
         isPinned ? "w-8 !px-0 justify-center" : ""
     )
 
@@ -46,7 +46,7 @@ const TabItem: React.FC<TabItemProps> = ({
 
                 {/* Title (hide for pinned tabs) */}
                 {!isPinned && (
-                    <span className="text-xs truncate max-w-[200px] flex-1">
+                    <span className="text-13 truncate max-w-[200px] flex-1">
                         {title || 'New Tab'}
                     </span>
                 )}
@@ -59,13 +59,13 @@ const TabItem: React.FC<TabItemProps> = ({
                             onClose()
                         }}
                         className={cn(
-                            "flex-shrink-0 p-1 rounded-md transition-opacity",
-                            "hover:bg-muted dark:hover:bg-muted/50",
+                            "flex-shrink-0 p-1 rounded-control transition-opacity",
+                            "hover:bg-border",
                             "opacity-0 group-hover/tab:opacity-100",
                             isActive && "opacity-100"
                         )}
                     >
-                        <X className="size-3 text-primary dark:text-primary" />
+                        <X className="size-3" />
                     </div>
                 )}
             </div>
