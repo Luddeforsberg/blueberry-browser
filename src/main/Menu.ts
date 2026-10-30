@@ -77,6 +77,10 @@ export class AppMenu {
             accelerator: "CmdOrCtrl+E",
             click: () => this.mainWindow.toggleChat(),
           },
+          {
+            label: "Toggle Light and Dark",
+            click: () => this.mainWindow.toggleDarkMode(),
+          },
           { type: "separator" },
           {
             label: "Toggle Developer Tools",

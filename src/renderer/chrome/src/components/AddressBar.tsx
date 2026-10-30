@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { useBrowser } from '../contexts/BrowserContext'
-import { Favicon } from '../components/Favicon'
 import { cn } from '@common/lib/utils'
 
 const toUrl = (input: string): string => {
@@ -61,7 +60,7 @@ export const AddressBar: React.FC = () => {
                         "w-full h-8 px-3 rounded-card bg-surface text-13 text-foreground",
                         "outline-none ring-2 ring-ring placeholder:text-muted-foreground"
                     )}
-                    placeholder={activeTab ? "Search or enter address" : "No active tab"}
+                    placeholder="Search or enter a URL"
                     disabled={!activeTab}
                     spellCheck={false}
                     autoFocus
@@ -83,9 +82,8 @@ export const AddressBar: React.FC = () => {
                 "focus-visible:ring-2 focus-visible:ring-ring"
             )}
         >
-            <Favicon src={activeTab?.favicon} />
             <span className="text-13 truncate flex-1">
-                {activeTab ? (
+                {activeTab?.url ? (
                     <>
                         <span className="text-foreground">{domain}</span>
                         <span className="group-hover/address-bar:hidden text-muted-foreground">
@@ -96,7 +94,7 @@ export const AddressBar: React.FC = () => {
                         </span>
                     </>
                 ) : (
-                    <span className="text-muted-foreground">No active tab</span>
+                    <span className="text-muted-foreground">Search or enter a URL</span>
                 )}
             </span>
         </button>

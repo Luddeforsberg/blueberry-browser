@@ -37,7 +37,7 @@ const useAutoScroll = (messages: Message[]) => {
 // User Message Component - appears on the right
 const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     <div className="relative max-w-[85%] ml-auto animate-fade-in">
-        <div className="bg-muted rounded-panel px-4 py-2">
+        <div className="bg-muted rounded-panel px-3 py-2">
             <div className="text-15 text-foreground" style={{ whiteSpace: 'pre-wrap' }}>
                 {content}
             </div>
@@ -181,51 +181,35 @@ const ChatInput: React.FC<{
 
     return (
         <div className={cn(
-            "w-full border p-3 rounded-panel bg-surface",
-            "outline-none transition-colors",
+            "w-full flex items-end gap-2 py-1.5 pl-3 pr-1.5 rounded-panel bg-surface border transition-colors",
             isFocused ? "border-transparent ring-2 ring-ring" : "border-border"
         )}>
-            {/* Input Area */}
-            <div className="w-full px-3 py-2">
-                <div className="w-full flex items-start gap-3">
-                    <div className="relative flex-1 overflow-hidden">
-                        <textarea
-                            ref={textareaRef}
-                            value={value}
-                            onChange={(e) => setValue(e.target.value)}
-                            onFocus={() => setIsFocused(true)}
-                            onBlur={() => setIsFocused(false)}
-                            onKeyDown={handleKeyDown}
-                            aria-label="Message"
-                            placeholder="Send a message..."
-                            className="w-full resize-none outline-none bg-transparent 
-                                     text-15 text-foreground placeholder:text-muted-foreground
-                                     min-h-[24px] max-h-[200px]"
-                            rows={1}
-                            style={{ lineHeight: '24px' }}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* Send Button */}
-            <div className="w-full flex items-center gap-1.5 px-1 mt-2 mb-1">
-                <div className="flex-1" />
-                <button
-                    type="button"
-                    aria-label="Send"
-                    onClick={handleSubmit}
-                    disabled={disabled || !value.trim()}
-                    className={cn(
-                        "size-9 rounded-full flex items-center justify-center",
-                        "transition-colors",
-                        "bg-primary text-primary-foreground",
-                        "hover:opacity-80 disabled:opacity-50"
-                    )}
-                >
-                    <ArrowUp className="size-5" />
-                </button>
-            </div>
+            <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                onKeyDown={handleKeyDown}
+                aria-label="Message"
+                placeholder="Ask Berry"
+                className="flex-1 py-1 resize-none outline-none bg-transparent text-15 text-foreground placeholder:text-muted-foreground min-h-[24px] max-h-[200px]"
+                rows={1}
+                style={{ lineHeight: '24px' }}
+            />
+            <button
+                type="button"
+                aria-label="Send"
+                onClick={handleSubmit}
+                disabled={disabled || !value.trim()}
+                className={cn(
+                    "size-7 shrink-0 mb-0.5 rounded-full flex items-center justify-center transition-colors outline-none",
+                    "bg-primary text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                    "disabled:bg-muted disabled:text-muted-foreground"
+                )}
+            >
+                <ArrowUp className="size-4" />
+            </button>
         </div>
     )
 }
@@ -240,7 +224,7 @@ const ConversationTurnComponent: React.FC<{
     turn: ConversationTurn
     isLoading?: boolean
 }> = ({ turn, isLoading }) => (
-    <div className="pt-12 flex flex-col gap-8">
+    <div className="pt-4 flex flex-col gap-4">
         {turn.user && <UserMessage content={turn.user.content} />}
         {turn.assistant && (
             <AssistantMessage
@@ -286,18 +270,13 @@ export const Chat: React.FC = () => {
         <div className="flex flex-col h-full">
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto">
-                <div className="pb-4 relative max-w-3xl mx-auto px-4">
+                <div className="pb-4 relative px-3">
 
                     {messages.length === 0 ? (
                         // Empty State
-                        <div className="flex items-center justify-center h-full min-h-[400px]">
-                            <div className="text-center animate-fade-in max-w-md mx-auto gap-2 flex flex-col">
-                                <h3 className="text-20 font-semibold">🫐</h3>
-                                <p className="text-muted-foreground text-12">
-                                    Ask anything about this page
-                                </p>
-                            </div>
-                        </div>
+                        <p className="pt-4 px-1 text-13 text-muted-foreground animate-fade-in">
+                            Ask about this page, or anything else.
+                        </p>
                     ) : (
                         <>
 
@@ -321,7 +300,7 @@ export const Chat: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4">
+            <div className="p-3">
                 <ChatInput onSend={sendMessage} disabled={isLoading} />
             </div>
         </div>
