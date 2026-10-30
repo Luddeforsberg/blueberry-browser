@@ -4,6 +4,9 @@ import {
   type Page,
 } from "@playwright/test";
 import electronPath from "electron";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
 export async function launchApp(): Promise<ElectronApplication> {
@@ -13,7 +16,8 @@ export async function launchApp(): Promise<ElectronApplication> {
 
   return electron.launch({
     executablePath: electronPath as unknown as string,
-    args: ["."],
+    // A fresh profile keeps tests apart and away from the developer's real browsing data.
+    args: [".", `--user-data-dir=${mkdtempSync(join(tmpdir(), "blueberry-test-"))}`],
     env,
   });
 }

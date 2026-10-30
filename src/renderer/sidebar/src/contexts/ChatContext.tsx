@@ -125,7 +125,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const handleChatResponse = (data: { messageId: string; content: string; isComplete: boolean }) => {
             if (data.isComplete) {
                 setIsLoading(false)
+                return
             }
+            setMessages((current) => {
+                const last = current[current.length - 1]
+                if (last?.role !== 'assistant') return current
+                return [...current.slice(0, -1), { ...last, content: last.content + data.content }]
+            })
         }
 
         // Listen for message updates from main process

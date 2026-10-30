@@ -1,5 +1,3 @@
-import { ElectronAPI } from "@electron-toolkit/preload";
-
 interface ChatRequest {
   message: string;
   messageId: string;
@@ -44,8 +42,8 @@ interface SidebarAPI {
 
 declare global {
   interface Window {
-    electron: ElectronAPI;
     sidebarAPI: SidebarAPI;
   }
 }
 
+export {};

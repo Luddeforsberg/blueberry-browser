@@ -1,9 +1,8 @@
-import { ElectronAPI } from "@electron-toolkit/preload";
-
 interface TabInfo {
   id: string;
   title: string;
   url: string;
+  favicon?: string | null;
   isActive: boolean;
 }
 
@@ -24,7 +23,6 @@ interface TopBarAPI {
 
   // Tab actions
   tabScreenshot: (tabId: string) => Promise<string | null>;
-  tabRunJs: (tabId: string, code: string) => Promise<unknown>;
 
   // Sidebar
   toggleSidebar: () => Promise<void>;
@@ -32,8 +30,8 @@ interface TopBarAPI {
 
 declare global {
   interface Window {
-    electron: ElectronAPI;
     topBarAPI: TopBarAPI;
   }
 }
 
+export {};

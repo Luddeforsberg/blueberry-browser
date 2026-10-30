@@ -92,16 +92,6 @@ export const AddressBar: React.FC = () => {
         }
     }
 
-    const getFavicon = () => {
-        if (!activeTab?.url) return null
-        try {
-            const domain = new URL(activeTab.url).hostname
-            return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
-        } catch {
-            return null
-        }
-    }
-
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen)
         // Send IPC event to toggle sidebar
@@ -170,7 +160,7 @@ export const AddressBar: React.FC = () => {
                     <div className="flex h-full items-center">
                         {/* Favicon */}
                         <div className="size-4 mr-2">
-                            <Favicon src={getFavicon()} />
+                            <Favicon src={activeTab?.favicon} />
                         </div>
 
                         {/* URL Display */}

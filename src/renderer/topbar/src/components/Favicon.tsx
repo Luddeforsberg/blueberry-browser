@@ -7,9 +7,9 @@ interface FaviconProps {
 }
 
 export const Favicon: React.FC<FaviconProps> = ({ src, className }) => {
-    const [error, setError] = useState(false);
+    const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-    if (!src || error) {
+    if (!src || src === failedSrc) {
         return <Globe className={`size-4 text-muted-foreground ${className || ""}`} />;
     }
 
@@ -18,7 +18,7 @@ export const Favicon: React.FC<FaviconProps> = ({ src, className }) => {
             <img
                 src={src}
                 className="object-contain size-full"
-                onError={() => setError(true)}
+                onError={() => setFailedSrc(src)}
                 alt=""
             />
         </div>
