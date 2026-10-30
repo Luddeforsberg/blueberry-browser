@@ -1,7 +1,12 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-export type ChromeRegion = "chrome";
+// The chrome view under the tabs, and the overlay view that floats the collapsed sidebar over a page.
+export type ChromeRegion = "chrome" | "overlay";
+
+export type LayoutMode = "vertical" | "horizontal";
+
+export type ResizablePanel = "sidebar" | "chat";
 
 export interface Rect {
   x: number;
@@ -12,10 +17,16 @@ export interface Rect {
 
 // Where each region of the window goes, in window coordinates. Closed regions have no size.
 export interface Layout {
+  mode: LayoutMode;
   sidebarOpen: boolean;
   chatOpen: boolean;
+  sidebarWidth: number;
+  chatWidth: number;
+  panelLimits: Record<ResizablePanel, { min: number; max: number }>;
   controls: Rect;
   sidebar: Rect;
+  floatingSidebar: Rect;
+  tabStrip: Rect;
   toolbar: Rect;
   chat: Rect;
   page: Rect;
@@ -55,21 +66,25 @@ export interface ChatMessage {
   content: string;
 }
 
-// Renderer asks, main answers. `region` is the only view main accepts the call from.
+// Renderer asks, main answers. `region` names the views main accepts the call from.
 export interface InvokeChannels {
-  "tabs:list": { region: "chrome"; args: []; result: TabInfo[] };
-  "tabs:create": { region: "chrome"; args: [url?: string]; result: TabInfo };
-  "tabs:close": { region: "chrome"; args: [tabId: string]; result: boolean };
-  "tabs:switch": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tabs:list": { region: "chrome" | "overlay"; args: []; result: TabInfo[] };
+  "tabs:create": { region: "chrome" | "overlay"; args: [url?: string]; result: TabInfo };
+  "tabs:close": { region: "chrome" | "overlay"; args: [tabId: string]; result: boolean };
+  "tabs:switch": { region: "chrome" | "overlay"; args: [tabId: string]; result: boolean };
   "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
   "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:reload": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:stop": { region: "chrome"; args: [tabId: string]; result: boolean };
-  "layout:get": { region: "chrome"; args: []; result: Layout };
-  "layout:toggle-sidebar": { region: "chrome"; args: []; result: void };
+  "layout:get": { region: "chrome" | "overlay"; args: []; result: Layout };
+  "layout:toggle-sidebar": { region: "chrome" | "overlay"; args: []; result: void };
   "layout:toggle-chat": { region: "chrome"; args: []; result: void };
-  "theme:get": { region: "chrome"; args: []; result: ThemeState };
+  "layout:set-mode": { region: "chrome"; args: [mode: LayoutMode]; result: void };
+  "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
+  "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
+  "overlay:hide": { region: "overlay"; args: []; result: void };
+  "theme:get": { region: "chrome" | "overlay"; args: []; result: ThemeState };
   "theme:toggle-dark": { region: "chrome"; args: []; result: void };
   "chat:send": { region: "chrome"; args: [request: ChatRequest]; result: void };
   "chat:clear": { region: "chrome"; args: []; result: void };
@@ -109,6 +124,10 @@ export interface LayoutAPI {
   getLayout: () => Promise<Layout>;
   toggleSidebar: () => Promise<void>;
   toggleChat: () => Promise<void>;
+  setMode: (mode: LayoutMode) => Promise<void>;
+  resize: (panel: ResizablePanel, width: number) => Promise<void>;
+  showFloatingSidebar: () => Promise<void>;
+  hideFloatingSidebar: () => Promise<void>;
   onLayoutUpdated: (callback: (layout: Layout) => void) => Unsubscribe;
 }
 

@@ -21,8 +21,14 @@ export class EventManager {
   }
 
   private get endpoints(): Record<ChromeRegion, ChromeEndpoint> {
-    const { view, url } = this.mainWindow.chromeView;
-    return { chrome: { webContents: view.webContents, url } };
+    const endpoint = ({ view, url }: { view: { webContents: ChromeEndpoint["webContents"] }; url: string }) => ({
+      webContents: view.webContents,
+      url,
+    });
+    return {
+      chrome: endpoint(this.mainWindow.chromeView),
+      overlay: endpoint(this.mainWindow.overlayView),
+    };
   }
 
   private handle<C extends InvokeChannel>(
@@ -30,7 +36,8 @@ export class EventManager {
     listener: (...args: InvokeChannels[C]["args"]) => Result<C>
   ): void {
     ipcMain.handle(channel, (event, ...args) => {
-      if (!isTrustedSender(event, this.endpoints[CHANNEL_REGIONS[channel]])) {
+      const endpoints = this.endpoints;
+      if (!CHANNEL_REGIONS[channel].some((region) => isTrustedSender(event, endpoints[region]))) {
         throw new Error(`Rejected ${channel} from ${event.senderFrame?.url ?? "an unknown frame"}`);
       }
       return listener(...(args as InvokeChannels[C]["args"]));
@@ -78,6 +85,14 @@ export class EventManager {
     this.handle("layout:toggle-sidebar", () => this.mainWindow.toggleSidebar());
 
     this.handle("layout:toggle-chat", () => this.mainWindow.toggleChat());
+
+    this.handle("layout:set-mode", (mode) => this.mainWindow.setMode(mode));
+
+    this.handle("layout:resize", (panel, width) => this.mainWindow.resizePanel(panel, width));
+
+    this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
+
+    this.handle("overlay:hide", () => this.mainWindow.hideFloatingSidebar());
   }
 
   private handleThemeEvents(): void {

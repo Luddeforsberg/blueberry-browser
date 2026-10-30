@@ -35,6 +35,10 @@ const chromeAPI: ChromeAPI = {
     getLayout: () => invoke("layout:get"),
     toggleSidebar: () => invoke("layout:toggle-sidebar"),
     toggleChat: () => invoke("layout:toggle-chat"),
+    setMode: (mode) => invoke("layout:set-mode", mode),
+    resize: (panel, width) => invoke("layout:resize", panel, width),
+    showFloatingSidebar: () => invoke("overlay:show-sidebar"),
+    hideFloatingSidebar: () => invoke("overlay:hide"),
     onLayoutUpdated: (callback) => subscribe("layout:updated", callback),
   },
   theme: {

@@ -1,25 +1,33 @@
 import type { WebContents, WebFrameMain } from "electron";
 import type { EventChannels, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
-export const CHANNEL_REGIONS: { [C in InvokeChannel]: InvokeChannels[C]["region"] } = {
-  "tabs:list": "chrome",
-  "tabs:create": "chrome",
-  "tabs:close": "chrome",
-  "tabs:switch": "chrome",
-  "tab:navigate": "chrome",
-  "tab:back": "chrome",
-  "tab:forward": "chrome",
-  "tab:reload": "chrome",
-  "tab:stop": "chrome",
-  "layout:get": "chrome",
-  "layout:toggle-sidebar": "chrome",
-  "layout:toggle-chat": "chrome",
-  "theme:get": "chrome",
-  "theme:toggle-dark": "chrome",
-  "chat:send": "chrome",
-  "chat:clear": "chrome",
-  "chat:messages": "chrome",
-  "page:text": "chrome",
+const BOTH = ["chrome", "overlay"] as const;
+
+export const CHANNEL_REGIONS: {
+  [C in InvokeChannel]: readonly InvokeChannels[C]["region"][];
+} = {
+  "tabs:list": BOTH,
+  "tabs:create": BOTH,
+  "tabs:close": BOTH,
+  "tabs:switch": BOTH,
+  "tab:navigate": ["chrome"],
+  "tab:back": ["chrome"],
+  "tab:forward": ["chrome"],
+  "tab:reload": ["chrome"],
+  "tab:stop": ["chrome"],
+  "layout:get": BOTH,
+  "layout:toggle-sidebar": BOTH,
+  "layout:toggle-chat": ["chrome"],
+  "layout:set-mode": ["chrome"],
+  "layout:resize": ["chrome"],
+  "overlay:show-sidebar": ["chrome"],
+  "overlay:hide": ["overlay"],
+  "theme:get": BOTH,
+  "theme:toggle-dark": ["chrome"],
+  "chat:send": ["chrome"],
+  "chat:clear": ["chrome"],
+  "chat:messages": ["chrome"],
+  "page:text": ["chrome"],
 };
 
 export interface ChromeEndpoint {

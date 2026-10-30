@@ -1,11 +1,26 @@
-import { BaseWindow, nativeTheme, type WebContents } from "electron";
+import { BaseWindow, Menu, nativeTheme, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { LLMClient } from "./LLMClient";
-import { computeLayout, MIN_WINDOW, TOOLBAR_HEIGHT, type Layout } from "./Layout";
+import {
+  CHAT_WIDTH,
+  clampWidth,
+  computeLayout,
+  MIN_WINDOW,
+  SIDEBAR_WIDTH,
+  TAB_ROW_HEIGHT,
+  TOOLBAR_HEIGHT,
+  type Layout,
+} from "./Layout";
 import { sendToRenderer } from "./ipc";
-import type { TabInfo, ThemeState } from "../shared/ipc";
+import type {
+  EventChannels,
+  LayoutMode,
+  ResizablePanel,
+  TabInfo,
+  ThemeState,
+} from "../shared/ipc";
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -17,15 +32,25 @@ const supportsGlass = (): boolean => {
 // The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach.
 const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
 
+// macOS draws its window buttons 14px tall, so this centres them in the top row.
+const MAC_BUTTONS_HEIGHT = 14;
+
+export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
+
 export class Window {
   private _baseWindow: BaseWindow;
   private tabsMap: Map<string, Tab> = new Map();
   private activeTabId: string | null = null;
   private tabCounter: number = 0;
   private chrome: ChromeView;
+  private overlay: ChromeView;
+  private floatingSidebarVisible = false;
   private llmClient: LLMClient;
+  private mode: LayoutMode = "vertical";
   private sidebarOpen = true;
   private chatOpen = false;
+  private sidebarWidth = SIDEBAR_WIDTH.default;
+  private chatWidth = CHAT_WIDTH.default;
   private readonly glassSupported = supportsGlass();
 
   constructor() {
@@ -37,7 +62,7 @@ export class Window {
       show: true,
       autoHideMenuBar: false,
       titleBarStyle: "hidden",
-      trafficLightPosition: { x: 16, y: 15 },
+      trafficLightPosition: this.windowButtonPosition(),
       ...(process.platform === "darwin" && this.glassSupported
         ? { vibrancy: "sidebar" as const }
         : {}),
@@ -53,6 +78,11 @@ export class Window {
     this._baseWindow.contentView.addChildView(this.chrome.view);
     this.openLinksInTabs(this.chrome.view.webContents);
 
+    this.overlay = createChromeView("overlay");
+    this.overlay.view.setVisible(false);
+    this._baseWindow.contentView.addChildView(this.overlay.view);
+    this.openLinksInTabs(this.overlay.view.webContents);
+
     this.llmClient = new LLMClient(this.chrome.view.webContents);
     this.llmClient.setWindow(this);
 
@@ -60,6 +90,7 @@ export class Window {
     this.updateAllBounds();
 
     this._baseWindow.on("resize", () => this.updateAllBounds());
+    this._baseWindow.on("blur", () => this.hideFloatingSidebar());
 
     const onThemeUpdated = () => this.notifyTheme();
     nativeTheme.on("updated", onThemeUpdated);
@@ -69,6 +100,7 @@ export class Window {
       this.tabsMap.forEach((tab) => tab.destroy());
       this.tabsMap.clear();
       this.chrome.view.webContents.close();
+      this.overlay.view.webContents.close();
     });
   }
 
@@ -86,8 +118,16 @@ export class Window {
     return {
       color: "#00000000",
       symbolColor: nativeTheme.shouldUseDarkColors ? CAPTION_SYMBOL.dark : CAPTION_SYMBOL.light,
-      height: TOOLBAR_HEIGHT,
+      height: this.topRowHeight,
     };
+  }
+
+  private get topRowHeight(): number {
+    return this.mode === "vertical" ? TOOLBAR_HEIGHT : TAB_ROW_HEIGHT;
+  }
+
+  private windowButtonPosition() {
+    return { x: 16, y: Math.round((this.topRowHeight - MAC_BUTTONS_HEIGHT) / 2) };
   }
 
   get window(): BaseWindow {
@@ -100,6 +140,10 @@ export class Window {
 
   get chromeView(): ChromeView {
     return this.chrome;
+  }
+
+  get overlayView(): ChromeView {
+    return this.overlay;
   }
 
   get chat(): LLMClient {
@@ -216,8 +260,48 @@ export class Window {
   }
 
   toggleSidebar(): void {
+    this.hideFloatingSidebar();
     this.sidebarOpen = !this.layout.sidebarOpen;
     this.updateAllBounds();
+  }
+
+  setMode(mode: LayoutMode): void {
+    if (mode !== "vertical" && mode !== "horizontal") return;
+    this.hideFloatingSidebar();
+    this.mode = mode;
+
+    if (process.platform === "darwin") {
+      this._baseWindow.setWindowButtonPosition(this.windowButtonPosition());
+    } else if (process.platform === "win32") {
+      this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
+    }
+    const item = Menu.getApplicationMenu()?.getMenuItemById(HORIZONTAL_TABS_MENU_ID);
+    if (item) item.checked = mode === "horizontal";
+
+    this.updateAllBounds();
+  }
+
+  resizePanel(panel: ResizablePanel, width: number): void {
+    if (!Number.isFinite(width)) return;
+    if (panel === "sidebar") this.sidebarWidth = clampWidth(width, SIDEBAR_WIDTH);
+    else if (panel === "chat") this.chatWidth = clampWidth(width, CHAT_WIDTH);
+    this.updateAllBounds();
+  }
+
+  showFloatingSidebar(): void {
+    const { floatingSidebar } = this.layout;
+    if (floatingSidebar.width === 0) return;
+    // Adding a view again moves it to the top, above tabs opened since.
+    this._baseWindow.contentView.addChildView(this.overlay.view);
+    this.overlay.view.setBounds(floatingSidebar);
+    this.overlay.view.setVisible(true);
+    this.floatingSidebarVisible = true;
+  }
+
+  hideFloatingSidebar(): void {
+    if (!this.floatingSidebarVisible) return;
+    this.overlay.view.setVisible(false);
+    this.floatingSidebarVisible = false;
   }
 
   toggleChat(): void {
@@ -251,8 +335,11 @@ export class Window {
     return computeLayout(
       { width, height },
       {
+        mode: this.mode,
         sidebarOpen: this.sidebarOpen,
         chatOpen: this.chatOpen,
+        sidebarWidth: this.sidebarWidth,
+        chatWidth: this.chatWidth,
         platform: process.platform,
       }
     );
@@ -263,19 +350,26 @@ export class Window {
     const layout = this.layout;
     this.chrome.view.setBounds({ x: 0, y: 0, width, height });
     this.tabsMap.forEach((tab) => tab.view.setBounds(layout.page));
-    sendToRenderer(this.chrome.view.webContents, "layout:updated", layout);
+    if (layout.floatingSidebar.width === 0) this.hideFloatingSidebar();
+    else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
+    this.broadcast("layout:updated", layout);
   }
 
   private notifyTabs(): void {
     const active = this.activeTab;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
-    sendToRenderer(this.chrome.view.webContents, "tabs:updated", this.tabInfos);
+    this.broadcast("tabs:updated", this.tabInfos);
   }
 
   private notifyTheme(): void {
     if (process.platform === "win32") {
       this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
     }
-    sendToRenderer(this.chrome.view.webContents, "theme:updated", this.theme);
+    this.broadcast("theme:updated", this.theme);
+  }
+
+  private broadcast<C extends keyof EventChannels>(channel: C, payload: EventChannels[C]): void {
+    sendToRenderer(this.chrome.view.webContents, channel, payload);
+    sendToRenderer(this.overlay.view.webContents, channel, payload);
   }
 }
