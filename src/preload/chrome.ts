@@ -23,6 +23,7 @@ const chromeAPI: ChromeAPI = {
     createTab: (url) => invoke("tabs:create", url),
     closeTab: (tabId) => invoke("tabs:close", tabId),
     switchTab: (tabId) => invoke("tabs:switch", tabId),
+    moveTab: (tabId, toIndex) => invoke("tabs:move", tabId, toIndex),
     navigateTab: (tabId, url) => invoke("tab:navigate", tabId, url),
     goBack: (tabId) => invoke("tab:back", tabId),
     goForward: (tabId) => invoke("tab:forward", tabId),
@@ -40,6 +41,7 @@ const chromeAPI: ChromeAPI = {
     resize: (panel, width) => invoke("layout:resize", panel, width),
     showFloatingSidebar: () => invoke("overlay:show-sidebar"),
     hideFloatingSidebar: () => invoke("overlay:hide"),
+    onFloatingSidebarVisibility: (callback) => subscribe("overlay:visibility", callback),
     onLayoutUpdated: (callback) => subscribe("layout:updated", callback),
   },
   theme: {

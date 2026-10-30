@@ -270,6 +270,7 @@ export class Window {
     );
     this.syncTabViews();
     this.notifyTabs();
+    this.updateAllBounds();
     return true;
   }
 
@@ -326,7 +327,20 @@ export class Window {
     this.activeTabId = tabId;
     this.syncTabViews();
     this.notifyTabs();
+    this.updateAllBounds();
 
+    return true;
+  }
+
+  moveTab(tabId: string, toIndex: number): boolean {
+    const entries = this.entries;
+    const from = entries.findIndex((tab) => tab.id === tabId);
+    if (from === -1) return false;
+
+    const [tab] = entries.splice(from, 1);
+    entries.splice(toIndex, 0, tab);
+    this.tabsMap = new Map(entries.map((entry) => [entry.id, entry]));
+    this.notifyTabs();
     return true;
   }
 
@@ -401,15 +415,24 @@ export class Window {
     this.overlay.view.setBounds(floatingSidebar);
     this.overlay.view.setVisible(true);
     this.floatingSidebarVisible = true;
+    sendToRenderer(this.overlay.view.webContents, "overlay:visibility", true);
   }
 
   hideFloatingSidebar(): void {
     if (!this.floatingSidebarVisible) return;
     this.overlay.view.setVisible(false);
     this.floatingSidebarVisible = false;
+    sendToRenderer(this.overlay.view.webContents, "overlay:visibility", false);
+  }
+
+  // The new tab page has its own composer. The panel comes back on the next page if it was open.
+  private get chatAvailable(): boolean {
+    const entry = this.activeEntry;
+    return !(entry instanceof InternalTab && entry.page === "new-tab");
   }
 
   toggleChat(): void {
+    if (!this.chatAvailable) return;
     this.chatOpen = !this.layout.chatOpen;
     this.updateAllBounds();
   }
@@ -438,7 +461,7 @@ export class Window {
       {
         mode: this.mode,
         sidebarOpen: this.sidebarOpen,
-        chatOpen: this.chatOpen,
+        chatOpen: this.chatOpen && this.chatAvailable,
         sidebarWidth: this.settings.sidebarWidth,
         chatWidth: this.settings.chatWidth,
         platform: process.platform,

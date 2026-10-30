@@ -49,7 +49,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     if (empty) {
         return (
             <div className="h-full overflow-y-auto">
-                <div className="max-w-[640px] mx-auto px-6 pt-[18vh] pb-12">
+                <div className="max-w-[800px] mx-auto px-6 pt-[18vh] pb-12">
                     <BerryHero title="What are you working on?" />
                     {composer}
                 </div>
@@ -60,7 +60,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="h-full flex flex-col">
             <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="max-w-[640px] mx-auto px-6 pt-8 pb-4 flex flex-col gap-6">
+                <div className="max-w-[800px] mx-auto px-6 pt-8 pb-4 flex flex-col gap-6">
                     {thread.messages.map((message, index) =>
                         message.role === 'user' ? (
                             <UserMessage key={index} content={message.content} />
@@ -72,7 +72,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 </div>
             </div>
 
-            <div className="max-w-[640px] w-full mx-auto px-6 pb-5">{composer}</div>
+            <div className="max-w-[800px] w-full mx-auto px-6 pb-5">{composer}</div>
         </div>
     )
 }

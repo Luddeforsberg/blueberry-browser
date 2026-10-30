@@ -9,6 +9,7 @@ interface BrowserContextType {
     createTab: (url?: string) => Promise<void>
     closeTab: (tabId: string) => Promise<void>
     switchTab: (tabId: string) => Promise<void>
+    moveTab: (tabId: string, toIndex: number) => Promise<void>
 
     // Navigation
     navigateToUrl: (url: string) => Promise<void>
@@ -62,6 +63,11 @@ export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ child
         [run]
     )
 
+    const moveTab = useCallback(
+        (tabId: string, toIndex: number) => run('move tab', () => browser().moveTab(tabId, toIndex)),
+        [run]
+    )
+
     const withActiveTab = useCallback(
         (label: string, action: (tabId: string) => Promise<unknown>) =>
             activeTab ? run(label, () => action(activeTab.id)) : Promise.resolve(),
@@ -83,6 +89,7 @@ export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ child
         createTab,
         closeTab,
         switchTab,
+        moveTab,
         navigateToUrl,
         goBack,
         goForward,

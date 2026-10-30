@@ -24,10 +24,13 @@ export async function launchApp(
   const env = { ...process.env } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
 
+  // CI has nobody to disturb, so it runs the app exactly as users get it.
+  const background = process.env.CI ? [] : ["-r", join(__dirname, "background.cjs")];
+
   return electron.launch({
     executablePath: electronPath as unknown as string,
     // A fresh profile keeps tests apart and away from the developer's real browsing data.
-    args: [".", `--user-data-dir=${userDataDir}`],
+    args: [...background, ".", `--user-data-dir=${userDataDir}`],
     env,
   });
 }

@@ -10,6 +10,7 @@ export const CHANNEL_REGIONS: {
   "tabs:create": BOTH,
   "tabs:close": BOTH,
   "tabs:switch": BOTH,
+  "tabs:move": BOTH,
   "tabs:open-page": BOTH,
   "history:recent": ["chrome"],
   "tab:navigate": ["chrome"],

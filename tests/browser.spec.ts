@@ -9,6 +9,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 
+declare global {
+  interface Window {
+    slideRuns: number;
+  }
+}
+
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwAEAgH/1oN2SgAAAABJRU5ErkJggg==",
   "base64"
@@ -73,6 +79,8 @@ const sendToChrome = (channel: string, payload: unknown) =>
     },
     [channel, payload] as const
   );
+
+const tabOrder = async () => (await getTabs()).map((tab) => tab.page ?? tab.url.replace(origin, ""));
 
 const openChat = async () => {
   await chrome.getByRole("button", { name: "Show Berry" }).click();
@@ -187,6 +195,7 @@ test("favicons come from the page, not from Google", async () => {
 });
 
 test("chat markdown gets typography styles", async () => {
+  await openFixture();
   await openChat();
   await sendToChrome("chat:messages-updated", [
     { role: "assistant", content: "# Heading\n\n- item" },
@@ -198,6 +207,7 @@ test("chat markdown gets typography styles", async () => {
 });
 
 test("streamed chunks appear in the chat as they arrive", async () => {
+  await openFixture();
   await openChat();
   await sendToChrome("chat:messages-updated", [
     { role: "user", content: "hello" },
@@ -438,7 +448,7 @@ test("the sidebar opens Routines and Settings as tabs, once each", async () => {
   await expect(chrome.getByRole("heading", { name: "Routines", level: 1 })).toBeVisible();
   await expect(chrome.getByText("Needs your OK")).toBeVisible();
 
-  await places.getByRole("button", { name: "Settings" }).click();
+  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: /^Settings/ }).click();
   await places.getByRole("button", { name: "Routines" }).click();
 
   const pages = (await getTabs()).map((tab) => tab.page).filter(Boolean);
@@ -521,11 +531,142 @@ test("the main chat and the chat panel share one composer", async () => {
   await expect(main).toBeVisible();
   const mainClass = await main.getAttribute("class");
 
-  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await openFixture();
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" }).getByRole("textbox", { name: "Message" });
   await expect(panel).toBeVisible();
   expect(await panel.getAttribute("class")).toBe(mainClass);
+});
+
+test("the new tab page has no chat panel, and it comes back on the next page", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await expect(panel).toHaveCount(0);
+  await expect(chrome.getByRole("button", { name: /(Show|Hide) Berry/ })).toHaveCount(0);
+
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
+  expect((await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).chatOpen).toBe(false);
+
+  const { id } = await activeTab();
+  await chrome.evaluate(([tabId, url]) => window.chromeAPI.browser.navigateTab(tabId, url), [id, `${origin}/next`]);
+  await expect(panel).toBeVisible();
+});
+
+test("settings and the account sit at the bottom of the sidebar", async () => {
+  const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
+  const row = sidebar.getByRole("button", { name: "Settings, Sam Rivera" });
+
+  await expect(sidebar.getByText("sam@example.com")).toBeVisible();
+  const [rowBox, sidebarBox] = await Promise.all([row.boundingBox(), sidebar.boundingBox()]);
+  expect(rowBox!.y + rowBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 16);
+
+  await row.click();
+  expect((await activeTab()).page).toBe("settings");
+  await expect(row).toHaveAttribute("aria-current", "page");
+});
+
+test("dragging a tab reorders it in both layouts, and a short press only selects it", async () => {
+  await openFixture("/a");
+  await openFixture("/b");
+  expect(await tabOrder()).toEqual(["new-tab", "/a", "/b"]);
+
+  const tabs = chrome.getByRole("region", { name: "Tabs" }).getByRole("listitem");
+  const drag = async (fromIndex: number, toIndex: number, axis: "x" | "y") => {
+    const from = (await tabs.nth(fromIndex).boundingBox())!;
+    const to = (await tabs.nth(toIndex).boundingBox())!;
+    await chrome.mouse.move(from.x + 20, from.y + from.height / 2);
+    await chrome.mouse.down();
+    const x = axis === "x" ? to.x + 20 : from.x + 20;
+    const y = axis === "y" ? to.y + to.height / 2 : from.y + from.height / 2;
+    await chrome.mouse.move(x, y, { steps: 8 });
+    await chrome.mouse.up();
+  };
+
+  // A press with no movement selects and keeps the order.
+  const first = (await tabs.nth(0).boundingBox())!;
+  await chrome.mouse.click(first.x + 20, first.y + first.height / 2);
+  await expect.poll(async () => (await activeTab()).page).toBe("new-tab");
+  expect(await tabOrder()).toEqual(["new-tab", "/a", "/b"]);
+
+  await drag(0, 2, "y");
+  await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
+  expect((await activeTab()).page).toBe("new-tab");
+
+  await drag(2, 0, "y");
+  await expect.poll(tabOrder).toEqual(["new-tab", "/a", "/b"]);
+
+  // Past the end of the list, the tab stops at the last slot.
+  const last = (await tabs.nth(2).boundingBox())!;
+  await chrome.mouse.move(first.x + 20, first.y + first.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(first.x + 20, last.y + 400, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
+
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
+  const strip = chrome.getByRole("list", { name: "Tabs" }).getByRole("listitem");
+  // This press lands on the favicon, which must not start the browser's own image drag.
+  const a = (await strip.nth(0).boundingBox())!;
+  const c = (await strip.nth(2).boundingBox())!;
+  await chrome.mouse.move(a.x + 20, a.y + a.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(c.x + 20, a.y + a.height / 2, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(tabOrder).toEqual(["/b", "new-tab", "/a"]);
+});
+
+test("Alt and an arrow move the focused tab, and stop at the ends", async () => {
+  await openFixture("/a");
+  const tab = chrome.getByRole("button", { name: "Fixture", exact: true });
+
+  await tab.focus();
+  await chrome.keyboard.press("Alt+ArrowUp");
+  await expect.poll(tabOrder).toEqual(["/a", "new-tab"]);
+  await expect(tab).toBeFocused();
+
+  await chrome.keyboard.press("Alt+ArrowUp");
+  await expect.poll(tabOrder).toEqual(["/a", "new-tab"]);
+
+  await chrome.keyboard.press("Alt+ArrowDown");
+  await expect.poll(tabOrder).toEqual(["new-tab", "/a"]);
+  await expect(tab).toBeFocused();
+});
+
+test("the floating sidebar slides in, and slides out before hiding", async () => {
+  await openFixture();
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
+  const overlay = await findView(app, "view=overlay");
+  const slideRuns = () => overlay.evaluate(() => window.slideRuns);
+  const cardLeft = () =>
+    overlay.evaluate(() => document.querySelector("[data-slide]")!.getBoundingClientRect().left);
+  await overlay.evaluate(() => {
+    window.slideRuns = 0;
+    document.addEventListener("transitionrun", (event) => {
+      if (event.propertyName === "transform") window.slideRuns++;
+    });
+  });
+
+  await chrome.evaluate(() => window.chromeAPI.layout.showFloatingSidebar());
+  await expect.poll(slideRuns).toBe(1);
+  await expect.poll(cardLeft).toBe(8);
+
+  await overlay.mouse.move(100, 300);
+  await overlay.mouse.move(600, 300);
+  await expect.poll(slideRuns).toBe(2);
+  expect(await overlayVisible()).toBe(true);
+  await expect.poll(overlayVisible).toBe(false);
+
+  // Hidden by main with no slide out, it still slides in next time rather than appearing.
+  await chrome.evaluate(() => window.chromeAPI.layout.showFloatingSidebar());
+  await expect.poll(cardLeft).toBe(8);
+  await overlay.evaluate(() => window.chromeAPI.layout.hideFloatingSidebar());
+  const before = await slideRuns();
+  await chrome.evaluate(() => window.chromeAPI.layout.showFloatingSidebar());
+  await expect.poll(slideRuns).toBeGreaterThan(before);
 });
 
 test("the sidebar's search button focuses the address bar", async () => {

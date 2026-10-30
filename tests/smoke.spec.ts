@@ -8,6 +8,7 @@ test("the built app renders its sidebar, toolbar and chat", async () => {
     await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
     await expect(chrome.getByRole("button", { name: "Address" })).toBeVisible();
 
+    await chrome.evaluate(() => window.chromeAPI.browser.createTab("about:blank"));
     await chrome.getByRole("button", { name: "Show Berry" }).click();
     await expect(chrome.getByPlaceholder("Ask Berry", { exact: true })).toBeVisible();
   } finally {

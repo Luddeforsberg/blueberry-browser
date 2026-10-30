@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { LibrarySnapshot } from '@shared/library'
 
-const EMPTY: LibrarySnapshot = { pinned: [], bookmarks: [], chats: [], routines: [], todaysRun: [] }
+const EMPTY: LibrarySnapshot = { account: { name: '', email: '' }, pinned: [], bookmarks: [], chats: [], routines: [], todaysRun: [] }
 
 const LibraryContext = createContext<LibrarySnapshot>(EMPTY)
 

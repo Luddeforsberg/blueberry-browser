@@ -51,8 +51,8 @@ Sizes (*to tune*):
 | Minimum page width | 480px |
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
-- **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It floats over the page, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search, then New Tab, New chat, Routines and Settings, then chats, then tabs. The collapse button is in the toolbar.
+- **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
+- **Sidebar contents, top to bottom:** window controls with search, then New Tab, New chat and Routines, then chats, then tabs. The account and Settings stay at the bottom. The collapse button is in the toolbar.
 - **Bookmarks bar:** pinned sites and bookmarks, under the address bar.
 - **Spaces and folders:** not part of this design yet.
 
@@ -322,7 +322,7 @@ Four short, skippable steps: meet Berry, choose layout and appearance, import fr
 
 ### New tab
 
-Berry, large and centred, above a 640px composer with a tray under it linking to Routines, a new chat and Settings. Below that are two idea cards linking to real features, then recent pages if there are any. A faint scatter of berries and leaves fills the background. Nothing appears in the recent list unless it is real.
+Berry, large and centred, above a 752px composer with a tray under it linking to Routines, a new chat and Settings. Below that are two idea cards linking to real features, then recent pages if there are any. A faint scatter of berries and leaves fills the background. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
 
 `Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
 
@@ -334,7 +334,7 @@ The page gets the space. The address bar shows the real URL and real navigation 
 
 A full page for talking to Berry about anything, not about a particular web page. It opens as a tab, and past chats are listed in the sidebar.
 
-- A centred conversation of about 680px, with the composer fixed at the bottom. A new chat with no messages looks like the new tab page instead.
+- A centred conversation and composer of 752px, with the composer fixed at the bottom. A new chat with no messages looks like the new tab page instead.
 - Messages and the composer are the same components as the chat panel, so the two sizes look like one chat.
 - Berry's working state says what it is doing and offers to show the work in a tab.
 
@@ -356,7 +356,7 @@ Plain sections, including layout, appearance, Berry (Still and Hide), and data a
 ## 10. Accessibility
 
 - **Standard:** WCAG 2.2 AA for all our UI, with contrast checked on real glass.
-- **Keyboard:** everything works without a mouse. Tab views are separate native views, so focus does not move between chrome and page by itself. Provide shortcuts to jump between sidebar, address bar, page and chat, such as `F6`.
+- **Keyboard:** everything works without a mouse. Tab views are separate native views, so focus does not move between chrome and page by itself. Provide shortcuts to jump between sidebar, address bar, page and chat, such as `F6`. Tabs reorder by dragging, or with `Alt` and an arrow key along the list.
 - **Screen readers:** everything is labelled, and Berry's status changes are announced politely. Decorative movement is hidden.
 - **System settings:** follow reduced motion, reduced transparency, increased contrast and light or dark.
 - **Colour:** never the only signal.

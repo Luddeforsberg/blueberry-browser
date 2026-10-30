@@ -102,6 +102,7 @@ export interface InvokeChannels {
   "tabs:create": { region: "chrome" | "overlay"; args: [url?: string]; result: TabInfo };
   "tabs:close": { region: "chrome" | "overlay"; args: [tabId: string]; result: boolean };
   "tabs:switch": { region: "chrome" | "overlay"; args: [tabId: string]; result: boolean };
+  "tabs:move": { region: "chrome" | "overlay"; args: [tabId: string, toIndex: number]; result: boolean };
   "tabs:open-page": {
     region: "chrome" | "overlay";
     args: [page: InternalPage, options?: { param?: string; title?: string }];
@@ -148,6 +149,7 @@ export interface EventChannels {
   "settings:updated": Settings;
   "library:updated": LibrarySnapshot;
   "toolbar:focus-address": null;
+  "overlay:visibility": boolean;
   "chat:chunk": ChatChunk;
   "chat:messages-updated": ChatMessage[];
 }
@@ -159,6 +161,7 @@ export interface BrowserAPI {
   createTab: (url?: string) => Promise<TabInfo>;
   closeTab: (tabId: string) => Promise<boolean>;
   switchTab: (tabId: string) => Promise<boolean>;
+  moveTab: (tabId: string, toIndex: number) => Promise<boolean>;
   navigateTab: (tabId: string, url: string) => Promise<boolean>;
   goBack: (tabId: string) => Promise<boolean>;
   goForward: (tabId: string) => Promise<boolean>;
@@ -177,6 +180,7 @@ export interface LayoutAPI {
   resize: (panel: ResizablePanel, width: number) => Promise<void>;
   showFloatingSidebar: () => Promise<void>;
   hideFloatingSidebar: () => Promise<void>;
+  onFloatingSidebarVisibility: (callback: (visible: boolean) => void) => Unsubscribe;
   onLayoutUpdated: (callback: (layout: Layout) => void) => Unsubscribe;
 }
 

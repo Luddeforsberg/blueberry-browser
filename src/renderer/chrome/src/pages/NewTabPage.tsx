@@ -78,7 +78,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="relative h-full overflow-y-auto">
             <Backdrop />
-            <div className="relative max-w-[640px] mx-auto px-6 pt-[13vh] pb-12">
+            <div className="relative max-w-[800px] mx-auto px-6 pt-[13vh] pb-12">
                 <BerryHero title="Where shall we start today?" />
 
                 <div className="rounded-composer bg-tray">

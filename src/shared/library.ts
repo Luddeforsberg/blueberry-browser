@@ -44,7 +44,13 @@ export interface RoutineStep {
   isCurrent: boolean;
 }
 
+export interface Account {
+  name: string;
+  email: string;
+}
+
 export interface LibrarySnapshot {
+  account: Account;
   pinned: PinnedSite[];
   bookmarks: Bookmark[];
   chats: ChatThreadSummary[];

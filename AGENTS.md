@@ -39,4 +39,5 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 - **`executeJavaScript`:** the code is a script, not a function body, so a top-level `return` is a syntax error.
 - **Preloads load nothing but `electron`:** they're sandboxed, so a shared runtime import becomes a chunk the preload can't `require`, and the chrome loses its API. Preloads may only `import type` from other files.
 - **Views stack by order:** a tab view covers the chrome beneath it, so CSS in the chrome can't draw over a page.
+- **Tests run off-screen:** outside CI, `tests/background.cjs` keeps the test app off-screen and out of the foreground, so they don't disturb the Mac. Take screenshots with Playwright, not `screencapture`.
 - **Formatting:** existing files aren't Prettier-clean, which is most of the lint warnings. Don't run `pnpm format` over files you aren't otherwise rewriting.

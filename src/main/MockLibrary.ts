@@ -45,6 +45,7 @@ export class MockLibrary {
 
   snapshot(): LibrarySnapshot {
     return {
+      account: { name: "Sam Rivera", email: "sam@example.com" },
       pinned: [
         { id: "pin-mail", title: "Mail", url: "https://mail.google.com/" },
         { id: "pin-calendar", title: "Calendar", url: "https://calendar.google.com/" },

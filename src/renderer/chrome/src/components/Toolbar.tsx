@@ -65,7 +65,7 @@ export const Toolbar: React.FC = () => {
                     <AddressBar />
                 </div>
 
-                {activeTab?.page !== 'chat' && (
+                {activeTab?.page !== 'chat' && activeTab?.page !== 'new-tab' && (
                     <ToolBarButton
                         Icon={PanelRight}
                         label={layout.chatOpen ? 'Hide Berry' : 'Show Berry'}

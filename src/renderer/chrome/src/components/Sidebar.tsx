@@ -123,13 +123,6 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         selected={isOpen('routines')}
                         onClick={() => void browser.openPage('routines')}
                     />
-                    <SidebarRow
-                        muted
-                        leading={<Settings className={ICON} />}
-                        label="Settings"
-                        selected={isOpen('settings')}
-                        onClick={() => void browser.openPage('settings')}
-                    />
                 </ul>
 
                 {library.chats.length > 0 && (
@@ -152,6 +145,25 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 <Section id="sidebar-tabs" title="Tabs">
                     <Tabs mode="vertical" labelledBy="sidebar-tabs" showNew={false} />
                 </Section>
+            </div>
+
+            <div className="shrink-0 p-2">
+                <button
+                    type="button"
+                    aria-label={`Settings, ${library.account.name}`}
+                    aria-current={isOpen('settings') ? 'page' : undefined}
+                    onClick={() => void browser.openPage('settings')}
+                    className={cn(ROW, "h-12", isOpen('settings') ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
+                >
+                    <span className="size-7 shrink-0 flex items-center justify-center rounded-full bg-primary text-13 text-primary-foreground">
+                        {library.account.name.charAt(0)}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                        <span className="block truncate">{library.account.name}</span>
+                        <span className="block truncate text-12 text-muted-foreground">{library.account.email}</span>
+                    </span>
+                    <Settings className={cn(ICON, "text-muted-foreground")} />
+                </button>
             </div>
         </nav>
     )

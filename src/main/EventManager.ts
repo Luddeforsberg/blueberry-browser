@@ -63,6 +63,8 @@ export class EventManager {
 
     this.handle("tabs:switch", (tabId) => this.mainWindow.switchActiveTab(tabId));
 
+    this.handle("tabs:move", (tabId, toIndex) => this.mainWindow.moveTab(tabId, toIndex));
+
     this.handle("tabs:open-page", (page, options) =>
       this.mainWindow.tabInfo(this.mainWindow.openPage(page, options))
     );
