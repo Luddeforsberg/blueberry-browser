@@ -1,4 +1,4 @@
-import { WebContents } from "electron";
+import type { WebContents } from "electron";
 import {
   streamText,
   type LanguageModel,
@@ -34,6 +34,14 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 
 const MAX_CONTEXT_LENGTH = 4000;
 const DEFAULT_TEMPERATURE = 0.7;
+
+const withoutImages = (message: CoreMessage): CoreMessage => {
+  if (message.role !== "user" || typeof message.content === "string") {
+    return message;
+  }
+  const text = message.content.find((part) => part.type === "text");
+  return { ...message, content: text?.text ?? "" };
+};
 
 export class LLMClient {
   private readonly webContents: WebContents;
@@ -146,6 +154,8 @@ export class LLMClient {
         content: userContent.length === 1 ? request.message : userContent,
       };
       
+      // Only the newest screenshot is useful, so older ones don't stay in memory or go to the model.
+      this.messages = this.messages.map(withoutImages);
       this.messages.push(userMessage);
 
       // Send updated messages to renderer
@@ -173,11 +183,11 @@ export class LLMClient {
   }
 
   getMessages(): CoreMessage[] {
-    return this.messages;
+    return this.messages.map(withoutImages);
   }
 
   private sendMessagesToRenderer(): void {
-    this.webContents.send("chat-messages-updated", this.messages);
+    this.webContents.send("chat-messages-updated", this.getMessages());
   }
 
   private async prepareMessagesWithContext(): Promise<CoreMessage[]> {
@@ -270,6 +280,7 @@ export class LLMClient {
     // Keep track of the index for updates
     const messageIndex = this.messages.length;
     this.messages.push(assistantMessage);
+    this.sendMessagesToRenderer();
 
     for await (const chunk of textStream) {
       accumulatedText += chunk;
@@ -279,7 +290,6 @@ export class LLMClient {
         role: "assistant",
         content: accumulatedText,
       };
-      this.sendMessagesToRenderer();
 
       this.sendStreamChunk(messageId, {
         content: chunk,

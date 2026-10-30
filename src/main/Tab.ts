@@ -5,6 +5,7 @@ export class Tab {
   private _id: string;
   private _title: string;
   private _url: string;
+  private _favicon: string | null = null;
   private _isVisible: boolean = false;
 
   constructor(id: string, url: string = "https://www.google.com") {
@@ -38,6 +39,11 @@ export class Tab {
     // Update URL when navigation occurs
     this.webContentsView.webContents.on("did-navigate", (_, url) => {
       this._url = url;
+      this._favicon = null;
+    });
+
+    this.webContentsView.webContents.on("page-favicon-updated", (_, favicons) => {
+      this._favicon = favicons[0] ?? null;
     });
 
     this.webContentsView.webContents.on("did-navigate-in-page", (_, url) => {
@@ -56,6 +62,10 @@ export class Tab {
 
   get url(): string {
     return this._url;
+  }
+
+  get favicon(): string | null {
+    return this._favicon;
   }
 
   get isVisible(): boolean {
@@ -90,11 +100,11 @@ export class Tab {
   }
 
   async getTabHtml(): Promise<string> {
-    return await this.runJs<string>("return document.documentElement.outerHTML");
+    return await this.runJs<string>("document.documentElement.outerHTML");
   }
 
   async getTabText(): Promise<string> {
-    return await this.runJs<string>("return document.documentElement.innerText");
+    return await this.runJs<string>("document.documentElement.innerText");
   }
 
   loadURL(url: string): Promise<void> {

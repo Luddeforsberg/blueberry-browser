@@ -1,5 +1,5 @@
-import { contextBridge } from "electron";
-import { electronAPI } from "@electron-toolkit/preload";
+import { contextBridge, ipcRenderer } from "electron";
+import { darkModeAPI } from "./darkMode";
 
 interface ChatRequest {
   message: string;
@@ -21,37 +21,37 @@ interface ChatResponse {
 const sidebarAPI = {
   // Chat functionality
   sendChatMessage: (request: Partial<ChatRequest>) =>
-    electronAPI.ipcRenderer.invoke("sidebar-chat-message", request),
+    ipcRenderer.invoke("sidebar-chat-message", request),
 
-  clearChat: () => electronAPI.ipcRenderer.invoke("sidebar-clear-chat"),
+  clearChat: () => ipcRenderer.invoke("sidebar-clear-chat"),
 
-  getMessages: () => electronAPI.ipcRenderer.invoke("sidebar-get-messages"),
+  getMessages: () => ipcRenderer.invoke("sidebar-get-messages"),
 
   onChatResponse: (callback: (data: ChatResponse) => void) => {
-    electronAPI.ipcRenderer.on("chat-response", (_, data) => callback(data));
+    ipcRenderer.on("chat-response", (_, data) => callback(data));
   },
 
   onMessagesUpdated: (callback: (messages: unknown[]) => void) => {
-    electronAPI.ipcRenderer.on("chat-messages-updated", (_, messages) =>
+    ipcRenderer.on("chat-messages-updated", (_, messages) =>
       callback(messages)
     );
   },
 
   removeChatResponseListener: () => {
-    electronAPI.ipcRenderer.removeAllListeners("chat-response");
+    ipcRenderer.removeAllListeners("chat-response");
   },
 
   removeMessagesUpdatedListener: () => {
-    electronAPI.ipcRenderer.removeAllListeners("chat-messages-updated");
+    ipcRenderer.removeAllListeners("chat-messages-updated");
   },
 
   // Page content access
-  getPageContent: () => electronAPI.ipcRenderer.invoke("get-page-content"),
-  getPageText: () => electronAPI.ipcRenderer.invoke("get-page-text"),
-  getCurrentUrl: () => electronAPI.ipcRenderer.invoke("get-current-url"),
+  getPageContent: () => ipcRenderer.invoke("get-page-content"),
+  getPageText: () => ipcRenderer.invoke("get-page-text"),
+  getCurrentUrl: () => ipcRenderer.invoke("get-current-url"),
 
   // Tab information
-  getActiveTabInfo: () => electronAPI.ipcRenderer.invoke("get-active-tab-info"),
+  getActiveTabInfo: () => ipcRenderer.invoke("get-active-tab-info"),
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to
@@ -59,14 +59,14 @@ const sidebarAPI = {
 // just add to the DOM global.
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld("electron", electronAPI);
+    contextBridge.exposeInMainWorld("darkModeAPI", darkModeAPI);
     contextBridge.exposeInMainWorld("sidebarAPI", sidebarAPI);
   } catch (error) {
     console.error(error);
   }
 } else {
   // @ts-ignore (define in dts)
-  window.electron = electronAPI;
+  window.darkModeAPI = darkModeAPI;
   // @ts-ignore (define in dts)
   window.sidebarAPI = sidebarAPI;
 }

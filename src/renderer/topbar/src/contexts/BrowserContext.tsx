@@ -4,6 +4,7 @@ interface TabInfo {
     id: string
     title: string
     url: string
+    favicon?: string | null
     isActive: boolean
 }
 
@@ -26,7 +27,6 @@ interface BrowserContextType {
 
     // Tab actions
     takeScreenshot: (tabId: string) => Promise<string | null>
-    runJavaScript: (tabId: string, code: string) => Promise<unknown>
 }
 
 const BrowserContext = createContext<BrowserContextType | null>(null)
@@ -147,15 +147,6 @@ export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [])
 
-    const runJavaScript = useCallback(async (tabId: string, code: string) => {
-        try {
-            return await window.topBarAPI.tabRunJs(tabId, code)
-        } catch (error) {
-            console.error('Failed to run JavaScript:', error)
-            return null
-        }
-    }, [])
-
     // Initialize tabs on mount
     useEffect(() => {
         refreshTabs()
@@ -179,8 +170,7 @@ export const BrowserProvider: React.FC<{ children: React.ReactNode }> = ({ child
         goBack,
         goForward,
         reload,
-        takeScreenshot,
-        runJavaScript
+        takeScreenshot
     }
 
     return (

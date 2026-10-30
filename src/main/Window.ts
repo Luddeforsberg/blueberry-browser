@@ -1,4 +1,4 @@
-import { BaseWindow, shell } from "electron";
+import { BaseWindow, type WebContents } from "electron";
 import { Tab } from "./Tab";
 import { TopBar } from "./TopBar";
 import { SideBar } from "./SideBar";
@@ -49,15 +49,19 @@ export class Window {
       }
     });
 
-    // Handle external link opening
-    this.tabsMap.forEach((tab) => {
-      tab.webContents.setWindowOpenHandler((details) => {
-        shell.openExternal(details.url);
-        return { action: "deny" };
-      });
-    });
+    this.openLinksInTabs(this._sideBar.view.webContents);
 
     this.setupEventListeners();
+  }
+
+  // Without a handler, window.open starts a new window that inherits the opener's preload.
+  private openLinksInTabs(webContents: WebContents): void {
+    webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/i.test(url)) {
+        this.createTab(url);
+      }
+      return { action: "deny" };
+    });
   }
 
   private setupEventListeners(): void {
@@ -108,13 +112,8 @@ export class Window {
     // Store the tab
     this.tabsMap.set(tabId, tab);
 
-    // If this is the first tab, make it active
-    if (this.tabsMap.size === 1) {
-      this.switchActiveTab(tabId);
-    } else {
-      // Hide the tab initially if it's not the first one
-      tab.hide();
-    }
+    this.openLinksInTabs(tab.webContents);
+    this.switchActiveTab(tabId);
 
     return tab;
   }

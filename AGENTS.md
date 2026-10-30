@@ -10,11 +10,12 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm dev` | Run the app with hot reload |
 | `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
 | `pnpm run lint` | Lint. Warnings are allowed, errors fail CI |
+| `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
 | `pnpm exec electron-builder --dir` | Package an unsigned app into `dist/` |
 
-CI runs typecheck, lint, build and the end-to-end tests on macOS and Windows. It doesn't package the app.
+CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and Windows. It doesn't package the app.
 
 ## Architecture
 

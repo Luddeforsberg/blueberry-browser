@@ -80,16 +80,6 @@ export const TabBar: React.FC = () => {
         createTab('https://www.google.com')
     }
 
-    // Extract favicon from URL (simplified - you might want to improve this)
-    const getFavicon = (url: string) => {
-        try {
-            const domain = new URL(url).hostname
-            return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
-        } catch {
-            return null
-        }
-    }
-
     return (
         <div className="flex-1 overflow-x-hidden flex items-center">
             {/* macOS traffic lights spacing */}
@@ -102,7 +92,7 @@ export const TabBar: React.FC = () => {
                         key={tab.id}
                         id={tab.id}
                         title={tab.title}
-                        favicon={getFavicon(tab.url)}
+                        favicon={tab.favicon}
                         isActive={tab.isActive}
                         onClose={() => closeTab(tab.id)}
                         onActivate={() => switchTab(tab.id)}
