@@ -132,8 +132,10 @@ export class AppMenu {
   }
 
   private handleCloseTab(): void {
-    if (this.mainWindow.activeTab) {
-      this.mainWindow.closeTab(this.mainWindow.activeTab.id);
+    // Any tab closes, including internal pages, which have no web view.
+    const tab = this.mainWindow.activeEntry;
+    if (tab) {
+      this.mainWindow.closeTab(tab.id);
     }
   }
 

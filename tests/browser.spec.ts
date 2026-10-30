@@ -467,3 +467,16 @@ test("settings are saved and come back after a restart", async () => {
     .toBe("horizontal");
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
 });
+
+test("Close Tab in the menu closes internal pages too", async () => {
+  await openFixture();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+  expect((await activeTab()).page).toBe("settings");
+
+  await app.evaluate(({ Menu }) => {
+    const file = Menu.getApplicationMenu()?.items.find((item) => item.label === "File");
+    file?.submenu?.items.find((item) => item.label === "Close Tab")?.click();
+  });
+
+  await expect.poll(async () => (await getTabs()).some((tab) => tab.page === "settings")).toBe(false);
+});
