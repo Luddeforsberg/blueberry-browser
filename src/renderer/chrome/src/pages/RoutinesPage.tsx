@@ -1,6 +1,7 @@
 import React from 'react'
 import type { RoutineStatus } from '@shared/library'
 import { useLibrary } from '../contexts/LibraryContext'
+import { Berry } from '../components/Berry'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 
@@ -13,6 +14,7 @@ const STATUS: Record<RoutineStatus, { label: string; className: string }> = {
 
 export const RoutinesPage: React.FC = () => {
     const { routines, todaysRun } = useLibrary()
+    const running = routines.some((routine) => routine.status === 'running')
 
     return (
         <div className="h-full overflow-y-auto">
@@ -44,7 +46,8 @@ export const RoutinesPage: React.FC = () => {
                 </ul>
 
                 {todaysRun.length > 0 && (
-                    <section aria-labelledby="todays-run" className="mt-10">
+                    <section aria-labelledby="todays-run" className="mt-10 relative">
+                        <Berry mood={running ? 'fetching' : 'delivered'} size={88} className="absolute right-4 top-0" />
                         <h2 id="todays-run" className="text-20 font-semibold">{"Today's run"}</h2>
                         <ol className="mt-3 flex flex-col gap-2">
                             {todaysRun.map((step) => (

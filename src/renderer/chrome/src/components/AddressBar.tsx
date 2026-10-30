@@ -20,7 +20,8 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     'new-tab': null,
     chat: 'Chat',
     routines: 'Routines',
-    settings: 'Settings'
+    settings: 'Settings',
+    gallery: 'Component gallery'
 }
 
 // Internal pages have no address worth editing, so the field starts empty there.

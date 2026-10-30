@@ -1,5 +1,5 @@
 import React from 'react'
-import { Compass, MessageCircle, RefreshCw, Settings } from 'lucide-react'
+import { Compass, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import { Favicon } from './Favicon'
 
@@ -7,7 +7,8 @@ const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
     'new-tab': Compass,
     chat: MessageCircle,
     routines: RefreshCw,
-    settings: Settings
+    settings: Settings,
+    gallery: LayoutGrid
 }
 
 // Internal pages have no favicon, so they show the same icon as their place in the sidebar.

@@ -4,6 +4,7 @@ import type { TabInfo } from '@shared/ipc'
 import type { ChatThread } from '@shared/library'
 import { useLibrary } from '../contexts/LibraryContext'
 import { Markdown } from '../components/Chat'
+import { Berry } from '../components/Berry'
 import { cn } from '@common/lib/utils'
 
 // A full page for talking to Berry about anything, not about a web page.
@@ -54,7 +55,12 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     {message.content}
                                 </div>
                             ) : (
-                                <Markdown key={index} content={message.content} />
+                                <div key={index} className="flex gap-3 -ml-9">
+                                    <Berry mood="rest" size={24} className="mt-0.5" />
+                                    <div className="min-w-0 flex-1">
+                                        <Markdown content={message.content} />
+                                    </div>
+                                </div>
                             )
                         )
                     )}

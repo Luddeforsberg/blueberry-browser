@@ -4,6 +4,8 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { ArrowUp } from 'lucide-react'
 import { useChat } from '../contexts/ChatContext'
+import { useShell } from '../contexts/ShellContext'
+import { Berry } from './Berry'
 import { cn } from '@common/lib/utils'
 
 interface Message {
@@ -124,23 +126,13 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
     </div>
 )
 
-// Loading Indicator with spinning star
-const LoadingIndicator: React.FC = () => {
-    const [isVisible, setIsVisible] = useState(false)
-
-    useEffect(() => {
-        setIsVisible(true)
-    }, [])
-
-    return (
-        <div className={cn(
-            "transition-transform duration-layout",
-            isVisible ? "scale-100" : "scale-0"
-        )}>
-            ...
-        </div>
-    )
-}
+// Berry's working state while a reply is on its way.
+const LoadingIndicator: React.FC = () => (
+    <div role="status" className="flex items-center gap-2 text-13 text-muted-foreground animate-fade-in">
+        <Berry mood="thinking" size={24} />
+        Thinking
+    </div>
+)
 
 // Chat Input Component with pill design
 const ChatInput: React.FC<{
@@ -149,6 +141,7 @@ const ChatInput: React.FC<{
 }> = ({ onSend, disabled }) => {
     const [value, setValue] = useState('')
     const [isFocused, setIsFocused] = useState(false)
+    const placeholder = useShell().settings.showBerry ? 'Ask Berry' : 'Ask a question'
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     // Auto-resize textarea
@@ -192,7 +185,7 @@ const ChatInput: React.FC<{
                 onBlur={() => setIsFocused(false)}
                 onKeyDown={handleKeyDown}
                 aria-label="Message"
-                placeholder="Ask Berry"
+                placeholder={placeholder}
                 className="flex-1 py-1 resize-none outline-none bg-transparent text-15 text-foreground placeholder:text-muted-foreground min-h-[24px] max-h-[200px]"
                 rows={1}
                 style={{ lineHeight: '24px' }}
