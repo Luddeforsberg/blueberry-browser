@@ -66,6 +66,7 @@ export const Mascot: React.FC<MascotProps> = ({
       <MessageCircle
         role="img"
         aria-label="Assistant"
+        onContextMenu={onContextMenu}
         className={cn("text-muted-foreground", className)}
         style={{ width: size, height: size }}
       />

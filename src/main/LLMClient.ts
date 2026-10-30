@@ -129,7 +129,8 @@ export class LLMClient {
         if (activeTab) {
           try {
             const image = await activeTab.screenshot();
-            screenshot = image.toDataURL();
+            // Switched off while capturing: drop the screenshot.
+            screenshot = this.pageAccess ? image.toDataURL() : null;
           } catch (error) {
             console.error("Failed to capture screenshot:", error);
           }
@@ -226,13 +227,19 @@ export class LLMClient {
       }
     }
 
-    // Build system message
+    // "Can see" may have been switched off while the page was being read, so nothing read goes out.
+    if (!this.pageAccess) {
+      return [
+        { role: "system", content: this.buildSystemPrompt(null, null) },
+        ...this.messages.map(withoutImages),
+      ];
+    }
+
     const systemMessage: CoreMessage = {
       role: "system",
       content: this.buildSystemPrompt(pageUrl, pageText),
     };
 
-    // Include all messages in history (system + conversation)
     return [systemMessage, ...this.messages];
   }
 
