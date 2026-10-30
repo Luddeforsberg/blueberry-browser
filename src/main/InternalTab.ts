@@ -5,6 +5,7 @@ const TITLES: Record<InternalPage, string> = {
   chat: "New chat",
   routines: "Routines",
   settings: "Settings",
+  gallery: "Component gallery",
 };
 
 // A tab whose page the chrome renderer draws, so it has no web view and no navigation history.

@@ -268,8 +268,7 @@ export class Window {
     this.tabsMap = new Map(
       this.entries.map((existing) => [existing.id, existing.id === tabId ? tab : existing])
     );
-    if (this.activeTabId === tabId) tab.show();
-    else tab.hide();
+    this.syncTabViews();
     this.notifyTabs();
     return true;
   }
@@ -324,15 +323,35 @@ export class Window {
       return false;
     }
 
-    if (this.activeTabId && this.activeTabId !== tabId) {
-      this.tabsMap.get(this.activeTabId)?.hide();
-    }
-
-    tab.show();
     this.activeTabId = tabId;
+    this.syncTabViews();
     this.notifyTabs();
 
     return true;
+  }
+
+  // Only the active web tab shows, and none while onboarding fills the window.
+  private syncTabViews(): void {
+    const { onboarded } = this.settings;
+    this.allTabs.forEach((tab) => (onboarded && tab.id === this.activeTabId ? tab.show() : tab.hide()));
+  }
+
+  showBerryMenu(): void {
+    const { keepBerryStill, showBerry } = this.settings;
+    Menu.buildFromTemplate([
+      {
+        label: "Keep Berry Still",
+        type: "checkbox",
+        checked: keepBerryStill,
+        click: () => this.updateSettings({ keepBerryStill: !keepBerryStill }),
+      },
+      {
+        label: "Hide Berry",
+        type: "checkbox",
+        checked: !showBerry,
+        click: () => this.updateSettings({ showBerry: !showBerry }),
+      },
+    ]).popup({ window: this._baseWindow });
   }
 
   getTab(tabId: string): Tab | null {
@@ -361,6 +380,8 @@ export class Window {
     const item = Menu.getApplicationMenu()?.getMenuItemById(HORIZONTAL_TABS_MENU_ID);
     if (item) item.checked = after.layoutMode === "horizontal";
     if (after.appearance !== before.appearance) nativeTheme.themeSource = after.appearance;
+
+    if (after.onboarded !== before.onboarded) this.syncTabViews();
 
     this.broadcast("settings:updated", after);
     this.updateAllBounds();

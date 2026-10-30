@@ -11,7 +11,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "gallery";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -23,6 +23,8 @@ export interface Settings {
   chatWidth: number;
   showBerry: boolean;
   keepBerryStill: boolean;
+  // False until the first-launch steps are finished or skipped.
+  onboarded: boolean;
 }
 
 // A page the user really visited, newest first.
@@ -131,6 +133,9 @@ export interface InvokeChannels {
   "chat:clear": { region: "chrome"; args: []; result: void };
   "chat:messages": { region: "chrome"; args: []; result: ChatMessage[] };
   "page:text": { region: "chrome"; args: []; result: string | null };
+  "chat:page-access": { region: "chrome"; args: []; result: boolean };
+  "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
+  "berry:context-menu": { region: "chrome"; args: []; result: void };
 }
 
 export type InvokeChannel = keyof InvokeChannels;
@@ -183,6 +188,8 @@ export interface ThemeAPI {
 export interface SettingsAPI {
   getSettings: () => Promise<Settings>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  // The native menu for right-clicking Berry, with Keep Berry still and Hide Berry.
+  showBerryMenu: () => Promise<void>;
   onSettingsUpdated: (callback: (settings: Settings) => void) => Unsubscribe;
 }
 
@@ -191,6 +198,8 @@ export interface ChatAPI {
   clearChat: () => Promise<void>;
   getMessages: () => Promise<ChatMessage[]>;
   getPageText: () => Promise<string | null>;
+  getPageAccess: () => Promise<boolean>;
+  setPageAccess: (enabled: boolean) => Promise<boolean>;
   onChatChunk: (callback: (chunk: ChatChunk) => void) => Unsubscribe;
   onMessagesUpdated: (callback: (messages: ChatMessage[]) => void) => Unsubscribe;
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import { useShell } from '../contexts/ShellContext'
 import { Favicon } from '../components/Favicon'
+import { Berry, useAssistantName } from '../components/Berry'
 import { toUrl } from '@common/lib/url'
 import { cn } from '@common/lib/utils'
 
@@ -34,16 +35,19 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
 
     const askKey = theme.platform === 'mac' ? '⌘↵' : 'Ctrl+↵'
+    const name = useAssistantName()
 
     return (
         <div className="h-full overflow-y-auto">
             <div className="max-w-xl mx-auto px-6 pt-[18vh] pb-12">
                 <h1 className="text-34 font-semibold">Where shall we start today?</h1>
                 <div className="relative mt-6">
+                    {/* Berry perches on the input's top edge. */}
+                    <Berry mood="rest" size={56} className="absolute right-6 -top-[50px]" />
                     <input
                         type="text"
-                        aria-label="Search, enter a URL, or ask Berry"
-                        placeholder="Search, enter a URL, or ask Berry"
+                        aria-label={`Search, enter a URL, or ask ${name === 'Berry' ? 'Berry' : 'a question'}`}
+                        placeholder={`Search, enter a URL, or ask ${name === 'Berry' ? 'Berry' : 'a question'}`}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         onKeyDown={handleKeyDown}
@@ -55,7 +59,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-12 text-muted-foreground pointer-events-none">
-                        {askKey} Ask Berry
+                        {askKey} {name === 'Berry' ? 'Ask Berry' : 'Ask'}
                     </span>
                 </div>
 

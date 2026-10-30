@@ -81,4 +81,46 @@ describe("LLMClient", () => {
     expect(updates).toHaveLength(3);
     expect(updates[2].at(-1)).toEqual({ role: "assistant", content: "one two three" });
   });
+
+  it("sends no page text or screenshot when Berry can't see the page", async () => {
+    const { client } = await setup();
+    client.setPageAccess(false);
+
+    await client.sendChatMessage({ message: "first", messageId: "1" });
+
+    const messages: CoreMessage[] = streamText.mock.calls[0][0].messages;
+    expect(messages.some(hasImage)).toBe(false);
+    expect(JSON.stringify(messages)).not.toContain("page text");
+    expect(JSON.stringify(messages)).not.toContain("example.com");
+  });
+
+  it("sends nothing from the page when Can see is switched off while the page is being read", async () => {
+    const { client } = await setup();
+    const window = (client as unknown as { window: { activeTab: Record<string, unknown> } }).window;
+    window.activeTab.screenshot = async () => {
+      client.setPageAccess(false);
+      return { toDataURL: () => SCREENSHOT };
+    };
+
+    await client.sendChatMessage({ message: "first", messageId: "1" });
+
+    const messages: CoreMessage[] = streamText.mock.calls[0][0].messages;
+    expect(messages.some(hasImage)).toBe(false);
+    expect(JSON.stringify(messages)).not.toContain("page text");
+  });
+
+  it("drops page text read before Can see was switched off", async () => {
+    const { client } = await setup();
+    const window = (client as unknown as { window: { activeTab: Record<string, unknown> } }).window;
+    window.activeTab.getTabText = async () => {
+      client.setPageAccess(false);
+      return "page text";
+    };
+
+    await client.sendChatMessage({ message: "first", messageId: "1" });
+
+    const messages: CoreMessage[] = streamText.mock.calls[0][0].messages;
+    expect(messages.some(hasImage)).toBe(false);
+    expect(JSON.stringify(messages)).not.toContain("page text");
+  });
 });

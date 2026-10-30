@@ -10,6 +10,7 @@ import { TabStrip } from './components/TabStrip'
 import { Toolbar } from './components/Toolbar'
 import { ChatPanel } from './components/ChatPanel'
 import { ResizeHandle } from './components/ResizeHandle'
+import { Onboarding } from './components/Onboarding'
 import { cn } from '@common/lib/utils'
 
 // Regions sit exactly where main's layout puts them, so the tab view lines up with the page card.
@@ -29,8 +30,10 @@ const Region: React.FC<{
 )
 
 const Shell: React.FC = () => {
-    const { layout, theme } = useShell()
+    const { layout, theme, settings } = useShell()
     const { activeTab } = useBrowser()
+
+    if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
 
     return (

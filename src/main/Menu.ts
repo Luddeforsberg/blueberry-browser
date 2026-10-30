@@ -92,6 +92,10 @@ export class AppMenu {
           },
           { type: "separator" },
           {
+            label: "Component Gallery",
+            click: () => this.mainWindow.openPage("gallery"),
+          },
+          {
             label: "Toggle Developer Tools",
             accelerator:
               process.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",

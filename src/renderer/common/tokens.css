@@ -16,6 +16,13 @@
     --warning: 122 79 0;
     --destructive: 179 38 30;
     --destructive-foreground: 255 255 255;
+
+    /* Berry's own colours, never the UI accent. */
+    --berry-ink: 26 34 64;
+    --berry-wing: 45 58 104;
+    --berry-nape: 152 165 195;
+    --berry-eye: 244 241 230;
+    --berry-beak: 16 21 43;
   }
 
   .dark {
@@ -34,11 +41,24 @@
     --warning: 224 176 80;
     --destructive: 242 139 130;
     --destructive-foreground: 28 28 30;
+
+    --berry-ink: 117 133 198;
+    --berry-wing: 147 161 216;
+    --berry-nape: 188 199 227;
+    --berry-eye: 251 249 240;
+    --berry-beak: 40 51 95;
   }
 
   :root,
   .dark {
     --glass-tint: rgb(var(--background) / 0.88);
+
+    /* The blueberry looks the same in light and dark. */
+    --berry-fruit-light: 90 109 184;
+    --berry-fruit-mid: 52 69 143;
+    --berry-fruit-dark: 27 37 96;
+    --berry-fruit-bloom: 213 220 242;
+    --berry-fruit-crown: 26 35 88;
 
     /* Names kept from the starter theme, as aliases of the tokens above. */
     --card: var(--surface);

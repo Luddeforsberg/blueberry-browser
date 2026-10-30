@@ -54,6 +54,7 @@ export class LLMClient {
   private readonly modelName: string;
   private readonly model: LanguageModel | null;
   private messages: CoreMessage[] = [];
+  private pageAccess = true;
 
   constructor(webContents: WebContents) {
     this.webContents = webContents;
@@ -123,12 +124,13 @@ export class LLMClient {
     try {
       // Get screenshot from active tab if available
       let screenshot: string | null = null;
-      if (this.window) {
-        const activeTab = this.window.activeTab;
+      {
+        const activeTab = this.pageTab;
         if (activeTab) {
           try {
             const image = await activeTab.screenshot();
-            screenshot = image.toDataURL();
+            // Switched off while capturing: drop the screenshot.
+            screenshot = this.pageAccess ? image.toDataURL() : null;
           } catch (error) {
             console.error("Failed to capture screenshot:", error);
           }
@@ -181,6 +183,20 @@ export class LLMClient {
     }
   }
 
+  // The "Can see" toggle. Off means no page text or screenshot goes with a message.
+  setPageAccess(enabled: boolean): boolean {
+    this.pageAccess = enabled === true;
+    return this.pageAccess;
+  }
+
+  get canSeePage(): boolean {
+    return this.pageAccess;
+  }
+
+  private get pageTab() {
+    return this.pageAccess ? (this.window?.activeTab ?? null) : null;
+  }
+
   clearMessages(): void {
     this.messages = [];
     this.sendMessagesToRenderer();
@@ -198,9 +214,9 @@ export class LLMClient {
     // Get page context from active tab
     let pageUrl: string | null = null;
     let pageText: string | null = null;
-    
-    if (this.window) {
-      const activeTab = this.window.activeTab;
+
+    {
+      const activeTab = this.pageTab;
       if (activeTab) {
         pageUrl = activeTab.url;
         try {
@@ -211,13 +227,19 @@ export class LLMClient {
       }
     }
 
-    // Build system message
+    // "Can see" may have been switched off while the page was being read, so nothing read goes out.
+    if (!this.pageAccess) {
+      return [
+        { role: "system", content: this.buildSystemPrompt(null, null) },
+        ...this.messages.map(withoutImages),
+      ];
+    }
+
     const systemMessage: CoreMessage = {
       role: "system",
       content: this.buildSystemPrompt(pageUrl, pageText),
     };
 
-    // Include all messages in history (system + conversation)
     return [systemMessage, ...this.messages];
   }
 

@@ -480,3 +480,56 @@ test("Close Tab in the menu closes internal pages too", async () => {
 
   await expect.poll(async () => (await getTabs()).some((tab) => tab.page === "settings")).toBe(false);
 });
+
+test("first launch shows onboarding until it's finished or skipped", async () => {
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-first-"));
+  await app.close();
+  app = await launchApp(profile, { firstLaunch: true });
+  chrome = await findView(app, "view=chrome");
+
+  await expect(chrome.getByRole("heading", { name: "Hi, I’m Berry." })).toBeVisible();
+  await chrome.getByRole("button", { name: "Nice to meet you" }).click();
+  await chrome.getByRole("radio", { name: "Tabs along the top" }).click();
+  await chrome.getByRole("button", { name: "Skip setup" }).click();
+
+  await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
+  expect(await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).toMatchObject({
+    onboarded: true,
+    layoutMode: "horizontal",
+  });
+
+  await app.close();
+  app = await launchApp(profile, { firstLaunch: true });
+  chrome = await findView(app, "view=chrome");
+  await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
+});
+
+test("the chat says what Berry can see, and the switch takes the page away", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+
+  await expect(panel.getByText("Can see: 127.0.0.1")).toBeVisible();
+  await panel.getByRole("switch", { name: "Let Berry see this page" }).click();
+
+  await expect(panel.getByText("Can see: no pages")).toBeVisible();
+  expect(await chrome.evaluate(() => window.chromeAPI.chat.getPageAccess())).toBe(false);
+});
+
+test("Hide Berry swaps the character for a plain icon and neutral words", async () => {
+  await expect(chrome.getByRole("img", { name: /^Berry, / }).first()).toBeVisible();
+
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ showBerry: false }));
+
+  await expect(chrome.getByRole("img", { name: /^Berry, / })).toHaveCount(0);
+  await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask a question" })).toBeVisible();
+});
+
+test("the component gallery shows Berry in every mood", async () => {
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("gallery"));
+
+  for (const mood of ["at rest", "fetching", "something went wrong", "asleep"]) {
+    await expect(chrome.getByRole("img", { name: `Berry, ${mood}` }).first()).toBeVisible();
+  }
+  await expect(chrome.getByRole("region", { name: "Approval needed" })).toBeVisible();
+});

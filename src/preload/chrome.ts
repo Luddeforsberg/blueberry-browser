@@ -49,6 +49,7 @@ const chromeAPI: ChromeAPI = {
   settings: {
     getSettings: () => invoke("settings:get"),
     updateSettings: (patch) => invoke("settings:update", patch),
+    showBerryMenu: () => invoke("berry:context-menu"),
     onSettingsUpdated: (callback) => subscribe("settings:updated", callback),
   },
   library: {
@@ -62,6 +63,8 @@ const chromeAPI: ChromeAPI = {
     clearChat: () => invoke("chat:clear"),
     getMessages: () => invoke("chat:messages"),
     getPageText: () => invoke("page:text"),
+    getPageAccess: () => invoke("chat:page-access"),
+    setPageAccess: (enabled) => invoke("chat:set-page-access", enabled),
     onChatChunk: (callback) => subscribe("chat:chunk", callback),
     onMessagesUpdated: (callback) => subscribe("chat:messages-updated", callback),
   },

@@ -49,6 +49,18 @@ module.exports = {
         DEFAULT: "rgb(var(--popover) / <alpha-value>)",
         foreground: "rgb(var(--popover-foreground) / <alpha-value>)",
       },
+      berry: {
+        ink: "rgb(var(--berry-ink) / <alpha-value>)",
+        wing: "rgb(var(--berry-wing) / <alpha-value>)",
+        nape: "rgb(var(--berry-nape) / <alpha-value>)",
+        eye: "rgb(var(--berry-eye) / <alpha-value>)",
+        beak: "rgb(var(--berry-beak) / <alpha-value>)",
+        "fruit-light": "rgb(var(--berry-fruit-light) / <alpha-value>)",
+        "fruit-mid": "rgb(var(--berry-fruit-mid) / <alpha-value>)",
+        "fruit-dark": "rgb(var(--berry-fruit-dark) / <alpha-value>)",
+        "fruit-bloom": "rgb(var(--berry-fruit-bloom) / <alpha-value>)",
+        "fruit-crown": "rgb(var(--berry-fruit-crown) / <alpha-value>)",
+      },
       card: {
         DEFAULT: "rgb(var(--card) / <alpha-value>)",
         foreground: "rgb(var(--card-foreground) / <alpha-value>)",
@@ -108,8 +120,19 @@ module.exports = {
       },
       animation: {
         "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",
+        // Berry's own motion. Bounce belongs to Berry, never the chrome.
+        "berry-bob": "berry-bob 900ms ease-in-out infinite",
+        "berry-feather": "berry-feather 1200ms ease-in forwards",
       },
       keyframes: {
+        "berry-bob": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-3px)" },
+        },
+        "berry-feather": {
+          "0%": { transform: "translate(0, 0) rotate(0deg)", opacity: "1" },
+          "100%": { transform: "translate(-4px, 14px) rotate(-40deg)", opacity: "0" },
+        },
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
