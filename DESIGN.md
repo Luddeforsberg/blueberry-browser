@@ -30,7 +30,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 | Region | Vertical (default) | Horizontal |
 |---|---|---|
-| Tabs | Left sidebar: pinned sites, tabs, new tab button | Top row |
+| Tabs | Left sidebar (see below) | Top row |
 | Address bar and navigation | Row above the page | Row below the tabs |
 | Chat panel | Right, pushes the page | Same |
 | Web page | Solid rounded card, inset 8px from the frame | Same |
@@ -48,6 +48,7 @@ Sizes (*to tune*):
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It floats over the page, so it is an overlay view (see below).
+- **Sidebar contents, top to bottom:** window controls with search and collapse buttons, pinned sites, bookmarks, chats with a new chat button, tabs with a new tab button, and Routines and Settings at the bottom.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
@@ -63,7 +64,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, Routines, Settings) open as tabs drawn by the chrome renderer, with no tab view.
+- **Internal pages** (new tab, main chat, Routines, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on a solid `surface` card in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -313,13 +314,21 @@ Four short, skippable steps: meet Berry, choose layout and appearance, import fr
 
 A heading, one input and recent work. Nothing appears in the recent list unless it is real. There are no promos or idea cards.
 
-The input is one smart field. `Enter` goes to a URL or runs a search. `⌘Enter` (`Ctrl+Enter` on Windows) asks Berry, and the input shows a small hint saying so.
+The input is one smart field. `Enter` goes to a URL or runs a search. `⌘Enter` (`Ctrl+Enter` on Windows) asks Berry and opens the main chat, and the input shows a small hint saying so.
 
 ### Browsing
 
 The page gets the space. The address bar shows the real URL and real navigation state. Berry stays small and only shows a mood when something is happening.
 
-### Chat
+### Main chat
+
+A full page for talking to Berry about anything, not about a particular web page. It opens as a tab, and past chats are listed in the sidebar.
+
+- A centred conversation of about 680px, with the composer fixed at the bottom.
+- Berry's working state says what it is doing and offers to show the work in a tab.
+- The composer always shows what Berry can see, such as "Can see: no pages".
+
+### Chat panel
 
 - Opens on the right with `⌘E` (`Ctrl+E` on Windows) and pushes the page.
 - Always shows what Berry can see, such as "Can see: wikipedia.org", with a toggle to remove it.
