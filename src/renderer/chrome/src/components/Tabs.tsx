@@ -70,15 +70,16 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     label,
     showNew = true
 }) => {
-    const { tabs, createTab, closeTab, switchTab, moveTab } = useBrowser()
+    const { tabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
     const vertical = mode === 'vertical'
     const { start, itemProps } = useTabDrag(tabs.map(tab => tab.id), vertical ? 'y' : 'x', moveTab)
     const order = tabs.map(tab => tab.id).join()
     const nudged = useRef<HTMLElement | null>(null)
 
     // Moving a node in the DOM can drop its focus, which would end a run of Alt+arrow presses.
+    // At the end of the list nothing moves, so only take focus back if it really was dropped.
     useLayoutEffect(() => {
-        nudged.current?.focus()
+        if (document.activeElement === document.body) nudged.current?.focus()
         nudged.current = null
     }, [order])
 
@@ -103,10 +104,8 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                             start(event, tab.id)
                         }}
                         onNudge={(delta, button) => {
-                            const toIndex = index + delta
-                            if (toIndex < 0 || toIndex >= tabs.length) return
                             nudged.current = button
-                            void moveTab(tab.id, toIndex)
+                            void moveTabBy(tab.id, delta)
                         }}
                         {...itemProps(tab.id, index)}
                     />

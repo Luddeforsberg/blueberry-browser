@@ -338,10 +338,15 @@ export class Window {
     if (from === -1) return false;
 
     const [tab] = entries.splice(from, 1);
-    entries.splice(toIndex, 0, tab);
+    entries.splice(Math.max(0, Math.min(toIndex, entries.length)), 0, tab);
     this.tabsMap = new Map(entries.map((entry) => [entry.id, entry]));
     this.notifyTabs();
     return true;
+  }
+
+  // Relative to the real order here, because key presses can outrun the order the chrome has drawn.
+  moveTabBy(tabId: string, delta: number): boolean {
+    return this.moveTab(tabId, this.entries.findIndex((tab) => tab.id === tabId) + delta);
   }
 
   // Only the active web tab shows, and none while onboarding fills the window.

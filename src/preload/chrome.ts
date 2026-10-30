@@ -24,6 +24,7 @@ const chromeAPI: ChromeAPI = {
     closeTab: (tabId) => invoke("tabs:close", tabId),
     switchTab: (tabId) => invoke("tabs:switch", tabId),
     moveTab: (tabId, toIndex) => invoke("tabs:move", tabId, toIndex),
+    moveTabBy: (tabId, delta) => invoke("tabs:move-by", tabId, delta),
     navigateTab: (tabId, url) => invoke("tab:navigate", tabId, url),
     goBack: (tabId) => invoke("tab:back", tabId),
     goForward: (tabId) => invoke("tab:forward", tabId),

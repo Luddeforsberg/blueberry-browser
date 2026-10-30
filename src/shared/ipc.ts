@@ -103,6 +103,7 @@ export interface InvokeChannels {
   "tabs:close": { region: "chrome" | "overlay"; args: [tabId: string]; result: boolean };
   "tabs:switch": { region: "chrome" | "overlay"; args: [tabId: string]; result: boolean };
   "tabs:move": { region: "chrome" | "overlay"; args: [tabId: string, toIndex: number]; result: boolean };
+  "tabs:move-by": { region: "chrome" | "overlay"; args: [tabId: string, delta: number]; result: boolean };
   "tabs:open-page": {
     region: "chrome" | "overlay";
     args: [page: InternalPage, options?: { param?: string; title?: string }];
@@ -162,6 +163,7 @@ export interface BrowserAPI {
   closeTab: (tabId: string) => Promise<boolean>;
   switchTab: (tabId: string) => Promise<boolean>;
   moveTab: (tabId: string, toIndex: number) => Promise<boolean>;
+  moveTabBy: (tabId: string, delta: number) => Promise<boolean>;
   navigateTab: (tabId: string, url: string) => Promise<boolean>;
   goBack: (tabId: string) => Promise<boolean>;
   goForward: (tabId: string) => Promise<boolean>;
