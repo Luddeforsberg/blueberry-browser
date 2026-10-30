@@ -210,10 +210,14 @@ test("the sidebar and tabs fill the window, whether the sidebar is open or not",
 });
 
 test("views follow the window when it resizes", async () => {
-  await app.evaluate(({ BaseWindow }) =>
-    BaseWindow.getAllWindows()[0].setContentSize(1300, 900)
-  );
+  // The window may not get the size it asks for on a small screen, such as a CI runner.
+  const [width, height] = await app.evaluate(({ BaseWindow }) => {
+    const baseWindow = BaseWindow.getAllWindows()[0];
+    baseWindow.setContentSize(1100, 800);
+    return baseWindow.getContentSize();
+  });
+  expect(width).toBe(1100);
 
-  await expect.poll(() => topBar.evaluate(() => window.innerWidth)).toBe(1300);
-  await expect.poll(() => sidebar.evaluate(() => window.innerHeight)).toBe(900 - 88);
+  await expect.poll(() => topBar.evaluate(() => window.innerWidth)).toBe(width);
+  await expect.poll(() => sidebar.evaluate(() => window.innerHeight)).toBe(height - 88);
 });
