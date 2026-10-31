@@ -47,7 +47,7 @@ export const RoutineNotice: React.FC = () => {
             className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
             <BerryDot />
-            {asking > 0 ? 'Routine needs your OK' : 'Routine finished'}
+            {asking > 0 ? 'Routine needs your OK' : 'Routine has news'}
         </button>
     )
 }

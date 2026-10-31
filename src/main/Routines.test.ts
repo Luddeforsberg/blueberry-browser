@@ -171,6 +171,19 @@ describe("the scheduler", () => {
     expect(store.runs(id)).toHaveLength(1);
   });
 
+  it("tells the page the next time when one passes during a run", async () => {
+    const { routines, started: runs, events } = setup();
+    save(routines, daily("13:00"));
+    started(routines);
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(runs).toHaveLength(1);
+
+    events.onChanged.mockClear();
+    await jump(DAY);
+    expect(runs).toHaveLength(1);
+    expect(events.onChanged).toHaveBeenCalled();
+  });
+
   it("limits how many work at once, and the rest wait their turn", async () => {
     const { routines, started: runs } = setup();
     const ids = Array.from({ length: MAX_ACTIVE_RUNS + 1 }, (_, index) => save(routines, daily("13:00", `R${index}`)));

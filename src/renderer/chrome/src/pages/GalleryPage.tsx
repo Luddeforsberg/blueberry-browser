@@ -151,7 +151,7 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Routine form">
                     <div className="max-w-xl">
-                        <RoutineForm values={routineForm} onChange={setRoutineForm} onCancel={() => undefined} onSaved={() => undefined} />
+                        <RoutineForm preview values={routineForm} onChange={setRoutineForm} onCancel={() => undefined} onSaved={() => undefined} />
                     </div>
                 </Section>
 

@@ -126,8 +126,10 @@ export class Routines {
     this.store.due(now).forEach((routine) => {
       const next = nextRun(routine.schedule, now);
       // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up.
-      if (this.active.has(routine.id)) this.store.setNextRun(routine.id, next);
-      else if (this.hasFreePlace) {
+      if (this.active.has(routine.id)) {
+        this.store.setNextRun(routine.id, next);
+        this.events.onChanged();
+      } else if (this.hasFreePlace) {
         const dueAt = routine.nextRunAt as number;
         this.store.setNextRun(routine.id, next);
         // However many times were missed, this one run covers them all.

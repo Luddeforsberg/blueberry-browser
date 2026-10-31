@@ -31,12 +31,15 @@ export const RoutineForm: React.FC<{
     onChange: (values: RoutineFormValues) => void
     onCancel: () => void
     onSaved: (id: string) => void
-}> = ({ values, onChange, onCancel, onSaved }) => {
+    // For the gallery, where Save must not create a routine that really runs.
+    preview?: boolean
+}> = ({ values, onChange, onCancel, onSaved, preview = false }) => {
     const [error, setError] = useState<string | null>(null)
     const set = (patch: Partial<RoutineFormValues>) => onChange({ ...values, ...patch })
 
     const save = async (event: React.FormEvent) => {
         event.preventDefault()
+        if (preview) return
         const result = await window.chromeAPI.routines.save(values.id, toDraft(values))
         if (result.ok) onSaved(result.id)
         else setError(result.error)
