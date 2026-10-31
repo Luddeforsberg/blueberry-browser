@@ -1,10 +1,13 @@
 import React from 'react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useChat, type Message } from '../contexts/ChatContext'
+import { useFlock } from '../contexts/LibraryContext'
 import { useAssistantName, BerrySpot } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, ThinkingMessage, UserMessage, useFollowReply } from './ChatMessage'
 import { PageCard } from './PageCard'
 import { ChatComposer } from './Composer'
+import { siteAllowed } from '@shared/mascots'
+import type { MascotProfile } from '@shared/library'
 
 // Conversation Turn Component
 interface ConversationTurn {
@@ -16,7 +19,8 @@ const ConversationTurnComponent: React.FC<{
     turn: ConversationTurn
     isLoading?: boolean
     waiting?: boolean
-}> = ({ turn, isLoading, waiting }) => (
+    mascot: MascotProfile
+}> = ({ turn, isLoading, waiting, mascot }) => (
     <div className="flex flex-col gap-5">
         {turn.user && <UserMessage content={turn.user.content} />}
         {turn.assistant && (
@@ -25,9 +29,10 @@ const ConversationTurnComponent: React.FC<{
                 steps={turn.assistant.steps}
                 isStreaming={turn.assistant.isStreaming}
                 waiting={waiting}
+                mascot={mascot}
             />
         )}
-        {isLoading && <ThinkingMessage />}
+        {isLoading && <ThinkingMessage mascot={mascot} />}
     </div>
 )
 
@@ -41,15 +46,19 @@ const hostOf = (url: string) => {
 
 // Main Chat Component
 export const Chat: React.FC = () => {
-    const { messages, isLoading, error, chatId, approval, sendMessage, stop, pageAccess: enabled, setPageAccess: change, draft, takeDraft } = useChat()
+    const { messages, isLoading, error, chatId, approval, sendMessage, stop, pageAccess: enabled, setPageAccess: change, draft, takeDraft, mascotId } = useChat()
+    const { find, chosen, choose } = useFlock()
+    // A chat not started yet goes to whoever is chosen. After that, it stays with the mascot it started with.
+    const mascot = chatId ? find(mascotId) : chosen
     const scrollerRef = useFollowReply(
         messages.filter((message) => message.role === 'user').length,
         messages[messages.length - 1]?.content,
         (messages[messages.length - 1]?.steps?.length ?? 0) + (approval ? 1 : 0)
     )
-    const name = useAssistantName()
+    const name = useAssistantName(mascot)
     const { activeTab } = useBrowser()
     const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
+    const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites)
 
     // Group messages into conversation turns
     const conversationTurns: ConversationTurn[] = []
@@ -77,7 +86,7 @@ export const Chat: React.FC = () => {
             <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
-                        {name === 'Berry' && <BerrySpot size={72} />}
+                        {name !== 'Assistant' && <BerrySpot size={72} />}
                         <p className="text-14 text-muted-foreground">
                             Ask about this page, or anything else.
                         </p>
@@ -89,13 +98,14 @@ export const Chat: React.FC = () => {
                                 key={`turn-${index}`}
                                 turn={turn}
                                 waiting={approval !== null}
+                                mascot={mascot}
                                 isLoading={
                                     showLoadingAfterLastTurn &&
                                     index === conversationTurns.length - 1
                                 }
                             />
                         ))}
-                        {chatId && approval && <ChatApprovalCard chatId={chatId} approval={approval} />}
+                        {chatId && approval && <ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} />}
                         {error && <ChatError message={error} />}
                     </div>
                 )}
@@ -103,14 +113,18 @@ export const Chat: React.FC = () => {
 
             <div className="p-3 pt-1">
                 <ChatComposer
-                    onSend={sendMessage}
+                    onSend={(message) => void sendMessage(message, mascot.id)}
+                    mascot={mascot}
+                    onChooseMascot={chatId ? undefined : choose}
                     draft={draft}
                     onDraftTaken={takeDraft}
                     disabled={isLoading}
                     onStop={isLoading ? stop : undefined}
-                    placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}
+                    placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
                     attachment={
-                        enabled && host ? (
+                        host && !canUseSite ? (
+                            <p className="px-2 py-1 text-12 text-muted-foreground">{name} isn’t allowed on {host}, so it can’t see this page.</p>
+                        ) : enabled && host ? (
                             <PageCard
                                 title={activeTab?.title || host}
                                 host={host}
@@ -119,8 +133,8 @@ export const Chat: React.FC = () => {
                             />
                         ) : undefined
                     }
-                    onAdd={!enabled && host ? () => change(true) : undefined}
-                    addLabel={!enabled && host ? 'Add this page' : undefined}
+                    onAdd={!enabled && host && canUseSite ? () => change(true) : undefined}
+                    addLabel={!enabled && host && canUseSite ? 'Add this page' : undefined}
                 />
             </div>
         </div>

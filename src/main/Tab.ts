@@ -65,6 +65,12 @@ export class Tab {
   private _trouble: TabTrouble | null = null;
   private _loadError: { url: string; description: string } | null = null;
   private reloadOnceGone = false;
+  // Who is working here, if a mascot other than Berry is.
+  workingMascotId: string | null = null;
+  // Addresses this tab may not go to while a limited mascot is acting in it, and any it tried.
+  private readonly navigationLimits = new Set<(url: string) => boolean>();
+  // One set for each limited call running now, so overlapping calls each hear about every refusal.
+  private readonly refusalListeners = new Set<Set<string>>();
   // Calls to the page that are waiting for an answer it may never give.
   private readonly waiting = new Set<() => void>();
 
@@ -106,6 +112,16 @@ export class Tab {
   }
 
   private setupEventListeners(contents: WebContents): void {
+    // Both are for the page itself: `will-navigate` for a link or script, `will-redirect` for a server sending it on.
+    const limit = (event: { preventDefault: () => void }, url: string) => {
+      if (this.refusesNavigation(url)) {
+        this.refusalListeners.forEach((refused) => refused.add(url));
+        event.preventDefault();
+      }
+    };
+    contents.on("will-navigate", (event) => limit(event, event.url));
+    contents.on("will-redirect", (event) => limit(event, event.url));
+
     contents.on("page-title-updated", (_, title) => {
       this._title = title;
       this.events.onDetails();
@@ -164,6 +180,35 @@ export class Tab {
       if (this._trouble === "unresponsive") this.setTrouble(null);
     });
     contents.on("destroyed", () => this.stopWaiting());
+  }
+
+  refusesNavigation(url: string): boolean {
+    return [...this.navigationLimits].some((allows) => !allows(url));
+  }
+
+  // For as long as `act` runs, the page can't take this tab anywhere `allows` says no to. The user's own use of the tab
+  // is left alone outside these moments. Says which addresses it stopped.
+  async withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
+    // One of its own for each call, because calls can overlap and one ending mustn't lift the other's limit.
+    const limit = (url: string) => allows(url);
+    const refused = new Set<string>();
+    this.navigationLimits.add(limit);
+    this.refusalListeners.add(refused);
+    try {
+      const result = await act();
+      return { result, refused: [...refused] };
+    } finally {
+      this.navigationLimits.delete(limit);
+      this.refusalListeners.delete(refused);
+    }
+  }
+
+  // Opened by a page a limited mascot is acting in, so its first load can't go where the opener couldn't.
+  limitFirstLoadLike(opener: Tab): void {
+    const limits = [...opener.navigationLimits].map((allows) => (url: string) => allows(url));
+    if (limits.length === 0) return;
+    limits.forEach((limit) => this.navigationLimits.add(limit));
+    this.webContents.once("did-stop-loading", () => limits.forEach((limit) => this.navigationLimits.delete(limit)));
   }
 
   // The chrome draws what to do about it, in the space the page leaves.
@@ -421,9 +466,9 @@ export class Tab {
   }
 
   // The page and what's in its frames, each frame labelled with where it really comes from.
-  async getTextWithFrames(): Promise<string> {
+  async getTextWithFrames(allowsFrame: (origin: string) => boolean = () => true): Promise<string> {
     const text = await this.getTabText();
-    const frames = this.webContents.mainFrame.framesInSubtree.filter((frame) => frame.parent).slice(0, MAX_FRAMES_READ);
+    const frames = this.webContents.mainFrame.framesInSubtree.filter((frame) => frame.parent && allowsFrame(frame.origin)).slice(0, MAX_FRAMES_READ);
     const parts = await Promise.all(
       frames.map(async (frame) => {
         let timer: NodeJS.Timeout | undefined;
@@ -442,6 +487,13 @@ export class Tab {
     this.unloaded = null;
     this._url = url;
     return this.webContents.loadURL(url);
+  }
+
+  // Where going back would land.
+  get backUrl(): string | null {
+    if (!this.canGoBack) return null;
+    const { navigationHistory } = this.webContents;
+    return navigationHistory.getEntryAtIndex(navigationHistory.getActiveIndex() - 1)?.url ?? null;
   }
 
   goBack(): void {

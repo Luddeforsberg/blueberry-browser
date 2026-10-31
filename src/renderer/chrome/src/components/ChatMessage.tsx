@@ -2,11 +2,12 @@ import React, { useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { ChatApproval, ChatStep } from '@shared/library'
+import type { ChatApproval, ChatStep, MascotProfile } from '@shared/library'
+import { BERRY_ID } from '@shared/mascots'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
-import { Berry } from './Berry'
+import { Berry, useAssistantName } from './Berry'
 
 const FOLLOW_DISTANCE = 120
 
@@ -81,10 +82,18 @@ export const AssistantMessage: React.FC<{
     isStreaming?: boolean
     avatar?: boolean
     waiting?: boolean
-}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false }) => (
+    // Who wrote it. Anyone but Berry is named, so one can always tell who's working.
+    mascot?: MascotProfile
+}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot }) => (
     <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
-            <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} className="absolute -left-11 top-0" />
+            <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} mascot={mascot} className="absolute -left-11 top-0" />
+        )}
+        {mascot && mascot.id !== BERRY_ID && (
+            <p className="flex items-center gap-2 text-13 font-semibold">
+                {!avatar && <Berry mood={isStreaming ? 'thinking' : 'rest'} size={24} mascot={mascot} />}
+                {mascot.name}
+            </p>
         )}
         {steps.length > 0 && <StepTrail steps={steps} />}
         {content ? (
@@ -129,21 +138,22 @@ export const StepTrail: React.FC<{ steps: ChatStep[] }> = ({ steps }) => (
 )
 
 // Berry's working state while a reply is on its way, where there's no room for Berry beside the reply.
-export const ThinkingMessage: React.FC = () => (
+export const ThinkingMessage: React.FC<{ mascot?: MascotProfile }> = ({ mascot }) => (
     <div role="status" className="flex items-center gap-2.5 text-14 text-muted-foreground animate-fade-in">
-        <Berry mood="thinking" size={22} />
+        <Berry mood="thinking" size={22} mascot={mascot} />
         <ThinkingWord />
     </div>
 )
 
 // Berry needs something only the user knows, and carries on with the answer. Secrets go in the page, never here.
-const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval }> = ({ chatId, approval }) => {
+const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
     const [answer, setAnswer] = useState('')
+    const name = useAssistantName(mascot)
     const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow, allow ? answer : undefined)
     return (
-        <section aria-label="Berry is asking" className="[overflow-wrap:anywhere] animate-fade-in rounded-panel border bg-surface p-3 shadow-float">
+        <section aria-label={`${name} is asking`} className="[overflow-wrap:anywhere] animate-fade-in rounded-panel border bg-surface p-3 shadow-float">
             <h3 className="text-13 font-semibold">{approval.text}</h3>
-            <p className="mt-1 text-12 text-muted-foreground">Berry waits for your answer. Don’t type passwords or codes here.</p>
+            <p className="mt-1 text-12 text-muted-foreground">{name} waits for your answer. Don’t type passwords or codes here.</p>
             <form
                 className="mt-3 flex items-center gap-3"
                 onSubmit={(event) => {
@@ -166,9 +176,9 @@ const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval }> = (
 }
 
 // An action Berry wants to take, which waits here until the user answers.
-export const ChatApprovalCard: React.FC<{ chatId: string; approval: ChatApproval }> = ({ chatId, approval }) => {
+export const ChatApprovalCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
     const decide = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
-    if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} />
+    if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} mascot={mascot} />
     return (
         <div className="[overflow-wrap:anywhere] animate-fade-in">
             <ApprovalCard

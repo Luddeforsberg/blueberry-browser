@@ -15,12 +15,15 @@ interface ChatContextType {
     error: string | null
     chatId: string | null
     approval: ChatApproval | null
+    // Who the open chat runs as. Null is Berry, and it's also what a chat not started yet has.
+    mascotId: string | null
     // Whether Berry can see the open page. The card on the composer is the signal, and + brings it back.
     pageAccess: boolean
     setPageAccess: (enabled: boolean) => void
 
     // Chat actions
-    sendMessage: (content: string) => Promise<void>
+    // A new chat runs as `mascotId`. An open one keeps its own.
+    sendMessage: (content: string, mascotId: string) => Promise<void>
     stop: () => void
     clearChat: () => void
 
@@ -89,9 +92,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState)
     }, [])
 
-    const sendMessage = useCallback(async (content: string) => {
+    const sendMessage = useCallback(async (content: string, mascotId: string) => {
         try {
-            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true })
+            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true, mascotId })
             if (sent) setChatId(sent.id)
         } catch (error) {
             console.error('Failed to send message:', error)
@@ -117,6 +120,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error: thread?.error ?? null,
         chatId,
         approval: thread?.approval ?? null,
+        mascotId: thread?.mascotId ?? null,
         pageAccess,
         setPageAccess,
         sendMessage,

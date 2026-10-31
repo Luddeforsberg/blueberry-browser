@@ -16,6 +16,8 @@ export interface StoredRoutine {
   name: string;
   instructions: string;
   schedule: RoutineSchedule;
+  // Null is Berry.
+  mascotId: string | null;
   paused: boolean;
   // When it's next due. Null when paused, or for a one-off that's been used.
   nextRunAt: number | null;
@@ -60,9 +62,10 @@ const MIGRATIONS = [
      seen INTEGER NOT NULL DEFAULT 0
    );
    CREATE INDEX runs_by_routine ON runs(routine_id, started_at);`,
+  `ALTER TABLE routines ADD COLUMN mascot_id TEXT;`,
 ];
 
-const ROUTINE_COLUMNS = "id, name, instructions, schedule, paused, next_run_at AS nextRunAt";
+const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, paused, next_run_at AS nextRunAt";
 const RUN_COLUMNS =
   "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen";
 
@@ -116,18 +119,18 @@ export class RoutineStore {
     return row.at;
   }
 
-  create({ name, instructions, schedule }: RoutineDraft, nextRunAt: number | null): string {
+  create({ name, instructions, schedule, mascotId = null }: RoutineDraft, nextRunAt: number | null): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO routines (id, name, instructions, schedule, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(id, name, instructions, JSON.stringify(schedule), nextRunAt, Date.now());
+      .prepare("INSERT INTO routines (id, name, instructions, schedule, mascot_id, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(id, name, instructions, JSON.stringify(schedule), mascotId, nextRunAt, Date.now());
     return id;
   }
 
-  update(id: string, { name, instructions, schedule }: RoutineDraft, nextRunAt: number | null): boolean {
+  update(id: string, { name, instructions, schedule, mascotId = null }: RoutineDraft, nextRunAt: number | null): boolean {
     const { changes } = this.db
-      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, next_run_at = ? WHERE id = ?")
-      .run(name, instructions, JSON.stringify(schedule), nextRunAt, id);
+      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, mascot_id = ?, next_run_at = ? WHERE id = ?")
+      .run(name, instructions, JSON.stringify(schedule), mascotId, nextRunAt, id);
     return changes > 0;
   }
 

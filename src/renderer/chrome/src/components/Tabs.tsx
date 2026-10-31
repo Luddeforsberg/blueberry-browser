@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
+import { useFlock } from '../contexts/LibraryContext'
 import { TabIcon } from './TabIcon'
 import { SHIMMER_TEXT } from './ChatMessage'
 import { useTabDrag } from './useTabDrag'
@@ -17,7 +18,9 @@ const TabItem: React.FC<{
     dragged: boolean
     shifting: boolean
     style?: React.CSSProperties
-}> = ({ tab, mode, onActivate, onClose, onPress, onNudge, dragged, shifting, style }) => (
+}> = ({ tab, mode, onActivate, onClose, onPress, onNudge, dragged, shifting, style }) => {
+    const { find } = useFlock()
+    return (
     <li
         data-berry-tab={tab.id}
         onPointerDown={onPress}
@@ -46,7 +49,7 @@ const TabItem: React.FC<{
         >
             <TabIcon tab={tab} />
             <span className={cn("text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New Tab'}</span>
-            {tab.berryWorking && <span className="sr-only"> (Berry is working here)</span>}
+            {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>
         <button
             type="button"
@@ -63,7 +66,8 @@ const TabItem: React.FC<{
             <X className="size-3" />
         </button>
     </li>
-)
+    )
+}
 
 // One tab list for both layouts: a column in the sidebar, a row in the horizontal tab strip.
 // The sidebar puts its new tab button in the section heading, so it passes showNew={false}.

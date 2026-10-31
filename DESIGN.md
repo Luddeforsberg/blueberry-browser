@@ -7,7 +7,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 ## 1. Principles
 
 1. **The page comes first.** Web pages stay solid and get the space. The chrome stays quiet around them.
-2. **One colleague.** Berry is a single character who helps with your work, not a team to manage.
+2. **One colleague at a time.** Berry comes first and is enough on its own. You can grow a flock of birds for jobs you repeat, but you always talk to one, and it's always clear which.
 3. **Calm by default.** Nothing moves, glows or asks for attention without a reason.
 4. **Trust you can see.** The UI always shows what Berry can see and what it is doing, and it asks before anything that matters.
 5. **A normal browser first.** Tabs, navigation and bookmarks must be excellent with no account and no AI.
@@ -15,7 +15,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 ### What we reject
 
-- A team of humanoid companions, or characters assigned to job roles.
+- Humanoid companions, or a team you have to manage. The flock is birds you made yourself, and none appears until you ask.
 - Promo cards and upsells on the new tab. The idea cards there only link to real features.
 - Glass that makes text harder to read, or glass on web pages.
 - Beige neutrals and blue-tinted dark mode.
@@ -53,7 +53,7 @@ Sizes (*to tune*):
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat and Routines, then chats, then tabs. Settings stays at the bottom, and the account joins it when real accounts arrive in stage 5 of the roadmap. Collapsed, the toolbar shows the button that brings the sidebar back.
+- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account joins it when real accounts arrive in stage 5 of the roadmap. Collapsed, the toolbar shows the button that brings the sidebar back.
 - **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. With nothing saved, the cluster and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
 - **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
 - **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
@@ -73,7 +73,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Routines, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **Internal pages** (new tab, main chat, Routines, Flock, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -174,7 +174,19 @@ Berry has separate tokens and never uses the UI accent:
 | `berry-fruit-bloom` | `#a4afe0` | Same |
 | `berry-fruit-crown` | `#161c4c` | Same |
 
+`berry-gear` and `berry-gear-shade` colour a mascot's accessory, with `berry-pupil` as its edge. Jackdaw's are `#d9a312` and `#a87c08` in light, `#ffd23f` and `#d9a312` in dark.
+
 Dark `berry-ink` is lifted just enough to stay visible while still reading as a dark bird. It is below the 3:1 for meaningful graphics, so the eyes, hood and berry carry the shape, and nothing may rely on Berry alone: moods have text labels.
+
+The flock's presets replace `berry-ink`, `wing`, `nape`, `beak`, `gear` and `gear-shade` on that mascot's drawing, through `data-mascot`. The eye and the blueberry never change. Body contrast is against `canvas`.
+
+| Preset | Body light | Nape light | Gear light | Body contrast | Body dark | Nape dark | Gear dark | Body contrast |
+|---|---|---|---|---|---|---|---|---|
+| Robin | `#8f3b22` | `#f28a4c` | `#1f8f86` | 7.3:1 | `#b5553a` | `#f79a60` | `#3fc2b6` | 3.4:1 |
+| Canary | `#b77f00` | `#ffc93c` | `#c8314f` | 3.4:1 | `#e0a810` | `#ffe07a` | `#f0607e` | 7.7:1 |
+| Parakeet | `#1f8a4c` | `#9ad94f` | `#d9542b` | 4.3:1 | `#35b56c` | `#bcec70` | `#f47a52` | 6.3:1 |
+| Flamingo | `#d13f7c` | `#ffb0cc` | `#1b8fa3` | 4.4:1 | `#ec6a9d` | `#ffc9dc` | `#4cc6d9` | 5.6:1 |
+| Kingfisher | `#0f7ea3` | `#f58b3c` | `#e8a900` | 4.5:1 | `#2ba8cf` | `#fb9f58` | `#ffd23f` | 6.0:1 |
 
 ### Spacing, radius, elevation
 
@@ -248,6 +260,10 @@ Berry is a small jackdaw in ink who nearly always has a blueberry in its beak. B
 - **Style:** flat ink for the bird. The berry is the one thing in the chrome with depth and colour, and on its own it serves as the status marker for work in progress, always beside words.
 - **Implementation:** one SVG drawing per mood behind a `<Mascot mood size>` interface, animated with CSS, so artwork can be replaced without touching screens. Each mood should be recognisable from its outline. Rive is the next step for the large animated moments.
 
+### The flock's look
+
+Every mascot is this same drawing with one preset and one accessory: nothing, a crown, a cap, glasses, headphones or a bow. The accessory belongs to the head, so it moves with it in every mood, and has a front view for Asking. Shapes are big and edged, so colour and accessory tell mascots apart at 16px, where the mood can't. There is no colour picker, because every preset has to work in both modes and beside the blueberry. Everything said here about Berry's character, voice and moods goes for them too.
+
 ### Sizes
 
 | Size | Drawing |
@@ -301,6 +317,7 @@ Every mood has a text label for assistive technology.
 | Chat | Working and waiting states beside its replies |
 | Routines | Flies off when a routine runs and returns with the result |
 | Settings | Its own section |
+| Flock | Its own page, sitting on each card |
 | Over a web page | Only while acting on that page, in an overlay view |
 
 ### Where Berry goes
@@ -389,6 +406,20 @@ A list with schedule, last result and status, plus a page for each routine with 
 - **Timing:** a routine runs only while a window is open. A time missed with the app closed or the computer asleep runs once on the next chance, however many were missed, and says it was late. Times missed while paused are not made up. A time that comes while the same routine is still going is skipped. A run starts only while fewer than two are working, and the rest wait to start. A run waiting for an OK doesn't count, and once allowed it goes straight on, even if two others have started meanwhile.
 - **Speaking up:** a result or a needed approval puts a dot on the Routines row until Routines is opened. If the app isn't in front, and the window isn't fullscreen and no tab is playing sound, a silent macOS notification says so, with no page text or approval wording in it. A run the user stopped says nothing.
 
+### Flock
+
+Opens as a tab from the sidebar, the Go menu, or the new tab page when there's no sidebar, with only one open at a time.
+
+- **The flock:** a heading and a grid of `surface` cards, each with its bird sitting on the top edge, legs over it, as Berry sits on the new tab composer. Coming near makes it curious, and one that's working flies, with the berry beside its name. A card has the name, what it's for, its limits as small tags and the routines it runs, with **Chat** and **Edit**. Berry comes first, can't be edited or deleted, and has no limit tags. The last tile, dashed with a blueberry, is **New mascot**.
+- **Making one:** a form in the page, never a modal, numbered 1 to 4, with the preview beside it, or above it in a narrow window. Look, name and what it's for take under a minute, and the limits are optional. **Surprise me** picks a look and a name. Looks are chosen by pressing the bird wearing them. What's typed survives going to another tab.
+- **The preview:** the moment this page is for. The mascot, at 160px, hops when its look changes, gets curious while you name it, thinks while you say what it's for, and faces you while you set limits. Its nine moods sit below it, and pressing one shows it. Saving flies it off, and it lands on its new card with a hop. This is the one place a bird moves with no work behind it, and Still and reduced motion stop it as they do everywhere.
+- **Limits only take away.** Any site, or only named sites with their subdomains. Reading is always on, with switches for going to pages, clicking and typing. The page says plainly that no limit changes when it asks: approvals work the same for every mascot, and a mascot has no setting that could skip one.
+- **Refusals:** something off its sites never reaches a card, because there's nothing to decide. It shows in the steps as "Stayed off example.com". With an off-limits page open, the composer says the mascot can't see it in place of the page card, and the reading ring doesn't show. Refused pages aren't read or sent, including the page that would go with a message, embedded frames from other sites, and a page that sends the tab somewhere else while the mascot acts. A click can't open what it couldn't go to.
+- **Choosing one:** the shared composer has a chip with the bird and its name. Pressing it opens the flock in a row inside the composer, in the flow rather than floating, so it works beside a web page. The bird on the new tab composer and the active tab becomes the chosen one. Once a chat has begun it keeps its mascot, and the chip just says who.
+- **Who's working:** a reply names any mascot but Berry above it. A chat in the sidebar shows its bird, and a running chat shows the working berry where its age goes. A tab a mascot is working in shows its bird as the tab's icon. Berry's old chats stay plain.
+- **Routines:** **Who runs it** in the form uses the same row of birds, and a run keeps to that mascot's instructions and limits.
+- **Deleting:** asks first, in a native dialog. The mascot leaves the flock, and its chats keep its look and limits. Routines it runs pause and stay limited, because moving them to Berry could let them do more than they were set up to. Anything pointing at a mascot that's no longer on file can only talk.
+
 ### History
 
 Opens as a tab with `⌘Y` (`Ctrl+Y` on Windows) and from the Go menu, with only one open at a time. The same column as Routines: the heading with Clear history beside it, a search field that takes focus, then a `surface` card of 36px rows for each day, headed Today, Yesterday or the date. A row shows the time in tabular figures, the favicon, the title and the site, and hovering or focusing it shows a delete button. Clicking a row opens the page in a new tab. Show more loads the next hundred, and search covers titles and addresses.
@@ -475,7 +506,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 - Don't put glass on web pages or inject styles into them for chrome effects.
 - Don't use raw hex values or hard-coded sizes in components.
 - Don't add a colour, weight, font or shadow that isn't in this document.
-- Don't add bounce to the chrome or loops without real work behind them. The one exception is Berry's world on the new tab page and the legs of a sitting Berry.
+- Don't add bounce to the chrome or loops without real work behind them. The exceptions are Berry's world on the new tab page, the legs of a sitting bird, and the preview on the Flock page.
 - Don't let Berry joke about permissions, payments, messages, data or failures.
 - Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start.
 - Don't read page content unless the user asked.

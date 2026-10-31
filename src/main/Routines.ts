@@ -16,7 +16,7 @@ const START_DELAY_MS = 5_000;
 const MAX_RESULT_PREVIEW = 80;
 
 export interface RoutineRunner {
-  runTask: (id: string, message: string, onProgress: (progress: TaskProgress) => void) => Promise<TaskResult>;
+  runTask: (id: string, message: string, onProgress: (progress: TaskProgress) => void, mascotId?: string | null) => Promise<TaskResult>;
   stop: (id: string) => void;
 }
 
@@ -151,7 +151,7 @@ export class Routines {
     this.events.onChanged();
 
     void this.runner
-      .runTask(runId, prompt(routine, now), (progress) => this.onProgress(routine, run, progress))
+      .runTask(runId, prompt(routine, now), (progress) => this.onProgress(routine, run, progress), routine.mascotId)
       .then((result) => this.finish(routine.id, run, result));
   }
 
@@ -191,12 +191,13 @@ export class Routines {
     const now = Date.now();
     return this.store.routines().map((routine) => {
       const latestRun = this.store.latestRun(routine.id);
-      const { id, name, instructions, schedule, paused, nextRunAt } = routine;
+      const { id, name, instructions, schedule, mascotId, paused, nextRunAt } = routine;
       return {
         id,
         name,
         instructions,
         scheduleSpec: schedule,
+        mascotId,
         schedule: scheduleLabel(schedule),
         paused,
         nextRunAt,

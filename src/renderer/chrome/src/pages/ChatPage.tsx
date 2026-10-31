@@ -4,6 +4,7 @@ import { useChatThread } from '../contexts/ChatContext'
 import { AssistantMessage, ChatApprovalCard, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
 import { BerryHero, useAssistantName } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
+import { useFlock } from '../contexts/LibraryContext'
 import { Button } from '@common/components/Button'
 import { blankForm, setRoutinesView } from '../routinesView'
 
@@ -11,7 +12,10 @@ import { blankForm, setRoutinesView } from '../routinesView'
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const chatId = tab.pageParam
     const thread = useChatThread(chatId)
-    const name = useAssistantName()
+    const { find, chosen, choose } = useFlock()
+    // A chat not started yet goes to whoever is chosen. After that, it stays with the mascot it started with.
+    const mascot = chatId ? find(thread?.mascotId ?? null) : chosen
+    const name = useAssistantName(mascot)
     const partial = thread?.partial
     const running = partial != null
     const scrollerRef = useFollowReply(
@@ -21,7 +25,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     )
 
     const send = async (message: string) => {
-        const chat = await window.chromeAPI.chat.send(chatId, message, { seePage: false })
+        const chat = await window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id })
         // A new chat gets its own tab, so it can be found again in the sidebar.
         if (chat && !chatId) {
             await window.chromeAPI.browser.openPage('chat', { param: chat.id, title: chat.title })
@@ -33,7 +37,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const saveAsRoutine = () => {
         if (!thread) return
         const asked = thread.messages.filter((message) => message.role === 'user').map((message) => message.content)
-        setRoutinesView({ page: 'form', values: blankForm(thread.title, asked.join('\n\n')) })
+        setRoutinesView({ page: 'form', values: blankForm(thread.title, asked.join('\n\n'), thread.mascotId) })
         void window.chromeAPI.browser.openPage('routines')
     }
 
@@ -43,8 +47,10 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             onSend={(message) => void send(message)}
             disabled={running}
             onStop={running && chatId ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
-            placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}
+            placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
             autoFocus
+            mascot={mascot}
+            onChooseMascot={chatId ? undefined : choose}
         />
     )
 
@@ -78,10 +84,11 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 isStreaming={running && index === messages.length - 1}
                                 avatar
                                 waiting={thread.approval !== null}
+                                mascot={mascot}
                             />
                         )
                     )}
-                    {chatId && thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} />}
+                    {chatId && thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} />}
                     {thread.error && <ChatError message={thread.error} />}
                     {!running && thread.messages.at(-1)?.role === 'assistant' && (
                         <div>

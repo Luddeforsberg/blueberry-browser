@@ -180,6 +180,8 @@ export class EventManager {
     this.handle("routines:stop", (runId) => routines.stop(runId));
     this.handle("routines:runs", (id) => routines.runs(id));
     this.handle("routines:mark-seen", () => routines.markSeen());
+    this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
+    this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
   }
 
   private handleDownloadEvents(): void {

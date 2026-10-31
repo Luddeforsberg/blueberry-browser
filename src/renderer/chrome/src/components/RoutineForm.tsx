@@ -4,6 +4,8 @@ import { Choice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { toDraft, type RoutineFormValues } from '../routinesView'
 import { ChatError } from './ChatMessage'
+import { MascotPerch } from './MascotPerch'
+import { BERRY_ID } from '@shared/mascots'
 
 const INPUT = "w-full h-9 px-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
@@ -74,6 +76,17 @@ export const RoutineForm: React.FC<{
                     className={cn(INPUT, "h-auto py-2 resize-y")}
                 />
             </Field>
+
+            <div>
+                <span className="block text-14 font-semibold">Who runs it</span>
+                <span className="block mt-0.5 text-13 text-muted-foreground">It keeps to that mascot’s instructions and limits.</span>
+                <div className="mt-2">
+                    <MascotPerch
+                        selectedId={values.mascotId ?? BERRY_ID}
+                        onChoose={(id) => set({ mascotId: id === BERRY_ID ? null : id })}
+                    />
+                </div>
+            </div>
 
             <div>
                 <span className="block text-14 font-semibold">When</span>

@@ -29,6 +29,8 @@ export interface ReplyOptions {
   onStep: (text: string) => () => void;
   // Told the tokens each model call used, as they're reported.
   onUsage?: (tokens: number) => void;
+  // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
+  mascotNote?: string;
 }
 
 export type StreamReply = (
@@ -162,7 +164,7 @@ const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseC
 export async function* streamReply(
   messages: ReplyMessage[],
   signal: AbortSignal,
-  { tools, actionApproval, approve, onStep, onUsage }: ReplyOptions,
+  { tools, actionApproval, approve, onStep, onUsage, mascotNote = "" }: ReplyOptions,
   model?: BaseChatModel
 ): AsyncGenerator<string> {
   const [
@@ -188,6 +190,8 @@ export async function* streamReply(
   });
   // What the user allowed, by tool call. The check is in here so no path reaches an action without it.
   const allowed = new Map<string, string>();
+  // A mascot's limit comes first: what it won't be allowed to do at all has nothing to ask about.
+  const refusedOutright = async ({ refuses }: PageTool, args: unknown) => (await refuses?.(args)) ?? null;
   const needsAsking = async ({ isRisky }: PageTool, args: unknown): Promise<boolean> => {
     const mode = actionApproval();
     if (mode === "always") return true;
@@ -202,7 +206,8 @@ export async function* streamReply(
               {
                 allowedDecisions: ["approve" as const, "reject" as const],
                 description: ({ args }: { args: unknown }) => pageTool.describe!(args),
-                when: ({ toolCall }: { toolCall: { args: unknown } }) => needsAsking(pageTool, toolCall.args),
+                when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
+                  !(await refusedOutright(pageTool, toolCall.args)) && needsAsking(pageTool, toolCall.args),
               },
             ],
           ]
@@ -221,6 +226,11 @@ export async function* streamReply(
       const { name, description, schema, label, run, describe, returnsImage } = pageTool;
       return tool(
         async (args: unknown, config: { toolCall?: { id?: string } }) => {
+          const refused = await refusedOutright(pageTool, args);
+          if (refused) {
+            onStep(refused.label)();
+            return refused.message;
+          }
           // Allowed, it must still be the same action. Not asked about, it must still not need asking.
           const allowedAs = allowed.get(config.toolCall?.id ?? "");
           if (describe && allowedAs !== undefined && (await describe(args)) !== allowedAs) return CHANGED;
@@ -242,7 +252,7 @@ export async function* streamReply(
         { name, description, schema }
       );
     }),
-    systemPrompt: tools.length > 0 ? SYSTEM_PROMPT + TOOLS_PROMPT : SYSTEM_PROMPT,
+    systemPrompt: (tools.length > 0 ? SYSTEM_PROMPT + TOOLS_PROMPT : SYSTEM_PROMPT) + mascotNote,
   });
   const configurable = { thread_id: "reply" };
   let input: Parameters<typeof agent.stream>[0] = {

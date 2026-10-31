@@ -1,5 +1,6 @@
-import React, { useId } from "react";
+import React, { createContext, useContext, useId } from "react";
 import { MessageCircle } from "lucide-react";
+import type { MascotAccessory, MascotLook } from "@shared/library";
 import { cn } from "../lib/utils";
 
 export type Mood =
@@ -29,6 +30,10 @@ export const MOOD_LABELS: Record<Mood, string> = {
 interface MascotProps {
   mood?: Mood;
   size: number;
+  // Colours and an accessory for one of the flock. Left out, this is Berry.
+  look?: MascotLook;
+  // What it's called to assistive technology.
+  name?: string;
   // Hide Berry: a plain icon stands in, and every feature keeps working.
   hidden?: boolean;
   // Keep Berry still: the pose stays, the motion stops. Reduced motion does the same through CSS.
@@ -154,6 +159,84 @@ const Eye: React.FC<{ x: number; y: number; r?: number; look: Eyes }> = ({ x, y,
   );
 };
 
+// A dark edge, so an accessory stands off any body colour and any background.
+const GEAR_EDGE = { strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round", className: "fill-berry-gear stroke-berry-pupil" } as const;
+
+const GearContext = createContext<MascotAccessory>("none");
+
+// In the head's own coordinates, so it moves with the head in every pose. Big shapes in their own colour, so one can
+// tell mascots apart at icon size. `front` is for the one pose that faces you.
+const Gear: React.FC<{ front?: boolean }> = ({ front = false }) => {
+  const accessory = useContext(GearContext);
+  switch (accessory) {
+    case "none":
+      return null;
+    case "crown":
+      return (
+        <g transform={front ? "translate(-1 -11)" : "rotate(6 61 15)"}>
+          <path d="M46 25 L42 6 L53 14 L61 1 L69 14 L80 6 L76 25 Q61 19 46 25 Z" {...GEAR_EDGE} />
+          <circle cx={61} cy={17} r={3} className="fill-berry-gear-shade" />
+        </g>
+      );
+    case "cap":
+      return front ? (
+        <>
+          <path d="M34 25 C34 2 86 2 86 25 C72 19 48 19 34 25 Z" {...GEAR_EDGE} />
+          <path d="M38 24 C50 18 70 18 82 24 C76 30 44 30 38 24 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
+        </>
+      ) : (
+        <>
+          <path d="M76 25 C88 23 99 26 106 32 C105 35 101 35 97 33 C90 31 84 30 77 30 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
+          <path d="M37 33 C38 12 68 5 84 26 C70 22 52 24 37 33 Z" {...GEAR_EDGE} />
+        </>
+      );
+    case "glasses":
+      return front ? (
+        <g fill="none" strokeLinecap="round">
+          {["M41 30 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M61 30 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M59 28 L61 28"].map((d) => (
+            <React.Fragment key={d}>
+              <path d={d} strokeWidth={5} className="stroke-berry-pupil" />
+              <path d={d} strokeWidth={3} className="stroke-berry-gear" />
+            </React.Fragment>
+          ))}
+        </g>
+      ) : (
+        <g fill="none" strokeLinecap="round">
+          {["M58 35 a11 11 0 1 0 22 0 a11 11 0 1 0 -22 0 M58 33 L43 29"].map((d) => (
+            <React.Fragment key={d}>
+              <path d={d} strokeWidth={5} className="stroke-berry-pupil" />
+              <path d={d} strokeWidth={3} className="stroke-berry-gear" />
+            </React.Fragment>
+          ))}
+        </g>
+      );
+    case "headphones":
+      return front ? (
+        <>
+          <path d="M33 36 C29 -2 91 -2 87 36" fill="none" strokeWidth={7} strokeLinecap="round" className="stroke-berry-pupil" />
+          <path d="M33 36 C29 -2 91 -2 87 36" fill="none" strokeWidth={4} strokeLinecap="round" className="stroke-berry-gear" />
+          <rect x={26} y={30} width={13} height={22} rx={6} {...GEAR_EDGE} />
+          <rect x={81} y={30} width={13} height={22} rx={6} {...GEAR_EDGE} />
+        </>
+      ) : (
+        <>
+          <path d="M49 34 C43 12 68 2 80 22" fill="none" strokeWidth={7} strokeLinecap="round" className="stroke-berry-pupil" />
+          <path d="M49 34 C43 12 68 2 80 22" fill="none" strokeWidth={4} strokeLinecap="round" className="stroke-berry-gear" />
+          <ellipse cx={50} cy={41} rx={9} ry={12} {...GEAR_EDGE} />
+          <ellipse cx={50} cy={41} rx={4} ry={6.5} className="fill-berry-gear-shade" />
+        </>
+      );
+    case "bow":
+      return (
+        <g transform={front ? "translate(8 -7)" : undefined}>
+          <path d="M52 19 L35 8 C31 14 31 24 35 30 Z" {...GEAR_EDGE} />
+          <path d="M52 19 L69 8 C73 14 73 24 69 30 Z" {...GEAR_EDGE} />
+          <circle cx={52} cy={19} r={4.5} {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
+        </g>
+      );
+  }
+};
+
 const Head: React.FC<{ turn?: number; eyes?: Eyes; berry?: boolean; open?: boolean; blink?: boolean }> = ({
   turn = 0,
   eyes = "open",
@@ -169,6 +252,7 @@ const Head: React.FC<{ turn?: number; eyes?: Eyes; berry?: boolean; open?: boole
     </g>
     {berry && <Fruit x={97} y={53} />}
     <path d={open ? BEAK_OPEN : BEAK} className="fill-berry-beak" />
+    <Gear />
   </g>
 );
 
@@ -272,6 +356,7 @@ const Pose: React.FC<{ mood: Mood; animate: boolean }> = ({ mood, animate }) => 
             <path d="M54 38 C57 36 63 36 66 38 C65.6 43 63 49 61 51 C60.4 52 59.6 52 59 51 C57 49 54.4 43 54 38 Z" className="fill-berry-beak" />
             <Eye x={50} y={30} r={6.8} look="wide" />
             <Eye x={70} y={30} r={6.8} look="wide" />
+            <Gear front />
           </g>
         </>
       );
@@ -371,12 +456,14 @@ export const WalkingBird: React.FC<{ size: number; foot: -1 | 0 | 1; stepMs: num
 export const Mascot: React.FC<MascotProps> = ({
   mood = "rest",
   size,
+  look,
+  name = "Berry",
   hidden = false,
   still = false,
   className,
   onContextMenu,
 }) => {
-  const label = `Berry, ${MOOD_LABELS[mood]}`;
+  const label = `${name}, ${MOOD_LABELS[mood]}`;
 
   if (hidden) {
     return (
@@ -398,12 +485,15 @@ export const Mascot: React.FC<MascotProps> = ({
       width={size}
       height={size}
       onContextMenu={onContextMenu}
+      data-mascot={look?.palette}
       className={cn("shrink-0 overflow-visible", className)}
     >
-      {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
-      <g key={mood} className={cn(!still && "animate-berry-pose")}>
-        {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={mood} /> : <Pose mood={mood} animate={!still} />}
-      </g>
+      <GearContext.Provider value={look?.accessory ?? "none"}>
+        {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
+        <g key={mood} className={cn(!still && "animate-berry-pose")}>
+          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={mood} /> : <Pose mood={mood} animate={!still} />}
+        </g>
+      </GearContext.Provider>
     </svg>
   );
 };

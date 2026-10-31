@@ -24,6 +24,8 @@ import {
 } from "./pageScripts";
 import { clickAt, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import type { Tab } from "./Tab";
+import type { MascotProfile, MascotTool } from "../shared/library";
+import { siteAllowed } from "../shared/mascots";
 
 const MAX_READ_LENGTH = 20_000;
 const MAX_ELEMENTS = 200;
@@ -55,7 +57,36 @@ export interface PageTool {
   isRisky?: (args: unknown) => Promise<boolean>;
   // `run` answers with an image's data address when it worked, which the model gets as a picture.
   returnsImage?: boolean;
+  // Set while a mascot's limits apply. Says why this call can't happen at all, before anything asks or runs.
+  refuses?: (args: unknown) => Promise<{ label: string; message: string } | null>;
 }
+
+// What each tool needs from a mascot. "reading" and "asking" are every mascot's. A tool that isn't listed here is
+// nobody's, so a new tool can't reach a limited mascot by being forgotten.
+const TOOL_NEEDS: Record<string, MascotTool | "reading" | "asking"> = {
+  list_tabs: "reading",
+  read_page: "reading",
+  find_in_page: "reading",
+  list_elements: "reading",
+  scroll_page: "reading",
+  hover: "reading",
+  screenshot: "reading",
+  wait: "asking",
+  ask_user: "asking",
+  go_to: "visit",
+  open_tab: "visit",
+  go_back: "visit",
+  close_tab: "visit",
+  click: "click",
+  double_click: "click",
+  drag: "click",
+  choose_option: "click",
+  type_text: "type",
+  press_key: "type",
+};
+
+// These can happen wherever the tab is, so where it is doesn't matter to them.
+const ANY_TAB = ["list_tabs", "wait", "ask_user", "close_tab", "open_tab"];
 
 const pageTool = <S extends z.ZodObject>(tool: {
   name: string;
@@ -85,13 +116,13 @@ const siteOf = (url: string): string => {
   }
 };
 
-const readText = async (tab: Tab): Promise<string | null> => {
+const readText = async (tab: Tab, allowsFrame: (origin: string) => boolean): Promise<string | null> => {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<null>((resolve) => {
     timer = setTimeout(() => resolve(null), READ_TIMEOUT_MS);
   });
   try {
-    return await Promise.race([tab.getTextWithFrames(), timeout]);
+    return await Promise.race([tab.getTextWithFrames(allowsFrame), timeout]);
   } catch (error) {
     console.error("Failed to read a page for a tool:", error);
     return null;
@@ -182,6 +213,8 @@ export interface PageToolAccess {
   canSee: () => boolean;
   // Told about each tab a tool is about to use, so the user can see where Berry is working.
   onUse: (tab: Tab) => void;
+  // A mascot other than Berry. It only ever takes tools and sites away. Approvals work the same either way.
+  limits?: Pick<MascotProfile, "name" | "sites" | "tools">;
 }
 
 export const createPageTools = ({
@@ -193,7 +226,16 @@ export const createPageTools = ({
   ask,
   canSee,
   onUse,
+  limits,
 }: PageToolAccess): PageTool[] => {
+  const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
+  const offLimits = (url: string) => {
+    const name = siteOf(url);
+    return {
+      label: `Stayed off ${name}`,
+      message: `${limits?.name} isn't allowed on ${name}, so nothing happened and nothing was read from it. It may only use ${limits?.sites.join(", ")}. Tell the user if the job needs that site.`,
+    };
+  };
   const opened = new Set<string>();
   let lastQuestion: Promise<void> = Promise.resolve();
   // A ref into a frame from another origin is `f<number>.<its ref>`. Which frame and site that means is only kept
@@ -235,7 +277,7 @@ export const createPageTools = ({
     const tab = find(id);
     if (!tab) return id ? `There is no web page in tab ${id}.` : "The user's current tab has no web page.";
     onUse(tab);
-    const text = await readText(tab);
+    const text = await readText(tab, allowed);
     if (!canSee()) return NO_ACCESS;
     return text === null ? (inTrouble(tab) ?? `The page at ${tab.url} could not be read.`) : format(tab, text);
   };
@@ -329,6 +371,14 @@ export const createPageTools = ({
     return finish(await scripted(), `${SCRIPTED}${covered}`);
   };
 
+  // A page can't take the tab off-limits while this runs. If it got there anyway, what came back is the other site's.
+  const limitedRun = async (tab: Tab, act: () => Promise<string>): Promise<string> => {
+    const { result, refused } = await tab.withNavigationLimit(allowed, act);
+    if (!allowed(tab.url)) return `${offLimits(tab.url).message} The tab went there by itself. Don't use it again.`;
+    // A picture can't carry words, and it shows where the tab stayed anyway.
+    return refused.length === 0 || result.startsWith("data:image/") ? result : `${result} The page tried to go to ${siteOf(refused[0])}, which ${limits?.name} isn't allowed on, so it stayed here.`;
+  };
+
   const describeOn = async (id: string | undefined, ref: string, say: (info: ElementInfo) => string) => {
     const info = await element(id, ref);
     const tab = find(id);
@@ -336,7 +386,7 @@ export const createPageTools = ({
     return `${say(info)}${placeOf(info)} ${tab.url}${info.target ? `, which goes to ${info.target}` : ""}`;
   };
 
-  return [
+  const tools = [
     pageTool({
       name: "list_tabs",
       description: "List the web pages open in the browser, with each tab's id, title and address.",
@@ -345,7 +395,9 @@ export const createPageTools = ({
       run: async () => {
         if (!canSee()) return NO_ACCESS;
         const active = activeTab();
-        const tabs = allTabs().map(({ id, title, url }) => ({ id, title, url, active: id === active?.id }));
+        const tabs = allTabs()
+          .filter((tab) => allowed(tab.url))
+          .map(({ id, title, url }) => ({ id, title, url, active: id === active?.id }));
         return JSON.stringify(tabs);
       },
     }),
@@ -400,7 +452,7 @@ export const createPageTools = ({
           const top = await tab.runInPage<ListedElements>(listElements({ query, limit: MAX_ELEMENTS, everything, descend: true }));
           const script = listElements({ query, limit: MAX_FRAME_ELEMENTS, everything, descend: false });
           const frames = await Promise.all(
-            tab.foreignFrames.map(async (frame) => {
+            tab.foreignFrames.filter((frame) => allowed(frame.origin)).map(async (frame) => {
               const found = await tab.runInFrame<ListedElements>(frame, script).catch(() => null);
               if (!Array.isArray(found?.elements) || found.elements.length === 0) return { total: 0, elements: [] };
               const name = frameName(frame, tab);
@@ -654,6 +706,9 @@ export const createPageTools = ({
       run: ({ tabId: id }) =>
         withTab(id, async (tab) => {
           if (!tab.canGoBack) return "There's no earlier page in that tab, so nothing happened.";
+          // History isn't a navigation the limit below gets to stop.
+          const back = tab.backUrl;
+          if (back && !allowed(back)) return offLimits(back).message;
           tab.goBack();
           return whereNow(tab);
         }),
@@ -708,8 +763,45 @@ export const createPageTools = ({
         const tab = openTab(url);
         opened.add(tab.id);
         onUse(tab);
-        return whereNow(tab);
+        return limits ? (await limitedRun(tab, () => whereNow(tab))) : whereNow(tab);
       },
     }),
   ];
+
+  if (!limits) return tools;
+
+  // Where this call would reach: the tab, then any frame or address it names.
+  const refuses = (tool: PageTool) => async (args: unknown) => {
+    const { tabId: id, url, ref, toRef } = (args ?? {}) as { tabId?: string; url?: string; ref?: string; toRef?: string };
+    if (typeof url === "string" && !allowed(url)) return offLimits(url);
+    if (ANY_TAB.includes(tool.name)) return null;
+    const tab = find(id);
+    if (!tab) return null;
+    if (!allowed(tab.url)) return offLimits(tab.url);
+    for (const named of [ref, toRef]) {
+      const frame = typeof named === "string" ? frameOf(tab, named) : null;
+      if (frame && frame !== "gone" && !allowed(frame.origin)) return offLimits(frame.origin);
+    }
+    return null;
+  };
+
+  return tools
+    .filter(({ name }) => {
+      const need = TOOL_NEEDS[name];
+      return need === "reading" || need === "asking" || (need !== undefined && limits.tools.includes(need));
+    })
+    .map((tool) => {
+      const refused = refuses(tool);
+      return {
+        ...tool,
+        refuses: refused,
+        // `agent.ts` asks this too, but only `run` can't be got around: whatever calls a tool, this is what acts.
+        run: async (args: unknown) => {
+          const refusal = await refused(args);
+          if (refusal) return refusal.message;
+          const tab = ANY_TAB.includes(tool.name) ? null : find((args as { tabId?: string } | null)?.tabId);
+          return tab ? limitedRun(tab, () => tool.run(args)) : tool.run(args);
+        },
+      };
+    });
 };

@@ -25,6 +25,8 @@ const MIGRATIONS = [
   // A settled title is final: the user chose it, or it was generated. Chats from before this keep theirs.
   `ALTER TABLE chats ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 1;`,
   `ALTER TABLE messages ADD COLUMN steps TEXT;`,
+  // Chats from before the flock have none, which means Berry.
+  `ALTER TABLE chats ADD COLUMN mascot_id TEXT;`,
 ];
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
@@ -41,13 +43,13 @@ export class ChatStore {
 
   summaries(): ChatThreadSummary[] {
     return this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt FROM chats ORDER BY updated_at DESC, rowid DESC")
+      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId FROM chats ORDER BY updated_at DESC, rowid DESC")
       .all() as unknown as ChatThreadSummary[];
   }
 
   chat(id: string): StoredChat | null {
     const summary = this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt FROM chats WHERE id = ?")
+      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId FROM chats WHERE id = ?")
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
@@ -59,11 +61,11 @@ export class ChatStore {
     return { ...summary, messages };
   }
 
-  createChat(title: string): string {
+  createChat(title: string, mascotId: string | null = null): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO chats (id, title, updated_at, title_settled) VALUES (?, ?, ?, 0)")
-      .run(id, title, Date.now());
+      .prepare("INSERT INTO chats (id, title, updated_at, title_settled, mascot_id) VALUES (?, ?, ?, 0, ?)")
+      .run(id, title, Date.now(), mascotId);
     return id;
   }
 

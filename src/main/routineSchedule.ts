@@ -89,7 +89,7 @@ const parseSchedule = (input: unknown): RoutineSchedule | null => {
 
 // What comes from the renderer is checked here, and its errors are worded for the form.
 export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: string } => {
-  const { name, instructions, schedule: rawSchedule } = (input ?? {}) as Record<string, unknown>;
+  const { name, instructions, schedule: rawSchedule, mascotId } = (input ?? {}) as Record<string, unknown>;
   const cleanName = typeof name === "string" ? name.trim() : "";
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanName) return { error: "Give the routine a name." };
@@ -100,5 +100,5 @@ export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: s
   }
   const schedule = parseSchedule(rawSchedule);
   if (!schedule) return { error: "Choose when the routine should run." };
-  return { draft: { name: cleanName, instructions: cleanInstructions, schedule } };
+  return { draft: { name: cleanName, instructions: cleanInstructions, schedule, ...(typeof mascotId === "string" ? { mascotId } : {}) } };
 };

@@ -7,6 +7,7 @@ import { SettingsStore } from "./SettingsStore";
 import { BookmarkStore } from "./BookmarkStore";
 import { ChatStore } from "./ChatStore";
 import { RoutineStore } from "./RoutineStore";
+import { MascotStore } from "./MascotStore";
 import { Downloads } from "./Downloads";
 import { SitePermissions } from "./SitePermissions";
 import { installSessionHandlers } from "./sessionHandlers";
@@ -21,6 +22,7 @@ let menu: AppMenu | null = null;
 let settings: SettingsStore | null = null;
 let chatStore: ChatStore | null = null;
 let routineStore: RoutineStore | null = null;
+let mascotStore: MascotStore | null = null;
 let downloads: Downloads | null = null;
 let sitePermissions: SitePermissions | null = null;
 let historyStore: HistoryStore | null = null;
@@ -59,6 +61,7 @@ const createWindow = (): Window => {
   const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
   const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
   routineStore ??= new RoutineStore(join(app.getPath("userData"), "routines.db"));
+  mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
   const savedSettings = settings;
   if (!downloads || !sitePermissions) {
     downloads = new Downloads(join(app.getPath("userData"), "downloads.json"), {
@@ -71,7 +74,7 @@ const createWindow = (): Window => {
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
-  const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, downloads, sitePermissions, historyStore, sessionStore);
+  const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, mascotStore, downloads, sitePermissions, historyStore, sessionStore);
   showStoreNotices(window);
   menu = new AppMenu(window);
   eventManager = new EventManager(window);

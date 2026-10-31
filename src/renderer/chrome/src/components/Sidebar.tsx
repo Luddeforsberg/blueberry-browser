@@ -1,10 +1,10 @@
 import React, { useRef, useState } from 'react'
-import { ChevronDown, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Bird, ChevronDown, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
-import { NO_SAVED_SITES, useLibrary, useSavedSites } from '../contexts/LibraryContext'
+import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
@@ -12,6 +12,8 @@ import { RoutineApprovals } from './RoutineRunCard'
 import { RoutineDot } from './RoutineNotice'
 import { ToolBarButton } from './ToolBarButton'
 import { cn } from '@common/lib/utils'
+import { BerryDot } from '@common/components/Mascot'
+import { Berry } from './Berry'
 
 const ROW = cn(
     "w-full flex items-center gap-3 h-[34px] px-3 rounded-card text-14 text-left outline-none transition-colors",
@@ -132,6 +134,8 @@ export const ChatRow: React.FC<{
     // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
     const finished = useRef(false)
     const api = window.chromeAPI.chat
+    const { find } = useFlock()
+    const mascot = find(chat.mascotId)
 
     const showMenu = async () => {
         if ((await api.showMenu(chat.id)) === 'rename') {
@@ -181,8 +185,16 @@ export const ChatRow: React.FC<{
                 onClick={onOpen}
                 className={cn(ROW, "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
             >
+                {/* Berry's own chats stay plain until it's working, so a list of them stays quiet. */}
+                {(chat.mascotId || chat.running) && <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} className="-ml-0.5" />}
                 <span className="flex-1 truncate">{chat.title}</span>
-                {!selected && (
+                {chat.running && (
+                    <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
+                        <BerryDot working />
+                        <span className="sr-only">{mascot.name} is working</span>
+                    </span>
+                )}
+                {!selected && !chat.running && (
                     <span className="shrink-0 -mr-6 text-12 text-muted-foreground tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">
                         {age(chat.updatedAt)}
                     </span>
@@ -253,6 +265,13 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         trailing={<RoutineDot />}
                         selected={isOpen('routines')}
                         onClick={() => void browser.openPage('routines')}
+                    />
+                    <SidebarRow
+                        muted
+                        leading={<Bird className={ICON} />}
+                        label="Flock"
+                        selected={isOpen('flock')}
+                        onClick={() => void browser.openPage('flock')}
                     />
                 </ul>
 

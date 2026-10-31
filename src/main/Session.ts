@@ -33,7 +33,7 @@ export interface Session {
   height: number;
 }
 
-const PAGES: readonly InternalPage[] = ["new-tab", "chat", "routines", "settings", "downloads", "gallery", "history"];
+const PAGES: readonly InternalPage[] = ["new-tab", "chat", "routines", "settings", "downloads", "gallery", "history", "flock"];
 const MAX_ENTRIES = 50;
 const WRITE_DELAY_MS = 500;
 
