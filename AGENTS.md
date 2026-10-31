@@ -14,6 +14,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm exec electron-vite build` | Build into `out/` |
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
 | `pnpm exec electron-builder --dir` | Package an unsigned app into `dist/` |
+| `pnpm run eval` | Run Berry on real websites with the real model, which costs money. See `evals/README.md` |
 | `pnpm run verify` | Typecheck, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
 
 CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-end tests run on macOS for every PR, and on Windows only for pushes to `main`. It doesn't package the app. GitHub Actions is out of minutes for now, so CI shows red without running anything. Run `pnpm run verify` instead.

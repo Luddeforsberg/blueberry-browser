@@ -23,7 +23,7 @@ Berry has 9 tools today: `list_tabs`, `read_page`, `find_in_page`, `list_element
 
 | Work | State |
 |---|---|
-| Real-site evaluation: a repeatable set of jobs with a scorecard | Next |
+| Real-site evaluation: a repeatable set of jobs with a scorecard | Done, first results in `evals/results/` |
 | Hands: real mouse and keyboard input, iframes, shadow DOM, a screenshot tool, dropdowns, keys, hover, waiting, back, closing tabs, link addresses | After the evaluation |
 | Long jobs: trimming old page text from context, a visible plan, asking the user mid-job, spotting loops, a higher step limit with a budget, model failover | After the evaluation |
 | Sign-ins: the user takes over for passwords and 2FA, and these never reach the model, then Berry carries on | After hands |
