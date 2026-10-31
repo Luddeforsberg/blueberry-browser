@@ -19,6 +19,12 @@ export interface ChatStep {
   done: boolean;
 }
 
+// An action waiting for the user to allow it.
+export interface ChatApproval {
+  id: string;
+  text: string;
+}
+
 export interface ChatThreadMessage {
   role: "user" | "assistant";
   content: string;
@@ -37,6 +43,7 @@ export interface ChatThread extends ChatThreadSummary {
   partial: string | null;
   // What the running reply has done so far. Empty when no reply is running.
   steps: ChatStep[];
+  approval: ChatApproval | null;
   // Why the last reply failed, until the next message.
   error: string | null;
 }

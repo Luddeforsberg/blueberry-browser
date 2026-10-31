@@ -123,6 +123,7 @@ export interface InvokeChannels {
     result: ChatThread | null;
   };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
+  "chat:decide": { region: "chrome"; args: [chatId: string, approvalId: string, allow: boolean]; result: boolean };
   "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
   // The native menu for a chat in the sidebar. Delete happens in main, so only Rename comes back.
   "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string]; result: "rename" | null };
@@ -196,6 +197,7 @@ export interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
   send: (chatId: string | null, text: string, options: { seePage: boolean }) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
+  decide: (chatId: string, approvalId: string, allow: boolean) => Promise<boolean>;
   rename: (chatId: string, title: string) => Promise<boolean>;
   showMenu: (chatId: string) => Promise<"rename" | null>;
   getPageText: () => Promise<string | null>;

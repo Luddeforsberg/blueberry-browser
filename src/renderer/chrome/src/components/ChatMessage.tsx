@@ -2,7 +2,8 @@ import React, { useLayoutEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { ChatStep } from '@shared/library'
+import type { ChatApproval, ChatStep } from '@shared/library'
+import { ApprovalCard } from '@common/components/ApprovalCard'
 import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
 
@@ -77,7 +78,8 @@ export const AssistantMessage: React.FC<{
     steps?: ChatStep[]
     isStreaming?: boolean
     avatar?: boolean
-}> = ({ content, steps = [], isStreaming, avatar = false }) => (
+    waiting?: boolean
+}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false }) => (
     <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
             <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} className="absolute -left-11 top-0" />
@@ -87,6 +89,7 @@ export const AssistantMessage: React.FC<{
             <Markdown content={content} />
         ) : (
             isStreaming &&
+            !waiting &&
             steps.every((step) => step.done) && (
                 <div role="status" className="flex items-center h-7 text-14 text-muted-foreground">
                     <ThinkingWord />
@@ -130,6 +133,24 @@ export const ThinkingMessage: React.FC = () => (
         <ThinkingWord />
     </div>
 )
+
+// An action Berry wants to take, which waits here until the user answers.
+export const ChatApprovalCard: React.FC<{ chatId: string; approval: ChatApproval }> = ({ chatId, approval }) => {
+    const decide = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
+    return (
+        <div className="[overflow-wrap:anywhere] animate-fade-in">
+            <ApprovalCard
+                request={{
+                    question: approval.text,
+                    details: 'Nothing happens until you allow it.',
+                    confirmLabel: 'Allow'
+                }}
+                onConfirm={() => decide(true)}
+                onCancel={() => decide(false)}
+            />
+        </div>
+    )
+}
 
 // Why a reply failed, worded with what to do about it.
 export const ChatError: React.FC<{ message: string }> = ({ message }) => (

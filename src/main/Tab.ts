@@ -4,6 +4,12 @@ import { NativeImage, WebContentsView } from "electron";
 // Matches the card the page sits in, `rounded-panel` in the chrome.
 const PAGE_RADIUS = 22;
 
+// An id of our own, away from the page's world (0) and Electron's low numbers.
+const AGENT_WORLD = 1000;
+// How long a click gets to start loading something, and that load to end.
+const LOAD_START_MS = 300;
+const LOAD_END_MS = 10_000;
+
 export interface TabEvents {
   onChange: () => void;
   onNavigate: (url: string) => void;
@@ -134,6 +140,27 @@ export class Tab {
 
   async runJs<T = unknown>(code: string): Promise<T> {
     return await this.webContentsView.webContents.executeJavaScript(code);
+  }
+
+  // Runs in a world of its own. The page shares its DOM but can't see its variables.
+  async runInPage<T = unknown>(code: string): Promise<T> {
+    return await this.webContentsView.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true);
+  }
+
+  // Waits for whatever an action started to load, within reason.
+  async settled(): Promise<void> {
+    const contents = this.webContentsView.webContents;
+    await new Promise((resolve) => setTimeout(resolve, LOAD_START_MS));
+    if (contents.isDestroyed() || !contents.isLoading()) return;
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        contents.off("did-stop-loading", done);
+        resolve();
+      };
+      const timer = setTimeout(done, LOAD_END_MS);
+      contents.once("did-stop-loading", done);
+    });
   }
 
   async getTabHtml(): Promise<string> {

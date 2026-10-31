@@ -1,7 +1,7 @@
 import React from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { useChatThread } from '../contexts/ChatContext'
-import { AssistantMessage, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
+import { AssistantMessage, ChatApprovalCard, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
 import { BerryHero, useAssistantName } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
 
@@ -15,7 +15,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const scrollerRef = useFollowReply(
         thread?.messages.filter((message) => message.role === 'user').length ?? 0,
         partial,
-        thread?.steps.length ?? 0
+        (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0)
     )
 
     const send = async (message: string) => {
@@ -67,9 +67,11 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 steps={message.steps}
                                 isStreaming={running && index === messages.length - 1}
                                 avatar
+                                waiting={thread.approval !== null}
                             />
                         )
                     )}
+                    {chatId && thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} />}
                     {thread.error && <ChatError message={thread.error} />}
                 </div>
             </div>

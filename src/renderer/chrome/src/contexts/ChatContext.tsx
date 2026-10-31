@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ChatStep, ChatThread } from '@shared/library'
+import type { ChatApproval, ChatStep, ChatThread } from '@shared/library'
 
 export interface Message {
     id: string
@@ -13,6 +13,8 @@ interface ChatContextType {
     messages: Message[]
     isLoading: boolean
     error: string | null
+    chatId: string | null
+    approval: ChatApproval | null
     // Whether Berry can see the open page. The card on the composer is the signal, and + brings it back.
     pageAccess: boolean
     setPageAccess: (enabled: boolean) => void
@@ -50,7 +52,7 @@ const toMessages = (thread: ChatThread | null): Message[] => {
     if (!thread) return []
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
     // Before the first words arrive, the thinking state stands in for the reply.
-    return thread.partial || thread.steps.length > 0
+    return thread.partial || thread.steps.length > 0 || thread.approval
         ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', steps: thread.steps, isStreaming: true }]
         : saved
 }
@@ -105,6 +107,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         messages: toMessages(thread),
         isLoading: thread?.partial != null,
         error: thread?.error ?? null,
+        chatId,
+        approval: thread?.approval ?? null,
         pageAccess,
         setPageAccess,
         sendMessage,

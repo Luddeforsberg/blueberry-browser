@@ -35,6 +35,17 @@ test.beforeAll(async () => {
       return;
     }
     response.setHeader("content-type", "text/html");
+    if (request.url === "/form") {
+      response.end(`<!doctype html><title>Form</title><body>
+        <button onclick="document.title = 'Saved'">Save</button>
+        <form onsubmit="event.preventDefault(); document.title = 'Sent ' + this.elements.note.value">
+          <label>Note <input name="note" value="old"></label>
+          <input type="password" name="secret" aria-label="Secret" value="hunter2">
+          <button formaction="/draft">Draft</button>
+        </form>
+        <a href="/one">Continue</a></body>`);
+      return;
+    }
     response.end(
       '<!doctype html><title>Fixture</title><link rel="icon" href="/icon.png"><body>hello from the page</body>'
     );
@@ -267,7 +278,7 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   await expect(panel.getByRole("list", { name: "Steps" }).getByText(`Searched ${site}`)).toBeVisible();
 
   const [offered, answered] = model.requests;
-  expect(offered.tools?.map((tool) => tool.function.name)).toEqual(["list_tabs", "read_page", "find_in_page"]);
+  expect(offered.tools?.map((tool) => tool.function.name)).toContain("find_in_page");
   const toolMessage = answered.messages.at(-1);
   expect(toolMessage?.role).toBe("tool");
   expect(toolMessage?.content).toContain("1 matches");
@@ -281,6 +292,87 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   await message.press("Enter");
   await expect.poll(() => model.requests.length).toBe(3);
   expect(model.requests.at(-1)?.tools).toBeUndefined();
+});
+
+test("Berry does nothing if a link changes while the user decides", async () => {
+  const page = await openFixture("/form");
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const card = panel.getByRole("region", { name: "Approval needed" });
+
+  model.callTools({ name: "list_elements", args: { query: "Continue" } });
+  model.callTools({ name: "click", args: { ref: "e1" } });
+  await askInPanel("Continue");
+  await expect(card.getByText(`Click the link “Continue” on ${origin}/form, which goes to ${origin}/one`)).toBeVisible();
+
+  await page.evaluate(() => document.querySelector("a")!.setAttribute("href", "/delete"));
+  await card.getByRole("button", { name: "Allow" }).click();
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+
+  expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("the page changed");
+  expect(page.url()).toBe(`${origin}/form`);
+
+  model.callTools({ name: "list_elements", args: { query: "Draft" } });
+  model.callTools({ name: "click", args: { ref: "e2" } });
+  await askInPanel("Save a draft");
+  await expect(card.getByText(`Click the button “Draft” on ${origin}/form, which goes to ${origin}/draft`)).toBeVisible();
+});
+
+test("Berry only acts on a page once allowed, and shows what will happen", async () => {
+  const page = await openFixture("/form");
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const card = panel.getByRole("region", { name: "Approval needed" });
+
+  model.callTools({ name: "list_elements", args: {} });
+  model.callTools({ name: "click", args: { ref: "e1" } });
+  await askInPanel("Save it");
+  await expect(card.getByText(`Click the button “Save” on ${origin}/form`)).toBeVisible();
+  expect(await page.title()).toBe("Form");
+  const listed = String(model.requests.at(-1)?.messages.at(-1)?.content);
+  expect(listed).toContain('"name":"Save"');
+  expect(listed).not.toContain("hunter2");
+
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  await expect(card).toHaveCount(0);
+  expect(await page.title()).toBe("Form");
+  expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("The user said no");
+
+  model.callTools({ name: "click", args: { ref: "e1" } });
+  await askInPanel("Please save it");
+  await card.getByRole("button", { name: "Allow" }).click();
+  await expect.poll(() => page.title()).toBe("Saved");
+  await expect(panel.getByText("Clicked something on")).toBeVisible();
+
+  model.callTools({ name: "type_text", args: { ref: "e2", text: "hi there", submit: true } });
+  await askInPanel("Write a note");
+  await expect(card.getByText(`Type “hi there” into the field “Note” and submit it on ${origin}/form, which goes to ${origin}/form`)).toBeVisible();
+  await card.getByRole("button", { name: "Allow" }).click();
+  await expect.poll(() => page.title()).toBe("Sent hi there");
+  await expect(card).toHaveCount(0);
+});
+
+test("Berry opens an address only once allowed, and never a non-web one", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const card = panel.getByRole("region", { name: "Approval needed" });
+
+  model.callTools({ name: "open_tab", args: { url: "file:///etc/hosts" } });
+  await askInPanel("Open the file");
+  await card.getByRole("button", { name: "Allow" }).click();
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Only http and https");
+
+  const before = (await getTabs()).length;
+  model.callTools({ name: "open_tab", args: { url: `${origin}/form` } });
+  await askInPanel("Open the form");
+  await expect(card.getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
+  expect(await getTabs()).toHaveLength(before);
+  await card.getByRole("button", { name: "Allow" }).click();
+  await expect.poll(async () => (await getTabs()).length).toBe(before + 1);
+  await expect.poll(async () => (await activeTab()).title).toBe("Form");
 });
 
 test("chats are still there after a restart", async () => {

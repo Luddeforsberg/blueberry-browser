@@ -31,7 +31,11 @@ const setup = (
   const chunks: string[] = [];
   let listChanges = 0;
   let onEnd = () => {};
-  const chats = new Chats(store, streamReply, generateTitle, () => activeTab, () => (activeTab ? [activeTab] : []), {
+  const chats = new Chats(store, streamReply, generateTitle, {
+    activeTab: () => activeTab,
+    allTabs: () => (activeTab ? [activeTab] : []),
+    openTab: () => activeTab as Tab,
+  }, {
     onChunk: (_, content) => chunks.push(content),
     onThread: (thread) => {
       threads.push(thread);
@@ -267,7 +271,7 @@ describe("Chats", () => {
     };
 
     it("are only offered when Berry can see a page", async () => {
-      expect(await toolNames(tab(), true, true)).toEqual(["list_tabs", "read_page", "find_in_page"]);
+      expect(await toolNames(tab(), true, true)).toEqual(expect.arrayContaining(["read_page", "click", "open_tab"]));
       expect(await toolNames(tab(), false, true)).toEqual([]);
       expect(await toolNames(tab(), true, false)).toEqual([]);
       expect(await toolNames(null, true, true)).toEqual([]);
@@ -286,6 +290,54 @@ describe("Chats", () => {
       const { content } = chats.thread(id)!.messages.at(-1)!;
       expect(content).not.toContain("page text");
       expect(content).not.toContain("example.com");
+    });
+
+    it("don't report where a page went if Can see is switched off during the action", async () => {
+      let chats: Chats | null = null;
+      const context = setup(
+        async function* (_, __, { tools }) {
+          yield await tools.find((tool) => tool.name === "click")!.run({ ref: "e1" });
+        },
+        {
+          ...tab(),
+          title: "Private title",
+          runInPage: async () => "done",
+          settled: async () => {
+            chats?.setPageAccess(false);
+          },
+        } as unknown as Tab
+      );
+      chats = context.chats;
+
+      const ended = context.replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      const { content } = chats.thread(id)!.messages.at(-1)!;
+      expect(content).toMatch(/page access/);
+      expect(content).not.toContain("Private title");
+      expect(content).not.toContain("example.com");
+    });
+
+    it("say so when an address fails to load, rather than reporting it done", async () => {
+      const failing = {
+        ...tab(),
+        loadURL: async () => {
+          throw new Error("ERR_CONNECTION_REFUSED");
+        },
+        settled: () => new Promise((resolve) => setTimeout(resolve, 5)),
+      } as unknown as Tab;
+      const { chats, replyEnded } = setup(async function* (_, __, { tools }) {
+        yield await tools.find((tool) => tool.name === "go_to")!.run({ url: "https://down.example/" });
+      }, failing);
+
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      const { content } = chats.thread(id)!.messages.at(-1)!;
+      expect(content).toMatch(/didn't work/);
+      expect(content).not.toMatch(/Done/);
     });
 
     it("drop what they read if Can see is switched off while reading", async () => {
@@ -361,6 +413,62 @@ describe("Chats", () => {
         content: "",
         steps: [{ text: "Read a.com", done: true }],
       });
+    });
+  });
+
+  describe("approvals", () => {
+    const asking =
+      (answers: boolean[]): StreamReply =>
+      async function* (_, __, { approve }) {
+        answers.push(await approve("Click “Buy” on a.com"));
+        yield "done";
+      };
+
+    it("shows the request until it's answered, and takes one answer", async () => {
+      const answers: boolean[] = [];
+      const { chats, threads, replyEnded } = setup(asking(answers));
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await vi.waitFor(() => expect(threads.at(-1)?.approval?.text).toBe("Click “Buy” on a.com"));
+      const approval = threads.at(-1)!.approval!;
+
+      expect(chats.decide(id, "wrong", true)).toBe(false);
+      expect(answers).toEqual([]);
+      expect(chats.decide(id, approval.id, true)).toBe(true);
+      expect(chats.decide(id, approval.id, false)).toBe(false);
+      await ended;
+
+      expect(answers).toEqual([true]);
+      expect(chats.thread(id)?.approval).toBeNull();
+    });
+
+    it("treats anything but true as no", async () => {
+      const answers: boolean[] = [];
+      const { chats, threads, replyEnded } = setup(asking(answers));
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await vi.waitFor(() => expect(threads.at(-1)?.approval).not.toBeNull());
+
+      chats.decide(id, threads.at(-1)!.approval!.id, "yes" as unknown as boolean);
+      await ended;
+
+      expect(answers).toEqual([false]);
+    });
+
+    it("ends the reply with no action when stopped while waiting", async () => {
+      const answers: boolean[] = [];
+      const { chats, threads, replyEnded } = setup(asking(answers));
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await vi.waitFor(() => expect(threads.at(-1)?.approval).not.toBeNull());
+      const approvalId = threads.at(-1)!.approval!.id;
+
+      chats.stop(id);
+      await ended;
+
+      expect(answers).toEqual([]);
+      expect(chats.thread(id)).toMatchObject({ partial: null, approval: null, error: null });
+      expect(chats.decide(id, approvalId, true)).toBe(false);
     });
   });
 
