@@ -57,8 +57,8 @@ module.exports = {
         wing: "rgb(var(--berry-wing) / <alpha-value>)",
         nape: "rgb(var(--berry-nape) / <alpha-value>)",
         eye: "rgb(var(--berry-eye) / <alpha-value>)",
+        pupil: "rgb(var(--berry-pupil) / <alpha-value>)",
         beak: "rgb(var(--berry-beak) / <alpha-value>)",
-        "fruit-light": "rgb(var(--berry-fruit-light) / <alpha-value>)",
         "fruit-mid": "rgb(var(--berry-fruit-mid) / <alpha-value>)",
         "fruit-dark": "rgb(var(--berry-fruit-dark) / <alpha-value>)",
         "fruit-bloom": "rgb(var(--berry-fruit-bloom) / <alpha-value>)",
@@ -81,11 +81,12 @@ module.exports = {
       composer: "24px",
       full: "9999px",
     },
-    // Things that float, the composer, and selected rows in the frame. Nothing else has a shadow.
+    // DESIGN.md section 4: floating content, composer, selected rows, and the page's left edge.
     boxShadow: {
       none: "none",
       raised: "var(--shadow-raised)",
       selected: "var(--shadow-selected)",
+      page: "var(--shadow-page)",
       float: "0 8px 24px rgb(0 0 0 / 0.16)",
     },
     fontFamily: {
@@ -131,11 +132,54 @@ module.exports = {
         // Berry's own motion. Bounce belongs to Berry, never the chrome.
         "berry-bob": "berry-bob 900ms ease-in-out infinite",
         "berry-feather": "berry-feather 1200ms ease-in forwards",
+        "berry-pose": "berry-pose 160ms ease-out",
+        "berry-settle": "berry-settle 420ms ease-out",
+        "berry-blink": "berry-blink 6s linear infinite",
+        "berry-toss": "berry-toss 1400ms ease-in-out infinite",
+        "berry-flap": "berry-flap 150ms ease-in-out infinite alternate",
+        "berry-swing": "berry-swing 2600ms ease-in-out infinite alternate",
+        "berry-swing-back": "berry-swing 2600ms ease-in-out -900ms infinite alternate",
+        "berry-peck": "berry-peck 700ms ease-in-out infinite",
+        "berry-print": "berry-print 30s ease-in forwards",
       },
       keyframes: {
         "berry-bob": {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-3px)" },
+        },
+        "berry-pose": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "berry-settle": {
+          "0%": { transform: "translate(-6px, -20px)" },
+          "65%": { transform: "translate(0, 0)" },
+          "82%": { transform: "translate(0, -3px)" },
+          "100%": { transform: "translate(0, 0)" },
+        },
+        "berry-blink": {
+          "0%, 95%, 100%": { transform: "scaleY(1)" },
+          "97.5%": { transform: "scaleY(0.08)" },
+        },
+        "berry-toss": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(14px)" },
+        },
+        "berry-swing": {
+          "0%": { transform: "rotate(-12deg)" },
+          "100%": { transform: "rotate(14deg)" },
+        },
+        "berry-peck": {
+          "0%, 55%, 100%": { transform: "rotate(0deg)" },
+          "25%": { transform: "rotate(38deg)" },
+        },
+        "berry-print": {
+          "0%": { opacity: "0.3" },
+          "100%": { opacity: "0" },
+        },
+        "berry-flap": {
+          "0%": { transform: "rotate(-16deg)" },
+          "100%": { transform: "rotate(24deg)" },
         },
         "berry-feather": {
           "0%": { transform: "translate(0, 0) rotate(0deg)", opacity: "1" },

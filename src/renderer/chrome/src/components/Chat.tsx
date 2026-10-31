@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useLayoutEffect, useState } from 'react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useChat } from '../contexts/ChatContext'
-import { Berry, useAssistantName } from './Berry'
+import { useAssistantName, BerrySpot } from './Berry'
 import { AssistantMessage, ThinkingMessage, UserMessage } from './ChatMessage'
 import { PageCard } from './PageCard'
 import { ChatComposer } from './Composer'
@@ -115,7 +115,7 @@ export const Chat: React.FC = () => {
             <div className="flex-1 min-h-0 overflow-y-auto">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
-                        {name === 'Berry' && <Berry mood="rest" size={72} />}
+                        {name === 'Berry' && <BerrySpot size={72} />}
                         <p className="text-14 text-muted-foreground">
                             Ask about this page, or anything else.
                         </p>

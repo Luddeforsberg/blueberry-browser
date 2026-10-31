@@ -702,6 +702,45 @@ test("Hide Berry swaps the character for a plain icon and neutral words", async 
   await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask a question" })).toBeVisible();
 });
 
+test("Berry sits on the new tab composer, then on the active tab", async () => {
+  const seatGap = (selector: string) =>
+    chrome.evaluate((selector) => {
+      const berry = document.querySelector("[data-berry-companion]")!.getBoundingClientRect();
+      const perch = document.querySelector(selector)!.getBoundingClientRect();
+      const seat = berry.top + berry.height * (46 / 64);
+      return { y: Math.abs(seat - perch.top), inside: berry.left >= perch.left && berry.right <= perch.right };
+    }, selector);
+  const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
+
+  await expect(sitting).toBeVisible();
+  await expect.poll(async () => (await seatGap("[data-berry-home]")).y).toBeLessThan(2);
+  expect((await seatGap("[data-berry-home]")).inside).toBe(true);
+
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(2);
+  expect((await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
+  await expect(sitting).toBeVisible();
+});
+
+test("birds walk behind the new tab page unless Berry is kept still", async () => {
+  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
+
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: true }));
+  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(0);
+  await expect(chrome.locator("#berry-backdrop path").first()).toBeAttached();
+
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: false }));
+  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
+});
+
+test("reduced motion stops background birds immediately", async () => {
+  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
+  await chrome.emulateMedia({ reducedMotion: "reduce" });
+  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(0);
+  await chrome.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
+});
+
 test("the component gallery shows Berry in every mood", async () => {
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("gallery"));
 

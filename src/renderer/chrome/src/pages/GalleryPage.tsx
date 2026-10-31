@@ -1,10 +1,9 @@
 import React, { useState } from 'react'
-import { Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
+import { Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { AssistantMessage, ThinkingMessage, UserMessage } from '../components/ChatMessage'
-import { BerryHero } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
 
@@ -49,6 +48,11 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
                     </div>
+                    <div className="mt-4 flex items-end gap-6 text-12 text-muted-foreground">
+                        <WalkingBird size={40} foot={1} stepMs={0} />
+                        <WalkingBird size={40} foot={0} stepMs={0} pecking />
+                        <span>The small birds behind the new tab page, walking and pecking.</span>
+                    </div>
                 </Section>
 
                 <Section title="Chat">
@@ -57,7 +61,6 @@ export const GalleryPage: React.FC = () => {
                         <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." />
                         <ThinkingMessage />
                         <div>
-                            <BerryHero title="Example" />
                             <ChatComposer onSend={() => undefined} placeholder="Ask Berry" />
                         </div>
                         <ChatComposer
