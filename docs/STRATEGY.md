@@ -2,7 +2,7 @@
 
 Research from 31 October 2026 by a Codex agent (gpt-6.1-sol), using public sources only. Nobody tested Strawberry hands-on or checked its security, and public complaints are few and often old. Three claims were checked against their sources: pricing, routines waiting while Strawberry is closed, and the February review. The rest wasn't rechecked.
 
-**Status: a recommendation, not a decision.** Decisions go in [ROADMAP.md](../ROADMAP.md).
+**Status: research, not the plan.** [ROADMAP.md](../ROADMAP.md) holds the decisions. The user chose general power users over the research agencies recommended below, and kept the recommended build order and the smaller companions. The demo and pitch below are written for agencies, so they need rewording for that audience.
 
 ## Recommendation (judgement)
 
