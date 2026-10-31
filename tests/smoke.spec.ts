@@ -1,5 +1,5 @@
 import { errors, expect, test } from "@playwright/test";
-import { findView, launchApp, retryStuckLaunch } from "./app";
+import { closeWithin, findView, killApp, launchApp, retryStuckLaunch } from "./app";
 
 test("the built app renders its sidebar, toolbar and chat", async () => {
   const app = await launchApp();
@@ -40,4 +40,16 @@ test("a stuck launch gets one more try, and other failures get none", async () =
   const broken = failing(new Error("no such file"));
   await expect(retryStuckLaunch(broken.launch)).rejects.toThrow("no such file");
   expect(broken.calls()).toBe(1);
+});
+
+test("an app that won't quit is killed, and one that quits is left alone", async () => {
+  let kills = 0;
+  await closeWithin(async () => {}, () => kills++, 1000);
+  expect(kills).toBe(0);
+
+  const app = await launchApp();
+  const exited = new Promise((resolve) => app.process().once("exit", resolve));
+  await closeWithin(() => new Promise(() => {}), () => killApp(app), 10);
+  await exited;
+  expect(app.process().exitCode !== null || app.process().signalCode !== null).toBe(true);
 });

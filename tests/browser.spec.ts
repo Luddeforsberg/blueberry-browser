@@ -56,7 +56,8 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await app.close();
+  // No app if the launch failed, and this error would hide that one.
+  await app?.close();
 });
 
 const getTabs = () => chrome.evaluate(() => window.chromeAPI.browser.getTabs());
@@ -864,6 +865,18 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   await tabs.nth(0).getByRole("button", { name: "New tab", exact: true }).click();
   await expect.poll(async () => (await activeTab()).page).toBe("new-tab");
   expect(await tabOrder(), `Stationary-click pointer events: ${JSON.stringify(await pointerEvents.jsonValue())}`).toEqual(["new-tab", "/a", "/b"]);
+
+  // Windows can report the real cursor mid-press, far away and with no button down. That isn't a drag.
+  const pressed = (await tabs.nth(0).boundingBox())!;
+  await chrome.mouse.move(pressed.x + 20, pressed.y + pressed.height / 2);
+  await chrome.mouse.down();
+  await chrome.evaluate(() =>
+    window.dispatchEvent(new PointerEvent("pointermove", { clientX: 512, clientY: 384, buttons: 0 }))
+  );
+  await chrome.mouse.up();
+  // Long enough for a drop to settle, if this had been taken for one.
+  await chrome.waitForTimeout(500);
+  expect(await tabOrder()).toEqual(["new-tab", "/a", "/b"]);
 
   await drag(0, 2, "y");
   await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
