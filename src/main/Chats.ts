@@ -9,7 +9,7 @@ import { randomUUID } from "crypto";
 import { createPageTools, HANDOFF_WORDS, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
 import { enterCodeInTab } from "./codeEntry";
 import type { CodeResult } from "./Phone";
-import { codeSpellings } from "./phoneReplies";
+import { codeEcho } from "./phoneReplies";
 import { mascotNote } from "./mascotNote";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
@@ -149,7 +149,7 @@ export class Chats {
   // stopped waiting after the user typed there leaves the tab here, until they send it with a message or close it.
   private readonly handedOver = new Map<string, { touched: boolean; asking: boolean; host: string | null; entering: boolean; codeEntered: boolean }>();
   // Codes sent from the phone, and until when to keep them out of anything going to the model. Memory only.
-  private readonly enteredCodes = new Map<string, number>();
+  private readonly enteredCodes = new Map<RegExp, number>();
 
   constructor(
     private readonly store: ChatStore,
@@ -203,17 +203,17 @@ export class Chats {
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
-    return tools.map((tool) => ({ ...tool, run: async (args) => this.withoutCodes(await tool.run(args)) }));
+    // A picture can't be gone through, so `Tab` refuses to take one instead.
+    return tools.map((tool) => (tool.name === "screenshot" ? tool : { ...tool, run: async (args) => this.withoutCodes(await tool.run(args)) }));
   }
 
-  // What a page might say back after a code went in. A picture can't be gone through, so `Tab` refuses to take one.
+  // What a page might say back after a code went in.
   withoutCodes(text: string): string {
     const now = Date.now();
-    if (text.startsWith("data:image/")) return text;
     let clean = text;
-    this.enteredCodes.forEach((until, spelling) => {
-      if (until < now) this.enteredCodes.delete(spelling);
-      else clean = clean.split(spelling).join(CODE_REMOVED);
+    this.enteredCodes.forEach((until, echo) => {
+      if (until < now) this.enteredCodes.delete(echo);
+      else clean = clean.replace(echo, CODE_REMOVED);
     });
     return clean;
   }
@@ -274,7 +274,8 @@ export class Chats {
     if (held.entering) return "busy";
     held.entering = true;
     const until = Date.now() + REMEMBER_CODE_MS;
-    codeSpellings(code).forEach((spelling) => this.enteredCodes.set(spelling, until));
+    const echo = codeEcho(code);
+    if (echo) this.enteredCodes.set(echo, until);
     tab.noScreenshotsUntil = until;
     // Given a size and drawn while it types, like any tab a job is using behind the user's. The hold is what keeps jobs out.
     run.tabs.add(tab);

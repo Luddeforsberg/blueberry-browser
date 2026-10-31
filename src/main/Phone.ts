@@ -131,7 +131,13 @@ export class Phone {
     this.requests.forEach((request, id) => {
       if (!open.has(id)) this.settle(id, request);
     });
-    if (!this.channel.ready || !this.deps.away()) return;
+    if (!this.channel.ready) {
+      // Whatever comes next may be another bot, which has seen none of these, and whose message numbers mean something else.
+      this.requests.clear();
+      this.decided.clear();
+      return;
+    }
+    if (!this.deps.away()) return;
     items.filter(({ approval }) => !this.requests.has(approval.id)).forEach((item) => this.ask(item));
   }
 

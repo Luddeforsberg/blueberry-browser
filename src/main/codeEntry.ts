@@ -46,15 +46,23 @@ export const enterCodeInTab = async (tab: Tab, code: string, stillOurs: () => bo
 
   const moved = () => tab.url !== startingUrl || tab.isLoading;
   const submitted = async () => moved() || (await run<boolean>(codeFieldsChanged(indexes)).catch(() => true));
+  // With the whole code in, a page going elsewhere is the code working, unless the user is the one who took it there.
+  const carryOn = () => stillOurs() || (moved() && !userIsThere());
   // Many pages submit by themselves on the last character.
   await pause(AFTER_TYPING_MS);
-  if (!stillOurs()) return interrupted();
+  if (!carryOn()) return interrupted();
   if (!(await submitted())) {
     await pressKey(keys, "Enter", false);
     await pause(AFTER_ENTER_MS);
-    if (!(await submitted())) await run(pressCodeSubmit(indexes));
+    if (!carryOn()) return interrupted();
+    if (!(await submitted()) && (await run<string>(pressCodeSubmit(indexes))) === "none") {
+      // Nothing took it, so it mustn't look entered. The tab stays held for the user.
+      await wipe().catch(() => {});
+      return "no-field";
+    }
   }
   await tab.settled();
+  if (!carryOn()) return interrupted();
   // Left in the field, a job could read it there. A new page has nothing to wipe, and can't answer if it's still coming.
   await wipe().catch(() => {});
   return "entered";

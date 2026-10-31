@@ -14,10 +14,10 @@ export const plausibleCode = (text: string): string | null => {
   return /\d/.test(code) || code === code.toUpperCase() ? code : null;
 };
 
-// Every way a code could show up again in what a page says, for taking it back out.
-export const codeSpellings = (text: string): string[] => {
+// Any way a page could say a code back, such as 123-456 or one digit per box, for taking it out again.
+export const codeEcho = (text: string): RegExp | null => {
   const code = plausibleCode(text);
-  return code === null ? [] : [...new Set([text.trim(), code])];
+  return code === null ? null : new RegExp([...code].join("[\\s.-]*"), "gi");
 };
 
 export type RequestKind = "approval" | "question" | "code" | "computer";

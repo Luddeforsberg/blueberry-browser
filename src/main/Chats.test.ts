@@ -449,6 +449,12 @@ describe("Chats", () => {
         return { chats, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id };
       };
 
+      it("takes a code out however a page says it back, even in text that looks like a picture", async () => {
+        const { chats, enter } = await handedOver("code");
+        await enter();
+        for (const said of ["123456", "123-456", "123 456", "1\n2\n3\n4\n5\n6", "data:image/png;base64,123456"]) expect(chats.withoutCodes(said)).not.toMatch(/1\s*-?2\s*3\s*-?4\s*5\s*6/);
+      });
+
       it("only goes to the open request for a code", async () => {
         const { chats, id, looked } = await handedOver("code");
         expect(await chats.enterCode(id, "another", "123456")).toBe("closed");

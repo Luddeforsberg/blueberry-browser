@@ -26,6 +26,7 @@ const LONGEST_TEXT = 3800;
 const TOKEN_REJECTED = "Telegram no longer accepts this bot’s token. Disconnect and connect it again.";
 const NO_NETWORK = "Can’t reach Telegram right now. Blueberry keeps trying, and everything still waits on Needs you.";
 const OTHER_POLLER = "Something else is reading this bot’s messages, so Blueberry can’t. Stop it, or use a bot of its own.";
+const NOT_SAVED = "Connected for now, but this couldn’t be saved, so you’d have to connect again after a restart.";
 const CANT_MESSAGE = "Telegram says the bot can’t message you. Open its chat and press Start.";
 
 // Only an app we're developing or testing can be pointed elsewhere, and only at this computer. A real user's token
@@ -89,6 +90,7 @@ export class TelegramChannel implements PhoneChannel {
   private polling: AbortController | null = null;
   private waitUntil = 0;
   private closed = false;
+  private notSaved = false;
   private onReply: (reply: IncomingReply) => void = () => {};
   private onChoice: (choice: IncomingChoice) => void = () => {};
 
@@ -113,7 +115,7 @@ export class TelegramChannel implements PhoneChannel {
       status: this.token === null ? "off" : this.chatId === null ? "pairing" : "connected",
       botName: this.botName,
       pairLink: this.chatId === null && this.pairing && this.botName ? `https://t.me/${this.botName}?start=${this.pairing.token}` : null,
-      problem: this.problem,
+      problem: this.notSaved ? NOT_SAVED : this.problem,
     };
   }
 
@@ -173,6 +175,7 @@ export class TelegramChannel implements PhoneChannel {
     this.chatId = null;
     this.problem = null;
     this.pairing = null;
+    this.notSaved = false;
     try {
       rmSync(this.file, { force: true });
     } catch {
@@ -358,7 +361,9 @@ export class TelegramChannel implements PhoneChannel {
       const temp = `${this.file}.tmp`;
       writeFileSync(temp, JSON.stringify({ token: safeStorage.encryptString(this.token).toString("base64"), botName: this.botName, chatId: this.chatId }), { mode: 0o600 });
       renameSync(temp, this.file);
+      this.notSaved = false;
     } catch {
+      this.notSaved = true;
       console.error("Couldn't save the phone connection.");
     }
   }
