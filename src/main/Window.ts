@@ -110,6 +110,7 @@ export class Window {
       allTabs: () => this.allTabs,
       openTab: (url) => this.createTab(url),
       openBackgroundTab: (url) => this.createBackgroundTab(url),
+      actionApproval: () => this.settings.actionApproval,
     }, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
@@ -118,6 +119,10 @@ export class Window {
         sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
       },
       onListChanged: () => this.broadcast("library:updated", this.librarySnapshot),
+      onWorkingTabs: (working) => {
+        this.allTabs.forEach((tab) => tab.setBerryWorking(working.has(tab)));
+        this.notifyTabs();
+      },
     });
 
     this.createTab();
@@ -232,6 +237,7 @@ export class Window {
       favicon: tab.favicon,
       isActive: this.activeTabId === tab.id,
       isLoading: tab.isLoading,
+      berryWorking: tab.berryWorking,
       canGoBack: tab.canGoBack,
       canGoForward: tab.canGoForward,
       page: tab instanceof InternalTab ? tab.page : null,

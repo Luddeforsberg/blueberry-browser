@@ -30,6 +30,36 @@ const SHARED = `
   };
 `;
 
+// Words that mean a click changes or sends something, in English and Swedish. Pages choose their own labels,
+// so this only spots ordinary sites doing ordinary things. It's what decides when to ask, and it's meant to
+// err towards asking.
+const RISKY_WORDS = [
+  "delete", "remove", "discard", "erase", "trash", "clear", "reset", "archive", "cancel", "close account", "deactivate",
+  "send", "post", "publish", "submit", "share", "reply", "comment", "invite", "merge", "deploy", "transfer", "upload",
+  "buy", "pay", "order", "purchase", "checkout", "subscribe", "unsubscribe", "donate", "book", "confirm", "accept",
+  "agree", "approve", "save", "update", "edit", "rename", "install", "sign out", "log out", "logout",
+  "radera", "ta bort", "töm", "avbryt", "skicka", "publicera", "dela", "svara", "kommentera", "köp", "betala",
+  "beställ", "boka", "prenumerera", "bekräfta", "godkänn", "acceptera", "spara", "uppdatera", "ändra", "logga ut",
+];
+
+const ASSESS = `
+  const riskyWord = new RegExp("(^|[^\\p{L}])(" + ${JSON.stringify(RISKY_WORDS.join("|"))} + ")([^\\p{L}]|$)", "iu");
+  const sendsForm = (form) => !!form && (form.method === "post" || !!form.querySelector("input[type=password]"));
+  // A plain link only goes somewhere. A button with no label could do anything, so it counts as risky.
+  const riskyClick = (el) => {
+    const name = nameOf(el);
+    if (!name || riskyWord.test(name)) return true;
+    const role = roleOf(el);
+    if (role === "checkbox" || role === "switch") return true;
+    const submits = el.form && (el.type === "submit" || el.type === "image");
+    return !!submits && (el.formMethod === "post" || sendsForm(el.form));
+  };
+  const isSearch = (el) =>
+    el.type === "search" || el.getAttribute("role") === "searchbox" || !!el.closest?.("[role=search]") ||
+    /search|sök/i.test(nameOf(el));
+  const safeToType = (el) => el.type !== "password" && !el.isContentEditable && isSearch(el) && !sendsForm(el.form);
+`;
+
 const LIST = `
   const SELECTOR = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[role=checkbox],[role=radio],[role=switch],[role=tab],[role=menuitem],[role=option],[role=combobox],[role=searchbox],[role=textbox],[contenteditable=""],[contenteditable=true]';
   const visible = (el) => {
@@ -61,13 +91,14 @@ export const listElements = (query: string | undefined, limit: number): string =
 
 const withElement = (ref: string, body: string): string => `(() => {
   ${SHARED}
+  ${ASSESS}
   const el = state.byRef.get(${JSON.stringify(ref)});
   if (!el || !el.isConnected) return null;
   ${body}
 })()`;
 
 export const describeElement = (ref: string): string =>
-  withElement(ref, `return { role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null };`);
+  withElement(ref, `return { role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el) };`);
 
 export const clickElement = (ref: string): string =>
   withElement(

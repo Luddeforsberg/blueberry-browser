@@ -132,11 +132,11 @@ module.exports = {
       },
       backgroundImage: {
         shimmer:
-          "linear-gradient(90deg, rgb(var(--muted-foreground)) 40%, rgb(var(--foreground)) 50%, rgb(var(--muted-foreground)) 60%)",
+          "linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--accent-ink)) 38%, rgb(var(--foreground)) 50%, rgb(var(--accent-ink)) 62%, rgb(var(--muted-foreground) / 0.55) 80%)",
       },
       animation: {
         "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",
-        shimmer: "shimmer 1800ms linear infinite",
+        shimmer: "shimmer 1300ms linear infinite",
         // Berry's own motion. Bounce belongs to Berry, never the chrome.
         "berry-bob": "berry-bob 900ms ease-in-out infinite",
         "berry-feather": "berry-feather 1200ms ease-in forwards",

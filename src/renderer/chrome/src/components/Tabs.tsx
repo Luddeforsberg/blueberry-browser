@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
 import { TabIcon } from './TabIcon'
+import { SHIMMER_TEXT } from './ChatMessage'
 import { useTabDrag } from './useTabDrag'
 import { cn } from '@common/lib/utils'
 
@@ -44,7 +45,8 @@ const TabItem: React.FC<{
             className="flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
         >
             <TabIcon tab={tab} />
-            <span className="text-14 truncate">{tab.title || 'New Tab'}</span>
+            <span className={cn("text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New Tab'}</span>
+            {tab.berryWorking && <span className="sr-only"> (Berry is working here)</span>}
         </button>
         <button
             type="button"

@@ -13,6 +13,7 @@ export class InternalTab {
   readonly kind = "internal";
   readonly favicon = null;
   readonly isLoading = false;
+  readonly berryWorking = false;
   readonly canGoBack = false;
   readonly canGoForward = false;
   title: string;

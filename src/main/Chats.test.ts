@@ -30,6 +30,7 @@ const setup = (
   const store = new ChatStore(":memory:");
   const threads: ChatThread[] = [];
   const chunks: string[] = [];
+  const working: Tab[][] = [];
   let listChanges = 0;
   let onEnd = () => {};
   const chats = new Chats(store, streamReply, generateTitle, {
@@ -37,6 +38,7 @@ const setup = (
     allTabs: () => (activeTab ? [activeTab] : []),
     openTab: () => activeTab as Tab,
     openBackgroundTab,
+    actionApproval: () => "always",
   }, {
     onChunk: (_, content) => chunks.push(content),
     onThread: (thread) => {
@@ -44,9 +46,10 @@ const setup = (
       if (thread.partial === null) onEnd();
     },
     onListChanged: () => listChanges++,
+    onWorkingTabs: (tabs) => working.push([...tabs]),
   });
   const replyEnded = () => new Promise<void>((resolve) => (onEnd = resolve));
-  return { chats, store, threads, chunks, replyEnded, listChanges: () => listChanges };
+  return { chats, store, threads, chunks, working, replyEnded, listChanges: () => listChanges };
 };
 
 const replying = (...tokens: string[]): StreamReply =>
@@ -301,12 +304,14 @@ describe("Chats", () => {
           allTabs.push(opened);
           return opened;
         },
+        actionApproval: () => "always",
       }, {
         onChunk: () => {},
         onThread: (thread) => {
           if (thread.partial === null) finished = true;
         },
         onListChanged: () => {},
+        onWorkingTabs: () => {},
       });
 
       send(chats, null, "first", false);
@@ -321,6 +326,20 @@ describe("Chats", () => {
       chats.releaseTab("tab-own");
       const readPage = reached.find((tool) => tool.name === "read_page")!;
       expect(await readPage.run({ tabId: "tab-own" })).toMatch(/no web page/);
+    });
+
+    it("mark the tabs they use as working until the reply ends", async () => {
+      const used = tab();
+      const { chats, working, replyEnded } = setup(async function* (_, __, { tools }) {
+        yield await tools.find((tool) => tool.name === "read_page")!.run({});
+      }, used);
+
+      const ended = replyEnded();
+      send(chats, null, "first");
+      await ended;
+
+      expect(working[0]).toEqual([used]);
+      expect(working.at(-1)).toEqual([]);
     });
 
     it("explain a step limit in words the user can act on", async () => {

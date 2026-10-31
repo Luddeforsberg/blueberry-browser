@@ -21,6 +21,8 @@ export interface PageTool {
   // Set on anything that changes something. Says exactly what will happen, for the user to allow. It's worked
   // out again just before the tool runs, and a different answer means nothing happens.
   describe?: (args: unknown) => Promise<string>;
+  // Whether to ask in the default mode: anything that could delete, send, buy or change text.
+  isRisky?: (args: unknown) => Promise<boolean>;
 }
 
 const pageTool = <S extends z.ZodObject>(tool: {
@@ -30,13 +32,15 @@ const pageTool = <S extends z.ZodObject>(tool: {
   label: (args: z.infer<S>) => string;
   run: (args: z.infer<S>) => Promise<string>;
   describe?: (args: z.infer<S>) => Promise<string>;
+  isRisky?: (args: z.infer<S>) => Promise<boolean>;
 }): PageTool => {
-  const { describe } = tool;
+  const { describe, isRisky } = tool;
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
     run: (args) => tool.run(tool.schema.parse(args)),
     describe: describe && ((args) => describe(tool.schema.parse(args))),
+    isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
   };
 };
 
@@ -76,7 +80,22 @@ interface ElementInfo {
   name: string;
   // Where a link or form goes, which a page can change while the user decides.
   target: string | null;
+  riskyClick: boolean;
+  safeToType: boolean;
 }
+
+// Search text is short. A long one could be private text on its way out through a search box.
+const MAX_SAFE_TYPED_LENGTH = 100;
+
+// An address with a query can carry anything out to the site in it, which a plain one has little room for.
+const carriesData = (url: string): boolean => {
+  try {
+    const { search, hash } = new URL(url);
+    return search !== "" || hash !== "";
+  } catch {
+    return false;
+  }
+};
 
 const NOT_WEB = "Only http and https addresses can be opened.";
 const STALE_ELEMENT = "That element is no longer on the page. Call list_elements and try again.";
@@ -91,9 +110,11 @@ export interface PageToolAccess {
   openTab: (url: string) => Tab;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
   canSee: () => boolean;
+  // Told about each tab a tool is about to use, so the user can see where Berry is working.
+  onUse: (tab: Tab) => void;
 }
 
-export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToolAccess): PageTool[] => {
+export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: PageToolAccess): PageTool[] => {
   const find = (id?: string) => (id ? allTabs().find((tab) => tab.id === id) : activeTab()) ?? null;
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
@@ -105,6 +126,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return id ? `There is no web page in tab ${id}.` : "The user's current tab has no web page.";
+    onUse(tab);
     const text = await readText(tab);
     if (!canSee()) return NO_ACCESS;
     return text === null ? `The page at ${tab.url} could not be read.` : format(tab, text);
@@ -114,6 +136,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return id ? `There is no web page in tab ${id}.` : "The user's current tab has no web page.";
+    onUse(tab);
     try {
       return await act(tab);
     } catch (error) {
@@ -216,6 +239,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
       schema: z.object({ tabId, ref: z.string().max(20) }),
       label: ({ tabId: id }) => `Clicked something on ${site(id)}`,
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
+      isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
       run: ({ tabId: id, ref }) =>
         withTab(id, async (tab) => {
           const result = await tab.runInPage<string | null>(clickElement(ref));
@@ -240,6 +264,10 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
           ref,
           ({ role, name }) => `Type “${text}” into the ${role} “${name}”${submit ? " and submit it" : ""}`
         ),
+      isRisky: async ({ tabId: id, ref, text }) => {
+        const info = await element(id, ref);
+        return !!info && (!info.safeToType || text.length > MAX_SAFE_TYPED_LENGTH);
+      },
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
           const result = await tab.runInPage<string | null>(typeIntoElement(ref, text, submit));
@@ -254,6 +282,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
       schema: z.object({ tabId, url: z.string().max(2000) }),
       label: ({ url }) => `Went to ${siteOf(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
+      isRisky: async ({ url }) => carriesData(url),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
@@ -267,10 +296,13 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
       schema: z.object({ url: z.string().max(2000) }),
       label: ({ url }) => `Opened ${siteOf(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
+      isRisky: async ({ url }) => carriesData(url),
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
-        return whereNow(openTab(url));
+        const tab = openTab(url);
+        onUse(tab);
+        return whereNow(tab);
       },
     }),
   ];
