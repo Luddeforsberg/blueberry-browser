@@ -112,6 +112,8 @@ export interface InvokeChannels {
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "theme:get": { region: "chrome" | "overlay"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
+  "bookmarks:toggle": { region: "chrome"; args: []; result: void };
+  "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
@@ -121,6 +123,9 @@ export interface InvokeChannels {
     result: ChatThread | null;
   };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
+  "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
+  // The native menu for a chat in the sidebar. Delete happens in main, so only Rename comes back.
+  "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string]; result: "rename" | null };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -140,6 +145,7 @@ export interface EventChannels {
   "overlay:visibility": boolean;
   "chat:chunk": ChatChunk;
   "chat:updated": ChatThread;
+  "chat:deleted": string;
 }
 
 export type Unsubscribe = () => void;
@@ -190,14 +196,19 @@ export interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
   send: (chatId: string | null, text: string, options: { seePage: boolean }) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
+  rename: (chatId: string, title: string) => Promise<boolean>;
+  showMenu: (chatId: string) => Promise<"rename" | null>;
   getPageText: () => Promise<string | null>;
   getPageAccess: () => Promise<boolean>;
   setPageAccess: (enabled: boolean) => Promise<boolean>;
   onChatChunk: (callback: (chunk: ChatChunk) => void) => Unsubscribe;
   onChatUpdated: (callback: (thread: ChatThread) => void) => Unsubscribe;
+  onChatDeleted: (callback: (chatId: string) => void) => Unsubscribe;
 }
 
 export interface LibraryAPI {
+  toggleBookmark: () => Promise<void>;
+  showBookmarkMenu: (bookmarkId: string) => Promise<void>;
   getLibrary: () => Promise<LibrarySnapshot>;
   getChat: (chatId: string) => Promise<ChatThread | null>;
   onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;

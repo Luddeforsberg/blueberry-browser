@@ -88,6 +88,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [chatId])
 
+    // New messages would otherwise go to a chat that no longer exists.
+    useEffect(
+        () => window.chromeAPI.chat.onChatDeleted((id) => setChatId((current) => (current === id ? null : current))),
+        []
+    )
+
     const stop = useCallback(() => {
         if (chatId) void window.chromeAPI.chat.stop(chatId)
     }, [chatId])

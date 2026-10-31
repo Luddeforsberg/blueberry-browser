@@ -56,6 +56,8 @@ const chromeAPI: ChromeAPI = {
     onSettingsUpdated: (callback) => subscribe("settings:updated", callback),
   },
   library: {
+    toggleBookmark: () => invoke("bookmarks:toggle"),
+    showBookmarkMenu: (bookmarkId) => invoke("bookmarks:menu", bookmarkId),
     getLibrary: () => invoke("library:get"),
     getChat: (chatId) => invoke("library:chat", chatId),
     onLibraryUpdated: (callback) => subscribe("library:updated", callback),
@@ -63,11 +65,14 @@ const chromeAPI: ChromeAPI = {
   chat: {
     send: (chatId, text, options) => invoke("chat:send", chatId, text, options),
     stop: (chatId) => invoke("chat:stop", chatId),
+    rename: (chatId, title) => invoke("chat:rename", chatId, title),
+    showMenu: (chatId) => invoke("chat:menu", chatId),
     getPageText: () => invoke("page:text"),
     getPageAccess: () => invoke("chat:page-access"),
     setPageAccess: (enabled) => invoke("chat:set-page-access", enabled),
     onChatChunk: (callback) => subscribe("chat:chunk", callback),
     onChatUpdated: (callback) => subscribe("chat:updated", callback),
+    onChatDeleted: (callback) => subscribe("chat:deleted", callback),
   },
 };
 

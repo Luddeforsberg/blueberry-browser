@@ -103,6 +103,10 @@ export class EventManager {
 
     this.handle("library:get", () => this.mainWindow.librarySnapshot);
 
+    this.handle("bookmarks:toggle", () => this.mainWindow.toggleBookmark());
+
+    this.handle("bookmarks:menu", (id) => this.mainWindow.showBookmarkMenu(id));
+
     this.handle("library:chat", (chatId) => this.mainWindow.chats.thread(chatId));
 
     this.handle("settings:get", () => this.mainWindow.settings);
@@ -116,6 +120,12 @@ export class EventManager {
     );
 
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
+
+    this.handle("chat:rename", (chatId, title) =>
+      typeof title === "string" ? this.mainWindow.chats.rename(chatId, title) : false
+    );
+
+    this.handle("chat:menu", (chatId) => this.mainWindow.showChatMenu(chatId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

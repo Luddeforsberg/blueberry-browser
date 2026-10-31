@@ -6,6 +6,7 @@ export interface FakeModelRequest {
 }
 
 const DEFAULT_TOKENS = ["A reply ", "from the model"];
+const TITLE_MODEL = "fake-title-model";
 
 const sseChunk = (delta: object, finish: string | null) =>
   `data: ${JSON.stringify({
@@ -20,7 +21,9 @@ const sseChunk = (delta: object, finish: string | null) =>
 export const startFakeModel = async () => {
   let tokens = DEFAULT_TOKENS;
   let hold: Promise<void> | null = null;
+  let title = "NONE";
   const requests: FakeModelRequest[] = [];
+  const titleRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -30,8 +33,24 @@ export const startFakeModel = async () => {
     }
     let body = "";
     for await (const part of request) body += part;
-    requests.push(JSON.parse(body));
+    const parsed = JSON.parse(body);
 
+    if (parsed.model === TITLE_MODEL) {
+      titleRequests.push(parsed);
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: "fake",
+          object: "chat.completion",
+          created: 0,
+          model: TITLE_MODEL,
+          choices: [{ index: 0, message: { role: "assistant", content: title }, finish_reason: "stop" }],
+        })
+      );
+      return;
+    }
+
+    requests.push(parsed);
     const reply = tokens;
     const held = hold;
     hold = null;
@@ -49,12 +68,20 @@ export const startFakeModel = async () => {
       OPENAI_API_KEY: "test-key",
       OPENAI_BASE_URL: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
       LLM_MODEL: "gpt-4o-mini",
+      LLM_TITLE_MODEL: TITLE_MODEL,
     },
     requests,
+    titleRequests,
     reset() {
       tokens = DEFAULT_TOKENS;
       hold = null;
+      title = "NONE";
       requests.length = 0;
+      titleRequests.length = 0;
+    },
+    // What the title model answers. NONE means the chat has no topic yet.
+    titleWith(next: string) {
+      title = next;
     },
     replyWith(...next: string[]) {
       tokens = next;

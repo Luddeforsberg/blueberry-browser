@@ -56,6 +56,7 @@ Sizes (*to tune*):
 - **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat and Routines, then chats, then tabs. The account and Settings stay at the bottom. Collapsed, the toolbar shows the button that brings the sidebar back.
 - **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter.
 - **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
+- **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
@@ -139,6 +140,7 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 | `primary` | `#2a3380` | `#4e5fb4` | Primary button fill |
 | `primary-foreground` | `#ffffff` | `#ffffff` | Primary button text |
 | `accent-ink` | `#2f3aa8` | `#a3aefb` | Links, focus rings, selected states |
+| `bookmark` | `#facc15` | `#fde047` | Saved page's filled bookmark star |
 | `success` | `#17653c` | `#6fcf97` | Status |
 | `warning` | `#744b00` | `#e0b050` | Status |
 | `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
@@ -213,6 +215,7 @@ The chrome is crisp: quick to start, gently settling, with no bounce.
 - **Web pages:** never animate page content, only the frame around it.
 - **Bounce and squash:** reserved for Berry.
 - **Loops:** only while real work is happening, stopping as soon as it ends.
+- **Thinking:** a soft shimmer sweeps across the word while a reply is on its way. Reduced motion leaves the word still.
 - **Moving tab views:** if animating tab view bounds is not smooth, animate the chrome and let the page snap into place at the end.
 - **Reduced motion:** follow `systemPreferences.getAnimationSettings().prefersReducedMotion` and the CSS media query. Movement becomes short fades or instant changes.
 
@@ -350,6 +353,8 @@ A full page for talking to Berry about anything, not about a particular web page
 
 - A centred conversation and composer of 752px, with the composer fixed at the bottom. A new chat with no messages looks like the new tab page instead.
 - Messages and the composer are the same components as the chat panel, so the two sizes look like one chat.
+- A chat is named automatically once it has a topic, and until then shows its first message. A name the user chose is never replaced.
+- In the sidebar, hovering or focusing a chat swaps its age for a button with Rename and Delete, also on right-click. Rename edits in place, and Delete asks first because it can't be undone.
 - Berry's working state says what it is doing and offers to show the work in a tab. Steps, once the agent reports them, form a trail: a footprint for each finished step and the berry on the current one.
 
 ### Chat panel

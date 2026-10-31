@@ -27,6 +27,7 @@ module.exports = {
       "glass-tint": "var(--glass-tint)",
       success: "rgb(var(--success) / <alpha-value>)",
       warning: "rgb(var(--warning) / <alpha-value>)",
+      bookmark: "rgb(var(--bookmark) / <alpha-value>)",
       primary: {
         DEFAULT: "rgb(var(--primary) / <alpha-value>)",
         foreground: "rgb(var(--primary-foreground) / <alpha-value>)",
@@ -129,8 +130,13 @@ module.exports = {
       spacing: {
         4.5: "1.125rem",
       },
+      backgroundImage: {
+        shimmer:
+          "linear-gradient(90deg, rgb(var(--muted-foreground)) 40%, rgb(var(--foreground)) 50%, rgb(var(--muted-foreground)) 60%)",
+      },
       animation: {
         "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",
+        shimmer: "shimmer 1800ms linear infinite",
         // Berry's own motion. Bounce belongs to Berry, never the chrome.
         "berry-bob": "berry-bob 900ms ease-in-out infinite",
         "berry-feather": "berry-feather 1200ms ease-in forwards",
@@ -145,6 +151,10 @@ module.exports = {
         "berry-print": "berry-print 30s ease-in forwards",
       },
       keyframes: {
+        shimmer: {
+          "0%": { backgroundPosition: "150% 0" },
+          "100%": { backgroundPosition: "-50% 0" },
+        },
         "berry-bob": {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-3px)" },

@@ -4,6 +4,7 @@ import { Window } from "./Window";
 import { AppMenu } from "./Menu";
 import { EventManager } from "./EventManager";
 import { SettingsStore } from "./SettingsStore";
+import { BookmarkStore } from "./BookmarkStore";
 import { ChatStore } from "./ChatStore";
 import { join } from "path";
 
@@ -16,7 +17,8 @@ let chatStore: ChatStore | null = null;
 const createWindow = (): Window => {
   settings ??= new SettingsStore(join(app.getPath("userData"), "settings.json"));
   chatStore ??= new ChatStore(join(app.getPath("userData"), "chats.db"));
-  const window = new Window(settings, chatStore);
+  const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
+  const window = new Window(settings, chatStore, bookmarks);
   menu = new AppMenu(window);
   eventManager = new EventManager(window);
   return window;

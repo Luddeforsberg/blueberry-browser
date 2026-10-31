@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, RotateCw, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, RotateCw, Star, X } from 'lucide-react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -13,12 +13,16 @@ const BookmarksBar: React.FC = () => {
     const { pinned, bookmarks } = useLibrary()
 
     return (
-        <ul aria-label="Bookmarks" className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-hidden">
+        <ul aria-label="Bookmarks" className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-x-auto">
             {[...pinned, ...bookmarks].map((site) => (
                 <li key={site.id} className="shrink-0">
                     <button
                         type="button"
                         onClick={() => createTab(site.url)}
+                        onContextMenu={(event) => {
+                            event.preventDefault()
+                            void window.chromeAPI.library.showBookmarkMenu(site.id)
+                        }}
                         className="h-7 px-2 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <Favicon src={siteIcon(site.url)} />
@@ -33,6 +37,8 @@ const BookmarksBar: React.FC = () => {
 export const Toolbar: React.FC = () => {
     const { activeTab, goBack, goForward, reload, stop } = useBrowser()
     const { layout, theme, toggleSidebar, toggleChat } = useShell()
+    const { bookmarks } = useLibrary()
+    const bookmarked = bookmarks.some((bookmark) => bookmark.url === activeTab?.url)
 
     // With no sidebar, the toolbar is the window's top-left corner, where macOS puts its buttons.
     // In horizontal mode the tab row above takes the window buttons instead.
@@ -60,6 +66,16 @@ export const Toolbar: React.FC = () => {
                 <div className="flex-1 min-w-0 px-1">
                     <AddressBar />
                 </div>
+
+                <ToolBarButton
+                    label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                    active={!!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url)}
+                    toggled={bookmarked}
+                    className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
+                    onClick={() => void window.chromeAPI.library.toggleBookmark()}
+                >
+                    <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
+                </ToolBarButton>
 
                 {activeTab?.page !== 'chat' && activeTab?.page !== 'new-tab' && (
                     <ToolBarButton

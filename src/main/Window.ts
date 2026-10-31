@@ -1,13 +1,14 @@
-import { BaseWindow, Menu, nativeTheme, type WebContents } from "electron";
+import { BaseWindow, Menu, dialog, nativeTheme, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
 import { History } from "./History";
 import { MockLibrary } from "./MockLibrary";
 import type { SettingsStore } from "./SettingsStore";
+import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
 import { Chats } from "./Chats";
-import { streamReply } from "./agent";
+import { generateTitle, streamReply } from "./agent";
 import { createChromeView, type ChromeView } from "./chromeView";
 import {
   computeLayout,
@@ -27,7 +28,7 @@ import type {
   ThemeState,
   Visit,
 } from "../shared/ipc";
-import type { LibrarySnapshot } from "../shared/library";
+import type { ChatThread, LibrarySnapshot } from "../shared/library";
 
 export type BrowserTab = Tab | InternalTab;
 
@@ -47,6 +48,9 @@ const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
 // macOS draws its window buttons 14px tall, so this centres them in the top row.
 const MAC_BUTTONS_HEIGHT = 14;
 
+// macOS can report a menu closed before it runs the clicked item, so this waits well past that.
+const MENU_CLICK_GRACE_MS = 1000;
+
 export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 
 export class Window {
@@ -54,6 +58,7 @@ export class Window {
   private tabsMap: Map<string, BrowserTab> = new Map();
   private activeTabId: string | null = null;
   private tabCounter: number = 0;
+  private closedTabs: TabInfo[] = [];
   private chrome: ChromeView;
   private overlay: ChromeView;
   private floatingSidebarVisible = false;
@@ -66,7 +71,8 @@ export class Window {
 
   constructor(
     private readonly settingsStore: SettingsStore,
-    private readonly chatStore: ChatStore
+    private readonly chatStore: ChatStore,
+    private readonly bookmarkStore: BookmarkStore
   ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
 
@@ -99,10 +105,13 @@ export class Window {
     this._baseWindow.contentView.addChildView(this.overlay.view);
     this.openLinksInTabs(this.overlay.view.webContents);
 
-    this.chats = new Chats(chatStore, streamReply, () => this.activeTab, {
+    this.chats = new Chats(chatStore, streamReply, generateTitle, () => this.activeTab, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
-      onThread: (thread) => sendToRenderer(this.chrome.view.webContents, "chat:updated", thread),
+      onThread: (thread) => {
+        this.syncChatTabTitle(thread);
+        sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
+      },
       onListChanged: () => this.broadcast("library:updated", this.librarySnapshot),
     });
 
@@ -173,7 +182,7 @@ export class Window {
   }
 
   get librarySnapshot(): LibrarySnapshot {
-    return { ...this.library.snapshot(), chats: this.chatStore.summaries() };
+    return { ...this.library.snapshot(), bookmarks: this.bookmarkStore.get(), chats: this.chatStore.summaries() };
   }
 
   // The active web tab. Internal pages have no page for Berry to read.
@@ -302,12 +311,24 @@ export class Window {
     return tab;
   }
 
-  closeTab(tabId: string): boolean {
+  reopenClosedTab(): void {
+    const tab = this.closedTabs.pop();
+    if (!tab) return;
+    if (tab.page) {
+      const chat = tab.page === "chat" && tab.pageParam ? this.chats.thread(tab.pageParam) : null;
+      this.openPage(tab.page, { param: tab.pageParam ?? undefined, title: chat?.title ?? tab.title });
+    } else {
+      this.createTab(tab.url);
+    }
+  }
+
+  closeTab(tabId: string, remember = true): boolean {
     const tab = this.tabsMap.get(tabId);
     if (!tab) {
       return false;
     }
 
+    if (remember) this.closedTabs.push(this.tabInfo(tab));
     if (tab instanceof Tab) this._baseWindow.contentView.removeChildView(tab.view);
     tab.destroy();
     this.tabsMap.delete(tabId);
@@ -364,6 +385,79 @@ export class Window {
   private syncTabViews(): void {
     const { onboarded } = this.settings;
     this.allTabs.forEach((tab) => (onboarded && tab.id === this.activeTabId ? tab.show() : tab.hide()));
+  }
+
+  private chatTabs(chatId: string): InternalTab[] {
+    return this.entries.filter(
+      (tab): tab is InternalTab => tab instanceof InternalTab && tab.page === "chat" && tab.param === chatId
+    );
+  }
+
+  private syncChatTabTitle({ id, title }: ChatThread): void {
+    const stale = this.chatTabs(id).filter((tab) => tab.title !== title);
+    stale.forEach((tab) => (tab.title = title));
+    if (stale.length > 0) this.notifyTabs();
+  }
+
+  showChatMenu(chatId: string): Promise<"rename" | null> {
+    return new Promise((resolve) => {
+      Menu.buildFromTemplate([
+        { label: "Rename", click: () => resolve("rename") },
+        { label: "Delete…", click: () => void this.confirmDeleteChat(chatId) },
+      ]).popup({
+        window: this._baseWindow,
+        callback: () => setTimeout(() => resolve(null), MENU_CLICK_GRACE_MS),
+      });
+    });
+  }
+
+  private async confirmDeleteChat(chatId: string): Promise<void> {
+    const chat = this.chats.thread(chatId);
+    if (!chat) return;
+    const { response } = await dialog.showMessageBox(this._baseWindow, {
+      type: "warning",
+      message: `Delete “${chat.title}”?`,
+      detail: "This chat will be permanently removed from this computer.",
+      buttons: ["Delete", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    if (response !== 0 || !this.chats.delete(chatId)) return;
+
+    // Closing the last tab closes the window, and deleting a chat shouldn't do that.
+    const tabs = this.chatTabs(chatId);
+    if (tabs.length === this.tabCount) this.openPage("new-tab");
+    this.closedTabs = this.closedTabs.filter((tab) => tab.page !== "chat" || tab.pageParam !== chatId);
+    tabs.forEach((tab) => this.closeTab(tab.id, false));
+    sendToRenderer(this.chrome.view.webContents, "chat:deleted", chatId);
+  }
+
+  toggleBookmark(): void {
+    const tab = this.activeTab;
+    if (!tab) return;
+    this.saveBookmarks(() => this.bookmarkStore.toggle(tab.url, tab.title));
+  }
+
+  showBookmarkMenu(id: string): void {
+    if (!this.bookmarkStore.get().some((bookmark) => bookmark.id === id)) return;
+    Menu.buildFromTemplate([{
+      label: "Remove Bookmark",
+      click: () => this.saveBookmarks(() => this.bookmarkStore.remove(id)),
+    }]).popup({ window: this._baseWindow });
+  }
+
+  private saveBookmarks(save: () => void): void {
+    try {
+      save();
+      this.broadcast("library:updated", this.librarySnapshot);
+    } catch (error) {
+      console.error("Failed to save bookmarks:", error);
+      void dialog.showMessageBox(this._baseWindow, {
+        type: "error",
+        message: "Could not save your bookmarks",
+        detail: "Check that there is space on your disk and try again.",
+      });
+    }
   }
 
   showBerryMenu(): void {

@@ -1,5 +1,5 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
-// Chats are saved locally. Today a mock in the main process serves the rest, until storage replaces it.
+// Chats and bookmarks are saved locally. The rest is sample content until storage replaces it.
 
 export interface PinnedSite {
   id: string;

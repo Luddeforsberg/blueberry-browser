@@ -16,6 +16,7 @@
     --primary: 42 51 128;
     --primary-foreground: 255 255 255;
     --accent-ink: 47 58 168;
+    --bookmark: 250 204 21;
     --success: 23 101 60;
     --warning: 116 75 0;
     --destructive: 171 36 28;
@@ -51,6 +52,7 @@
     --primary: 78 95 180;
     --primary-foreground: 255 255 255;
     --accent-ink: 163 174 251;
+    --bookmark: 253 224 71;
     --success: 111 207 151;
     --warning: 224 176 80;
     --destructive: 245 158 150;

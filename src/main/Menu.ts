@@ -30,6 +30,16 @@ export class AppMenu {
             click: () => this.handleNewTab(),
           },
           {
+            label: "Reopen Closed Tab",
+            accelerator: "CmdOrCtrl+Shift+T",
+            click: () => this.mainWindow.reopenClosedTab(),
+          },
+          {
+            label: "Bookmark This Page",
+            accelerator: "CmdOrCtrl+D",
+            click: () => this.mainWindow.toggleBookmark(),
+          },
+          {
             label: "Close Tab",
             accelerator: "CmdOrCtrl+W",
             click: () => this.handleCloseTab(),

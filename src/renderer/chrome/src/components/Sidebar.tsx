@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
-import { ChevronDown, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import React, { useRef, useState } from 'react'
+import { ChevronDown, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
+import type { ChatThreadSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -90,6 +91,10 @@ const Cluster: React.FC = () => {
                         aria-label={site.title}
                         title={site.title}
                         onClick={() => createTab(site.url)}
+                        onContextMenu={(event) => {
+                            event.preventDefault()
+                            void window.chromeAPI.library.showBookmarkMenu(site.id)
+                        }}
                         className={cn(
                             "size-11 flex items-center justify-center rounded-full text-14 font-semibold text-muted-foreground shadow-selected outline-none transition-colors app-region-no-drag",
                             "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
@@ -113,6 +118,87 @@ const age = (time: number) => {
 }
 
 const ICON = "size-4 shrink-0"
+
+// A chat in the sidebar. Hover or keyboard focus swaps its age for a button with Rename and Delete.
+export const ChatRow: React.FC<{
+    chat: ChatThreadSummary
+    selected: boolean
+    onOpen: () => void
+}> = ({ chat, selected, onOpen }) => {
+    const [editing, setEditing] = useState(false)
+    // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
+    const finished = useRef(false)
+    const api = window.chromeAPI.chat
+
+    const showMenu = async () => {
+        if ((await api.showMenu(chat.id)) === 'rename') {
+            finished.current = false
+            setEditing(true)
+        }
+    }
+
+    const finish = (title: string | null) => {
+        if (finished.current) return
+        finished.current = true
+        setEditing(false)
+        if (title !== null && title.trim() !== chat.title) void api.rename(chat.id, title)
+    }
+
+    if (editing) {
+        return (
+            <li>
+                <input
+                    aria-label="Chat name"
+                    defaultValue={chat.title}
+                    maxLength={100}
+                    autoFocus
+                    onFocus={(event) => event.target.select()}
+                    onBlur={(event) => finish(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter') finish(event.currentTarget.value)
+                        if (event.key === 'Escape') finish(null)
+                    }}
+                    className={cn(ROW, "bg-surface shadow-selected")}
+                />
+            </li>
+        )
+    }
+
+    return (
+        <li
+            className="group/chat relative"
+            onContextMenu={(event) => {
+                event.preventDefault()
+                void showMenu()
+            }}
+        >
+            <button
+                type="button"
+                aria-current={selected ? 'page' : undefined}
+                onClick={onOpen}
+                className={cn(ROW, "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
+            >
+                <span className="flex-1 truncate">{chat.title}</span>
+                {!selected && (
+                    <span className="shrink-0 -mr-6 text-12 text-muted-foreground tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">
+                        {age(chat.updatedAt)}
+                    </span>
+                )}
+            </button>
+            <button
+                type="button"
+                aria-label={`More options for ${chat.title}`}
+                onClick={() => void showMenu()}
+                className={cn(
+                    "absolute right-1 top-1 size-[26px] flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors app-region-no-drag",
+                    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                )}
+            >
+                <Ellipsis className={ICON} />
+            </button>
+        </li>
+    )
+}
 
 // `floating` is the collapsed sidebar shown over the page, where the button pins it open again.
 export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) => {
@@ -170,12 +256,11 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                     <Section id="sidebar-chats" title="Chats" collapsible>
                         <ul>
                             {library.chats.map((chat) => (
-                                <SidebarRow
+                                <ChatRow
                                     key={chat.id}
-                                    label={chat.title}
-                                    trailing={isOpen('chat', chat.id) ? undefined : age(chat.updatedAt)}
+                                    chat={chat}
                                     selected={isOpen('chat', chat.id)}
-                                    onClick={() => void browser.openPage('chat', { param: chat.id, title: chat.title })}
+                                    onOpen={() => void browser.openPage('chat', { param: chat.id, title: chat.title })}
                                 />
                             ))}
                         </ul>
