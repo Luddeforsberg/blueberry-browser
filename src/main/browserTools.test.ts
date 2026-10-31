@@ -48,9 +48,12 @@ describe("whether an address with a query asks in the default mode", () => {
     ["a name that only ends like one", "https://evilyoutube.com/results?q=jet", true],
     ["a listed site as the username", "https://youtube.com@evil.example/?q=jet", true],
     ["an unknown site", "https://unknown.example/?q=jet", true],
-    ["the site this job has open", "https://www.page.example/search?q=jet", false],
-    ["a subdomain of the site this job has open", "https://other.page.example/search?q=jet", true],
-    ["over the limit on the site this job has open", `https://page.example/${ofLength(101)}`, true],
+    ["the site this job has open", "https://www.page.example/search?q=jet", true],
+    ["a script anyone can publish on Google", "https://script.google.com/macros/s/abc/exec?d=jet", true],
+    ["a form anyone can publish on Google", "https://docs.google.com/forms/d/abc/formResponse?entry.1=jet", true],
+    ["a redirect on a listed site", "https://www.google.com/url?q=https://evil.example/", true],
+    ["another page on a listed site", "https://www.youtube.com/redirect?q=https://evil.example/", true],
+    ["a listed site without www", "https://youtube.com/results?search_query=jet", false],
   ])("%s", async (_, url, expected) => {
     expect(await asks(url)).toBe(expected);
   });

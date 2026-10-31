@@ -176,8 +176,21 @@ const carriesData = (url: string): boolean => {
   }
 };
 
-// Where a short query is an ordinary search. Each also covers its subdomains, and never a name that only starts like one.
-const SEARCH_SITES = ["youtube.com", "google.com", "bing.com", "duckduckgo.com", "wikipedia.org", "github.com", "reddit.com", "amazon.com"];
+// The search pages where a short query is an ordinary search, by exact host and path. Anything wider lets data out:
+// script.google.com and docs.google.com/forms run what anyone publishes, and most big sites have an open redirect.
+const SEARCH_PAGES: Record<string, string> = {
+  "www.youtube.com": "/results",
+  "m.youtube.com": "/results",
+  "www.google.com": "/search",
+  "www.bing.com": "/search",
+  "duckduckgo.com": "/",
+  "github.com": "/search",
+  "www.reddit.com": "/search",
+  "www.amazon.com": "/s",
+};
+const isSearchPage = ({ hostname, pathname }: URL): boolean =>
+  pathname.replace(/\/$/, "") === (SEARCH_PAGES[hostname] ?? SEARCH_PAGES[`www.${hostname}`] ?? "?").replace(/\/$/, "") ||
+  (hostname.endsWith(".wikipedia.org") && pathname === "/w/index.php");
 
 const NOT_WEB = "Only http and https addresses can be opened.";
 const STALE_ELEMENT = "That element is no longer on the page. Call list_elements and try again.";
@@ -292,15 +305,11 @@ export const createPageTools = ({
     return tab && !takenOver?.has(tab.id) ? tab : null;
   };
   const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
-  // In the default mode, an address carrying data asks unless it's short and on a site that's an ordinary place to
-  // search, or short and on a site this job already has open.
+  // In the default mode, an address carrying data asks unless it's a short search on a well-known search page.
   const needsCard = (url: string) => {
     if (!carriesData(url)) return false;
-    const { hostname, search, hash } = new URL(url);
-    if (search.length + hash.length > MAX_SAFE_TYPED_LENGTH) return true;
-    if (SEARCH_SITES.some((name) => hostname === name || hostname.endsWith(`.${name}`))) return false;
-    const jobTabs = [...allTabs().filter((tab) => ownsTab(tab.id)), activeTab()];
-    return !jobTabs.some((tab) => tab && !takenOver?.has(tab.id) && siteOf(tab.url) === siteOf(url));
+    const address = new URL(url);
+    return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
   };
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
