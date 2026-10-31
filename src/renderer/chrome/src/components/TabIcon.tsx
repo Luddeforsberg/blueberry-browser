@@ -1,5 +1,5 @@
 import React from 'react'
-import { Compass, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
+import { Compass, Download, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import { BerryDot } from '@common/components/Mascot'
 import { Favicon } from './Favicon'
@@ -9,6 +9,7 @@ const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
     chat: MessageCircle,
     routines: RefreshCw,
     settings: Settings,
+    downloads: Download,
     gallery: LayoutGrid
 }
 

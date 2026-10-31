@@ -5,6 +5,7 @@ const TITLES: Record<InternalPage, string> = {
   chat: "New chat",
   routines: "Routines",
   settings: "Settings",
+  downloads: "Downloads",
   gallery: "Component gallery",
 };
 

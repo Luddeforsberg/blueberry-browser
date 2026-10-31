@@ -66,7 +66,7 @@ export function pageMenuTemplate(
 
   if (image) {
     groups.push([
-      ...(SAVEABLE_IMAGE.test(srcURL) ? [{ label: "Save Image…", click: () => actions.saveImage(srcURL) }] : []),
+      ...(SAVEABLE_IMAGE.test(srcURL) ? [{ label: "Save Image", click: () => actions.saveImage(srcURL) }] : []),
       { label: "Copy Image", click: actions.copyImage },
     ]);
   }

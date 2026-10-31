@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
+import { dirname, isAbsolute } from "path";
 import type { Settings } from "../shared/ipc";
 import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "./Layout";
 import { sanitizeSiteZoom } from "./siteZoom";
@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: Settings = {
   showBerry: true,
   keepBerryStill: false,
   actionApproval: "risky",
+  downloadFolder: null,
+  askWhereToSave: false,
   onboarded: false,
   siteZoom: {},
 };
@@ -25,6 +27,11 @@ const bool = (value: unknown, fallback: boolean): boolean =>
 const width = (value: unknown, range: { min: number; max: number }, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? clampWidth(value, range) : fallback;
 
+const folder = (value: unknown, fallback: string | null): string | null => {
+  if (value === null) return null;
+  return typeof value === "string" && isAbsolute(value) && !value.includes("\0") ? value : fallback;
+};
+
 // Whatever arrives, from disk or a renderer, only valid values get through.
 export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS): Settings {
   const input = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -36,6 +43,8 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     showBerry: bool(input.showBerry, base.showBerry),
     keepBerryStill: bool(input.keepBerryStill, base.keepBerryStill),
     actionApproval: pick(input.actionApproval, ["risky", "always", "never"] as const, base.actionApproval),
+    downloadFolder: folder(input.downloadFolder, base.downloadFolder),
+    askWhereToSave: bool(input.askWhereToSave, base.askWhereToSave),
     onboarded: bool(input.onboarded, base.onboarded),
     siteZoom: sanitizeSiteZoom(input.siteZoom, base.siteZoom),
   };

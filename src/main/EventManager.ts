@@ -19,6 +19,8 @@ export class EventManager {
     this.handleThemeEvents();
     this.handleChatEvents();
     this.handleRoutineEvents();
+    this.handleDownloadEvents();
+    this.handlePermissionEvents();
   }
 
   private get endpoints(): Record<ChromeRegion, ChromeEndpoint> {
@@ -30,6 +32,7 @@ export class EventManager {
       chrome: endpoint(this.mainWindow.chromeView),
       overlay: endpoint(this.mainWindow.overlayView),
       find: endpoint(this.mainWindow.findBar.chromeView),
+      prompt: endpoint(this.mainWindow.permissionPrompt.chrome),
     };
   }
 
@@ -169,6 +172,21 @@ export class EventManager {
     this.handle("routines:stop", (runId) => routines.stop(runId));
     this.handle("routines:runs", (id) => routines.runs(id));
     this.handle("routines:mark-seen", () => routines.markSeen());
+  }
+
+  private handleDownloadEvents(): void {
+    this.handle("downloads:list", () => this.mainWindow.downloads.refresh());
+    this.handle("downloads:act", (id, action) => this.mainWindow.downloads.act(id, action));
+    this.handle("downloads:choose-folder", () => this.mainWindow.chooseDownloadFolder());
+  }
+
+  private handlePermissionEvents(): void {
+    const { sitePermissions, permissionPrompt } = this.mainWindow;
+    this.handle("permissions:saved", () => sitePermissions.saved);
+    this.handle("permissions:set", (origin, permission, decision) => sitePermissions.set(origin, permission, decision));
+    this.handle("permissions:current", () => permissionPrompt.current);
+    this.handle("permissions:decide", (id, allow) => permissionPrompt.decide(id, allow === true));
+    this.handle("permissions:resize", (height) => permissionPrompt.resize(height));
   }
 
   public cleanup(): void {

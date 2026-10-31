@@ -21,6 +21,18 @@ describe("sanitizeSettings", () => {
   });
 });
 
+describe("downloadFolder", () => {
+  it("keeps null and absolute paths, and refuses anything else", () => {
+    const base = { ...DEFAULT_SETTINGS, downloadFolder: "/kept" };
+    expect(sanitizeSettings({ downloadFolder: null }, base).downloadFolder).toBeNull();
+    expect(sanitizeSettings({ downloadFolder: "/new/place" }, base).downloadFolder).toBe("/new/place");
+    expect(sanitizeSettings({}, base).downloadFolder).toBe("/kept");
+    for (const bad of ["", "relative/path", "/nul\0byte", 3, {}]) {
+      expect(sanitizeSettings({ downloadFolder: bad }, base).downloadFolder).toBe("/kept");
+    }
+  });
+});
+
 describe("SettingsStore", () => {
   it("survives a missing or corrupt file", () => {
     const file = tempFile();

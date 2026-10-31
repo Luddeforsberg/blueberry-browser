@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Star } from 'lucide-react'
+import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
 import { ApprovalCard } from '@common/components/ApprovalCard'
+import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
@@ -16,6 +18,8 @@ import { RoutineForm } from '../components/RoutineForm'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { blankForm } from '../routinesView'
 import type { RoutineRun } from '@shared/library'
+import { DownloadRow } from '../components/DownloadRow'
+import { DownloadsProgress } from '../components/DownloadsButton'
 import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
@@ -49,6 +53,30 @@ const SAMPLE_RUNS: RoutineRun[] = [
     { ...SAMPLE_RUN, id: 'run-4', status: 'failed', result: null, error: 'The model is rate limited right now. Try again in a moment.' },
     { ...SAMPLE_RUN, id: 'run-5', status: 'stopped', result: null },
     { ...SAMPLE_RUN, id: 'run-6', status: 'interrupted', approval: SAMPLE_APPROVAL, result: null, tokens: null }
+]
+
+const SAMPLE_DOWNLOAD: DownloadInfo = {
+    id: 'gallery',
+    filename: 'field-notes.pdf',
+    path: '/Downloads/field-notes.pdf',
+    source: 'example.com',
+    state: 'progressing',
+    receivedBytes: 3_400_000,
+    totalBytes: 9_100_000,
+    startedAt: 0,
+    canResume: false,
+    missing: false
+}
+
+const SAMPLE_DOWNLOADS: DownloadInfo[] = [
+    SAMPLE_DOWNLOAD,
+    { ...SAMPLE_DOWNLOAD, id: 'unknown-size', totalBytes: 0 },
+    { ...SAMPLE_DOWNLOAD, id: 'paused', state: 'paused' },
+    { ...SAMPLE_DOWNLOAD, id: 'stopped', state: 'interrupted', canResume: true },
+    { ...SAMPLE_DOWNLOAD, id: 'finished', state: 'completed', receivedBytes: 9_100_000 },
+    { ...SAMPLE_DOWNLOAD, id: 'missing', state: 'completed', missing: true, receivedBytes: 9_100_000 },
+    { ...SAMPLE_DOWNLOAD, id: 'cancelled', state: 'cancelled' },
+    { ...SAMPLE_DOWNLOAD, id: 'failed', state: 'interrupted' }
 ]
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -169,6 +197,26 @@ export const GalleryPage: React.FC = () => {
                             onCancel={() => undefined}
                         />
                     </div>
+                </Section>
+
+                <Section title="Site permission card">
+                    <div className="max-w-sm flex flex-col gap-4">
+                        <PermissionCard prompt={{ origin: 'https://example.com', permissions: ['camera', 'microphone'] }} onDecide={() => undefined} />
+                        <PermissionCard prompt={{ origin: 'http://example.com:8080', permissions: ['screen'] }} onDecide={() => undefined} />
+                    </div>
+                </Section>
+
+                <Section title="Downloads">
+                    <div className="flex items-center gap-3">
+                        <DownloadsProgress downloads={[]} />
+                        <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(0, 1)} />
+                        <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(1, 2)} />
+                    </div>
+                    <ul className="mt-4 rounded-panel border bg-surface divide-y overflow-hidden">
+                        {SAMPLE_DOWNLOADS.map((download) => (
+                            <DownloadRow key={download.id} download={download} onAction={() => undefined} />
+                        ))}
+                    </ul>
                 </Section>
 
                 <Section title="Bookmark button">

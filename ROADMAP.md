@@ -13,7 +13,7 @@ There is no fixed date. Each stage starts when the one before it holds up in rea
 | Work | State |
 |---|---|
 | Find in page, zoom, right-click menu on pages, print | Done |
-| Downloads, and asking before a site uses the camera, microphone, location and so on | Next |
+| Downloads, and asking before a site uses the camera, microphone, location and so on | Done |
 | Saved history with a history page, restoring tabs after a restart, recovering from a crashed page | Next |
 | Real pinned sites, and no sample account | After saved history |
 

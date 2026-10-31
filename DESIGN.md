@@ -72,7 +72,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Routines, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **Internal pages** (new tab, main chat, Routines, Downloads, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -389,7 +389,25 @@ A list with schedule, last result and status, plus a page for each routine with 
 
 ### Settings
 
-Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), and data and privacy, which must be easy to find. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Appearance follows the system by default, with a manual light or dark override.
+
+### Downloads
+
+A list on one card, newest first. Each row has the file's name, its status in words, and the site it came from. While running it adds a thin `accent-ink` progress bar, Pause or Resume, and Cancel. Finished rows offer Open and show in folder, and any finished row can be removed from the list, which leaves the file alone. A file that's gone says "File is missing" in `warning` and offers neither. Files save straight to the folder with no dialog unless Settings says to ask, and never overwrite: a second `report.pdf` becomes `report (1).pdf`.
+
+The toolbar has one Downloads button, which opens this page. While anything is running, a ring around the icon shows the combined progress, and the button's label names each file with its percentage. There's no popover, so nothing floats over the page.
+
+### Site permissions
+
+When a site asks for the camera, microphone, location, notifications, MIDI, the screen or similar, a card appears in the page's top left corner, in an overlay view as tall as the card. It names the exact site and what it wants, with Block and Allow. No request is granted before the user answers.
+
+- **Solid, not glass:** it uses `surface` instead of the floating glass, so a page can't change how it reads.
+- **No Berry:** this is the user's decision. Berry doesn't appear on it and can't answer it, even in a tab it's using.
+- **Its buttons wake after 500ms,** so a page can't open it under a click already on its way.
+- **No button has focus,** so typing meant for the page can't answer it.
+- **One tab at a time:** a card only shows while its tab does, and a request in another tab waits there. Leaving the page or closing the tab refuses it, and that isn't remembered.
+- **Remembered per site:** by exact origin, both Allow and Block. The screen and opening other apps are the exception: Allow lasts for one request, and only Block is remembered.
+- **Embedded frames from another site never ask,** because the user can't see who they are. Device pickers for USB, HID and serial don't exist yet, so those are refused.
 
 ## 10. Accessibility
 

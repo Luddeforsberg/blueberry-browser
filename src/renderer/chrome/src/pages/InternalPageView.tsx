@@ -5,6 +5,7 @@ import { ChatPage } from './ChatPage'
 import { RoutinesPage } from './RoutinesPage'
 import { SettingsPage } from './SettingsPage'
 import { GalleryPage } from './GalleryPage'
+import { DownloadsPage } from './DownloadsPage'
 
 export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     switch (tab.page) {
@@ -16,6 +17,8 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             return <RoutinesPage />
         case 'settings':
             return <SettingsPage />
+        case 'downloads':
+            return <DownloadsPage />
         case 'gallery':
             return <GalleryPage />
         default:

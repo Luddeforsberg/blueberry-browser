@@ -29,7 +29,7 @@ export const CHANNEL_REGIONS: {
   "layout:resize": ["chrome"],
   "overlay:show-sidebar": ["chrome"],
   "overlay:hide": ["overlay"],
-  "theme:get": ["chrome", "overlay", "find"],
+  "theme:get": ["chrome", "overlay", "find", "prompt"],
   "library:get": BOTH,
   "bookmarks:toggle": ["chrome"],
   "bookmarks:menu": BOTH,
@@ -52,6 +52,14 @@ export const CHANNEL_REGIONS: {
   "routines:stop": ["chrome"],
   "routines:runs": ["chrome"],
   "routines:mark-seen": ["chrome"],
+  "downloads:list": ["chrome"],
+  "downloads:act": ["chrome"],
+  "downloads:choose-folder": ["chrome"],
+  "permissions:saved": ["chrome"],
+  "permissions:set": ["chrome"],
+  "permissions:current": ["prompt"],
+  "permissions:decide": ["prompt"],
+  "permissions:resize": ["prompt"],
 };
 
 export interface ChromeEndpoint {

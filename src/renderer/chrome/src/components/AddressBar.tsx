@@ -24,6 +24,7 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     chat: 'Chat',
     routines: 'Routines',
     settings: 'Settings',
+    downloads: 'Downloads',
     gallery: 'Component gallery'
 }
 
