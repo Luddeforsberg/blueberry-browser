@@ -29,7 +29,7 @@ No date is set. More time and more thought count in our favour, but what's finis
 | 9 | **Growth:** landing page, a one-page plan for one sharp audience, and the launch video | Once the demo is filmable |
 | 10 | **Repo clean-up and sending:** a new README replacing the challenge text, a short architecture walkthrough, the two-minute video script in Swedish, a rehearsed demo run, and access to the private repo for Charles | Last |
 
-Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines. Page abilities is in progress.
+Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines; page abilities: dropdowns, shadow DOM, link addresses, screenshots, real size for tabs behind the chat, and real load errors.
 
 Parked unless the demo needs them: evidence workbook (a strong candidate for the day at Strawberry, with unfinished work in its worktree), files, helpers, exception inbox, task budgets, importing, keys in the app, signed updates and a Windows pass.
 

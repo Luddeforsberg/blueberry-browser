@@ -123,5 +123,12 @@ export function computeLayout(
       width: cardWidth,
       height: pageHeight,
     },
+    // A view wholly outside the window gets no size and draws nothing, so one corner pixel stays inside.
+    parkedPage: {
+      x: window.width - 1,
+      y: height - 1,
+      width: cardWidth,
+      height: pageHeight,
+    },
   };
 }

@@ -144,6 +144,8 @@ export interface Layout {
   toolbar: Rect;
   chat: Rect;
   page: Rect;
+  // The page's size, all but one pixel outside the window, for a tab Berry works in behind the user's.
+  parkedPage: Rect;
 }
 
 export interface TabInfo {

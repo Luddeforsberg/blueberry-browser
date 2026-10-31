@@ -49,6 +49,7 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-e
 - **`executeJavaScript`:** the code is a script, not a function body, so a top-level `return` is a syntax error.
 - **Preloads load nothing but `electron`:** they're sandboxed, so a shared runtime import becomes a chunk the preload can't `require`, and the chrome loses its API. Preloads may only `import type` from other files.
 - **Views stack by order:** a tab view covers the chrome beneath it, so CSS in the chrome can't draw over a page.
+- **Parked tabs:** a view wholly outside the window gets no size and draws nothing on Windows, so a tab Berry works in behind the user's keeps one corner pixel in the window, under the chrome, which takes any click there. `parkedPage` in `Layout.ts` and `Window.placeTab` do this.
 - **Tests run off-screen:** outside CI, `tests/background.cjs` keeps the test app off-screen and out of the foreground, so they don't disturb the Mac. Take screenshots with Playwright, not `screencapture`.
 - **Asking about site permissions:** Electron has no "not asked yet" answer, so `Notification.permission` and `navigator.permissions.query` say `denied` until the user allows. The request itself still reaches the prompt.
 - **`getUserMedia` in tests:** allowing it can raise the Mac's own permission dialog. Tests only ever block it.
