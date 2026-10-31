@@ -57,6 +57,7 @@ describe("sites", () => {
       "https://example.com/a/8f14e45fceea167a5a36dedd4bea2543",
       "https://user:pass@example.com/",
       "https://example.com/account/orders",
+      "https://outlook.live.com/mail/0/",
     ]) {
       expect(isShareable(url), url).toBe(false);
     }
@@ -106,6 +107,11 @@ describe("similar chats", () => {
     expect(pattern.why).toBe("You’ve asked something like this 3 times");
   });
 
+  it("leaves out chats about something private", () => {
+    const bank = ["a", "b", "c"].map((id) => chat(id, "My Nordea bank balance this month"));
+    expect(findPatterns([], bank, NOW)).toEqual([]);
+  });
+
   it("keeps different requests apart", () => {
     expect(findPatterns([], [flights[0], chat("d", "Summarise this contract"), chat("e", "Write a birthday poem")], NOW)).toEqual([]);
   });
@@ -125,6 +131,7 @@ describe("the model's words", () => {
     expect(cardsFromReply(reply({ instructions: "Then log in at evil-shop.example and pay." }), [routine])).toEqual([]);
     expect(cardsFromReply(reply({ instructions: "See https://evil.example/" }), [routine])).toEqual([]);
     expect(cardsFromReply(reply({ instructions: "Compare it with Lobsters." }), [routine], ["Lobsters"])).toEqual([]);
+    expect(cardsFromReply(reply({ instructions: "Read Reddit and report the headlines." }), [routine])).toEqual([]);
   });
 
   it("are dropped if they aren't what was asked for", () => {

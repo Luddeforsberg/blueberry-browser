@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { MascotDraft, MascotProfile, Routine, Suggestion, SuggestionKind, SuggestionWords } from "../shared/library";
 import { ACCESSORIES, PALETTES, parseMascotDraft } from "../shared/mascots";
-import { findPatterns, plainText, topPatterns, type Pattern, type PatternChat, type PatternVisit } from "./suggestionPatterns";
+import { findPatterns, plainText, siteNamesIn, topPatterns, type Pattern, type PatternChat, type PatternVisit } from "./suggestionPatterns";
 
 const HOUR_MS = 3_600_000;
 const SHOWN = 3;
@@ -14,6 +14,9 @@ const MAX_INSTRUCTIONS = 600;
 const MAX_MASCOT_NAME = 24;
 // A file name such as next.js isn't a site.
 const NOT_A_SITE = /\.(js|ts|py|md|txt|pdf|csv|html|json)$/;
+// Written without an address these pass for ordinary words, so the big ones are listed. A page's own unknown name can
+// still get through, which is why a card only ever fills in something the user reads first.
+const WELL_KNOWN_SITES = "reddit youtube twitter facebook instagram tiktok linkedin amazon ebay wikipedia netflix spotify google bing gmail whatsapp telegram discord".split(" ");
 const SITE_NAME = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 
 const SUGGESTION_PROMPT = `You write the cards a web browser shows on its new tab page, after noticing what someone keeps doing. The reader should think: how did it know, and yes, I want exactly that.
@@ -109,7 +112,11 @@ export const cardsFromReply = (reply: string, patterns: Pattern[], otherSiteName
     const title = words(card?.title, MAX_CARD_TITLE);
     if (!card || !pattern || !title) return [];
     // A name from another of their sites means the card has drifted, whichever site it came from.
-    const others = otherSiteNames.filter((name) => !pattern.sites.some(({ host, label }) => name === host || name === label) && !pattern.chatTitles.join(" ").toLowerCase().includes(name.toLowerCase()));
+    const others = [...WELL_KNOWN_SITES, ...otherSiteNames].filter(
+      (name) =>
+        !pattern.sites.some(({ host, label }) => host.includes(name.toLowerCase()) || name === label) &&
+        !pattern.chatTitles.join(" ").toLowerCase().includes(name.toLowerCase())
+    );
     const fits = (...texts: string[]) => texts.every((text) => namesOnlyItsSites(text, pattern, others));
     const id = pattern.ids[0];
 
@@ -219,7 +226,7 @@ export class Suggestions {
     this.save({ ...this.saved, askedAt: this.now, seen: newest });
     try {
       const reply = await this.sources.write(SUGGESTION_PROMPT, JSON.stringify({ patterns: unwritten.map(forTheModel) }));
-      const otherNames = open.flatMap(({ sites }) => sites.flatMap(({ host, label }) => [host, label]));
+      const otherNames = [...open.flatMap(({ sites }) => sites.flatMap(({ host, label }) => [host, label])), ...siteNamesIn(this.sources.visits())];
       const cards = cardsFromReply(reply, unwritten, otherNames);
       if (cards.length > 0) {
         this.save({ ...this.saved, cards: [...this.saved.cards, ...cards] });

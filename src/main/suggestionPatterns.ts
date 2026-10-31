@@ -63,13 +63,13 @@ const PRIVATE_SUFFIX = /\.(local|internal|lan|corp|home|intranet|localhost)$/;
 const IP_ADDRESS = /^\d+\.\d+\.\d+\.\d+$|^\[/;
 const PRIVATE_LABEL =
   /(^|[.-])(mail|email|webmail|inbox|login|signin|sso|auth|accounts?|pay|payments?|checkout|wallet|health|patient|hospital|intranet|vpn|admin|dating)([.-]|$)/;
-const PRIVATE_WORD = /bank|mail|nordea|(^|\.)seb\.|paypal|klarna|revolut|swish|skatteverket|kivra|1177|mychart|porn|xvideos|xnxx|onlyfans|tinder|grindr/;
-const PRIVATE_PATH = /^\/(log-?in|sign-?in|account|billing|checkout|inbox|password)(\/|$)/i;
+const PRIVATE_WORD = /bank|mail|outlook|proton|nordea|(^|\.)seb\.|paypal|klarna|revolut|swish|skatteverket|kivra|1177|mychart|porn|xvideos|xnxx|onlyfans|tinder|grindr/;
+const PRIVATE_PATH = /^\/(log-?in|sign-?in|account|billing|checkout|inbox|mail|password)(\/|$)/i;
 // These are how you get somewhere, not somewhere you go. Nothing can be suggested from them.
 const JUST_A_WAY_THERE = /(^|\.)(google|bing|duckduckgo|yahoo|ecosia|kagi|baidu|yandex)\.[a-z.]+$/;
 const SECRET_PARAMETER = /token|secret|session|sid|auth|password|passwd|pwd|signature|otp|apikey|api_key|access_key|code/i;
 const LONG_RANDOM = /^(?=.*\d)[A-Za-z0-9_-]{24,}$/;
-const PRIVATE_TITLE = /@|\d{6,}/;
+const PRIVATE_TITLE = /@|\d{6,}|bank|nordea|inbox|e-?mail|password|lösenord|konto|account|balance|invoice|diagnos|symptom/i;
 
 // Whether a visit may count at all. Local addresses, banks, mail and anything carrying a token are left out, so they
 // can't turn up in a pattern or reach the model.
@@ -329,23 +329,29 @@ const chatPatterns = (chats: PatternChat[], now: number): Pattern[] => {
       if (group) group.chats.push(chat);
       else groups.push({ words, chats: [chat] });
     });
-  return groups.flatMap(({ chats: members }): Pattern[] =>
-    members.length < MIN_TIMES
-      ? []
-      : [
-          {
-            ids: members.map(({ id }) => `chat:${id}`),
-            kind: "prompt",
-            sites: [],
-            why: `You’ve asked something like this ${members.length} times`,
-            pageTitles: [],
-            chatTitles: members.slice(-MAX_TITLES).flatMap(({ title }) => titleToShare(title) ?? []),
-            schedule: null,
-            score: members.length * 2,
-          },
-        ]
-  );
+  return groups.flatMap(({ chats: members }): Pattern[] => {
+    const titles = members.flatMap(({ title }) => titleToShare(title) ?? []);
+    // One private title means they're all about something private.
+    if (members.length < MIN_TIMES || titles.length < members.length) return [];
+    return [
+      {
+        ids: members.map(({ id }) => `chat:${id}`),
+        kind: "prompt",
+        sites: [],
+        why: `You’ve asked something like this ${members.length} times`,
+        pageTitles: [],
+        chatTitles: titles.slice(-MAX_TITLES),
+        schedule: null,
+        score: members.length * 2,
+      },
+    ];
+  });
 };
+
+// Every site in the history by the name people would write, such as "reddit" for old.reddit.com.
+export const siteNamesIn = (visits: PatternVisit[]): string[] => [
+  ...new Set(visits.flatMap(({ url }) => normaliseSite(url)?.split(".").at(-2) ?? []).filter((name) => name.length > 2)),
+];
 
 // Everything the history and chats show, best first. Costs a few milliseconds and no money.
 export const findPatterns = (visits: PatternVisit[], chats: PatternChat[], now = Date.now()): Pattern[] => {
