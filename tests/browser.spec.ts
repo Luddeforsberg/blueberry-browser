@@ -8,6 +8,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
+import { startFakeModel, type FakeModel } from "./fakeModel";
 
 declare global {
   interface Window {
@@ -22,6 +23,7 @@ const PNG = Buffer.from(
 
 let server: Server;
 let origin: string;
+let model: FakeModel;
 let app: ElectronApplication;
 let chrome: Page;
 
@@ -39,14 +41,17 @@ test.beforeAll(async () => {
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  model = await startFakeModel();
 });
 
 test.afterAll(() => {
   server.close();
+  model.close();
 });
 
 test.beforeEach(async () => {
-  app = await launchApp();
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
   chrome = await findView(app, "view=chrome");
 });
 
@@ -69,22 +74,17 @@ const openFixture = async (path = "/") => {
   return page;
 };
 
-const sendToChrome = (channel: string, payload: unknown) =>
-  app.evaluate(
-    ({ webContents }, [channel, payload]) => {
-      webContents
-        .getAllWebContents()
-        .find((contents) => contents.getURL().includes("view=chrome"))
-        ?.send(channel as string, payload);
-    },
-    [channel, payload] as const
-  );
-
 const tabOrder = async () => (await getTabs()).map((tab) => tab.page ?? tab.url.replace(origin, ""));
 
 const openChat = async () => {
   await chrome.getByRole("button", { name: "Show Berry" }).click();
   await expect(chrome.getByRole("complementary", { name: "Berry" })).toBeVisible();
+};
+
+const askInPanel = async (text: string) => {
+  const message = chrome.getByRole("complementary", { name: "Berry" }).getByRole("textbox", { name: "Message" });
+  await message.fill(text);
+  await message.press("Enter");
 };
 
 test("page text reaches the chat", async () => {
@@ -195,29 +195,95 @@ test("favicons come from the page, not from Google", async () => {
 });
 
 test("chat markdown gets typography styles", async () => {
+  model.replyWith("# Heading\n\n", "- item");
   await openFixture();
   await openChat();
-  await sendToChrome("chat:messages-updated", [
-    { role: "assistant", content: "# Heading\n\n- item" },
-  ]);
+  await askInPanel("Show me a list");
 
   const list = chrome.locator(".prose ul");
   await expect(list).toBeVisible();
   await expect(list).toHaveCSS("list-style-type", "disc");
 });
 
-test("streamed chunks appear in the chat as they arrive", async () => {
+test("a reply streams as it arrives, and Stop keeps what was written", async () => {
+  model.replyWith("first words ", "never sent");
+  const release = model.holdAfterFirstToken();
   await openFixture();
   await openChat();
-  await sendToChrome("chat:messages-updated", [
-    { role: "user", content: "hello" },
-    { role: "assistant", content: "" },
-  ]);
-  for (const content of ["first ", "second"]) {
-    await sendToChrome("chat:chunk", { messageId: "1", content, isComplete: false });
-  }
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  await askInPanel("hello");
 
-  await expect(chrome.getByText("first second")).toBeVisible();
+  await expect(panel.getByText("first words")).toBeVisible();
+  await panel.getByRole("button", { name: "Stop" }).click();
+  await expect(panel.getByRole("button", { name: "Send" })).toBeVisible();
+  await expect(panel.getByText("first words")).toBeVisible();
+  release();
+  await expect(panel.getByText("never sent")).toHaveCount(0);
+
+  // The stopped reply is part of the conversation the model sees next.
+  model.replyWith("second reply");
+  await askInPanel("and again");
+  await expect(panel.getByText("second reply")).toBeVisible();
+  const roles = model.requests.at(-1)?.messages.map((message) => message.role);
+  expect(roles).toEqual(["system", "user", "assistant", "user"]);
+});
+
+test("the panel shares the page with the model, and the main chat doesn't", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  await askInPanel("What's here?");
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  const shared = JSON.stringify(model.requests.at(-1)?.messages);
+  expect(shared).toContain("hello from the page");
+  expect(shared).toContain("data:image/png");
+
+  await panel.getByRole("group", { name: "Berry can see 127.0.0.1" }).hover();
+  await panel.getByRole("button", { name: "Remove this page" }).click();
+  await askInPanel("And now?");
+  await expect(panel.getByText("A reply from the model")).toHaveCount(2);
+  expect(JSON.stringify(model.requests.at(-1)?.messages)).not.toContain("hello from the page");
+
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  const message = chrome.getByRole("textbox", { name: "Message" }).first();
+  await message.fill("Something else");
+  await message.press("Enter");
+  await expect.poll(() => model.requests.length).toBe(3);
+  expect(JSON.stringify(model.requests.at(-1)?.messages)).not.toContain("hello from the page");
+});
+
+test("chats are still there after a restart", async () => {
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-chats-"));
+  const first = await launchApp(profile, { modelEnv: model.env });
+  const firstChrome = await findView(first, "view=chrome");
+  await firstChrome.evaluate(() => window.chromeAPI.chat.send(null, "Remember this", { seePage: false }));
+  await expect(firstChrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: "Remember this" })).toBeVisible();
+  await expect.poll(() => model.requests.length).toBe(1);
+  await expect
+    .poll(async () => {
+      const { chats } = await firstChrome.evaluate(() => window.chromeAPI.library.getLibrary());
+      const thread = await firstChrome.evaluate((id) => window.chromeAPI.library.getChat(id), chats[0].id);
+      return thread?.partial;
+    })
+    .toBeNull();
+  await first.close();
+
+  const second = await launchApp(profile, { modelEnv: model.env });
+  const secondChrome = await findView(second, "view=chrome");
+  await secondChrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: "Remember this" }).click();
+  await expect(secondChrome.getByText("A reply from the model")).toBeVisible();
+  await second.close();
+});
+
+test("a missing API key says what to do, and browsing still works", async () => {
+  const noKey = await launchApp();
+  const noKeyChrome = await findView(noKey, "view=chrome");
+  const input = noKeyChrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  await input.fill("Plan a trip");
+  await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+
+  await expect(noKeyChrome.getByRole("alert")).toContainText("OPENAI_API_KEY");
+  await noKey.close();
 });
 
 test("the chrome renderer gets no raw IPC or code execution in tabs", async () => {
@@ -432,7 +498,7 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
   await expect.poll(async () => (await activeTab()).page).toBe("chat");
   expect((await getTabs()).some((tab) => tab.page === "new-tab")).toBe(false);
   await expect(chrome.getByText("Plan a trip to Porto").first()).toBeVisible();
-  await expect(chrome.getByText(/This is sample data/)).toBeVisible();
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
 
   const chats = chrome.getByRole("region", { name: "Chats" });
   await expect(chats.getByRole("button", { name: "Plan a trip to Porto" })).toHaveAttribute(
@@ -522,7 +588,7 @@ test("the new tab composer sends only when there is text, and asks Berry unless 
   await send.click();
 
   await expect.poll(async () => (await activeTab()).page).toBe("chat");
-  await expect(chrome.getByText(/This is sample data/)).toBeVisible();
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
 });
 
 test("the main chat and the chat panel share one composer", async () => {
@@ -748,42 +814,26 @@ test("bookmarks are in the sidebar when vertical and under the address bar when 
 });
 
 test("the page's card rings while Berry reads it, and not once the page is taken away", async () => {
-  // Holds the reply open, so this never reaches a provider and the ring stays up to be seen.
-  await app.evaluate(({ ipcMain }) => {
-    ipcMain.removeHandler("chat:send");
-    ipcMain.handle("chat:send", () => new Promise<void>((resolve) => {
-      (globalThis as unknown as { finishReply?: () => void }).finishReply = resolve;
-    }));
-  });
-  const replyHeld = () =>
-    app.evaluate(() => !!(globalThis as unknown as { finishReply?: () => void }).finishReply);
-  const finishReply = () =>
-    app.evaluate(() => {
-      const held = globalThis as unknown as { finishReply?: () => void };
-      held.finishReply?.();
-      delete held.finishReply;
-    });
+  let release = model.holdAfterFirstToken();
   const ring = chrome.locator("[data-berry-reading]");
 
   await openFixture();
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" });
-  const message = panel.getByRole("textbox", { name: "Message" });
   await expect(ring).toHaveCount(0);
 
-  await message.fill("What's on this page?");
-  await message.press("Enter");
+  await askInPanel("What's on this page?");
   await expect(ring).toHaveCount(1);
-  await finishReply();
+  release();
   await expect(ring).toHaveCount(0);
 
   await panel.getByRole("group", { name: "Berry can see 127.0.0.1" }).hover();
   await panel.getByRole("button", { name: "Remove this page" }).click();
-  await message.fill("And in general?");
-  await message.press("Enter");
-  await expect.poll(replyHeld).toBe(true);
+  release = model.holdAfterFirstToken();
+  await askInPanel("And in general?");
+  await expect(panel.getByRole("button", { name: "Stop" })).toBeVisible();
   await expect(ring).toHaveCount(0);
-  await finishReply();
+  release();
 });
 
 test("right-clicking Berry opens its menu on the composer and active tab", async () => {

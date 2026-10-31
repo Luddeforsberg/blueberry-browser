@@ -35,7 +35,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }, [browser])
 
     const askBerry = async (message: string) => {
-        const chat = await window.chromeAPI.library.sendChat(null, message)
+        const chat = await window.chromeAPI.chat.send(null, message, { seePage: false })
         if (!chat) return
         await browser.openPage('chat', { param: chat.id, title: chat.title })
         await browser.closeTab(tab.id)

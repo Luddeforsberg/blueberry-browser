@@ -58,18 +58,16 @@ const chromeAPI: ChromeAPI = {
   library: {
     getLibrary: () => invoke("library:get"),
     getChat: (chatId) => invoke("library:chat", chatId),
-    sendChat: (chatId, text) => invoke("library:send-chat", chatId, text),
     onLibraryUpdated: (callback) => subscribe("library:updated", callback),
   },
   chat: {
-    sendChatMessage: (request) => invoke("chat:send", request),
-    clearChat: () => invoke("chat:clear"),
-    getMessages: () => invoke("chat:messages"),
+    send: (chatId, text, options) => invoke("chat:send", chatId, text, options),
+    stop: (chatId) => invoke("chat:stop", chatId),
     getPageText: () => invoke("page:text"),
     getPageAccess: () => invoke("chat:page-access"),
     setPageAccess: (enabled) => invoke("chat:set-page-access", enabled),
     onChatChunk: (callback) => subscribe("chat:chunk", callback),
-    onMessagesUpdated: (callback) => subscribe("chat:messages-updated", callback),
+    onChatUpdated: (callback) => subscribe("chat:updated", callback),
   },
 };
 

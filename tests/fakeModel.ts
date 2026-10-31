@@ -1,0 +1,75 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+
+export interface FakeModelRequest {
+  messages: Array<{ role: string; content: unknown }>;
+}
+
+const DEFAULT_TOKENS = ["A reply ", "from the model"];
+
+const sseChunk = (delta: object, finish: string | null) =>
+  `data: ${JSON.stringify({
+    id: "fake",
+    object: "chat.completion.chunk",
+    created: 0,
+    model: "fake",
+    choices: [{ index: 0, delta, finish_reason: finish }],
+  })}\n\n`;
+
+// A local stand-in for OpenAI's API, so tests run the real app and client without paying for a model.
+export const startFakeModel = async () => {
+  let tokens = DEFAULT_TOKENS;
+  let hold: Promise<void> | null = null;
+  const requests: FakeModelRequest[] = [];
+
+  const server = createServer(async (request, response) => {
+    if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
+      response.statusCode = 404;
+      response.end();
+      return;
+    }
+    let body = "";
+    for await (const part of request) body += part;
+    requests.push(JSON.parse(body));
+
+    const reply = tokens;
+    const held = hold;
+    hold = null;
+    response.setHeader("content-type", "text/event-stream");
+    response.write(sseChunk({ role: "assistant", content: reply[0] }, null));
+    if (held) await held;
+    for (const token of reply.slice(1)) response.write(sseChunk({ content: token }, null));
+    response.write(sseChunk({}, "stop"));
+    response.end("data: [DONE]\n\n");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  return {
+    env: {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_BASE_URL: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
+      LLM_MODEL: "gpt-4o-mini",
+    },
+    requests,
+    reset() {
+      tokens = DEFAULT_TOKENS;
+      hold = null;
+      requests.length = 0;
+    },
+    replyWith(...next: string[]) {
+      tokens = next;
+    },
+    // The next reply waits after its first token until the returned function is called.
+    holdAfterFirstToken() {
+      let release = () => {};
+      hold = new Promise<void>((resolve) => (release = resolve));
+      return () => release();
+    },
+    close() {
+      server.closeAllConnections();
+      server.close();
+    },
+  };
+};
+
+export type FakeModel = Awaited<ReturnType<typeof startFakeModel>>;

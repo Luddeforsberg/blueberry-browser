@@ -1,34 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React from 'react'
 import type { TabInfo } from '@shared/ipc'
-import type { ChatThread } from '@shared/library'
-import { useLibrary } from '../contexts/LibraryContext'
-import { AssistantMessage, UserMessage } from '../components/ChatMessage'
+import { useChatThread } from '../contexts/ChatContext'
+import { AssistantMessage, ChatError, ThinkingMessage, UserMessage, useFollowReply } from '../components/ChatMessage'
 import { BerryHero, useAssistantName } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
 
 // A full page for talking to Berry about anything, not about a web page.
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
-    const library = useLibrary()
-    const [thread, setThread] = useState<ChatThread | null>(null)
-    const name = useAssistantName()
-    const endRef = useRef<HTMLDivElement>(null)
     const chatId = tab.pageParam
-    const updatedAt = library.chats.find((chat) => chat.id === chatId)?.updatedAt
-
-    useEffect(() => {
-        if (!chatId) {
-            setThread(null)
-            return
-        }
-        window.chromeAPI.library.getChat(chatId).then(setThread)
-    }, [chatId, updatedAt])
-
-    useEffect(() => {
-        endRef.current?.scrollIntoView({ block: 'end' })
-    }, [thread?.messages.length])
+    const thread = useChatThread(chatId)
+    const name = useAssistantName()
+    const partial = thread?.partial
+    const running = partial != null
+    const scrollerRef = useFollowReply(
+        thread?.messages.filter((message) => message.role === 'user').length ?? 0,
+        partial
+    )
 
     const send = async (message: string) => {
-        const chat = await window.chromeAPI.library.sendChat(chatId, message)
+        const chat = await window.chromeAPI.chat.send(chatId, message, { seePage: false })
         // A new chat gets its own tab, so it can be found again in the sidebar.
         if (chat && !chatId) {
             await window.chromeAPI.browser.openPage('chat', { param: chat.id, title: chat.title })
@@ -40,6 +30,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const composer = (
         <ChatComposer
             onSend={(message) => void send(message)}
+            disabled={running}
+            onStop={running && chatId ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
             placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}
             autoFocus
         />
@@ -59,7 +51,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     return (
         <div className="h-full flex flex-col">
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
                 <div className="max-w-[800px] mx-auto px-6 pt-8 pb-4 flex flex-col gap-6">
                     {thread.messages.map((message, index) =>
                         message.role === 'user' ? (
@@ -68,7 +60,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <AssistantMessage key={index} content={message.content} avatar />
                         )
                     )}
-                    <div ref={endRef} />
+                    {partial === '' && <ThinkingMessage />}
+                    {partial && <AssistantMessage content={partial} isStreaming avatar />}
+                    {thread.error && <ChatError message={thread.error} />}
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
-// Today a mock in the main process serves these. Local storage and sync replace it later.
+// Chats are saved locally. Today a mock in the main process serves the rest, until storage replaces it.
 
 export interface PinnedSite {
   id: string;
@@ -26,6 +26,10 @@ export interface ChatThreadSummary {
 
 export interface ChatThread extends ChatThreadSummary {
   messages: ChatThreadMessage[];
+  // The reply being written, which is saved once it ends. Null when no reply is running.
+  partial: string | null;
+  // Why the last reply failed, until the next message.
+  error: string | null;
 }
 
 export type RoutineStatus = "running" | "finished" | "needs-approval";

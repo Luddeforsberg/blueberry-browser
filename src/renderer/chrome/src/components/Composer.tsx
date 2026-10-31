@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Plus } from 'lucide-react'
+import { ArrowUp, Plus, Square } from 'lucide-react'
 import { cn } from '@common/lib/utils'
 
 // The one input for talking to Berry, on the new tab page, the main chat and the chat panel.
@@ -19,7 +19,9 @@ export const Composer: React.FC<{
     addLabel?: string
     canSend: boolean
     onSend: () => void
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, spellCheck, attachment, onAdd, addLabel, canSend, onSend }) => {
+    // While a reply is running, the send button stops it.
+    onStop?: () => void
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, spellCheck, attachment, onAdd, addLabel, canSend, onSend, onStop }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     useLayoutEffect(() => {
@@ -69,9 +71,9 @@ export const Composer: React.FC<{
                 </button>
                 <button
                     type="button"
-                    aria-label="Send"
-                    onClick={onSend}
-                    disabled={!canSend}
+                    aria-label={onStop ? 'Stop' : 'Send'}
+                    onClick={onStop ?? onSend}
+                    disabled={!onStop && !canSend}
                     className={cn(
                         "size-9 shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
                         "bg-primary text-primary-foreground hover:brightness-110",
@@ -79,7 +81,7 @@ export const Composer: React.FC<{
                         "disabled:hover:brightness-100"
                     )}
                 >
-                    <ArrowUp className="size-[18px]" />
+                    {onStop ? <Square className="size-3.5" fill="currentColor" /> : <ArrowUp className="size-[18px]" />}
                 </button>
             </div>
         </div>
@@ -89,13 +91,14 @@ export const Composer: React.FC<{
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
     onSend: (message: string) => void
+    onStop?: () => void
     disabled?: boolean
     placeholder: string
     attachment?: React.ReactNode
     onAdd?: () => void
     addLabel?: string
     autoFocus?: boolean
-}> = ({ onSend, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus }) => {
+}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus }) => {
     const [value, setValue] = useState('')
 
     const send = () => {
@@ -123,6 +126,7 @@ export const ChatComposer: React.FC<{
             addLabel={addLabel}
             canSend={!disabled && value.trim().length > 0}
             onSend={send}
+            onStop={onStop}
         />
     )
 }

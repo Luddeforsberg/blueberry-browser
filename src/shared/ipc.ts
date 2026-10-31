@@ -80,19 +80,8 @@ export interface ThemeState {
   platform: "mac" | "windows" | "other";
 }
 
-export interface ChatRequest {
-  message: string;
-  messageId: string;
-}
-
 export interface ChatChunk {
-  messageId: string;
-  content: string;
-  isComplete: boolean;
-}
-
-export interface ChatMessage {
-  role: "user" | "assistant";
+  chatId: string;
   content: string;
 }
 
@@ -124,16 +113,14 @@ export interface InvokeChannels {
   "theme:get": { region: "chrome" | "overlay"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
-  "library:send-chat": {
-    region: "chrome";
-    args: [chatId: string | null, text: string];
-    result: ChatThread | null;
-  };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
-  "chat:send": { region: "chrome"; args: [request: ChatRequest]; result: void };
-  "chat:clear": { region: "chrome"; args: []; result: void };
-  "chat:messages": { region: "chrome"; args: []; result: ChatMessage[] };
+  "chat:send": {
+    region: "chrome";
+    args: [chatId: string | null, text: string, options: { seePage: boolean }];
+    result: ChatThread | null;
+  };
+  "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -152,7 +139,7 @@ export interface EventChannels {
   "toolbar:focus-address": null;
   "overlay:visibility": boolean;
   "chat:chunk": ChatChunk;
-  "chat:messages-updated": ChatMessage[];
+  "chat:updated": ChatThread;
 }
 
 export type Unsubscribe = () => void;
@@ -200,20 +187,19 @@ export interface SettingsAPI {
 }
 
 export interface ChatAPI {
-  sendChatMessage: (request: ChatRequest) => Promise<void>;
-  clearChat: () => Promise<void>;
-  getMessages: () => Promise<ChatMessage[]>;
+  // Starts a chat when `chatId` is null. The reply arrives through the events.
+  send: (chatId: string | null, text: string, options: { seePage: boolean }) => Promise<ChatThread | null>;
+  stop: (chatId: string) => Promise<void>;
   getPageText: () => Promise<string | null>;
   getPageAccess: () => Promise<boolean>;
   setPageAccess: (enabled: boolean) => Promise<boolean>;
   onChatChunk: (callback: (chunk: ChatChunk) => void) => Unsubscribe;
-  onMessagesUpdated: (callback: (messages: ChatMessage[]) => void) => Unsubscribe;
+  onChatUpdated: (callback: (thread: ChatThread) => void) => Unsubscribe;
 }
 
 export interface LibraryAPI {
   getLibrary: () => Promise<LibrarySnapshot>;
   getChat: (chatId: string) => Promise<ChatThread | null>;
-  sendChat: (chatId: string | null, text: string) => Promise<ChatThread | null>;
   onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;
 }
 
