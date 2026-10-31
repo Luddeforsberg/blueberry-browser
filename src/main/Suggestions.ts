@@ -98,6 +98,12 @@ const mascotDraft = (card: Record<string, unknown>, pattern: Pattern, name: stri
 // Words were written for exactly these sites and chats, so they only ever go back on the same pattern.
 const wordsKey = ({ ids }: Pattern): string => [...ids].sort().join("+");
 
+// A card's title can say the time, so a habit that moves gets new words rather than a card that disagrees with itself.
+const wordsFit = (card: SuggestionWords, pattern: Pattern): boolean =>
+  card.id === wordsKey(pattern) &&
+  card.kind === pattern.kind &&
+  (card.kind !== "routine" || JSON.stringify(card.draft.schedule) === JSON.stringify(pattern.schedule));
+
 // The model's words become cards only if they fit their pattern. Anything off is dropped and that pattern gets no card.
 export const cardsFromReply = (reply: string, patterns: Pattern[], otherSiteNames: string[] = []): SuggestionWords[] => {
   let parsed: unknown;
@@ -197,11 +203,8 @@ export class Suggestions {
     const { open, newest } = this.patterns;
     void this.refresh(open, newest);
     const cards = this.saved.cards.flatMap((card): Suggestion[] => {
-      const pattern = open.find((candidate) => wordsKey(candidate) === card.id && candidate.kind === card.kind);
-      if (!pattern) return [];
-      // The habit can drift while the words still fit, so its time comes from the pattern, as the reason does.
-      if (card.kind === "routine" && pattern.schedule) return [{ ...card, why: pattern.why, draft: { ...card.draft, schedule: pattern.schedule } }];
-      return [{ ...card, why: pattern.why }];
+      const pattern = open.find((candidate) => wordsFit(card, candidate));
+      return pattern ? [{ ...card, why: pattern.why }] : [];
     });
     return pickShown(cards);
   }
@@ -224,7 +227,7 @@ export class Suggestions {
     if (this.asking) return;
     const { askedAt, seen } = this.saved;
     if (askedAt > 0 && (this.now - askedAt < HOUR_MS || newest <= seen)) return;
-    const hasWords = (pattern: Pattern) => this.saved.cards.some((card) => card.id === wordsKey(pattern) && card.kind === pattern.kind);
+    const hasWords = (pattern: Pattern) => this.saved.cards.some((card) => wordsFit(card, pattern));
     const unwritten = topPatterns(open).filter((pattern) => !hasWords(pattern));
     if (unwritten.length === 0 || !this.sources.hasModel()) return;
 
@@ -236,7 +239,7 @@ export class Suggestions {
       const otherNames = [...open.flatMap(({ sites }) => sites.flatMap(({ host, label }) => [host, label])), ...siteNamesIn(this.sources.visits())];
       const cards = cardsFromReply(reply, unwritten, otherNames);
       if (cards.length > 0) {
-        this.save({ ...this.saved, seen: newest, cards: [...this.saved.cards, ...cards] });
+        this.save({ ...this.saved, seen: newest, cards: [...this.saved.cards.filter(({ id }) => !cards.some((card) => card.id === id)), ...cards] });
         this.sources.onChanged();
       }
     } catch (error) {
