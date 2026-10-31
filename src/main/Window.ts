@@ -85,6 +85,7 @@ export class Window {
   // Kept here because a closed window, which is when this is saved last, can't be asked.
   private windowSize = { width: 0, height: 0 };
   private readonly glassSupported = supportsGlass();
+  private readonly tabsUnderChrome = new WeakSet<Tab>();
   readonly chats: Chats;
   readonly routines: Routines;
   readonly permissionPrompt: PermissionPromptView;
@@ -170,7 +171,13 @@ export class Window {
       },
       onListChanged: () => this.broadcast("library:updated", this.librarySnapshot),
       onWorkingTabs: (working) => {
-        this.allTabs.forEach((tab) => tab.setBerryWorking(working.has(tab)));
+        // A reply stopped by the window closing ends after the window has gone.
+        if (this._baseWindow.isDestroyed()) return;
+        const { layout } = this;
+        this.allTabs.forEach((tab) => {
+          tab.setBerryWorking(working.has(tab));
+          this.placeTab(tab, layout);
+        });
         this.notifyTabs();
       },
     });
@@ -468,7 +475,7 @@ export class Window {
           }),
         onView: (withView) => {
           this._baseWindow.contentView.addChildView(withView.view);
-          withView.view.setBounds(this.layout.page);
+          this.placeTab(withView, this.layout);
           this.openLinksInTabs(withView.webContents);
           this.siteZoom.track(withView);
           attachPageMenu(withView, this._baseWindow, {
@@ -888,11 +895,28 @@ export class Window {
     );
   }
 
+  // A parked tab goes under the chrome, which then takes any click on the one pixel it leaves in the window.
+  private placeTab(tab: Tab, layout: Layout): void {
+    const view = tab.existingView;
+    if (!view) return;
+    if (tab.isParked !== this.tabsUnderChrome.has(tab)) {
+      const { contentView } = this._baseWindow;
+      if (tab.isParked) {
+        contentView.addChildView(view, 0);
+        this.tabsUnderChrome.add(tab);
+      } else {
+        contentView.addChildView(view, contentView.children.indexOf(this.chrome.view) + 1);
+        this.tabsUnderChrome.delete(tab);
+      }
+    }
+    tab.place(layout);
+  }
+
   updateAllBounds(): void {
     const { width, height } = this._baseWindow.getContentBounds();
     const layout = this.layout;
     this.chrome.view.setBounds({ x: 0, y: 0, width, height });
-    this.allTabs.forEach((tab) => tab.existingView?.setBounds(layout.page));
+    this.allTabs.forEach((tab) => this.placeTab(tab, layout));
     if (layout.floatingSidebar.width === 0) this.hideFloatingSidebar();
     else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
     this.findBar.setBounds(layout.findBar);

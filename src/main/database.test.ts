@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseSync } from "node:sqlite";
@@ -16,18 +16,22 @@ const open = (file: string) => {
 };
 
 const savedChat = (file: string) => {
-  const store = new ChatStore(file);
+  // `new ChatStore` never closes its handle, and Windows won't move a file that's open, so this saves elsewhere and
+  // copies the result. It checkpoints through a handle of its own.
+  const source = tempFile();
+  const store = new ChatStore(source);
   store.createChat("Keep me");
-  // `new ChatStore` never closes its handle, so this checkpoints through a handle of its own.
-  const db = new DatabaseSync(file);
+  const db = new DatabaseSync(source);
   db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   db.close();
+  copyFileSync(source, file);
 };
 
 describe("openStore", () => {
   it("opens a missing file, and a healthy one, without a word", () => {
+    expect(open(tempFile()).problems).toEqual([]);
+
     const file = tempFile();
-    expect(open(file).problems).toEqual([]);
     savedChat(file);
 
     const { store, problems } = open(file);
@@ -84,7 +88,6 @@ describe("openStore", () => {
   it("leaves a file alone when the trouble isn't damage, and carries on in memory", () => {
     const file = tempFile();
     savedChat(file);
-    const before = readdirSync(join(file, ".."));
 
     const problems: StoreProblem[] = [];
     let attempts = 0;
@@ -99,7 +102,8 @@ describe("openStore", () => {
 
     expect(problems).toEqual([{ movedTo: null }]);
     expect(store.summaries()).toEqual([]);
-    expect(readdirSync(join(file, ".."))).toEqual(before);
+    // Reading a database can leave SQLite's empty helper files beside it, so this only looks for the file moving.
+    expect(readdirSync(join(file, "..")).filter((name) => name.includes("corrupt"))).toEqual([]);
     expect(new ChatStore(file).summaries()).toHaveLength(1);
   });
 

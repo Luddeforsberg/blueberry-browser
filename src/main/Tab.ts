@@ -1,5 +1,5 @@
 import { NativeImage, WebContentsView, type WebContents } from "electron";
-import type { TabTrouble } from "../shared/ipc";
+import type { Layout, TabTrouble } from "../shared/ipc";
 import { savedEntries, type SavedWebTab } from "./Session";
 
 // The page card radius from DESIGN.md.
@@ -24,6 +24,9 @@ const WORKING_CSS = `
 // How long a click gets to start loading something, and that load to end.
 const LOAD_START_MS = 300;
 const LOAD_END_MS = 10_000;
+
+// Chromium's code for a load that was stopped or replaced, or became a download. Nothing went wrong.
+const ERR_ABORTED = -3;
 
 // A crashed or stuck page never answers, and no event says so for a page stuck with no input going to it.
 const PAGE_ANSWER_MS = 10_000;
@@ -55,6 +58,7 @@ export class Tab {
   // Coming back to a page after a restart isn't a new visit.
   private notAVisit: string | null = null;
   private _trouble: TabTrouble | null = null;
+  private _loadError: { url: string; description: string } | null = null;
   private reloadOnceGone = false;
   // Calls to the page that are waiting for an answer it may never give.
   private readonly waiting = new Set<() => void>();
@@ -91,7 +95,7 @@ export class Tab {
       },
     });
     view.setBorderRadius(PAGE_RADIUS);
-    view.setVisible(this._isVisible);
+    view.setVisible(this.shouldDraw);
     this.setupEventListeners(view.webContents);
     return view;
   }
@@ -133,7 +137,11 @@ export class Tab {
     // A reload, a typed address or going back all bring the page back in a new process.
     contents.on("did-start-loading", () => {
       this.setTrouble(null);
+      this._loadError = null;
       this.events.onChange();
+    });
+    contents.on("did-fail-load", (_, code, description, url, isMainFrame) => {
+      if (isMainFrame && code !== ERR_ABORTED) this._loadError = { url, description };
     });
     contents.on("did-stop-loading", () => this.events.onChange());
 
@@ -157,7 +165,7 @@ export class Tab {
   private setTrouble(trouble: TabTrouble | null): void {
     if (trouble === this._trouble) return;
     this._trouble = trouble;
-    this.webContentsView?.setVisible(this._isVisible && !trouble);
+    this.webContentsView?.setVisible(this.shouldDraw);
     if (trouble) this.stopWaiting();
     this.events.onChange();
   }
@@ -231,6 +239,11 @@ export class Tab {
 
   get trouble(): TabTrouble | null {
     return this._trouble;
+  }
+
+  // Why the last address didn't load, until another load starts.
+  get loadError(): { url: string; description: string } | null {
+    return this._loadError;
   }
 
   // Getters
@@ -325,6 +338,27 @@ export class Tab {
   hide(): void {
     this._isVisible = false;
     this.webContentsView?.setVisible(false);
+  }
+
+  // A view that's never been shown has no width, and a hidden one doesn't draw, so pages hide their content from
+  // Berry and a screenshot comes back empty. A tab Berry is working in behind the user's stays drawn, nearly all
+  // outside the window, where it can't cover anything.
+  get isParked(): boolean {
+    return this._berryWorking && !this._isVisible;
+  }
+
+  private get shouldDraw(): boolean {
+    return (this._isVisible || this.isParked) && !this._trouble;
+  }
+
+  // Hides before moving and moves before showing, so the view never crosses the page the user is looking at.
+  place({ page, parkedPage }: Pick<Layout, "page" | "parkedPage">): void {
+    const view = this.webContentsView;
+    if (!view) return;
+    const draw = this.shouldDraw;
+    if (!draw) view.setVisible(false);
+    view.setBounds(this.isParked ? parkedPage : page);
+    if (draw) view.setVisible(true);
   }
 
   async screenshot(): Promise<NativeImage> {

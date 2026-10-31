@@ -125,6 +125,38 @@ describe("streamReply", () => {
   });
 });
 
+describe("streamReply with a tool that returns an image", () => {
+  const screenshot = (result: string): PageTool => ({
+    name: "screenshot",
+    description: "Looks",
+    schema: z.object({}),
+    label: () => "Looked",
+    returnsImage: true,
+    run: async () => result,
+  });
+  const lastToolMessage = async (result: string) => {
+    const model = fakeModel()
+      .respond(new AIMessage({ content: "", tool_calls: [{ name: "screenshot", args: {}, id: "call-1" }] }))
+      .respond(new AIMessage("seen"));
+    await collect(
+      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [screenshot(result)] }, model)
+    );
+    return model.calls.at(-1)?.messages.at(-1);
+  };
+
+  it("sends the picture to the model, marked as untrusted", async () => {
+    const message = await lastToolMessage("data:image/jpeg;base64,AAAA");
+    expect(message?.content).toEqual([
+      { type: "text", text: expect.stringContaining("untrusted") },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,AAAA" } },
+    ]);
+  });
+
+  it("sends a failure as words", async () => {
+    expect((await lastToolMessage("Nothing to look at"))?.content).toBe("Nothing to look at");
+  });
+});
+
 describe("streamReply with a bad tool call", () => {
   it("tells the model, so one bad call doesn't end the reply", async () => {
     const run = vi.fn(async () => "never");

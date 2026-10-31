@@ -58,6 +58,38 @@ test.beforeAll(async () => {
         <a href="/one">Continue</a></body>`);
       return;
     }
+    if (request.url === "/frame") {
+      response.end(`<!doctype html><title>Frame</title><body>A frame<script>
+        location.hash = "moved";
+        history.pushState({}, "", "/frame/moved");
+      </script></body>`);
+      return;
+    }
+    if (request.url === "/abilities") {
+      response.end(`<!doctype html><meta charset="utf-8"><title>Abilities</title><body>
+        <a href="/one">Plain link</a>
+        <label>Size <select id="size">
+          <option value="">Pick one</option><option value="s">Small</option><option value="m">Medium</option>
+          <option value="x" disabled>Gone</option>
+          <option value="blank"></option>
+          <optgroup disabled label="Old"><option value="o">Older</option></optgroup>
+        </select></label>
+        <select id="sticky" aria-label="Sticky" onchange="this.value = 'a'"><option value="a">Keep</option><option value="b">Other</option></select>
+        <input id="number" type="number" aria-label="Amount">
+        <shadow-box></shadow-box>
+        <div id="footer"><p id="close" style="cursor: pointer">Close</p></div>
+        <input id="toggle" type="checkbox" aria-label="Finished" style="opacity: 0; width: 40px; height: 40px">
+        <button style="opacity: 0">Ghost</button>
+        <input type="password" aria-label="Secret" value="hunter2">
+        <iframe src="http://localhost:${(server.address() as AddressInfo).port}/frame"></iframe>
+        <script>
+          customElements.define("shadow-box", class extends HTMLElement {
+            connectedCallback() { this.attachShadow({ mode: "open" }).innerHTML = '<input type="search" placeholder="Deep search">'; }
+          });
+          document.getElementById("footer").addEventListener("click", () => { document.title = "Closed"; });
+        </script></body>`);
+      return;
+    }
     response.end(
       '<!doctype html><title>Fixture</title><link rel="icon" href="/icon.png"><body>hello from the page</body>'
     );
@@ -330,6 +362,174 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Save");
   expect((await activeTab()).page).toBe("chat");
   expect((await getTabs()).map((tab) => tab.url)).toContain(`${origin}/form`);
+});
+
+const placedView = (url: string) =>
+  app.evaluate(({ BaseWindow }, address) => {
+    const window = BaseWindow.getAllWindows()[0];
+    const view = window.contentView.children.find(
+      (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL() === address
+    );
+    return {
+      bounds: view?.getBounds(),
+      visible: view?.getVisible(),
+      windowWidth: window.getContentBounds().width,
+      // The chrome is the first view that loads the app's own page.
+      underChrome:
+        window.contentView.children.indexOf(view!) <
+        window.contentView.children.findIndex((child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=chrome")),
+    };
+  }, url);
+
+test("a tab behind the chat has a real size and can be seen, without showing over the page", async () => {
+  await askBeforeActing("never");
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  const message = chrome.getByRole("textbox", { name: "Message" });
+  const url = `${origin}/form`;
+
+  model.callTools({ name: "open_tab", args: { url } });
+  model.callTools({ name: "screenshot", args: {} });
+  const release = model.holdBeforeFirstToken();
+  await message.fill("Look at the form");
+  await message.press("Enter");
+  await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("The page as it looks now");
+
+  const page = await findView(app, url);
+  expect(await page.evaluate(() => [window.innerWidth > 0, document.visibilityState])).toEqual([true, "visible"]);
+  const parked = await placedView(url);
+  expect(parked.visible).toBe(true);
+  expect(parked.bounds!.x).toBe(parked.windowWidth - 1);
+  expect(parked.underChrome).toBe(true);
+  expect(await page.evaluate(() => window.innerWidth)).toBe(parked.bounds!.width);
+
+  // Going to the tab brings it back over the chrome.
+  const chatTab = await activeTab();
+  const opened = (await getTabs()).find((tab) => tab.url === url)!;
+  await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), opened.id);
+  const shown = await placedView(url);
+  expect(shown).toMatchObject({ visible: true, underChrome: false });
+  expect(shown.bounds!.x).toBeLessThan(shown.windowWidth - 1);
+  await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), chatTab.id);
+  expect(await placedView(url)).toMatchObject({ visible: true, underChrome: true });
+
+  release();
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
+  await expect.poll(() => placedView(url).then((view) => view.visible)).toBe(false);
+  const after = await placedView(url);
+  expect(after.bounds!.x).toBeLessThan(after.windowWidth - 1);
+  expect(after.underChrome).toBe(false);
+});
+
+test("Berry finds more on a page, chooses dropdown options, and says what really happened", async () => {
+  await askBeforeActing("never");
+  const page = await openFixture("/abilities");
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const card = panel.getByRole("region", { name: "Approval needed" });
+  const url = `${origin}/abilities`;
+  const replies = panel.getByText("A reply from the model");
+  let done = 0;
+  const resultOf = async (name: string, args: object) => {
+    model.callTools({ name, args });
+    await askInPanel(`Do ${name}`);
+    await expect(replies).toHaveCount(++done);
+    return String(model.requests.at(-1)?.messages.at(-1)?.content);
+  };
+  const value = (selector: string) => page.locator(selector).inputValue();
+
+  const listed = await resultOf("list_elements", {});
+  expect(listed).not.toContain("hunter2");
+  expect(listed).not.toContain("Ghost");
+  const { elements } = JSON.parse(listed.trim()) as {
+    elements: Array<{ ref: string; name: string; address?: string; selected?: string[]; options?: string[]; transparent?: boolean }>;
+  };
+  const named = (name: string) => elements.find((element) => element.name === name)!;
+  expect(named("Plain link").address).toBe(`${origin}/one`);
+  expect(named("Size").selected).toEqual(["Pick one"]);
+  expect(named("Size").options).toContain("Medium");
+  expect(named("Finished").transparent).toBe(true);
+  expect(named("Deep search")).toBeDefined();
+  expect(named("Close")).toBeDefined();
+
+  // A false success on a dropdown, and on a field that won't hold the text.
+  expect(await resultOf("type_text", { ref: named("Size").ref, text: "Medium" })).toContain("Use choose_option");
+  expect(await value("#size")).toBe("");
+  expect(await resultOf("type_text", { ref: named("Amount").ref, text: "not a number", submit: true })).toContain("Nothing was submitted");
+
+  // Reports what's really selected, including when the page undoes it.
+  expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Small" })).toContain('now shows ["Small"]');
+  expect(await value("#size")).toBe("s");
+  expect(await resultOf("choose_option", { ref: named("Sticky").ref, option: "Other" })).toContain("didn't hold: the dropdown shows [\"Keep\"]");
+  expect(await resultOf("choose_option", { ref: named("Size").ref, option: "s" })).toContain('now shows ["Small"]');
+  expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Huge" })).toContain("no single option matches");
+  expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Gone" })).toContain("disabled");
+  expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Older" })).toContain("disabled");
+  expect(await resultOf("choose_option", { ref: named("Plain link").ref, option: "Small" })).toContain("isn't a dropdown");
+  expect(await value("#size")).toBe("s");
+
+  // A click on a plain element a script made clickable, found by its pointer cursor.
+  await resultOf("click", { ref: named("Close").ref });
+  await expect.poll(() => page.title()).toBe("Closed");
+
+  // The card names the option by what it shows, and this page rather than the frame that moved. It always asks.
+  await askBeforeActing("risky");
+  model.callTools({ name: "choose_option", args: { ref: named("Size").ref, option: "Medium" } });
+  await askInPanel("Choose medium");
+  await expect(card.getByText(`Choose “Medium” (sent as “m”) in the dropdown “Size” on ${url}`)).toBeVisible();
+
+  // The page changes what that option sends while the user decides, so nothing happens.
+  await page.evaluate(() => {
+    document.querySelector<HTMLOptionElement>("option[value=m]")!.value = "delete-everything";
+  });
+  await card.getByRole("button", { name: "Allow" }).click();
+  await expect(replies).toHaveCount(++done);
+  expect(String(model.requests.at(-1)?.messages.at(-1)?.content)).toContain("the page changed");
+  expect(await value("#size")).toBe("s");
+
+  // A click on an input nobody can see always asks.
+  model.callTools({ name: "click", args: { ref: named("Finished").ref } });
+  await askInPanel("Tick it");
+  await expect(card.getByText(`Click the checkbox “Finished” on ${url}`)).toBeVisible();
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(replies).toHaveCount(++done);
+
+  // An option with no text still says what it sends.
+  model.callTools({ name: "choose_option", args: { ref: named("Size").ref, option: "" } });
+  await askInPanel("Choose the blank one");
+  await expect(card.getByText(`Choose “” (sent as “blank”) in the dropdown “Size” on ${url}`)).toBeVisible();
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(replies).toHaveCount(++done);
+
+  // An element that's gone says so.
+  await askBeforeActing("never");
+  await page.evaluate(() => document.querySelector("#size")!.remove());
+  expect(await resultOf("choose_option", { ref: named("Size").ref, option: "Small" })).toContain("no longer on the page");
+});
+
+test("an address that can't load says so instead of reporting success", async () => {
+  await askBeforeActing("never");
+  await openFixture();
+  await openChat();
+  const replies = chrome.getByRole("complementary", { name: "Berry" }).getByText("A reply from the model");
+  const dead = "https://blueberry-test.invalid/report";
+
+  model.callTools({ name: "open_tab", args: { url: dead } });
+  await askInPanel("Open it");
+  await expect(replies).toHaveCount(1);
+  const opened = String(model.requests.at(-1)?.messages.at(-1)?.content);
+  expect(opened).toContain(`couldn't load ${dead}`);
+  expect(opened).toContain("ERR_NAME_NOT_RESOLVED");
+  expect(opened).not.toContain("Done");
+
+  model.callTools({ name: "go_to", args: { url: `${dead}/other` } });
+  await askInPanel("Try another");
+  await expect(replies).toHaveCount(2);
+  expect(String(model.requests.at(-1)?.messages.at(-1)?.content)).toContain("ERR_NAME_NOT_RESOLVED");
+
+  model.callTools({ name: "go_to", args: { url: `${origin}/` } });
+  await askInPanel("Go somewhere real");
+  await expect(replies).toHaveCount(3);
+  expect(String(model.requests.at(-1)?.messages.at(-1)?.content)).toContain("Done.");
 });
 
 test("Berry does nothing if a link changes while the user decides", async () => {
@@ -766,13 +966,14 @@ test("the appearance setting switches the chrome between light and dark", async 
 });
 
 test("the page card follows the sidebar and chat as they open and close", async () => {
-  // The window may not get the size it asks for on a small screen, such as a CI runner.
+  // The window may not get the size it asks for on a small screen, such as a CI runner, and Windows can add a few
+  // pixels for its frame. The rest of this works from the size it really got.
   const [width, height] = await app.evaluate(({ BaseWindow }) => {
     const baseWindow = BaseWindow.getAllWindows()[0];
     baseWindow.setContentSize(1200, 700);
     return baseWindow.getContentSize();
   });
-  expect(width).toBe(1200);
+  expect(width).toBeGreaterThanOrEqual(1200);
 
   const page = await openFixture();
   const size = () => page.evaluate(() => [window.innerWidth, window.innerHeight]);
@@ -799,7 +1000,7 @@ test("the chrome fills the window as it resizes", async () => {
     baseWindow.setContentSize(1100, 700);
     return baseWindow.getContentSize();
   });
-  expect(width).toBe(1100);
+  expect(width).toBeGreaterThanOrEqual(1100);
 
   await expect
     .poll(() => chrome.evaluate(() => [window.innerWidth, window.innerHeight]))
@@ -829,7 +1030,7 @@ const overlayVisible = () =>
 
 test("horizontal tabs put a tab row above the toolbar, with the same tabs", async () => {
   const [width, height] = await setContentSize(1200, 700);
-  expect(width).toBe(1200);
+  expect(width).toBeGreaterThanOrEqual(1200);
   const page = await openFixture();
 
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
@@ -852,7 +1053,7 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
 
 test("the sidebar and chat resize within their limits, by pointer or keyboard", async () => {
   const [width] = await setContentSize(1400, 700);
-  expect(width).toBe(1400);
+  expect(width).toBeGreaterThanOrEqual(1400);
   const page = await openFixture();
   const pageWidth = () => page.evaluate(() => window.innerWidth);
 

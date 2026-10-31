@@ -24,7 +24,7 @@ No date is set. Plan for about a week of evenings and weekends, then book it whe
 | 6 | **Repo clean-up:** a new README that explains the product and how it fits together, replacing the challenge text | Before sending |
 | 7 | **Sending it:** the script for the two-minute video, a rehearsed demo run, and giving Charles access to the private repo | Last |
 
-Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines. Page abilities is in progress.
+Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines; page abilities: dropdowns, shadow DOM, link addresses, screenshots, real size for tabs behind the chat, and real load errors.
 
 Parked unless the demo needs them: sign-ins, files, helpers, saved briefs, exception inbox, task budgets, importing, accounts, keys in the app, signed updates and a Windows pass. Real mouse and keyboard, and the rest of long jobs, are parked on the same terms.
 

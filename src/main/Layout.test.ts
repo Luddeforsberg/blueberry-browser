@@ -10,6 +10,15 @@ const mac = {
 const both = { sidebarOpen: true, chatOpen: true, ...mac };
 
 describe("computeLayout", () => {
+  it("parks a tab with one pixel in the window's corner, at the size the page would be", () => {
+    const { page, parkedPage } = computeLayout({ width: 1280, height: 800 }, both);
+
+    expect(parkedPage.x).toBe(1279);
+    expect(parkedPage.y).toBe(799);
+    expect(parkedPage.width).toBe(page.width);
+    expect(parkedPage.height).toBe(page.height);
+  });
+
   it("puts the sidebar left, the chat right, and the page card between them under the toolbar", () => {
     const layout = computeLayout({ width: 1280, height: 800 }, both);
 

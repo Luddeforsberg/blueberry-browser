@@ -72,14 +72,14 @@ describe("safeFilename", () => {
 
 describe("uniquePath", () => {
   it("counts up past every taken name", () => {
-    const taken = new Set(["/d/a.pdf", "/d/a (1).pdf"]);
-    expect(uniquePath("/d", "b.pdf", (path) => taken.has(path))).toBe("/d/b.pdf");
-    expect(uniquePath("/d", "a.pdf", (path) => taken.has(path))).toBe("/d/a (2).pdf");
+    const taken = new Set([join("/d", "a.pdf"), join("/d", "a (1).pdf")]);
+    expect(uniquePath("/d", "b.pdf", (path) => taken.has(path))).toBe(join("/d", "b.pdf"));
+    expect(uniquePath("/d", "a.pdf", (path) => taken.has(path))).toBe(join("/d", "a (2).pdf"));
   });
 
   it("keeps compound and missing extensions whole", () => {
-    expect(uniquePath("/d", "a.tar.gz", (path) => path === "/d/a.tar.gz")).toBe("/d/a (1).tar.gz");
-    expect(uniquePath("/d", "a", (path) => path === "/d/a")).toBe("/d/a (1)");
+    expect(uniquePath("/d", "a.tar.gz", (path) => path === join("/d", "a.tar.gz"))).toBe(join("/d", "a (1).tar.gz"));
+    expect(uniquePath("/d", "a", (path) => path === join("/d", "a"))).toBe(join("/d", "a (1)"));
   });
 });
 
