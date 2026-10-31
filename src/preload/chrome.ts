@@ -101,6 +101,11 @@ const chromeAPI: ChromeAPI = {
     save: (id, draft) => invoke("mascots:save", id, draft),
     delete: (id) => invoke("mascots:delete", id),
   },
+  suggestions: {
+    list: () => invoke("suggestions:list"),
+    dismiss: (id) => invoke("suggestions:dismiss", id),
+    onUpdated: (callback) => subscribe("suggestions:updated", callback),
+  },
   downloads: {
     list: () => invoke("downloads:list"),
     act: (id, action) => invoke("downloads:act", id, action),

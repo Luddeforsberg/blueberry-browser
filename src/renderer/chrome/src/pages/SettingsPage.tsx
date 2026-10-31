@@ -116,7 +116,7 @@ export const SettingsPage: React.FC = () => {
                                         ]}
                                     />
                                 </SettingsRow>
-                                <SettingsRow id="setting-berry-sees" title="What Berry can see" description="Berry only reads a page when you ask, and only speaks up about work you started. Your history and memory stay on this device." />
+                                <SettingsRow id="setting-berry-sees" title="What Berry can see" description="Berry only reads a page when you ask, and only speaks up about work you started. Your history and memory stay on this device, apart from what Suggestions sends, if it's on." />
                             </>
                         )}
 
@@ -139,6 +139,17 @@ export const SettingsPage: React.FC = () => {
                                             { value: 'restore', label: 'Restore tabs' },
                                             { value: 'fresh', label: 'Start fresh' }
                                         ]}
+                                    />
+                                </SettingsRow>
+                                <SettingsRow
+                                    id="setting-suggestions"
+                                    title="Suggestions"
+                                    description="The new tab page offers to take over what you repeat. Finding it happens on this computer. To word the cards, site names, page titles, chat titles and counts go to the AI service, never page text or full addresses. Local addresses, banks, mail and addresses with tokens are left out. Off means nothing is sent."
+                                >
+                                    <Switch
+                                        labelledBy="setting-suggestions"
+                                        checked={settings.suggestions}
+                                        onChange={(suggestions) => updateSettings({ suggestions })}
                                     />
                                 </SettingsRow>
                                 <SettingsRow id="setting-pages" title="Pages Berry reads" description="Messages in the Berry panel include the open page's text and a screenshot, which go to the AI service to answer them." />

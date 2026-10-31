@@ -16,7 +16,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 ### What we reject
 
 - Humanoid companions, or a team you have to manage. The flock is birds you made yourself, and none appears until you ask.
-- Promo cards and upsells on the new tab. The idea cards there only link to real features.
+- Promo cards and upsells on the new tab. The idea cards there only link to real features, and suggestions only come from what the user really did.
 - Glass that makes text harder to read, or glass on web pages.
 - Beige neutrals and blue-tinted dark mode.
 - Bounce in the chrome, and decorative loops that run when no work is happening.
@@ -326,7 +326,7 @@ Berry belongs to real parts of the interface, so it only ever sits in the places
 
 ### When Berry may interrupt
 
-Berry only speaks about work the user started: a finished task, a routine result, or a needed approval. It does not offer unprompted suggestions, and it does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
+Berry only speaks about work the user started: a finished task, a routine result, or a needed approval. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear as cards on the new tab page, where the user is already choosing what to do next, and nothing about them moves, asks or waits. Berry does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
 
 | Level | Behaviour |
 |---|---|
@@ -357,9 +357,19 @@ Four short, skippable steps: meet Berry, choose layout and appearance, import fr
 
 ### New tab
 
-Berry, large, sits on the top edge of a 752px composer with its legs over it. Below rises the art blueberry, the page's one big moment: thousands of tiny berries spiral out of a sunken crown like seeds in a sunflower head, swelling in the light and shrinking in shadow, under heavy grain, with dust drifting off the edge so it has no hard outline. It is 1240px across at any window size, painted once and never moves. Up to three frosted cards sit on it showing real chats and routines, or two idea cards linking to real features if there are none, then recent pages in a frosted panel if there are any. When the sidebar is closed, links to Routines, a new chat and Settings sit under the composer. Faint, irregular trails of alternating bird footprints sit in the background behind the art blueberry, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
+Berry, large, sits on the top edge of a 752px composer with its legs over it. Below rises the art blueberry, the page's one big moment: thousands of tiny berries spiral out of a sunken crown like seeds in a sunflower head, swelling in the light and shrinking in shadow, under heavy grain, with dust drifting off the edge so it has no hard outline. It is 1240px across at any window size, painted once and never moves. Up to three frosted cards sit on it, showing suggestions if there are any, otherwise real chats and routines, or two idea cards linking to real features if there are none of those either, then recent pages in a frosted panel if there are any. When the sidebar is closed, links to Routines, a new chat and Settings sit under the composer. Faint, irregular trails of alternating bird footprints sit in the background behind the art blueberry, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
 
 `Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
+
+**Suggestions** are what Blueberry noticed you repeat, offered as work it can take over. The bar is three times: a site on three different days, at about the same time or weekday, two sites used together on three days, or three similar chat requests. Each card says plainly why it's there, and those words and numbers come from code, not from the model.
+
+- **Prompt:** puts a ready prompt in the composer with the cursor at the end. Enter sends it.
+- **Routine:** opens the routine form filled in with a name, instructions and a schedule that finishes 15 minutes before the user usually looks.
+- **Mascot:** opens the new-mascot form filled in with a look, name, instructions and limits, with the bird sitting on the card's top edge. It starts limited to the sites in the pattern, with only Go to pages switched on.
+
+A suggestion only ever fills something in for the user to confirm, so nothing runs, is saved or is sent until they act. Each card has a dismiss button, shown on hover or focus, and what's dismissed doesn't come back, along with anything else about the same sites or chats. Saving the form or sending the prompt also ends it. Card order is always prompt, routine, mascot.
+
+The page shows saved cards at once or what it would show without them, and never waits. New cards are written at most about once an hour and only when history has grown, by one call to the cheap model, which gets only site names, page titles, chat titles and counts. Local addresses, banks, mail, search engines and addresses with tokens are never counted, and a title from an address with a query isn't sent. A card that names a site outside its pattern is dropped. Settings has an off switch, under Data and privacy, which also says what is sent.
 
 ### Browsing
 
@@ -440,7 +450,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, and whether Blueberry restores tabs or starts fresh. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Downloads
 
@@ -508,7 +518,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 - Don't add a colour, weight, font or shadow that isn't in this document.
 - Don't add bounce to the chrome or loops without real work behind them. The exceptions are Berry's world on the new tab page, the legs of a sitting bird, and the preview on the Flock page.
 - Don't let Berry joke about permissions, payments, messages, data or failures.
-- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start.
+- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestion cards on the new tab page.
 - Don't read page content unless the user asked.
 - Don't send browsing data to third-party services for UI features such as favicons.
 - Don't make any feature depend on Berry being visible.

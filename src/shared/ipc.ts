@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, LibrarySnapshot, MascotDraft, RoutineDraft, RoutineRun } from "./library";
+import type { ChatThread, LibrarySnapshot, MascotDraft, RoutineDraft, RoutineRun, Suggestion } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -40,6 +40,8 @@ export interface Settings {
   onboarded: boolean;
   // Page zoom in percent, by site. Sites at 100% aren't listed.
   siteZoom: Record<string, number>;
+  // Whether the new tab page offers what it noticed you repeat. Off means no model call.
+  suggestions: boolean;
 }
 
 export type DownloadState = "progressing" | "paused" | "completed" | "cancelled" | "interrupted";
@@ -271,6 +273,8 @@ export interface InvokeChannels {
   "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft]; result: MascotSaveResult };
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
+  "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
+  "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
   "downloads:act": { region: "chrome"; args: [id: string, action: DownloadAction]; result: boolean };
   "downloads:choose-folder": { region: "chrome"; args: []; result: void };
@@ -303,6 +307,7 @@ export interface EventChannels {
   "chat:draft": string;
   "find:opened": null;
   "find:result": FindResult;
+  "suggestions:updated": Suggestion[];
   "downloads:updated": DownloadInfo[];
   "permissions:saved-updated": SavedSitePermission[];
   "permissions:prompt": PermissionPrompt | null;
@@ -404,6 +409,12 @@ export interface MascotsAPI {
   delete: (id: string) => Promise<boolean>;
 }
 
+export interface SuggestionsAPI {
+  list: () => Promise<Suggestion[]>;
+  dismiss: (id: string) => Promise<Suggestion[]>;
+  onUpdated: (callback: (suggestions: Suggestion[]) => void) => Unsubscribe;
+}
+
 export interface DownloadsAPI {
   list: () => Promise<DownloadInfo[]>;
   act: (id: string, action: DownloadAction) => Promise<boolean>;
@@ -432,6 +443,7 @@ export interface ChromeAPI {
   find: FindAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
+  suggestions: SuggestionsAPI;
   downloads: DownloadsAPI;
   permissions: PermissionsAPI;
 }

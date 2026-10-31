@@ -12,6 +12,8 @@ export interface RoutineFormValues {
     day: number
     // Who runs it. Null is Berry.
     mascotId: string | null
+    // The suggestion that filled this in, which goes away once it's saved.
+    suggestionId?: string
 }
 
 export type RoutinesView =
@@ -39,8 +41,8 @@ export const blankForm = (name = '', instructions = '', mascotId: string | null 
     }
 }
 
-export const formFor = ({ id, name, instructions, mascotId, scheduleSpec: schedule }: Routine): RoutineFormValues => {
-    const values: RoutineFormValues = { ...blankForm(name, instructions, mascotId), id, kind: schedule.kind }
+const withSchedule = (blank: RoutineFormValues, schedule: RoutineSchedule): RoutineFormValues => {
+    const values: RoutineFormValues = { ...blank, kind: schedule.kind }
     if (schedule.kind === 'once') {
         const at = new Date(schedule.at)
         return { ...values, date: dateValue(at), time: `${pad(at.getHours())}:${pad(at.getMinutes())}` }
@@ -49,6 +51,12 @@ export const formFor = ({ id, name, instructions, mascotId, scheduleSpec: schedu
     if (schedule.kind === 'monthly') return { ...values, time: schedule.time, day: schedule.day }
     return { ...values, time: schedule.time }
 }
+
+export const formFor = ({ id, name, instructions, mascotId, scheduleSpec }: Routine): RoutineFormValues =>
+    withSchedule({ ...blankForm(name, instructions, mascotId), id }, scheduleSpec)
+
+export const suggestedForm = ({ name, instructions, mascotId, schedule }: RoutineDraft, suggestionId: string): RoutineFormValues =>
+    withSchedule({ ...blankForm(name, instructions, mascotId ?? null), suggestionId }, schedule)
 
 export const toDraft = ({ name, instructions, kind, time, date, days, day, mascotId }: RoutineFormValues): RoutineDraft => {
     const schedule = (): RoutineSchedule => {

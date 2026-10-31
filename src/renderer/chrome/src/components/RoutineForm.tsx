@@ -43,8 +43,12 @@ export const RoutineForm: React.FC<{
         event.preventDefault()
         if (preview) return
         const result = await window.chromeAPI.routines.save(values.id, toDraft(values))
-        if (result.ok) onSaved(result.id)
-        else setError(result.error)
+        if (!result.ok) {
+            setError(result.error)
+            return
+        }
+        if (values.suggestionId) void window.chromeAPI.suggestions.dismiss(values.suggestionId)
+        onSaved(result.id)
     }
 
     const toggleDay = (day: number) =>

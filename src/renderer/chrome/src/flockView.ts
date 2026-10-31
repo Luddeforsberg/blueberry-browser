@@ -11,6 +11,8 @@ export interface MascotFormValues {
     onlySomeSites: boolean
     sitesText: string
     tools: MascotTool[]
+    // The suggestion that filled this in, which goes away once it's saved.
+    suggestionId?: string
 }
 
 export type FlockView = { page: 'list'; landed?: string } | { page: 'form'; values: MascotFormValues }
@@ -50,6 +52,12 @@ export const mascotForm = ({ id, name, look, instructions, sites, tools }: Masco
     onlySomeSites: sites.length > 0,
     sitesText: sites.join(', '),
     tools
+})
+
+export const suggestedMascot = (draft: MascotDraft, suggestionId: string): MascotFormValues => ({
+    ...mascotForm({ ...draft, id: '', deletedAt: null }),
+    id: null,
+    suggestionId
 })
 
 export const sitesFrom = ({ onlySomeSites, sitesText }: Pick<MascotFormValues, 'onlySomeSites' | 'sitesText'>): string[] =>

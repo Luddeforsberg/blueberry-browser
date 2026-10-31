@@ -141,6 +141,18 @@ export interface MascotProfile extends MascotDraft {
   deletedAt: number | null;
 }
 
+export type SuggestionKind = "prompt" | "routine" | "mascot";
+
+// The words of a suggestion, written once and saved. A suggestion only ever fills something in for the user to confirm.
+export type SuggestionWords = { id: string; title: string } & (
+  | { kind: "prompt"; prompt: string }
+  | { kind: "routine"; draft: RoutineDraft }
+  | { kind: "mascot"; draft: MascotDraft }
+);
+
+// With why it's there, worked out fresh from what's in the history now.
+export type Suggestion = SuggestionWords & { why: string };
+
 export interface LibrarySnapshot {
   pinned: PinnedSite[];
   bookmarks: Bookmark[];

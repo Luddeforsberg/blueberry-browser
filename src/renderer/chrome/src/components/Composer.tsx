@@ -40,7 +40,10 @@ export const Composer: React.FC<{
     }, [value])
 
     useEffect(() => {
-        if (focusKey) textareaRef.current?.focus()
+        const textarea = textareaRef.current
+        if (!focusKey || !textarea) return
+        textarea.focus()
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
     }, [focusKey])
 
     return (

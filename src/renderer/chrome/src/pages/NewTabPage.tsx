@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { ArrowRight, Bird, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
+import type { Suggestion } from '@shared/library'
 import { BerryDot } from '@common/components/Mascot'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -9,6 +10,9 @@ import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
+import { SuggestionCard } from '../components/SuggestionCard'
+import { setFlockView, suggestedMascot } from '../flockView'
+import { setRoutinesView, suggestedForm } from '../routinesView'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { cn } from '@common/lib/utils'
 
@@ -26,6 +30,9 @@ const timeOf = (visitedAt: number) =>
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [text, setText] = useState('')
     const [recent, setRecent] = useState<Visit[]>([])
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+    // A prompt put in the composer: moves the keyboard there, and goes away once it's been sent.
+    const [filled, setFilled] = useState<{ id: string; times: number } | null>(null)
     const browser = window.chromeAPI.browser
     const library = useLibrary()
     const { layout, theme } = useShell()
@@ -35,7 +42,30 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))
     }, [browser])
 
+    // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
+    useEffect(() => {
+        const { list, onUpdated } = window.chromeAPI.suggestions
+        void list().then(setSuggestions)
+        return onUpdated(setSuggestions)
+    }, [])
+
+    const takeUp = (suggestion: Suggestion) => {
+        if (suggestion.kind === 'prompt') {
+            setText(suggestion.prompt)
+            setFilled({ id: suggestion.id, times: (filled?.times ?? 0) + 1 })
+        } else if (suggestion.kind === 'routine') {
+            setRoutinesView({ page: 'form', values: suggestedForm(suggestion.draft, suggestion.id) })
+            void browser.openPage('routines')
+        } else {
+            setFlockView({ page: 'form', values: suggestedMascot(suggestion.draft, suggestion.id) })
+            void browser.openPage('flock')
+        }
+    }
+
+    const dismiss = (id: string) => void window.chromeAPI.suggestions.dismiss(id).then(setSuggestions)
+
     const askBerry = async (message: string) => {
+        if (filled) void window.chromeAPI.suggestions.dismiss(filled.id)
         const chat = await window.chromeAPI.chat.send(null, message, { seePage: false, mascotId: chosen.id })
         if (!chat) return
         await browser.openPage('chat', { param: chat.id, title: chat.title })
@@ -126,10 +156,15 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             label={`Search, enter a URL, or ask ${isBerry ? name : 'a question'}`}
                             placeholder={isBerry ? `Ask ${name} anything, or enter a URL…` : 'Ask anything, or enter a URL…'}
                             value={text}
-                            onChange={setText}
+                            onChange={(next) => {
+                                setText(next)
+                                // Emptied, it's no longer that prompt being sent.
+                                if (!next.trim()) setFilled(null)
+                            }}
                             onKeyDown={handleKeyDown}
                             spellCheck={false}
                             autoFocus
+                            focusKey={filled?.times}
                             canSend={text.trim().length > 0}
                             onSend={() => submit(false)}
                             mascot={chosen}
@@ -153,10 +188,26 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         </div>
                     )}
 
-                    <div className="relative mt-12 pt-[210px]">
+                    {/* Suggestions sit nearer the composer, so they're in view on an ordinary window. It stays where it is. */}
+                    <div className={cn("relative", suggestions.length > 0 ? "mt-6 pt-[110px]" : "mt-12 pt-[210px]")}>
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
 
-                        {work.length > 0 ? (
+                        {suggestions.length > 0 ? (
+                            <section aria-labelledby="suggestions-heading" className="relative">
+                                <h2 id="suggestions-heading" className="sr-only">Things you repeat</h2>
+                                <ul className="grid grid-cols-3 gap-3">
+                                    {suggestions.map((suggestion) => (
+                                        <SuggestionCard
+                                            key={suggestion.id}
+                                            suggestion={suggestion}
+                                            className={cardClass}
+                                            onUse={() => takeUp(suggestion)}
+                                            onDismiss={() => dismiss(suggestion.id)}
+                                        />
+                                    ))}
+                                </ul>
+                            </section>
+                        ) : work.length > 0 ? (
                             <section aria-labelledby="work-heading" className="relative">
                                 <h2 id="work-heading" className="sr-only">Your work</h2>
                                 <div className="grid grid-cols-3 gap-3">

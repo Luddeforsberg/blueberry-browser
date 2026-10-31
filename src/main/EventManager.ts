@@ -182,6 +182,8 @@ export class EventManager {
     this.handle("routines:mark-seen", () => routines.markSeen());
     this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
+    this.handle("suggestions:list", () => this.mainWindow.suggestions.list());
+    this.handle("suggestions:dismiss", (id) => this.mainWindow.suggestions.dismiss(id));
   }
 
   private handleDownloadEvents(): void {
