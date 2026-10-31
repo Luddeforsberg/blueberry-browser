@@ -1,4 +1,5 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { AIMessageChunk } from "@langchain/core/messages";
 import type { Interrupt } from "langchain";
 import * as dotenv from "dotenv";
 import { join } from "path";
@@ -26,6 +27,8 @@ export interface ReplyOptions {
   approve: (description: string) => Promise<boolean>;
   // Called as each tool starts, with what the chat should show. The result is called when it ends.
   onStep: (text: string) => () => void;
+  // Told the tokens each model call used, as they're reported.
+  onUsage?: (tokens: number) => void;
 }
 
 export type StreamReply = (
@@ -124,7 +127,7 @@ const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseC
 export async function* streamReply(
   messages: ReplyMessage[],
   signal: AbortSignal,
-  { tools, actionApproval, approve, onStep }: ReplyOptions,
+  { tools, actionApproval, approve, onStep, onUsage }: ReplyOptions,
   model?: BaseChatModel
 ): AsyncGenerator<string> {
   const [
@@ -199,6 +202,8 @@ export async function* streamReply(
         const [chunk] = part[1];
         // Tool results come through this stream too, and they're for the model.
         if (chunk.type === "ai" && chunk.text) yield chunk.text;
+        const usage = chunk.type === "ai" ? (chunk as AIMessageChunk).usage_metadata : undefined;
+        if (usage) onUsage?.(usage.total_tokens);
       } else {
         // LangGraph adds this key to its updates, which the agent's types don't show.
         const { __interrupt__: interrupts = [] } = part[1] as unknown as { __interrupt__?: Interrupt[] };

@@ -8,6 +8,9 @@ import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
 import { Chats } from "./Chats";
+import type { RoutineStore } from "./RoutineStore";
+import { Routines } from "./Routines";
+import { confirmDeleteRoutine, notifyRoutine } from "./routineNotices";
 import { generateTitle, streamReply } from "./agent";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
@@ -75,11 +78,13 @@ export class Window {
   private readonly history = new History();
   private readonly library = new MockLibrary();
   readonly chats: Chats;
+  readonly routines: Routines;
 
   constructor(
     private readonly settingsStore: SettingsStore,
     private readonly chatStore: ChatStore,
-    private readonly bookmarkStore: BookmarkStore
+    private readonly bookmarkStore: BookmarkStore,
+    routineStore: RoutineStore
   ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
 
@@ -143,8 +148,22 @@ export class Window {
       },
     });
 
+    this.routines = new Routines(routineStore, this.chats, {
+      onChanged: () => this.broadcast("library:updated", this.librarySnapshot),
+      onAttention: (routine, kind) => {
+        // The Routines row and the toolbar say so anyway, and that holds until the user is free.
+        if (this.userIsBusyOrHere) return;
+        notifyRoutine(routine.name, kind, () => {
+          this.show();
+          this.openPage("routines");
+        });
+      },
+      closeTab: (tabId) => this.closeTab(tabId, false),
+    });
+
     this.createTab();
     this.updateAllBounds();
+    this.routines.start();
 
     this._baseWindow.on("resize", () => this.updateAllBounds());
     this._baseWindow.on("blur", () => this.hideFloatingSidebar());
@@ -154,6 +173,7 @@ export class Window {
 
     this._baseWindow.on("closed", () => {
       nativeTheme.off("updated", onThemeUpdated);
+      this.routines.shutdown();
       this.chats.stopAll();
       this.settingsStore.flush();
       this.tabsMap.forEach((tab) => tab.destroy());
@@ -168,7 +188,10 @@ export class Window {
   private openLinksInTabs(webContents: WebContents): void {
     webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url)) {
-        this.createTab(url);
+        // A page behind the current one, perhaps one Berry is using, doesn't get to come to the front.
+        const opener = this.allTabs.find((tab) => tab.webContents === webContents);
+        if (opener && opener.id !== this.activeTabId) this.chats.notePopup(opener.id, this.createBackgroundTab(url).id);
+        else this.createTab(url);
       }
       return { action: "deny" };
     });
@@ -211,7 +234,12 @@ export class Window {
   }
 
   get librarySnapshot(): LibrarySnapshot {
-    return { ...this.library.snapshot(), bookmarks: this.bookmarkStore.get(), chats: this.chatStore.summaries() };
+    return {
+      ...this.library.snapshot(),
+      bookmarks: this.bookmarkStore.get(),
+      chats: this.chatStore.summaries(),
+      routines: this.routines.list(),
+    };
   }
 
   // The active web tab. Internal pages have no page for Berry to read.
@@ -291,6 +319,8 @@ export class Window {
 
   private createBackgroundTab(url: string): Tab {
     const tab = this.createWebTab(`tab-${++this.tabCounter}`, url);
+    // Berry never makes a sound. Going to the tab turns it back on.
+    tab.webContents.setAudioMuted(true);
     this.tabsMap.set(tab.id, tab);
     this.notifyTabs();
     return tab;
@@ -405,6 +435,7 @@ export class Window {
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
     this.activeTabId = tabId;
     this.chats.releaseTab(tabId);
+    if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
     this.syncTabViews();
     this.notifyTabs();
     this.updateAllBounds();
@@ -524,6 +555,18 @@ export class Window {
     this.closedTabs = this.closedTabs.filter((tab) => tab.page !== "chat" || tab.pageParam !== chatId);
     tabs.forEach((tab) => this.closeTab(tab.id, false));
     sendToRenderer(this.chrome.view.webContents, "chat:deleted", chatId);
+  }
+
+  // In the app already, or somewhere a notification would interrupt: fullscreen, or anything playing sound.
+  private get userIsBusyOrHere(): boolean {
+    const window = this._baseWindow;
+    return window.isFocused() || window.isFullScreen() || this.allTabs.some((tab) => tab.webContents.isCurrentlyAudible());
+  }
+
+  async confirmDeleteRoutine(id: string): Promise<boolean> {
+    const routine = this.routines.list().find((candidate) => candidate.id === id);
+    if (!routine || !(await confirmDeleteRoutine(this._baseWindow, routine.name))) return false;
+    return this.routines.delete(id);
   }
 
   toggleBookmark(): void {

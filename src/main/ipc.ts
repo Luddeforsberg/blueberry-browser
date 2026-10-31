@@ -38,13 +38,20 @@ export const CHANNEL_REGIONS: {
   "settings:update": ["chrome"],
   "chat:send": ["chrome"],
   "chat:stop": ["chrome"],
-  "chat:decide": ["chrome"],
+  "chat:decide": BOTH,
   "chat:rename": BOTH,
   "chat:menu": BOTH,
   "page:text": ["chrome"],
   "chat:page-access": ["chrome"],
   "chat:set-page-access": ["chrome"],
   "berry:context-menu": ["chrome"],
+  "routines:save": ["chrome"],
+  "routines:set-paused": ["chrome"],
+  "routines:delete": ["chrome"],
+  "routines:run-now": ["chrome"],
+  "routines:stop": ["chrome"],
+  "routines:runs": ["chrome"],
+  "routines:mark-seen": ["chrome"],
 };
 
 export interface ChromeEndpoint {

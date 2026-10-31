@@ -72,6 +72,118 @@ beforeEach(() => {
 });
 
 describe("Chats", () => {
+  describe("runTask", () => {
+    it("runs in its own tabs, reaches no others, and saves no chat", async () => {
+      const own = { ...tab(), id: "tab-own", settled: async () => {} } as unknown as Tab;
+      const users = { ...tab(), id: "tab-user", url: "https://user.example/" } as unknown as Tab;
+      let toolNames: string[] = [];
+      let listed = "";
+      const stream: StreamReply = async function* (_, __, { tools, onUsage }) {
+        toolNames = tools.map((tool) => tool.name);
+        await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
+        listed = await tools.find((tool) => tool.name === "list_tabs")!.run({});
+        onUsage?.(120);
+        onUsage?.(30);
+        yield "report";
+      };
+      const store = new ChatStore(":memory:");
+      const chats = new Chats(store, stream, async () => null, {
+        activeTab: () => users,
+        allTabs: () => [users, own],
+        openTab: () => users,
+        openBackgroundTab: () => own,
+        actionApproval: () => "risky",
+      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+
+      const result = await chats.runTask("run-1", "Look", () => {});
+
+      expect(toolNames).toContain("open_tab");
+      expect(listed).toContain("tab-own");
+      expect(listed).not.toContain("tab-user");
+      expect(result).toMatchObject({ text: "report", error: null, stopped: false, tokens: 150, tabIds: ["tab-own"] });
+      expect(store.summaries()).toEqual([]);
+    });
+
+    it("gives back only the tabs still its own", async () => {
+      const own = { ...tab(), id: "tab-own", settled: async () => {} } as unknown as Tab;
+      const stream: StreamReply = async function* (_, __, { tools }) {
+        await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
+        chats.releaseTab("tab-own");
+        yield "report";
+      };
+      const { chats } = setup(stream, tab(), async () => null, () => own);
+
+      expect((await chats.runTask("run-1", "Look", () => {})).tabIds).toEqual([]);
+    });
+
+    it("clears up popups from its tabs, without being able to reach them", async () => {
+      const own = { ...tab(), id: "tab-own", settled: async () => {} } as unknown as Tab;
+      const popup = { ...tab(), id: "tab-popup" } as unknown as Tab;
+      const gone = { ...tab(), id: "tab-gone" } as unknown as Tab;
+      let listed = "";
+      const stream: StreamReply = async function* (_, __, { tools }) {
+        await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
+        chats.notePopup("tab-own", "tab-popup");
+        chats.notePopup("tab-popup", "tab-gone");
+        chats.notePopup("tab-user", "tab-unrelated");
+        chats.releaseTab("tab-gone");
+        listed = await tools.find((tool) => tool.name === "list_tabs")!.run({});
+        yield "report";
+      };
+      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
+        activeTab: () => null,
+        allTabs: () => [own, popup, gone],
+        openTab: () => own,
+        openBackgroundTab: () => own,
+        actionApproval: () => "risky",
+      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+
+      const { tabIds } = await chats.runTask("run-1", "Look", () => {});
+
+      expect(listed).toContain("tab-own");
+      expect(listed).not.toContain("tab-popup");
+      expect(tabIds).toEqual(["tab-own", "tab-popup"]);
+    });
+
+    it("waits for an approval by its own id, and doesn't act if stopped first", async () => {
+      const acted: string[] = [];
+      const stream: StreamReply = async function* (_, __, { approve }) {
+        if (await approve("Delete it")) acted.push("first");
+        if (await approve("Pay for it")) acted.push("second");
+        yield "never reached";
+      };
+      const { chats } = setup(stream);
+      const seen: Array<string | null> = [];
+
+      const ended = chats.runTask("run-1", "Look", ({ approval }) => {
+        seen.push(approval?.text ?? null);
+        if (approval?.text === "Delete it") chats.decide("run-1", approval.id, true);
+        if (approval?.text === "Pay for it") chats.stop("run-1");
+      });
+      const result = await ended;
+
+      expect(seen).toEqual(["Delete it", null, "Pay for it"]);
+      expect(acted).toEqual(["first"]);
+      expect(result).toMatchObject({ stopped: true, error: null, text: "" });
+      expect(chats.decide("run-1", "any", true)).toBe(false);
+    });
+
+    it("reports a step limit in words that fit a routine, and keeps what it wrote", async () => {
+      const limit = Object.assign(new Error("limit"), { name: "ModelCallLimitMiddlewareError" });
+      const stream: StreamReply = async function* () {
+        yield "so far";
+        throw limit;
+      };
+      const { chats } = setup(stream);
+
+      expect(await chats.runTask("run-1", "Look", () => {})).toMatchObject({
+        text: "so far",
+        error: "This took too many steps, so it stopped here.",
+        stopped: false,
+      });
+    });
+  });
+
   it("streams a reply and saves it when it ends", async () => {
     const { chats, chunks, replyEnded, listChanges } = setup(replying("one ", "two"));
 

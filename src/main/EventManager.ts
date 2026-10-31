@@ -18,6 +18,7 @@ export class EventManager {
     this.handleLayoutEvents();
     this.handleThemeEvents();
     this.handleChatEvents();
+    this.handleRoutineEvents();
   }
 
   private get endpoints(): Record<ChromeRegion, ChromeEndpoint> {
@@ -157,6 +158,17 @@ export class EventManager {
         return null;
       }
     });
+  }
+
+  private handleRoutineEvents(): void {
+    const { routines } = this.mainWindow;
+    this.handle("routines:save", (id, draft) => routines.save(id, draft));
+    this.handle("routines:set-paused", (id, paused) => routines.setPaused(id, paused));
+    this.handle("routines:delete", (id) => this.mainWindow.confirmDeleteRoutine(id));
+    this.handle("routines:run-now", (id) => routines.runNow(id));
+    this.handle("routines:stop", (runId) => routines.stop(runId));
+    this.handle("routines:runs", (id) => routines.runs(id));
+    this.handle("routines:mark-seen", () => routines.markSeen());
   }
 
   public cleanup(): void {

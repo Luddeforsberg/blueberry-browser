@@ -4,6 +4,8 @@ import { useChatThread } from '../contexts/ChatContext'
 import { AssistantMessage, ChatApprovalCard, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
 import { BerryHero, useAssistantName } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
+import { Button } from '@common/components/Button'
+import { blankForm, setRoutinesView } from '../routinesView'
 
 // A full page for talking to Berry about anything, not about a web page.
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
@@ -25,6 +27,14 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             await window.chromeAPI.browser.openPage('chat', { param: chat.id, title: chat.title })
             await window.chromeAPI.browser.closeTab(tab.id)
         }
+    }
+
+    // Only what the user asked for, which they can change before saving it.
+    const saveAsRoutine = () => {
+        if (!thread) return
+        const asked = thread.messages.filter((message) => message.role === 'user').map((message) => message.content)
+        setRoutinesView({ page: 'form', values: blankForm(thread.title, asked.join('\n\n')) })
+        void window.chromeAPI.browser.openPage('routines')
     }
 
     const empty = !thread || thread.messages.length === 0
@@ -73,6 +83,13 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     )}
                     {chatId && thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} />}
                     {thread.error && <ChatError message={thread.error} />}
+                    {!running && thread.messages.at(-1)?.role === 'assistant' && (
+                        <div>
+                            <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>
+                                Save as routine
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
 

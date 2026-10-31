@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, LibrarySnapshot } from "./library";
+import type { ChatThread, LibrarySnapshot, RoutineDraft, RoutineRun } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own.
@@ -102,6 +102,8 @@ export interface ChatChunk {
   content: string;
 }
 
+export type RoutineSaveResult = { ok: true; id: string } | { ok: false; error: string };
+
 // Renderer asks, main answers. `region` names the views main accepts the call from.
 export interface InvokeChannels {
   "tabs:list": { region: "chrome" | "overlay"; args: []; result: TabInfo[] };
@@ -144,7 +146,12 @@ export interface InvokeChannels {
     result: ChatThread | null;
   };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
-  "chat:decide": { region: "chrome"; args: [chatId: string, approvalId: string, allow: boolean]; result: boolean };
+  // A routine's run answers its approvals here too, under the run's id.
+  "chat:decide": {
+    region: "chrome" | "overlay";
+    args: [chatId: string, approvalId: string, allow: boolean];
+    result: boolean;
+  };
   "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
   // The native menu for a chat in the sidebar. Delete happens in main, so only Rename comes back.
   "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string]; result: "rename" | null };
@@ -152,6 +159,14 @@ export interface InvokeChannels {
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
   "berry:context-menu": { region: "chrome"; args: []; result: void };
+  "routines:save": { region: "chrome"; args: [id: string | null, draft: RoutineDraft]; result: RoutineSaveResult };
+  "routines:set-paused": { region: "chrome"; args: [id: string, paused: boolean]; result: boolean };
+  // Asks first, in main.
+  "routines:delete": { region: "chrome"; args: [id: string]; result: boolean };
+  "routines:run-now": { region: "chrome"; args: [id: string]; result: boolean };
+  "routines:stop": { region: "chrome"; args: [runId: string]; result: boolean };
+  "routines:runs": { region: "chrome"; args: [id: string]; result: RoutineRun[] };
+  "routines:mark-seen": { region: "chrome"; args: []; result: void };
 }
 
 export type InvokeChannel = keyof InvokeChannels;
@@ -251,6 +266,16 @@ export interface FindAPI {
   onResult: (callback: (result: FindResult) => void) => Unsubscribe;
 }
 
+export interface RoutinesAPI {
+  save: (id: string | null, draft: RoutineDraft) => Promise<RoutineSaveResult>;
+  setPaused: (id: string, paused: boolean) => Promise<boolean>;
+  delete: (id: string) => Promise<boolean>;
+  runNow: (id: string) => Promise<boolean>;
+  stop: (runId: string) => Promise<boolean>;
+  getRuns: (id: string) => Promise<RoutineRun[]>;
+  markSeen: () => Promise<void>;
+}
+
 export interface ChromeAPI {
   browser: BrowserAPI;
   layout: LayoutAPI;
@@ -259,4 +284,5 @@ export interface ChromeAPI {
   library: LibraryAPI;
   chat: ChatAPI;
   find: FindAPI;
+  routines: RoutinesAPI;
 }

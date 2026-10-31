@@ -6,6 +6,7 @@ import { useShell } from '../contexts/ShellContext'
 import { AddressBar } from './AddressBar'
 import { Favicon, siteIcon } from './Favicon'
 import { ToolBarButton } from './ToolBarButton'
+import { RoutineNotice } from './RoutineNotice'
 
 // Pinned sites and bookmarks, one row under the address bar. In the vertical layout they're in the sidebar.
 const BookmarksBar: React.FC = () => {
@@ -77,6 +78,8 @@ export const Toolbar: React.FC = () => {
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
                 )}
+                {/* The sidebar says this when it's open. */}
+                {(!vertical || !layout.sidebarOpen) && <RoutineNotice />}
 
                 <ToolBarButton
                     label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}

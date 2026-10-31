@@ -22,7 +22,7 @@ const Row: React.FC<{ id: string; title: string; description?: string; children?
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
     risky: 'Berry asks before anything that could delete, send, buy or change text. Opening pages and searching happen without asking.',
     always: 'Berry asks before every click, every typed word and every new page.',
-    never: "Berry doesn't ask, so it can delete, send or buy without checking with you, including if a page tricks it. Only use this if you're watching."
+    never: "Berry doesn't ask, so it can delete, send or buy without checking with you, including if a page tricks it. That includes routines, which run when you aren't watching."
 }
 
 const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Data and privacy', 'Account'] as const
