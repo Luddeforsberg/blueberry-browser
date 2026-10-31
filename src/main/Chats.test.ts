@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
-import type { ReplyMessage, StreamReply } from "./agent";
+import type { GenerateTitle, ReplyMessage, StreamReply } from "./agent";
 import type { Tab } from "./Tab";
 import type { ChatThread } from "../shared/library";
 
@@ -21,13 +21,17 @@ const tab = (overrides: Partial<Record<"screenshot" | "getTabText", () => Promis
   }) as unknown as Tab;
 
 // Waits for the reply to end, which is the last thing a run reports.
-const setup = (streamReply: StreamReply, activeTab: Tab | null = tab()) => {
+const setup = (
+  streamReply: StreamReply,
+  activeTab: Tab | null = tab(),
+  generateTitle: GenerateTitle = async () => null
+) => {
   const store = new ChatStore(":memory:");
   const threads: ChatThread[] = [];
   const chunks: string[] = [];
   let listChanges = 0;
   let onEnd = () => {};
-  const chats = new Chats(store, streamReply, () => activeTab, {
+  const chats = new Chats(store, streamReply, generateTitle, () => activeTab, {
     onChunk: (_, content) => chunks.push(content),
     onThread: (thread) => {
       threads.push(thread);
@@ -246,5 +250,145 @@ describe("Chats", () => {
     finishers.forEach((finish) => finish());
 
     await vi.waitFor(() => expect(threads.filter((thread) => thread.partial === null)).toHaveLength(2));
+  });
+
+  describe("titles", () => {
+    const turn = async (context: ReturnType<typeof setup>, chatId: string | null, text: string) => {
+      const ended = context.replyEnded();
+      const thread = send(context.chats, chatId, text, false)!;
+      await ended;
+      // The title is asked for after the reply ends.
+      await new Promise((resolve) => setTimeout(resolve));
+      return thread.id;
+    };
+
+    it("keeps the first message until the model finds a topic, then asks no more", async () => {
+      const generate = vi.fn<GenerateTitle>(async () => null);
+      const context = setup(replying("ok"), null, generate);
+
+      const id = await turn(context, null, "hey");
+      expect(context.chats.thread(id)?.title).toBe("hey");
+
+      generate.mockResolvedValue("Trip to Porto");
+      await turn(context, id, "plan a trip");
+      expect(context.chats.thread(id)?.title).toBe("Trip to Porto");
+      expect(context.threads.at(-1)?.title).toBe("Trip to Porto");
+
+      await turn(context, id, "and food");
+      expect(generate).toHaveBeenCalledTimes(2);
+    });
+
+    it("gives up after five messages with no topic", async () => {
+      const generate = vi.fn<GenerateTitle>(async () => null);
+      const context = setup(replying("ok"), null, generate);
+
+      const id = await turn(context, null, "1");
+      for (const text of ["2", "3", "4", "5", "6"]) await turn(context, id, text);
+
+      expect(generate).toHaveBeenCalledTimes(5);
+    });
+
+    it("doesn't ask when the reply failed or the user named the chat", async () => {
+      const generate = vi.fn<GenerateTitle>(async () => "Generated");
+      const failing = setup(
+        () => {
+          throw new Error("boom");
+        },
+        null,
+        generate
+      );
+      await turn(failing, null, "first");
+      expect(generate).not.toHaveBeenCalled();
+
+      const named = setup(replying("ok"), null, generate);
+      const ended = named.replyEnded();
+      const { id } = send(named.chats, null, "first", false)!;
+      named.chats.rename(id, "Mine");
+      await ended;
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(generate).not.toHaveBeenCalled();
+      expect(named.chats.thread(id)?.title).toBe("Mine");
+    });
+
+    it("keeps the user's name if they rename while a title is being generated", async () => {
+      let finish: (title: string) => void = () => {};
+      const generate: GenerateTitle = () => new Promise((resolve) => (finish = resolve));
+      const context = setup(replying("ok"), null, generate);
+
+      const id = await turn(context, null, "first");
+      context.chats.rename(id, "Mine");
+      finish("Generated");
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(context.chats.thread(id)?.title).toBe("Mine");
+    });
+
+    it("survives a failed title", async () => {
+      const context = setup(replying("ok"), null, async () => {
+        throw new Error("no such model");
+      });
+
+      const id = await turn(context, null, "first");
+
+      expect(context.chats.thread(id)).toMatchObject({ title: "first", error: null });
+    });
+  });
+
+  describe("rename", () => {
+    it("trims the name, and rejects an empty name or unknown chat", async () => {
+      const { chats, replyEnded } = setup(replying("ok"));
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      expect(chats.rename(id, "   ")).toBe(false);
+      expect(chats.thread(id)?.title).toBe("first");
+      expect(chats.rename("missing", "Name")).toBe(false);
+      expect(chats.rename(id, "  a  ")).toBe(true);
+      expect(chats.thread(id)?.title).toBe("a");
+    });
+
+    it("keeps names to 100 characters", async () => {
+      const { chats, replyEnded } = setup(replying("ok"));
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      chats.rename(id, "x".repeat(100));
+      expect(chats.thread(id)?.title).toHaveLength(100);
+      chats.rename(id, "y".repeat(101));
+      expect(chats.thread(id)?.title).toBe("y".repeat(100));
+    });
+  });
+
+  describe("delete", () => {
+    it("removes the chat and its messages", async () => {
+      const { chats, store, replyEnded } = setup(replying("ok"));
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      expect(chats.delete(id)).toBe(true);
+      expect(chats.thread(id)).toBeNull();
+      expect(store.summaries()).toEqual([]);
+      expect(chats.delete(id)).toBe(false);
+    });
+
+    it("stops a running reply without saving it or crashing", async () => {
+      const abortable: StreamReply = async function* (_, signal) {
+        yield "partial";
+        await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+      };
+      const { chats, chunks, threads, store } = setup(abortable);
+      const { id } = send(chats, null, "first")!;
+      await vi.waitFor(() => expect(chunks).toEqual(["partial"]));
+      const seen = threads.length;
+
+      expect(chats.delete(id)).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(store.summaries()).toEqual([]);
+      expect(threads).toHaveLength(seen);
+    });
   });
 });

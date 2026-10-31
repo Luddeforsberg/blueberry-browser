@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { Star } from 'lucide-react'
+import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
@@ -7,6 +9,7 @@ import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } 
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
+import { ChatRow } from '../components/Sidebar'
 import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
@@ -93,6 +96,13 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
+                <Section title="Chat in the sidebar">
+                    <ul className="max-w-xs">
+                        <ChatRow chat={{ id: 'gallery-1', title: 'Long weekend in Lisbon', updatedAt: Date.now() }} selected={false} onOpen={() => undefined} />
+                        <ChatRow chat={{ id: 'gallery-2', title: 'The open chat', updatedAt: Date.now() }} selected onOpen={() => undefined} />
+                    </ul>
+                </Section>
+
                 <Section title="Approval card">
                     <div className="max-w-sm">
                         <ApprovalCard
@@ -106,6 +116,14 @@ export const GalleryPage: React.FC = () => {
                             onReview={() => undefined}
                             onCancel={() => undefined}
                         />
+                    </div>
+                </Section>
+
+                <Section title="Bookmark button">
+                    <div className="flex items-center gap-3">
+                        <ToolBarButton Icon={Star} label="Bookmark this page" onClick={() => undefined} />
+                        <ToolBarButton Icon={Star} label="Remove bookmark" toggled onClick={() => undefined} />
+                        <ToolBarButton Icon={Star} label="Bookmark this page (unavailable on internal pages)" active={false} />
                     </div>
                 </Section>
 

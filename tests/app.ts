@@ -26,6 +26,7 @@ export async function launchApp(
     ...process.env,
     LLM_PROVIDER: "",
     LLM_MODEL: "",
+    LLM_TITLE_MODEL: "",
     OPENAI_API_KEY: "",
     ANTHROPIC_API_KEY: "",
     ...modelEnv,

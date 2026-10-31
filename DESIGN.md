@@ -213,6 +213,7 @@ The chrome is crisp: quick to start, gently settling, with no bounce.
 - **Web pages:** never animate page content, only the frame around it.
 - **Bounce and squash:** reserved for Berry.
 - **Loops:** only while real work is happening, stopping as soon as it ends.
+- **Thinking:** a soft shimmer sweeps across the word while a reply is on its way. Reduced motion leaves the word still.
 - **Moving tab views:** if animating tab view bounds is not smooth, animate the chrome and let the page snap into place at the end.
 - **Reduced motion:** follow `systemPreferences.getAnimationSettings().prefersReducedMotion` and the CSS media query. Movement becomes short fades or instant changes.
 
@@ -350,6 +351,8 @@ A full page for talking to Berry about anything, not about a particular web page
 
 - A centred conversation and composer of 752px, with the composer fixed at the bottom. A new chat with no messages looks like the new tab page instead.
 - Messages and the composer are the same components as the chat panel, so the two sizes look like one chat.
+- A chat is named automatically once it has a topic, and until then shows its first message. A name the user chose is never replaced.
+- In the sidebar, hovering or focusing a chat swaps its age for a button with Rename and Delete, also on right-click. Rename edits in place, and Delete asks first because it can't be undone.
 - Berry's working state says what it is doing and offers to show the work in a tab. Steps, once the agent reports them, form a trail: a footprint for each finished step and the berry on the current one.
 
 ### Chat panel

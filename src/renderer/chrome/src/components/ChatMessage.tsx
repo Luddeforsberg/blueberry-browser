@@ -114,7 +114,7 @@ export const StepTrail: React.FC<{ steps: Step[] }> = ({ steps }) => (
 export const ThinkingMessage: React.FC = () => (
     <div role="status" className="flex items-center gap-2.5 text-14 text-muted-foreground animate-fade-in">
         <Berry mood="thinking" size={22} />
-        Thinking
+        <span className="bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer">Thinking</span>
     </div>
 )
 

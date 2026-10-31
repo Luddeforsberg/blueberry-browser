@@ -15,7 +15,7 @@ export class InternalTab {
   readonly isLoading = false;
   readonly canGoBack = false;
   readonly canGoForward = false;
-  readonly title: string;
+  title: string;
 
   constructor(
     readonly id: string,

@@ -22,6 +22,8 @@ const MIGRATIONS = [
      content TEXT NOT NULL
    );
    CREATE INDEX messages_by_chat ON messages(chat_id, id);`,
+  // A settled title is final: the user chose it, or it was generated. Chats from before this keep theirs.
+  `ALTER TABLE chats ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 1;`,
 ];
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
@@ -65,9 +67,33 @@ export class ChatStore {
   createChat(title: string): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO chats (id, title, updated_at) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO chats (id, title, updated_at, title_settled) VALUES (?, ?, ?, 0)")
       .run(id, title, Date.now());
     return id;
+  }
+
+  needsTitle(id: string): boolean {
+    return this.db.prepare("SELECT 1 FROM chats WHERE id = ? AND title_settled = 0").get(id) !== undefined;
+  }
+
+  // The user's choice, which a generated title never replaces.
+  renameChat(id: string, title: string): boolean {
+    const { changes } = this.db
+      .prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ?")
+      .run(title, id);
+    return changes > 0;
+  }
+
+  // False if the chat was renamed or deleted while the title was being generated.
+  setGeneratedTitle(id: string, title: string): boolean {
+    const { changes } = this.db
+      .prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ? AND title_settled = 0")
+      .run(title, id);
+    return changes > 0;
+  }
+
+  deleteChat(id: string): boolean {
+    return this.db.prepare("DELETE FROM chats WHERE id = ?").run(id).changes > 0;
   }
 
   addMessage(chatId: string, message: ChatThreadMessage): void {

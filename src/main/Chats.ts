@@ -1,10 +1,19 @@
-import { ModelConfigError, type ReplyContent, type ReplyMessage, type StreamReply } from "./agent";
+import {
+  ModelConfigError,
+  type GenerateTitle,
+  type ReplyContent,
+  type ReplyMessage,
+  type StreamReply,
+} from "./agent";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { ChatThread } from "../shared/library";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
+const MAX_RENAME_LENGTH = 100;
+// A chat with no topic by then probably won't get one, so stop paying to ask.
+const MAX_TITLE_ATTEMPTS = 5;
 
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
@@ -60,6 +69,7 @@ export class Chats {
   constructor(
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
+    private readonly generateTitle: GenerateTitle,
     private readonly activeTab: () => Tab | null,
     private readonly events: ChatEvents
   ) {}
@@ -91,10 +101,30 @@ export class Chats {
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
-    const thread = this.thread(id);
+    this.notify(id);
+    return this.thread(id);
+  }
+
+  private notify(chatId: string): void {
+    const thread = this.thread(chatId);
     if (thread) this.events.onThread(thread);
     this.events.onListChanged();
-    return thread;
+  }
+
+  rename(chatId: string, title: string): boolean {
+    const name = title.trim().slice(0, MAX_RENAME_LENGTH);
+    if (!name || !this.store.renameChat(chatId, name)) return false;
+    this.notify(chatId);
+    return true;
+  }
+
+  delete(chatId: string): boolean {
+    this.stop(chatId);
+    this.runs.delete(chatId);
+    this.errors.delete(chatId);
+    if (!this.store.deleteChat(chatId)) return false;
+    this.events.onListChanged();
+    return true;
   }
 
   stop(chatId: string): void {
@@ -121,11 +151,25 @@ export class Chats {
       }
     }
 
+    // Deleted while replying, so there's nowhere to save it.
+    if (this.runs.get(chatId) !== run) return;
     this.runs.delete(chatId);
     if (run.partial) this.store.addMessage(chatId, { role: "assistant", content: run.partial });
-    const thread = this.thread(chatId);
-    if (thread) this.events.onThread(thread);
-    this.events.onListChanged();
+    this.notify(chatId);
+    if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
+  }
+
+  // Never rejects: a chat keeps its first message as its title until this works.
+  private async nameChat(chatId: string): Promise<void> {
+    const chat = this.store.chat(chatId);
+    if (!chat || !this.store.needsTitle(chatId)) return;
+    if (chat.messages.filter((message) => message.role === "user").length > MAX_TITLE_ATTEMPTS) return;
+    try {
+      const title = await this.generateTitle(chat.messages);
+      if (title && this.store.setGeneratedTitle(chatId, title)) this.notify(chatId);
+    } catch (error) {
+      console.error("Failed to generate a chat title:", error);
+    }
   }
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.

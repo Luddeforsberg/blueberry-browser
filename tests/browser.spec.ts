@@ -267,7 +267,7 @@ test("chats are still there after a restart", async () => {
 
   app = await launchApp(profile, { modelEnv: model.env });
   chrome = await findView(app, "view=chrome");
-  await chrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: "Remember this" }).click();
+  await chatInSidebar("Remember this").click();
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
 });
 
@@ -280,6 +280,143 @@ test("a missing API key says what to do", async () => {
   await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
 
   await expect(chrome.getByRole("alert")).toContainText("OPENAI_API_KEY");
+});
+
+// A row's name starts with the chat's title, and a chat that isn't open adds its age.
+const chatInSidebar = (title: string) =>
+  chrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: new RegExp(`^${title}`) });
+
+const startChat = async (text: string) => {
+  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  await input.fill(text);
+  await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
+};
+
+// Native menus can't be driven, so popup keeps the menu to click its items by label.
+const captureMenus = () =>
+  app.evaluate(({ Menu }) => {
+    Menu.prototype.popup = function () {
+      Menu.setApplicationMenu(this);
+    };
+    Menu.setApplicationMenu(null);
+  });
+
+const menuLabels = () =>
+  app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label));
+
+const clickMenuItem = (label: string) =>
+  app.evaluate(({ Menu, BaseWindow, webContents }, label) => {
+    const item = Menu.getApplicationMenu()?.items.find((candidate) => candidate.label === label);
+    item?.click(undefined, BaseWindow.getAllWindows()[0], webContents.getAllWebContents()[0]);
+  }, label);
+
+test("a chat is named once it has a topic, and keeps its first message until then", async () => {
+  await startChat("hey");
+  await expect.poll(() => model.titleRequests.length).toBe(1);
+  await expect(chatInSidebar("hey")).toBeVisible();
+
+  model.titleWith("Weekend in Porto");
+  const message = chrome.getByRole("textbox", { name: "Message" });
+  await message.fill("Help me plan a weekend in Porto");
+  await message.press("Enter");
+
+  await expect(chatInSidebar("Weekend in Porto")).toBeVisible();
+  await expect.poll(async () => (await activeTab()).title).toBe("Weekend in Porto");
+  expect(JSON.stringify(model.titleRequests.at(-1)?.messages)).toContain("plan a weekend in Porto");
+
+  // Named for good, so later replies don't pay for another title.
+  await message.fill("And the food?");
+  await message.press("Enter");
+  await expect.poll(() => model.requests.length).toBe(3);
+  await expect(chrome.getByText("A reply from the model")).toHaveCount(3);
+  expect(model.titleRequests).toHaveLength(2);
+});
+
+test("a chat can be renamed from its menu, and is never renamed for you after that", async () => {
+  await startChat("hey");
+  await expect.poll(() => model.titleRequests.length).toBe(1);
+  await captureMenus();
+
+  const options = chrome.getByRole("button", { name: "More options for hey" });
+  await expect(options).toHaveCSS("opacity", "0");
+  await chatInSidebar("hey").hover();
+  await expect(options).toHaveCSS("opacity", "1");
+  await options.click();
+  await expect.poll(menuLabels).toEqual(["Rename", "Delete…"]);
+  await clickMenuItem("Rename");
+
+  const name = chrome.getByRole("textbox", { name: "Chat name" });
+  await expect(name).toBeFocused();
+  await name.press("Escape");
+  await expect(chatInSidebar("hey")).toBeVisible();
+
+  await options.click();
+  await clickMenuItem("Rename");
+  await name.fill("My own name");
+  await name.press("Enter");
+  await expect(chatInSidebar("My own name")).toBeVisible();
+  await expect.poll(async () => (await activeTab()).title).toBe("My own name");
+
+  model.titleWith("A generated name");
+  const message = chrome.getByRole("textbox", { name: "Message" });
+  await message.fill("Help me plan a weekend in Porto");
+  await message.press("Enter");
+  await expect(chrome.getByText("A reply from the model")).toHaveCount(2);
+  await expect(chatInSidebar("My own name")).toBeVisible();
+  expect(model.titleRequests).toHaveLength(1);
+});
+
+test("deleting a chat asks first, then removes it and its tab", async () => {
+  await startChat("Delete me");
+  await captureMenus();
+  await app.evaluate(({ dialog }) => {
+    const answers = [1, 0];
+    dialog.showMessageBox = (async () => ({ response: answers.shift(), checkboxChecked: false })) as never;
+  });
+  const options = chrome.getByRole("button", { name: "More options for Delete me" });
+
+  await chatInSidebar("Delete me").hover();
+  await options.click();
+  await clickMenuItem("Delete…");
+  await expect.poll(async () => (await activeTab()).page).toBe("chat");
+  await expect(chatInSidebar("Delete me")).toBeVisible();
+
+  await chatInSidebar("Delete me").hover();
+  await options.click();
+  await clickMenuItem("Delete…");
+  await expect(chatInSidebar("Delete me")).toHaveCount(0);
+
+  // It was the only tab, and the window stays open on a new one.
+  await expect.poll(async () => (await getTabs()).map((tab) => tab.page)).toEqual(["new-tab"]);
+  expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ chats }) => chats.length))).toBe(0);
+});
+
+test("deleting the panel's chat starts it fresh", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  await askInPanel("Delete me");
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  await captureMenus();
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
+  });
+
+  await chatInSidebar("Delete me").hover();
+  await chrome.getByRole("button", { name: "More options for Delete me" }).click();
+  await clickMenuItem("Delete…");
+  await expect(panel.getByText("A reply from the model")).toHaveCount(0);
+
+  await askInPanel("A new start");
+  await expect(chatInSidebar("A new start")).toBeVisible();
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  expect(model.requests.at(-1)?.messages.map((message) => message.role)).toEqual(["system", "user"]);
+});
+
+test("the thinking state shimmers", async () => {
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("gallery"));
+  await expect(chrome.getByRole("status").getByText("Thinking")).toHaveCSS("animation-name", "shimmer");
 });
 
 test("the chrome renderer gets no raw IPC or code execution in tabs", async () => {
@@ -496,11 +633,7 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
   await expect(chrome.getByText("Plan a trip to Porto").first()).toBeVisible();
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
 
-  const chats = chrome.getByRole("region", { name: "Chats" });
-  await expect(chats.getByRole("button", { name: "Plan a trip to Porto" })).toHaveAttribute(
-    "aria-current",
-    "page"
-  );
+  await expect(chatInSidebar("Plan a trip to Porto")).toHaveAttribute("aria-current", "page");
 });
 
 test("the sidebar opens Routines and Settings as tabs, once each", async () => {
