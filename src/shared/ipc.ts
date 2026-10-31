@@ -240,7 +240,7 @@ export interface InvokeChannels {
   // A routine's run answers its approvals here too, under the run's id.
   "chat:decide": {
     region: "chrome" | "overlay";
-    args: [chatId: string, approvalId: string, allow: boolean];
+    args: [chatId: string, approvalId: string, allow: boolean, answer?: string];
     result: boolean;
   };
   "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
@@ -347,7 +347,7 @@ export interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
   send: (chatId: string | null, text: string, options: { seePage: boolean }) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
-  decide: (chatId: string, approvalId: string, allow: boolean) => Promise<boolean>;
+  decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => Promise<boolean>;
   rename: (chatId: string, title: string) => Promise<boolean>;
   showMenu: (chatId: string) => Promise<"rename" | null>;
   getPageText: () => Promise<string | null>;

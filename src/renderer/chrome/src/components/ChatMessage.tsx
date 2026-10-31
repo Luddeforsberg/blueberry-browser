@@ -1,9 +1,10 @@
-import React, { useLayoutEffect, useRef } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep } from '@shared/library'
 import { ApprovalCard } from '@common/components/ApprovalCard'
+import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
 
@@ -135,9 +136,39 @@ export const ThinkingMessage: React.FC = () => (
     </div>
 )
 
+// Berry needs something only the user knows, and carries on with the answer. Secrets go in the page, never here.
+const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval }> = ({ chatId, approval }) => {
+    const [answer, setAnswer] = useState('')
+    const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow, allow ? answer : undefined)
+    return (
+        <section aria-label="Berry is asking" className="[overflow-wrap:anywhere] animate-fade-in rounded-panel border bg-surface p-3 shadow-float">
+            <h3 className="text-13 font-semibold">{approval.text}</h3>
+            <p className="mt-1 text-12 text-muted-foreground">Berry waits for your answer. Don’t type passwords or codes here.</p>
+            <form
+                className="mt-3 flex items-center gap-3"
+                onSubmit={(event) => {
+                    event.preventDefault()
+                    if (answer.trim()) send(true)
+                }}
+            >
+                <input
+                    aria-label="Your answer"
+                    autoFocus
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    className="min-w-0 flex-1 rounded-control border bg-background px-2 py-1 text-13"
+                />
+                <Button size="sm" type="submit" disabled={!answer.trim()}>Answer</Button>
+                <Button size="sm" variant="ghost" type="button" onClick={() => send(false)}>Skip</Button>
+            </form>
+        </section>
+    )
+}
+
 // An action Berry wants to take, which waits here until the user answers.
 export const ChatApprovalCard: React.FC<{ chatId: string; approval: ChatApproval }> = ({ chatId, approval }) => {
     const decide = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
+    if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} />
     return (
         <div className="[overflow-wrap:anywhere] animate-fade-in">
             <ApprovalCard

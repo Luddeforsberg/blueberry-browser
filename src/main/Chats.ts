@@ -1,5 +1,4 @@
 import {
-  isStepLimit,
   ModelConfigError,
   type GenerateTitle,
   type ReplyContent,
@@ -18,13 +17,15 @@ const MAX_PAGE_TEXT_LENGTH = 4000;
 const MAX_RENAME_LENGTH = 100;
 // A chat with no topic by then probably won't get one, so stop paying to ask.
 const MAX_TITLE_ATTEMPTS = 5;
+const MAX_ANSWER_LENGTH = 2000;
+
+const publicApproval = ({ id, text, question }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}) });
 
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
 
 const errorMessage = (error: unknown): string => {
   if (error instanceof ModelConfigError) return error.message;
-  if (isStepLimit(error)) return "This took too many steps, so it stopped here. Send a message to keep going.";
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("401") || message.includes("unauthorized")) {
     return "The API key was rejected. Check it in the .env file and restart.";
@@ -66,7 +67,7 @@ interface Run {
   steps: ChatStep[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
-  approval: (ChatApproval & { answer: (allow: boolean) => void }) | null;
+  approval: (ChatApproval & { answer: (allow: boolean, text?: string) => void }) | null;
   tabs: Set<Tab>;
   // Set for a task, which belongs to its caller rather than to a saved chat.
   onChange?: () => void;
@@ -108,15 +109,16 @@ export class Chats {
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
-    private readonly browser: Omit<PageToolAccess, "canSee" | "onUse"> & {
+    private readonly browser: Pick<PageToolAccess, "activeTab" | "allTabs" | "openTab"> & {
       openBackgroundTab: (url: string) => Tab;
+      closeTab: (tabId: string) => boolean;
       actionApproval: () => ActionApproval;
     },
     private readonly events: ChatEvents
   ) {}
 
   // These open behind the chat, so the approval cards and the reply stay in front of the user.
-  private ownTabTools(chatId: string, onUse: (tab: Tab) => void): PageTool[] {
+  private ownTabTools(chatId: string, run: Run, onUse: (tab: Tab) => void): PageTool[] {
     const ids = this.ownTabs.get(chatId) ?? new Set<string>();
     this.ownTabs.set(chatId, ids);
     const allTabs = () => this.browser.allTabs().filter((tab) => ids.has(tab.id));
@@ -130,7 +132,16 @@ export class Chats {
       },
       canSee: () => true,
       onUse,
+      ownsEveryTab: true,
+      closeTab: (tab) => this.closeRunTab(run, tab),
+      ask: (question) => this.askQuestion(chatId, run, question),
     });
+  }
+
+  private closeRunTab(run: Run, tab: Tab): boolean {
+    run.tabs.delete(tab);
+    this.publishWorkingTabs();
+    return this.browser.closeTab(tab.id);
   }
 
   // A page in a task's tab opened another. Nobody allowed that, so the task can't reach it, but it's cleared up with
@@ -162,7 +173,7 @@ export class Chats {
       ...chat,
       partial: run?.partial ?? null,
       steps: run?.steps ?? [],
-      approval: run?.approval ? { id: run.approval.id, text: run.approval.text } : null,
+      approval: run?.approval ? publicApproval(run.approval) : null,
       error: this.errors.get(chat.id) ?? null,
     };
   }
@@ -228,8 +239,16 @@ export class Chats {
       };
       const tools =
         seePage && this.pageAccess && this.activeTab
-          ? createPageTools({ ...this.browser, canSee: () => this.pageAccess, onUse })
-          : this.ownTabTools(chatId, onUse);
+          ? createPageTools({
+              activeTab: this.browser.activeTab,
+              allTabs: this.browser.allTabs,
+              openTab: this.browser.openTab,
+              canSee: () => this.pageAccess,
+              onUse,
+              closeTab: (tab) => this.closeRunTab(run, tab),
+              ask: (question) => this.askQuestion(chatId, run, question),
+            })
+          : this.ownTabTools(chatId, run, onUse);
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
     } catch (error) {
       if (!signal.aborted) {
@@ -287,7 +306,7 @@ export class Chats {
       onChange: () =>
         onProgress({
           steps: run.steps.map((step) => ({ ...step })),
-          approval: run.approval && { id: run.approval.id, text: run.approval.text },
+          approval: run.approval && publicApproval(run.approval),
           tokens,
         }),
     };
@@ -295,7 +314,7 @@ export class Chats {
     this.taskPopups.set(id, new Set());
     let error: string | null = null;
     try {
-      const tools = this.ownTabTools(id, (tab) => {
+      const tools = this.ownTabTools(id, run, (tab) => {
         run.tabs.add(tab);
         this.publishWorkingTabs();
       });
@@ -303,7 +322,7 @@ export class Chats {
     } catch (caught) {
       if (!run.controller.signal.aborted) {
         console.error("Error in a task:", caught);
-        error = isStepLimit(caught) ? "This took too many steps, so it stopped here." : errorMessage(caught);
+        error = errorMessage(caught);
       }
     }
     this.runs.delete(id);
@@ -342,7 +361,7 @@ export class Chats {
     };
   }
 
-  private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
+  private wait<T>(chatId: string, run: Run, text: string, question: boolean, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
     const { signal } = run.controller;
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
@@ -351,22 +370,32 @@ export class Chats {
       run.approval = {
         id: randomUUID(),
         text,
-        answer: (allow) => {
+        ...(question ? { question: true } : {}),
+        answer: (allow, answer) => {
           signal.removeEventListener("abort", stopped);
-          resolve(allow);
+          resolve(onAnswer(allow, answer));
         },
       };
       this.publish(chatId, run);
     });
   }
 
-  // False if that request has already been answered or its reply has ended.
-  decide(chatId: string, approvalId: string, allow: boolean): boolean {
+  private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
+    return this.wait(chatId, run, text, false, (allow) => allow);
+  }
+
+  // Null if the user would rather not answer.
+  private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
+    return this.wait(chatId, run, question, true, (allow, answer) => (allow && answer ? answer : null));
+  }
+
+  // False if that request has already been answered or its reply has ended. `answer` is for a question.
+  decide(chatId: string, approvalId: string, allow: boolean, answer?: string): boolean {
     const run = this.runs.get(chatId);
     if (run?.approval?.id !== approvalId) return false;
-    const { answer } = run.approval;
+    const { answer: finish } = run.approval;
     run.approval = null;
-    answer(allow === true);
+    finish(allow === true, typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined);
     this.publish(chatId, run);
     return true;
   }

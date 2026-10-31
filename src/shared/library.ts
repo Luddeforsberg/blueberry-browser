@@ -23,6 +23,8 @@ export interface ChatStep {
 export interface ChatApproval {
   id: string;
   text: string;
+  // Berry is asking for an answer in words, not for leave to do something.
+  question?: boolean;
 }
 
 export interface ChatThreadMessage {

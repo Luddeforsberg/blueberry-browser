@@ -1,18 +1,37 @@
 import { z } from "zod";
+import type { WebFrameMain } from "electron";
 import {
+  aimClick,
+  aimHover,
+  aimKey,
   chooseOption,
-  clickElement,
   describeElement,
   describeOption,
+  hasFocus,
+  inputLanded,
+  isHovered,
   listElements,
+  planDrag,
+  scriptedClick,
+  scriptedEnter,
+  scriptedHover,
   scrollPage,
   selectedOptions,
   typeIntoElement,
+  type Aim,
+  type DragPlan,
+  type FocusInfo,
 } from "./pageScripts";
+import { clickAt, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import type { Tab } from "./Tab";
 
 const MAX_READ_LENGTH = 20_000;
 const MAX_ELEMENTS = 200;
+const MAX_FRAME_ELEMENTS = 50;
+const MAX_WAIT_SECONDS = 10;
+// How long a page gets to finish moving after being scrolled, before anything is aimed at it.
+const SCROLL_SETTLE_MS = 200;
+const RETRIES_AFTER_MISS = 1;
 const MAX_MATCHES = 10;
 const MATCH_CONTEXT_LENGTH = 150;
 // A page that never finishes loading would otherwise hold its script, and the reply, forever.
@@ -72,7 +91,7 @@ const readText = async (tab: Tab): Promise<string | null> => {
     timer = setTimeout(() => resolve(null), READ_TIMEOUT_MS);
   });
   try {
-    return await Promise.race([tab.getTabText(), timeout]);
+    return await Promise.race([tab.getTextWithFrames(), timeout]);
   } catch (error) {
     console.error("Failed to read a page for a tool:", error);
     return null;
@@ -96,6 +115,15 @@ interface ElementInfo {
   target: string | null;
   riskyClick: boolean;
   safeToType: boolean;
+  // Set for a same-origin frame: where in the site this is.
+  frameUrl: string | null;
+  // Set for a frame from another origin, by the main process rather than the frame: the site it's really from.
+  frameOrigin?: string;
+}
+
+interface ListedElements {
+  total: number;
+  elements: Array<Record<string, unknown>>;
 }
 
 type ChooseResult =
@@ -121,6 +149,11 @@ const NOT_WEB = "Only http and https addresses can be opened.";
 const STALE_ELEMENT = "That element is no longer on the page. Call list_elements and try again.";
 
 const NO_ACCESS = "The user has turned off page access, so nothing can be read.";
+const SCRIPTED = "It got a scripted click rather than a real one, which some sites ignore, so check that it worked before saying it did.";
+
+// Ones the model might reach for when a page asks. These go in the page, typed by the user, and never through a model.
+const SECRET_REQUEST =
+  /pass ?(word|code|phrase)|lösenord|\b2fa\b|two.factor|one.time|\botp\b|(?<!(postal|zip|post|promo|discount|coupon|area|country|source) )\bcode\b|\bkod(en)?\b|engångskod|verifieringskod|\bcvc\b|\bcvv\b|card (number|details)|kortnummer|personnummer|\bpin\b/i;
 
 const tabId = z.string().optional().describe("The tab, from list_tabs. Leave out for the tab the user is on.");
 
@@ -139,13 +172,57 @@ export interface PageToolAccess {
   activeTab: () => Tab | null;
   allTabs: () => Tab[];
   openTab: (url: string) => Tab;
+  // False if it couldn't be closed, which it can't if it's the window's last.
+  closeTab: (tab: Tab) => boolean;
+  // Whether anything `allTabs` gives is Berry's own to close. Otherwise only what these tools opened.
+  ownsEveryTab?: boolean;
+  // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped.
+  ask: (question: string) => Promise<string | null>;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
   canSee: () => boolean;
   // Told about each tab a tool is about to use, so the user can see where Berry is working.
   onUse: (tab: Tab) => void;
 }
 
-export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: PageToolAccess): PageTool[] => {
+export const createPageTools = ({
+  activeTab,
+  allTabs,
+  openTab,
+  closeTab,
+  ownsEveryTab = false,
+  ask,
+  canSee,
+  onUse,
+}: PageToolAccess): PageTool[] => {
+  const opened = new Set<string>();
+  let lastQuestion: Promise<void> = Promise.resolve();
+  // A ref into a frame from another origin is `f<number>.<its ref>`. Which frame and site that means is only kept
+  // here, so the frame's page can't point it anywhere else, and it dies with the frame or a change of site.
+  const frameRefs = new Map<string, { frame: WebFrameMain; origin: string; tabId: string }>();
+  const frameNames = new Map<WebFrameMain, string>();
+  const frameName = (frame: WebFrameMain, tab: Tab) => {
+    const known = frameNames.get(frame);
+    if (known && frameRefs.get(known)?.origin === frame.origin) return known;
+    const name = `f${frameRefs.size + 1}`;
+    frameNames.set(frame, name);
+    frameRefs.set(name, { frame, origin: frame.origin, tabId: tab.id });
+    return name;
+  };
+  const frameOf = (tab: Tab, ref: string) => {
+    const [, name] = /^(f\d+)\./.exec(ref) ?? [];
+    if (!name) return null;
+    const entry = frameRefs.get(name);
+    const live = entry && entry.tabId === tab.id && !entry.frame.isDestroyed() && entry.frame.origin === entry.origin;
+    return live ? entry : "gone";
+  };
+  // Runs a script for this ref wherever its element lives. Null means the element has gone.
+  const onRef = async <T>(tab: Tab, ref: string, script: (ref: string) => string): Promise<T | null> => {
+    const entry = frameOf(tab, ref);
+    if (entry === "gone") return null;
+    if (!entry) return tab.runInPage<T | null>(script(ref));
+    return tab.runInFrame<T | null>(entry.frame, script(ref.slice(ref.indexOf(".") + 1)));
+  };
+
   const find = (id?: string) => (id ? allTabs().find((tab) => tab.id === id) : activeTab()) ?? null;
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
@@ -176,6 +253,19 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
     }
   };
 
+  // A real Enter where it can reach, which also submits a form the way a person's does. Only into the field the card
+  // named: if the focus has moved, this goes to that field by script instead.
+  const pressEnter = async (tab: Tab, ref: string) => {
+    if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(hasFocus(ref)))) {
+      const focus = await tab.runInPage<FocusInfo>(aimKey);
+      if (!focus.foreignFrame) {
+        await pressKey(tab, "Enter", false);
+        if ((await landed(() => tab.runInPage<boolean | null>(inputLanded))) === "landed") return;
+      }
+    }
+    await onRef<string>(tab, ref, scriptedEnter);
+  };
+
   const whereNow = async (tab: Tab) => {
     await tab.settled();
     if (!canSee()) return NO_ACCESS;
@@ -191,14 +281,58 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
   const element = (id: string | undefined, ref: string) => {
     const tab = canSee() ? find(id) : null;
     if (!tab) return Promise.resolve(null);
-    return tab.runInPage<ElementInfo | null>(describeElement(ref)).catch(() => null);
+    return describeRef(tab, ref).catch(() => null);
+  };
+
+  // A frame from another origin can answer anything here, so it's never trusted to say something is safe.
+  const describeRef = async (tab: Tab, ref: string): Promise<ElementInfo | null> => {
+    const info = await onRef<ElementInfo>(tab, ref, describeElement);
+    const entry = frameOf(tab, ref);
+    if (!info || !entry || entry === "gone") return info;
+    return { ...info, target: null, frameUrl: null, riskyClick: true, safeToType: false, frameOrigin: entry.origin };
+  };
+
+  const placeOf = (info: ElementInfo) => {
+    if (info.frameOrigin) return ` in a frame from ${info.frameOrigin}, inside`;
+    if (info.frameUrl) return ` in a frame showing ${info.frameUrl}, inside`;
+    return " on";
+  };
+
+  // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
+  // something covering it gets the scripted click sent straight to the element, not the real one.
+  const clickRef = async (tab: Tab, ref: string, clicks: 1 | 2) => {
+    const scripted = () => onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks));
+    const finish = (result: string | null, note = "") => {
+      if (result === null) return STALE_ELEMENT;
+      if (result === "disabled") return "That element is disabled, so nothing happened.";
+      return whereNow(tab).then((where) => (note ? `${where} ${note}` : where));
+    };
+    if (frameOf(tab, ref)) return finish(await scripted(), SCRIPTED);
+    const aimAgain = async () => {
+      await pause(SCROLL_SETTLE_MS);
+      return tab.runInPage<Aim | null>(aimClick(ref, false));
+    };
+    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true));
+    if (aim?.status === "scrolled") aim = await aimAgain();
+    if (aim === null) return STALE_ELEMENT;
+    if (aim.status === "disabled") return finish("disabled");
+    for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
+      await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks);
+      const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
+      if (arrived === "landed") return finish("done");
+      if (arrived === "lost") return finish(await scripted(), SCRIPTED);
+      aim = await aimAgain();
+    }
+    if (aim === null) return STALE_ELEMENT;
+    const covered = aim.status === "covered" ? ` Something else was on top of it (“${aim.by}”), which may still be in the way.` : "";
+    return finish(await scripted(), `${SCRIPTED}${covered}`);
   };
 
   const describeOn = async (id: string | undefined, ref: string, say: (info: ElementInfo) => string) => {
     const info = await element(id, ref);
     const tab = find(id);
     if (!info || !tab) return `Act on element ${ref}, which is no longer on the page`;
-    return `${say(info)} on ${tab.url}${info.target ? `, which goes to ${info.target}` : ""}`;
+    return `${say(info)}${placeOf(info)} ${tab.url}${info.target ? `, which goes to ${info.target}` : ""}`;
   };
 
   return [
@@ -253,13 +387,28 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
     }),
     pageTool({
       name: "list_elements",
-      description: `List what can be clicked or filled in on a page, each with a ref for click, type_text and choose_option. A link's address comes with it. Shows up to ${MAX_ELEMENTS}, so use query to narrow by name. Refs stop working when the page changes address.`,
-      schema: z.object({ tabId, query: z.string().max(100).optional().describe("Only elements with this in their name.") }),
+      description: `List what can be clicked or filled in on a page, including inside its frames, each with a ref for the tools that act on elements. A link's address comes with it. Shows up to ${MAX_ELEMENTS}, so use query to narrow by name. A query also finds plain text and pictures with that name, which is how to reach something to hover over or double-click. Set everything to list all text and pictures too. Refs stop working when the page changes address.`,
+      schema: z.object({
+        tabId,
+        query: z.string().max(100).optional().describe("Only elements with this in their name."),
+        everything: z.boolean().optional().describe("Also list plain text and pictures, not only controls."),
+      }),
       label: ({ tabId: id }) => `Looked over ${site(id)}`,
-      run: ({ tabId: id, query }) =>
+      run: ({ tabId: id, query, everything }) =>
         withTab(id, async (tab) => {
-          const result = await tab.runInPage(listElements(query, MAX_ELEMENTS));
-          return canSee() ? JSON.stringify(result) : NO_ACCESS;
+          const top = await tab.runInPage<ListedElements>(listElements({ query, limit: MAX_ELEMENTS, everything, descend: true }));
+          const script = listElements({ query, limit: MAX_FRAME_ELEMENTS, everything, descend: false });
+          const frames = await Promise.all(
+            tab.foreignFrames.map(async (frame) => {
+              const found = await tab.runInFrame<ListedElements>(frame, script).catch(() => null);
+              if (!Array.isArray(found?.elements) || found.elements.length === 0) return [];
+              const name = frameName(frame, tab);
+              return found.elements.slice(0, MAX_FRAME_ELEMENTS).map((element) => ({ ...element, ref: `${name}.${element.ref}`, frame: frame.origin }));
+            })
+          );
+          const fromFrames = frames.flat();
+          if (!canSee()) return NO_ACCESS;
+          return JSON.stringify({ total: top.total + fromFrames.length, elements: [...top.elements, ...fromFrames] });
         }),
     }),
     pageTool({
@@ -272,22 +421,140 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
     }),
     pageTool({
       name: "click",
-      description: "Click an element from list_elements. The user is asked first.",
+      description: "Click an element from list_elements with the real mouse. The user is asked first when it could change something.",
       schema: z.object({ tabId, ref: z.string().max(20) }),
       label: ({ tabId: id }) => `Clicked something on ${site(id)}`,
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
+      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
+    }),
+    pageTool({
+      name: "double_click",
+      description: "Double-click an element from list_elements with the real mouse, such as a label a page edits that way. The user is asked first when it could change something.",
+      schema: z.object({ tabId, ref: z.string().max(20) }),
+      label: ({ tabId: id }) => `Double-clicked something on ${site(id)}`,
+      describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Double-click the ${role} “${name}”`),
+      isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
+      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 2)),
+    }),
+    pageTool({
+      name: "hover",
+      description: "Move the mouse over an element from list_elements and leave it there, to reveal what the page only shows on hover. Call list_elements or screenshot afterwards to see what appeared.",
+      schema: z.object({ tabId, ref: z.string().max(20) }),
+      label: ({ tabId: id }) => `Moved the pointer on ${site(id)}`,
       run: ({ tabId: id, ref }) =>
         withTab(id, async (tab) => {
-          const result = await tab.runInPage<string | null>(clickElement(ref));
+          if (!frameOf(tab, ref)) {
+            let aim = await tab.runInPage<Aim | null>(aimHover(ref, true));
+            if (aim?.status === "scrolled") {
+              await pause(SCROLL_SETTLE_MS);
+              aim = await tab.runInPage<Aim | null>(aimHover(ref, false));
+            }
+            if (aim === null) return STALE_ELEMENT;
+            if (aim.status === "aimed") {
+              await moveTo(tab, { x: aim.x!, y: aim.y! });
+              const over = await tab.runInPage<boolean | null>(isHovered(ref));
+              if (over) return "The pointer is over it now. Look again to see what appeared.";
+            }
+          }
+          const result = await onRef<string>(tab, ref, scriptedHover);
           if (result === null) return STALE_ELEMENT;
-          if (result === "disabled") return "That element is disabled, so nothing happened.";
+          return "A scripted hover went to it, because the real pointer couldn't get there. A page that reveals things by CSS won't respond, so look again before saying anything appeared.";
+        }),
+    }),
+    pageTool({
+      name: "drag",
+      description: "Drag an element from list_elements onto another. The user is asked first. Nothing confirms that the page accepted it, so look at the page afterwards before saying it worked.",
+      schema: z.object({ tabId, ref: z.string().max(20), toRef: z.string().max(20) }),
+      label: ({ tabId: id }) => `Dragged something on ${site(id)}`,
+      // No `isRisky`, so it always asks in the default mode: dropping something can mean anything on a page.
+      describe: async ({ tabId: id, ref, toRef }) => {
+        const [from, to] = await Promise.all([element(id, ref), element(id, toRef)]);
+        const tab = find(id);
+        if (!from || !to || !tab) return `Drag element ${ref} onto ${toRef}, which are no longer on the page`;
+        return `Drag the ${from.role} “${from.name}” onto the ${to.role} “${to.name}”${placeOf(from)} ${tab.url}`;
+      },
+      run: ({ tabId: id, ref, toRef }) =>
+        withTab(id, async (tab) => {
+          const frame = frameOf(tab, ref);
+          if (frame !== frameOf(tab, toRef)) return "Those two aren't in the same frame, so nothing was dragged.";
+          const inner = frame ? toRef.slice(toRef.indexOf(".") + 1) : toRef;
+          let plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
+          // It may have just scrolled them into view, so where they are now is what counts.
+          if (plan?.status === "aimed") {
+            await pause(SCROLL_SETTLE_MS);
+            plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
+          }
+          if (plan === null) return STALE_ELEMENT;
+          if (plan.status === "disabled") return "That element is disabled, so nothing happened.";
+          if (plan.status === "covered") return "Something else is on top of one of those, so nothing was dragged. Clear it first.";
+          if (plan.status === "out-of-view") return "Those two don't fit on screen together, or one is in a frame real input can't reach, so nothing was dragged.";
+          const check = "Nothing confirms that the page accepted it, so look at the page before saying it worked.";
+          if (plan.status === "aimed") {
+            // A frame's page writes its own answers, so it never gets to choose where the real mouse goes.
+            if (frame) return "That needs a real mouse, which can't reach a frame from another site, so nothing was dragged.";
+            await dragBetween(tab, plan.from!, plan.to!);
+            if ((await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded))) !== "landed") {
+              return "The press didn't land on that element, so nothing was dragged.";
+            }
+          }
+          return `${await whereNow(tab)} ${check}`;
+        }),
+    }),
+    pageTool({
+      name: "press_key",
+      description: `Press a key on the keyboard, wherever the focus is. Click something first to put the focus there. One of ${KEY_NAMES.join(", ")}, or a single character. To type words, use type_text. The user is asked first when it could change something.`,
+      schema: z.object({ tabId, key: z.string().min(1).max(10), shift: z.boolean().optional() }),
+      label: ({ tabId: id }) => `Pressed a key on ${site(id)}`,
+      describe: async ({ tabId: id, key, shift }) => {
+        const tab = canSee() ? find(id) : null;
+        const focus = tab && (await tab.runInPage<FocusInfo>(aimKey).catch(() => null));
+        const where = focus?.foreignFrame ? "in a frame from another site" : focus?.role ? `with the focus on the ${focus.role} “${focus.name}”` : "with the focus on the page";
+        return `Press ${shift ? "Shift+" : ""}${key} ${where}, on ${tab?.url ?? "no page"}`;
+      },
+      isRisky: async ({ key }) => !isHarmlessKey(key),
+      run: ({ tabId: id, key, shift = false }) =>
+        withTab(id, async (tab) => {
+          if (!isKnownKey(key)) return `That isn't a key this can press. It can press ${KEY_NAMES.join(", ")}, or a single character.`;
+          const focus = await tab.runInPage<FocusInfo>(aimKey);
+          if (focus.foreignFrame) return "The focus is in a frame from another site, where real keys can't reach, so nothing was pressed. Click something there instead.";
+          await pressKey(tab, key, shift);
+          if ((await landed(() => tab.runInPage<boolean | null>(inputLanded))) === "lost") return "The page didn't receive that key, so it may not have done anything.";
           return whereNow(tab);
         }),
     }),
     pageTool({
+      name: "wait",
+      description: `Wait up to ${MAX_WAIT_SECONDS} seconds for a page to catch up, such as after an action that takes a moment to show.`,
+      schema: z.object({ seconds: z.number().min(0).max(MAX_WAIT_SECONDS) }),
+      label: () => "Waited a moment",
+      run: async ({ seconds }) => {
+        await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+        return `Waited ${seconds} seconds.`;
+      },
+    }),
+    pageTool({
+      name: "ask_user",
+      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. Never ask for a password, a code or card details: tell them to type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
+      schema: z.object({ question: z.string().min(1).max(500) }),
+      label: () => "Asked you something",
+      run: async ({ question }) => {
+        if (SECRET_REQUEST.test(question)) {
+          return "That wasn't asked, because passwords, codes and card details never go through this chat. Tell the user to type it in the page themselves, then stop.";
+        }
+        // Tools can run at the same time, and the chat shows one question at a time.
+        const turn = lastQuestion.then(() => ask(question));
+        lastQuestion = turn.then(
+          () => {},
+          () => {}
+        );
+        const answer = await turn;
+        return answer === null ? "The user chose not to answer. Carry on without it if you can, or say what you couldn't do." : `The user answered: ${answer}`;
+      },
+    }),
+    pageTool({
       name: "type_text",
-      description: "Replace what's in a field from list_elements with this text, and optionally submit it. The user is asked first.",
+      description: "Replace what's in a field from list_elements with this text, and optionally press Enter. The user is asked first when it could change something.",
       schema: z.object({
         tabId,
         ref: z.string().max(20),
@@ -307,13 +574,14 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
       },
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
-          const result = await tab.runInPage<string | null>(typeIntoElement(ref, text, submit));
+          const result = await onRef<string>(tab, ref, (inner) => typeIntoElement(inner, text));
           if (result === null) return STALE_ELEMENT;
           if (result === "dropdown") return "That's a dropdown, so nothing was typed. Use choose_option.";
           if (result === "not-kept") {
             return "The field holds something other than that text now, so it may not have taken it. Nothing was submitted. Look at it again before saying it worked.";
           }
           if (result !== "done") return "That element can't be typed into, so nothing happened.";
+          if (submit) await pressEnter(tab, ref);
           return whereNow(tab);
         }),
     }),
@@ -325,16 +593,22 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
       // No `isRisky`, so it always asks in the default mode: changing a dropdown can run anything the page likes.
       describe: async ({ tabId: id, ref, option }) => {
         const tab = canSee() ? find(id) : null;
-        const info = tab && (await tab.runInPage<(ElementInfo & { option: string | null; optionValue: string | null }) | null>(describeOption(ref, option)).catch(() => null));
+        const info = tab && (await onRef<ElementInfo & { option: string | null; optionValue: string | null }>(tab, ref, (inner) => describeOption(inner, option)).catch(() => null));
         if (!tab || !info) return `Act on element ${ref}, which is no longer on the page`;
+        const frame = frameOf(tab, ref);
+        if (frame && frame !== "gone") {
+          info.target = null;
+          info.frameUrl = null;
+          info.frameOrigin = frame.origin;
+        }
         // The value is what a form sends, so the page changing it while the user decides must change this too.
         const sends = info.optionValue !== null && info.optionValue !== info.option ? ` (sent as “${info.optionValue}”)` : "";
         const choice = info.option !== null ? `“${info.option}”${sends}` : `“${option}”, which it doesn't offer,`;
-        return `Choose ${choice} in the ${info.role} “${info.name}” on ${tab.url}${info.target ? `, in a form that goes to ${info.target}` : ""}`;
+        return `Choose ${choice} in the ${info.role} “${info.name}”${placeOf(info)} ${tab.url}${info.target ? `, in a form that goes to ${info.target}` : ""}`;
       },
       run: ({ tabId: id, ref, option }) =>
         withTab(id, async (tab) => {
-          const result = await tab.runInPage<ChooseResult | null>(chooseOption(ref, option));
+          const result = await onRef<ChooseResult>(tab, ref, (inner) => chooseOption(inner, option));
           if (result === null) return STALE_ELEMENT;
           if (result.status === "not-a-dropdown") return "That element isn't a dropdown, so nothing happened.";
           if (result.status === "disabled") return "That dropdown or option is disabled, so nothing happened.";
@@ -343,7 +617,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
           }
           const where = await whereNow(tab);
           // Asked again after the page has reacted, and gone if that took it to a new address.
-          const shown = await tab.runInPage<string[] | null>(selectedOptions(ref)).catch(() => null);
+          const shown = await onRef<string[]>(tab, ref, selectedOptions).catch(() => null);
           if (!canSee()) return NO_ACCESS;
           if (!shown) return where;
           if (!shown.includes(result.chosen)) {
@@ -367,6 +641,37 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
           const scaled = image.getSize().width > MAX_SCREENSHOT_WIDTH ? image.resize({ width: MAX_SCREENSHOT_WIDTH }) : image;
           return `data:image/jpeg;base64,${scaled.toJPEG(SCREENSHOT_QUALITY).toString("base64")}`;
         }),
+    }),
+    pageTool({
+      name: "go_back",
+      description: "Go back one page in a tab, like the browser's back button.",
+      schema: z.object({ tabId }),
+      label: ({ tabId: id }) => `Went back on ${site(id)}`,
+      describe: async ({ tabId: id }) => `Go back from ${find(id)?.url ?? "no page"}`,
+      isRisky: async () => false,
+      run: ({ tabId: id }) =>
+        withTab(id, async (tab) => {
+          if (!tab.canGoBack) return "There's no earlier page in that tab, so nothing happened.";
+          tab.goBack();
+          return whereNow(tab);
+        }),
+    }),
+    pageTool({
+      name: "close_tab",
+      description: "Close a tab you opened yourself, when you're done with it. It can't close any other tab.",
+      schema: z.object({ tabId: z.string().describe("The tab, from list_tabs.") }),
+      label: () => "Closed a tab it opened",
+      describe: async ({ tabId: id }) => `Close the tab showing ${find(id)?.url ?? "no page"}, which Berry opened`,
+      isRisky: async () => false,
+      run: async ({ tabId: id }) => {
+        if (!canSee()) return NO_ACCESS;
+        const tab = find(id);
+        if (!tab) return `There is no web page in tab ${id}.`;
+        if (!ownsEveryTab && !opened.has(id)) return "You didn't open that tab, so it stays open.";
+        if (!closeTab(tab)) return "That's the last tab in the window, so it stays open.";
+        opened.delete(id);
+        return `Closed tab ${id}.`;
+      },
     }),
     pageTool({
       name: "go_to",
@@ -399,6 +704,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
         const tab = openTab(url);
+        opened.add(tab.id);
         onUse(tab);
         return whereNow(tab);
       },

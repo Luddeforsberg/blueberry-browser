@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPageTools } from "./browserTools";
 import type { Tab } from "./Tab";
 
@@ -13,6 +13,8 @@ const screenshotTool = (tab: Tab, canSee: () => boolean) =>
     activeTab: () => tab,
     allTabs: () => [tab],
     openTab: () => tab,
+    closeTab: () => true,
+    ask: async () => null,
     canSee,
     onUse: () => {},
   }).find((tool) => tool.name === "screenshot")!;
@@ -53,5 +55,52 @@ describe("the screenshot tool", () => {
   it("says so when there's nothing to see", async () => {
     const tab = { id: "tab-1", settled, screenshot: async () => ({ ...IMAGE, isEmpty: () => true }) } as unknown as Tab;
     expect(await screenshotTool(tab, () => true).run({})).toMatch(/hasn't drawn/);
+  });
+});
+
+describe("the ask_user tool", () => {
+  const askTool = (ask: (question: string) => Promise<string | null>) =>
+    createPageTools({
+      activeTab: () => null,
+      allTabs: () => [],
+      openTab: () => {
+        throw new Error("Not used");
+      },
+      closeTab: () => true,
+      ask,
+      canSee: () => true,
+      onUse: () => {},
+    }).find((tool) => tool.name === "ask_user")!;
+
+  it.each(["What is your password?", "What is the code?", "What code did you receive?", "Vad är koden?", "Which card number?", "Your 2FA?"])(
+    "never asks %s",
+    async (question) => {
+      const ask = vi.fn(async () => "secret");
+      expect(await askTool(ask).run({ question })).toMatch(/never go through this chat/);
+      expect(ask).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["Which colour?", "What is the postal code?", "Which of the two flights did you mean?"])("asks %s", async (question) => {
+    expect(await askTool(async () => "Blue").run({ question })).toBe("The user answered: Blue");
+  });
+
+  it("says when the user skipped", async () => {
+    expect(await askTool(async () => null).run({ question: "Which colour?" })).toMatch(/chose not to answer/);
+  });
+
+  it("shows one question at a time", async () => {
+    const answers: Array<() => void> = [];
+    const asked: string[] = [];
+    const tool = askTool((question) => {
+      asked.push(question);
+      return new Promise((resolve) => answers.push(() => resolve("ok")));
+    });
+    const both = Promise.all([tool.run({ question: "First?" }), tool.run({ question: "Second?" })]);
+    await vi.waitFor(() => expect(asked).toEqual(["First?"]));
+    answers[0]();
+    await vi.waitFor(() => expect(asked).toEqual(["First?", "Second?"]));
+    answers[1]();
+    await both;
   });
 });

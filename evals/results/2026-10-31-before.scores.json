@@ -1,0 +1,74 @@
+{
+  "booking-dates#1": {
+    "outcome": "Done",
+    "reason": "Results page for Stockholm, 14 to 16 December, 2 adults."
+  },
+  "native-dropdown#1": {
+    "outcome": "Done",
+    "reason": "Value is 2, matching the answer."
+  },
+  "custom-dropdown#1": {
+    "outcome": "Done",
+    "reason": "Both values set; end state agrees."
+  },
+  "checkboxes#1": {
+    "outcome": "Done",
+    "reason": "End state [true, false]."
+  },
+  "drag-and-drop#1": {
+    "outcome": "Failed",
+    "reason": "Missing ability. Said so plainly, order still A, B."
+  },
+  "hover-menu#1": {
+    "outcome": "Failed",
+    "reason": "Missing ability. Said so plainly."
+  },
+  "iframe-editor#1": {
+    "outcome": "Done",
+    "reason": "Text is right, by the source-mode workaround outside the frame."
+  },
+  "iframe-read#1": {
+    "outcome": "Done",
+    "reason": "All four words right, read from the first message's screenshot with no tools."
+  },
+  "modal-in-the-way#1": {
+    "outcome": "Done",
+    "reason": "Modal closed; end state agrees."
+  },
+  "cookie-banner#1": {
+    "outcome": "Partly",
+    "reason": "Headline given, banner left up. Said it stopped because rejecting costs money."
+  },
+  "todomvc-edits#1": {
+    "outcome": "Partly",
+    "reason": "Added and ticked. Couldn't rename or delete, and said so."
+  },
+  "table-with-links#1": {
+    "outcome": "Done",
+    "reason": "Addresses from list_elements, in 3 calls."
+  },
+  "reddit-search#1": {
+    "outcome": "Done",
+    "reason": "Search reached through the shadow DOM."
+  },
+  "youtube-search-open#1": {
+    "outcome": "Partly",
+    "reason": "Stopped at the consent screen and asked the user to choose."
+  },
+  "youtube-from-new-tab#1": {
+    "outcome": "Done",
+    "reason": "Video open, title and channel match."
+  },
+  "amazon-cart#1": {
+    "outcome": "Done",
+    "reason": "Cart shows 1."
+  },
+  "dead-link#1": {
+    "outcome": "Done",
+    "reason": "Said the address didn't resolve."
+  },
+  "long-wikipedia-hops#1": {
+    "outcome": "Failed",
+    "reason": "Hit the 30-call limit and lost all titles. Said it couldn't list them. Cost $0.23."
+  }
+}

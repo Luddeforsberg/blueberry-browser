@@ -58,6 +58,36 @@ test.beforeAll(async () => {
         <a href="/one">Continue</a></body>`);
       return;
     }
+    if (request.url === "/real-input") {
+      const port = (server.address() as AddressInfo).port;
+      response.end(`<!doctype html><meta charset="utf-8"><title>Waiting</title><body>
+        <button onclick="document.title = 'Real ' + event.isTrusted">Press</button>
+        <iframe src="http://localhost:${port}/inner" width="300" height="100"></iframe>
+      </body>`);
+      return;
+    }
+    if (request.url === "/slides-under") {
+      response.end(`<!doctype html><meta charset="utf-8"><title>Waiting</title><body>
+        <div style="position: relative; width: 200px; height: 60px">
+          <button id="named" style="width: 200px; height: 60px" onclick="document.title = 'Named ' + (window.decoyPressed ? 'and decoy' : 'only')"
+            onmouseover="document.querySelector('#decoy').hidden = false">Open</button>
+          <button id="decoy" hidden style="position: absolute; inset: 0" onclick="window.decoyPressed = true">Decoy</button>
+        </div>
+      </body>`);
+      return;
+    }
+    if (request.url === "/keys") {
+      response.end(`<!doctype html><title>Keys</title><body>
+        <input aria-label="Box" onkeydown="sessionStorage.keys = (sessionStorage.keys ?? '') + '|' + event.key + (event.isTrusted ? '' : ' (fake)')" onkeyup="sessionStorage.box = this.value">
+        <input aria-label="Sign-in step" autocomplete="one-time-code" value="123456">
+        <a href="/one">Onward</a>
+      </body>`);
+      return;
+    }
+    if (request.url === "/inner") {
+      response.end(`<!doctype html><meta charset="utf-8"><body><button onclick="this.textContent = 'Was pressed'">Inside</button>`);
+      return;
+    }
     if (request.url === "/frame") {
       response.end(`<!doctype html><title>Frame</title><body>A frame<script>
         location.hash = "moved";
@@ -362,6 +392,106 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Save");
   expect((await activeTab()).page).toBe("chat");
   expect((await getTabs()).map((tab) => tab.url)).toContain(`${origin}/form`);
+});
+
+test("real input in a tab behind the chat, a card naming another site's frame, and a question", async () => {
+  await askBeforeActing("risky");
+  await openFixture();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  const message = chrome.getByRole("textbox", { name: "Message" });
+  const card = chrome.getByRole("region", { name: "Approval needed" });
+  const url = `${origin}/real-input`;
+  const framed = `http://localhost:${new URL(origin).port}`;
+
+  model.callTools({ name: "open_tab", args: { url } });
+  model.callTools({ name: "list_elements", args: {} });
+  model.callTools({ name: "click", args: { ref: "e1" } });
+  model.callTools({ name: "click", args: { ref: "f1.e1" } });
+  model.callTools({ name: "ask_user", args: { question: "What is your password?" } });
+  model.callTools({ name: "ask_user", args: { question: "Which colour?" } });
+  await message.fill("Press them");
+  await message.press("Enter");
+
+  // Even a harmless-looking button in another site's frame asks, and says whose it is.
+  await expect(card.getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
+  await card.getByRole("button", { name: "Allow" }).click();
+
+  const question = chrome.getByRole("region", { name: "Berry is asking" });
+  await expect(question.getByText("Which colour?")).toBeVisible();
+  await question.getByRole("textbox", { name: "Your answer" }).fill("Blue");
+  await question.getByRole("button", { name: "Answer" }).click();
+
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
+  const said = JSON.stringify(model.requests.at(-1)?.messages);
+  expect(said).toContain("The user answered: Blue");
+  expect(said).toContain("never go through this chat");
+
+  const page = app.windows().find((view) => view.url() === url)!;
+  // The click arrived as a person's, in a tab the user isn't on.
+  await expect(page).toHaveTitle("Real true");
+  await expect(page.frames().at(-1)!.getByRole("button", { name: "Was pressed" })).toBeVisible();
+  expect((await activeTab()).page).toBe("chat");
+});
+
+test("a real click that would land on something else is stopped, and only the named element gets clicked", async () => {
+  await askBeforeActing("never");
+  const page = await openFixture("/slides-under");
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  model.callTools({ name: "list_elements", args: { query: "Open" } });
+  model.callTools({ name: "click", args: { ref: "e1" } });
+  const message = panel.getByRole("textbox", { name: "Message" });
+  await message.fill("Open it");
+  await message.press("Enter");
+
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  await expect(page).toHaveTitle("Named only");
+  expect(await page.evaluate(() => (window as unknown as { decoyPressed?: boolean }).decoyPressed)).toBeUndefined();
+  expect(JSON.stringify(model.requests.at(-1)?.messages)).toContain("scripted click");
+});
+
+test("real keys, going back, and closing only a tab Berry opened", async () => {
+  await askBeforeActing("never");
+  await openFixture("/");
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const userTab = (await activeTab()).id;
+  const url = `${origin}/keys`;
+  model.callTools({ name: "close_tab", args: { tabId: userTab } });
+  model.callTools({ name: "open_tab", args: { url } });
+  model.callTools({ name: "list_elements", args: {} });
+  model.callTools({ name: "click", args: { ref: "e1" } });
+  model.callTools({ name: "press_key", args: { key: "x" } });
+  model.callTools({ name: "press_key", args: { key: "Space" } });
+  model.callTools({ name: "press_key", args: { key: "Backspace" } });
+  model.callTools({ name: "press_key", args: { key: "Escape" } });
+  model.callTools({ name: "press_key", args: { key: "Control+Q" } });
+  model.callTools({ name: "wait", args: { seconds: 0 } });
+  model.callTools({ name: "click", args: { ref: "e3" } });
+  model.callTools({ name: "go_back", args: {} });
+  await panel.getByRole("textbox", { name: "Message" }).fill("Go");
+  await panel.getByRole("textbox", { name: "Message" }).press("Enter");
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+
+  const said = JSON.stringify(model.requests.at(-1)?.messages);
+  expect(said).toContain("You didn't open that tab");
+  expect(said).toContain("isn't a key this can press");
+  expect(said).toContain("Sign-in step");
+  expect(said).not.toContain("123456");
+  const page = app.windows().find((view) => view.url() === url)!;
+  expect(await page.evaluate(() => [sessionStorage.keys, sessionStorage.box])).toEqual(["|x| |Backspace|Escape", "x"]);
+  expect((await getTabs()).map((tab) => tab.id)).toContain(userTab);
+
+  const other = `${origin}/one`;
+  // Tab ids count up, and the model is told which it opened.
+  const nextId = `tab-${Math.max(...(await getTabs()).map((tab) => Number(tab.id.replace("tab-", "")))) + 1}`;
+  model.reset();
+  model.callTools({ name: "open_tab", args: { url: other } });
+  model.callTools({ name: "close_tab", args: { tabId: nextId } });
+  await panel.getByRole("textbox", { name: "Message" }).fill("Open one");
+  await panel.getByRole("textbox", { name: "Message" }).press("Enter");
+  await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("Closed tab");
+  expect((await getTabs()).map((tab) => tab.url)).not.toContain(other);
 });
 
 const placedView = (url: string) =>

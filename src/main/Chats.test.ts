@@ -7,7 +7,7 @@ import type { ChatThread } from "../shared/library";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
-  return { ModelConfigError, isStepLimit: (error: Error) => error.name === "ModelCallLimitMiddlewareError" };
+  return { ModelConfigError };
 });
 
 const SCREENSHOT = "data:image/png;base64,AAAA";
@@ -38,6 +38,7 @@ const setup = (
     allTabs: () => (activeTab ? [activeTab] : []),
     openTab: () => activeTab as Tab,
     openBackgroundTab,
+    closeTab: () => true,
     actionApproval: () => "always",
   }, {
     onChunk: (_, content) => chunks.push(content),
@@ -92,6 +93,7 @@ describe("Chats", () => {
         allTabs: () => [users, own],
         openTab: () => users,
         openBackgroundTab: () => own,
+        closeTab: () => true,
         actionApproval: () => "risky",
       }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
 
@@ -135,6 +137,7 @@ describe("Chats", () => {
         allTabs: () => [own, popup, gone],
         openTab: () => own,
         openBackgroundTab: () => own,
+        closeTab: () => true,
         actionApproval: () => "risky",
       }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
 
@@ -166,21 +169,6 @@ describe("Chats", () => {
       expect(acted).toEqual(["first"]);
       expect(result).toMatchObject({ stopped: true, error: null, text: "" });
       expect(chats.decide("run-1", "any", true)).toBe(false);
-    });
-
-    it("reports a step limit in words that fit a routine, and keeps what it wrote", async () => {
-      const limit = Object.assign(new Error("limit"), { name: "ModelCallLimitMiddlewareError" });
-      const stream: StreamReply = async function* () {
-        yield "so far";
-        throw limit;
-      };
-      const { chats } = setup(stream);
-
-      expect(await chats.runTask("run-1", "Look", () => {})).toMatchObject({
-        text: "so far",
-        error: "This took too many steps, so it stopped here.",
-        stopped: false,
-      });
     });
   });
 
@@ -392,7 +380,7 @@ describe("Chats", () => {
     });
 
     it("reach only the tabs a chat opened itself when it can't see a page", async () => {
-      const opened = { ...tab(), id: "tab-own", getTabText: async () => "own words", settled: async () => {} } as unknown as Tab;
+      const opened = { ...tab(), id: "tab-own", getTextWithFrames: async () => "own words", settled: async () => {} } as unknown as Tab;
       const results: string[] = [];
       let reached: ReplyOptions["tools"] = [];
       const reply: StreamReply = async function* (_, __, { tools }) {
@@ -416,6 +404,7 @@ describe("Chats", () => {
           allTabs.push(opened);
           return opened;
         },
+        closeTab: () => true,
         actionApproval: () => "always",
       }, {
         onChunk: () => {},
@@ -452,17 +441,6 @@ describe("Chats", () => {
 
       expect(working[0]).toEqual([used]);
       expect(working.at(-1)).toEqual([]);
-    });
-
-    it("explain a step limit in words the user can act on", async () => {
-      const limit = Object.assign(new Error("limit"), { name: "ModelCallLimitMiddlewareError" });
-      const { chats, replyEnded } = setup(() => {
-        throw limit;
-      });
-      const ended = replyEnded();
-      const { id } = send(chats, null, "first")!;
-      await ended;
-      expect(chats.thread(id)?.error).toMatch(/too many steps/);
     });
 
     it("read nothing once Can see is switched off during a reply", async () => {
