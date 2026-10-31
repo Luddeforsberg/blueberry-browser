@@ -200,8 +200,8 @@ export class Chats {
   // gives it back to the job. So does anything else, if they never touched it. If they did, it's theirs, and it stays
   // out of every job's reach, because Berry must not read what they left half typed.
   private async handOver(chatId: string, run: Run, job: Job, tab: Tab, need: HandoffNeed): Promise<boolean> {
-    // Another job got there first, and only its answer may let the tab go.
-    if (this.handedOver.get(tab.id)?.asking) return false;
+    // Another job got there first and only its answer may let the tab go, or the user left it half typed and it stays theirs.
+    if (this.handedOver.has(tab.id)) return false;
     const wasOwn = job.own.delete(tab.id);
     job.takenOver.set(tab.id, tab.url);
     const held = { touched: false, asking: true };
