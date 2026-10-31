@@ -105,7 +105,7 @@ export class Window {
     this._baseWindow.contentView.addChildView(this.overlay.view);
     this.openLinksInTabs(this.overlay.view.webContents);
 
-    this.chats = new Chats(chatStore, streamReply, generateTitle, () => this.activeTab, {
+    this.chats = new Chats(chatStore, streamReply, generateTitle, () => this.activeTab, () => this.allTabs, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
       onThread: (thread) => {

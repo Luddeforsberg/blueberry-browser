@@ -24,6 +24,7 @@ const MIGRATIONS = [
    CREATE INDEX messages_by_chat ON messages(chat_id, id);`,
   // A settled title is final: the user chose it, or it was generated. Chats from before this keep theirs.
   `ALTER TABLE chats ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 1;`,
+  `ALTER TABLE messages ADD COLUMN steps TEXT;`,
 ];
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
@@ -58,9 +59,12 @@ export class ChatStore {
       .prepare("SELECT id, title, updated_at AS updatedAt FROM chats WHERE id = ?")
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
-    const messages = this.db
-      .prepare("SELECT role, content FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as ChatThreadMessage[];
+    const rows = this.db
+      .prepare("SELECT role, content, steps FROM messages WHERE chat_id = ? ORDER BY id")
+      .all(id) as unknown as Array<Omit<ChatThreadMessage, "steps"> & { steps: string | null }>;
+    const messages = rows.map(({ steps, ...message }): ChatThreadMessage =>
+      steps ? { ...message, steps: JSON.parse(steps) } : message
+    );
     return { ...summary, messages };
   }
 
@@ -98,8 +102,8 @@ export class ChatStore {
 
   addMessage(chatId: string, message: ChatThreadMessage): void {
     this.db
-      .prepare("INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)")
-      .run(chatId, message.role, message.content);
+      .prepare("INSERT INTO messages (chat_id, role, content, steps) VALUES (?, ?, ?, ?)")
+      .run(chatId, message.role, message.content, message.steps?.length ? JSON.stringify(message.steps) : null);
     this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
   }
 }

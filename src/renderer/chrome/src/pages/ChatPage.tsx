@@ -14,7 +14,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const running = partial != null
     const scrollerRef = useFollowReply(
         thread?.messages.filter((message) => message.role === 'user').length ?? 0,
-        partial
+        partial,
+        thread?.steps.length ?? 0
     )
 
     const send = async (message: string) => {
@@ -50,7 +51,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
 
     // The reply being written holds the place it's saved in, so it stays the same element when it ends.
-    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial }] : thread.messages
+    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps }] : thread.messages
 
     return (
         <div className="h-full flex flex-col">
@@ -63,6 +64,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <AssistantMessage
                                 key={index}
                                 content={message.content}
+                                steps={message.steps}
                                 isStreaming={running && index === messages.length - 1}
                                 avatar
                             />

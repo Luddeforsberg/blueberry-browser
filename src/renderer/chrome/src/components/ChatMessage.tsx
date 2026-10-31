@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
+import type { ChatStep } from '@shared/library'
 import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
 
@@ -9,7 +10,7 @@ const FOLLOW_DISTANCE = 120
 
 // Keeps the newest words in view while a reply streams, unless the reader has scrolled up to read.
 // Sending a message always comes back down to it.
-export const useFollowReply = (sentCount: number, partial: string | null | undefined) => {
+export const useFollowReply = (sentCount: number, partial: string | null | undefined, stepCount: number) => {
     const scrollerRef = useRef<HTMLDivElement>(null)
     const lastSentCount = useRef(0)
 
@@ -19,7 +20,7 @@ export const useFollowReply = (sentCount: number, partial: string | null | undef
         const nearEnd = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < FOLLOW_DISTANCE
         if (sentCount !== lastSentCount.current || nearEnd) scroller.scrollTop = scroller.scrollHeight
         lastSentCount.current = sentCount
-    }, [sentCount, partial])
+    }, [sentCount, partial, stepCount])
 
     return scrollerRef
 }
@@ -70,33 +71,34 @@ const ThinkingWord: React.FC = () => (
 
 // The main chat has room for Berry beside its replies. In the narrow panel, the reply takes the width.
 // With no words yet, it says Thinking in their place, so nothing moves when they arrive.
-export const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean; avatar?: boolean }> = ({
-    content,
-    isStreaming,
-    avatar = false
-}) => (
-    <div className="relative animate-fade-in">
+// A running step already says what Berry is doing, so it doesn't say Thinking as well.
+export const AssistantMessage: React.FC<{
+    content: string
+    steps?: ChatStep[]
+    isStreaming?: boolean
+    avatar?: boolean
+}> = ({ content, steps = [], isStreaming, avatar = false }) => (
+    <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
             <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} className="absolute -left-11 top-0" />
         )}
+        {steps.length > 0 && <StepTrail steps={steps} />}
         {content ? (
             <Markdown content={content} />
         ) : (
-            <div role="status" className="flex items-center h-7 text-14 text-muted-foreground">
-                <ThinkingWord />
-            </div>
+            isStreaming &&
+            steps.every((step) => step.done) && (
+                <div role="status" className="flex items-center h-7 text-14 text-muted-foreground">
+                    <ThinkingWord />
+                </div>
+            )
         )}
     </div>
 )
 
-export interface Step {
-    text: string
-    done: boolean
-}
-
 // What Berry did on the way to a reply: a footprint for each step behind it, and the berry on the one
-// it's on now. Nothing reports steps yet, so only the gallery shows this until the agent does.
-export const StepTrail: React.FC<{ steps: Step[] }> = ({ steps }) => (
+// it's on now.
+export const StepTrail: React.FC<{ steps: ChatStep[] }> = ({ steps }) => (
     <ol aria-label="Steps" className="flex flex-col gap-2.5 text-14 text-muted-foreground">
         {steps.map((step, index) => (
             <li key={index} className="flex items-center gap-3">

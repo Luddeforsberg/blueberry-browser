@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 
 export interface FakeModelRequest {
   messages: Array<{ role: string; content: unknown }>;
+  tools?: Array<{ function: { name: string } }>;
 }
 
 const DEFAULT_TOKENS = ["A reply ", "from the model"];
@@ -23,6 +24,7 @@ export const startFakeModel = async () => {
   let holdStart: Promise<void> | null = null;
   let hold: Promise<void> | null = null;
   let title = "NONE";
+  let toolCalls: Array<{ name: string; args: object }> = [];
   const requests: FakeModelRequest[] = [];
   const titleRequests: FakeModelRequest[] = [];
 
@@ -52,6 +54,20 @@ export const startFakeModel = async () => {
     }
 
     requests.push(parsed);
+    if (toolCalls.length > 0) {
+      const calls = toolCalls.map(({ name, args }, index) => ({
+        index,
+        id: `call-${requests.length}-${index}`,
+        type: "function",
+        function: { name, arguments: JSON.stringify(args) },
+      }));
+      toolCalls = [];
+      response.setHeader("content-type", "text/event-stream");
+      response.write(sseChunk({ role: "assistant", content: null, tool_calls: calls }, null));
+      response.write(sseChunk({}, "tool_calls"));
+      response.end("data: [DONE]\n\n");
+      return;
+    }
     const reply = tokens;
     const heldStart = holdStart;
     const held = hold;
@@ -81,12 +97,17 @@ export const startFakeModel = async () => {
       holdStart = null;
       hold = null;
       title = "NONE";
+      toolCalls = [];
       requests.length = 0;
       titleRequests.length = 0;
     },
     // What the title model answers. NONE means the chat has no topic yet.
     titleWith(next: string) {
       title = next;
+    },
+    // The next reply asks for these tools instead of answering.
+    callTools(...calls: Array<{ name: string; args: object }>) {
+      toolCalls = calls;
     },
     replyWith(...next: string[]) {
       tokens = next;
