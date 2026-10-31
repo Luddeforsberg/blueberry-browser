@@ -35,6 +35,18 @@ test.beforeAll(async () => {
       return;
     }
     response.setHeader("content-type", "text/html");
+    if (request.url === "/risks") {
+      response.end(`<!doctype html><meta charset="utf-8"><title>Risks</title><body>
+        <a href="/next" onclick="event.preventDefault(); window.clicked = 'Next page'">Next page</a>
+        <button onclick="window.clicked = 'Load more'">Load more</button>
+        <form onsubmit="event.preventDefault(); window.clicked = 'Find'"><input type="search" aria-label="Search"><button>Find</button></form>
+        <button onclick="window.clicked = 'Delete'">Delete account</button>
+        <button onclick="window.clicked = 'Ta bort'">Ta bort inlägg</button>
+        <button onclick="window.clicked = 'Icon'" aria-label=""><svg width="16" height="16"></svg></button>
+        <form method="post" onsubmit="event.preventDefault(); window.clicked = 'Go'"><input aria-label="Title"><button>Go</button></form>
+      </body>`);
+      return;
+    }
     if (request.url === "/form") {
       response.end(`<!doctype html><title>Form</title><body>
         <button onclick="document.title = 'Saved'">Save</button>
@@ -92,6 +104,9 @@ const openChat = async () => {
   await chrome.getByRole("button", { name: "Show Berry" }).click();
   await expect(chrome.getByRole("complementary", { name: "Berry" })).toBeVisible();
 };
+
+const askBeforeActing = (actionApproval: "risky" | "always" | "never") =>
+  chrome.evaluate((value) => window.chromeAPI.settings.updateSettings({ actionApproval: value }), actionApproval);
 
 const askInPanel = async (text: string) => {
   const message = chrome.getByRole("complementary", { name: "Berry" }).getByRole("textbox", { name: "Message" });
@@ -294,6 +309,7 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
 });
 
 test("a chat with no page opens tabs behind itself, and reaches only those", async () => {
+  await askBeforeActing("always");
   await openFixture();
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
   const message = chrome.getByRole("textbox", { name: "Message" });
@@ -317,6 +333,7 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
 });
 
 test("Berry does nothing if a link changes while the user decides", async () => {
+  await askBeforeActing("always");
   const page = await openFixture("/form");
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" });
@@ -341,6 +358,7 @@ test("Berry does nothing if a link changes while the user decides", async () => 
 });
 
 test("Berry only acts on a page once allowed, and shows what will happen", async () => {
+  await askBeforeActing("always");
   const page = await openFixture("/form");
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" });
@@ -375,7 +393,88 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
   await expect(card).toHaveCount(0);
 });
 
+test("by default Berry acts without asking unless it's risky, and Settings can turn asking off", async () => {
+  const page = await openFixture("/risks");
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const card = panel.getByRole("region", { name: "Approval needed" });
+  const clicked = () => page.evaluate(() => (window as unknown as { clicked?: string }).clicked);
+  const act = async (name: string, args: object) => {
+    model.callTools({ name, args });
+    await askInPanel(`Do ${JSON.stringify(args)}`);
+  };
+
+  model.callTools({ name: "list_elements", args: {} });
+  await askInPanel("What's here?");
+  await expect(panel.getByRole("button", { name: "Stop" })).toHaveCount(0);
+  const replies = () => panel.getByText("A reply from the model");
+  await expect(replies()).toHaveCount(1);
+  const listed = JSON.parse(String(model.requests.at(-1)?.messages.at(-1)?.content).trim()) as {
+    elements: Array<{ ref: string; name: string; role: string }>;
+  };
+  const ref = (name: string) => listed.elements.find((element) => element.name === name)!.ref;
+  const unnamed = listed.elements.find((element) => element.name === "")!.ref;
+
+  let done = 1;
+  for (const [name, expected] of [["Next page", "Next page"], ["Load more", "Load more"], ["Find", "Find"]]) {
+    await act("click", { ref: ref(name) });
+    await expect(replies()).toHaveCount(++done);
+    expect(await clicked()).toBe(expected);
+    await expect(card).toHaveCount(0);
+  }
+  await act("type_text", { ref: ref("Search"), text: "berries" });
+  await expect(replies()).toHaveCount(++done);
+  await expect(card).toHaveCount(0);
+
+  for (const [element, expected] of [[ref("Delete account"), "Delete account"], [ref("Ta bort inlägg"), "Ta bort inlägg"], [unnamed, "”"], [ref("Go"), "Go"]]) {
+    await act("click", { ref: element });
+    await expect(card.getByText(expected, { exact: false })).toBeVisible();
+    await card.getByRole("button", { name: "Cancel" }).click();
+    await expect(replies()).toHaveCount(++done);
+  }
+  await act("type_text", { ref: ref("Title"), text: "hello" });
+  await expect(card.getByText("Type “hello”", { exact: false })).toBeVisible();
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(replies()).toHaveCount(++done);
+  await act("type_text", { ref: ref("Search"), text: "x".repeat(101) });
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(replies()).toHaveCount(++done);
+  await act("open_tab", { url: `${origin}/?secret=abc` });
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: "Cancel" }).click();
+  await expect(replies()).toHaveCount(++done);
+
+  await askBeforeActing("never");
+  await act("click", { ref: ref("Delete account") });
+  await expect(replies()).toHaveCount(++done);
+  await expect(card).toHaveCount(0);
+  expect(await clicked()).toBe("Delete");
+});
+
+test("a tab Berry is using glows and shimmers until the reply ends", async () => {
+  const page = await openFixture();
+  await openChat();
+  const row = chrome.getByRole("region", { name: "Tabs" }).getByRole("listitem").filter({ hasText: "Fixture" });
+  const glow = () => page.evaluate(() => getComputedStyle(document.documentElement, "::after").boxShadow);
+  expect(await glow()).toBe("none");
+
+  model.callTools({ name: "read_page", args: {} });
+  const release = model.holdBeforeFirstToken();
+  await askInPanel("Read this");
+  await expect.poll(glow).not.toBe("none");
+  await expect(row.getByText("Berry is working here")).toBeAttached();
+  expect((await getTabs()).find((tab) => tab.url.startsWith(origin))?.berryWorking).toBe(true);
+  await chrome.waitForTimeout(600);
+  await chrome.screenshot({ path: "/tmp/working-chrome.png" });
+
+  release();
+  await expect.poll(glow).toBe("none");
+  await expect(row.getByText("Berry is working here")).toHaveCount(0);
+});
+
 test("Berry opens an address only once allowed, and never a non-web one", async () => {
+  await askBeforeActing("always");
   await openFixture();
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" });

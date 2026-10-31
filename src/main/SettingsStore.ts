@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatWidth: CHAT_WIDTH.default,
   showBerry: true,
   keepBerryStill: false,
+  actionApproval: "risky",
   onboarded: false,
 };
 
@@ -32,6 +33,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     chatWidth: width(input.chatWidth, CHAT_WIDTH, base.chatWidth),
     showBerry: bool(input.showBerry, base.showBerry),
     keepBerryStill: bool(input.keepBerryStill, base.keepBerryStill),
+    actionApproval: pick(input.actionApproval, ["risky", "always", "never"] as const, base.actionApproval),
     onboarded: bool(input.onboarded, base.onboarded),
   };
 }

@@ -15,6 +15,9 @@ export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "galle
 
 export type Appearance = "system" | "light" | "dark";
 
+// When Berry stops to ask before acting on a page.
+export type ActionApproval = "risky" | "always" | "never";
+
 // Saved in the main process and kept across restarts.
 export interface Settings {
   layoutMode: LayoutMode;
@@ -23,6 +26,7 @@ export interface Settings {
   chatWidth: number;
   showBerry: boolean;
   keepBerryStill: boolean;
+  actionApproval: ActionApproval;
   // False until the first-launch steps are finished or skipped.
   onboarded: boolean;
 }
@@ -66,6 +70,8 @@ export interface TabInfo {
   favicon: string | null;
   isActive: boolean;
   isLoading: boolean;
+  // A running reply has used this tab, and hasn't finished yet.
+  berryWorking: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
   // Set for internal pages, which have no web view. `pageParam` picks which chat, for example.

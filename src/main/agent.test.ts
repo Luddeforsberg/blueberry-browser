@@ -6,7 +6,12 @@ import { z } from "zod";
 import type { PageTool } from "./browserTools";
 import { generateTitle, isStepLimit, ModelConfigError, modelConfig, streamReply } from "./agent";
 
-const NO_TOOLS = { tools: [], approve: async () => false, onStep: () => () => {} };
+const NO_TOOLS = {
+  tools: [],
+  actionApproval: () => "always" as const,
+  approve: async () => false,
+  onStep: () => () => {},
+};
 
 const collect = async (stream: AsyncIterable<string>) => {
   let text = "";
@@ -203,6 +208,61 @@ describe("streamReply with an action that needs approval", () => {
 
     expect(tool.run).not.toHaveBeenCalled();
     expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("page changed");
+  });
+
+  describe("when it's only asked about if risky", () => {
+    const ask = (
+      tool: PageTool,
+      model: BaseChatModel,
+      actionApproval: () => "risky" | "never",
+      asked: string[]
+    ) =>
+      collect(
+        streamReply(
+          [{ role: "user", content: "hi" }],
+          new AbortController().signal,
+          {
+            ...NO_TOOLS,
+            tools: [tool],
+            actionApproval,
+            approve: async (description) => {
+              asked.push(description);
+              return true;
+            },
+          },
+          model
+        )
+      );
+
+    it("runs a safe action without asking, and asks about a risky one", async () => {
+      const safe = click({ isRisky: async () => false });
+      const asked: string[] = [];
+      await ask(safe, callsTool("1"), () => "risky", asked);
+      expect(asked).toEqual([]);
+      expect(safe.run).toHaveBeenCalledTimes(1);
+
+      const risky = click({ isRisky: async () => true });
+      await ask(risky, callsTool("1"), () => "risky", asked);
+      expect(asked).toEqual(["Click e-1"]);
+      expect(risky.run).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks about nothing in never mode", async () => {
+      const risky = click({ isRisky: async () => true });
+      const asked: string[] = [];
+      await ask(risky, callsTool("1"), () => "never", asked);
+      expect(asked).toEqual([]);
+      expect(risky.run).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing if a safe action turned risky before it ran", async () => {
+      let checks = 0;
+      const tool = click({ isRisky: async () => ++checks > 1 });
+      const model = callsTool("1");
+      await ask(tool, model, () => "risky", []);
+      expect(tool.run).not.toHaveBeenCalled();
+      expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("page changed");
+    });
   });
 
   it("stops a run that won't end, after 30 model calls", async () => {

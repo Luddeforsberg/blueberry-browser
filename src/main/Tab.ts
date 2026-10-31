@@ -6,6 +6,19 @@ const PAGE_RADIUS = 22;
 
 // An id of our own, away from the page's world (0) and Electron's low numbers.
 const AGENT_WORLD = 1000;
+// A glow around the page while Berry works in it. Added as a style, not an element, so the page's own content
+// and scripts are left alone, and it can't take a click.
+const WORKING_CSS = `
+  html::after {
+    content: "" !important; position: fixed !important; inset: 0 !important; z-index: 2147483647 !important;
+    pointer-events: none !important;
+    box-shadow: inset 0 0 0 3px rgb(127 139 216), inset 0 0 72px rgb(127 139 216 / 0.6) !important;
+    animation: berry-working 1600ms ease-in-out infinite alternate !important;
+  }
+  @keyframes berry-working { from { opacity: 0.6; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { html::after { animation: none !important; } }
+`;
+
 // How long a click gets to start loading something, and that load to end.
 const LOAD_START_MS = 300;
 const LOAD_END_MS = 10_000;
@@ -23,6 +36,8 @@ export class Tab {
   private _url: string;
   private _favicon: string | null = null;
   private _isVisible: boolean = false;
+  private _berryWorking = false;
+  private workingStyle: Promise<string | null> | null = null;
   private events: TabEvents;
 
   constructor(
@@ -64,6 +79,8 @@ export class Tab {
     contents.on("did-navigate", (_, url) => {
       this._url = url;
       this._favicon = null;
+      // A new document has none of the old one's styles.
+      if (this._berryWorking) this.addWorkingStyle();
       this.events.onNavigate(url);
       this.events.onChange();
     });
@@ -101,6 +118,30 @@ export class Tab {
 
   get isLoading(): boolean {
     return this.webContentsView.webContents.isLoading();
+  }
+
+  get berryWorking(): boolean {
+    return this._berryWorking;
+  }
+
+  setBerryWorking(working: boolean): void {
+    if (working === this._berryWorking) return;
+    this._berryWorking = working;
+    if (working) this.addWorkingStyle();
+    else this.removeWorkingStyle();
+  }
+
+  private addWorkingStyle(): void {
+    this.workingStyle = this.webContentsView.webContents.insertCSS(WORKING_CSS).catch(() => null);
+  }
+
+  private removeWorkingStyle(): void {
+    const contents = this.webContentsView.webContents;
+    void this.workingStyle?.then((key) => {
+      if (key && !contents.isDestroyed()) return contents.removeInsertedCSS(key);
+      return undefined;
+    }).catch(() => {});
+    this.workingStyle = null;
   }
 
   get canGoBack(): boolean {

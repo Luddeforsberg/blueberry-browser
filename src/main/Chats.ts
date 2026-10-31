@@ -8,6 +8,7 @@ import {
 } from "./agent";
 import { randomUUID } from "crypto";
 import { createPageTools, type PageTool, type PageToolAccess } from "./browserTools";
+import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage } from "../shared/library";
@@ -66,12 +67,14 @@ interface Run {
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
   approval: (ChatApproval & { answer: (allow: boolean) => void }) | null;
+  tabs: Set<Tab>;
 }
 
 export interface ChatEvents {
   onChunk: (chatId: string, content: string) => void;
   onThread: (thread: ChatThread) => void;
   onListChanged: () => void;
+  onWorkingTabs: (tabs: Set<Tab>) => void;
 }
 
 // Every conversation with the model, whichever screen it's on. Replies are saved once they end.
@@ -79,7 +82,6 @@ export class Chats {
   private readonly runs = new Map<string, Run>();
   private readonly errors = new Map<string, string>();
   private pageAccess = true;
-  private readonly pageTools: PageTool[];
   // The tabs each chat opened itself, which are all it can reach when it can't see the user's page.
   private readonly ownTabs = new Map<string, Set<string>>();
 
@@ -87,14 +89,15 @@ export class Chats {
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
-    private readonly browser: Omit<PageToolAccess, "canSee"> & { openBackgroundTab: (url: string) => Tab },
+    private readonly browser: Omit<PageToolAccess, "canSee" | "onUse"> & {
+      openBackgroundTab: (url: string) => Tab;
+      actionApproval: () => ActionApproval;
+    },
     private readonly events: ChatEvents
-  ) {
-    this.pageTools = createPageTools({ ...browser, canSee: () => this.pageAccess });
-  }
+  ) {}
 
   // These open behind the chat, so the approval cards and the reply stay in front of the user.
-  private ownTabTools(chatId: string): PageTool[] {
+  private ownTabTools(chatId: string, onUse: (tab: Tab) => void): PageTool[] {
     const ids = this.ownTabs.get(chatId) ?? new Set<string>();
     this.ownTabs.set(chatId, ids);
     const allTabs = () => this.browser.allTabs().filter((tab) => ids.has(tab.id));
@@ -107,6 +110,7 @@ export class Chats {
         return tab;
       },
       canSee: () => true,
+      onUse,
     });
   }
 
@@ -145,7 +149,7 @@ export class Chats {
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set() };
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
@@ -169,6 +173,7 @@ export class Chats {
   delete(chatId: string): boolean {
     this.stop(chatId);
     this.runs.delete(chatId);
+    this.publishWorkingTabs();
     this.errors.delete(chatId);
     this.ownTabs.delete(chatId);
     if (!this.store.deleteChat(chatId)) return false;
@@ -189,10 +194,22 @@ export class Chats {
     const { signal } = run.controller;
     try {
       const messages = await this.withNewestPage(chatId, seePage);
-      const tools = seePage && this.pageAccess && this.activeTab ? this.pageTools : this.ownTabTools(chatId);
+      const onUse = (tab: Tab) => {
+        run.tabs.add(tab);
+        this.publishWorkingTabs();
+      };
+      const tools =
+        seePage && this.pageAccess && this.activeTab
+          ? createPageTools({ ...this.browser, canSee: () => this.pageAccess, onUse })
+          : this.ownTabTools(chatId, onUse);
       const onStep = (text: string) => this.startStep(chatId, run, text);
       const approve = (text: string) => this.askToAllow(chatId, run, text);
-      for await (const words of this.streamReply(messages, signal, { tools, approve, onStep })) {
+      for await (const words of this.streamReply(messages, signal, {
+        tools,
+        actionApproval: this.browser.actionApproval,
+        approve,
+        onStep,
+      })) {
         const content = run.breakBeforeText ? `\n\n${words}` : words;
         run.breakBeforeText = false;
         run.partial += content;
@@ -208,6 +225,7 @@ export class Chats {
     // Deleted while replying, so there's nowhere to save it.
     if (this.runs.get(chatId) !== run) return;
     this.runs.delete(chatId);
+    this.publishWorkingTabs();
     if (run.partial || run.steps.length > 0) {
       // A step cut off by Stop is over too.
       const steps = run.steps.map((step) => ({ ...step, done: true }));
@@ -215,6 +233,10 @@ export class Chats {
     }
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
+  }
+
+  private publishWorkingTabs(): void {
+    this.events.onWorkingTabs(new Set([...this.runs.values()].flatMap((run) => [...run.tabs])));
   }
 
   private publish(chatId: string, run: Run): void {

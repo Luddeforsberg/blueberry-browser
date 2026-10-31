@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { Appearance, LayoutMode } from '@shared/ipc'
+import type { ActionApproval, Appearance, LayoutMode } from '@shared/ipc'
 import { useShell } from '../contexts/ShellContext'
 import { cn } from '@common/lib/utils'
 import { Choice, Switch } from '@common/components/Controls'
@@ -18,6 +18,12 @@ const Row: React.FC<{ id: string; title: string; description?: string; children?
         {children}
     </div>
 )
+
+const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
+    risky: 'Berry asks before anything that could delete, send, buy or change text. Opening pages and searching happen without asking.',
+    always: 'Berry asks before every click, every typed word and every new page.',
+    never: "Berry doesn't ask, so it can delete, send or buy without checking with you, including if a page tricks it. Only use this if you're watching."
+}
 
 const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Data and privacy', 'Account'] as const
 type Section = typeof SECTIONS[number]
@@ -99,6 +105,22 @@ export const SettingsPage: React.FC = () => {
                                         labelledBy="setting-still-berry"
                                         checked={settings.keepBerryStill}
                                         onChange={(keepBerryStill) => updateSettings({ keepBerryStill })}
+                                    />
+                                </Row>
+                                <Row
+                                    id="setting-action-approval"
+                                    title="Ask before acting"
+                                    description={APPROVAL_DESCRIPTIONS[settings.actionApproval]}
+                                >
+                                    <Choice<ActionApproval>
+                                        label="Ask before acting"
+                                        value={settings.actionApproval}
+                                        onChange={(actionApproval) => updateSettings({ actionApproval })}
+                                        options={[
+                                            { value: 'risky', label: 'When risky' },
+                                            { value: 'always', label: 'Always' },
+                                            { value: 'never', label: 'Never' }
+                                        ]}
                                     />
                                 </Row>
                                 <Row id="setting-berry-sees" title="What Berry can see" description="Berry only reads a page when you ask, and only speaks up about work you started. Your history and memory stay on this device." />

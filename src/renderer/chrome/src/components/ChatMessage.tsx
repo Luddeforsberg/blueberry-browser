@@ -66,9 +66,10 @@ export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     </div>
 )
 
-const ThinkingWord: React.FC = () => (
-    <span className="bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer">Thinking</span>
-)
+// Words for work happening right now.
+export const SHIMMER_TEXT = 'bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer'
+
+const ThinkingWord: React.FC = () => <span className={SHIMMER_TEXT}>Thinking</span>
 
 // The main chat has room for Berry beside its replies. In the narrow panel, the reply takes the width.
 // With no words yet, it says Thinking in their place, so nothing moves when they arrive.
@@ -117,8 +118,8 @@ export const StepTrail: React.FC<{ steps: ChatStep[] }> = ({ steps }) => (
                         <BerryDot working />
                     )}
                 </span>
-                <span className={step.done ? undefined : 'text-foreground'}>
-                    {step.text}
+                <span>
+                    <span className={step.done ? undefined : SHIMMER_TEXT}>{step.text}</span>
                     {!step.done && <span className="sr-only"> (in progress)</span>}
                 </span>
             </li>

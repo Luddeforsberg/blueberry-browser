@@ -180,7 +180,7 @@ Dark `berry-ink` is lifted just enough to stay visible while still reading as a 
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
 - **Radius:** 8px for controls, 12px for sidebar rows and inputs, 22px for cards, panels and the page card, including the web page view itself, 26px for the composer, and full for buttons and segmented controls.
 - **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, cards on the art blueberry and selected rows in the sidebar also get a shadow.
-- **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration and is never shown otherwise.
+- **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration, and also shows while Berry is using the tab in a running reply. Inside the page, a matching inset glow pulses slowly, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
 
 ## 5. Typography
 
@@ -361,7 +361,7 @@ A full page for talking to Berry about anything, not about a particular web page
 
 - Opens on the right with `⌘E` (`Ctrl+E` on Windows) and pushes the page.
 - A card on the composer, with the page's icon, title and address, shows the page Berry can see. Removing it takes the page away from Berry, and the composer's + brings it back. No card means Berry sees no page. While the card is there, Berry may also read your other open tabs when the question needs it, and every look shows as a step. With no card, Berry can only open and use tabs of its own, each after asking, and they open behind the chat. A tab you go to becomes yours, and Berry can't reach it this way any more.
-- Approval requests are cards showing exactly what will happen. Every click, typed text and new address waits for one, and Cancel tells Berry no.
+- Approval requests are cards showing exactly what will happen. By default one appears only for what could delete, send, buy or change text, such as a Delete button or typing in a form, and for an address carrying data in its query. Going to a plain link or typing a search doesn't ask. Settings can make Berry ask always or never. Cancel tells Berry no.
 - Using Berry requires an account, requested the first time someone uses it. Browsing, tabs and bookmarks never need one.
 
 ### Routines
@@ -370,7 +370,7 @@ A list with schedule, last run and result, plus a run history showing what Berry
 
 ### Settings
 
-Plain sections, including layout, appearance, Berry (Still and Hide), and data and privacy, which must be easy to find. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), and data and privacy, which must be easy to find. Appearance follows the system by default, with a manual light or dark override.
 
 ## 10. Accessibility
 

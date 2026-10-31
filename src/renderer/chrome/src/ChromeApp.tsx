@@ -40,7 +40,8 @@ const Shell: React.FC = () => {
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
-    const reading = isLoading && pageAccess && !!activeTab && !activeTab.page
+    // It also shows on any tab Berry is using in the reply it's working on.
+    const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess))
 
     return (
         <div className={cn("relative h-full", theme.glass ? "bg-frame" : "bg-background")}>
