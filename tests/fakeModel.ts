@@ -24,7 +24,7 @@ export const startFakeModel = async () => {
   let holdStart: Promise<void> | null = null;
   let hold: Promise<void> | null = null;
   let title = "NONE";
-  let toolCalls: Array<{ name: string; args: object }> = [];
+  let toolCalls: Array<Array<{ name: string; args: object }>> = [];
   const requests: FakeModelRequest[] = [];
   const titleRequests: FakeModelRequest[] = [];
 
@@ -54,14 +54,14 @@ export const startFakeModel = async () => {
     }
 
     requests.push(parsed);
-    if (toolCalls.length > 0) {
-      const calls = toolCalls.map(({ name, args }, index) => ({
+    const nextCalls = toolCalls.shift();
+    if (nextCalls) {
+      const calls = nextCalls.map(({ name, args }, index) => ({
         index,
         id: `call-${requests.length}-${index}`,
         type: "function",
         function: { name, arguments: JSON.stringify(args) },
       }));
-      toolCalls = [];
       response.setHeader("content-type", "text/event-stream");
       response.write(sseChunk({ role: "assistant", content: null, tool_calls: calls }, null));
       response.write(sseChunk({}, "tool_calls"));
@@ -105,9 +105,9 @@ export const startFakeModel = async () => {
     titleWith(next: string) {
       title = next;
     },
-    // The next reply asks for these tools instead of answering.
+    // The next reply asks for these tools instead of answering. Call again for the reply after that.
     callTools(...calls: Array<{ name: string; args: object }>) {
-      toolCalls = calls;
+      toolCalls.push(calls);
     },
     replyWith(...next: string[]) {
       tokens = next;

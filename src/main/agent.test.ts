@@ -1,11 +1,12 @@
 import { FakeListChatModel } from "@langchain/core/utils/testing";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { AIMessage, fakeModel } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
 import { generateTitle, ModelConfigError, modelConfig, streamReply } from "./agent";
 
-const NO_TOOLS = { tools: [], onStep: () => () => {} };
+const NO_TOOLS = { tools: [], approve: async () => false, onStep: () => () => {} };
 
 const collect = async (stream: AsyncIterable<string>) => {
   let text = "";
@@ -68,6 +69,7 @@ describe("streamReply", () => {
         [{ role: "user", content: "hi" }],
         new AbortController().signal,
         {
+          ...NO_TOOLS,
           tools: [pageTool],
           onStep: (step) => {
             steps.push(`start ${step}`);
@@ -120,6 +122,95 @@ describe("streamReply with a bad tool call", () => {
 
     expect(text).toBe("recovered");
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe("streamReply with an action that needs approval", () => {
+  const callsTool = (...ids: string[]) =>
+    fakeModel()
+      .respond(
+        new AIMessage({
+          content: "",
+          tool_calls: ids.map((id) => ({ name: "click", args: { ref: `e-${id}` }, id })),
+        })
+      )
+      .respond(new AIMessage("finished"));
+
+  const click = (overrides: Partial<PageTool> = {}): PageTool => ({
+    name: "click",
+    description: "Clicks",
+    schema: z.object({ ref: z.string() }),
+    label: () => "Clicked",
+    describe: async (args) => `Click ${(args as { ref: string }).ref}`,
+    run: vi.fn(async () => "clicked"),
+    ...overrides,
+  });
+
+  const reply = (tool: PageTool, model: BaseChatModel, approve: (text: string) => Promise<boolean>) =>
+    collect(
+      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve }, model)
+    );
+
+  it("runs once allowed, showing the user what will happen", async () => {
+    const tool = click();
+    const asked: string[] = [];
+
+    const text = await reply(tool, callsTool("1"), async (description) => {
+      asked.push(description);
+      expect(tool.run).not.toHaveBeenCalled();
+      return true;
+    });
+
+    expect(asked).toEqual(["Click e-1"]);
+    expect(tool.run).toHaveBeenCalledTimes(1);
+    expect(text).toBe("finished");
+  });
+
+  it("doesn't run when refused, and tells the model", async () => {
+    const tool = click();
+    const model = callsTool("1");
+
+    const text = await reply(tool, model, async () => false);
+
+    expect(tool.run).not.toHaveBeenCalled();
+    expect(text).toBe("finished");
+    expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("The user said no");
+  });
+
+  it("asks about each action in one model turn, and only runs the allowed one", async () => {
+    const run = vi.fn(async () => "clicked");
+    const asked: string[] = [];
+
+    await reply(click({ run }), callsTool("1", "2"), async (description) => {
+      asked.push(description);
+      return description === "Click e-2";
+    });
+
+    expect(asked.sort()).toEqual(["Click e-1", "Click e-2"]);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledWith({ ref: "e-2" });
+  });
+
+  it("does nothing if the page no longer matches what was allowed", async () => {
+    let page = "before";
+    const tool = click({ describe: async () => `Click on ${page}` });
+    const model = callsTool("1");
+
+    await reply(tool, model, async () => {
+      page = "after";
+      return true;
+    });
+
+    expect(tool.run).not.toHaveBeenCalled();
+    expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("page changed");
+  });
+
+  it("stops when the wait for an answer is cut short", async () => {
+    await expect(
+      reply(click(), callsTool("1"), async () => {
+        throw new Error("Stopped");
+      })
+    ).rejects.toThrow("Stopped");
   });
 });
 

@@ -105,7 +105,11 @@ export class Window {
     this._baseWindow.contentView.addChildView(this.overlay.view);
     this.openLinksInTabs(this.overlay.view.webContents);
 
-    this.chats = new Chats(chatStore, streamReply, generateTitle, () => this.activeTab, () => this.allTabs, {
+    this.chats = new Chats(chatStore, streamReply, generateTitle, {
+      activeTab: () => this.activeTab,
+      allTabs: () => this.allTabs,
+      openTab: (url) => this.createTab(url),
+    }, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
       onThread: (thread) => {
@@ -248,6 +252,8 @@ export class Window {
   }
 
   // With no address, a tab opens on the new tab page.
+  createTab(url: string): Tab;
+  createTab(url?: string): BrowserTab;
   createTab(url?: string): BrowserTab {
     if (!url) return this.openPage("new-tab");
     const tab = this.createWebTab(`tab-${++this.tabCounter}`, url);

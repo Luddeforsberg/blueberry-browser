@@ -5,10 +5,11 @@ import {
   type ReplyMessage,
   type StreamReply,
 } from "./agent";
-import { createPageTools, type PageTool } from "./browserTools";
+import { randomUUID } from "crypto";
+import { createPageTools, type PageTool, type PageToolAccess } from "./browserTools";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
-import type { ChatStep, ChatThread, ChatThreadMessage } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage } from "../shared/library";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
@@ -62,6 +63,7 @@ interface Run {
   steps: ChatStep[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
+  approval: (ChatApproval & { answer: (allow: boolean) => void }) | null;
 }
 
 export interface ChatEvents {
@@ -81,11 +83,14 @@ export class Chats {
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
-    private readonly activeTab: () => Tab | null,
-    allTabs: () => Tab[],
+    private readonly browser: Omit<PageToolAccess, "canSee">,
     private readonly events: ChatEvents
   ) {
-    this.pageTools = createPageTools({ activeTab, allTabs, canSee: () => this.pageAccess });
+    this.pageTools = createPageTools({ ...browser, canSee: () => this.pageAccess });
+  }
+
+  private get activeTab(): Tab | null {
+    return this.browser.activeTab();
   }
 
   thread(id: string): ChatThread | null {
@@ -94,10 +99,12 @@ export class Chats {
   }
 
   private toThread(chat: StoredChat): ChatThread {
+    const run = this.runs.get(chat.id);
     return {
       ...chat,
-      partial: this.runs.get(chat.id)?.partial ?? null,
-      steps: this.runs.get(chat.id)?.steps ?? [],
+      partial: run?.partial ?? null,
+      steps: run?.steps ?? [],
+      approval: run?.approval ? { id: run.approval.id, text: run.approval.text } : null,
       error: this.errors.get(chat.id) ?? null,
     };
   }
@@ -112,7 +119,7 @@ export class Chats {
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null };
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
@@ -155,9 +162,10 @@ export class Chats {
     const { signal } = run.controller;
     try {
       const messages = await this.withNewestPage(chatId, seePage);
-      const tools = seePage && this.pageAccess && this.activeTab() ? this.pageTools : [];
+      const tools = seePage && this.pageAccess && this.activeTab ? this.pageTools : [];
       const onStep = (text: string) => this.startStep(chatId, run, text);
-      for await (const words of this.streamReply(messages, signal, { tools, onStep })) {
+      const approve = (text: string) => this.askToAllow(chatId, run, text);
+      for await (const words of this.streamReply(messages, signal, { tools, approve, onStep })) {
         const content = run.breakBeforeText ? `\n\n${words}` : words;
         run.breakBeforeText = false;
         run.partial += content;
@@ -182,19 +190,49 @@ export class Chats {
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
   }
 
+  private publish(chatId: string, run: Run): void {
+    const thread = this.runs.get(chatId) === run ? this.thread(chatId) : null;
+    if (thread) this.events.onThread(thread);
+  }
+
   private startStep(chatId: string, run: Run, text: string): () => void {
     const step: ChatStep = { text, done: false };
-    const publish = () => {
-      const thread = this.runs.get(chatId) === run ? this.thread(chatId) : null;
-      if (thread) this.events.onThread(thread);
-    };
     run.steps.push(step);
     run.breakBeforeText = run.partial !== "";
-    publish();
+    this.publish(chatId, run);
     return () => {
       step.done = true;
-      publish();
+      this.publish(chatId, run);
     };
+  }
+
+  private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
+    const { signal } = run.controller;
+    return new Promise((resolve, reject) => {
+      const stopped = () => reject(new Error("Stopped while waiting for approval"));
+      if (signal.aborted) return stopped();
+      signal.addEventListener("abort", stopped, { once: true });
+      run.approval = {
+        id: randomUUID(),
+        text,
+        answer: (allow) => {
+          signal.removeEventListener("abort", stopped);
+          resolve(allow);
+        },
+      };
+      this.publish(chatId, run);
+    });
+  }
+
+  // False if that request has already been answered or its reply has ended.
+  decide(chatId: string, approvalId: string, allow: boolean): boolean {
+    const run = this.runs.get(chatId);
+    if (run?.approval?.id !== approvalId) return false;
+    const { answer } = run.approval;
+    run.approval = null;
+    answer(allow === true);
+    this.publish(chatId, run);
+    return true;
   }
 
   // Never rejects: a chat keeps its first message as its title until this works.
@@ -220,7 +258,7 @@ export class Chats {
   }
 
   private async readPage(): Promise<Page | null> {
-    const tab = this.pageAccess ? this.activeTab() : null;
+    const tab = this.pageAccess ? this.activeTab : null;
     if (!tab) return null;
 
     const [screenshot, text] = await Promise.all([

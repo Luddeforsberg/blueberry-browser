@@ -65,6 +65,7 @@ const chromeAPI: ChromeAPI = {
   chat: {
     send: (chatId, text, options) => invoke("chat:send", chatId, text, options),
     stop: (chatId) => invoke("chat:stop", chatId),
+    decide: (chatId, approvalId, allow) => invoke("chat:decide", chatId, approvalId, allow),
     rename: (chatId, title) => invoke("chat:rename", chatId, title),
     showMenu: (chatId) => invoke("chat:menu", chatId),
     getPageText: () => invoke("page:text"),
