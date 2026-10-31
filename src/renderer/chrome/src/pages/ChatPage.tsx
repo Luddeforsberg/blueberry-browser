@@ -1,7 +1,7 @@
 import React from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { useChatThread } from '../contexts/ChatContext'
-import { AssistantMessage, ChatError, ThinkingMessage, UserMessage, useFollowReply } from '../components/ChatMessage'
+import { AssistantMessage, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
 import { BerryHero, useAssistantName } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
 
@@ -49,19 +49,25 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         )
     }
 
+    // The reply being written holds the place it's saved in, so it stays the same element when it ends.
+    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial }] : thread.messages
+
     return (
         <div className="h-full flex flex-col">
             <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
                 <div className="max-w-[800px] mx-auto px-6 pt-8 pb-4 flex flex-col gap-6">
-                    {thread.messages.map((message, index) =>
+                    {messages.map((message, index) =>
                         message.role === 'user' ? (
                             <UserMessage key={index} content={message.content} />
                         ) : (
-                            <AssistantMessage key={index} content={message.content} avatar />
+                            <AssistantMessage
+                                key={index}
+                                content={message.content}
+                                isStreaming={running && index === messages.length - 1}
+                                avatar
+                            />
                         )
                     )}
-                    {partial === '' && <ThinkingMessage />}
-                    {partial && <AssistantMessage content={partial} isStreaming avatar />}
                     {thread.error && <ChatError message={thread.error} />}
                 </div>
             </div>

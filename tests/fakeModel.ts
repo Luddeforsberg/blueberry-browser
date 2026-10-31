@@ -20,6 +20,7 @@ const sseChunk = (delta: object, finish: string | null) =>
 // A local stand-in for OpenAI's API, so tests run the real app and client without paying for a model.
 export const startFakeModel = async () => {
   let tokens = DEFAULT_TOKENS;
+  let holdStart: Promise<void> | null = null;
   let hold: Promise<void> | null = null;
   let title = "NONE";
   const requests: FakeModelRequest[] = [];
@@ -52,9 +53,12 @@ export const startFakeModel = async () => {
 
     requests.push(parsed);
     const reply = tokens;
+    const heldStart = holdStart;
     const held = hold;
+    holdStart = null;
     hold = null;
     response.setHeader("content-type", "text/event-stream");
+    if (heldStart) await heldStart;
     response.write(sseChunk({ role: "assistant", content: reply[0] }, null));
     if (held) await held;
     for (const token of reply.slice(1)) response.write(sseChunk({ content: token }, null));
@@ -74,6 +78,7 @@ export const startFakeModel = async () => {
     titleRequests,
     reset() {
       tokens = DEFAULT_TOKENS;
+      holdStart = null;
       hold = null;
       title = "NONE";
       requests.length = 0;
@@ -85,6 +90,12 @@ export const startFakeModel = async () => {
     },
     replyWith(...next: string[]) {
       tokens = next;
+    },
+    // The next reply waits before its first token until the returned function is called.
+    holdBeforeFirstToken() {
+      let release = () => {};
+      holdStart = new Promise<void>((resolve) => (release = resolve));
+      return () => release();
     },
     // The next reply waits after its first token until the returned function is called.
     holdAfterFirstToken() {

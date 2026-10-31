@@ -448,6 +448,43 @@ test("the thinking state shimmers", async () => {
   await expect(chrome.getByRole("status").getByText("Thinking")).toHaveCSS("animation-name", "shimmer");
 });
 
+test("a reply takes over from Thinking in place, and isn't redrawn when it ends", async () => {
+  const fadesDone = () =>
+    chrome.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => (animation as CSSAnimation).animationName === "fade-in")
+          .map((animation) => animation.finished)
+      ).then(() => undefined)
+    );
+  model.replyWith("first words ", "and the rest");
+  const releaseStart = model.holdBeforeFirstToken();
+  const releaseRest = model.holdAfterFirstToken();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  const message = chrome.getByRole("textbox", { name: "Message" }).last();
+  await message.fill("hello");
+  await message.press("Enter");
+
+  const berry = chrome.getByRole("img", { name: "Berry, thinking" });
+  await expect(chrome.getByRole("status").getByText("Thinking")).toBeVisible();
+  await fadesDone();
+  const thinking = await berry.boundingBox();
+
+  releaseStart();
+  const words = chrome.getByText("first words");
+  await expect(words).toBeVisible();
+  await expect(chrome.getByRole("status")).toHaveCount(0);
+  await fadesDone();
+  expect(await berry.boundingBox()).toEqual(thinking);
+  const reply = await words.elementHandle();
+
+  releaseRest();
+  await expect(chrome.getByRole("button", { name: "Send" }).last()).toBeVisible();
+  await expect(words).toHaveText("first words and the rest");
+  expect(await reply?.evaluate((element) => element.isConnected)).toBe(true);
+});
+
 test("the chrome renderer gets no raw IPC or code execution in tabs", async () => {
   expect(await chrome.evaluate(() => "electron" in window)).toBe(false);
   expect(await chrome.evaluate(() => "tabRunJs" in window.chromeAPI.browser)).toBe(false);
