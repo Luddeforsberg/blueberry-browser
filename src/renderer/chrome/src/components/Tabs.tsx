@@ -18,6 +18,7 @@ const TabItem: React.FC<{
     style?: React.CSSProperties
 }> = ({ tab, mode, onActivate, onClose, onPress, onNudge, dragged, shifting, style }) => (
     <li
+        data-berry-tab={tab.id}
         onPointerDown={onPress}
         onDragStart={(e) => e.preventDefault()}
         style={style}

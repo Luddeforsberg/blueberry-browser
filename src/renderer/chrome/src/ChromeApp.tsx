@@ -11,6 +11,7 @@ import { Toolbar } from './components/Toolbar'
 import { ChatPanel } from './components/ChatPanel'
 import { ResizeHandle } from './components/ResizeHandle'
 import { Onboarding } from './components/Onboarding'
+import { BerryCompanion } from './components/BerryCompanion'
 import { cn } from '@common/lib/utils'
 
 // Regions sit exactly where main's layout puts them, so the tab view lines up with the page card.
@@ -41,7 +42,7 @@ const Shell: React.FC = () => {
             {/* One card holds the toolbar, bookmarks bar and page, so they read as one surface. */}
             <Region
                 rect={{ ...layout.toolbar, height: page.y + page.height - layout.toolbar.y }}
-                className={cn("bg-canvas", layout.sidebarOpen && "rounded-tl-card", layout.chatOpen && "rounded-tr-card")}
+                className={cn("bg-canvas", layout.sidebarOpen && "rounded-tl-card shadow-page", layout.chatOpen && "rounded-tr-card")}
             />
             {/* Internal pages draw here. For web pages it shows until the tab view paints. */}
             <Region rect={page} className="overflow-hidden">
@@ -74,6 +75,7 @@ const Shell: React.FC = () => {
                     <ResizeHandle panel="chat" />
                 </Region>
             )}
+            <BerryCompanion />
         </div>
     )
 }

@@ -155,22 +155,24 @@ Berry has separate tokens and never uses the UI accent:
 
 | Token | Light | Dark |
 |---|---|---|
-| `berry-ink` (body) | `#1a2240` | `#4a5896` |
-| `berry-wing` | `#2d3a68` | `#5e6caa` |
-| `berry-nape` | `#98a5c3` | `#98a3c8` |
+| `berry-ink` (body) | `#181c2e` | `#3a4270` |
+| `berry-wing` | `#2e3454` | `#525c8e` |
+| `berry-nape` | `#9ea6be` | `#a8b0c8` |
 | `berry-eye` | `#f4f1e6` | `#f4f1e6` |
-| `berry-beak` | `#10152b` | `#161c3a` |
-| `berry-fruit` (gradient) | `#5a6db8`, `#34458f`, `#1b2560` | Same |
-| `berry-fruit-bloom` | `#d5dcf2` | Same |
-| `berry-fruit-crown` | `#1a2358` | Same |
+| `berry-pupil` | `#141624` | `#141624` |
+| `berry-beak` | `#3e4466` | `#5c648c` |
+| `berry-fruit-mid` | `#5568b2` | Same |
+| `berry-fruit-dark` (shade) | `#37478f` | Same |
+| `berry-fruit-bloom` | `#7e8ec8` | Same |
+| `berry-fruit-crown` | `#182054` | Same |
 
-Dark `berry-ink` is deliberately deep, about 2.0–2.5:1 against the dark surfaces and 1.5:1 on worst-case glass. That is below the 3:1 for meaningful graphics, so nothing may rely on Berry alone: moods have text labels, and the pale eye and nape carry the shape.
+Dark `berry-ink` is lifted just enough to stay visible while still reading as a dark bird. It is below the 3:1 for meaningful graphics, so the eyes, hood and berry carry the shape, and nothing may rely on Berry alone: moods have text labels.
 
 ### Spacing, radius, elevation
 
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
 - **Radius:** 8px for controls, 10px for sidebar rows and inputs, 20px for cards and panels, 24px for the composer, and full for buttons and segmented controls.
-- **Elevation:** chrome regions are separated by tone, not shadow. Three things get a shadow: things that float, the composer, and selected rows in the sidebar.
+- **Elevation:** chrome regions are separated by tone, with a soft left-facing shadow on the page card when the sidebar is open. The page shadow is `-2px 0 6px`, black at 4% in light mode and 12% in dark mode. Things that float, the composer, and selected rows in the sidebar also get a shadow.
 
 ## 5. Typography
 
@@ -227,24 +229,24 @@ Tabs also show: page loading, audio playing, crashed, and Berry working in this 
 
 ## 8. Berry, the mascot
 
-Berry is a small jackdaw in flat ink who carries a blueberry. Berry is "it", and it refers to itself as "I".
+Berry is a small jackdaw in flat ink who nearly always has a blueberry in its beak. Berry is "it", and it refers to itself as "I".
 
 ### Character
 
-- **Bird:** rounded but not fat, somewhere between sleek and plump. A pale eye and a grey nape are what make it a jackdaw, and the eye carries most of the expression.
-- **Blueberry:** its signature. It has a matte, dusty bloom, a slightly squashed shape, and a sunken crown with uneven lobes set off-centre. It is never a blue circle with a star.
-- **Style:** flat ink in the product. Large moments may add engraved detail.
-- **Implementation:** SVG and Motion behind a `<Mascot mood>` interface, so artwork can be replaced without touching screens. Prototype flight first, and consider Rive only if SVG flight looks poor.
+- **Bird:** a big head on a plump, smooth body with stubby legs, turned three-quarters so it can look at you. Softness comes from gentle light on the chest and a few deliberate feathers, never a bumpy outline. A dark cap and throat, a grey hood behind them and pale eyes with big pupils make it a friendly jackdaw, and the eyes carry most of the expression.
+- **Blueberry:** its signature, and what ties Berry to the name. It stays in Berry's beak, even in the smallest icon, and leaves only when Berry is thinking, finishes a job, makes a mistake or sleeps. It has a matte, dusty bloom, a slightly squashed shape, and a sunken crown with uneven lobes set off-centre. It is never a blue circle with a star.
+- **Style:** flat ink, with the berry in the same flat style as the bird. Large moments may add engraved detail.
+- **Implementation:** one SVG drawing per mood behind a `<Mascot mood size>` interface, animated with CSS, so artwork can be replaced without touching screens. Each mood should be recognisable from its outline. Rive is the next step for the large animated moments.
 
 ### Sizes
 
 | Size | Drawing |
 |---|---|
-| 16–20px | Simplified: no wing, nape, legs or berry, with a larger eye. This shows identity only. |
-| 24px | The same simplified drawing. This is the smallest size that may show a mood, through pose and eye alone. |
+| 16–20px | Simplified: just the head and the berry, with one larger eye. This shows identity only. |
+| 24–31px | The same simplified drawing. 24px is the smallest size that may show a mood, through head tilt and eye alone. |
 | 32px and up | Full drawing. |
 
-The blueberry's crown turns into a smudge below about 20px, which is another reason the simplified drawing leaves it out.
+The blueberry's crown turns into a smudge below about 20px, so at those sizes its colour and shape carry it.
 
 ### Personality and voice
 
@@ -268,26 +270,32 @@ Every mood has a text label for assistive technology.
 
 | Mood | Meaning | Pose |
 |---|---|---|
-| At rest | Present, nothing happening | Perched |
-| Curious | Looking at something you asked about | Head cocked |
-| Thinking | Working something out | Eye drifts up |
-| Fetching | Working out on the web | In flight, carrying the berry |
-| Asking | Needs your decision | Holds the berry and waits |
-| Delivered | Finished | Sets the berry down, a bit smug |
-| Oops | Something went wrong | Slumped, a feather falls |
-| Off duty | Nothing to do for a long time | Asleep |
+| At rest | Present, nothing happening | Perched, berry in beak, blinks now and then |
+| Sitting | On a tab or the edge of a card | Legs hanging over the edge and swinging, berry in beak |
+| Curious | Looking at something you asked about | Leans in, head cocked |
+| Thinking | Working something out | Head back, eyes up, tossing the berry |
+| Fetching | Working out on the web | In flight, wings beating, berry in beak |
+| Asking | Needs your decision | Faces you square on, berry held out |
+| Delivered | Finished | Sets the berry down, chest out, heavy-lidded and a bit smug |
+| Oops | Something went wrong | Slumped, berry rolled away, a feather falls |
+| Off duty | Nothing to do for a long time | Fluffed up asleep, berry beside it |
 
 ### Where Berry appears
 
 | Place | What it does |
 |---|---|
 | Onboarding | Large, guides setup |
-| New tab and an empty main chat | Large, centred above the composer |
-| Browsing | Small in the chrome, and its mood shows what it is doing |
+| New tab | Large, sitting on the composer's top edge with its legs over it |
+| Empty main chat | Large, standing above the composer |
+| Browsing | Small, sitting on the active tab with its legs hanging |
 | Chat | Working and waiting states beside its replies |
 | Routines | Flies off when a routine runs and returns with the result |
 | Settings | Its own section |
 | Over a web page | Only while acting on that page, in an overlay view |
+
+### Where Berry goes
+
+Berry belongs to real parts of the interface, so it only ever sits in the places listed above. It never wanders on its own. It flies when the active tab changes and that takes it somewhere new, and at most once every 15 seconds: quicker tab changes move it with a quick fade. Web pages sit above the chrome, so a flight towards a web page passes behind it.
 
 ### When Berry may interrupt
 
@@ -309,7 +317,7 @@ Poses switch with a quick fade, with no flying or hopping. Nothing relies on see
 
 Available from Settings and by right-clicking the perch:
 
-- **Still:** keeps the bird, stops all animation.
+- **Still:** keeps the bird, stops all animation and flight. It moves between places with a quick fade.
 - **Hide Berry:** removes the character everywhere, replacing it with a plain icon and neutral copy.
 
 Every feature keeps working either way, and turning it off never prompts the user to reconsider.
@@ -322,7 +330,7 @@ Four short, skippable steps: meet Berry, choose layout and appearance, import fr
 
 ### New tab
 
-Berry, large and centred, above a 752px composer with a tray under it linking to Routines, a new chat and Settings. Below that are two idea cards linking to real features, then recent pages if there are any. A faint scatter of berries and leaves fills the background. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
+Berry, large, sitting on the top edge of a 752px composer with a tray under it linking to Routines, a new chat and Settings. Below that are two idea cards linking to real features, then recent pages if there are any. Faint, irregular trails of alternating bird footprints sit in the background, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
 
 `Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
 
@@ -399,7 +407,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 - Don't put glass on web pages or inject styles into them for chrome effects.
 - Don't use raw hex values or hard-coded sizes in components.
 - Don't add a colour, weight, font or shadow that isn't in this document.
-- Don't add bounce to the chrome or loops without real work behind them.
+- Don't add bounce to the chrome or loops without real work behind them. The one exception is Berry's world on the new tab page and the legs of a sitting Berry.
 - Don't let Berry joke about permissions, payments, messages, data or failures.
 - Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start.
 - Don't read page content unless the user asked.

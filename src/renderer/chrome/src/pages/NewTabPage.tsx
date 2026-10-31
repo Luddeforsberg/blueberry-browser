@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { ArrowRight, Lightbulb, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import { Favicon } from '../components/Favicon'
-import { BerryHero, useAssistantName } from '../components/Berry'
+import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
 import { Backdrop } from '../components/Backdrop'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
@@ -78,10 +78,12 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="relative h-full overflow-y-auto">
             <Backdrop />
-            <div className="relative max-w-[800px] mx-auto px-6 pt-[13vh] pb-12">
-                <BerryHero title="Where shall we start today?" />
+            <div className="relative max-w-[800px] mx-auto px-6 pt-[22vh] pb-12">
+                <h1 className="sr-only">Where shall we start today?</h1>
+                {/* Room for Berry, who sits on the composer's top edge with its legs over it. */}
+                {isBerry && <div className="h-[84px]" />}
 
-                <div className="rounded-composer bg-tray">
+                <div data-berry-home className="rounded-composer bg-tray">
                     <Composer
                         label={`Search, enter a URL, or ask ${isBerry ? 'Berry' : 'a question'}`}
                         placeholder={isBerry ? 'Ask Berry anything, or enter a URL…' : 'Ask anything, or enter a URL…'}
