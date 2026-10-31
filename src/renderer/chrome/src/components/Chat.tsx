@@ -21,6 +21,7 @@ const ConversationTurnComponent: React.FC<{
         {turn.assistant && (
             <AssistantMessage
                 content={turn.assistant.content}
+                steps={turn.assistant.steps}
                 isStreaming={turn.assistant.isStreaming}
             />
         )}
@@ -41,7 +42,8 @@ export const Chat: React.FC = () => {
     const { messages, isLoading, error, sendMessage, stop, pageAccess: enabled, setPageAccess: change } = useChat()
     const scrollerRef = useFollowReply(
         messages.filter((message) => message.role === 'user').length,
-        messages[messages.length - 1]?.content
+        messages[messages.length - 1]?.content,
+        messages[messages.length - 1]?.steps?.length ?? 0
     )
     const name = useAssistantName()
     const { activeTab } = useBrowser()

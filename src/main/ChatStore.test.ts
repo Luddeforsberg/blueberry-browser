@@ -22,6 +22,20 @@ describe("ChatStore", () => {
     });
   });
 
+  it("keeps a reply's steps, and adds none to other messages", () => {
+    const store = new ChatStore(":memory:");
+    const id = store.createChat("Trip");
+    store.addMessage(id, { role: "user", content: "first" });
+    store.addMessage(id, { role: "assistant", content: "", steps: [{ text: "Read a.com", done: true }] });
+    store.addMessage(id, { role: "assistant", content: "second", steps: [] });
+
+    expect(store.chat(id)?.messages).toEqual([
+      { role: "user", content: "first" },
+      { role: "assistant", content: "", steps: [{ text: "Read a.com", done: true }] },
+      { role: "assistant", content: "second" },
+    ]);
+  });
+
   it("has no chat for an unknown id", () => {
     const store = new ChatStore(":memory:");
     expect(store.summaries()).toEqual([]);

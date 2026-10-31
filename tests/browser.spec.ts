@@ -255,6 +255,34 @@ test("the panel shares the page with the model, and the main chat doesn't", asyn
   expect(JSON.stringify(model.requests.at(-1)?.messages)).not.toContain("hello from the page");
 });
 
+test("Berry reads a page with a tool and shows the step, and only where it can see a page", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const site = new URL(origin).hostname;
+
+  model.callTools({ name: "find_in_page", args: { query: "HELLO" } });
+  await askInPanel("Does it say hello?");
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  await expect(panel.getByRole("list", { name: "Steps" }).getByText(`Searched ${site}`)).toBeVisible();
+
+  const [offered, answered] = model.requests;
+  expect(offered.tools?.map((tool) => tool.function.name)).toEqual(["list_tabs", "read_page", "find_in_page"]);
+  const toolMessage = answered.messages.at(-1);
+  expect(toolMessage?.role).toBe("tool");
+  expect(toolMessage?.content).toContain("1 matches");
+  expect(toolMessage?.content).toContain("hello from the page");
+  await expect(panel.getByText("matches on")).toHaveCount(0);
+
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  await expect(chrome.getByRole("textbox", { name: "Message" })).toHaveCount(2);
+  const message = chrome.getByRole("textbox", { name: "Message" }).first();
+  await message.fill("Something else");
+  await message.press("Enter");
+  await expect.poll(() => model.requests.length).toBe(3);
+  expect(model.requests.at(-1)?.tools).toBeUndefined();
+});
+
 test("chats are still there after a restart", async () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-chats-"));
   await app.close();

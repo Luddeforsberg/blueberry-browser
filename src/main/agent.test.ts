@@ -1,6 +1,11 @@
 import { FakeListChatModel } from "@langchain/core/utils/testing";
-import { describe, expect, it } from "vitest";
+import { AIMessage, fakeModel } from "langchain";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import type { PageTool } from "./browserTools";
 import { generateTitle, ModelConfigError, modelConfig, streamReply } from "./agent";
+
+const NO_TOOLS = { tools: [], onStep: () => () => {} };
 
 const collect = async (stream: AsyncIterable<string>) => {
   let text = "";
@@ -40,9 +45,43 @@ describe("streamReply", () => {
   it("streams the model's text through the agent", async () => {
     const model = new FakeListChatModel({ responses: ["hello there"] });
     const text = await collect(
-      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, model)
+      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, NO_TOOLS, model)
     );
     expect(text).toBe("hello there");
+  });
+
+  it("runs a tool, reports it, and keeps its result out of the reply", async () => {
+    const pageTool: PageTool = {
+      name: "read_page",
+      description: "Reads the page",
+      schema: z.object({ tabId: z.string() }),
+      label: () => "Read example.com",
+      run: async (args) => `secret page words from ${(args as { tabId: string }).tabId}`,
+    };
+    const model = fakeModel()
+      .respond(new AIMessage({ content: "", tool_calls: [{ name: "read_page", args: { tabId: "tab-1" }, id: "call-1" }] }))
+      .respond(new AIMessage("the answer"));
+    const steps: string[] = [];
+
+    const text = await collect(
+      streamReply(
+        [{ role: "user", content: "hi" }],
+        new AbortController().signal,
+        {
+          tools: [pageTool],
+          onStep: (step) => {
+            steps.push(`start ${step}`);
+            return () => steps.push(`end ${step}`);
+          },
+        },
+        model
+      )
+    );
+
+    expect(text).toBe("the answer");
+    expect(steps).toEqual(["start Read example.com", "end Read example.com"]);
+    const toolMessage = model.calls.at(-1)?.messages.at(-1);
+    expect(toolMessage?.text).toBe("secret page words from tab-1");
   });
 
   it("stops when aborted", async () => {
@@ -50,7 +89,7 @@ describe("streamReply", () => {
     const controller = new AbortController();
     const seen: string[] = [];
     const run = async () => {
-      for await (const token of streamReply([{ role: "user", content: "hi" }], controller.signal, model)) {
+      for await (const token of streamReply([{ role: "user", content: "hi" }], controller.signal, NO_TOOLS, model)) {
         seen.push(token);
         controller.abort();
       }
@@ -58,6 +97,29 @@ describe("streamReply", () => {
 
     await expect(run()).rejects.toThrow();
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe("streamReply with a bad tool call", () => {
+  it("tells the model, so one bad call doesn't end the reply", async () => {
+    const run = vi.fn(async () => "never");
+    const model = fakeModel()
+      .respond(new AIMessage({ content: "", tool_calls: [{ name: "find", args: { query: "" }, id: "call-1" }] }))
+      .respond(new AIMessage("recovered"));
+    const tool: PageTool = {
+      name: "find",
+      description: "Finds",
+      schema: z.object({ query: z.string().min(1) }),
+      label: () => "Looked",
+      run,
+    };
+
+    const text = await collect(
+      streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool] }, model)
+    );
+
+    expect(text).toBe("recovered");
+    expect(run).not.toHaveBeenCalled();
   });
 });
 

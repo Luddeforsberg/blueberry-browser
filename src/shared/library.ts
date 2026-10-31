@@ -13,9 +13,16 @@ export interface Bookmark {
   url: string;
 }
 
+// Something Berry did on the way to a reply.
+export interface ChatStep {
+  text: string;
+  done: boolean;
+}
+
 export interface ChatThreadMessage {
   role: "user" | "assistant";
   content: string;
+  steps?: ChatStep[];
 }
 
 export interface ChatThreadSummary {
@@ -28,6 +35,8 @@ export interface ChatThread extends ChatThreadSummary {
   messages: ChatThreadMessage[];
   // The reply being written, which is saved once it ends. Null when no reply is running.
   partial: string | null;
+  // What the running reply has done so far. Empty when no reply is running.
+  steps: ChatStep[];
   // Why the last reply failed, until the next message.
   error: string | null;
 }

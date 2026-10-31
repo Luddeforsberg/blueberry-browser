@@ -5,9 +5,10 @@ import {
   type ReplyMessage,
   type StreamReply,
 } from "./agent";
+import { createPageTools, type PageTool } from "./browserTools";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
-import type { ChatThread } from "../shared/library";
+import type { ChatStep, ChatThread, ChatThreadMessage } from "../shared/library";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
@@ -49,9 +50,18 @@ const withPage = (message: string, page: Page): ReplyContent => {
   ];
 };
 
+// The model sees what it did earlier by these notes, not by the pages themselves, which aren't saved.
+const toReplyMessage = ({ role, content, steps }: ChatThreadMessage): ReplyMessage => ({
+  role,
+  content: steps ? `<steps>\n${steps.map((step) => `- ${step.text}`).join("\n")}\n</steps>\n\n${content}` : content,
+});
+
 interface Run {
   controller: AbortController;
   partial: string;
+  steps: ChatStep[];
+  // Words after a step start a new paragraph, not the end of the sentence before it.
+  breakBeforeText: boolean;
 }
 
 export interface ChatEvents {
@@ -65,14 +75,18 @@ export class Chats {
   private readonly runs = new Map<string, Run>();
   private readonly errors = new Map<string, string>();
   private pageAccess = true;
+  private readonly pageTools: PageTool[];
 
   constructor(
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
     private readonly activeTab: () => Tab | null,
+    allTabs: () => Tab[],
     private readonly events: ChatEvents
-  ) {}
+  ) {
+    this.pageTools = createPageTools({ activeTab, allTabs, canSee: () => this.pageAccess });
+  }
 
   thread(id: string): ChatThread | null {
     const chat = this.store.chat(id);
@@ -83,6 +97,7 @@ export class Chats {
     return {
       ...chat,
       partial: this.runs.get(chat.id)?.partial ?? null,
+      steps: this.runs.get(chat.id)?.steps ?? [],
       error: this.errors.get(chat.id) ?? null,
     };
   }
@@ -97,7 +112,7 @@ export class Chats {
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
 
-    const run: Run = { controller: new AbortController(), partial: "" };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false };
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
@@ -140,7 +155,11 @@ export class Chats {
     const { signal } = run.controller;
     try {
       const messages = await this.withNewestPage(chatId, seePage);
-      for await (const content of this.streamReply(messages, signal)) {
+      const tools = seePage && this.pageAccess && this.activeTab() ? this.pageTools : [];
+      const onStep = (text: string) => this.startStep(chatId, run, text);
+      for await (const words of this.streamReply(messages, signal, { tools, onStep })) {
+        const content = run.breakBeforeText ? `\n\n${words}` : words;
+        run.breakBeforeText = false;
         run.partial += content;
         this.events.onChunk(chatId, content);
       }
@@ -154,9 +173,28 @@ export class Chats {
     // Deleted while replying, so there's nowhere to save it.
     if (this.runs.get(chatId) !== run) return;
     this.runs.delete(chatId);
-    if (run.partial) this.store.addMessage(chatId, { role: "assistant", content: run.partial });
+    if (run.partial || run.steps.length > 0) {
+      // A step cut off by Stop is over too.
+      const steps = run.steps.map((step) => ({ ...step, done: true }));
+      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps });
+    }
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
+  }
+
+  private startStep(chatId: string, run: Run, text: string): () => void {
+    const step: ChatStep = { text, done: false };
+    const publish = () => {
+      const thread = this.runs.get(chatId) === run ? this.thread(chatId) : null;
+      if (thread) this.events.onThread(thread);
+    };
+    run.steps.push(step);
+    run.breakBeforeText = run.partial !== "";
+    publish();
+    return () => {
+      step.done = true;
+      publish();
+    };
   }
 
   // Never rejects: a chat keeps its first message as its title until this works.
@@ -174,7 +212,7 @@ export class Chats {
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.
   private async withNewestPage(chatId: string, seePage: boolean): Promise<ReplyMessage[]> {
-    const messages: ReplyMessage[] = this.store.chat(chatId)?.messages ?? [];
+    const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
     const page = seePage ? await this.readPage() : null;
     const newest = messages[messages.length - 1];
     if (!page || !newest || typeof newest.content !== "string") return messages;

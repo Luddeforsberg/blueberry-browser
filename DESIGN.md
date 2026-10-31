@@ -360,7 +360,7 @@ A full page for talking to Berry about anything, not about a particular web page
 ### Chat panel
 
 - Opens on the right with `⌘E` (`Ctrl+E` on Windows) and pushes the page.
-- A card on the composer, with the page's icon, title and address, shows the page Berry can see. Removing it takes the page away from Berry, and the composer's + brings it back. No card means Berry sees no page.
+- A card on the composer, with the page's icon, title and address, shows the page Berry can see. Removing it takes the page away from Berry, and the composer's + brings it back. No card means Berry sees no page. While the card is there, Berry may also read your other open tabs when the question needs it, and every look shows as a step.
 - Approval requests are cards showing exactly what will happen.
 - Using Berry requires an account, requested the first time someone uses it. Browsing, tabs and bookmarks never need one.
 

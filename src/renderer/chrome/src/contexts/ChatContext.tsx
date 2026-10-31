@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ChatThread } from '@shared/library'
+import type { ChatStep, ChatThread } from '@shared/library'
 
 export interface Message {
     id: string
     role: 'user' | 'assistant'
     content: string
+    steps?: ChatStep[]
     isStreaming?: boolean
 }
 
@@ -49,8 +50,8 @@ const toMessages = (thread: ChatThread | null): Message[] => {
     if (!thread) return []
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
     // Before the first words arrive, the thinking state stands in for the reply.
-    return thread.partial
-        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial, isStreaming: true }]
+    return thread.partial || thread.steps.length > 0
+        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', steps: thread.steps, isStreaming: true }]
         : saved
 }
 

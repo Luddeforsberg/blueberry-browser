@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
-import type { GenerateTitle, ReplyMessage, StreamReply } from "./agent";
+import type { GenerateTitle, ReplyMessage, ReplyOptions, StreamReply } from "./agent";
 import type { Tab } from "./Tab";
 import type { ChatThread } from "../shared/library";
 
@@ -31,7 +31,7 @@ const setup = (
   const chunks: string[] = [];
   let listChanges = 0;
   let onEnd = () => {};
-  const chats = new Chats(store, streamReply, generateTitle, () => activeTab, {
+  const chats = new Chats(store, streamReply, generateTitle, () => activeTab, () => (activeTab ? [activeTab] : []), {
     onChunk: (_, content) => chunks.push(content),
     onThread: (thread) => {
       threads.push(thread);
@@ -250,6 +250,118 @@ describe("Chats", () => {
     finishers.forEach((finish) => finish());
 
     await vi.waitFor(() => expect(threads.filter((thread) => thread.partial === null)).toHaveLength(2));
+  });
+
+  describe("page tools", () => {
+    const toolNames = async (activeTab: Tab | null, seePage: boolean, canSee: boolean) => {
+      let options: ReplyOptions | null = null;
+      const { chats, replyEnded } = setup(async function* (_, __, given) {
+        options = given;
+        yield "ok";
+      }, activeTab);
+      chats.setPageAccess(canSee);
+      const ended = replyEnded();
+      send(chats, null, "first", seePage);
+      await ended;
+      return (options as ReplyOptions | null)?.tools.map((tool) => tool.name);
+    };
+
+    it("are only offered when Berry can see a page", async () => {
+      expect(await toolNames(tab(), true, true)).toEqual(["list_tabs", "read_page", "find_in_page"]);
+      expect(await toolNames(tab(), false, true)).toEqual([]);
+      expect(await toolNames(tab(), true, false)).toEqual([]);
+      expect(await toolNames(null, true, true)).toEqual([]);
+    });
+
+    it("read nothing once Can see is switched off during a reply", async () => {
+      const { chats, replyEnded } = setup(async function* (_, __, { tools }) {
+        chats.setPageAccess(false);
+        for (const tool of tools) yield tool.label({ query: "page" }) + (await tool.run({ query: "page" }));
+      });
+
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      const { content } = chats.thread(id)!.messages.at(-1)!;
+      expect(content).not.toContain("page text");
+      expect(content).not.toContain("example.com");
+    });
+
+    it("drop what they read if Can see is switched off while reading", async () => {
+      let chats: Chats | null = null;
+      let reads = 0;
+      const context = setup(
+        async function* (_, __, { tools }) {
+          for (const tool of tools) yield await tool.run({ query: "page" });
+        },
+        tab({
+          // The first read is the page sent with the message. The second is the tool's.
+          getTabText: async () => {
+            if (++reads === 2) chats?.setPageAccess(false);
+            return "page text";
+          },
+        })
+      );
+      chats = context.chats;
+
+      const ended = context.replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      expect(chats.thread(id)?.messages.at(-1)?.content).not.toContain("page text");
+    });
+
+    const stepping =
+      (texts: string[], words: string[]): StreamReply =>
+      async function* (_, __, { onStep }) {
+        yield words[0];
+        for (const text of texts) onStep(text)();
+        yield words[1];
+      };
+
+    it("saves the steps with the reply, and tells the model about them next time", async () => {
+      const replies: StreamReply[] = [stepping(["Read a.com"], ["Let me look.", "Found it."]), recording];
+      const { chats, chunks, replyEnded } = setup((...args) => replies.shift()!(...args));
+
+      let ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      expect(chunks).toEqual(["Let me look.", "\n\nFound it."]);
+      expect(chats.thread(id)?.steps).toEqual([]);
+      expect(chats.thread(id)?.messages.at(-1)).toEqual({
+        role: "assistant",
+        content: "Let me look.\n\nFound it.",
+        steps: [{ text: "Read a.com", done: true }],
+      });
+
+      ended = replyEnded();
+      send(chats, id, "second", false);
+      await ended;
+      expect(sent[0][1].content).toBe("<steps>\n- Read a.com\n</steps>\n\nLet me look.\n\nFound it.");
+    });
+
+    it("shows a step while it runs, and saves it as over when stopped with no words yet", async () => {
+      const running: StreamReply = async function* (_, signal, { onStep }) {
+        onStep("Read a.com");
+        yield "";
+        await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+      };
+      const { chats, threads, replyEnded } = setup(running);
+
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await vi.waitFor(() => expect(threads.at(-1)?.steps).toEqual([{ text: "Read a.com", done: false }]));
+      chats.stop(id);
+      await ended;
+
+      expect(chats.thread(id)?.messages.at(-1)).toEqual({
+        role: "assistant",
+        content: "",
+        steps: [{ text: "Read a.com", done: true }],
+      });
+    });
   });
 
   describe("titles", () => {
