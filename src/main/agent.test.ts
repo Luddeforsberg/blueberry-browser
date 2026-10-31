@@ -10,7 +10,7 @@ const collect = async (stream: AsyncIterable<string>) => {
 
 describe("modelConfig", () => {
   it("defaults to OpenAI, and needs its key", () => {
-    expect(modelConfig({ OPENAI_API_KEY: "key" })).toMatchObject({ provider: "openai", apiKey: "key" });
+    expect(modelConfig({ OPENAI_API_KEY: "key" })).toMatchObject({ provider: "openai", apiKey: "key", model: "gpt-6.1-terra" });
     expect(() => modelConfig({})).toThrow(/OPENAI_API_KEY/);
     expect(() => modelConfig({ OPENAI_API_KEY: "" })).toThrow(ModelConfigError);
   });
