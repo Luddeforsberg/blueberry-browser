@@ -187,6 +187,12 @@ export class AppMenu {
             accelerator: "CmdOrCtrl+Right",
             click: () => this.handleGoForward(),
           },
+          { type: "separator" },
+          {
+            label: "History",
+            accelerator: "CmdOrCtrl+Y",
+            click: () => this.mainWindow.openPage("history"),
+          },
         ],
       },
     ];

@@ -104,6 +104,17 @@ const NO_ACCESS = "The user has turned off page access, so nothing can be read."
 
 const tabId = z.string().optional().describe("The tab, from list_tabs. Leave out for the tab the user is on.");
 
+// Said instead of a vaguer failure, so the model tells the user what to do rather than trying again.
+const inTrouble = (tab: Tab): string | null => {
+  if (tab.trouble === "crashed") {
+    return `The page in tab ${tab.id} has crashed, so nothing happened there. It stays that way until the user reloads it, so tell them.`;
+  }
+  if (tab.trouble === "unresponsive") {
+    return `The page in tab ${tab.id} isn't responding, so nothing happened there. The user can wait or reload it, so tell them.`;
+  }
+  return null;
+};
+
 export interface PageToolAccess {
   activeTab: () => Tab | null;
   allTabs: () => Tab[];
@@ -129,7 +140,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
     onUse(tab);
     const text = await readText(tab);
     if (!canSee()) return NO_ACCESS;
-    return text === null ? `The page at ${tab.url} could not be read.` : format(tab, text);
+    return text === null ? (inTrouble(tab) ?? `The page at ${tab.url} could not be read.`) : format(tab, text);
   };
 
   const withTab = async (id: string | undefined, act: (tab: Tab) => Promise<string>) => {
@@ -141,13 +152,15 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee, onUse }: 
       return await act(tab);
     } catch (error) {
       console.error("A page tool failed:", error);
-      return canSee() ? `That didn't work on ${tab.url}.` : NO_ACCESS;
+      return canSee() ? (inTrouble(tab) ?? `That didn't work on ${tab.url}.`) : NO_ACCESS;
     }
   };
 
   const whereNow = async (tab: Tab) => {
     await tab.settled();
     if (!canSee()) return NO_ACCESS;
+    const trouble = inTrouble(tab);
+    if (trouble) return trouble;
     return `Done. Tab ${tab.id} is now at ${tab.url}, titled ${tab.title}.`;
   };
 

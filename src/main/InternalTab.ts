@@ -7,6 +7,7 @@ const TITLES: Record<InternalPage, string> = {
   settings: "Settings",
   downloads: "Downloads",
   gallery: "Component gallery",
+  history: "History",
 };
 
 // A tab whose page the chrome renderer draws, so it has no web view and no navigation history.
@@ -17,6 +18,7 @@ export class InternalTab {
   readonly berryWorking = false;
   readonly canGoBack = false;
   readonly canGoForward = false;
+  readonly trouble = null;
   title: string;
 
   constructor(

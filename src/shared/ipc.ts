@@ -13,12 +13,15 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history";
 
 export type Appearance = "system" | "light" | "dark";
 
 // When Berry stops to ask before acting on a page.
 export type ActionApproval = "risky" | "always" | "never";
+
+// What the app opens with: the tabs from last time, or just a new tab.
+export type StartupChoice = "restore" | "fresh";
 
 // Saved in the main process and kept across restarts.
 export interface Settings {
@@ -32,6 +35,7 @@ export interface Settings {
   // An absolute path, or null for the system's Downloads folder.
   downloadFolder: string | null;
   askWhereToSave: boolean;
+  onStartup: StartupChoice;
   // False until the first-launch steps are finished or skipped.
   onboarded: boolean;
   // Page zoom in percent, by site. Sites at 100% aren't listed.
@@ -98,6 +102,25 @@ export interface Visit {
   visitedAt: number;
 }
 
+// One visit in the saved history.
+export interface HistoryEntry extends Visit {
+  id: number;
+}
+
+export interface HistoryCursor {
+  visitedAt: number;
+  id: number;
+}
+
+// A page of history, and where the next one starts, if there is one.
+export interface HistoryPage {
+  entries: HistoryEntry[];
+  next: HistoryCursor | null;
+}
+
+// Why a web tab can't show its page right now. Null when all is well.
+export type TabTrouble = "crashed" | "unresponsive";
+
 export interface Rect {
   x: number;
   y: number;
@@ -138,6 +161,7 @@ export interface TabInfo {
   // Set for internal pages, which have no web view. `pageParam` picks which chat, for example.
   page: InternalPage | null;
   pageParam: string | null;
+  trouble: TabTrouble | null;
 }
 
 export interface ThemeState {
@@ -174,6 +198,14 @@ export interface InvokeChannels {
     result: TabInfo;
   };
   "history:recent": { region: "chrome"; args: []; result: Visit[] };
+  "history:search": {
+    region: "chrome";
+    args: [options: { query?: string; before?: HistoryCursor }];
+    result: HistoryPage;
+  };
+  "history:delete": { region: "chrome"; args: [id: number]; result: boolean };
+  // Asks first, in main. False if the user said no.
+  "history:clear": { region: "chrome"; args: []; result: boolean };
   "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
   "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
@@ -277,6 +309,9 @@ export interface BrowserAPI {
   resetZoom: (tabId: string) => Promise<boolean>;
   openPage: (page: InternalPage, options?: { param?: string; title?: string }) => Promise<TabInfo>;
   getRecent: () => Promise<Visit[]>;
+  searchHistory: (options: { query?: string; before?: HistoryCursor }) => Promise<HistoryPage>;
+  deleteHistoryEntry: (id: number) => Promise<boolean>;
+  clearHistory: () => Promise<boolean>;
   onTabsUpdated: (callback: (tabs: TabInfo[]) => void) => Unsubscribe;
   onFocusAddress: (callback: () => void) => Unsubscribe;
 }
