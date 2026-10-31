@@ -155,17 +155,21 @@ const scheduleTime = (minutes: number): string => {
   return `${String(Math.floor(rounded / 60)).padStart(2, "0")}:${String(rounded % 60).padStart(2, "0")}`;
 };
 
+const DAY_MINUTES = 24 * 60;
+
 const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 // The hour of the day that holds the most different days, if most of the visits fall in it.
 const habitualTime = (visits: PatternVisit[]): { minutes: number; days: number } | null => {
   const sorted = visits.map(({ visitedAt }) => ({ minutes: minutesOf(visitedAt), day: dayOf(visitedAt) })).sort((a, b) => a.minutes - b.minutes);
   let best: { minutes: number; days: number } | null = null;
+  // The day wraps, so a habit around midnight is one hour and not two.
+  const wrapped = [...sorted, ...sorted.map(({ minutes, day }) => ({ minutes: minutes + DAY_MINUTES, day }))];
   sorted.forEach(({ minutes: from }, start) => {
-    const inside = sorted.slice(start).filter(({ minutes }) => minutes < from + HABIT_WINDOW_MINUTES);
+    const inside = wrapped.slice(start).filter(({ minutes }) => minutes < from + HABIT_WINDOW_MINUTES);
     const days = new Set(inside.map(({ day }) => day)).size;
     if (days >= MIN_TIMES && inside.length >= sorted.length * HABIT_SHARE && (!best || days > best.days)) {
-      best = { minutes: median(inside.map(({ minutes }) => minutes)), days };
+      best = { minutes: median(inside.map(({ minutes }) => minutes)) % DAY_MINUTES, days };
     }
   });
   return best;
@@ -231,16 +235,7 @@ const sitePattern = ({ host, visits, titles, label }: SiteVisits, now: number): 
     chatTitles: [],
   };
 
-  const time = habitualTime(visits);
-  if (time) {
-    return {
-      ...base,
-      kind: "routine",
-      why: `You’ve opened ${label} around ${clockTime(time.minutes)} ${howOften(time.days, span)}`,
-      schedule: { kind: "daily", time: scheduleTime(time.minutes) },
-      score: time.days * 2,
-    };
-  }
+  // A weekday first: the same hour on one weekday would otherwise look like a daily habit.
   const weekday = habitualWeekday(visits, days);
   if (weekday) {
     return {
@@ -249,6 +244,16 @@ const sitePattern = ({ host, visits, titles, label }: SiteVisits, now: number): 
       why: `You’ve opened ${label} on ${weekday.dates} ${WEEKDAYS[weekday.weekday]}s in the last ${span} days`,
       schedule: { kind: "weekly", days: [weekday.weekday], time: scheduleTime(weekday.minutes) },
       score: weekday.dates * 2,
+    };
+  }
+  const time = habitualTime(visits);
+  if (time) {
+    return {
+      ...base,
+      kind: "routine",
+      why: `You’ve opened ${label} around ${clockTime(time.minutes)} ${howOften(time.days, span)}`,
+      schedule: { kind: "daily", time: scheduleTime(time.minutes) },
+      score: time.days * 2,
     };
   }
   const pages = new Set(visits.map(({ url }) => url.split("#")[0])).size;

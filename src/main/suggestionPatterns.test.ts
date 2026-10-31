@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPatterns, isShareable, topPatterns, type PatternVisit } from "./suggestionPatterns";
+import { findPatterns, isShareable, topPatterns, type Pattern, type PatternVisit } from "./suggestionPatterns";
 import { cardsFromReply } from "./Suggestions";
 
 const NOW = new Date(2026, 9, 31, 18, 0).getTime();
@@ -39,6 +39,17 @@ describe("sites", () => {
     const visits = [7, 14, 21].map((daysAgo) => hn(daysAgo, daysAgo));
     const [pattern] = findPatterns(visits, [], on(0, 18));
     expect(pattern.schedule?.kind).toBe("weekly");
+  });
+
+  it("doesn't call the same hour on one weekday a daily habit", () => {
+    const [pattern] = findPatterns([hn(7), hn(14), hn(21)], [], NOW);
+    expect(pattern.schedule).toMatchObject({ kind: "weekly", time: "08:15" });
+  });
+
+  it("sees a habit around midnight as one hour", () => {
+    const [pattern] = findPatterns([hn(1, 23, 50), hn(2, 0, 5), hn(3, 23, 55), hn(4, 0, 10)], [], NOW);
+    expect(pattern.kind).toBe("routine");
+    expect(pattern.schedule?.kind).toBe("daily");
   });
 
   it("forgets a habit nobody has kept up", () => {
@@ -125,6 +136,12 @@ describe("the model's words", () => {
     const [card] = cardsFromReply(reply({ instructions: "Read the front page.", schedule: { kind: "once", at: 0 } }), [routine]);
     expect(card.kind === "routine" && card.draft.schedule).toEqual({ kind: "daily", time: "08:15" });
     expect(card.kind === "routine" && card.draft.instructions).toBe("On news.ycombinator.com: Read the front page.");
+  });
+
+  it("belong to the whole pattern, not just its first site", () => {
+    const together = { ids: ["site:b.example", "site:a.example"], sites: [], pageTitles: [], chatTitles: [], kind: "prompt", why: "", schedule: null, score: 1 } as Pattern;
+    const [card] = cardsFromReply(JSON.stringify({ cards: [{ id: "p1", title: "Both", prompt: "Compare them" }] }), [together]);
+    expect(card.id).toBe("site:a.example+site:b.example");
   });
 
   it("can't name a site outside the pattern", () => {

@@ -95,6 +95,9 @@ const mascotDraft = (card: Record<string, unknown>, pattern: Pattern, name: stri
   return "error" in parsed ? null : parsed.draft;
 };
 
+// Words were written for exactly these sites and chats, so they only ever go back on the same pattern.
+const wordsKey = ({ ids }: Pattern): string => [...ids].sort().join("+");
+
 // The model's words become cards only if they fit their pattern. Anything off is dropped and that pattern gets no card.
 export const cardsFromReply = (reply: string, patterns: Pattern[], otherSiteNames: string[] = []): SuggestionWords[] => {
   let parsed: unknown;
@@ -118,7 +121,7 @@ export const cardsFromReply = (reply: string, patterns: Pattern[], otherSiteName
         !pattern.chatTitles.join(" ").toLowerCase().includes(name.toLowerCase())
     );
     const fits = (...texts: string[]) => texts.every((text) => namesOnlyItsSites(text, pattern, others));
-    const id = pattern.ids[0];
+    const id = wordsKey(pattern);
 
     if (pattern.kind === "prompt") {
       const prompt = words(card.prompt, MAX_PROMPT);
@@ -194,8 +197,11 @@ export class Suggestions {
     const { open, newest } = this.patterns;
     void this.refresh(open, newest);
     const cards = this.saved.cards.flatMap((card): Suggestion[] => {
-      const pattern = open.find(({ ids }) => ids.includes(card.id));
-      return pattern ? [{ ...card, why: pattern.why }] : [];
+      const pattern = open.find((candidate) => wordsKey(candidate) === card.id && candidate.kind === card.kind);
+      if (!pattern) return [];
+      // The habit can drift while the words still fit, so its time comes from the pattern, as the reason does.
+      if (card.kind === "routine" && pattern.schedule) return [{ ...card, why: pattern.why, draft: { ...card.draft, schedule: pattern.schedule } }];
+      return [{ ...card, why: pattern.why }];
     });
     return pickShown(cards);
   }
@@ -203,7 +209,7 @@ export class Suggestions {
   // It stays gone: anything sharing a site or chat with it is ruled out too.
   dismiss(id: unknown): Suggestion[] {
     if (typeof id === "string") {
-      const ids = this.patterns.all.find((pattern) => pattern.ids.includes(id))?.ids ?? [id];
+      const ids = this.patterns.all.find((pattern) => wordsKey(pattern) === id)?.ids ?? id.split("+");
       this.save({
         ...this.saved,
         dismissed: [...new Set([...this.saved.dismissed, ...ids])],
@@ -218,7 +224,7 @@ export class Suggestions {
     if (this.asking) return;
     const { askedAt, seen } = this.saved;
     if (askedAt > 0 && (this.now - askedAt < HOUR_MS || newest <= seen)) return;
-    const hasWords = (pattern: Pattern) => this.saved.cards.some((card) => pattern.ids.includes(card.id));
+    const hasWords = (pattern: Pattern) => this.saved.cards.some((card) => card.id === wordsKey(pattern) && card.kind === pattern.kind);
     const unwritten = topPatterns(open).filter((pattern) => !hasWords(pattern));
     if (unwritten.length === 0 || !this.sources.hasModel()) return;
 
