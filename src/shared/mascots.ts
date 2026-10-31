@@ -147,5 +147,7 @@ export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" |
         : types
           ? { text: "Can type, but can’t click", open: false }
           : { text: "Can’t type or click", open: false };
-  return visits ? [where, hands] : [where, { text: "Can’t open pages by itself", open: false }, hands];
+  // A click or a key can still follow a link, so without either is the only time it can't reach a new page at all.
+  const noVisit = clicks || types ? "Can’t go to an address by itself" : "Can’t open pages by itself";
+  return visits ? [where, hands] : [where, { text: noVisit, open: false }, hands];
 };

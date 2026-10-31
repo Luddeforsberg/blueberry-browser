@@ -11,7 +11,7 @@ describe("permissionsInWords", () => {
     [["hemnet.se"], ["visit"], ["Only visits hemnet.se", "Can’t type or click"]],
     [["hemnet.se", "booli.se"], ["visit", "click"], ["Only visits hemnet.se and booli.se", "Can click, but can’t type"]],
     [["a.se", "b.se", "c.se"], ["visit", "type"], ["Only visits a.se, b.se and c.se", "Can type, but can’t click"]],
-    [["hemnet.se"], ["click", "type"], ["Only reads hemnet.se", "Can’t open pages by itself", "Can click and type"]],
+    [["hemnet.se"], ["click", "type"], ["Only reads hemnet.se", "Can’t go to an address by itself", "Can click and type"]],
   ] as const)("says what %j and %j allow", (sites, tools, expected) => {
     expect(words([...sites], [...tools])).toEqual(expected);
   });
