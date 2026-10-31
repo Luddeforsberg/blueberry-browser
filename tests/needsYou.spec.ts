@@ -172,7 +172,7 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
 
     // The real one goes in the page, and the job carries on. This page repeats it back, in its words and its title.
     model.callTools({ name: "read_page", args: {} });
-    model.callTools({ name: "list_tabs", args: {} });
+    model.callTools({ name: "screenshot", args: {} });
     model.callTools({ name: "open_tab", args: { url: `${site.origin}/boxes` } });
     model.callTools({ name: "hand_to_user", args: { need: "code" } });
     const codeMessage = telegram.userSends(CODE);
@@ -194,6 +194,8 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     const seen = JSON.stringify(model.requests) + JSON.stringify(model.titleRequests);
     expect(seen).toContain("A code was entered");
     expect(seen).toContain("Order 4471");
+    expect(seen).toContain("Screenshots of tab");
+    expect(seen).not.toContain("data:image/");
     for (const secret of [CODE, BOX_CODE, `${BOX_CODE.slice(0, 3)} ${BOX_CODE.slice(3)}`]) {
       expect(seen).not.toContain(secret);
       expect(JSON.stringify(await reply(sent!.id))).not.toContain(secret);

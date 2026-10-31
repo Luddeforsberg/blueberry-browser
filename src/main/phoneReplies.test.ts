@@ -41,7 +41,9 @@ describe("bindReply", () => {
     const asked = question("1");
     expect(bindReply("123456", null, [asked])).toEqual({ refused: "looks-like-a-code" });
     expect(bindReply("the blue one", null, [asked])).toEqual({ to: asked });
-    expect(bindReply("SK1420", "1", [asked])).toEqual({ to: asked });
+    expect(bindReply("the blue one", "1", [asked])).toEqual({ to: asked });
+    expect(bindReply("123456", "1", [asked])).toEqual({ refused: "looks-like-a-code" });
+    expect(bindReply("123456", "1", [asked, code("2")])).toEqual({ refused: "looks-like-a-code" });
     expect(bindReply("123456", null, [asked, code("2")])).toEqual({ refused: "which-one" });
   });
 

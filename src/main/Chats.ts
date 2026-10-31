@@ -206,7 +206,7 @@ export class Chats {
     return tools.map((tool) => ({ ...tool, run: async (args) => this.withoutCodes(await tool.run(args)) }));
   }
 
-  // What a page might say back after a code went in. A picture can't be gone through, which is why the field is wiped.
+  // What a page might say back after a code went in. A picture can't be gone through, so `Tab` refuses to take one.
   withoutCodes(text: string): string {
     const now = Date.now();
     if (text.startsWith("data:image/")) return text;
@@ -275,6 +275,7 @@ export class Chats {
     held.entering = true;
     const until = Date.now() + REMEMBER_CODE_MS;
     codeSpellings(code).forEach((spelling) => this.enteredCodes.set(spelling, until));
+    tab.noScreenshotsUntil = until;
     // Given a size and drawn while it types, like any tab a job is using behind the user's. The hold is what keeps jobs out.
     run.tabs.add(tab);
     this.publishWorkingTabs();
@@ -634,13 +635,15 @@ export class Chats {
     if (!tab || !siteAllowed(tab.url, mascot.sites)) return null;
 
     const [screenshot, text] = await Promise.all([
-      tab.screenshot().then(
-        (image) => image.toDataURL(),
-        (error) => {
-          console.error("Failed to capture screenshot:", error);
-          return null;
-        }
-      ),
+      tab.mayShowCode
+        ? null
+        : tab.screenshot().then(
+            (image) => image.toDataURL(),
+            (error) => {
+              console.error("Failed to capture screenshot:", error);
+              return null;
+            }
+          ),
       tab.getTabText().catch((error) => {
         console.error("Failed to get page text:", error);
         return null;

@@ -432,6 +432,13 @@ export class Tab {
   // on its way when that happened stops here, rather than clicking or reading in the middle of their sign-in.
   heldForUser = false;
 
+  // A code from the phone went in here, and the page may show it, which can't be taken out of a picture.
+  noScreenshotsUntil = 0;
+
+  get mayShowCode(): boolean {
+    return Date.now() < this.noScreenshotsUntil;
+  }
+
   private refuseWhileHeld(): void {
     if (this.heldForUser) throw new Error("The user has this tab");
   }
@@ -467,6 +474,7 @@ export class Tab {
 
   async screenshot(): Promise<NativeImage> {
     this.refuseWhileHeld();
+    if (this.mayShowCode) throw new Error("This page may show a code");
     return await this.fromPage(() => this.view.webContents.capturePage());
   }
 

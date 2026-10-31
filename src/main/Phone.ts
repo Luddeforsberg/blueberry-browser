@@ -235,7 +235,7 @@ export class Phone {
     if (why === "closed") return "That’s no longer waiting, so nothing happened.";
     if (why === "nothing-waiting") return "Nothing’s waiting for you right now, so nothing happened.";
     if (why === "not-by-reply") return "A reply can’t answer that, so nothing happened. Use its buttons, or the computer.";
-    if (why === "looks-like-a-code") return "That looks like a code, and this is a question, whose answers go to the model. So it wasn’t passed on. If it really is your answer, reply to the question.";
+    if (why === "looks-like-a-code") return "That looks like a code, and answers to questions go to the model, so it wasn’t passed on. If it really is your answer, type it at the computer.";
     const takers = open.filter(({ kind }) => kind === "code" || kind === "question");
     const list = takers.map(({ item, kind, name }) => `• ${kind === "code" ? `${name}: a code for ${item.approval.handoff?.site}` : `${name}: a question for “${item.job}”`}`);
     return `More than one thing is waiting, so nothing was used. Reply to the message you’re answering:\n${list.join("\n")}`;

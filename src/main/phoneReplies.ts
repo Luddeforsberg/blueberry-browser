@@ -35,20 +35,18 @@ export type ReplyTarget<T> =
 
 const takesReply = ({ kind }: OpenRequest) => kind === "question" || kind === "code";
 
-// Which open request a message is for. A code must never reach the model by landing on the wrong request, so with
-// more than one that takes a reply, only replying to that request's message counts, and a lone question doesn't take
-// what looks like a code unless it's a reply to that question.
+// Which open request a message is for. A code must never reach the model by landing on the wrong request. So with more
+// than one that takes a reply, only replying to that request's message counts, and a question never takes what looks
+// like a code, even as a reply to it, which is one slip of the thumb away. Such an answer can be typed at the computer.
 export const bindReply = <T extends OpenRequest>(text: string, replyTo: string | null, open: readonly T[]): ReplyTarget<T> => {
-  if (replyTo !== null) {
-    const named = open.find(({ handle }) => handle === replyTo);
-    if (!named) return { refused: "closed" };
-    return takesReply(named) ? { to: named } : { refused: "not-by-reply" };
-  }
   const takers = open.filter(takesReply);
-  if (takers.length === 0) return { refused: open.length > 0 ? "not-by-reply" : "nothing-waiting" };
-  if (takers.length > 1) return { refused: "which-one" };
-  const [only] = takers;
-  return only.kind === "question" && plausibleCode(text) !== null ? { refused: "looks-like-a-code" } : { to: only };
+  const named = replyTo === null ? null : open.find(({ handle }) => handle === replyTo);
+  if (named === undefined) return { refused: "closed" };
+  if (named && !takesReply(named)) return { refused: "not-by-reply" };
+  if (named === null && takers.length === 0) return { refused: open.length > 0 ? "not-by-reply" : "nothing-waiting" };
+  if (named === null && takers.length > 1) return { refused: "which-one" };
+  const target = named ?? takers[0];
+  return target.kind === "question" && plausibleCode(text) !== null ? { refused: "looks-like-a-code" } : { to: target };
 };
 
 // What the page says about each visible field that could be typed in.

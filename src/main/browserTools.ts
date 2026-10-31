@@ -786,6 +786,7 @@ export const createPageTools = ({
       returnsImage: true,
       run: ({ tabId: id }) =>
         withTab(id, async (tab) => {
+          if (tab.mayShowCode) return `Screenshots of tab ${tab.id} aren't available for now, because a code from the user's phone went in there and the page might show it. Read its text instead.`;
           await tab.settled();
           const image = await tab.screenshot();
           if (!canSee()) return NO_ACCESS;
