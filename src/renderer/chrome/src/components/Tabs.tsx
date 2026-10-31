@@ -37,6 +37,7 @@ const TabItem: React.FC<{
         <button
             type="button"
             aria-current={tab.isActive ? 'page' : undefined}
+            title={tab.berryWorking ? `${find(tab.workingMascotId).name} is working here` : undefined}
             onClick={onActivate}
             onKeyDown={(e) => {
                 if (!e.altKey) return

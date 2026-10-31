@@ -163,10 +163,9 @@ export class Window {
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
-      openTab: (url) => this.createTab(url),
       openBackgroundTab: (url) => this.createBackgroundTab(url),
-      // The window closes with its last tab, so Berry never takes that one.
-      closeTab: (tabId) => this.tabCount > 1 && this.closeTab(tabId, false),
+      // The window closes with its last tab, so Berry never takes that one, or the one the user is looking at.
+      closeTab: (tabId) => this.tabCount > 1 && tabId !== this.activeTabId && this.closeTab(tabId, false),
       actionApproval: () => this.settings.actionApproval,
     }, {
       onChunk: (chatId, content) =>
@@ -199,7 +198,10 @@ export class Window {
           this.openPage("routines");
         });
       },
-      closeTab: (tabId) => this.closeTab(tabId, false),
+      // A tab the user has been to stays, even if they only looked.
+      closeTab: (tabId) => {
+        if (this.backgroundTabs.has(tabId)) this.closeTab(tabId, false);
+      },
     });
 
     if (restored) this.restoreSession(restored);
@@ -247,7 +249,8 @@ export class Window {
         const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
         // A limited mascot's click can't open what it couldn't go to.
         if (opener?.refusesNavigation(url)) return { action: "deny" };
-        const behind = !!opener && opener.id !== this.activeTabId;
+        // Nor does one Berry opened, even with the user watching. If they had clicked here, it would be theirs by now.
+        const behind = !!opener && (opener.id !== this.activeTabId || this.chats.isOwnTab(opener.id));
         const popup = behind ? this.createBackgroundTab(url) : this.createTab(url);
         if (opener) popup.limitFirstLoadLike(opener);
         if (behind) this.chats.notePopup(opener.id, popup.id);
@@ -458,6 +461,8 @@ export class Window {
     const entry = this.tabsMap.get(tabId);
     if (!entry) return false;
     if (entry instanceof Tab) {
+      // Only the address bar comes here, so the user has taken this tab from any job that opened it.
+      this.chats.releaseTab(tabId);
       await entry.loadURL(url);
       return true;
     }
@@ -482,6 +487,7 @@ export class Window {
         onChange: () => this.notifyTabs(),
         // The title at this point is still the last page's, so the new page's arrives through `onDetails`.
         onNavigate: (address) => this.saveVisit(tabId, () => this.history.record(address, "", null)),
+        onUserInput: () => this.chats.releaseTab(tabId),
         onDetails: () =>
           this.saveVisit(tabId, () => {
             if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
@@ -595,7 +601,6 @@ export class Window {
 
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
     this.activeTabId = tabId;
-    this.chats.releaseTab(tabId);
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
     if (this.backgroundTabs.delete(tabId) && tab instanceof Tab) {
       this.saveVisit(tabId, () => this.history.record(tab.url, tab.title, tab.favicon));

@@ -76,6 +76,16 @@ interface Run {
   onChange?: () => void;
 }
 
+// What a chat or task has to do with tabs. It outlasts a reply, so the next message can go on where the last one left off.
+interface Job {
+  // The tabs it opened, which are all it can reach when it can't see the user's page.
+  own: Set<string>;
+  // Tabs it opened that the user has taken, with the address each was at.
+  takenOver: Map<string, string>;
+  // Where a call that names no tab goes. Fixed by the job, so the user's browsing can't redirect it.
+  current: string | null;
+}
+
 export interface TaskProgress {
   steps: ChatStep[];
   approval: ChatApproval | null;
@@ -88,7 +98,7 @@ export interface TaskResult {
   error: string | null;
   stopped: boolean;
   tokens: number;
-  // The tabs it opened that are still its own. Any the user went to are theirs now, and aren't here.
+  // The tabs it opened that are still its own. Any the user took over are theirs now, and aren't here.
   tabIds: string[];
 }
 
@@ -105,15 +115,14 @@ export class Chats {
   private readonly runs = new Map<string, Run>();
   private readonly errors = new Map<string, string>();
   private pageAccess = true;
-  // The tabs each chat opened itself, which are all it can reach when it can't see the user's page.
-  private readonly ownTabs = new Map<string, Set<string>>();
+  private readonly jobs = new Map<string, Job>();
   private readonly taskPopups = new Map<string, Set<string>>();
 
   constructor(
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
-    private readonly browser: Pick<PageToolAccess, "activeTab" | "allTabs" | "openTab"> & {
+    private readonly browser: Pick<PageToolAccess, "activeTab" | "allTabs"> & {
       openBackgroundTab: (url: string) => Tab;
       closeTab: (tabId: string) => boolean;
       actionApproval: () => ActionApproval;
@@ -123,24 +132,37 @@ export class Chats {
     private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY
   ) {}
 
-  // These open behind the chat, so the approval cards and the reply stay in front of the user.
-  private ownTabTools(chatId: string, run: Run, onUse: (tab: Tab) => void): PageTool[] {
-    const limits = run.mascot.id === BERRY.id ? undefined : run.mascot;
-    const ids = this.ownTabs.get(chatId) ?? new Set<string>();
-    this.ownTabs.set(chatId, ids);
-    const allTabs = () => this.browser.allTabs().filter((tab) => ids.has(tab.id));
+  // Tabs always open behind the user, so the approval cards, the reply and whatever they're doing stay in front. With
+  // `page`, the page sent with this message, the tools also reach every open tab. Without it, only the job's own.
+  private jobTools(chatId: string, run: Run, page: Tab | null): PageTool[] {
+    const job = this.jobs.get(chatId) ?? { own: new Set<string>(), takenOver: new Map<string, string>(), current: null };
+    this.jobs.set(chatId, job);
+    if (page) {
+      job.current = page.id;
+      // Sending the page with a message is the user handing it over.
+      job.takenOver.delete(page.id);
+    } else if (job.current && !job.own.has(job.current) && !job.takenOver.has(job.current)) {
+      // That was the page from an earlier message. This one came without it, so it's out of reach.
+      job.current = [...job.own].at(-1) ?? null;
+    }
     return createPageTools({
-      allTabs,
-      activeTab: () => allTabs().at(-1) ?? null,
+      allTabs: () => this.browser.allTabs().filter((tab) => page || job.own.has(tab.id)),
+      activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current) ?? null,
       openTab: (url) => {
         const tab = this.browser.openBackgroundTab(url);
-        ids.add(tab.id);
+        job.own.add(tab.id);
+        job.current = tab.id;
         return tab;
       },
-      canSee: () => true,
-      onUse,
-      ownsEveryTab: true,
-      limits,
+      canSee: () => !page || this.pageAccess,
+      onUse: (tab) => {
+        run.tabs.add(tab);
+        this.publishWorkingTabs();
+      },
+      ownsEveryTab: !page,
+      ownsTab: (id) => job.own.has(id),
+      takenOver: job.takenOver,
+      limits: run.mascot.id === BERRY.id ? undefined : run.mascot,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
@@ -159,14 +181,28 @@ export class Chats {
   // the task's own.
   notePopup(openerId: string, tabId: string): void {
     this.taskPopups.forEach((popups, id) => {
-      if (popups.has(openerId) || this.ownTabs.get(id)?.has(openerId)) popups.add(tabId);
+      if (popups.has(openerId) || this.jobs.get(id)?.own.has(openerId)) popups.add(tabId);
     });
   }
 
-  // A tab the user has gone to is theirs now, and may hold anything, so no chat reaches it this way any more.
+  // Whether a chat or task is still using this tab as its own.
+  isOwnTab(tabId: string): boolean {
+    return [...this.jobs.values()].some(({ own }) => own.has(tabId));
+  }
+
+  // The user clicked or typed in this tab, or sent it somewhere. Looking at it isn't enough. From here on it may hold
+  // anything, so the job that opened it can't reach it, and the model is told why.
   releaseTab(tabId: string): void {
-    this.ownTabs.forEach((ids) => ids.delete(tabId));
     this.taskPopups.forEach((popups) => popups.delete(tabId));
+    // This runs on every click and key press in every tab, so most of the time it has nothing to do.
+    if (!this.isOwnTab(tabId)) return;
+    const tab = this.browser.allTabs().find((candidate) => candidate.id === tabId);
+    this.jobs.forEach((job, id) => {
+      if (!job.own.delete(tabId)) return;
+      job.takenOver.set(tabId, tab?.url ?? "an earlier page");
+      if (tab) this.runs.get(id)?.tabs.delete(tab);
+    });
+    this.publishWorkingTabs();
   }
 
   private get activeTab(): Tab | null {
@@ -234,7 +270,7 @@ export class Chats {
     this.runs.delete(chatId);
     this.publishWorkingTabs();
     this.errors.delete(chatId);
-    this.ownTabs.delete(chatId);
+    this.jobs.delete(chatId);
     if (!this.store.deleteChat(chatId)) return false;
     this.events.onListChanged();
     return true;
@@ -252,24 +288,10 @@ export class Chats {
   private async reply(chatId: string, run: Run, seePage: boolean): Promise<void> {
     const { signal } = run.controller;
     try {
+      // Read before anything waits, so it's the page the message was sent from wherever the user has gone since.
+      const page = seePage && this.pageAccess ? this.activeTab : null;
       const messages = await this.withNewestPage(chatId, seePage, run.mascot);
-      const onUse = (tab: Tab) => {
-        run.tabs.add(tab);
-        this.publishWorkingTabs();
-      };
-      const tools =
-        seePage && this.pageAccess && this.activeTab
-          ? createPageTools({
-              activeTab: this.browser.activeTab,
-              allTabs: this.browser.allTabs,
-              openTab: this.browser.openTab,
-              canSee: () => this.pageAccess,
-              onUse,
-              closeTab: (tab) => this.closeRunTab(run, tab),
-              ask: (question) => this.askQuestion(chatId, run, question),
-              limits: run.mascot.id === BERRY.id ? undefined : run.mascot,
-            })
-          : this.ownTabTools(chatId, run, onUse);
+      const tools = this.jobTools(chatId, run, page);
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
     } catch (error) {
       if (!signal.aborted) {
@@ -337,10 +359,7 @@ export class Chats {
     this.taskPopups.set(id, new Set());
     let error: string | null = null;
     try {
-      const tools = this.ownTabTools(id, run, (tab) => {
-        run.tabs.add(tab);
-        this.publishWorkingTabs();
-      });
+      const tools = this.jobTools(id, run, null);
       await this.consume(id, run, [{ role: "user", content: message }], tools, () => {}, (used) => (tokens += used));
     } catch (caught) {
       if (!run.controller.signal.aborted) {
@@ -350,8 +369,8 @@ export class Chats {
     }
     this.runs.delete(id);
     this.publishWorkingTabs();
-    const tabIds = [...(this.ownTabs.get(id) ?? []), ...(this.taskPopups.get(id) ?? [])];
-    this.ownTabs.delete(id);
+    const tabIds = [...(this.jobs.get(id)?.own ?? []), ...(this.taskPopups.get(id) ?? [])];
+    this.jobs.delete(id);
     this.taskPopups.delete(id);
     return {
       text: run.partial,

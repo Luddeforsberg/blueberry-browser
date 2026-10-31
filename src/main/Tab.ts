@@ -36,6 +36,11 @@ const FRAME_ANSWER_MS = 2_000;
 const MAX_FRAMES_READ = 30;
 const FRAME_TEXT = `innerWidth > 1 && innerHeight > 1 ? document.body?.innerText ?? "" : ""`;
 
+// A shortcut or a scrolling key isn't the user working in the page, and neither is the key-up from a shortcut that
+// brought them to this tab.
+const isTyping = ({ type, key, meta, control }: Electron.Input): boolean =>
+  type === "keyDown" && !meta && !control && ([...key].length === 1 || ["Enter", "Backspace", "Delete"].includes(key));
+
 export interface TabEvents {
   onChange: () => void;
   onNavigate: (url: string) => void;
@@ -43,6 +48,8 @@ export interface TabEvents {
   onDetails: () => void;
   // The tab has a view for the window to place.
   onView: (tab: Tab) => void;
+  // The user clicked or typed in the page, or went back or forward in it. Berry's own input doesn't count.
+  onUserInput: () => void;
 }
 
 export class Tab {
@@ -73,6 +80,8 @@ export class Tab {
   private readonly refusalListeners = new Set<Set<string>>();
   // Calls to the page that are waiting for an answer it may never give.
   private readonly waiting = new Set<() => void>();
+  // True only inside `sendAgentInput`.
+  private sendingAgentInput = false;
 
   constructor(
     id: string,
@@ -121,6 +130,14 @@ export class Tab {
     };
     contents.on("will-navigate", (event) => limit(event, event.url));
     contents.on("will-redirect", (event) => limit(event, event.url));
+
+    // Electron emits both of these from inside `sendInputEvent`, so `sendingAgentInput` tells Berry's input from a person's.
+    contents.on("before-mouse-event", (_, { type }) => {
+      if (type === "mouseDown" && !this.sendingAgentInput) this.events.onUserInput();
+    });
+    contents.on("before-input-event", (_, input) => {
+      if (isTyping(input) && !this.sendingAgentInput) this.events.onUserInput();
+    });
 
     contents.on("page-title-updated", (_, title) => {
       this._title = title;
@@ -411,6 +428,16 @@ export class Tab {
     if (draw) view.setVisible(true);
   }
 
+  // Berry's real mouse and keyboard. Anything else that reaches the page is the user's.
+  sendAgentInput(event: Parameters<WebContents["sendInputEvent"]>[0]): void {
+    this.sendingAgentInput = true;
+    try {
+      this.webContents.sendInputEvent(event);
+    } finally {
+      this.sendingAgentInput = false;
+    }
+  }
+
   async screenshot(): Promise<NativeImage> {
     return await this.fromPage(() => this.view.webContents.capturePage());
   }
@@ -496,11 +523,14 @@ export class Tab {
     return navigationHistory.getEntryAtIndex(navigationHistory.getActiveIndex() - 1)?.url ?? null;
   }
 
-  goBack(): void {
+  // `byAgent` is for Berry's own tool. Every other caller is the user, so the tab is theirs from here.
+  goBack(byAgent = false): void {
+    if (!byAgent) this.events.onUserInput();
     if (this.canGoBack) this.webContents.navigationHistory.goBack();
   }
 
   goForward(): void {
+    this.events.onUserInput();
     if (this.canGoForward) this.webContents.navigationHistory.goForward();
   }
 

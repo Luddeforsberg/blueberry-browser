@@ -26,18 +26,18 @@ const inView = (tab: Tab, { x, y }: Point) => {
 export const moveTo = async (tab: Tab, point: Point): Promise<void> => {
   const at = inView(tab, point);
   // The second move, a pixel on, is what makes some pages notice the pointer has arrived.
-  tab.webContents.sendInputEvent({ type: "mouseMove", x: at.x - 1, y: at.y });
+  tab.sendAgentInput({ type: "mouseMove", x: at.x - 1, y: at.y });
   await pause(STEP_MS);
-  tab.webContents.sendInputEvent({ type: "mouseMove", x: at.x, y: at.y });
+  tab.sendAgentInput({ type: "mouseMove", x: at.x, y: at.y });
   await pause(STEP_MS);
 };
 
 const press = (tab: Tab, at: Point, clickCount: number) => {
-  tab.webContents.sendInputEvent({ type: "mouseDown", button: "left", clickCount, ...at });
+  tab.sendAgentInput({ type: "mouseDown", button: "left", clickCount, ...at });
 };
 
 const release = (tab: Tab, at: Point, clickCount: number) => {
-  tab.webContents.sendInputEvent({ type: "mouseUp", button: "left", clickCount, ...at });
+  tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
 };
 
 export const clickAt = async (tab: Tab, point: Point, clicks: 1 | 2): Promise<void> => {
@@ -60,7 +60,7 @@ export const dragBetween = async (tab: Tab, from: Point, to: Point): Promise<voi
   for (let step = 1; step <= DRAG_STEPS; step++) {
     const x = Math.round(start.x + ((end.x - start.x) * step) / DRAG_STEPS);
     const y = Math.round(start.y + ((end.y - start.y) * step) / DRAG_STEPS);
-    tab.webContents.sendInputEvent({ type: "mouseMove", x, y });
+    tab.sendAgentInput({ type: "mouseMove", x, y });
     await pause(STEP_MS);
   }
   release(tab, end, 1);
@@ -99,13 +99,13 @@ export const isKnownKey = (key: string): boolean => key in NAMED_KEYS || [...key
 export const pressKey = async (tab: Tab, key: string, shift: boolean): Promise<void> => {
   const keyCode = NAMED_KEYS[key] ?? key;
   const modifiers: "shift"[] = shift ? ["shift"] : [];
-  tab.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+  tab.sendAgentInput({ type: "keyDown", keyCode, modifiers });
   // Without this a character isn't typed and Enter doesn't submit.
   if (keyCode === "Enter" || keyCode === "Space" || !(key in NAMED_KEYS)) {
-    tab.webContents.sendInputEvent({ type: "char", keyCode: keyCode === "Space" ? " " : keyCode, modifiers });
+    tab.sendAgentInput({ type: "char", keyCode: keyCode === "Space" ? " " : keyCode, modifiers });
   }
   await pause(STEP_MS);
-  tab.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+  tab.sendAgentInput({ type: "keyUp", keyCode, modifiers });
   await pause(STEP_MS);
 };
 

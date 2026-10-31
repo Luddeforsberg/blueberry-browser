@@ -36,7 +36,6 @@ const setup = (
   const chats = new Chats(store, streamReply, generateTitle, {
     activeTab: () => activeTab,
     allTabs: () => (activeTab ? [activeTab] : []),
-    openTab: () => activeTab as Tab,
     openBackgroundTab,
     closeTab: () => true,
     actionApproval: () => "always",
@@ -91,7 +90,6 @@ describe("Chats", () => {
       const chats = new Chats(store, stream, async () => null, {
         activeTab: () => users,
         allTabs: () => [users, own],
-        openTab: () => users,
         openBackgroundTab: () => own,
         closeTab: () => true,
         actionApproval: () => "risky",
@@ -135,7 +133,6 @@ describe("Chats", () => {
       const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
         activeTab: () => null,
         allTabs: () => [own, popup, gone],
-        openTab: () => own,
         openBackgroundTab: () => own,
         closeTab: () => true,
         actionApproval: () => "risky",
@@ -397,9 +394,6 @@ describe("Chats", () => {
       const chats = new Chats(store, reply, async () => null, {
         activeTab: () => allTabs[0],
         allTabs: () => allTabs,
-        openTab: () => {
-          throw new Error("A chat that can't see the page must not take over the window");
-        },
         openBackgroundTab: () => {
           allTabs.push(opened);
           return opened;
@@ -421,12 +415,91 @@ describe("Chats", () => {
       const [before, listed, , after] = results;
       expect(before).toMatch(/no web page/);
       expect(before).not.toContain("page text");
-      expect(JSON.parse(listed)).toEqual([]);
+      expect(listed).toMatch(/^\[\]\n\nThis is only the tabs you opened/);
       expect(after).toContain("own words");
 
       chats.releaseTab("tab-own");
       const readPage = reached.find((tool) => tool.name === "read_page")!;
-      expect(await readPage.run({ tabId: "tab-own" })).toMatch(/no web page/);
+      expect(await readPage.run({ tabId: "tab-own" })).toMatch(/user took over tab tab-own/);
+      expect(await readPage.run({})).toMatch(/user took over tab tab-own/);
+    });
+
+    it("stay on the job's tab when the user goes to another, with no tab named", async () => {
+      const sentFrom = { ...tab(), id: "tab-sent", getTextWithFrames: async () => "the page it was sent from" } as unknown as Tab;
+      const other = { ...tab(), id: "tab-other", getTextWithFrames: async () => "the user's next page" } as unknown as Tab;
+      const own = { ...tab(), id: "tab-own", settled: async () => {}, getTextWithFrames: async () => "the job's own tab" } as unknown as Tab;
+      let active = sentFrom;
+      const open = [sentFrom, other];
+      const results: string[] = [];
+      let onEnd = () => {};
+      const stream: StreamReply = async function* (_, __, { tools }) {
+        const call = (name: string, args: object) => tools.find((tool) => tool.name === name)!.run(args);
+        active = other;
+        results.push(await call("read_page", {}));
+        await call("open_tab", { url: "https://example.com/" });
+        results.push(await call("read_page", {}));
+        yield "done";
+      };
+      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
+        activeTab: () => active,
+        allTabs: () => open,
+        openBackgroundTab: () => {
+          open.push(own);
+          return own;
+        },
+        closeTab: () => true,
+        actionApproval: () => "risky",
+      }, {
+        onChunk: () => {},
+        onThread: (thread) => {
+          if (thread.partial === null) onEnd();
+        },
+        onListChanged: () => {},
+        onWorkingTabs: () => {},
+      });
+
+      const ended = new Promise<void>((resolve) => (onEnd = resolve));
+      send(chats, null, "first");
+      await ended;
+
+      expect(results[0]).toContain("the page it was sent from");
+      expect(results[1]).toContain("the job's own tab");
+      expect(active).toBe(other);
+    });
+
+    it("can't reach the page from an earlier message once a message comes without one", async () => {
+      const users = { ...tab(), id: "tab-user", getTextWithFrames: async () => "the user's page" } as unknown as Tab;
+      let results: string[] = [];
+      let onEnd = () => {};
+      const stream: StreamReply = async function* (_, __, { tools }) {
+        results = [await tools.find((tool) => tool.name === "read_page")!.run({})];
+        yield "done";
+      };
+      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
+        activeTab: () => users,
+        allTabs: () => [users],
+        openBackgroundTab: () => users,
+        closeTab: () => true,
+        actionApproval: () => "risky",
+      }, {
+        onChunk: () => {},
+        onThread: (thread) => {
+          if (thread.partial === null) onEnd();
+        },
+        onListChanged: () => {},
+        onWorkingTabs: () => {},
+      });
+      const reply = (chatId: string | null, seePage: boolean) => {
+        const ended = new Promise<void>((resolve) => (onEnd = resolve));
+        const thread = send(chats, chatId, "go on", seePage);
+        return ended.then(() => thread!.id);
+      };
+
+      const id = await reply(null, true);
+      expect(results[0]).toContain("the user's page");
+      await reply(id, false);
+      expect(results[0]).not.toContain("the user's page");
+      expect(results[0]).toMatch(/no web page/);
     });
 
     it("mark the tabs they use as working until the reply ends", async () => {
