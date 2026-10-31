@@ -15,9 +15,22 @@ There is no fixed date. Each stage starts when the one before it holds up in rea
 | Find in page, zoom, right-click menu on pages, print | Next |
 | Downloads, and asking before a site uses the camera, microphone, location and so on | Next |
 | Saved history with a history page, restoring tabs after a restart, recovering from a crashed page | Next |
-| Real pinned sites, no sample account, importing bookmarks and history from other browsers | After saved history |
+| Real pinned sites, and no sample account | After saved history |
 
-### 2. The AI features people expect
+### 2. An agent that can do the job
+
+Berry has 9 tools today: `list_tabs`, `read_page`, `find_in_page`, `list_elements`, `scroll_page`, `click`, `type_text`, `go_to` and `open_tab`. `evals/` measures what they can really do. Its results set the order here.
+
+| Work | State |
+|---|---|
+| Real-site evaluation: a repeatable set of jobs with a scorecard | Next |
+| Hands: real mouse and keyboard input, iframes, shadow DOM, a screenshot tool, dropdowns, keys, hover, waiting, back, closing tabs, link addresses | After the evaluation |
+| Long jobs: trimming old page text from context, a visible plan, asking the user mid-job, spotting loops, a higher step limit with a budget, model failover | After the evaluation |
+| Sign-ins: the user takes over for passwords and 2FA, and these never reach the model, then Berry carries on | After hands |
+| Files: uploads, downloads, a folder you choose, PDFs, and reports or tables as results | After long jobs |
+| Helpers: splitting a job into parts that run at once, and one view of all running tasks | After long jobs |
+
+### 3. The AI features people expect
 
 | Work | State |
 |---|---|
@@ -26,9 +39,9 @@ There is no fixed date. Each stage starts when the one before it holds up in rea
 | Editable memory | With companions |
 | Ask about selected text, chosen tabs, PDFs and attachments, with answers linking to their sources | After routines |
 
-Not planned before stage 3: app connections, extensions, meeting notes, generated slides. We can add one later if it serves the audience we choose.
+Not planned before stage 5: app connections, extensions, meeting notes, generated slides. We can add one later if it serves the audience we choose.
 
-### 3. Why people switch
+### 4. Why people switch
 
 Decided from [docs/STRATEGY.md](./docs/STRATEGY.md), which covers where Strawberry falls short, who we're for and how we show it. Candidates so far:
 
@@ -37,6 +50,14 @@ Decided from [docs/STRATEGY.md](./docs/STRATEGY.md), which covers where Strawber
 - Teaching a routine by doing it once, then testing it before it's scheduled.
 - Help from your phone: approvals and sign-ins while you're away.
 - Deadlines and budgets that change how Berry works, with useful partial results.
+
+### 5. Ready for other people
+
+Onboarding comes once there's something worth arriving at, before anyone outside tries it:
+
+- Importing bookmarks, history, passwords and sign-ins from Chrome, Safari, Arc and Firefox.
+- Real accounts, which need a server. What they're for (sync, shared companions, paying for model use) gets decided from the strategy work.
+- Keys and models set in the app rather than `.env`, signed updates, and a Windows pass.
 
 ## How we build
 
