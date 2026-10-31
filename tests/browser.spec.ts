@@ -810,8 +810,7 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   };
 
   // A press with no movement selects and keeps the order.
-  const first = (await tabs.nth(0).boundingBox())!;
-  await chrome.mouse.click(first.x + 20, first.y + first.height / 2);
+  await tabs.nth(0).getByRole("button", { name: "New tab", exact: true }).click();
   await expect.poll(async () => (await activeTab()).page).toBe("new-tab");
   expect(await tabOrder()).toEqual(["new-tab", "/a", "/b"]);
 
@@ -823,6 +822,7 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   await expect.poll(tabOrder).toEqual(["new-tab", "/a", "/b"]);
 
   // Past the end of the list, the tab stops at the last slot.
+  const first = (await tabs.nth(0).boundingBox())!;
   const last = (await tabs.nth(2).boundingBox())!;
   await chrome.mouse.move(first.x + 20, first.y + first.height / 2);
   await chrome.mouse.down();
