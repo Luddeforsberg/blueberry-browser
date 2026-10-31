@@ -952,6 +952,9 @@ test("Alt and an arrow move the focused tab, and stop at the ends", async () => 
   await expect(tab).toBeFocused();
 });
 
+// How long the overlay waits for its slide out, from OverlayApp.tsx.
+const SLIDE_OUT_MS = 240;
+
 test("the floating sidebar slides in, and slides out before hiding", async () => {
   await openFixture();
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
@@ -971,10 +974,12 @@ test("the floating sidebar slides in, and slides out before hiding", async () =>
   await expect.poll(cardLeft).toBe(8);
 
   await overlay.mouse.move(100, 300);
+  const leftAt = Date.now();
   await overlay.mouse.move(600, 300);
-  await expect.poll(slideRuns).toBe(2);
-  expect(await overlayVisible()).toBe(true);
   await expect.poll(overlayVisible).toBe(false);
+  // A slow machine can finish the slide before anything could look at it, but it can't hide any sooner.
+  expect(Date.now() - leftAt).toBeGreaterThanOrEqual(SLIDE_OUT_MS);
+  expect(await slideRuns()).toBe(2);
 
   // Hidden by main with no slide out, it still slides in next time rather than appearing.
   await chrome.evaluate(() => window.chromeAPI.layout.showFloatingSidebar());
