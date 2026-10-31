@@ -45,6 +45,10 @@ export class AppMenu {
             click: () => this.mainWindow.toggleBookmark(),
           },
           {
+            label: "Pin This Page",
+            click: () => this.mainWindow.togglePin(),
+          },
+          {
             label: "Close Tab",
             accelerator: "CmdOrCtrl+W",
             click: () => this.handleCloseTab(),

@@ -61,6 +61,7 @@ const chromeAPI: ChromeAPI = {
   },
   library: {
     toggleBookmark: () => invoke("bookmarks:toggle"),
+    togglePin: () => invoke("bookmarks:toggle-pin"),
     showBookmarkMenu: (bookmarkId) => invoke("bookmarks:menu", bookmarkId),
     getLibrary: () => invoke("library:get"),
     getChat: (chatId) => invoke("library:chat", chatId),

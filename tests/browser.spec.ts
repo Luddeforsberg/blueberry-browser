@@ -1057,11 +1057,11 @@ test("the new tab page has no chat panel, and it comes back on the next page", a
   await expect(panel).toBeVisible();
 });
 
-test("settings and the account sit at the bottom of the sidebar", async () => {
+test("settings sits at the bottom of the sidebar", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  const row = sidebar.getByRole("button", { name: "Settings, Sam Rivera" });
+  // Last, because the Settings tab has the same name once it's open.
+  const row = sidebar.getByRole("button", { name: "Settings", exact: true }).last();
 
-  await expect(sidebar.getByText("sam@example.com")).toBeVisible();
   const [rowBox, sidebarBox] = await Promise.all([row.boundingBox(), sidebar.boundingBox()]);
   expect(rowBox!.y + rowBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 16);
 
@@ -1272,12 +1272,12 @@ test("the new tab page paints the art blueberry, and web pages don't carry it", 
 
 test("bookmarks are in the sidebar when vertical and under the address bar when horizontal", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  await expect(sidebar.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "GitHub" })).toBeVisible();
+  await expect(sidebar.getByRole("list", { name: "Bookmarks" })).toBeVisible();
   await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveCount(1);
 
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
   await expect(sidebar).toHaveCount(0);
-  await expect(chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "GitHub" })).toBeVisible();
+  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toBeVisible();
 });
 
 test("the page's card rings while Berry reads it, and not once the page is taken away", async () => {

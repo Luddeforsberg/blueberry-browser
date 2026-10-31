@@ -57,6 +57,7 @@ const createWindow = (): Window => {
     storeNotice("Your browsing history", "is")
   );
   const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
+  const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
   routineStore ??= new RoutineStore(join(app.getPath("userData"), "routines.db"));
   const savedSettings = settings;
   if (!downloads || !sitePermissions) {
@@ -70,7 +71,7 @@ const createWindow = (): Window => {
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
-  const window = new Window(settings, chatStore, bookmarks, routineStore, downloads, sitePermissions, historyStore, sessionStore);
+  const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, downloads, sitePermissions, historyStore, sessionStore);
   showStoreNotices(window);
   menu = new AppMenu(window);
   eventManager = new EventManager(window);

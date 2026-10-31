@@ -224,6 +224,7 @@ export interface InvokeChannels {
   "theme:get": { region: "chrome" | "overlay" | "find" | "prompt"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
+  "bookmarks:toggle-pin": { region: "chrome"; args: []; result: void };
   "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
@@ -358,6 +359,7 @@ export interface ChatAPI {
 
 export interface LibraryAPI {
   toggleBookmark: () => Promise<void>;
+  togglePin: () => Promise<void>;
   showBookmarkMenu: (bookmarkId: string) => Promise<void>;
   getLibrary: () => Promise<LibrarySnapshot>;
   getChat: (chatId: string) => Promise<ChatThread | null>;

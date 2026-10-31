@@ -53,10 +53,11 @@ Sizes (*to tune*):
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat and Routines, then chats, then tabs. The account and Settings stay at the bottom. Collapsed, the toolbar shows the button that brings the sidebar back.
-- **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter.
+- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat and Routines, then chats, then tabs. Settings stays at the bottom, and the account joins it when real accounts arrive in stage 5 of the roadmap. Collapsed, the toolbar shows the button that brings the sidebar back.
+- **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. With nothing saved, the cluster and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
 - **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
 - **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
+- **Pin button:** beside the star, and usable on the same pages. A pinned page fills the pin and uses the normal toggled background. The File menu has Pin This Page, and right-clicking a saved site offers Unpin and Remove Bookmark, whichever apply.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
