@@ -26,7 +26,7 @@ import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
 import { SuggestionCard } from '../components/SuggestionCard'
 import { RoutineRunCard } from '../components/RoutineRunCard'
-import { NeedsYouRow, PhonePreview } from '../components/NeedsYou'
+import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
 import type { RoutineRun } from '@shared/library'
 import { DownloadRow } from '../components/DownloadRow'
@@ -122,6 +122,7 @@ const waitingSample = (id: string, approval: Omit<NeedsYouItem['approval'], 'id'
 const SAMPLE_WAITING: NeedsYouItem[] = [
     waitingSample('sample-allow', { text: 'Click the button “Send” on https://example.com/' }, 'Reply to Anna'),
     waitingSample('sample-question', { text: 'Which of the two flights did you mean?', question: true }, 'Book the flight'),
+    waitingSample('sample-code', { text: 'Berry needs a code for linkedin.com', handoff: { need: 'code', tabId: 'none', site: 'linkedin.com' } }, 'Check my messages'),
     waitingSample('sample-handoff', { text: 'Berry needs you to sign in on example.com', handoff: { need: 'sign-in', tabId: 'none', site: 'example.com' } }, 'Check my orders')
 ]
 
@@ -342,12 +343,9 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Needs you">
-                    <div className="flex items-start gap-6">
-                        <ul className="min-w-0 flex-1 flex flex-col gap-3">
-                            {SAMPLE_WAITING.map((item) => <NeedsYouRow key={item.approval.id} item={item} onAnswered={() => undefined} />)}
-                        </ul>
-                        <PhonePreview item={SAMPLE_WAITING[0]} onAnswered={() => undefined} />
-                    </div>
+                    <ul className="border-y divide-y">
+                        {SAMPLE_WAITING.map((item) => <NeedsYouRow key={item.approval.id} item={item} onAnswered={() => undefined} />)}
+                    </ul>
                 </Section>
 
                 <Section title="Site permission card">

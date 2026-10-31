@@ -1,15 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import type { NeedsYouItem } from '@shared/library'
-import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
-import { AnsweredRow, NeedsYouRow, PhonePreview } from '../components/NeedsYou'
+import { AnsweredRow, NeedsYouRow } from '../components/NeedsYou'
+import { usePhone } from '../usePhone'
 
 const ANSWERED_MS = 1600
-// Past this the phone goes under the rows rather than beside them.
-const PHONE_BESIDE_WIDTH = 860
 
 const MAX_RESTING = 6
 
@@ -44,21 +41,41 @@ const AllClear: React.FC = () => {
     )
 }
 
+// One true line about the phone, or a quiet way to set it up.
+const PhoneLine: React.FC = () => {
+    const [phone] = usePhone()
+    const openSettings = () => void window.chromeAPI.browser.openPage('settings', { param: 'Phone' })
+    const link = "text-13 text-muted-foreground rounded-control outline-none underline-offset-2 hover:underline hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    if (phone.status === 'connected' && !phone.problem) return <p className="text-13 text-muted-foreground">Replies from your phone are on</p>
+    if (phone.status === 'connected') return <button type="button" onClick={openSettings} className={link}>Replies from your phone are paused</button>
+    return <button type="button" onClick={openSettings} className={link}>Answer these from your phone</button>
+}
+
 // Everything the flock is waiting on, from every chat and routine, answered right here.
 export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { needsYou } = useLibrary()
-    const { layout } = useShell()
     const [answered, setAnswered] = useState<{ item: NeedsYouItem; said: string }[]>([])
-    const beside = layout.page.width >= PHONE_BESIDE_WIDTH
 
     const onAnswered = (item: NeedsYouItem) => (said: string) => {
         setAnswered((list) => [...list, { item, said }])
         setTimeout(() => setAnswered((list) => list.filter((entry) => entry.item.approval.id !== item.approval.id)), ANSWERED_MS)
     }
 
+    // An answer from the phone may arrive after its row has gone from the list, so rows are remembered for it.
+    const seen = useRef(new Map<string, NeedsYouItem>())
+    needsYou.forEach((item) => seen.current.set(item.approval.id, item))
+    const latestOnAnswered = useRef(onAnswered)
+    latestOnAnswered.current = onAnswered
+    useEffect(
+        () =>
+            window.chromeAPI.phone.onAnswered(({ approvalId, said }) => {
+                const item = seen.current.get(approvalId)
+                if (item) latestOnAnswered.current(item)(said)
+            }),
+        []
+    )
+
     const waiting = needsYou.filter((item) => !answered.some((entry) => entry.item.approval.id === item.approval.id))
-    // A phone is for a tap, so the phone shows the first plain yes or no it can.
-    const onPhone = waiting.find(({ approval }) => !approval.question && !approval.handoff) ?? waiting[0] ?? null
     const rows = [
         ...waiting.map((item) => ({ item, said: null as string | null })),
         ...answered
@@ -66,15 +83,17 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     return (
         <div className="h-full overflow-y-auto">
-            <div className={cn("mx-auto px-8 py-10", rows.length > 0 && beside ? "max-w-5xl" : "max-w-3xl")}>
-                <h1 className="text-20 font-semibold">Needs you</h1>
-                <p className="mt-1 text-14 text-muted-foreground">What your flock can’t finish without you. Everything else keeps going.</p>
+            <div className="mx-auto max-w-3xl px-8 py-10">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+                    <h1 className="text-20 font-semibold">Needs you</h1>
+                    <PhoneLine />
+                </div>
 
                 {rows.length === 0 ? (
                     <AllClear />
                 ) : (
-                    <div className={cn("mt-6 flex gap-8", beside ? "items-start" : "flex-col items-center")}>
-                        <ul aria-label="Waiting for you" className="min-w-0 w-full flex-1 flex flex-col gap-3">
+                    <>
+                        <ul aria-label="Waiting for you" className="mt-4 border-y divide-y">
                             {rows.map(({ item, said }) =>
                                 said === null ? (
                                     <NeedsYouRow key={item.approval.id} item={item} onAnswered={onAnswered(item)} highlighted={tab.pageParam === item.approval.id} />
@@ -83,8 +102,8 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 )
                             )}
                         </ul>
-                        <PhonePreview item={onPhone} onAnswered={onPhone ? onAnswered(onPhone) : () => undefined} />
-                    </div>
+                        <p className="mt-3 text-12 text-muted-foreground">Passwords and codes go in the page, not through the model.</p>
+                    </>
                 )}
             </div>
         </div>

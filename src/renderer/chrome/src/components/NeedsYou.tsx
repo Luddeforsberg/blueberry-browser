@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import type { NeedsYouItem } from '@shared/library'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
@@ -7,10 +7,21 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { setRoutinesView } from '../routinesView'
 import { Berry, useAssistantName } from './Berry'
-import { HandoffActions, handoffNote } from './ChatMessage'
 
 // Whatever answers an item says so at once, because the page keeps the row for a moment in those words.
 type OnAnswered = (said: string) => void
+
+// Rows name sites. The exact words stay beside them, because that's what is being allowed.
+export const withSiteNames = (text: string) =>
+    text.replace(/https?:\/\/[^\s,”"<>]+/g, (found) => {
+        const trailing = /[.)]+$/.exec(found)?.[0] ?? ''
+        try {
+            const { hostname } = new URL(found.slice(0, found.length - trailing.length))
+            return `${hostname.replace(/^www\./, '')}${trailing}`
+        } catch {
+            return found
+        }
+    })
 
 const askedAgo = (at: number) => {
     const minutes = Math.floor((Date.now() - at) / 60000)
@@ -66,68 +77,56 @@ export const HandoffNotice: React.FC = () => {
     )
 }
 
-// What an item can be told, wherever it shows. These are the same `chat:decide` as the card in a chat.
-const AskControls: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered }> = ({ item, onAnswered }) => {
-    const { id, approval } = item
-    const mascot = useFlock().find(item.mascotId)
-    const name = useAssistantName(mascot)
-    const [answer, setAnswer] = useState('')
-    const send = (allow: boolean, said: string, words?: string) => {
-        onAnswered(said)
-        void window.chromeAPI.chat.decide(id, approval.id, allow, words)
-    }
+// Everything but the main action, until the row has the pointer or the keyboard. They can still be tabbed to.
+const QUIETLY = "opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
 
-    if (approval.handoff) return <HandoffActions chatId={id} approval={approval} mascot={mascot} onAnswered={onAnswered} />
-    if (approval.question) {
-        return (
-            <form
-                className="flex flex-wrap items-center gap-2"
-                onSubmit={(event) => {
-                    event.preventDefault()
-                    if (answer.trim()) send(true, `Answered. ${name} carries on.`, answer)
-                }}
-            >
-                <input
-                    aria-label={`Your answer to ${name}`}
-                    value={answer}
-                    onChange={(event) => setAnswer(event.target.value)}
-                    className="min-w-0 flex-1 basis-40 h-8 rounded-card border bg-canvas px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <Button size="sm" type="submit" disabled={!answer.trim()}>Answer</Button>
-                <Button size="sm" variant="ghost" type="button" onClick={() => send(false, `Skipped. ${name} carries on without it.`)}>Skip</Button>
-            </form>
-        )
-    }
+const QuestionBox: React.FC<{ name: string; onAnswer: (words: string) => void }> = ({ name, onAnswer }) => {
+    const [answer, setAnswer] = useState('')
     return (
-        <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>
-            <Button size="sm" variant="outline" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>
-        </div>
+        <form
+            className="mt-2 flex items-center gap-2"
+            onSubmit={(event) => {
+                event.preventDefault()
+                if (answer.trim()) onAnswer(answer)
+            }}
+        >
+            <input
+                aria-label={`Your answer to ${name}`}
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                className="min-w-0 flex-1 h-8 rounded-card border bg-surface px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <Button size="sm" type="submit" disabled={!answer.trim()}>Answer</Button>
+        </form>
     )
 }
 
-const noteFor = ({ approval }: NeedsYouItem, name: string) => {
-    if (approval.handoff) return handoffNote(name)
-    return approval.question ? 'Don’t type passwords or codes here.' : 'Nothing happens until you allow it.'
-}
-
-// One thing waiting: who, on what, and exactly what it's asking, with the answer right here.
+// One line of the list: what's being asked, first and in plain words, with who and what for underneath.
 export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered; highlighted?: boolean }> = ({ item, onAnswered, highlighted = false }) => {
     const mascot = useFlock().find(item.mascotId)
     const name = useAssistantName(mascot)
     const { tabs, switchTab } = useBrowser()
     const browser = window.chromeAPI.browser
-    const { handoff } = item.approval
-    const canGoToTab = item.tabId !== null && !handoff && tabs.some((tab) => tab.id === item.tabId)
+    const { id, approval } = item
+    const { handoff, question } = approval
+    const canGoToTab = item.tabId !== null && tabs.some((tab) => tab.id === item.tabId)
+    const onThatTab = !!handoff && tabs.some((tab) => tab.id === handoff.tabId && tab.isActive)
+    const shortened = withSiteNames(approval.text)
 
+    const send = (allow: boolean, said: string, words?: string) => {
+        onAnswered(said)
+        void window.chromeAPI.chat.decide(id, approval.id, allow, words)
+    }
     const openJob = () => {
         if (item.routineId) {
             setRoutinesView({ page: 'detail', id: item.routineId })
             void browser.openPage('routines')
         } else {
-            void browser.openPage('chat', { param: item.id, title: item.job })
+            void browser.openPage('chat', { param: id, title: item.job })
         }
     }
+    const goToTab = () => void switchTab(item.tabId!)
+    const done = () => send(true, `${name} has the tab back.`)
 
     return (
         <li
@@ -135,27 +134,32 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
                 if (node && highlighted) node.scrollIntoView({ block: 'nearest' })
             }}
             aria-label={`${name} is asking`}
-            className={cn("flex gap-4 p-4 rounded-panel border bg-surface shadow-card animate-fade-in", highlighted && "ring-2 ring-ring")}
+            className={cn("group py-3 animate-fade-in", highlighted && "bg-muted -mx-3 px-3 rounded-card")}
         >
-            <Berry mood="asking" size={64} mascot={mascot} className="shrink-0" />
-            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                <p className="flex items-baseline gap-2 text-13 text-muted-foreground">
-                    <span className="font-semibold text-foreground">{name}</span>
-                    <span className="min-w-0 truncate">{item.job}</span>
-                    <span className="ml-auto shrink-0 text-12 tabular-nums">{askedAgo(item.askedAt)}</span>
-                </p>
-                <h2 className="mt-1 text-16">{item.approval.text}</h2>
-                <p className="mt-1 text-12 text-muted-foreground">
-                    {noteFor(item, name)}
-                    {item.lastStep && !handoff && ` Last step: ${item.lastStep.toLowerCase()}.`}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <AskControls item={item} onAnswered={onAnswered} />
-                    <span className="flex items-center gap-1">
-                        {canGoToTab && <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => void switchTab(item.tabId!)}>Go to the tab</Button>}
-                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
-                    </span>
+            <div className="flex items-start gap-4">
+                <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                    <h2 className="pt-0.5 text-16">{shortened}</h2>
+                    {/* Open from the moment Allow can be reached, and it opens downwards, so Allow stays where it is. */}
+                    {shortened !== approval.text && (
+                        <p className="text-12 text-muted-foreground truncate group-hover:whitespace-normal group-focus-within:whitespace-normal">{approval.text}</p>
+                    )}
+                    {question && <QuestionBox name={name} onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)} />}
+                    <div className="mt-1 min-h-7 flex flex-wrap items-center gap-x-1.5 text-12 text-muted-foreground">
+                        <Berry mood="asking" size={24} mascot={mascot} className="shrink-0" />
+                        <span className="min-w-0 truncate">{name} · {item.job} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
+                        <span className={cn("ml-auto flex items-center", QUIETLY)}>
+                            {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={goToTab}>Go to the tab</Button>}
+                            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
+                            {question && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Skipped. ${name} carries on without it.`)}>Skip</Button>}
+                            {handoff && !onThatTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={done}>I’m done</Button>}
+                            {handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `${name} carries on without it.`)}>Not now</Button>}
+                            {!question && !handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>}
+                        </span>
+                    </div>
                 </div>
+                {!question && !handoff && <Button size="sm" className="shrink-0" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>}
+                {handoff && onThatTab && <Button size="sm" className="shrink-0" onClick={done}>I’m done</Button>}
+                {handoff && !onThatTab && canGoToTab && <Button size="sm" variant="outline" className="shrink-0" onClick={goToTab}>Go to the tab</Button>}
             </div>
         </li>
     )
@@ -165,62 +169,9 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
 export const AnsweredRow: React.FC<{ item: NeedsYouItem; said: string }> = ({ item, said }) => {
     const mascot = useFlock().find(item.mascotId)
     return (
-        <li role="status" className="flex items-center gap-3 px-4 py-3 rounded-panel border bg-surface text-14 text-muted-foreground motion-safe:animate-answered">
-            <Berry mood="fetching" size={32} mascot={mascot} className="shrink-0" />
+        <li role="status" className="flex items-center gap-2 py-3 text-14 text-muted-foreground motion-safe:animate-answered">
+            <Berry mood="fetching" size={24} mascot={mascot} className="shrink-0" />
             {said}
         </li>
-    )
-}
-
-const useClock = () => {
-    const [now, setNow] = useState(() => new Date())
-    useEffect(() => {
-        const timer = setInterval(() => setNow(new Date()), 30_000)
-        return () => clearInterval(timer)
-    }, [])
-    return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-}
-
-// A picture of what a phone notification could be, clearly labelled. There is no phone app, but its buttons really answer.
-export const PhonePreview: React.FC<{ item: NeedsYouItem | null; onAnswered: OnAnswered }> = ({ item, onAnswered }) => {
-    const { find } = useFlock()
-    const mascot = item ? find(item.mascotId) : undefined
-    const name = useAssistantName(mascot)
-    const clock = useClock()
-
-    return (
-        <aside aria-label="Coming to your phone: a preview" className="w-[248px] shrink-0">
-            <div className="p-1.5 rounded-[40px] bg-foreground dark:bg-border shadow-float">
-                <div className="relative h-[460px] rounded-[34px] overflow-hidden bg-frame">
-                    <div aria-hidden className="absolute top-2.5 left-1/2 -translate-x-1/2 w-20 h-5 rounded-full bg-foreground dark:bg-border" />
-                    <p aria-hidden className="pt-14 text-center text-[44px] leading-none font-semibold tabular-nums tracking-tight">{clock}</p>
-                    <div className="absolute inset-x-2 bottom-3">
-                        {item ? (
-                            <section key={item.approval.id} aria-label="Preview notification" className="p-3 rounded-panel bg-surface shadow-float animate-fade-in [overflow-wrap:anywhere]">
-                                <p className="flex items-center gap-1.5 text-11 text-muted-foreground">
-                                    <BerryDot />
-                                    Blueberry
-                                    <span className="ml-auto">now</span>
-                                </p>
-                                <div className="mt-2 flex gap-2">
-                                    <Berry mood="asking" size={40} mascot={mascot} className="shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-13 font-semibold">{name}</p>
-                                        <p className="text-12 line-clamp-5">{item.approval.text}</p>
-                                    </div>
-                                </div>
-                                <div className="mt-3">
-                                    <AskControls item={item} onAnswered={onAnswered} />
-                                </div>
-                            </section>
-                        ) : (
-                            <p role="status" className="pb-6 text-center text-13 text-muted-foreground">Nothing waiting</p>
-                        )}
-                    </div>
-                </div>
-            </div>
-            <p className="mt-3 text-13 font-semibold text-center">Coming to your phone</p>
-            <p className="mt-1 text-12 text-muted-foreground text-center">A preview. There’s no phone app yet, but these buttons really answer.</p>
-        </aside>
     )
 }

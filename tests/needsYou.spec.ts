@@ -2,17 +2,20 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 /// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { FAKE_BOT_TOKEN, startFakeTelegram } from "./fakeTelegram";
 
 const startSite = async () => {
-  const server = createServer((_, response) => {
+  const server = createServer((request, response) => {
     response.setHeader("content-type", "text/html");
-    response.end(readFileSync(join(__dirname, "../evals/fixtures/login.html")));
+    const page = /code|boxes/.test(request.url ?? "") ? "code.html" : "login.html";
+    response.end(readFileSync(join(__dirname, "../evals/fixtures", page)));
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   return { origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, close: () => server.close() };
@@ -33,7 +36,9 @@ test("an approval answered from Needs you lets the job carry on", async () => {
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Open my orders", { seePage: false }));
 
     const row = chrome.getByRole("listitem", { name: "Berry is asking" });
-    await expect(row.getByRole("heading")).toHaveText(`Open ${address} in a new tab`);
+    // The row names the site, and the exact address is right there before Allow.
+    await expect(row.getByRole("heading")).toHaveText("Open 127.0.0.1 in a new tab");
+    await expect(row.getByText(`Open ${address} in a new tab`)).toBeAttached();
     await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible();
     await row.getByRole("button", { name: "Allow", exact: true }).click();
 
@@ -97,6 +102,118 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
   } finally {
     await app.close();
     model.close();
+    site.close();
+  }
+});
+
+test("from the phone: pair, press Allow, and a code goes in the page without ever reaching the model", async () => {
+  const CODE = "482913";
+  const BOX_CODE = "705162";
+  const site = await startSite();
+  const model = await startFakeModel();
+  const telegram = await startFakeTelegram();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-test-"));
+  const app = await launchApp(profile, { modelEnv: { ...model.env, ...telegram.env } });
+  let output = "";
+  app.process().stdout?.on("data", (data) => (output += data));
+  app.process().stderr?.on("data", (data) => (output += data));
+  try {
+    const chrome = await findView(app, "view=chrome");
+    const phone = () => chrome.evaluate(() => window.chromeAPI.phone.state());
+    const reply = (id: string) => chrome.evaluate((chat) => window.chromeAPI.library.getChat(chat), id);
+    const lastSent = async (words: string) => {
+      await expect.poll(() => telegram.sent.at(-1)?.text ?? "").toContain(words);
+      return telegram.sent.at(-1)!;
+    };
+
+    // Off by default, and a bad token saves nothing.
+    expect((await phone()).status).toBe("off");
+    expect((await chrome.evaluate(() => window.chromeAPI.phone.connect("nonsense"))).status).toBe("off");
+
+    // Pairing: only the one-time link counts, and only from the chat that first uses it.
+    const pairing = await chrome.evaluate((token) => window.chromeAPI.phone.connect(token), FAKE_BOT_TOKEN);
+    expect(pairing.status).toBe("pairing");
+    expect(JSON.stringify(pairing)).not.toContain(FAKE_BOT_TOKEN);
+    const start = new URL(pairing.pairLink!).searchParams.get("start")!;
+    telegram.userSends("/start wrong-token");
+    await expect.poll(() => telegram.polls).toBeGreaterThan(2);
+    expect((await phone()).status).toBe("pairing");
+    telegram.userSends(`/start ${start}`);
+    await expect.poll(async () => (await phone()).status).toBe("connected");
+    await lastSent("Connected.");
+    const known = telegram.sent.length;
+    telegram.strangerSends("Hello");
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ phoneAlways: true }));
+    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await expect(chrome.getByText("Replies from your phone are on")).toBeVisible();
+    expect(telegram.sent.length).toBe(known);
+
+    // An approval, in the same words as the card, answered with a button.
+    const address = `${site.origin}/code?from=inbox`;
+    model.callTools({ name: "open_tab", args: { url: address } });
+    model.callTools({ name: "hand_to_user", args: { need: "code" } });
+    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Check my orders", { seePage: false }));
+    const asked = await lastSent(`Open ${address} in a new tab`);
+    expect(asked.buttons.map(({ text }) => text)).toEqual(["Allow", "Don’t allow"]);
+    telegram.userPresses(asked.buttons[0], asked.message_id);
+    await expect.poll(() => telegram.editsOf.get(asked.message_id) ?? "").toContain("Allowed. Berry carries on.");
+    expect(telegram.answeredCallbacks).toContain(`press-${asked.message_id}`);
+
+    // A code: anything that isn't one is refused and nothing is typed.
+    const code = await lastSent("Berry needs a code for 127.0.0.1. Reply with it.");
+    expect(code.buttons).toEqual([]);
+    const row = chrome.getByRole("listitem", { name: "Berry is asking" });
+    await expect(row.getByRole("heading")).toHaveText("Berry needs a code for 127.0.0.1");
+    const notACode = telegram.userSends("hunter2 is my password");
+    await lastSent("doesn’t look like a code");
+    await expect.poll(() => telegram.deleted).toContain(notACode);
+    const page = await findView(app, address);
+    await expect(page.locator("#code")).toHaveValue("");
+
+    // The real one goes in the page, and the job carries on. This page repeats it back, in its words and its title.
+    model.callTools({ name: "read_page", args: {} });
+    model.callTools({ name: "list_tabs", args: {} });
+    model.callTools({ name: "open_tab", args: { url: `${site.origin}/boxes` } });
+    model.callTools({ name: "hand_to_user", args: { need: "code" } });
+    const codeMessage = telegram.userSends(CODE);
+    await expect(page.getByText(`Verified with code ${CODE}`)).toBeVisible();
+    await expect.poll(() => telegram.deleted).toContain(codeMessage);
+    await expect.poll(() => telegram.editsOf.get(code.message_id) ?? "").toContain("Entered the code on 127.0.0.1");
+
+    // One box per digit, with real keys, in a tab behind the user. With "123 456" spacing, too.
+    const boxes = await lastSent("Berry needs a code for 127.0.0.1. Reply with it.");
+    expect(boxes.message_id).not.toBe(code.message_id);
+    model.callTools({ name: "read_page", args: {} });
+    model.replyWith("All done");
+    telegram.userSends(`${BOX_CODE.slice(0, 3)} ${BOX_CODE.slice(3)}`, boxes.message_id);
+    await expect.poll(async () => (await reply(sent!.id))?.messages.at(-1)?.content).toBe("All done");
+    const boxPage = await findView(app, `${site.origin}/boxes`);
+    await expect(boxPage.getByText(`Verified with code ${BOX_CODE}`)).toBeVisible();
+
+    // The job really read those pages again, and neither code went anywhere it shouldn't.
+    const seen = JSON.stringify(model.requests) + JSON.stringify(model.titleRequests);
+    expect(seen).toContain("A code was entered");
+    expect(seen).toContain("Order 4471");
+    for (const secret of [CODE, BOX_CODE, `${BOX_CODE.slice(0, 3)} ${BOX_CODE.slice(3)}`]) {
+      expect(seen).not.toContain(secret);
+      expect(JSON.stringify(await reply(sent!.id))).not.toContain(secret);
+      expect(telegram.sent.map(({ text }) => text).join()).not.toContain(secret);
+      expect(output).not.toContain(secret);
+    }
+    await app.close();
+    for (const file of readdirSync(profile).filter((name) => /^(chats|phone|settings|session)/.test(name))) {
+      const saved = readFileSync(join(profile, file)).toString("latin1");
+      expect(saved).not.toContain(FAKE_BOT_TOKEN);
+      if (file.startsWith("chats")) {
+        expect(saved).not.toContain(CODE);
+        expect(saved).not.toContain(BOX_CODE);
+      }
+    }
+    expect(output).not.toContain(FAKE_BOT_TOKEN);
+  } finally {
+    await app.close();
+    model.close();
+    telegram.close();
     site.close();
   }
 });

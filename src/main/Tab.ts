@@ -447,6 +447,24 @@ export class Tab {
     }
   }
 
+  // The one thing that may use a held tab: a code the user sent from their phone, typed for them by `codeEntry.ts`. They
+  // refuse any tab that isn't held, so they can't stand in for the methods above. No tool calls these, and no job can
+  // reach a held tab to try, because the hold itself stays on throughout.
+  sendInputWhileHeld(event: Parameters<WebContents["sendInputEvent"]>[0]): void {
+    if (!this.heldForUser) throw new Error("This tab isn't held");
+    this.sendingAgentInput = true;
+    try {
+      this.webContents.sendInputEvent(event);
+    } finally {
+      this.sendingAgentInput = false;
+    }
+  }
+
+  async runInPageWhileHeld<T = unknown>(code: string): Promise<T> {
+    if (!this.heldForUser) throw new Error("This tab isn't held");
+    return await this.fromPage(() => this.view.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true));
+  }
+
   async screenshot(): Promise<NativeImage> {
     this.refuseWhileHeld();
     return await this.fromPage(() => this.view.webContents.capturePage());

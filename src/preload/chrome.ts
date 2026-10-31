@@ -103,6 +103,14 @@ const chromeAPI: ChromeAPI = {
     gallery: () => invoke("mascots:gallery"),
     addFromGallery: (galleryId, name) => invoke("mascots:add-from-gallery", galleryId, name),
   },
+  phone: {
+    state: () => invoke("phone:state"),
+    connect: (token) => invoke("phone:connect", token),
+    newLink: () => invoke("phone:new-link"),
+    disconnect: () => invoke("phone:disconnect"),
+    onUpdated: (callback) => subscribe("phone:updated", callback),
+    onAnswered: (callback) => subscribe("phone:answered", callback),
+  },
   suggestions: {
     list: () => invoke("suggestions:list"),
     dismiss: (id) => invoke("suggestions:dismiss", id),

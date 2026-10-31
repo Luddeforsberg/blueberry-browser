@@ -83,7 +83,7 @@ export async function launchApp(
     electron.launch({
       executablePath: electronPath as unknown as string,
       // A fresh profile keeps tests apart and away from the developer's real browsing data.
-      args: [...background, ".", `--user-data-dir=${userDataDir}`],
+      args: [...background, "-r", join(__dirname, "fakeKeychain.cjs"), ".", `--user-data-dir=${userDataDir}`],
       env,
       timeout: LAUNCH_TIMEOUT_MS,
     })

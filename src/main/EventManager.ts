@@ -136,6 +136,11 @@ export class EventManager {
     this.handle("settings:get", () => this.mainWindow.settings);
 
     this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));
+
+    this.handle("phone:state", () => this.mainWindow.telegram.state);
+    this.handle("phone:connect", (token) => this.mainWindow.telegram.connect(token));
+    this.handle("phone:new-link", () => this.mainWindow.telegram.newLink());
+    this.handle("phone:disconnect", () => this.mainWindow.telegram.disconnect());
   }
 
   private handleChatEvents(): void {

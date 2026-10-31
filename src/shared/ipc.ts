@@ -42,6 +42,24 @@ export interface Settings {
   siteZoom: Record<string, number>;
   // Whether the new tab page offers what it noticed you repeat. Off means no model call.
   suggestions: boolean;
+  // Send to the phone even while the user is at the computer, for filming and trying it out.
+  phoneAlways: boolean;
+}
+
+// Replies from the phone, for Settings and Needs you. Nothing here can be used to read the bot's token, which never
+// comes back from main once it's saved.
+export interface PhoneState {
+  status: "off" | "pairing" | "connected";
+  botName: string | null;
+  // The one-time link that binds the user's chat, while it's waiting for one.
+  pairLink: string | null;
+  // What's wrong right now, in words.
+  problem: string | null;
+}
+
+export interface PhoneAnswered {
+  approvalId: string;
+  said: string;
 }
 
 export type DownloadState = "progressing" | "paused" | "completed" | "cancelled" | "interrupted";
@@ -287,6 +305,11 @@ export interface InvokeChannels {
     args: [origin: string, permission: SitePermission, decision: SiteDecision | null];
     result: boolean;
   };
+  "phone:state": { region: "chrome"; args: []; result: PhoneState };
+  // The token goes this way only.
+  "phone:connect": { region: "chrome"; args: [token: string]; result: PhoneState };
+  "phone:new-link": { region: "chrome"; args: []; result: PhoneState };
+  "phone:disconnect": { region: "chrome"; args: []; result: PhoneState };
   "permissions:current": { region: "prompt"; args: []; result: PermissionPrompt | null };
   "permissions:decide": { region: "prompt"; args: [promptId: string, allow: boolean]; result: boolean };
   "permissions:resize": { region: "prompt"; args: [height: number]; result: void };
@@ -297,6 +320,8 @@ export type InvokeChannel = keyof InvokeChannels;
 // Main tells renderers.
 export interface EventChannels {
   "tabs:updated": TabInfo[];
+  "phone:updated": PhoneState;
+  "phone:answered": PhoneAnswered;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
   "settings:updated": Settings;
@@ -438,6 +463,15 @@ export interface PermissionsAPI {
   onPrompt: (callback: (prompt: PermissionPrompt | null) => void) => Unsubscribe;
 }
 
+export interface PhoneAPI {
+  state: () => Promise<PhoneState>;
+  connect: (token: string) => Promise<PhoneState>;
+  newLink: () => Promise<PhoneState>;
+  disconnect: () => Promise<PhoneState>;
+  onUpdated: (callback: (state: PhoneState) => void) => Unsubscribe;
+  onAnswered: (callback: (answered: PhoneAnswered) => void) => Unsubscribe;
+}
+
 export interface ChromeAPI {
   browser: BrowserAPI;
   layout: LayoutAPI;
@@ -451,4 +485,5 @@ export interface ChromeAPI {
   suggestions: SuggestionsAPI;
   downloads: DownloadsAPI;
   permissions: PermissionsAPI;
+  phone: PhoneAPI;
 }

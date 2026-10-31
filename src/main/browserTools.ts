@@ -252,8 +252,9 @@ export interface PageToolAccess {
   takenOver?: ReadonlyMap<string, string>;
   // Whether the user has been handed this tab and hasn't said they're done. No job can reach it, not even the one asking.
   heldByUser?: (id: string) => boolean;
-  // Waits until the user says they're done with this tab, which gives it back: true. False if they won't, or closed it.
-  handOver?: (tab: Tab, need: HandoffNeed) => Promise<boolean>;
+  // Waits until the user says they're done with this tab, which gives it back: true. "code" if that's because a code
+  // they sent from their phone went in, which never comes here itself. False if they won't, or closed it.
+  handOver?: (tab: Tab, need: HandoffNeed) => Promise<boolean | "code">;
   // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped.
   ask: (question: string) => Promise<string | null>;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
@@ -699,7 +700,8 @@ export const createPageTools = ({
         // They may have ended up anywhere, and a limited mascot still doesn't get to read it.
         if (!allowed(tab.url)) return offLimits(tab.url).message;
         onUse(tab);
-        return `The user says they're done, and tab ${tab.id} is yours again. ${await whereNow(tab)} You couldn't see it meanwhile, so look at the page again to see whether it worked, then carry on with the job.`;
+        const back = done === "code" ? `A code was entered in tab ${tab.id} from the user's phone, and the tab is yours again.` : `The user says they're done, and tab ${tab.id} is yours again.`;
+        return `${back} ${await whereNow(tab)} You couldn't see it meanwhile, so look at the page again to see whether it worked, then carry on with the job.`;
       },
     }),
     pageTool({

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Harbour Books</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 0; background: #f5f1e8; color: #27241d; }
+  main { max-width: 420px; margin: 64px auto; padding: 32px; background: #fff; border-radius: 12px; }
+  label { display: block; margin-top: 16px; font-size: 14px; }
+  input { box-sizing: border-box; margin-top: 4px; padding: 10px; font: inherit; border: 1px solid #b8b09c; border-radius: 6px; }
+  #boxes input { width: 40px; margin-right: 4px; text-align: center; }
+  button { display: block; margin-top: 20px; padding: 10px 20px; font: inherit; color: #fff; background: #27241d; border: 0; border-radius: 6px; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<!-- A fake two-factor step for proving a code from the phone. ?boxes has one box per digit, moved along by the page and
+     filled only by real keys. It repeats the code back on purpose, as careless sites do. Nothing leaves the page. -->
+<main id="ask">
+  <h1>Harbour Books</h1>
+  <p>Enter the code we sent you.</p>
+  <form id="form">
+    <label id="single">Code <input id="code" name="code" autocomplete="one-time-code" inputmode="numeric"></label>
+    <div id="boxes" hidden></div>
+    <button type="submit">Verify</button>
+  </form>
+</main>
+<main id="done" hidden>
+  <h1>Your orders</h1>
+  <p>Verified with code <span id="echo"></span>. Order 4471 arrives on Tuesday.</p>
+</main>
+<script>
+  const boxes = location.pathname.includes("boxes");
+  const list = document.getElementById("boxes");
+  if (boxes) {
+    document.getElementById("single").hidden = true;
+    list.hidden = false;
+    for (let at = 0; at < 6; at++) {
+      const box = document.createElement("input");
+      box.maxLength = 1;
+      box.setAttribute("aria-label", `Digit ${at + 1}`);
+      box.addEventListener("input", () => box.value && box.nextElementSibling?.focus());
+      list.append(box);
+    }
+  }
+  document.getElementById("form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const code = boxes ? [...list.children].map((box) => box.value).join("") : document.getElementById("code").value;
+    document.getElementById("echo").textContent = code;
+    document.getElementById("ask").hidden = true;
+    document.getElementById("done").hidden = false;
+    document.title = `Verified ${code} - Harbour Books`;
+  });
+</script>
+</body>
+</html>

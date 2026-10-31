@@ -7,6 +7,9 @@ import {
 } from "./agent";
 import { randomUUID } from "crypto";
 import { createPageTools, HANDOFF_WORDS, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
+import { enterCodeInTab } from "./codeEntry";
+import type { CodeResult } from "./Phone";
+import { codeSpellings } from "./phoneReplies";
 import { mascotNote } from "./mascotNote";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
@@ -20,6 +23,17 @@ const MAX_RENAME_LENGTH = 100;
 // A chat with no topic by then probably won't get one, so stop paying to ask.
 const MAX_TITLE_ATTEMPTS = 5;
 const MAX_ANSWER_LENGTH = 2000;
+// A page may repeat a code back, in its words or its address, for as long as a job could plausibly still be there.
+const REMEMBER_CODE_MS = 60 * 60 * 1000;
+const CODE_REMOVED = "[code removed]";
+
+const hostOf = (url: string): string | null => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+};
 
 const publicApproval = ({ id, text, question, handoff }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}), ...(handoff ? { handoff } : {}) });
 
@@ -120,6 +134,8 @@ export interface ChatEvents {
   onListChanged: () => void;
   // `mascots` says who is working in a tab, where it's a mascot other than Berry.
   onWorkingTabs: (tabs: Set<Tab>, mascots: Map<Tab, string>) => void;
+  // An approval got its answer. Comes just before the list changes.
+  onDecided?: (approvalId: string, allow: boolean) => void;
 }
 
 // Every conversation with the model, whichever screen it's on. Replies are saved once they end.
@@ -131,7 +147,9 @@ export class Chats {
   private readonly taskPopups = new Map<string, Set<string>>();
   // Tabs handed to the user. Nothing reaches these, from any job. `asking` is whether a job is still waiting: one that
   // stopped waiting after the user typed there leaves the tab here, until they send it with a message or close it.
-  private readonly handedOver = new Map<string, { touched: boolean; asking: boolean }>();
+  private readonly handedOver = new Map<string, { touched: boolean; asking: boolean; host: string | null; entering: boolean; codeEntered: boolean }>();
+  // Codes sent from the phone, and until when to keep them out of anything going to the model. Memory only.
+  private readonly enteredCodes = new Map<string, number>();
 
   constructor(
     private readonly store: ChatStore,
@@ -162,7 +180,7 @@ export class Chats {
       // That was the page from an earlier message. This one came without it, so it's out of reach.
       job.current = [...job.own].at(-1) ?? null;
     }
-    return createPageTools({
+    const tools = createPageTools({
       allTabs: () => this.browser.allTabs().filter((tab) => page || job.own.has(tab.id)),
       activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current) ?? null,
       openTab: (url) => {
@@ -185,6 +203,19 @@ export class Chats {
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
+    return tools.map((tool) => ({ ...tool, run: async (args) => this.withoutCodes(await tool.run(args)) }));
+  }
+
+  // What a page might say back after a code went in. A picture can't be gone through, which is why the field is wiped.
+  withoutCodes(text: string): string {
+    const now = Date.now();
+    if (text.startsWith("data:image/")) return text;
+    let clean = text;
+    this.enteredCodes.forEach((until, spelling) => {
+      if (until < now) this.enteredCodes.delete(spelling);
+      else clean = clean.split(spelling).join(CODE_REMOVED);
+    });
+    return clean;
   }
 
   private closeRunTab(run: Run, tab: Tab): boolean {
@@ -199,12 +230,12 @@ export class Chats {
   // The user does what only they can in this tab, with nothing reaching it until they say they're done. "I'm done"
   // gives it back to the job. So does anything else, if they never touched it. If they did, it's theirs, and it stays
   // out of every job's reach, because Berry must not read what they left half typed.
-  private async handOver(chatId: string, run: Run, job: Job, tab: Tab, need: HandoffNeed): Promise<boolean> {
+  private async handOver(chatId: string, run: Run, job: Job, tab: Tab, need: HandoffNeed): Promise<boolean | "code"> {
     // Another job got there first and only its answer may let the tab go, or the user left it half typed and it stays theirs.
     if (this.handedOver.has(tab.id)) return false;
     const wasOwn = job.own.delete(tab.id);
     job.takenOver.set(tab.id, tab.url);
-    const held = { touched: false, asking: true };
+    const held = { touched: false, asking: true, host: hostOf(tab.url), entering: false, codeEntered: false };
     this.handedOver.set(tab.id, held);
     tab.heldForUser = true;
     run.tabs.delete(tab);
@@ -213,9 +244,9 @@ export class Chats {
     const site = siteOf(tab.url);
     let done = false;
     try {
-      const text = `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;
+      const text = need === "code" ? `${who} needs a code for ${site}` : `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;
       done = await this.wait(chatId, run, text, { handoff: { need, tabId: tab.id, site } }, (allow) => allow);
-      return done;
+      return done && held.codeEntered ? "code" : done;
     } finally {
       held.asking = false;
       if (done || !held.touched) {
@@ -224,6 +255,41 @@ export class Chats {
         if (wasOwn) job.own.add(tab.id);
       }
       if (done) job.current = tab.id;
+    }
+  }
+
+  // A code from the user's phone goes straight into the page, and the job only hears that one went in. Everything is
+  // checked here first, and the tab stays held until it's done, so no job can see any of it happen. Not reachable from
+  // any tool, and the code goes no further than the page.
+  async enterCode(chatId: string, approvalId: string, code: string): Promise<CodeResult> {
+    const run = this.runs.get(chatId);
+    const handoff = run?.approval?.id === approvalId ? run.approval.handoff : undefined;
+    if (!run || handoff?.need !== "code") return "closed";
+    const tab = this.browser.allTabs().find((candidate) => candidate.id === handoff.tabId);
+    if (!tab) return "tab-gone";
+    const held = this.handedOver.get(tab.id);
+    if (!held?.asking || !tab.heldForUser) return "not-held";
+    if (held.touched) return "touched";
+    if (hostOf(tab.url) !== held.host) return "moved";
+    if (held.entering) return "busy";
+    held.entering = true;
+    const until = Date.now() + REMEMBER_CODE_MS;
+    codeSpellings(code).forEach((spelling) => this.enteredCodes.set(spelling, until));
+    // Given a size and drawn while it types, like any tab a job is using behind the user's. The hold is what keeps jobs out.
+    run.tabs.add(tab);
+    this.publishWorkingTabs();
+    const open = () => run.approval?.id === approvalId;
+    try {
+      const stillOurs = () => open() && !held.touched && hostOf(tab.url) === held.host;
+      const result = await enterCodeInTab(tab, code, stillOurs, () => held.touched).catch(() => "no-field" as const);
+      if (result === "no-field") return "no-field";
+      if (result === "interrupted") return held.touched ? "touched" : open() ? "moved" : "closed";
+      held.codeEntered = true;
+      return this.decide(chatId, approvalId, true) ? "entered" : "closed";
+    } finally {
+      held.entering = false;
+      run.tabs.delete(tab);
+      this.publishWorkingTabs();
     }
   }
 
@@ -533,6 +599,7 @@ export class Chats {
     if (run?.approval?.id !== approvalId) return false;
     const { answer: finish } = run.approval;
     run.approval = null;
+    this.events.onDecided?.(approvalId, allow === true);
     finish(allow === true, typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined);
     this.publish(chatId, run);
     this.events.onListChanged();
@@ -580,7 +647,9 @@ export class Chats {
       }),
     ]);
     // "Can see" may have been switched off while the page was being read, so nothing read goes out.
-    return this.pageAccess && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites) ? { url: tab.url, text, screenshot } : null;
+    return this.pageAccess && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites)
+      ? { url: this.withoutCodes(tab.url), text: text === null ? null : this.withoutCodes(text), screenshot }
+      : null;
   }
 
   // The "Can see" toggle. Off means no page text or screenshot goes with a message.
