@@ -139,9 +139,12 @@ export class Chats {
   }
 
   private closeRunTab(run: Run, tab: Tab): boolean {
-    run.tabs.delete(tab);
-    this.publishWorkingTabs();
-    return this.browser.closeTab(tab.id);
+    const closed = this.browser.closeTab(tab.id);
+    if (closed) {
+      run.tabs.delete(tab);
+      this.publishWorkingTabs();
+    }
+    return closed;
   }
 
   // A page in a task's tab opened another. Nobody allowed that, so the task can't reach it, but it's cleared up with

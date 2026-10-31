@@ -286,10 +286,11 @@ export const createPageTools = ({
 
   // A frame from another origin can answer anything here, so it's never trusted to say something is safe.
   const describeRef = async (tab: Tab, ref: string): Promise<ElementInfo | null> => {
-    const info = await onRef<ElementInfo>(tab, ref, describeElement);
     const entry = frameOf(tab, ref);
-    if (!info || !entry || entry === "gone") return info;
-    return { ...info, target: null, frameUrl: null, riskyClick: true, safeToType: false, frameOrigin: entry.origin };
+    if (!entry || entry === "gone") return onRef<ElementInfo>(tab, ref, describeElement);
+    // Saying nothing or failing can't make it safe either, because the action would still reach that frame.
+    const info = await onRef<ElementInfo>(tab, ref, describeElement).catch(() => null);
+    return { role: "element", name: "unnamed", ...info, target: null, frameUrl: null, riskyClick: true, safeToType: false, frameOrigin: entry.origin };
   };
 
   const placeOf = (info: ElementInfo) => {
@@ -401,14 +402,15 @@ export const createPageTools = ({
           const frames = await Promise.all(
             tab.foreignFrames.map(async (frame) => {
               const found = await tab.runInFrame<ListedElements>(frame, script).catch(() => null);
-              if (!Array.isArray(found?.elements) || found.elements.length === 0) return [];
+              if (!Array.isArray(found?.elements) || found.elements.length === 0) return { total: 0, elements: [] };
               const name = frameName(frame, tab);
-              return found.elements.slice(0, MAX_FRAME_ELEMENTS).map((element) => ({ ...element, ref: `${name}.${element.ref}`, frame: frame.origin }));
+              const elements = found.elements.slice(0, MAX_FRAME_ELEMENTS).map((element) => ({ ...element, ref: `${name}.${element.ref}`, frame: frame.origin }));
+              return { total: Number.isFinite(found.total) ? Math.max(found.total, elements.length) : elements.length, elements };
             })
           );
-          const fromFrames = frames.flat();
           if (!canSee()) return NO_ACCESS;
-          return JSON.stringify({ total: top.total + fromFrames.length, elements: [...top.elements, ...fromFrames] });
+          const total = frames.reduce((sum, frame) => sum + frame.total, top.total);
+          return JSON.stringify({ total, elements: [...top.elements, ...frames.flatMap((frame) => frame.elements)] });
         }),
     }),
     pageTool({

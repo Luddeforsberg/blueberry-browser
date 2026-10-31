@@ -241,6 +241,8 @@ const AIM = `
       if (!event.isTrusted) return;
       const onIt = reaches(event.composedPath()[0], el);
       if (state.landed === false) state.landed = onIt ? true : "missed";
+      // The press arrived but the rest of the click is about to be stopped, so it didn't happen.
+      else if (state.landed === true && !onIt && !pressOnly) state.landed = "missed";
       if (onIt || (pressOnly && state.landed === true)) return;
       event.preventDefault();
       event.stopImmediatePropagation();

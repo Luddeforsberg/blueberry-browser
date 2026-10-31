@@ -104,3 +104,45 @@ describe("the ask_user tool", () => {
     await both;
   });
 });
+
+describe("a frame from another site", () => {
+  const frame = { origin: "https://other.example", isDestroyed: () => false };
+  const setUp = (runInFrame: () => Promise<unknown>) => {
+    const tab = {
+      id: "t1",
+      url: "https://site.example/",
+      foreignFrames: [frame],
+      runInPage: async () => ({ total: 0, elements: [] }),
+      runInFrame,
+    } as unknown as Tab;
+    const tools = createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+    });
+    return (name: string) => tools.find((tool) => tool.name === name)!;
+  };
+  const listing = { total: 100, elements: [{ ref: "e1", role: "button", name: "Go" }] };
+
+  it.each([
+    ["says nothing", async () => null],
+    ["fails", async () => Promise.reject(new Error("gone"))],
+  ])("still asks when it %s about an element", async (_, describing) => {
+    const runInFrame = vi.fn(describing);
+    runInFrame.mockResolvedValueOnce(listing);
+    const tool = setUp(runInFrame);
+    const { elements } = JSON.parse(await tool("list_elements").run({}));
+    expect(await tool("click").isRisky!({ ref: elements[0].ref })).toBe(true);
+    expect(await tool("type_text").isRisky!({ ref: elements[0].ref, text: "hi" })).toBe(true);
+    expect(await tool("click").describe!({ ref: elements[0].ref })).toContain("https://other.example");
+  });
+
+  it("counts everything it found, not just what it returned", async () => {
+    const tool = setUp(async () => listing);
+    expect(JSON.parse(await tool("list_elements").run({})).total).toBe(100);
+  });
+});
