@@ -34,6 +34,13 @@ const BookmarksBar: React.FC = () => {
     )
 }
 
+// Shows only when the page isn't at 100%. Pressing it goes back there.
+export const ZoomButton: React.FC<{ percent: number; onReset: () => void }> = ({ percent, onReset }) => (
+    <ToolBarButton label={`Zoom ${percent}%, reset to 100%`} onClick={onReset} className="w-auto px-2 text-12 tabular-nums">
+        {percent}%
+    </ToolBarButton>
+)
+
 export const Toolbar: React.FC = () => {
     const { activeTab, goBack, goForward, reload, stop } = useBrowser()
     const { layout, theme, toggleSidebar, toggleChat } = useShell()
@@ -66,6 +73,10 @@ export const Toolbar: React.FC = () => {
                 <div className="flex-1 min-w-0 px-1">
                     <AddressBar />
                 </div>
+
+                {activeTab && activeTab.zoomPercent !== 100 && (
+                    <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
+                )}
 
                 <ToolBarButton
                     label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}

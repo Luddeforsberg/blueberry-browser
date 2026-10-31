@@ -41,7 +41,7 @@ const hostOf = (url: string) => {
 
 // Main Chat Component
 export const Chat: React.FC = () => {
-    const { messages, isLoading, error, chatId, approval, sendMessage, stop, pageAccess: enabled, setPageAccess: change } = useChat()
+    const { messages, isLoading, error, chatId, approval, sendMessage, stop, pageAccess: enabled, setPageAccess: change, draft, takeDraft } = useChat()
     const scrollerRef = useFollowReply(
         messages.filter((message) => message.role === 'user').length,
         messages[messages.length - 1]?.content,
@@ -104,6 +104,8 @@ export const Chat: React.FC = () => {
             <div className="p-3 pt-1">
                 <ChatComposer
                     onSend={sendMessage}
+                    draft={draft}
+                    onDraftTaken={takeDraft}
                     disabled={isLoading}
                     onStop={isLoading ? stop : undefined}
                     placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}

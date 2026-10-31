@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowUp, Plus, Square } from 'lucide-react'
 import { cn } from '@common/lib/utils'
 
@@ -11,6 +11,8 @@ export const Composer: React.FC<{
     onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
     rows?: number
     autoFocus?: boolean
+    // Moves the keyboard here each time this changes.
+    focusKey?: number
     spellCheck?: boolean
     // Shown above the text, such as the page Berry can see.
     attachment?: React.ReactNode
@@ -21,7 +23,7 @@ export const Composer: React.FC<{
     onSend: () => void
     // While a reply is running, the send button stops it.
     onStop?: () => void
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, spellCheck, attachment, onAdd, addLabel, canSend, onSend, onStop }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, canSend, onSend, onStop }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     useLayoutEffect(() => {
@@ -30,6 +32,10 @@ export const Composer: React.FC<{
         textarea.style.height = 'auto'
         textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
     }, [value])
+
+    useEffect(() => {
+        if (focusKey) textareaRef.current?.focus()
+    }, [focusKey])
 
     return (
         <div
@@ -98,8 +104,26 @@ export const ChatComposer: React.FC<{
     onAdd?: () => void
     addLabel?: string
     autoFocus?: boolean
-}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus }) => {
+    // Text to add to whatever is already being written. It's never sent without the user.
+    draft?: string | null
+    onDraftTaken?: () => void
+}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus, draft, onDraftTaken }) => {
     const [value, setValue] = useState('')
+    const [focusKey, setFocusKey] = useState(0)
+
+    // StrictMode runs this twice when the panel opens with a draft waiting, and it must only add it once.
+    const draftTaken = useRef(false)
+    useEffect(() => {
+        if (!draft) {
+            draftTaken.current = false
+            return
+        }
+        if (draftTaken.current) return
+        draftTaken.current = true
+        setValue((current) => (current ? `${current}\n\n${draft}` : draft))
+        setFocusKey((key) => key + 1)
+        onDraftTaken?.()
+    }, [draft, onDraftTaken])
 
     const send = () => {
         const message = value.trim()
@@ -115,6 +139,7 @@ export const ChatComposer: React.FC<{
             value={value}
             onChange={setValue}
             autoFocus={autoFocus}
+            focusKey={focusKey}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()

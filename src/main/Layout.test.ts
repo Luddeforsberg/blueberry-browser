@@ -19,6 +19,14 @@ describe("computeLayout", () => {
     expect(layout.page).toEqual({ x: 240, y: 48, width: 680, height: 744 });
   });
 
+  it("puts the find bar in the page's top right corner, and never outside the page", () => {
+    const { findBar, page } = computeLayout({ width: 1280, height: 800 }, both);
+    expect(findBar).toEqual({ x: page.x + page.width - 384, y: page.y, width: 384, height: 72 });
+
+    const tiny = computeLayout({ width: 300, height: 90 }, { sidebarOpen: false, chatOpen: false, ...mac });
+    expect(tiny.findBar).toEqual({ x: 8, y: 48, width: 284, height: 34 });
+  });
+
   it("floats the page card with the frame showing around it when both panels are gone", () => {
     const layout = computeLayout(
       { width: 1280, height: 800 },

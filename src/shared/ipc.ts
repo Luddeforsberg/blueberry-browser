@@ -3,8 +3,9 @@
 
 import type { ChatThread, LibrarySnapshot } from "./library";
 
-// The chrome view under the tabs, and the overlay view that floats the collapsed sidebar over a page.
-export type ChromeRegion = "chrome" | "overlay";
+// The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
+// find bar, which floats over a page in a view of its own.
+export type ChromeRegion = "chrome" | "overlay" | "find";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -29,6 +30,8 @@ export interface Settings {
   actionApproval: ActionApproval;
   // False until the first-launch steps are finished or skipped.
   onboarded: boolean;
+  // Page zoom in percent, by site. Sites at 100% aren't listed.
+  siteZoom: Record<string, number>;
 }
 
 // A page the user really visited, newest first.
@@ -57,6 +60,7 @@ export interface Layout {
   controls: Rect;
   sidebar: Rect;
   floatingSidebar: Rect;
+  findBar: Rect;
   tabStrip: Rect;
   toolbar: Rect;
   chat: Rect;
@@ -74,6 +78,7 @@ export interface TabInfo {
   berryWorking: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  zoomPercent: number;
   // Set for internal pages, which have no web view. `pageParam` picks which chat, for example.
   page: InternalPage | null;
   pageParam: string | null;
@@ -84,6 +89,12 @@ export interface ThemeState {
   // False when the system asks for reduced transparency, or the platform has no window material.
   glass: boolean;
   platform: "mac" | "windows" | "other";
+}
+
+// Where find in page has got to. `active` counts from 1.
+export interface FindResult {
+  active: number;
+  total: number;
 }
 
 export interface ChatChunk {
@@ -110,13 +121,17 @@ export interface InvokeChannels {
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:reload": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:stop": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "tab:zoom-reset": { region: "chrome"; args: [tabId: string]; result: boolean };
+  "find:search": { region: "find"; args: [text: string]; result: void };
+  "find:step": { region: "find"; args: [forward: boolean]; result: void };
+  "find:close": { region: "find"; args: []; result: void };
   "layout:get": { region: "chrome" | "overlay"; args: []; result: Layout };
   "layout:toggle-sidebar": { region: "chrome" | "overlay"; args: []; result: void };
   "layout:toggle-chat": { region: "chrome"; args: []; result: void };
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
-  "theme:get": { region: "chrome" | "overlay"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
@@ -153,6 +168,10 @@ export interface EventChannels {
   "chat:chunk": ChatChunk;
   "chat:updated": ChatThread;
   "chat:deleted": string;
+  // Text the user chose to ask about. It waits in the composer and is never sent by itself.
+  "chat:draft": string;
+  "find:opened": null;
+  "find:result": FindResult;
 }
 
 export type Unsubscribe = () => void;
@@ -169,6 +188,7 @@ export interface BrowserAPI {
   goForward: (tabId: string) => Promise<boolean>;
   reload: (tabId: string) => Promise<boolean>;
   stop: (tabId: string) => Promise<boolean>;
+  resetZoom: (tabId: string) => Promise<boolean>;
   openPage: (page: InternalPage, options?: { param?: string; title?: string }) => Promise<TabInfo>;
   getRecent: () => Promise<Visit[]>;
   onTabsUpdated: (callback: (tabs: TabInfo[]) => void) => Unsubscribe;
@@ -212,6 +232,7 @@ export interface ChatAPI {
   onChatChunk: (callback: (chunk: ChatChunk) => void) => Unsubscribe;
   onChatUpdated: (callback: (thread: ChatThread) => void) => Unsubscribe;
   onChatDeleted: (callback: (chatId: string) => void) => Unsubscribe;
+  onDraft: (callback: (text: string) => void) => Unsubscribe;
 }
 
 export interface LibraryAPI {
@@ -222,6 +243,14 @@ export interface LibraryAPI {
   onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;
 }
 
+export interface FindAPI {
+  search: (text: string) => Promise<void>;
+  step: (forward: boolean) => Promise<void>;
+  close: () => Promise<void>;
+  onOpened: (callback: () => void) => Unsubscribe;
+  onResult: (callback: (result: FindResult) => void) => Unsubscribe;
+}
+
 export interface ChromeAPI {
   browser: BrowserAPI;
   layout: LayoutAPI;
@@ -229,4 +258,5 @@ export interface ChromeAPI {
   settings: SettingsAPI;
   library: LibraryAPI;
   chat: ChatAPI;
+  find: FindAPI;
 }

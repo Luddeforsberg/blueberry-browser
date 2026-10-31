@@ -20,7 +20,7 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-e
 
 ## Architecture
 
-- `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one window-sized chrome view underneath, one `WebContentsView` per tab above it, and an overlay view on top for the collapsed sidebar when it floats over the page.
+- `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one window-sized chrome view underneath, one `WebContentsView` per tab above it, an overlay view on top for the collapsed sidebar when it floats over the page, and another for the find bar (`src/main/FindBar.ts`).
 - `src/main/Layout.ts`: the only place that decides where regions go. `Window` places the tab views with it and sends it to the chrome renderer, which draws each region at those rects. Don't hard-code sizes anywhere else.
 - `src/shared/ipc.ts`: the one IPC contract. Every channel, its arguments, its result and which chrome view may call it live here. Add a channel here first, then to `CHANNEL_REGIONS` in `src/main/ipc.ts`, and then to the preload.
 - `src/preload`: one sandboxed preload per chrome view, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.

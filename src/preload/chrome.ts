@@ -30,6 +30,7 @@ const chromeAPI: ChromeAPI = {
     goForward: (tabId) => invoke("tab:forward", tabId),
     reload: (tabId) => invoke("tab:reload", tabId),
     stop: (tabId) => invoke("tab:stop", tabId),
+    resetZoom: (tabId) => invoke("tab:zoom-reset", tabId),
     openPage: (page, options) => invoke("tabs:open-page", page, options),
     getRecent: () => invoke("history:recent"),
     onTabsUpdated: (callback) => subscribe("tabs:updated", callback),
@@ -74,6 +75,14 @@ const chromeAPI: ChromeAPI = {
     onChatChunk: (callback) => subscribe("chat:chunk", callback),
     onChatUpdated: (callback) => subscribe("chat:updated", callback),
     onChatDeleted: (callback) => subscribe("chat:deleted", callback),
+    onDraft: (callback) => subscribe("chat:draft", callback),
+  },
+  find: {
+    search: (text) => invoke("find:search", text),
+    step: (forward) => invoke("find:step", forward),
+    close: () => invoke("find:close"),
+    onOpened: (callback) => subscribe("find:opened", () => callback()),
+    onResult: (callback) => subscribe("find:result", callback),
   },
 };
 

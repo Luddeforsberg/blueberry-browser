@@ -347,6 +347,18 @@ Berry, large, sits on the top edge of a 752px composer with its legs over it. Be
 
 The page gets the space. The address bar shows the real URL and real navigation state. Berry stays small and only shows a mood when something is happening.
 
+### Find in page
+
+`⌘F` (`Ctrl+F` on Windows) opens a bar in the top right corner of the page, in an overlay view of its own, using the Floating glass level. It has a field, a count such as "2 of 14" or "No results", previous and next, and close. `Enter` and `Shift+Enter` step through matches, and `Esc` closes it and puts the keyboard back on the page. The bar belongs to one page: going to another tab closes it, and opening it again keeps the last search, selected so typing replaces it. Internal pages can be searched too, and because the chrome view draws them, matches in the sidebar count as well.
+
+### Zoom and printing
+
+`⌘+`, `⌘-` and `⌘0` zoom the web page, per site and across restarts. Other open tabs on the site follow. Away from 100%, the toolbar shows the level beside the bookmark star, and pressing it goes back to 100%. Internal pages don't zoom, and `⌘P` prints web pages only, so those menu items are disabled there.
+
+### Page menu
+
+Right-clicking a web page opens a native menu with what was clicked in mind: spelling suggestions, link, image, editing, or back, forward and reload on a plain page, always ending in Inspect. With text selected, Ask Berry About This opens the chat panel with that text added to the composer. It is never sent by itself.
+
 ### Main chat
 
 A full page for talking to Berry about anything, not about a particular web page. It opens as a tab, and past chats are listed in the sidebar.
