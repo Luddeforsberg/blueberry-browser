@@ -83,6 +83,29 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).bookmarks).toEqual([]);
 });
 
+test("bookmarked pages show a filled yellow star in both layouts and themes", async () => {
+  await visit();
+  for (const layoutMode of ["vertical", "horizontal"] as const) {
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((settings) => window.chromeAPI.settings.updateSettings(settings), { layoutMode, appearance });
+      const emptyStar = chrome.getByRole("button", { name: "Bookmark this page", exact: true });
+      await expect(emptyStar.locator("svg")).toHaveCSS("fill", "none");
+      await emptyStar.click();
+      const savedStar = chrome.getByRole("button", { name: "Remove bookmark", exact: true });
+      const color = appearance === "light" ? "rgb(250, 204, 21)" : "rgb(253, 224, 71)";
+      await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
+      await expect(savedStar.locator("svg")).toHaveCSS("stroke", color);
+      await expect(savedStar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await savedStar.hover();
+      await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
+      await expect(savedStar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await chrome.screenshot({ path: `/tmp/blueberry-star-${layoutMode}-${appearance}.png` });
+      await savedStar.click();
+      await expect(emptyStar.locator("svg")).toHaveCSS("fill", "none");
+    }
+  }
+});
+
 test("reopen closed tab restores pages and internal tabs in reverse closing order", async () => {
   await menuAction("Reopen Closed Tab");
   expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).length).toBe(1);

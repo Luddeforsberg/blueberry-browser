@@ -68,12 +68,14 @@ export const Toolbar: React.FC = () => {
                 </div>
 
                 <ToolBarButton
-                    Icon={Star}
                     label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
                     active={!!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url)}
                     toggled={bookmarked}
+                    className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
                     onClick={() => void window.chromeAPI.library.toggleBookmark()}
-                />
+                >
+                    <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
+                </ToolBarButton>
 
                 {activeTab?.page !== 'chat' && activeTab?.page !== 'new-tab' && (
                     <ToolBarButton

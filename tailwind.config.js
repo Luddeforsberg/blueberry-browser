@@ -27,6 +27,7 @@ module.exports = {
       "glass-tint": "var(--glass-tint)",
       success: "rgb(var(--success) / <alpha-value>)",
       warning: "rgb(var(--warning) / <alpha-value>)",
+      bookmark: "rgb(var(--bookmark) / <alpha-value>)",
       primary: {
         DEFAULT: "rgb(var(--primary) / <alpha-value>)",
         foreground: "rgb(var(--primary-foreground) / <alpha-value>)",

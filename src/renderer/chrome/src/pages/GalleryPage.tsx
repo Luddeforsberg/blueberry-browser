@@ -122,7 +122,9 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Bookmark button">
                     <div className="flex items-center gap-3">
                         <ToolBarButton Icon={Star} label="Bookmark this page" onClick={() => undefined} />
-                        <ToolBarButton Icon={Star} label="Remove bookmark" toggled onClick={() => undefined} />
+                        <ToolBarButton label="Remove bookmark" toggled className="bg-transparent hover:bg-transparent" onClick={() => undefined}>
+                            <Star className="size-4 fill-current text-bookmark" />
+                        </ToolBarButton>
                         <ToolBarButton Icon={Star} label="Bookmark this page (unavailable on internal pages)" active={false} />
                     </div>
                 </Section>

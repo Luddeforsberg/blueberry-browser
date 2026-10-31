@@ -56,6 +56,7 @@ Sizes (*to tune*):
 - **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat and Routines, then chats, then tabs. The account and Settings stay at the bottom. Collapsed, the toolbar shows the button that brings the sidebar back.
 - **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter.
 - **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
+- **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
@@ -139,6 +140,7 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 | `primary` | `#2a3380` | `#4e5fb4` | Primary button fill |
 | `primary-foreground` | `#ffffff` | `#ffffff` | Primary button text |
 | `accent-ink` | `#2f3aa8` | `#a3aefb` | Links, focus rings, selected states |
+| `bookmark` | `#facc15` | `#fde047` | Saved page's filled bookmark star |
 | `success` | `#17653c` | `#6fcf97` | Status |
 | `warning` | `#744b00` | `#e0b050` | Status |
 | `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
