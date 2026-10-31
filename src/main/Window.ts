@@ -315,7 +315,8 @@ export class Window {
     const tab = this.closedTabs.pop();
     if (!tab) return;
     if (tab.page) {
-      this.openPage(tab.page, { param: tab.pageParam ?? undefined, title: tab.title });
+      const chat = tab.page === "chat" && tab.pageParam ? this.chats.thread(tab.pageParam) : null;
+      this.openPage(tab.page, { param: tab.pageParam ?? undefined, title: chat?.title ?? tab.title });
     } else {
       this.createTab(tab.url);
     }

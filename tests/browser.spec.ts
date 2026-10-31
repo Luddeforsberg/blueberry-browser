@@ -333,6 +333,33 @@ test("a chat is named once it has a topic, and keeps its first message until the
   expect(model.titleRequests).toHaveLength(2);
 });
 
+for (const change of ["renamed", "generated"] as const) {
+  test(`reopening a closed chat uses its ${change} title`, async () => {
+    await startChat("Original title");
+    const tab = await activeTab();
+    const [chat] = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats;
+    await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+    await chrome.evaluate((id) => window.chromeAPI.browser.closeTab(id), tab.id);
+
+    const title = "Weekend in Porto";
+    if (change === "renamed") {
+      await chrome.evaluate(({ id, title }) => window.chromeAPI.chat.rename(id, title), { id: chat.id, title });
+    } else {
+      model.titleWith(title);
+      await chrome.evaluate((id) => window.chromeAPI.chat.send(id, "Plan a weekend in Porto", { seePage: false }), chat.id);
+    }
+    await expect(chatInSidebar(title)).toBeVisible();
+    await app.evaluate(({ Menu }) => {
+      const items = Menu.getApplicationMenu()!.items.flatMap((item) => item.submenu?.items ?? []);
+      const item = items.find((item) => item.label === "Reopen Closed Tab");
+      if (!item) throw new Error("Missing Reopen Closed Tab menu item");
+      item.click();
+    });
+    await expect.poll(async () => (await activeTab()).title).toBe(title);
+    await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getTitle())).toBe(title);
+  });
+}
+
 test("a chat can be renamed from its menu, and is never renamed for you after that", async () => {
   await startChat("hey");
   await expect.poll(() => model.titleRequests.length).toBe(1);
@@ -393,11 +420,13 @@ test("deleting a chat asks first, then removes it and its tab", async () => {
 });
 
 test("deleting the panel's chat starts it fresh", async () => {
+  await setContentSize(1200, 700);
   await openFixture();
   await openChat();
   const panel = chrome.getByRole("complementary", { name: "Berry" });
   await askInPanel("Delete me");
   await expect(panel.getByText("A reply from the model")).toBeVisible();
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
   await captureMenus();
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
