@@ -76,9 +76,9 @@ module.exports = {
     borderRadius: {
       none: "0",
       control: "8px",
-      card: "10px",
-      panel: "20px",
-      composer: "24px",
+      card: "12px",
+      panel: "22px",
+      composer: "26px",
       full: "9999px",
     },
     // DESIGN.md section 4: floating content, composer, selected rows, and the page's left edge.
@@ -87,6 +87,8 @@ module.exports = {
       raised: "var(--shadow-raised)",
       selected: "var(--shadow-selected)",
       page: "var(--shadow-page)",
+      card: "var(--shadow-card)",
+      reading: "var(--shadow-reading)",
       float: "0 8px 24px rgb(0 0 0 / 0.16)",
     },
     fontFamily: {

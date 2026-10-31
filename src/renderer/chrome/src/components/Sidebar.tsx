@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
 import { ChevronDown, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
-import { Berry } from './Berry'
 import { ToolBarButton } from './ToolBarButton'
 import { cn } from '@common/lib/utils'
 
@@ -67,6 +67,43 @@ const Section: React.FC<{
     )
 }
 
+// Rows of four and three take turns, offset like a bunch of fruit, on a grid where each site takes two columns.
+const CLUSTER_PERIOD = 7
+const CLUSTER_OFFSET_AT = 4
+const clusterColumn = (index: number) => {
+    const place = index % CLUSTER_PERIOD
+    return place === 0 ? 1 : place === CLUSTER_OFFSET_AT ? 2 : undefined
+}
+
+// Pinned sites and bookmarks, grown together in a round cluster at the top of the sidebar.
+const Cluster: React.FC = () => {
+    const { createTab } = useBrowser()
+    const { theme } = useShell()
+    const { pinned, bookmarks } = useLibrary()
+
+    return (
+        <ul aria-label="Bookmarks" className="grid grid-cols-8 gap-y-1.5 px-1 pb-3">
+            {[...pinned, ...bookmarks].map((site, index) => (
+                <li key={site.id} className="col-span-2 flex justify-center" style={{ gridColumnStart: clusterColumn(index) }}>
+                    <button
+                        type="button"
+                        aria-label={site.title}
+                        title={site.title}
+                        onClick={() => createTab(site.url)}
+                        className={cn(
+                            "size-11 flex items-center justify-center rounded-full text-14 font-semibold text-muted-foreground shadow-selected outline-none transition-colors app-region-no-drag",
+                            "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
+                            theme.glass ? "bg-surface/60" : "bg-surface"
+                        )}
+                    >
+                        <Favicon src={siteIcon(site.url)} fallback={site.title.charAt(0)} />
+                    </button>
+                </li>
+            ))}
+        </ul>
+    )
+}
+
 const age = (time: number) => {
     const minutes = Math.floor((Date.now() - time) / 60000)
     if (minutes < 1) return 'now'
@@ -96,18 +133,22 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                     paddingLeft: theme.platform === 'mac' ? layout.controls.width : undefined
                 }}
             >
-                {floating ? (
-                    <ToolBarButton Icon={PanelLeft} label="Keep sidebar open" onClick={toggleSidebar} />
-                ) : (
+                {!floating && (
                     <ToolBarButton
                         Icon={Search}
                         label="Search"
                         onClick={() => window.dispatchEvent(new Event(FOCUS_ADDRESS_EVENT))}
                     />
                 )}
+                <ToolBarButton
+                    Icon={PanelLeft}
+                    label={floating ? 'Keep sidebar open' : 'Hide sidebar'}
+                    onClick={toggleSidebar}
+                />
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-2">
+                <Cluster />
                 <ul aria-label="Places">
                     <SidebarRow leading={<Plus className={ICON} />} label="New Tab" onClick={() => createTab()} />
                     <SidebarRow
@@ -131,7 +172,6 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                             {library.chats.map((chat) => (
                                 <SidebarRow
                                     key={chat.id}
-                                    leading={<Berry mood="rest" size={18} />}
                                     label={chat.title}
                                     trailing={isOpen('chat', chat.id) ? undefined : age(chat.updatedAt)}
                                     selected={isOpen('chat', chat.id)}

@@ -1,8 +1,6 @@
 # Blueberry design
 
-Blueberry is an AI browser that should feel like a good Mac app with one capable colleague inside it. The direction is **Ink on glass**: solid web pages, quiet tinted glass around them, and one deep blue ink.
-
-**Current phase:** the layout, proportions and interaction patterns closely follow Strawberry on purpose, as a reference to iterate away from. Blueberry keeps its own mascot, wording, icons and background art, and uses no Strawberry assets. Where this document and the older principles below disagree, the values here win.
+Blueberry is an AI browser that should feel like a good Mac app with one capable colleague inside it. The direction is **Bloom**: the window is made of the fruit. The frame is the dusty, matte skin of a blueberry, solid web pages float on it in one rounded card, and the blueberry itself is the one thing in the chrome with real colour. Blueberry uses no Strawberry or Aside assets.
 
 This document is the source of truth for the UI. Values marked *to tune* are starting points, to be adjusted on real windows without changing the intent.
 
@@ -34,8 +32,9 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 |---|---|---|
 | Tabs | Left sidebar (see below) | Top row |
 | Address bar and navigation | Row above the page | Row below the tabs |
+| Bookmarks | A round cluster at the top of the sidebar | A bar under the address bar |
 | Chat panel | Right, pushes the page | Same |
-| Web page | Reaches the window edges, in one card with the toolbar and bookmarks bar | Same |
+| Web page | In one rounded card with the toolbar, floating on the frame | Same |
 
 Sizes (*to tune*):
 
@@ -44,7 +43,9 @@ Sizes (*to tune*):
 | Sidebar | 280px default, resizable 200–360px, collapses fully |
 | Chat panel | 400px default, resizable 320–480px |
 | Address row | 40px |
-| Bookmarks bar | 36px, with a hairline under it |
+| Top row in vertical mode | 56px, so the window buttons line up with the address row |
+| Frame around the page card | 8px where no panel sits beside it |
+| Bookmarks bar (horizontal only) | 36px, with a hairline under it |
 | Sidebar row | 34px |
 | Horizontal tab row | 40px |
 | Minimum window | 900×600 |
@@ -52,8 +53,9 @@ Sizes (*to tune*):
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search, then New Tab, New chat and Routines, then chats, then tabs. The account and Settings stay at the bottom. The collapse button is in the toolbar.
-- **Bookmarks bar:** pinned sites and bookmarks, under the address bar.
+- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat and Routines, then chats, then tabs. The account and Settings stay at the bottom. Collapsed, the toolbar shows the button that brings the sidebar back.
+- **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter.
+- **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
@@ -78,11 +80,12 @@ There is one glass strength, not a user setting.
 | Level | Used for | How it is made |
 |---|---|---|
 | Solid | Web pages, always | An opaque view |
-| Frame | Window frame, sidebar, chat panel | Native window material plus the glass tint |
-| Panel | Cards and popovers inside the chrome | CSS `backdrop-filter` plus the glass tint |
+| Frame | Window frame, sidebar, chat panel | The `frame` gradient with a fine grain, painted opaque over the native window material |
+| Card | The card internal pages sit on | `canvas` at 85% with `backdrop-filter` over the frame |
+| Panel | Cards over the art blueberry, bookmark buttons | `surface` at 60–80% with `backdrop-filter` |
 | Floating | Anything over a web page | Overlay view with `backdrop-filter` plus the glass tint |
 
-The glass tint is 88% of `background`, in both light and dark mode (*to tune*).
+The frame is opaque so its colour and text contrast don't depend on the desktop behind it. The glass tint is 88% of `background`, in both light and dark mode (*to tune*).
 
 ### What has been tested
 
@@ -102,6 +105,8 @@ Use the solid `background` colour instead of glass when:
 - Windows is older than Windows 11 22H2, where `backgroundMaterial` is unsupported.
 - Native glass looks wrong on a platform and has not been fixed.
 
+In these cases the frame is solid `background` too, without the gradient or grain, and cards use solid `surface` or `canvas`.
+
 Text must meet the contrast rules with and without glass.
 
 ## 4. Tokens
@@ -120,17 +125,18 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `background` | `#eeeeee` | `#2b2b2b` | Frame, sidebar, chat panel |
-| `canvas` | `#fcfcfc` | `#1f1f1f` | Internal pages, the card a web page sits on |
+| `frame` | `#c3cbf0` to `#e7e6f7` to `#d4cfec` | `#38383b` to `#262628` | Gradient for the frame, sidebar, chat panel |
+| `background` | `#dcdff5` | `#2b2b2b` | Solid frame when glass is off, the glass tint |
+| `canvas` | `#fcfcff` | `#1f1f1f` | Internal pages, the card a web page sits on |
 | `surface` | `#ffffff` | `#242424` | Composer, inputs, raised content |
-| `tray` | `#f4f4f4` | `#181818` | Tray under the composer, page card, code blocks |
-| `card` | `#f3f3f3` | `#2a2a2a` | Idea cards |
+| `tray` | `#f2f3fb` | `#181818` | Page card on the composer, code blocks |
+| `card` | `#f3f4fb` | `#2a2a2a` | Raised content on `canvas` |
 | `selected` | `#ffffff` | `#565656` | Selected rows in the sidebar, selected segments |
-| `muted` | `#ececec` | `#303030` | Address bar, bubbles, hover, selected rows on `canvas` |
-| `border` | `#e4e4e4` | `#404040` | Separators |
-| `foreground` | `#1a1a1a` | `#f2f2f2` | Main text |
-| `muted-foreground` | `#5a5a5a` | `#b0b0b0` | Secondary text |
-| `primary` | `#4f568e` | `#4f568e` | Primary button fill |
+| `muted` | `#eceefa` | `#303030` | Address bar, bubbles, hover, selected rows on `canvas` |
+| `border` | `#e1e3f2` | `#404040` | Separators |
+| `foreground` | `#191b33` | `#f2f2f2` | Main text |
+| `muted-foreground` | `#4c5070` | `#b0b0b0` | Secondary text |
+| `primary` | `#2a3380` | `#4e5fb4` | Primary button fill |
 | `primary-foreground` | `#ffffff` | `#ffffff` | Primary button text |
 | `accent-ink` | `#2f3aa8` | `#a3aefb` | Links, focus rings, selected states |
 | `success` | `#17653c` | `#6fcf97` | Status |
@@ -138,18 +144,17 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 | `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
 | `glass-tint` | `background` at 88% | `background` at 88% | All glass |
 
-Worst-case contrast is calculated with pure black (light mode) or pure white (dark mode) behind the glass, ignoring blur. Re-measure on real glass.
+Contrast is calculated against each mode's most difficult frame colour, and against a `surface` card at 80% over the art blueberry's darkest colour in light mode and lightest in dark mode. Re-measure on real windows.
 
-| Text colour | Light on background | Light on worst-case glass | Dark on background | Dark on worst-case glass |
+| Text colour | Light on frame | Dark on frame | Light on berry card | Dark on berry card |
 |---|---|---|---|---|
-| `foreground` | 15.0:1 | 11.4:1 | 12.6:1 | 8.7:1 |
-| `muted-foreground` | 5.9:1 | 4.5:1 | 6.5:1 | 4.5:1 |
-| `accent-ink` | 7.9:1 | 6.0:1 | 6.7:1 | 4.6:1 |
-| `success` | 6.1:1 | 4.6:1 | 7.4:1 | 5.1:1 |
-| `warning` | 6.6:1 | 5.0:1 | 7.1:1 | 4.9:1 |
-| `destructive` | 6.0:1 | 4.6:1 | 6.9:1 | 4.7:1 |
+| `foreground` | 10.5:1 | 10.4:1 | 11.0:1 | 10.7:1 |
+| `muted-foreground` | 4.9:1 | 5.4:1 | 5.1:1 | 5.5:1 |
+| `accent-ink` | 5.7:1 | 5.6:1 | Not used | Not used |
 
-White on `primary` is 6.9:1 in both modes.
+White on `primary` is 11.2:1 in light mode and 5.8:1 in dark mode.
+
+The dark frame stays neutral, because blue-tinted dark mode is rejected. Only the blueberry keeps its colour there.
 
 Berry has separate tokens and never uses the UI accent:
 
@@ -161,18 +166,19 @@ Berry has separate tokens and never uses the UI accent:
 | `berry-eye` | `#f4f1e6` | `#f4f1e6` |
 | `berry-pupil` | `#141624` | `#141624` |
 | `berry-beak` | `#3e4466` | `#5c648c` |
-| `berry-fruit-mid` | `#5568b2` | Same |
-| `berry-fruit-dark` (shade) | `#37478f` | Same |
-| `berry-fruit-bloom` | `#7e8ec8` | Same |
-| `berry-fruit-crown` | `#182054` | Same |
+| `berry-fruit-mid` | `#4e5fb4` | Same |
+| `berry-fruit-dark` (shade) | `#2a3380` | Same |
+| `berry-fruit-bloom` | `#a4afe0` | Same |
+| `berry-fruit-crown` | `#161c4c` | Same |
 
 Dark `berry-ink` is lifted just enough to stay visible while still reading as a dark bird. It is below the 3:1 for meaningful graphics, so the eyes, hood and berry carry the shape, and nothing may rely on Berry alone: moods have text labels.
 
 ### Spacing, radius, elevation
 
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
-- **Radius:** 8px for controls, 10px for sidebar rows and inputs, 20px for cards and panels, 24px for the composer, and full for buttons and segmented controls.
-- **Elevation:** chrome regions are separated by tone, with a soft left-facing shadow on the page card when the sidebar is open. The page shadow is `-2px 0 6px`, black at 4% in light mode and 12% in dark mode. Things that float, the composer, and selected rows in the sidebar also get a shadow.
+- **Radius:** 8px for controls, 12px for sidebar rows and inputs, 22px for cards, panels and the page card, including the web page view itself, 26px for the composer, and full for buttons and segmented controls.
+- **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, cards on the art blueberry and selected rows in the sidebar also get a shadow.
+- **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration and is never shown otherwise.
 
 ## 5. Typography
 
@@ -229,13 +235,13 @@ Tabs also show: page loading, audio playing, crashed, and Berry working in this 
 
 ## 8. Berry, the mascot
 
-Berry is a small jackdaw in flat ink who nearly always has a blueberry in its beak. Berry is "it", and it refers to itself as "I".
+Berry is a small jackdaw in ink who nearly always has a blueberry in its beak. Berry is "it", and it refers to itself as "I".
 
 ### Character
 
-- **Bird:** a big head on a plump, smooth body with stubby legs, turned three-quarters so it can look at you. Softness comes from gentle light on the chest and a few deliberate feathers, never a bumpy outline. A dark cap and throat, a grey hood behind them and pale eyes with big pupils make it a friendly jackdaw, and the eyes carry most of the expression.
-- **Blueberry:** its signature, and what ties Berry to the name. It stays in Berry's beak, even in the smallest icon, and leaves only when Berry is thinking, finishes a job, makes a mistake or sleeps. It has a matte, dusty bloom, a slightly squashed shape, and a sunken crown with uneven lobes set off-centre. It is never a blue circle with a star.
-- **Style:** flat ink, with the berry in the same flat style as the bird. Large moments may add engraved detail.
+- **Bird:** a big head on a plump, smooth body with short legs, drawn in profile with one clean outline. A dark body, a grey nape, a short beak and one pale eye with a big pupil and a catchlight make it a friendly jackdaw, and the eye carries most of the expression. Berry only faces you, with two eyes, when it is asking for a decision.
+- **Blueberry:** its signature, and what ties Berry to the name. It stays in Berry's beak, even in the smallest icon, and leaves only when Berry is thinking, finishes a job, makes a mistake or sleeps. It has a dusty bloom lit from the upper left, a slightly squashed shape, and a dark crown with uneven lobes set off-centre. It is never a blue circle with a star.
+- **Style:** flat ink for the bird. The berry is the one thing in the chrome with depth and colour, and on its own it serves as the status marker for work in progress, always beside words.
 - **Implementation:** one SVG drawing per mood behind a `<Mascot mood size>` interface, animated with CSS, so artwork can be replaced without touching screens. Each mood should be recognisable from its outline. Rive is the next step for the large animated moments.
 
 ### Sizes
@@ -330,7 +336,7 @@ Four short, skippable steps: meet Berry, choose layout and appearance, import fr
 
 ### New tab
 
-Berry, large, sitting on the top edge of a 752px composer with a tray under it linking to Routines, a new chat and Settings. Below that are two idea cards linking to real features, then recent pages if there are any. Faint, irregular trails of alternating bird footprints sit in the background, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
+Berry, large, sits on the top edge of a 752px composer with its legs over it. Below rises the art blueberry, the page's one big moment: thousands of tiny berries spiral out of a sunken crown like seeds in a sunflower head, swelling in the light and shrinking in shadow, under heavy grain, with dust drifting off the edge so it has no hard outline. It is 1240px across at any window size, painted once and never moves. Up to three frosted cards sit on it showing real chats and routines, or two idea cards linking to real features if there are none, then recent pages in a frosted panel if there are any. When the sidebar is closed, links to Routines, a new chat and Settings sit under the composer. Faint, irregular trails of alternating bird footprints sit in the background behind the art blueberry, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
 
 `Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
 
@@ -344,7 +350,7 @@ A full page for talking to Berry about anything, not about a particular web page
 
 - A centred conversation and composer of 752px, with the composer fixed at the bottom. A new chat with no messages looks like the new tab page instead.
 - Messages and the composer are the same components as the chat panel, so the two sizes look like one chat.
-- Berry's working state says what it is doing and offers to show the work in a tab.
+- Berry's working state says what it is doing and offers to show the work in a tab. Steps, once the agent reports them, form a trail: a footprint for each finished step and the berry on the current one.
 
 ### Chat panel
 

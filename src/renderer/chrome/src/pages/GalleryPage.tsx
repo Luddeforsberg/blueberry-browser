@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
-import { Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
+import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
-import { AssistantMessage, ThinkingMessage, UserMessage } from '../components/ChatMessage'
+import { AssistantMessage, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
+import { ArtBlueberry } from '../components/ArtBlueberry'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
+import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 
@@ -21,6 +23,7 @@ export const GalleryPage: React.FC = () => {
     const [on, setOn] = useState(true)
     const [choice, setChoice] = useState<'one' | 'two'>('one')
     const [still, setStill] = useState(false)
+    const { theme } = useShell()
 
     return (
         <div className="h-full overflow-y-auto">
@@ -53,6 +56,15 @@ export const GalleryPage: React.FC = () => {
                         <WalkingBird size={40} foot={0} stepMs={0} pecking />
                         <span>The small birds behind the new tab page, walking and pecking.</span>
                     </div>
+                    <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
+                        <BerryDot /> <BerryDot working /> The berry as a status marker, at rest and during real work.
+                    </div>
+                </Section>
+
+                <Section title="Art blueberry">
+                    <div className="relative h-72 rounded-panel overflow-hidden">
+                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
+                    </div>
                 </Section>
 
                 <Section title="Chat">
@@ -60,6 +72,13 @@ export const GalleryPage: React.FC = () => {
                         <UserMessage content="What did the Monday digest find?" />
                         <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." />
                         <ThinkingMessage />
+                        <StepTrail
+                            steps={[
+                                { text: 'Looked through your history for Lisbon', done: true },
+                                { text: 'Opened norrskenair.com', done: true },
+                                { text: 'Comparing three weekends in November', done: false }
+                            ]}
+                        />
                         <div>
                             <ChatComposer onSend={() => undefined} placeholder="Ask Berry" />
                         </div>

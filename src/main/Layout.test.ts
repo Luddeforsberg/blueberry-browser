@@ -15,11 +15,11 @@ describe("computeLayout", () => {
 
     expect(layout.sidebar).toEqual({ x: 0, y: 0, width: 240, height: 800 });
     expect(layout.chat).toEqual({ x: 920, y: 0, width: 360, height: 800 });
-    expect(layout.toolbar).toEqual({ x: 240, y: 0, width: 680, height: 76 });
-    expect(layout.page).toEqual({ x: 240, y: 76, width: 680, height: 724 });
+    expect(layout.toolbar).toEqual({ x: 240, y: 8, width: 680, height: 40 });
+    expect(layout.page).toEqual({ x: 240, y: 48, width: 680, height: 744 });
   });
 
-  it("runs the page to the window edges, keeping a sliver on the left for the collapsed sidebar", () => {
+  it("floats the page card with the frame showing around it when both panels are gone", () => {
     const layout = computeLayout(
       { width: 1280, height: 800 },
       { sidebarOpen: false, chatOpen: false, ...mac }
@@ -27,8 +27,8 @@ describe("computeLayout", () => {
 
     expect(layout.sidebar.width).toBe(0);
     expect(layout.chat.width).toBe(0);
-    expect(layout.toolbar).toEqual({ x: 0, y: 0, width: 1280, height: 76 });
-    expect(layout.page).toEqual({ x: 4, y: 76, width: 1276, height: 724 });
+    expect(layout.toolbar).toEqual({ x: 8, y: 8, width: 1264, height: 40 });
+    expect(layout.page).toEqual({ x: 8, y: 48, width: 1264, height: 744 });
   });
 
   it("collapses the sidebar before closing the chat when space runs out", () => {
@@ -49,12 +49,12 @@ describe("computeLayout", () => {
   it("keeps the window buttons clear on each platform", () => {
     const size = { width: 1280, height: 800 };
 
-    expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 40 });
+    expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 56 });
     expect(computeLayout(size, { ...both, platform: "win32" }).controls).toEqual({
       x: 1142,
       y: 0,
       width: 138,
-      height: 40,
+      height: 56,
     });
   });
 
@@ -92,8 +92,8 @@ describe("computeLayout", () => {
     expect(layout.sidebarOpen).toBe(false);
     expect(layout.floatingSidebar.width).toBe(0);
     expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 920, height: 40 });
-    expect(layout.toolbar).toEqual({ x: 0, y: 40, width: 920, height: 76 });
-    expect(layout.page).toEqual({ x: 0, y: 116, width: 920, height: 684 });
+    expect(layout.toolbar).toEqual({ x: 8, y: 40, width: 912, height: 76 });
+    expect(layout.page).toEqual({ x: 8, y: 116, width: 912, height: 676 });
     expect(layout.controls.height).toBe(40);
   });
 

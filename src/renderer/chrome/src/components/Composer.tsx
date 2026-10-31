@@ -19,7 +19,7 @@ export const Composer: React.FC<{
     addLabel?: string
     canSend: boolean
     onSend: () => void
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 2, autoFocus, spellCheck, attachment, onAdd, addLabel, canSend, onSend }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, spellCheck, attachment, onAdd, addLabel, canSend, onSend }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     useLayoutEffect(() => {
@@ -35,24 +35,24 @@ export const Composer: React.FC<{
                 if (!(event.target as Element).closest('button')) textareaRef.current?.focus()
             }}
             className={cn(
-                "relative w-full p-2.5 rounded-composer border bg-surface shadow-raised cursor-text",
+                "relative w-full p-2 pl-3 rounded-composer border bg-surface shadow-raised cursor-text",
                 "transition-colors focus-within:border-muted-foreground/30"
             )}
         >
             {attachment && <div className="mb-1 cursor-default">{attachment}</div>}
-            <textarea
-                ref={textareaRef}
-                aria-label={label}
-                placeholder={placeholder}
-                value={value}
-                rows={rows}
-                autoFocus={autoFocus}
-                spellCheck={spellCheck}
-                onChange={(event) => onChange(event.target.value)}
-                onKeyDown={onKeyDown}
-                className="block w-full px-2.5 pt-2 resize-none bg-transparent text-16 outline-none placeholder:text-muted-foreground"
-            />
-            <div className="mt-1 flex items-center justify-between">
+            <div className="flex items-end gap-1">
+                <textarea
+                    ref={textareaRef}
+                    aria-label={label}
+                    placeholder={placeholder}
+                    value={value}
+                    rows={rows}
+                    autoFocus={autoFocus}
+                    spellCheck={spellCheck}
+                    onChange={(event) => onChange(event.target.value)}
+                    onKeyDown={onKeyDown}
+                    className="flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none placeholder:text-muted-foreground"
+                />
                 <button
                     type="button"
                     aria-label={addLabel ?? 'Add to chat'}

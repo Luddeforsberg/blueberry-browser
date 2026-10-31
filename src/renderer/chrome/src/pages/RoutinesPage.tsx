@@ -1,6 +1,7 @@
 import React from 'react'
 import type { RoutineStatus } from '@shared/library'
 import { useLibrary } from '../contexts/LibraryContext'
+import { BerryDot } from '@common/components/Mascot'
 import { Berry } from '../components/Berry'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
@@ -40,7 +41,8 @@ export const RoutinesPage: React.FC = () => {
                             <span className={cn(routine.status === 'running' && "font-semibold")}>{routine.name}</span>
                             <span className="text-muted-foreground">{routine.schedule}</span>
                             <span className="text-muted-foreground">{routine.lastResult}</span>
-                            <span className={cn("text-right", STATUS[routine.status].className)}>
+                            <span className={cn("flex items-center justify-end gap-2", STATUS[routine.status].className)}>
+                                {routine.status === 'running' && <BerryDot working />}
                                 {STATUS[routine.status].label}
                             </span>
                         </li>

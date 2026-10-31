@@ -7,7 +7,7 @@ import { AddressBar } from './AddressBar'
 import { Favicon, siteIcon } from './Favicon'
 import { ToolBarButton } from './ToolBarButton'
 
-// Pinned sites and bookmarks, one row under the address bar.
+// Pinned sites and bookmarks, one row under the address bar. In the vertical layout they're in the sidebar.
 const BookmarksBar: React.FC = () => {
     const { createTab } = useBrowser()
     const { pinned, bookmarks } = useLibrary()
@@ -46,12 +46,8 @@ export const Toolbar: React.FC = () => {
                 className="relative flex-1 min-h-0 flex items-center gap-0.5 app-region-drag"
                 style={{ paddingLeft: leftClear, paddingRight: rightClear }}
             >
-                {vertical && (
-                    <ToolBarButton
-                        Icon={PanelLeft}
-                        label={layout.sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-                        onClick={toggleSidebar}
-                    />
+                {vertical && !layout.sidebarOpen && (
+                    <ToolBarButton Icon={PanelLeft} label="Show sidebar" onClick={toggleSidebar} />
                 )}
                 <ToolBarButton Icon={ChevronLeft} label="Back" onClick={goBack} active={activeTab?.canGoBack ?? false} />
                 <ToolBarButton Icon={ChevronRight} label="Forward" onClick={goForward} active={activeTab?.canGoForward ?? false} />
@@ -61,7 +57,7 @@ export const Toolbar: React.FC = () => {
                     <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null && !activeTab.page} />
                 )}
 
-                <div className="flex-1 min-w-0 flex justify-center px-2">
+                <div className="flex-1 min-w-0 px-1">
                     <AddressBar />
                 </div>
 
@@ -74,7 +70,7 @@ export const Toolbar: React.FC = () => {
                     />
                 )}
             </div>
-            <BookmarksBar />
+            {!vertical && <BookmarksBar />}
         </div>
     )
 }

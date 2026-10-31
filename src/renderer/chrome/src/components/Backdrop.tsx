@@ -8,8 +8,8 @@ const STEP_MS = 300
 const MAX_PRINTS = 200
 const BIRD_COUNT = 2
 // Where the feet are in the bird's drawing, so it stands on the spot its walk is at.
-const FEET_X = 30 / 64
-const FEET_Y = 60 / 64
+const FEET_X = 57 / 120
+const FEET_Y = 112 / 120
 
 // A footprint the width of the bird's own foot: three toes forward, one back. Drawn pointing up, so it
 // turns to face the way the bird walked.

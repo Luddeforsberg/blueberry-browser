@@ -3,7 +3,7 @@ import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
 import { LibraryProvider } from './contexts/LibraryContext'
 import { InternalPageView } from './pages/InternalPageView'
-import { ChatProvider } from './contexts/ChatContext'
+import { ChatProvider, useChat } from './contexts/ChatContext'
 import { ShellProvider, useShell } from './contexts/ShellContext'
 import { Sidebar } from './components/Sidebar'
 import { TabStrip } from './components/TabStrip'
@@ -20,11 +20,13 @@ const Region: React.FC<{
     className?: string
     children?: React.ReactNode
     onMouseEnter?: () => void
-}> = ({ rect, className, children, onMouseEnter }) => (
+    reading?: boolean
+}> = ({ rect, className, children, onMouseEnter, reading }) => (
     <div
         className={cn("absolute", className)}
         style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
         onMouseEnter={onMouseEnter}
+        data-berry-reading={reading || undefined}
     >
         {children}
     </div>
@@ -33,19 +35,27 @@ const Region: React.FC<{
 const Shell: React.FC = () => {
     const { layout, theme, settings } = useShell()
     const { activeTab } = useBrowser()
+    const { isLoading, pageAccess } = useChat()
 
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
+    // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
+    const reading = isLoading && pageAccess && !!activeTab && !activeTab.page
 
     return (
-        <div className={cn("relative h-full", theme.glass ? "bg-glass-tint" : "bg-background")}>
+        <div className={cn("relative h-full", theme.glass ? "bg-frame" : "bg-background")}>
             {/* One card holds the toolbar, bookmarks bar and page, so they read as one surface. */}
             <Region
                 rect={{ ...layout.toolbar, height: page.y + page.height - layout.toolbar.y }}
-                className={cn("bg-canvas", layout.sidebarOpen && "rounded-tl-card shadow-page", layout.chatOpen && "rounded-tr-card")}
+                reading={reading}
+                className={cn(
+                    "rounded-panel transition-shadow duration-layout",
+                    theme.glass ? "bg-canvas/85 backdrop-blur-2xl" : "bg-canvas",
+                    reading ? "shadow-reading" : "shadow-page"
+                )}
             />
             {/* Internal pages draw here. For web pages it shows until the tab view paints. */}
-            <Region rect={page} className="overflow-hidden">
+            <Region rect={page} className="overflow-hidden rounded-b-panel">
                 {activeTab?.page && <InternalPageView tab={activeTab} />}
             </Region>
             {layout.sidebarOpen && (

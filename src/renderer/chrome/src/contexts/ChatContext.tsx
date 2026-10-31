@@ -12,6 +12,9 @@ interface Message {
 interface ChatContextType {
     messages: Message[]
     isLoading: boolean
+    // Whether Berry can see the open page. The card on the composer is the signal, and + brings it back.
+    pageAccess: boolean
+    setPageAccess: (enabled: boolean) => void
 
     // Chat actions
     sendMessage: (content: string) => Promise<void>
@@ -40,6 +43,16 @@ export const useChat = () => {
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoading, setIsLoading] = useState(false)
+    const [pageAccess, setPageAccessState] = useState(true)
+
+    useEffect(() => {
+        window.chromeAPI.chat.getPageAccess().then(setPageAccessState)
+    }, [])
+
+    const setPageAccess = useCallback((enabled: boolean) => {
+        setPageAccessState(enabled)
+        window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState)
+    }, [])
 
     // Load initial messages from main process
     useEffect(() => {
@@ -117,6 +130,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const value: ChatContextType = {
         messages,
         isLoading,
+        pageAccess,
+        setPageAccess,
         sendMessage,
         clearChat
     }
