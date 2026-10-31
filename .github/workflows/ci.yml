@@ -31,4 +31,6 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run test
       - run: pnpm exec electron-vite build
+      # Windows takes minutes longer, so it runs these only once a change reaches main.
       - run: pnpm run test:e2e
+        if: runner.os != 'Windows' || github.event_name == 'push'
