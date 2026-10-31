@@ -53,7 +53,7 @@ Sizes (*to tune*):
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account joins it when real accounts arrive in stage 5 of the roadmap. Collapsed, the toolbar shows the button that brings the sidebar back.
+- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat, Needs you, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account joins it when real accounts arrive in stage 5 of the roadmap. Collapsed, the toolbar shows the button that brings the sidebar back.
 - **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. With nothing saved, the cluster and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
 - **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
 - **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
@@ -73,7 +73,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Routines, Flock, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -318,6 +318,7 @@ Every mood has a text label for assistive technology.
 | Routines | Flies off when a routine runs and returns with the result |
 | Settings | Its own section |
 | Flock | Its own page, sitting on each card |
+| Needs you | Asking on each row, and off duty when nothing's waiting |
 | Over a web page | Only while acting on that page, in an overlay view |
 
 ### Where Berry goes
@@ -326,15 +327,17 @@ Berry belongs to real parts of the interface, so it only ever sits in the places
 
 ### When Berry may interrupt
 
-Berry only speaks about work the user started: a finished task, a routine result, or a needed approval. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear as cards on the new tab page, where the user is already choosing what to do next, and nothing about them moves, asks or waits. Berry does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
+Berry only speaks about work the user started: a finished task, a routine result, or something it can't go on without. Everything waiting is on one page, Needs you, so the flock can work on while the user carries on with their day. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear as cards on the new tab page, where the user is already choosing what to do next, and nothing about them moves, asks or waits. Berry does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
 
 | Level | Behaviour |
 |---|---|
 | Mood change | Nothing else moves or appears |
 | Dot on the perch | Something is ready, with one small hop at most |
-| Card in the panel | Only when Berry needs a decision to continue |
+| Count on Needs you | Anything waiting, with the berry beside the number on the sidebar row, or words in the toolbar with no sidebar. Answering is what clears it, not looking |
+| Card in the panel | Only when Berry needs a decision to continue, and the same item is on Needs you |
+| Silent system notification | Something new is waiting, or a routine has news, and the app isn't in front |
 
-Berry never opens a modal, takes keyboard focus or makes a sound. It never interrupts during typing, fullscreen, video or calls. Anything waiting holds until the user is done.
+Berry never opens a modal, takes keyboard focus or makes a sound. A notification never comes during fullscreen or while a tab plays sound, and it says who and what kind of thing it is, never the question, the site or anything typed. Anything waiting holds until the user is done.
 
 ### Reduced motion
 
@@ -403,6 +406,7 @@ A full page for talking to Berry about anything, not about a particular web page
 - A card on the composer, with the page's icon, title and address, shows the page Berry can see. Removing it takes the page away from Berry, and the composer's + brings it back. No card means Berry sees no page. While the card is there, Berry may also read your other open tabs when the question needs it, and every look shows as a step. With no card, Berry can only open and use tabs of its own, each after asking, and they open behind the chat. Tabs Berry opens from the panel open behind the page too. Going to one to watch changes nothing, and Berry carries on. Clicking or typing in it, or sending it somewhere from the address bar or Back and Forward, takes it over: Berry can't reach it any more, stops, and says so.
 - Approval requests are cards showing exactly what will happen. By default one appears only for what could delete, send, buy or change text, such as a Delete button or typing in a form, and for an address carrying data in its query. A query and hash of up to 100 characters don't ask on YouTube, Google, Bing, DuckDuckGo, Wikipedia, GitHub, Reddit or Amazon, or on the exact site of a page the job already has open. Going to a plain link or typing a search doesn't ask. Settings can make Berry ask always or never. Cancel tells Berry no.
 - When Berry can't go on without something only the user knows, it asks on the same card with a text box, Answer and Skip. It carries on with the answer, and a question waits like an approval, in any Ask before acting setting. Passwords, codes and card details are never asked for here.
+- When a page stops it with a sign-in, a code or a captcha, Berry hands the tab to the user, on the same card with Go to the tab, I'm done and Not now. See Needs you.
 - Using Berry requires an account, requested the first time someone uses it. Browsing, tabs and bookmarks never need one.
 
 ### Routines
@@ -412,9 +416,9 @@ A list with schedule, last result and status, plus a page for each routine with 
 - **A run** works like a chat with no page: the same tools, the same Ask before acting setting and the same step limit. It opens its own tabs behind the current view and closes them when it ends, except any the user has been to, which are theirs. It can't reach any other tab, including popups its pages open, which also stay behind and close with it. Its tabs are muted.
 - **Run history** shows each run as a card: when it started, its status in words, a footprint for each step, Berry's report and the tokens used. A run that's going has **Stop**. One that failed, was stopped or was interrupted has **Run again**. Each routine keeps its last 50 runs.
 - **Status** is one of Running now, Needs your OK, Finished, Failed, Stopped, Interrupted, Waiting to start, Paused or Scheduled.
-- **Approvals** use the same card and exact words as a chat. The card waits on the Routines page and, anywhere else, in the sidebar under Routines. With no sidebar, the toolbar says so. Nothing is ever allowed for later: closing the app stops the run with nothing done, and the next launch shows it as Interrupted, saying what it was waiting to do.
-- **Timing:** a routine runs only while a window is open. A time missed with the app closed or the computer asleep runs once on the next chance, however many were missed, and says it was late. Times missed while paused are not made up. A time that comes while the same routine is still going is skipped. A run starts only while fewer than two are working, and the rest wait to start. A run waiting for an OK doesn't count, and once allowed it goes straight on, even if two others have started meanwhile.
-- **Speaking up:** a result or a needed approval puts a dot on the Routines row until Routines is opened. If the app isn't in front, and the window isn't fullscreen and no tab is playing sound, a silent macOS notification says so, with no page text or approval wording in it. A run the user stopped says nothing.
+- **Approvals** use the same card and exact words as a chat. The card waits on the Routines page and on Needs you, and so do questions and tabs handed to the user. Nothing is ever allowed for later: closing the app stops the run with nothing done, and the next launch shows it as Interrupted, saying what it was waiting to do.
+- **Timing:** a routine runs only while a window is open. A time missed with the app closed or the computer asleep runs once on the next chance, however many were missed, and says it was late. Times missed while paused are not made up. A time that comes while the same routine is still going is skipped. A run starts only while fewer than two are working, and the rest wait to start. A run waiting on the user doesn't count, so other routines carry on, and once allowed it goes straight on, even if two others have started meanwhile.
+- **Speaking up:** a result or a needed approval puts a dot on the Routines row until Routines is opened. If the app isn't in front, and the window isn't fullscreen and no tab is playing sound, a silent macOS notification says so, with no page text or approval wording in it. Anything waiting goes through Needs you, and clicking its notification opens the item there. A run the user stopped says nothing.
 
 ### Flock
 
@@ -429,6 +433,26 @@ Opens as a tab from the sidebar, the Go menu, or the new tab page when there's n
 - **Who's working:** a reply names any mascot but Berry above it. A chat in the sidebar shows its bird, and a running chat shows the working berry where its age goes. A tab anyone is working in shows that bird as the tab's icon, Berry's too, or the working berry when Berry is hidden, with a shimmering title. When there's no sidebar to show it and the work is in another tab, the toolbar says who's working, and pressing that goes to the tab. Berry's old chats stay plain.
 - **Routines:** **Who runs it** in the form uses the same row of birds, and a run keeps to that mascot's instructions and limits.
 - **Deleting:** asks first, in a native dialog. The mascot leaves the flock, and its chats keep its look and limits. Routines it runs pause and stay limited, because moving them to Berry could let them do more than they were set up to. Anything pointing at a mascot that's no longer on file can only talk.
+
+### Needs you
+
+The flock's whole story on one page: give it jobs, carry on with your day, and it only interrupts when it truly needs you. Opens as a tab from the sidebar, the Go menu or the toolbar notice, with only one open at a time.
+
+- **A row** is a `surface` card, oldest first: the mascot at 64px in Asking, its name and the job (the chat's title or the routine's name), how long it's waited, exactly what it's asking in the same words as the card in the chat, and its last finished step. Answering happens in the row, and the job goes on behind it. **Open the chat** or **Open the routine** and **Go to the tab** are one press away.
+- **Answers:** Allow and Don't allow for an action, a text box with Answer and Skip for a question. After an answer, the row becomes one quiet line for about a second and a half, the mascot flying and saying what happened, such as "Allowed. Scout carries on." It uses `chat:decide`, like the card in a chat.
+- **Empty:** the flock in a row, off duty, above "Nothing needs you right now." Anyone working flies and is named instead, because resting has to be true.
+
+**A blocked job asks.** A sign-in, a code or a captcha is something only the user does, so the job calls `hand_to_user` and the row says "Scout needs you to sign in on github.com". The site comes from the tab's address and the words from code, so a page can't write them.
+
+- **Go to the tab** goes there. The toolbar on that tab says "Scout can't see this tab" with **I'm done**, in both layouts, since that's where the user will be when they finish. The row has **I'm done** too, and **Not now**. No control takes text, so there's nowhere for a secret to go.
+- **While the user has it,** no job can reach the tab: not the one that asked, not another with the page open, and no message sends it along. Tools get an error saying the user is busy there. The chat composer says the mascot can't see it, and the working icon and reading ring go away.
+- **I'm done** gives the tab back and Berry reads it again. This is the one way a taken tab returns to a job, apart from sending it with a message. The next click there takes it over again, as it would any other time.
+- **Not now** tells Berry no. If the user touched the tab it stays theirs and out of every job's reach, so Berry can't read something left half typed, until they close it or send it with a message. If they didn't, it stays the job's. Closing the tab counts as Not now. Stop or closing the app ends the job the same way.
+- Any Ask before acting setting hands over, because this isn't permission: Berry simply can't do it.
+
+**Phone preview.** While anything is waiting, a phone frame sits beside the rows, or under them below 860px of page, with the first plain yes-or-no on its lock screen, or else the first item. It's labelled "Coming to your phone" and says plainly that there's no phone app yet. Its buttons are real and answer the item. Its frame is the one place the page draws a device, with its own radii and the lock screen's clock.
+
+Not built: a job carrying on with other work while it waits. One reply runs one step at a time through the agent, so a waiting job waits, while other jobs go on.
 
 ### History
 

@@ -65,7 +65,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   const routinesTab = (await tabs()).find((tab) => tab.page === "routines");
   const countBefore = (await tabs()).length;
 
-  // It asks first, in the same words on the Routines page and in the sidebar, and nothing has loaded yet.
+  // It asks first, in the same words on the Routines page and in Needs you, and nothing has loaded yet.
   const address = `${origin}/prices?from=ARN`;
   model.callTools({ name: "open_tab", args: { url: address } });
   model.callTools({ name: "read_page", args: {} });
@@ -78,7 +78,8 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   await expect(cards.getByRole("heading")).toHaveText(question);
   await expect(chrome.getByText("Needs your OK").first()).toBeVisible();
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), (await tabs()).find((tab) => !tab.page || tab.page === "new-tab")!.id);
-  await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("region", { name: "Approval needed" }).getByRole("heading")).toHaveText(question);
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible();
+  await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.map(({ approval }) => approval.text)).toEqual([question]);
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id!), routinesTab?.id);
   expect(requested).toEqual([]);
 

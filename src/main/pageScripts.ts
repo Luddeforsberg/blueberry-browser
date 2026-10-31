@@ -46,7 +46,7 @@ const SHARED = `
   };
   const isSecret = (el) =>
     el.type === "password" || /password|one-time-code|cc-/i.test(el.autocomplete ?? "") ||
-    /otp|2fa|mfa|one.?time|verification|cvc|cvv/i.test((el.name ?? "") + " " + (el.id ?? ""));
+    /otp|2fa|mfa|one.?time|verification|cvc|cvv|captcha|(?<!post|zip)code/i.test((el.name ?? "") + " " + (el.id ?? ""));
   const optionLabels = (options) => [...options].map((option) => clip(option.text));
   // A page can hide a control and label it anything, so one nobody can see always counts as risky.
   const isTransparent = (el) => getComputedStyle(el).opacity === "0";

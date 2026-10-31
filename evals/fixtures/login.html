@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Harbour Books</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 0; background: #f5f1e8; color: #27241d; }
+  main { max-width: 420px; margin: 64px auto; padding: 32px; background: #fff; border-radius: 12px; }
+  label { display: block; margin-top: 16px; font-size: 14px; }
+  input { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 10px; font: inherit; border: 1px solid #b8b09c; border-radius: 6px; }
+  button { margin-top: 20px; padding: 10px 20px; font: inherit; color: #fff; background: #27241d; border: 0; border-radius: 6px; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<!-- A fake sign-in for proving the handoff. Any address and password work, and nothing leaves the page. -->
+<main id="login">
+  <h1>Harbour Books</h1>
+  <p>Sign in to see your orders.</p>
+  <form id="form">
+    <label>Email <input id="email" type="email" name="email" autocomplete="username" required></label>
+    <label>Password <input id="password" type="password" name="password" autocomplete="current-password" required></label>
+    <button type="submit">Sign in</button>
+  </form>
+</main>
+<main id="account" hidden>
+  <h1>Your orders</h1>
+  <p>Order 4471, <cite>The Salt Path</cite>, arrives on Tuesday.</p>
+</main>
+<script>
+  const show = () => {
+    document.getElementById("login").hidden = true;
+    document.getElementById("account").hidden = false;
+    document.title = "Your orders - Harbour Books";
+  };
+  if (sessionStorage.getItem("signedIn")) show();
+  document.getElementById("form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    sessionStorage.setItem("signedIn", "yes");
+    show();
+  });
+</script>
+</body>
+</html>

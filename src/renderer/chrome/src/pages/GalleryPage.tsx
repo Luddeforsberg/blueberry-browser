@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Pin, Star } from 'lucide-react'
-import type { MascotProfile, Suggestion } from '@shared/library'
+import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
@@ -25,6 +25,7 @@ import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
 import { SuggestionCard } from '../components/SuggestionCard'
 import { RoutineRunCard } from '../components/RoutineRunCard'
+import { NeedsYouRow, PhonePreview } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
 import type { RoutineRun } from '@shared/library'
 import { DownloadRow } from '../components/DownloadRow'
@@ -96,6 +97,23 @@ const SAMPLE_DOWNLOADS: DownloadInfo[] = [
     { ...SAMPLE_DOWNLOAD, id: 'missing', state: 'completed', missing: true, receivedBytes: 9_100_000 },
     { ...SAMPLE_DOWNLOAD, id: 'cancelled', state: 'cancelled' },
     { ...SAMPLE_DOWNLOAD, id: 'failed', state: 'interrupted' }
+]
+
+const waitingSample = (id: string, approval: Omit<NeedsYouItem['approval'], 'id'>, job: string): NeedsYouItem => ({
+    id,
+    approval: { id, ...approval },
+    mascotId: BERRY_ID,
+    job,
+    routineId: null,
+    lastStep: 'Opened example.com',
+    tabId: null,
+    askedAt: 0
+})
+
+const SAMPLE_WAITING: NeedsYouItem[] = [
+    waitingSample('sample-allow', { text: 'Click the button “Send” on https://example.com/' }, 'Reply to Anna'),
+    waitingSample('sample-question', { text: 'Which of the two flights did you mean?', question: true }, 'Book the flight'),
+    waitingSample('sample-handoff', { text: 'Berry needs you to sign in on example.com', handoff: { need: 'sign-in', tabId: 'none', site: 'example.com' } }, 'Check my orders')
 ]
 
 const SAMPLE_SUGGESTIONS: Suggestion[] = [
@@ -305,6 +323,15 @@ export const GalleryPage: React.FC = () => {
                             onReview={() => undefined}
                             onCancel={() => undefined}
                         />
+                    </div>
+                </Section>
+
+                <Section title="Needs you">
+                    <div className="flex items-start gap-6">
+                        <ul className="min-w-0 flex-1 flex flex-col gap-3">
+                            {SAMPLE_WAITING.map((item) => <NeedsYouRow key={item.approval.id} item={item} onAnswered={() => undefined} />)}
+                        </ul>
+                        <PhonePreview item={SAMPLE_WAITING[0]} onAnswered={() => undefined} />
                     </div>
                 </Section>
 

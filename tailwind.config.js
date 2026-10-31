@@ -138,6 +138,7 @@ module.exports = {
       },
       animation: {
         "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",
+        "answered": "answered 1600ms cubic-bezier(.32, .72, 0, 1) forwards",
         shimmer: "shimmer 1300ms linear infinite",
         // Berry's own motion. Bounce belongs to Berry, never the chrome.
         "berry-bob": "berry-bob 900ms ease-in-out infinite",
@@ -206,6 +207,11 @@ module.exports = {
         "berry-feather": {
           "0%": { transform: "translate(0, 0) rotate(0deg)", opacity: "1" },
           "100%": { transform: "translate(-4px, 14px) rotate(-40deg)", opacity: "0" },
+        },
+        // Stays long enough to read, then goes in the time a panel takes.
+        answered: {
+          "0%, 85%": { opacity: "1" },
+          "100%": { opacity: "0" },
         },
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(10px)" },

@@ -25,6 +25,34 @@ export interface ChatApproval {
   text: string;
   // Berry is asking for an answer in words, not for leave to do something.
   question?: boolean;
+  // Berry has handed a tab to the user, and is waiting for them to say they're done with it.
+  handoff?: ChatHandoff;
+}
+
+// What only the user can do on a page. Berry can't see the tab while they do it.
+export type HandoffNeed = "sign-in" | "code" | "captcha";
+
+export interface ChatHandoff {
+  need: HandoffNeed;
+  tabId: string;
+  site: string;
+}
+
+// One thing the flock is waiting on the user for, from any chat or routine run.
+export interface NeedsYouItem {
+  // The chat's or run's id, which is what `chat:decide` takes.
+  id: string;
+  approval: ChatApproval;
+  mascotId: string;
+  // What the job is: the chat's title, or the routine's name.
+  job: string;
+  // Set when it's a routine's run.
+  routineId: string | null;
+  // What it did last, in its own words. Null if it hasn't done anything yet.
+  lastStep: string | null;
+  // The tab it's working in, for going there.
+  tabId: string | null;
+  askedAt: number;
 }
 
 export interface ChatThreadMessage {
@@ -160,4 +188,6 @@ export interface LibrarySnapshot {
   routines: Routine[];
   // Berry first, then the rest of the flock, including deleted mascots that chats still point at.
   mascots: MascotProfile[];
+  // Oldest first.
+  needsYou: NeedsYouItem[];
 }

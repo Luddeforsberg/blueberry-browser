@@ -219,7 +219,7 @@ describe("a mascot's limits", () => {
 
   it("only hands over the tools it was given, plus reading and asking", () => {
     expect(setUp([], []).list.map(({ name }) => name).sort()).toEqual(
-      ["ask_user", "find_in_page", "hover", "list_elements", "list_tabs", "read_page", "screenshot", "scroll_page", "wait"]
+      ["ask_user", "find_in_page", "hand_to_user", "hover", "list_elements", "list_tabs", "read_page", "screenshot", "scroll_page", "wait"]
     );
     const canClick = setUp([], ["click"]).list.map(({ name }) => name);
     expect(canClick).toContain("click");

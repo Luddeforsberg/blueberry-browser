@@ -24,7 +24,7 @@ import {
 } from "./pageScripts";
 import { clickAt, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import type { Tab } from "./Tab";
-import type { MascotProfile, MascotTool } from "../shared/library";
+import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { siteAllowed } from "../shared/mascots";
 
 const MAX_READ_LENGTH = 20_000;
@@ -73,6 +73,7 @@ const TOOL_NEEDS: Record<string, MascotTool | "reading" | "asking"> = {
   screenshot: "reading",
   wait: "asking",
   ask_user: "asking",
+  hand_to_user: "asking",
   go_to: "visit",
   open_tab: "visit",
   go_back: "visit",
@@ -86,7 +87,8 @@ const TOOL_NEEDS: Record<string, MascotTool | "reading" | "asking"> = {
 };
 
 // These can happen wherever the tab is, so where it is doesn't matter to them.
-const ANY_TAB = ["list_tabs", "wait", "ask_user", "close_tab", "open_tab"];
+// Handing a tab over goes here too, because the limit it runs under would stop the user going where they need to.
+const ANY_TAB = ["list_tabs", "wait", "ask_user", "hand_to_user", "close_tab", "open_tab"];
 
 const pageTool = <S extends z.ZodObject>(tool: {
   name: string;
@@ -108,7 +110,7 @@ const pageTool = <S extends z.ZodObject>(tool: {
   };
 };
 
-const siteOf = (url: string): string => {
+export const siteOf = (url: string): string => {
   try {
     return new URL(url).hostname.replace(/^www\./, "") || "a local file";
   } catch {
@@ -203,6 +205,13 @@ const SCRIPTED = "It got a scripted click rather than a real one, which some sit
 const SECRET_REQUEST =
   /pass ?(word|code|phrase)|lösenord|\b2fa\b|two.factor|one.time|\botp\b|(?<!(postal|zip|post|promo|discount|coupon|area|country|source) )\bcode\b|\bkod(en)?\b|engångskod|verifieringskod|\bcvc\b|\bcvv\b|card (number|details)|kortnummer|personnummer|\bpin\b/i;
 
+// What the user is handed a tab to do, after "needs you to" and "Asked you to".
+export const HANDOFF_WORDS: Record<HandoffNeed, string> = {
+  "sign-in": "sign in",
+  code: "enter a code",
+  captcha: "solve a captcha",
+};
+
 const tabId = z.string().optional().describe("The tab, from list_tabs. Leave out for the one this job is working in: the last you opened, or else the page that came with the message. It never follows the user to another tab.");
 
 const NO_CURRENT_TAB = "This job has no web page to work in. Use a tab from list_tabs, or open_tab.";
@@ -210,6 +219,10 @@ const NO_CURRENT_TAB = "This job has no web page to work in. Use a tab from list
 // Said instead of a vaguer failure, so the model neither tries again nor tells the user the tab isn't there.
 const takenOverMessage = (id: string, url: string) =>
   `The user took over tab ${id}, which was at ${url}, so nothing happened there and you can't use it any more. It's theirs now. Don't open that page again in another tab unless they ask. Stop work on it and say in your reply that you stopped because they took over the tab.`;
+
+// Said to anything that reaches for a tab the user has been handed, from this job or any other.
+const heldMessage = (id: string) =>
+  `The user is doing something private in tab ${id}, so nothing happened there and nothing can be read from it.`;
 
 // These don't reach into any tab.
 const NOT_ON_A_TAB = ["list_tabs", "wait", "ask_user", "open_tab"];
@@ -237,6 +250,10 @@ export interface PageToolAccess {
   ownsTab?: (id: string) => boolean;
   // Tabs this job opened that the user has since taken, with the address each was at. Nothing here reaches them.
   takenOver?: ReadonlyMap<string, string>;
+  // Whether the user has been handed this tab and hasn't said they're done. No job can reach it, not even the one asking.
+  heldByUser?: (id: string) => boolean;
+  // Waits until the user says they're done with this tab, which gives it back: true. False if they won't, or closed it.
+  handOver?: (tab: Tab, need: HandoffNeed) => Promise<boolean>;
   // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped.
   ask: (question: string) => Promise<string | null>;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
@@ -255,6 +272,8 @@ export const createPageTools = ({
   ownsEveryTab = false,
   ownsTab = () => false,
   takenOver,
+  heldByUser = () => false,
+  handOver = async () => false,
   ask,
   canSee,
   onUse,
@@ -270,6 +289,15 @@ export const createPageTools = ({
   };
   const opened = new Set<string>();
   let lastQuestion: Promise<void> = Promise.resolve();
+  // Tools can run at the same time, and the chat shows one request at a time.
+  const oneAtATime = <T>(ask: () => Promise<T>): Promise<T> => {
+    const turn = lastQuestion.then(ask);
+    lastQuestion = turn.then(
+      () => {},
+      () => {}
+    );
+    return turn;
+  };
   // A ref into a frame from another origin is `f<number>.<its ref>`. Which frame and site that means is only kept
   // here, so the frame's page can't point it anywhere else, and it dies with the frame or a change of site.
   const frameRefs = new Map<string, { frame: WebFrameMain; origin: string; tabId: string }>();
@@ -298,12 +326,13 @@ export const createPageTools = ({
   };
 
   const tookOver = (id: string | undefined) => {
+    if (id !== undefined && heldByUser(id)) return heldMessage(id);
     const url = id === undefined ? undefined : takenOver?.get(id);
     return id !== undefined && url !== undefined ? takenOverMessage(id, url) : null;
   };
   const find = (id?: string) => {
     const tab = id ? allTabs().find((candidate) => candidate.id === id) : activeTab();
-    return tab && !takenOver?.has(tab.id) ? tab : null;
+    return tab && !takenOver?.has(tab.id) && !heldByUser(tab.id) ? tab : null;
   };
   const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
   // In the default mode, an address carrying data asks unless it's a short search on a well-known search page.
@@ -446,12 +475,12 @@ export const createPageTools = ({
         const active = activeTab();
         const tabs = allTabs()
           .filter((tab) => allowed(tab.url))
-          .filter((tab) => !takenOver?.has(tab.id))
+          .filter((tab) => !takenOver?.has(tab.id) && !heldByUser(tab.id))
           .map(({ id, title, url }) => ({ id, title, url, active: id === active?.id, ...(ownsTab(id) ? { yours: true } : {}) }));
         const notes = [
           // A chat with no page sees only its own tabs, so an empty list says nothing about what's open.
           ...(ownsEveryTab ? ["This is only the tabs you opened in this chat. The user may have others, which you can't reach."] : []),
-          ...[...(takenOver ?? [])].map(([id, url]) => takenOverMessage(id, url)),
+          ...[...(takenOver ?? [])].map(([id, url]) => (heldByUser(id) ? heldMessage(id) : takenOverMessage(id, url))),
         ];
         return [JSON.stringify(tabs), ...notes].join("\n\n");
       },
@@ -644,21 +673,33 @@ export const createPageTools = ({
     }),
     pageTool({
       name: "ask_user",
-      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. Never ask for a password, a code or card details: tell them to type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
+      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. Never ask for a password, a code or card details: use hand_to_user, so they type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
       schema: z.object({ question: z.string().min(1).max(500) }),
       label: () => "Asked you something",
       run: async ({ question }) => {
         if (SECRET_REQUEST.test(question)) {
-          return "That wasn't asked, because passwords, codes and card details never go through this chat. Tell the user to type it in the page themselves, then stop.";
+          return "That wasn't asked, because passwords, codes and card details never go through this chat. If a page needs one, use hand_to_user so the user types it in the page themselves.";
         }
-        // Tools can run at the same time, and the chat shows one question at a time.
-        const turn = lastQuestion.then(() => ask(question));
-        lastQuestion = turn.then(
-          () => {},
-          () => {}
-        );
-        const answer = await turn;
+        const answer = await oneAtATime(() => ask(question));
         return answer === null ? "The user chose not to answer. Carry on without it if you can, or say what you couldn't do." : `The user answered: ${answer}`;
+      },
+    }),
+    pageTool({
+      name: "hand_to_user",
+      description: "Hand a tab to the user when a page needs a sign-in, a one-time or two-factor code, or a captcha. They do it themselves in the page. You can't see or use the tab meanwhile, and this call ends when they say they're done. Then look at the page again and carry on with the job. Never try to get past these yourself.",
+      schema: z.object({ need: z.enum(["sign-in", "code", "captcha"]), tabId }),
+      label: ({ need, tabId: id }) => `Asked you to ${HANDOFF_WORDS[need]} on ${site(id)}`,
+      run: async ({ need, tabId: id }) => {
+        if (!canSee()) return NO_ACCESS;
+        const tab = find(id);
+        if (!tab) return noTab(id);
+        if (!allowed(tab.url)) return offLimits(tab.url).message;
+        const done = await oneAtATime(() => handOver(tab, need));
+        if (!done) return "The user didn't do that, so the page is as it was or the tab is gone. Carry on without it if you can, and say what you couldn't do. Don't hand it to them again unless they ask.";
+        // They may have ended up anywhere, and a limited mascot still doesn't get to read it.
+        if (!allowed(tab.url)) return offLimits(tab.url).message;
+        onUse(tab);
+        return `The user says they're done, and tab ${tab.id} is yours again. ${await whereNow(tab)} You couldn't see it meanwhile, so look at the page again to see whether it worked, then carry on with the job.`;
       },
     }),
     pageTool({

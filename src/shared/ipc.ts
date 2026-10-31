@@ -13,7 +13,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "needs-you";
 
 export type Appearance = "system" | "light" | "dark";
 

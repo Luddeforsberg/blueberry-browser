@@ -1,6 +1,6 @@
 import React from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { Bird, CircleAlert, Compass, Download, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
+import { Bird, CircleAlert, Compass, Download, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
 import { BerryDot } from '@common/components/Mascot'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
@@ -14,7 +14,8 @@ const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
     downloads: Download,
     gallery: LayoutGrid,
     history: History,
-    flock: Bird
+    flock: Bird,
+    'needs-you': Hand
 }
 
 // Internal pages have no favicon, so they show the same icon as their place in the sidebar.

@@ -10,7 +10,7 @@ import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
 import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
-import { confirmDeleteMascot, confirmDeleteRoutine, notifyRoutine } from "./routineNotices";
+import { confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
 import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
 import { join } from "path";
@@ -44,13 +44,13 @@ import type {
   ThemeState,
   Visit,
 } from "../shared/ipc";
-import type { ChatThread, LibrarySnapshot } from "../shared/library";
+import type { ChatThread, LibrarySnapshot, NeedsYouItem } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "needs-you"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -95,6 +95,8 @@ export class Window {
   private windowSize = { width: 0, height: 0 };
   private readonly glassSupported = supportsGlass();
   private readonly tabsUnderChrome = new WeakSet<Tab>();
+  // What Needs you held last time, so only something new gets a notification.
+  private knownWaiting = new Set<string>();
   readonly chats: Chats;
   readonly routines: Routines;
   readonly suggestions: Suggestions;
@@ -174,6 +176,7 @@ export class Window {
       // The window closes with its last tab, so Berry never takes that one, or the one the user is looking at.
       closeTab: (tabId) => this.tabCount > 1 && tabId !== this.activeTabId && this.closeTab(tabId, false),
       actionApproval: () => this.settings.actionApproval,
+      assistantName: () => (this.settings.showBerry ? BERRY.name : "Assistant"),
     }, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
@@ -181,7 +184,7 @@ export class Window {
         this.syncChatTabTitle(thread);
         sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
       },
-      onListChanged: () => this.broadcast("library:updated", this.librarySnapshot),
+      onListChanged: () => this.publishLibrary(),
       onWorkingTabs: (working, mascots) => {
         // A reply stopped by the window closing ends after the window has gone.
         if (this._baseWindow.isDestroyed()) return;
@@ -196,10 +199,11 @@ export class Window {
     }, (id) => this.mascotStore.resolve(id));
 
     this.routines = new Routines(routineStore, this.chats, {
-      onChanged: () => this.broadcast("library:updated", this.librarySnapshot),
+      onChanged: () => this.publishLibrary(),
       onAttention: (routine, kind) => {
-        // The Routines row and the toolbar say so anyway, and that holds until the user is free.
-        if (this.userIsBusyOrHere) return;
+        // The Routines row and the toolbar say so anyway, and that holds until the user is free. Anything asking
+        // is notified from Needs you, along with every chat's.
+        if (kind === "needs-approval" || this.userIsBusyOrHere) return;
         notifyRoutine(routine.name, kind, () => {
           this.show();
           this.openPage("routines");
@@ -318,6 +322,36 @@ export class Window {
     sendToRenderer(this.chrome.view.webContents, "suggestions:updated", this.suggestions.list());
   }
 
+  private get needsYou(): NeedsYouItem[] {
+    const routines = this.routines.list();
+    return this.chats.waiting().map(({ chatTitle, ...waiting }) => {
+      const routine = routines.find(({ latestRun }) => latestRun?.id === waiting.id);
+      return { ...waiting, job: chatTitle ?? routine?.name ?? "A job", routineId: routine?.id ?? null };
+    });
+  }
+
+  private publishLibrary(): void {
+    // A reply stopped by the window closing ends after the window has gone.
+    if (this._baseWindow.isDestroyed()) return;
+    const snapshot = this.librarySnapshot;
+    const known = this.knownWaiting;
+    this.knownWaiting = new Set(snapshot.needsYou.map(({ approval }) => approval.id));
+    if (!this.userIsBusyOrHere) {
+      snapshot.needsYou
+        .filter(({ approval }) => !known.has(approval.id))
+        .forEach(({ approval, mascotId }) => {
+          const mascot = this.mascotStore.resolve(mascotId);
+          const name = mascot.id === BERRY.id && !this.settings.showBerry ? "Assistant" : mascot.name;
+          notifyNeedsYou(name, approval, () => {
+            this.show();
+            this.focus();
+            this.openPage("needs-you", { param: approval.id });
+          });
+        });
+    }
+    this.broadcast("library:updated", snapshot);
+  }
+
   get librarySnapshot(): LibrarySnapshot {
     return {
       pinned: this.pinnedStore.get(),
@@ -325,6 +359,7 @@ export class Window {
       chats: this.chatStore.summaries().map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id) })),
       routines: this.routines.list(),
       mascots: this.mascotStore.all(),
+      needsYou: this.needsYou,
     };
   }
 
@@ -469,6 +504,8 @@ export class Window {
         (SINGLE_INSTANCE_PAGES.includes(page) || (param !== null && tab.param === param))
     );
     if (existing) {
+      // A one-of-a-kind page can be asked to show something else, such as the item a notification was about.
+      if (existing instanceof InternalTab && param !== null) existing.param = param;
       this.switchActiveTab(existing.id);
       return existing;
     }
@@ -600,6 +637,7 @@ export class Window {
     tab.destroy();
     this.tabsMap.delete(tabId);
     this.backgroundTabs.delete(tabId);
+    this.chats.tabClosed(tabId);
 
     if (this.activeTabId === tabId) {
       this.activeTabId = null;
