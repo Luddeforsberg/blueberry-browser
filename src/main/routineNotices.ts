@@ -1,19 +1,34 @@
 import { dialog, Notification, type BaseWindow } from "electron";
+import { HANDOFF_WORDS } from "./browserTools";
+import type { ChatApproval } from "../shared/library";
 
 const WORDS = {
   finished: { title: "finished", body: "See what it found in Routines." },
   failed: { title: "couldn’t finish", body: "See what happened in Routines." },
-  "needs-approval": { title: "needs your OK", body: "It’s waiting in Routines, and nothing happens until you answer." },
 };
 
 // Silent, because Berry never makes a sound. Page text and approval wording stay out of it, since they could be
 // private and notifications show on a locked screen.
-export const notifyRoutine = (name: string, kind: keyof typeof WORDS, onClick: () => void): void => {
+const notify = (title: string, body: string, onClick: () => void): void => {
   if (!Notification.isSupported()) return;
-  const { title, body } = WORDS[kind];
-  const notification = new Notification({ title: `${name} ${title}`, body, silent: true });
+  const notification = new Notification({ title, body, silent: true });
   notification.on("click", onClick);
   notification.show();
+};
+
+export const notifyRoutine = (name: string, kind: keyof typeof WORDS, onClick: () => void): void => {
+  const { title, body } = WORDS[kind];
+  notify(`${name} ${title}`, body, onClick);
+};
+
+// Never the question, the site or what's being typed, only that something is waiting and what kind of thing it is.
+export const notifyNeedsYou = (name: string, { question, handoff }: ChatApproval, onClick: () => void): void => {
+  const body = handoff
+    ? `To ${HANDOFF_WORDS[handoff.need]}. It’s waiting in Needs you.`
+    : question
+      ? "It has a question waiting in Needs you."
+      : "It’s waiting in Needs you, and nothing happens until you answer.";
+  notify(`${name} needs you`, body, onClick);
 };
 
 export const confirmDeleteRoutine = async (window: BaseWindow, name: string): Promise<boolean> => {

@@ -1,7 +1,7 @@
 import React from 'react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useChat, type Message } from '../contexts/ChatContext'
-import { useFlock } from '../contexts/LibraryContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useAssistantName, BerrySpot } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, ThinkingMessage, UserMessage, useFollowReply } from './ChatMessage'
 import { PageCard } from './PageCard'
@@ -59,6 +59,7 @@ export const Chat: React.FC = () => {
     const { activeTab } = useBrowser()
     const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
     const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites)
+    const heldByUser = useLibrary().needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
 
     // Group messages into conversation turns
     const conversationTurns: ConversationTurn[] = []
@@ -122,7 +123,9 @@ export const Chat: React.FC = () => {
                     onStop={isLoading ? stop : undefined}
                     placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
                     attachment={
-                        host && !canUseSite ? (
+                        heldByUser ? (
+                            <p className="px-2 py-1 text-12 text-muted-foreground">{name} can’t see this tab while it’s with you.</p>
+                        ) : host && !canUseSite ? (
                             <p className="px-2 py-1 text-12 text-muted-foreground">{name} isn’t allowed on {host}, so it can’t see this page.</p>
                         ) : enabled && host ? (
                             <PageCard

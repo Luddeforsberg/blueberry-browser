@@ -9,6 +9,7 @@ const TITLES: Record<InternalPage, string> = {
   gallery: "Component gallery",
   history: "History",
   flock: "Your flock",
+  "needs-you": "Needs you",
 };
 
 // A tab whose page the chrome renderer draws, so it has no web view and no navigation history.
@@ -26,7 +27,7 @@ export class InternalTab {
   constructor(
     readonly id: string,
     readonly page: InternalPage,
-    readonly param: string | null = null,
+    public param: string | null = null,
     title?: string
   ) {
     this.title = title || TITLES[page];

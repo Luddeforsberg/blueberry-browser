@@ -7,6 +7,7 @@ import { AddressBar } from './AddressBar'
 import { DownloadsButton } from './DownloadsButton'
 import { Favicon, siteIcon } from './Favicon'
 import { ToolBarButton } from './ToolBarButton'
+import { HandoffNotice, NeedsYouNotice } from './NeedsYou'
 import { RoutineNotice } from './RoutineNotice'
 import { WorkingNotice } from './WorkingNotice'
 
@@ -83,7 +84,9 @@ export const Toolbar: React.FC = () => {
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
                 )}
+                <HandoffNotice />
                 {/* The sidebar says this when it's open. */}
+                {(!vertical || !layout.sidebarOpen) && <NeedsYouNotice />}
                 {(!vertical || !layout.sidebarOpen) && <WorkingNotice />}
                 {(!vertical || !layout.sidebarOpen) && <RoutineNotice />}
 

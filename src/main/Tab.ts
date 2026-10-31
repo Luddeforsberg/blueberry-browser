@@ -428,8 +428,17 @@ export class Tab {
     if (draw) view.setVisible(true);
   }
 
+  // The user has been handed this tab. Everything Berry does to a page goes through these methods, so a call already
+  // on its way when that happened stops here, rather than clicking or reading in the middle of their sign-in.
+  heldForUser = false;
+
+  private refuseWhileHeld(): void {
+    if (this.heldForUser) throw new Error("The user has this tab");
+  }
+
   // Berry's real mouse and keyboard. Anything else that reaches the page is the user's.
   sendAgentInput(event: Parameters<WebContents["sendInputEvent"]>[0]): void {
+    this.refuseWhileHeld();
     this.sendingAgentInput = true;
     try {
       this.webContents.sendInputEvent(event);
@@ -439,15 +448,18 @@ export class Tab {
   }
 
   async screenshot(): Promise<NativeImage> {
+    this.refuseWhileHeld();
     return await this.fromPage(() => this.view.webContents.capturePage());
   }
 
   async runJs<T = unknown>(code: string): Promise<T> {
+    this.refuseWhileHeld();
     return await this.fromPage(() => this.view.webContents.executeJavaScript(code));
   }
 
   // Runs in a world of its own. The page shares its DOM but can't see its variables.
   async runInPage<T = unknown>(code: string): Promise<T> {
+    this.refuseWhileHeld();
     return await this.fromPage(() =>
       this.view.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true)
     );
@@ -465,6 +477,7 @@ export class Tab {
 
   // The frame's page can see and change this script and what it returns, so believe nothing it says about itself.
   async runInFrame<T = unknown>(frame: WebFrameMain, code: string): Promise<T> {
+    this.refuseWhileHeld();
     return await this.fromPage(() => frame.executeJavaScript(code, true) as Promise<T>);
   }
 

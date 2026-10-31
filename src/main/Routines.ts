@@ -35,7 +35,7 @@ interface ActiveRun {
 
 const prompt = ({ name, instructions }: StoredRoutine, now: number): string =>
   `This is a routine the user set up earlier, running by itself at ${new Date(now).toString()}. ` +
-  "Nobody is watching, so don't ask questions in words. Do what it says in your own tabs, " +
+  "Nobody is watching right now, so don't ask questions in words: anything you need from the user goes through ask_user or hand_to_user, which wait for them. Do what it says in your own tabs, " +
   "then end with a short report of what you found and did, and anything you couldn't do.\n\n" +
   `The routine, called “${name}”:\n${instructions}`;
 
@@ -62,7 +62,7 @@ const lastResult = (run: RoutineRun | null, now: number): string => {
     case "running":
       return "Working on it";
     case "needs-approval":
-      return "Waiting for your OK";
+      return run.approval?.question || run.approval?.handoff ? "Waiting for you" : "Waiting for your OK";
     case "finished":
       return `${day}: ${run.result ? firstLine(run.result) : "nothing to report"}`;
     case "failed":

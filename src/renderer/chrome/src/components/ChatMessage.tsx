@@ -7,6 +7,7 @@ import { BERRY_ID } from '@shared/mascots'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
+import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
 
 const FOLLOW_DISTANCE = 120
@@ -175,10 +176,51 @@ const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval; masco
     )
 }
 
+// What the user can do about a tab they've been handed. Words are never typed here, so there's nowhere for a secret to go.
+export const HandoffActions: React.FC<{
+    chatId: string
+    approval: ChatApproval
+    mascot?: MascotProfile
+    onAnswered?: (said: string) => void
+}> = ({ chatId, approval, mascot, onAnswered }) => {
+    const name = useAssistantName(mascot)
+    const { tabs, switchTab } = useBrowser()
+    const tabId = approval.handoff?.tabId
+    const here = tabs.some((tab) => tab.id === tabId && tab.isActive)
+    const send = (allow: boolean, said: string) => {
+        onAnswered?.(said)
+        void window.chromeAPI.chat.decide(chatId, approval.id, allow)
+    }
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            {!here && tabId && <Button size="sm" onClick={() => void switchTab(tabId)}>Go to the tab</Button>}
+            <Button size="sm" variant={here ? 'default' : 'outline'} onClick={() => send(true, `${name} has the tab back.`)}>I’m done</Button>
+            <Button size="sm" variant="ghost" onClick={() => send(false, `${name} carries on without it.`)}>Not now</Button>
+        </div>
+    )
+}
+
+export const handoffNote = (name: string) => `${name} can’t see that tab until you press I’m done. Your password or code goes in the page, and never in a chat.`
+
+// Berry has handed a tab to the user, and waits here until they say they're done.
+const ChatHandoffCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
+    const name = useAssistantName(mascot)
+    return (
+        <section aria-label={`${name} needs you`} className="[overflow-wrap:anywhere] animate-fade-in rounded-panel border bg-surface p-3 shadow-float">
+            <h3 className="text-13 font-semibold">{approval.text}</h3>
+            <p className="mt-1 text-12 text-muted-foreground">{handoffNote(name)}</p>
+            <div className="mt-3">
+                <HandoffActions chatId={chatId} approval={approval} mascot={mascot} />
+            </div>
+        </section>
+    )
+}
+
 // An action Berry wants to take, which waits here until the user answers.
 export const ChatApprovalCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
     const decide = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
     if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} mascot={mascot} />
+    if (approval.handoff) return <ChatHandoffCard chatId={chatId} approval={approval} mascot={mascot} />
     return (
         <div className="[overflow-wrap:anywhere] animate-fade-in">
             <ApprovalCard

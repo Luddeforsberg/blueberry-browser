@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
 import type { GenerateTitle, ReplyMessage, ReplyOptions, StreamReply } from "./agent";
+import type { PageTool } from "./browserTools";
 import type { Tab } from "./Tab";
 import type { ChatThread } from "../shared/library";
 
@@ -422,6 +423,50 @@ describe("Chats", () => {
       const readPage = reached.find((tool) => tool.name === "read_page")!;
       expect(await readPage.run({ tabId: "tab-own" })).toMatch(/user took over tab tab-own/);
       expect(await readPage.run({})).toMatch(/user took over tab tab-own/);
+    });
+
+    it("a handed-over tab the user typed in stays out of every job's reach, until they send it with a message", async () => {
+      const page = { ...tab(), id: "tab-sent" } as unknown as Tab;
+      const own = { ...tab(), id: "tab-own", settled: async () => {}, getTextWithFrames: async () => "half typed" } as unknown as Tab;
+      let active = page;
+      const open = [page];
+      let other: PageTool[] = [];
+      const stream: StreamReply = async function* (messages, __, { tools }) {
+        if (JSON.stringify(messages).includes("sign in for me")) {
+          await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
+          await tools.find((tool) => tool.name === "hand_to_user")!.run({ need: "sign-in" });
+        }
+        other = tools;
+        yield "ok";
+      };
+      const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
+        activeTab: () => active,
+        allTabs: () => open,
+        openBackgroundTab: () => {
+          open.push(own);
+          return own;
+        },
+        closeTab: () => true,
+        actionApproval: () => "always",
+      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+
+      send(chats, null, "sign in for me", false);
+      await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
+      const [{ id, approval }] = chats.waiting();
+      const looking = send(chats, null, "What's open?");
+      await vi.waitFor(() => expect(chats.isRunning(looking!.id)).toBe(false));
+      const read = () => other.find((tool) => tool.name === "read_page")!.run({ tabId: "tab-own" });
+      expect(await read()).toMatch(/private/);
+
+      chats.releaseTab("tab-own");
+      chats.decide(id, approval.id, false);
+      await vi.waitFor(() => expect(chats.isRunning(id)).toBe(false));
+      expect(await read()).toMatch(/private/);
+
+      active = own;
+      const shared = send(chats, looking!.id, "And this one?");
+      await vi.waitFor(() => expect(chats.isRunning(shared!.id)).toBe(false));
+      expect(await read()).toContain("half typed");
     });
 
     it("stay on the job's tab when the user goes to another, with no tab named", async () => {

@@ -6,12 +6,12 @@ import {
   type StreamReply,
 } from "./agent";
 import { randomUUID } from "crypto";
-import { createPageTools, type PageTool, type PageToolAccess } from "./browserTools";
+import { createPageTools, HANDOFF_WORDS, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
 import { mascotNote } from "./mascotNote";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, MascotProfile } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile } from "../shared/library";
 import { BERRY, siteAllowed } from "../shared/mascots";
 
 const MAX_TITLE_LENGTH = 40;
@@ -21,7 +21,7 @@ const MAX_RENAME_LENGTH = 100;
 const MAX_TITLE_ATTEMPTS = 5;
 const MAX_ANSWER_LENGTH = 2000;
 
-const publicApproval = ({ id, text, question }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}) });
+const publicApproval = ({ id, text, question, handoff }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}), ...(handoff ? { handoff } : {}) });
 
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
@@ -69,7 +69,7 @@ interface Run {
   steps: ChatStep[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
-  approval: (ChatApproval & { answer: (allow: boolean, text?: string) => void }) | null;
+  approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void }) | null;
   tabs: Set<Tab>;
   mascot: MascotProfile;
   // Set for a task, which belongs to its caller rather than to a saved chat.
@@ -84,6 +84,18 @@ interface Job {
   takenOver: Map<string, string>;
   // Where a call that names no tab goes. Fixed by the job, so the user's browsing can't redirect it.
   current: string | null;
+}
+
+// A run that's waiting on the user, for the Needs you page.
+export interface WaitingRun {
+  id: string;
+  approval: ChatApproval;
+  mascotId: string;
+  // Null for a task, which has no saved chat.
+  chatTitle: string | null;
+  lastStep: string | null;
+  tabId: string | null;
+  askedAt: number;
 }
 
 export interface TaskProgress {
@@ -117,6 +129,9 @@ export class Chats {
   private pageAccess = true;
   private readonly jobs = new Map<string, Job>();
   private readonly taskPopups = new Map<string, Set<string>>();
+  // Tabs handed to the user. Nothing reaches these, from any job. `asking` is whether a job is still waiting: one that
+  // stopped waiting after the user typed there leaves the tab here, until they send it with a message or close it.
+  private readonly handedOver = new Map<string, { touched: boolean; asking: boolean }>();
 
   constructor(
     private readonly store: ChatStore,
@@ -126,6 +141,8 @@ export class Chats {
       openBackgroundTab: (url: string) => Tab;
       closeTab: (tabId: string) => boolean;
       actionApproval: () => ActionApproval;
+      // What Berry goes by right now, since Hide Berry changes it.
+      assistantName?: () => string;
     },
     private readonly events: ChatEvents,
     // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
@@ -162,6 +179,8 @@ export class Chats {
       ownsEveryTab: !page,
       ownsTab: (id) => job.own.has(id),
       takenOver: job.takenOver,
+      heldByUser: (id) => this.handedOver.has(id),
+      handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
       limits: run.mascot.id === BERRY.id ? undefined : run.mascot,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
@@ -175,6 +194,73 @@ export class Chats {
       this.publishWorkingTabs();
     }
     return closed;
+  }
+
+  // The user does what only they can in this tab, with nothing reaching it until they say they're done. "I'm done"
+  // gives it back to the job. So does anything else, if they never touched it. If they did, it's theirs, and it stays
+  // out of every job's reach, because Berry must not read what they left half typed.
+  private async handOver(chatId: string, run: Run, job: Job, tab: Tab, need: HandoffNeed): Promise<boolean> {
+    // Another job got there first and only its answer may let the tab go, or the user left it half typed and it stays theirs.
+    if (this.handedOver.has(tab.id)) return false;
+    const wasOwn = job.own.delete(tab.id);
+    job.takenOver.set(tab.id, tab.url);
+    const held = { touched: false, asking: true };
+    this.handedOver.set(tab.id, held);
+    tab.heldForUser = true;
+    run.tabs.delete(tab);
+    this.publishWorkingTabs();
+    const who = run.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : run.mascot.name;
+    const site = siteOf(tab.url);
+    let done = false;
+    try {
+      const text = `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;
+      done = await this.wait(chatId, run, text, { handoff: { need, tabId: tab.id, site } }, (allow) => allow);
+      return done;
+    } finally {
+      held.asking = false;
+      if (done || !held.touched) {
+        this.letGo(tab);
+        job.takenOver.delete(tab.id);
+        if (wasOwn) job.own.add(tab.id);
+      }
+      if (done) job.current = tab.id;
+    }
+  }
+
+  private letGo(tab: Tab): void {
+    this.handedOver.delete(tab.id);
+    tab.heldForUser = false;
+  }
+
+  // Nothing's left to wait for once a handed-over tab has gone.
+  tabClosed(tabId: string): void {
+    this.handedOver.delete(tabId);
+    this.runs.forEach((run, id) => {
+      if (run.approval?.handoff?.tabId === tabId) this.decide(id, run.approval.id, false);
+    });
+  }
+
+  // Everything waiting on the user, oldest first.
+  waiting(): WaitingRun[] {
+    return [...this.runs.entries()]
+      .flatMap(([id, run]) => {
+        if (!run.approval) return [];
+        const job = this.jobs.get(id);
+        const tabId = run.approval.handoff?.tabId ?? job?.current ?? null;
+        return [
+          {
+            id,
+            approval: publicApproval(run.approval),
+            mascotId: run.mascot.id,
+            chatTitle: this.store.chat(id)?.title ?? null,
+            // Not the step it is on, which is the asking.
+            lastStep: run.steps.filter((step) => step.done).at(-1)?.text ?? null,
+            tabId: this.browser.allTabs().some((tab) => tab.id === tabId) ? tabId : null,
+            askedAt: run.approval.askedAt,
+          },
+        ];
+      })
+      .sort((a, b) => a.askedAt - b.askedAt);
   }
 
   // A page in a task's tab opened another. Nobody allowed that, so the task can't reach it, but it's cleared up with
@@ -194,6 +280,8 @@ export class Chats {
   // anything, so the job that opened it can't reach it, and the model is told why.
   releaseTab(tabId: string): void {
     this.taskPopups.forEach((popups) => popups.delete(tabId));
+    const held = this.handedOver.get(tabId);
+    if (held) held.touched = true;
     // This runs on every click and key press in every tab, so most of the time it has nothing to do.
     if (!this.isOwnTab(tabId)) return;
     const tab = this.browser.allTabs().find((candidate) => candidate.id === tabId);
@@ -205,8 +293,10 @@ export class Chats {
     this.publishWorkingTabs();
   }
 
+  // The page a message can go with. Not one a job has handed to the user and is waiting on, whatever they send from there.
   private get activeTab(): Tab | null {
-    return this.browser.activeTab();
+    const tab = this.browser.activeTab();
+    return tab && !this.handedOver.get(tab.id)?.asking ? tab : null;
   }
 
   thread(id: string): ChatThread | null {
@@ -290,6 +380,8 @@ export class Chats {
     try {
       // Read before anything waits, so it's the page the message was sent from wherever the user has gone since.
       const page = seePage && this.pageAccess ? this.activeTab : null;
+      // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
+      if (page) this.letGo(page);
       const messages = await this.withNewestPage(chatId, seePage, run.mascot);
       const tools = this.jobTools(chatId, run, page);
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
@@ -405,7 +497,7 @@ export class Chats {
     };
   }
 
-  private wait<T>(chatId: string, run: Run, text: string, question: boolean, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
+  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
     const { signal } = run.controller;
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
@@ -414,23 +506,25 @@ export class Chats {
       run.approval = {
         id: randomUUID(),
         text,
-        ...(question ? { question: true } : {}),
+        ...kind,
+        askedAt: Date.now(),
         answer: (allow, answer) => {
           signal.removeEventListener("abort", stopped);
           resolve(onAnswer(allow, answer));
         },
       };
       this.publish(chatId, run);
+      this.events.onListChanged();
     });
   }
 
   private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
-    return this.wait(chatId, run, text, false, (allow) => allow);
+    return this.wait(chatId, run, text, {}, (allow) => allow);
   }
 
   // Null if the user would rather not answer.
   private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
-    return this.wait(chatId, run, question, true, (allow, answer) => (allow && answer ? answer : null));
+    return this.wait(chatId, run, question, { question: true }, (allow, answer) => (allow && answer ? answer : null));
   }
 
   // False if that request has already been answered or its reply has ended. `answer` is for a question.
@@ -441,6 +535,7 @@ export class Chats {
     run.approval = null;
     finish(allow === true, typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined);
     this.publish(chatId, run);
+    this.events.onListChanged();
     return true;
   }
 
@@ -485,7 +580,7 @@ export class Chats {
       }),
     ]);
     // "Can see" may have been switched off while the page was being read, so nothing read goes out.
-    return this.pageAccess && siteAllowed(tab.url, mascot.sites) ? { url: tab.url, text, screenshot } : null;
+    return this.pageAccess && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites) ? { url: tab.url, text, screenshot } : null;
   }
 
   // The "Can see" toggle. Off means no page text or screenshot goes with a message.

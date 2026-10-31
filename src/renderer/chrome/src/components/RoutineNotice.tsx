@@ -37,8 +37,8 @@ export const RoutineDot: React.FC = () => {
 // For when there's no sidebar to say it. It waits in the toolbar and never takes focus.
 export const RoutineNotice: React.FC = () => {
     const { activeTab } = useBrowser()
-    const { asking, ready } = useRoutineNews()
-    if (activeTab?.page === 'routines' || asking + ready === 0) return null
+    const { ready } = useRoutineNews()
+    if (activeTab?.page === 'routines' || ready === 0) return null
 
     return (
         <button
@@ -47,7 +47,7 @@ export const RoutineNotice: React.FC = () => {
             className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
             <BerryDot />
-            {asking > 0 ? 'Routine needs your OK' : 'Routine has news'}
+            Routine has news
         </button>
     )
 }

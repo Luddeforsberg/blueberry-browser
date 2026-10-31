@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Bird, ChevronDown, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Bird, ChevronDown, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
@@ -8,7 +8,7 @@ import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
-import { RoutineApprovals } from './RoutineRunCard'
+import { NeedsYouCount } from './NeedsYou'
 import { RoutineDot } from './RoutineNotice'
 import { ToolBarButton } from './ToolBarButton'
 import { cn } from '@common/lib/utils'
@@ -259,6 +259,14 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         onClick={() => void browser.openPage('chat')}
                     />
                     <SidebarRow
+                        muted={library.needsYou.length === 0}
+                        leading={<Hand className={ICON} />}
+                        label="Needs you"
+                        trailing={<NeedsYouCount />}
+                        selected={isOpen('needs-you')}
+                        onClick={() => void browser.openPage('needs-you')}
+                    />
+                    <SidebarRow
                         muted
                         leading={<RefreshCw className={ICON} />}
                         label="Routines"
@@ -274,13 +282,6 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         onClick={() => void browser.openPage('flock')}
                     />
                 </ul>
-
-                {/* The Routines page shows these itself. */}
-                {!isOpen('routines') && (
-                    <div className="mt-3 empty:hidden">
-                        <RoutineApprovals />
-                    </div>
-                )}
 
                 {library.chats.length > 0 && (
                     <Section id="sidebar-chats" title="Chats" collapsible>
