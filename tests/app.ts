@@ -1,5 +1,6 @@
 import {
   _electron as electron,
+  errors,
   type ElectronApplication,
   type Page,
 } from "@playwright/test";
@@ -8,10 +9,22 @@ import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Together these stay inside the 30 second test timeout, so a hang names the step that stuck.
-const LAUNCH_TIMEOUT_MS = 18_000;
-const VIEW_TIMEOUT_MS = 10_000;
+// Two launches and a view stay inside the 30 second test timeout, so a hang names the step that stuck.
+const LAUNCH_TIMEOUT_MS = 12_000;
+const VIEW_TIMEOUT_MS = 5_000;
 const VIEW_POLL_MS = 50;
+
+// Now and then on Windows CI the app starts and Playwright connects to it, and then the launch never
+// finishes. We don't know why yet, and the next launch works. This line in a log means it happened again.
+export async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> {
+  try {
+    return await launch();
+  } catch (error) {
+    if (!(error instanceof errors.TimeoutError)) throw error;
+    console.log(`Launch stuck on ${process.platform} after ${LAUNCH_TIMEOUT_MS}ms, trying once more`);
+    return await launch();
+  }
+}
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
 // Pass a profile folder to launch again with the same saved settings.
@@ -42,13 +55,15 @@ export async function launchApp(
   const background = process.env.CI ? [] : ["-r", join(__dirname, "background.cjs")];
 
   const started = Date.now();
-  const app = await electron.launch({
-    executablePath: electronPath as unknown as string,
-    // A fresh profile keeps tests apart and away from the developer's real browsing data.
-    args: [...background, ".", `--user-data-dir=${userDataDir}`],
-    env,
-    timeout: LAUNCH_TIMEOUT_MS,
-  });
+  const app = await retryStuckLaunch(() =>
+    electron.launch({
+      executablePath: electronPath as unknown as string,
+      // A fresh profile keeps tests apart and away from the developer's real browsing data.
+      args: [...background, ".", `--user-data-dir=${userDataDir}`],
+      env,
+      timeout: LAUNCH_TIMEOUT_MS,
+    })
+  );
   // Reporters only print a test's output when it fails.
   console.log(`App launched in ${Date.now() - started}ms`);
   app.process().stderr?.on("data", (data) => console.log(`[app stderr] ${data}`));
