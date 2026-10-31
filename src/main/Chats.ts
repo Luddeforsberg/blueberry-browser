@@ -1,4 +1,5 @@
 import {
+  isStepLimit,
   ModelConfigError,
   type GenerateTitle,
   type ReplyContent,
@@ -22,6 +23,7 @@ const titleFrom = (text: string): string =>
 
 const errorMessage = (error: unknown): string => {
   if (error instanceof ModelConfigError) return error.message;
+  if (isStepLimit(error)) return "This took too many steps, so it stopped here. Send a message to keep going.";
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("401") || message.includes("unauthorized")) {
     return "The API key was rejected. Check it in the .env file and restart.";
@@ -78,15 +80,39 @@ export class Chats {
   private readonly errors = new Map<string, string>();
   private pageAccess = true;
   private readonly pageTools: PageTool[];
+  // The tabs each chat opened itself, which are all it can reach when it can't see the user's page.
+  private readonly ownTabs = new Map<string, Set<string>>();
 
   constructor(
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
-    private readonly browser: Omit<PageToolAccess, "canSee">,
+    private readonly browser: Omit<PageToolAccess, "canSee"> & { openBackgroundTab: (url: string) => Tab },
     private readonly events: ChatEvents
   ) {
     this.pageTools = createPageTools({ ...browser, canSee: () => this.pageAccess });
+  }
+
+  // These open behind the chat, so the approval cards and the reply stay in front of the user.
+  private ownTabTools(chatId: string): PageTool[] {
+    const ids = this.ownTabs.get(chatId) ?? new Set<string>();
+    this.ownTabs.set(chatId, ids);
+    const allTabs = () => this.browser.allTabs().filter((tab) => ids.has(tab.id));
+    return createPageTools({
+      allTabs,
+      activeTab: () => allTabs().at(-1) ?? null,
+      openTab: (url) => {
+        const tab = this.browser.openBackgroundTab(url);
+        ids.add(tab.id);
+        return tab;
+      },
+      canSee: () => true,
+    });
+  }
+
+  // A tab the user has gone to is theirs now, and may hold anything, so no chat reaches it this way any more.
+  releaseTab(tabId: string): void {
+    this.ownTabs.forEach((ids) => ids.delete(tabId));
   }
 
   private get activeTab(): Tab | null {
@@ -144,6 +170,7 @@ export class Chats {
     this.stop(chatId);
     this.runs.delete(chatId);
     this.errors.delete(chatId);
+    this.ownTabs.delete(chatId);
     if (!this.store.deleteChat(chatId)) return false;
     this.events.onListChanged();
     return true;
@@ -162,7 +189,7 @@ export class Chats {
     const { signal } = run.controller;
     try {
       const messages = await this.withNewestPage(chatId, seePage);
-      const tools = seePage && this.pageAccess && this.activeTab ? this.pageTools : [];
+      const tools = seePage && this.pageAccess && this.activeTab ? this.pageTools : this.ownTabTools(chatId);
       const onStep = (text: string) => this.startStep(chatId, run, text);
       const approve = (text: string) => this.askToAllow(chatId, run, text);
       for await (const words of this.streamReply(messages, signal, { tools, approve, onStep })) {

@@ -7,7 +7,7 @@ import type { ChatThread } from "../shared/library";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
-  return { ModelConfigError };
+  return { ModelConfigError, isStepLimit: (error: Error) => error.name === "ModelCallLimitMiddlewareError" };
 });
 
 const SCREENSHOT = "data:image/png;base64,AAAA";
@@ -24,7 +24,8 @@ const tab = (overrides: Partial<Record<"screenshot" | "getTabText", () => Promis
 const setup = (
   streamReply: StreamReply,
   activeTab: Tab | null = tab(),
-  generateTitle: GenerateTitle = async () => null
+  generateTitle: GenerateTitle = async () => null,
+  openBackgroundTab: (url: string) => Tab = () => tab()
 ) => {
   const store = new ChatStore(":memory:");
   const threads: ChatThread[] = [];
@@ -35,6 +36,7 @@ const setup = (
     activeTab: () => activeTab,
     allTabs: () => (activeTab ? [activeTab] : []),
     openTab: () => activeTab as Tab,
+    openBackgroundTab,
   }, {
     onChunk: (_, content) => chunks.push(content),
     onThread: (thread) => {
@@ -272,9 +274,64 @@ describe("Chats", () => {
 
     it("are only offered when Berry can see a page", async () => {
       expect(await toolNames(tab(), true, true)).toEqual(expect.arrayContaining(["read_page", "click", "open_tab"]));
-      expect(await toolNames(tab(), false, true)).toEqual([]);
-      expect(await toolNames(tab(), true, false)).toEqual([]);
-      expect(await toolNames(null, true, true)).toEqual([]);
+    });
+
+    it("reach only the tabs a chat opened itself when it can't see a page", async () => {
+      const opened = { ...tab(), id: "tab-own", getTabText: async () => "own words", settled: async () => {} } as unknown as Tab;
+      const results: string[] = [];
+      let reached: ReplyOptions["tools"] = [];
+      const reply: StreamReply = async function* (_, __, { tools }) {
+        reached = tools;
+        const call = (name: string, args: object) => tools.find((tool) => tool.name === name)!.run(args);
+        results.push(await call("read_page", {}), await call("list_tabs", {}));
+        results.push(await call("open_tab", { url: "https://opened.example/" }));
+        results.push(await call("read_page", {}));
+        yield "ok";
+      };
+      const allTabs = [{ ...tab(), id: "tab-user" } as unknown as Tab];
+      const store = new ChatStore(":memory:");
+      let finished = false;
+      const chats = new Chats(store, reply, async () => null, {
+        activeTab: () => allTabs[0],
+        allTabs: () => allTabs,
+        openTab: () => {
+          throw new Error("A chat that can't see the page must not take over the window");
+        },
+        openBackgroundTab: () => {
+          allTabs.push(opened);
+          return opened;
+        },
+      }, {
+        onChunk: () => {},
+        onThread: (thread) => {
+          if (thread.partial === null) finished = true;
+        },
+        onListChanged: () => {},
+      });
+
+      send(chats, null, "first", false);
+      await vi.waitFor(() => expect(finished).toBe(true));
+
+      const [before, listed, , after] = results;
+      expect(before).toMatch(/no web page/);
+      expect(before).not.toContain("page text");
+      expect(JSON.parse(listed)).toEqual([]);
+      expect(after).toContain("own words");
+
+      chats.releaseTab("tab-own");
+      const readPage = reached.find((tool) => tool.name === "read_page")!;
+      expect(await readPage.run({ tabId: "tab-own" })).toMatch(/no web page/);
+    });
+
+    it("explain a step limit in words the user can act on", async () => {
+      const limit = Object.assign(new Error("limit"), { name: "ModelCallLimitMiddlewareError" });
+      const { chats, replyEnded } = setup(() => {
+        throw limit;
+      });
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+      expect(chats.thread(id)?.error).toMatch(/too many steps/);
     });
 
     it("read nothing once Can see is switched off during a reply", async () => {

@@ -291,7 +291,29 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   await message.fill("Something else");
   await message.press("Enter");
   await expect.poll(() => model.requests.length).toBe(3);
-  expect(model.requests.at(-1)?.tools).toBeUndefined();
+});
+
+test("a chat with no page opens tabs behind itself, and reaches only those", async () => {
+  await openFixture();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  const message = chrome.getByRole("textbox", { name: "Message" });
+  const card = chrome.getByRole("region", { name: "Approval needed" });
+
+  model.callTools({ name: "list_tabs", args: {} });
+  model.callTools({ name: "open_tab", args: { url: `${origin}/form` } });
+  model.callTools({ name: "read_page", args: {} });
+  await message.fill("Look at the form");
+  await message.press("Enter");
+
+  await expect(card.getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
+  const reachable = JSON.stringify(model.requests.at(-1)?.messages.at(-1));
+  expect(reachable).not.toContain(origin);
+  await card.getByRole("button", { name: "Allow" }).click();
+
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
+  expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Save");
+  expect((await activeTab()).page).toBe("chat");
+  expect((await getTabs()).map((tab) => tab.url)).toContain(`${origin}/form`);
 });
 
 test("Berry does nothing if a link changes while the user decides", async () => {
