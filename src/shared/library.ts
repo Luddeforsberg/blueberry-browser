@@ -37,6 +37,10 @@ export interface ChatThreadSummary {
   id: string;
   title: string;
   updatedAt: number;
+  // Who the chat runs as. Null is Berry, which every chat from before the flock stays.
+  mascotId: string | null;
+  // A reply is being written right now.
+  running?: boolean;
 }
 
 export interface ChatThread extends ChatThreadSummary {
@@ -62,6 +66,8 @@ export interface RoutineDraft {
   name: string;
   instructions: string;
   schedule: RoutineSchedule;
+  // Who runs it. Left out or null is Berry.
+  mascotId?: string | null;
 }
 
 // How one run went, or is going.
@@ -93,6 +99,7 @@ export interface Routine {
   name: string;
   instructions: string;
   scheduleSpec: RoutineSchedule;
+  mascotId: string | null;
   // The schedule in words.
   schedule: string;
   paused: boolean;
@@ -104,9 +111,41 @@ export interface Routine {
   unseen: boolean;
 }
 
+// One drawing with changeable colours and one accessory. The blueberry never changes.
+export type MascotPalette = "jackdaw" | "robin" | "canary" | "parakeet" | "flamingo" | "kingfisher";
+export type MascotAccessory = "none" | "crown" | "cap" | "glasses" | "headphones" | "bow";
+
+export interface MascotLook {
+  palette: MascotPalette;
+  accessory: MascotAccessory;
+}
+
+// What a mascot may do beyond reading pages, as named switches rather than a list of tools, so a saved mascot means
+// the same thing when the tools change.
+export type MascotTool = "visit" | "click" | "type";
+
+// What the user fills in. Plain data, so a mascot can be saved, and later published, as it is.
+export interface MascotDraft {
+  name: string;
+  look: MascotLook;
+  // In the user's words: what it's for and how it should work. Goes into the prompt, marked as theirs.
+  instructions: string;
+  // The sites it may use, as hostnames, each with its subdomains. Empty means it isn't limited to any.
+  sites: string[];
+  tools: MascotTool[];
+}
+
+export interface MascotProfile extends MascotDraft {
+  id: string;
+  // A deleted mascot stays on file, so its chats keep their look and, above all, their limits.
+  deletedAt: number | null;
+}
+
 export interface LibrarySnapshot {
   pinned: PinnedSite[];
   bookmarks: Bookmark[];
   chats: ChatThreadSummary[];
   routines: Routine[];
+  // Berry first, then the rest of the flock, including deleted mascots that chats still point at.
+  mascots: MascotProfile[];
 }

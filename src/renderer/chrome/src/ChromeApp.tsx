@@ -1,7 +1,7 @@
 import React from 'react'
 import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
-import { LibraryProvider } from './contexts/LibraryContext'
+import { LibraryProvider, useFlock } from './contexts/LibraryContext'
 import { InternalPageView } from './pages/InternalPageView'
 import { ChatProvider, useChat } from './contexts/ChatContext'
 import { ShellProvider, useShell } from './contexts/ShellContext'
@@ -14,6 +14,7 @@ import { Onboarding } from './components/Onboarding'
 import { BerryCompanion } from './components/BerryCompanion'
 import { PageTrouble } from './components/PageTrouble'
 import { cn } from '@common/lib/utils'
+import { siteAllowed } from '@shared/mascots'
 
 // Regions sit exactly where main's layout puts them, so the tab view lines up with the page card.
 const Region: React.FC<{
@@ -36,13 +37,14 @@ const Region: React.FC<{
 const Shell: React.FC = () => {
     const { layout, theme, settings } = useShell()
     const { activeTab, reload } = useBrowser()
-    const { isLoading, pageAccess } = useChat()
+    const { isLoading, pageAccess, mascotId } = useChat()
+    const { find } = useFlock()
 
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
     // It also shows on any tab Berry is using in the reply it's working on.
-    const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess))
+    const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && siteAllowed(activeTab.url, find(mascotId).sites)))
 
     return (
         <div className={cn("relative h-full", theme.glass ? "bg-frame" : "bg-background")}>

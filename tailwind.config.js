@@ -60,6 +60,8 @@ module.exports = {
         eye: "rgb(var(--berry-eye) / <alpha-value>)",
         pupil: "rgb(var(--berry-pupil) / <alpha-value>)",
         beak: "rgb(var(--berry-beak) / <alpha-value>)",
+        gear: "rgb(var(--berry-gear) / <alpha-value>)",
+        "gear-shade": "rgb(var(--berry-gear-shade) / <alpha-value>)",
         "fruit-mid": "rgb(var(--berry-fruit-mid) / <alpha-value>)",
         "fruit-dark": "rgb(var(--berry-fruit-dark) / <alpha-value>)",
         "fruit-bloom": "rgb(var(--berry-fruit-bloom) / <alpha-value>)",
@@ -149,6 +151,7 @@ module.exports = {
         "berry-swing-back": "berry-swing 2600ms ease-in-out -900ms infinite alternate",
         "berry-peck": "berry-peck 700ms ease-in-out infinite",
         "berry-print": "berry-print 30s ease-in forwards",
+        "berry-hop": "berry-hop 420ms ease-out",
       },
       keyframes: {
         shimmer: {
@@ -184,6 +187,13 @@ module.exports = {
         "berry-peck": {
           "0%, 55%, 100%": { transform: "rotate(0deg)" },
           "25%": { transform: "rotate(38deg)" },
+        },
+        "berry-hop": {
+          "0%": { transform: "translateY(0) scale(1, 1)" },
+          "20%": { transform: "translateY(0) scale(1.06, 0.92)" },
+          "55%": { transform: "translateY(-14%) scale(0.97, 1.04)" },
+          "85%": { transform: "translateY(0) scale(1.04, 0.96)" },
+          "100%": { transform: "translateY(0) scale(1, 1)" },
         },
         "berry-print": {
           "0%": { opacity: "0.3" },

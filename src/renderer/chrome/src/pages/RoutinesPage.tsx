@@ -4,7 +4,7 @@ import type { Routine, RoutineRun } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
-import { useLibrary } from '../contexts/LibraryContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { RoutineForm } from '../components/RoutineForm'
 import { formatTime, RoutineApprovals, RoutineRunCard, RoutineStatusLabel } from '../components/RoutineRunCard'
@@ -31,6 +31,7 @@ const moodFor = (status: Routine['status']): Mood => {
 const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ onNew, onOpen }) => {
     const { routines } = useLibrary()
     const isBerry = useAssistantName() === 'Berry'
+    const { find } = useFlock()
 
     return (
         <>
@@ -62,7 +63,10 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                                 onClick={() => onOpen(routine.id)}
                                 className="w-full grid grid-cols-[1.4fr_1fr_1.4fr_130px] items-center gap-4 min-h-14 px-5 py-2 text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
-                                <span className={cn("min-w-0 truncate", routine.status === 'running' && "font-semibold")}>{routine.name}</span>
+                                <span className="min-w-0 flex items-center gap-2.5">
+                                    {routine.mascotId && <Berry mood={moodFor(routine.status)} size={24} mascot={find(routine.mascotId)} />}
+                                    <span className={cn("truncate", routine.status === 'running' && "font-semibold")}>{routine.name}</span>
+                                </span>
                                 <span className="min-w-0 text-muted-foreground">{routine.schedule}</span>
                                 <span className="min-w-0 text-muted-foreground line-clamp-2">{routine.lastResult}</span>
                                 <span className="flex justify-end">
@@ -79,6 +83,7 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
 
 const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => void }> = ({ routine, onBack, onEdit }) => {
     const library = useLibrary()
+    const mascot = useFlock().find(routine.mascotId)
     const [runs, setRuns] = useState<RoutineRun[]>([])
     const open = routine.status === 'running' || routine.status === 'needs-approval'
     const waiting = routine.status === 'queued'
@@ -104,9 +109,10 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
                     <p className="mt-1 text-14 text-muted-foreground">
                         {routine.schedule}
                         {routine.nextRunAt !== null && !routine.paused && ` · next ${formatTime(routine.nextRunAt)}`}
+                        {routine.mascotId && ` · runs as ${mascot.name}`}
                     </p>
                 </div>
-                <Berry mood={moodFor(routine.status)} size={64} className="shrink-0" />
+                <Berry mood={moodFor(routine.status)} size={64} mascot={mascot} className="shrink-0" />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">

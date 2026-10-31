@@ -26,7 +26,8 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     settings: 'Settings',
     downloads: 'Downloads',
     gallery: 'Component gallery',
-    history: 'History'
+    history: 'History',
+    flock: 'Your flock'
 }
 
 // Internal pages have no address worth editing, so the field starts empty there.

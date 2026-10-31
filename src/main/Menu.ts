@@ -197,6 +197,10 @@ export class AppMenu {
             accelerator: "CmdOrCtrl+Y",
             click: () => this.mainWindow.openPage("history"),
           },
+          {
+            label: "Flock",
+            click: () => this.mainWindow.openPage("flock"),
+          },
         ],
       },
     ];

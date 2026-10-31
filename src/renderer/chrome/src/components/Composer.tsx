@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowUp, Plus, Square } from 'lucide-react'
+import type { MascotProfile } from '@shared/library'
 import { cn } from '@common/lib/utils'
+import { MascotChip, MascotPerch } from './MascotPerch'
 
 // The one input for talking to Berry, on the new tab page, the main chat and the chat panel.
 export const Composer: React.FC<{
@@ -23,8 +25,12 @@ export const Composer: React.FC<{
     onSend: () => void
     // While a reply is running, the send button stops it.
     onStop?: () => void
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, canSend, onSend, onStop }) => {
+    // Who this goes to. With `onChooseMascot`, pressing it opens the flock. Without, it just says who.
+    mascot?: MascotProfile
+    onChooseMascot?: (id: string) => void
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, canSend, onSend, onStop, mascot, onChooseMascot }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const [choosing, setChoosing] = useState(false)
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current
@@ -47,6 +53,19 @@ export const Composer: React.FC<{
                 "transition-colors focus-within:border-muted-foreground/30"
             )}
         >
+            {choosing && mascot && onChooseMascot && (
+                <div className="mb-2 cursor-default">
+                    <MascotPerch
+                        selectedId={mascot.id}
+                        onChoose={(id) => {
+                            onChooseMascot(id)
+                            setChoosing(false)
+                            textareaRef.current?.focus()
+                        }}
+                        onClose={() => setChoosing(false)}
+                    />
+                </div>
+            )}
             {attachment && <div className="mb-1 cursor-default">{attachment}</div>}
             <div className="flex items-end gap-1">
                 <textarea
@@ -61,6 +80,9 @@ export const Composer: React.FC<{
                     onKeyDown={onKeyDown}
                     className="flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none placeholder:text-muted-foreground"
                 />
+                {mascot && (
+                    <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
+                )}
                 <button
                     type="button"
                     aria-label={addLabel ?? 'Add to chat'}
@@ -107,7 +129,9 @@ export const ChatComposer: React.FC<{
     // Text to add to whatever is already being written. It's never sent without the user.
     draft?: string | null
     onDraftTaken?: () => void
-}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus, draft, onDraftTaken }) => {
+    mascot?: MascotProfile
+    onChooseMascot?: (id: string) => void
+}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus, draft, onDraftTaken, mascot, onChooseMascot }) => {
     const [value, setValue] = useState('')
     const [focusKey, setFocusKey] = useState(0)
 
@@ -152,6 +176,8 @@ export const ChatComposer: React.FC<{
             canSend={!disabled && value.trim().length > 0}
             onSend={send}
             onStop={onStop}
+            mascot={mascot}
+            onChooseMascot={onChooseMascot}
         />
     )
 }

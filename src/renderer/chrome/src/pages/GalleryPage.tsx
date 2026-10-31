@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Pin, Star } from 'lucide-react'
+import type { MascotProfile } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
@@ -15,6 +16,10 @@ import { PageTrouble } from '../components/PageTrouble'
 import { TabIcon } from '../components/TabIcon'
 import { HistoryRow } from './HistoryPage'
 import { ChatRow } from '../components/Sidebar'
+import { MascotPerch } from '../components/MascotPerch'
+import { MascotCard, Preview } from './FlockPage'
+import { mascotForm } from '../flockView'
+import { ACCESSORIES, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
@@ -26,6 +31,16 @@ import { DownloadsProgress } from '../components/DownloadsButton'
 import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
+
+const SAMPLE_MASCOT: MascotProfile = {
+    id: 'gallery-mascot',
+    name: 'Scout',
+    look: { palette: 'kingfisher', accessory: 'cap' },
+    instructions: 'Reads pull requests and tells me what needs me.',
+    sites: ['github.com'],
+    tools: ['visit'],
+    deletedAt: null
+}
 
 const SAMPLE_STEPS = [
     { text: 'Opened norrskenair.com', done: true },
@@ -133,6 +148,44 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
+                <Section title="The flock">
+                    <div className="grid grid-cols-3 gap-4">
+                        {PALETTES.map(({ id, label }, index) => {
+                            const look = { palette: id, accessory: ACCESSORIES[index % ACCESSORIES.length].id }
+                            return (
+                                <figure key={id} className="flex flex-col items-center gap-2 p-4 rounded-card bg-muted">
+                                    <Mascot look={look} size={96} still={still} />
+                                    <div className="flex flex-wrap justify-center items-end gap-1">
+                                        {MOODS.map((mood) => (
+                                            <Mascot key={mood} look={look} mood={mood} size={36} still={still} />
+                                        ))}
+                                    </div>
+                                    <div className="flex items-end gap-3">
+                                        {ACCESSORIES.map(({ id: accessory }) => (
+                                            <Mascot key={accessory} look={{ palette: id, accessory }} size={24} still={still} />
+                                        ))}
+                                    </div>
+                                    <div className="flex items-end gap-3">
+                                        {ACCESSORIES.map(({ id: accessory }) => (
+                                            <Mascot key={accessory} look={{ palette: id, accessory }} size={16} still={still} />
+                                        ))}
+                                    </div>
+                                    <figcaption className="text-12 text-muted-foreground">{label}</figcaption>
+                                </figure>
+                            )
+                        })}
+                    </div>
+                    <div className="mt-4 max-w-xl p-2 rounded-composer border bg-surface">
+                        <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} onClose={() => undefined} />
+                    </div>
+                    <div className="mt-20 max-w-[248px]">
+                        <ul><MascotCard mascot={SAMPLE_MASCOT} landed={false} onEdit={() => undefined} /></ul>
+                    </div>
+                    <div className="mt-4 max-w-[288px]">
+                        <Preview values={mascotForm(SAMPLE_MASCOT)} mood="curious" onMood={() => undefined} flying={false} />
+                    </div>
+                </Section>
+
                 <Section title="Art blueberry">
                     <div className="relative h-72 rounded-panel overflow-hidden">
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
@@ -167,8 +220,8 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Chat in the sidebar">
                     <ul className="max-w-xs">
-                        <ChatRow chat={{ id: 'gallery-1', title: 'Long weekend in Lisbon', updatedAt: Date.now() }} selected={false} onOpen={() => undefined} />
-                        <ChatRow chat={{ id: 'gallery-2', title: 'The open chat', updatedAt: Date.now() }} selected onOpen={() => undefined} />
+                        <ChatRow chat={{ id: 'gallery-1', title: 'Long weekend in Lisbon', updatedAt: Date.now(), mascotId: null }} selected={false} onOpen={() => undefined} />
+                        <ChatRow chat={{ id: 'gallery-2', title: 'The open chat', updatedAt: Date.now(), mascotId: null }} selected onOpen={() => undefined} />
                     </ul>
                 </Section>
 

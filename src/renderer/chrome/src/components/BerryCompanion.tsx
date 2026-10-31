@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { Mood } from '@common/components/Mascot'
 import { useBrowser } from '../contexts/BrowserContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
+import { BERRY_ID } from '@shared/mascots'
 import { Berry } from './Berry'
 
 // Drawn at one size and scaled, so it keeps the full drawing wherever it lands.
@@ -9,8 +11,8 @@ const BASE_SIZE = 112
 // How far down the drawing Berry's seat is in the sitting pose.
 const SEAT = 46 / 64
 const HOME_SIZE = 112
-// Clear of the composer's text, which starts on the left.
-const HOME_INSET = 150
+// Between the composer's text, which starts on the left, and its controls on the right.
+const HOME_INSET = 250
 // Small enough to fit within the row above the tab, and clear of the tab's close button.
 const TAB_SIZE = 36
 const TAB_INSET = 50
@@ -77,6 +79,11 @@ const flightPath = (from: Target, to: Target) => {
 export const BerryCompanion: React.FC = () => {
     const { settings } = useShell()
     const { activeTab } = useBrowser()
+    const { chats } = useLibrary()
+    const { find, chosen } = useFlock()
+    // Whoever is working here, or an open chat's own, or else whoever the next chat goes to.
+    const working = activeTab?.workingMascotId ?? (activeTab?.page === 'chat' && activeTab.pageParam ? chats.find((chat) => chat.id === activeTab.pageParam)?.mascotId ?? BERRY_ID : null)
+    const mascot = working ? find(working) : chosen
     const box = useRef<HTMLDivElement>(null)
     const body = useRef<HTMLDivElement>(null)
     const landed = useRef<{ element: HTMLElement; target: Target; tabId: string | undefined } | null>(null)
@@ -204,7 +211,7 @@ export const BerryCompanion: React.FC = () => {
         >
             <div ref={body} className={atSpot || mood === 'sitting' ? 'pointer-events-auto' : undefined} style={{ transformOrigin: `50% ${SEAT * 100}%` }}>
                 <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
-                    <Berry mood={mood} size={BASE_SIZE} />
+                    <Berry mood={mood} size={BASE_SIZE} mascot={mascot} />
                 </div>
             </div>
         </div>

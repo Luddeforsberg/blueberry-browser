@@ -56,6 +56,8 @@ export const CHANNEL_REGIONS: {
   "routines:stop": ["chrome"],
   "routines:runs": ["chrome"],
   "routines:mark-seen": ["chrome"],
+  "mascots:save": ["chrome"],
+  "mascots:delete": ["chrome"],
   "downloads:list": ["chrome"],
   "downloads:act": ["chrome"],
   "downloads:choose-folder": ["chrome"],

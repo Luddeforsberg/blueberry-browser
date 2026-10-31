@@ -125,6 +125,52 @@ describe("streamReply", () => {
   });
 });
 
+describe("a mascot's limits and approvals", () => {
+  const click = (extra: Partial<PageTool>, run = vi.fn(async () => "clicked")): PageTool => ({
+    name: "click",
+    description: "Click",
+    schema: z.object({}),
+    label: () => "Clicked",
+    describe: async () => "Click Delete",
+    isRisky: async () => true,
+    run,
+    ...extra,
+  });
+  const clicking = () =>
+    fakeModel()
+      .respond(new AIMessage({ content: "", tool_calls: [{ name: "click", args: {}, id: "call-1" }] }))
+      .respond(new AIMessage({ content: "done" })) as unknown as BaseChatModel;
+  const reply = (tool: PageTool, approve: () => Promise<boolean>, mode: "risky" | "always" | "never" = "risky") =>
+    collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode }, clicking()));
+
+  it("still asks before a risky action on a site it's allowed, and does nothing if told no", async () => {
+    const run = vi.fn(async () => "clicked");
+    const approve = vi.fn(async () => false);
+    await reply(click({ refuses: async () => null }, run), approve);
+    expect(approve).toHaveBeenCalledWith("Click Delete");
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("refuses off its sites without a card, in every mode, and nothing runs", async () => {
+    for (const mode of ["risky", "always", "never"] as const) {
+      const run = vi.fn(async () => "clicked");
+      const approve = vi.fn(async () => true);
+      await reply(click({ refuses: async () => ({ label: "Stayed off example.com", message: "Not allowed" }) }, run), approve, mode);
+      expect(approve).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    }
+  });
+
+  it("doesn't let a limit passing late skip the card", async () => {
+    // Refused when the card was decided on, allowed by the time it runs: it must not go ahead unasked.
+    let checks = 0;
+    const run = vi.fn(async () => "clicked");
+    const approve = vi.fn(async () => true);
+    await reply(click({ refuses: async () => (checks++ === 0 ? { label: "x", message: "x" } : null) }, run), approve);
+    expect(run).not.toHaveBeenCalled();
+  });
+});
+
 describe("streamReply with a tool that returns an image", () => {
   const screenshot = (result: string): PageTool => ({
     name: "screenshot",

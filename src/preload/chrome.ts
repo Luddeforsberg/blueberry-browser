@@ -97,6 +97,10 @@ const chromeAPI: ChromeAPI = {
     getRuns: (id) => invoke("routines:runs", id),
     markSeen: () => invoke("routines:mark-seen"),
   },
+  mascots: {
+    save: (id, draft) => invoke("mascots:save", id, draft),
+    delete: (id) => invoke("mascots:delete", id),
+  },
   downloads: {
     list: () => invoke("downloads:list"),
     act: (id, action) => invoke("downloads:act", id, action),

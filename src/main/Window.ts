@@ -10,7 +10,8 @@ import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
 import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
-import { confirmDeleteRoutine, notifyRoutine } from "./routineNotices";
+import { confirmDeleteMascot, confirmDeleteRoutine, notifyRoutine } from "./routineNotices";
+import type { MascotStore } from "./MascotStore";
 import { generateTitle, streamReply } from "./agent";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
@@ -34,17 +35,19 @@ import type {
   InternalPage,
   LayoutMode,
   ResizablePanel,
+  MascotSaveResult,
   Settings,
   TabInfo,
   ThemeState,
   Visit,
 } from "../shared/ipc";
 import type { ChatThread, LibrarySnapshot } from "../shared/library";
+import { BERRY } from "../shared/mascots";
 
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -96,6 +99,7 @@ export class Window {
     private readonly bookmarkStore: BookmarkStore,
     private readonly pinnedStore: BookmarkStore,
     routineStore: RoutineStore,
+    private readonly mascotStore: MascotStore,
     readonly downloads: Downloads,
     readonly sitePermissions: SitePermissions,
     private readonly history: HistoryStore,
@@ -172,17 +176,18 @@ export class Window {
         sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
       },
       onListChanged: () => this.broadcast("library:updated", this.librarySnapshot),
-      onWorkingTabs: (working) => {
+      onWorkingTabs: (working, mascots) => {
         // A reply stopped by the window closing ends after the window has gone.
         if (this._baseWindow.isDestroyed()) return;
         const { layout } = this;
         this.allTabs.forEach((tab) => {
           tab.setBerryWorking(working.has(tab));
+          tab.workingMascotId = mascots.get(tab) ?? null;
           this.placeTab(tab, layout);
         });
         this.notifyTabs();
       },
-    });
+    }, (id) => this.mascotStore.resolve(id));
 
     this.routines = new Routines(routineStore, this.chats, {
       onChanged: () => this.broadcast("library:updated", this.librarySnapshot),
@@ -240,6 +245,8 @@ export class Window {
       if (/^https?:/i.test(url)) {
         // A page behind the current one, perhaps one Berry is using, doesn't get to come to the front.
         const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
+        // A limited mascot's click can't open what it couldn't go to.
+        if (opener?.refusesNavigation(url)) return { action: "deny" };
         if (opener && opener.id !== this.activeTabId) this.chats.notePopup(opener.id, this.createBackgroundTab(url).id);
         else this.createTab(url);
       }
@@ -287,8 +294,9 @@ export class Window {
     return {
       pinned: this.pinnedStore.get(),
       bookmarks: this.bookmarkStore.get(),
-      chats: this.chatStore.summaries(),
+      chats: this.chatStore.summaries().map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id) })),
       routines: this.routines.list(),
+      mascots: this.mascotStore.all(),
     };
   }
 
@@ -335,6 +343,7 @@ export class Window {
       isActive: this.activeTabId === tab.id,
       isLoading: tab.isLoading,
       berryWorking: tab.berryWorking,
+      workingMascotId: tab.workingMascotId,
       canGoBack: tab.canGoBack,
       canGoForward: tab.canGoForward,
       zoomPercent: tab instanceof Tab ? this.siteZoom.percent(tab.url) : 100,
@@ -720,6 +729,24 @@ export class Window {
     const routine = this.routines.list().find((candidate) => candidate.id === id);
     if (!routine || !(await confirmDeleteRoutine(this._baseWindow, routine.name))) return false;
     return this.routines.delete(id);
+  }
+
+  saveMascot(id: string | null, draft: unknown): MascotSaveResult {
+    const result = this.mascotStore.save(id, draft);
+    if (result.ok) this.broadcast("library:updated", this.librarySnapshot);
+    return result;
+  }
+
+  // Its routines pause rather than move to Berry, which could do more than the user set them up to.
+  async confirmDeleteMascot(id: string): Promise<boolean> {
+    const mascot = this.mascotStore.find(id);
+    if (!mascot || mascot.id === BERRY.id || mascot.deletedAt !== null) return false;
+    const runs = this.routines.list().filter((routine) => routine.mascotId === id);
+    if (!(await confirmDeleteMascot(this._baseWindow, mascot.name, runs.length))) return false;
+    if (!this.mascotStore.delete(id)) return false;
+    runs.forEach((routine) => this.routines.setPaused(routine.id, true));
+    this.broadcast("library:updated", this.librarySnapshot);
+    return true;
   }
 
   toggleBookmark(): void {

@@ -7,10 +7,12 @@ import {
 } from "./agent";
 import { randomUUID } from "crypto";
 import { createPageTools, type PageTool, type PageToolAccess } from "./browserTools";
+import { mascotNote } from "./mascotNote";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, MascotProfile } from "../shared/library";
+import { BERRY, siteAllowed } from "../shared/mascots";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
@@ -69,6 +71,7 @@ interface Run {
   breakBeforeText: boolean;
   approval: (ChatApproval & { answer: (allow: boolean, text?: string) => void }) | null;
   tabs: Set<Tab>;
+  mascot: MascotProfile;
   // Set for a task, which belongs to its caller rather than to a saved chat.
   onChange?: () => void;
 }
@@ -93,7 +96,8 @@ export interface ChatEvents {
   onChunk: (chatId: string, content: string) => void;
   onThread: (thread: ChatThread) => void;
   onListChanged: () => void;
-  onWorkingTabs: (tabs: Set<Tab>) => void;
+  // `mascots` says who is working in a tab, where it's a mascot other than Berry.
+  onWorkingTabs: (tabs: Set<Tab>, mascots: Map<Tab, string>) => void;
 }
 
 // Every conversation with the model, whichever screen it's on. Replies are saved once they end.
@@ -114,11 +118,14 @@ export class Chats {
       closeTab: (tabId: string) => boolean;
       actionApproval: () => ActionApproval;
     },
-    private readonly events: ChatEvents
+    private readonly events: ChatEvents,
+    // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
+    private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY
   ) {}
 
   // These open behind the chat, so the approval cards and the reply stay in front of the user.
   private ownTabTools(chatId: string, run: Run, onUse: (tab: Tab) => void): PageTool[] {
+    const limits = run.mascot.id === BERRY.id ? undefined : run.mascot;
     const ids = this.ownTabs.get(chatId) ?? new Set<string>();
     this.ownTabs.set(chatId, ids);
     const allTabs = () => this.browser.allTabs().filter((tab) => ids.has(tab.id));
@@ -133,6 +140,7 @@ export class Chats {
       canSee: () => true,
       onUse,
       ownsEveryTab: true,
+      limits,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
@@ -181,17 +189,26 @@ export class Chats {
     };
   }
 
-  // Starts a chat when `chatId` is null. The reply follows through the events.
-  send(chatId: string | null, text: string, { seePage }: { seePage: boolean }): ChatThread | null {
+  isRunning(chatId: string): boolean {
+    return this.runs.has(chatId);
+  }
+
+  // Starts a chat when `chatId` is null, as `mascotId` if it's given. An existing chat stays with its own mascot.
+  // The reply follows through the events.
+  send(chatId: string | null, text: string, { seePage, mascotId }: { seePage: boolean; mascotId?: string | null }): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
     if (chatId && (!this.store.chat(chatId) || this.runs.has(chatId))) return null;
 
-    const id = chatId ?? this.store.createChat(titleFrom(message));
+    // The renderer's choice is checked here, so nothing but a mascot in the flock can start a chat.
+    const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
+    if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
+    const id = chatId ?? this.store.createChat(titleFrom(message), chosen);
+    const mascot = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set() };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), mascot };
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
@@ -235,7 +252,7 @@ export class Chats {
   private async reply(chatId: string, run: Run, seePage: boolean): Promise<void> {
     const { signal } = run.controller;
     try {
-      const messages = await this.withNewestPage(chatId, seePage);
+      const messages = await this.withNewestPage(chatId, seePage, run.mascot);
       const onUse = (tab: Tab) => {
         run.tabs.add(tab);
         this.publishWorkingTabs();
@@ -250,6 +267,7 @@ export class Chats {
               onUse,
               closeTab: (tab) => this.closeRunTab(run, tab),
               ask: (question) => this.askQuestion(chatId, run, question),
+              limits: run.mascot.id === BERRY.id ? undefined : run.mascot,
             })
           : this.ownTabTools(chatId, run, onUse);
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
@@ -287,6 +305,7 @@ export class Chats {
       approve: (text) => this.askToAllow(id, run, text),
       onStep: (text) => this.startStep(id, run, text),
       onUsage,
+      mascotNote: run.mascot.id === BERRY.id ? undefined : mascotNote(run.mascot),
     })) {
       const content = run.breakBeforeText ? `\n\n${words}` : words;
       run.breakBeforeText = false;
@@ -297,7 +316,7 @@ export class Chats {
 
   // Runs one message as a chat with no page would, with the same tools and the same approvals, under an id of the
   // caller's. Nothing is saved here. `stop` and `decide` take that id. Never rejects.
-  async runTask(id: string, message: string, onProgress: (progress: TaskProgress) => void): Promise<TaskResult> {
+  async runTask(id: string, message: string, onProgress: (progress: TaskProgress) => void, mascotId: string | null = null): Promise<TaskResult> {
     let tokens = 0;
     const run: Run = {
       controller: new AbortController(),
@@ -306,6 +325,7 @@ export class Chats {
       breakBeforeText: false,
       approval: null,
       tabs: new Set(),
+      mascot: this.mascotOf(mascotId),
       onChange: () =>
         onProgress({
           steps: run.steps.map((step) => ({ ...step })),
@@ -344,7 +364,9 @@ export class Chats {
   }
 
   private publishWorkingTabs(): void {
-    this.events.onWorkingTabs(new Set([...this.runs.values()].flatMap((run) => [...run.tabs])));
+    const runs = [...this.runs.values()];
+    const mascots = new Map(runs.filter((run) => run.mascot.id !== BERRY.id).flatMap((run) => [...run.tabs].map((tab) => [tab, run.mascot.id] as const)));
+    this.events.onWorkingTabs(new Set(runs.flatMap((run) => [...run.tabs])), mascots);
   }
 
   private publish(chatId: string, run: Run): void {
@@ -417,17 +439,18 @@ export class Chats {
   }
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.
-  private async withNewestPage(chatId: string, seePage: boolean): Promise<ReplyMessage[]> {
+  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile): Promise<ReplyMessage[]> {
     const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
-    const page = seePage ? await this.readPage() : null;
+    const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
     if (!page || !newest || typeof newest.content !== "string") return messages;
     return [...messages.slice(0, -1), { role: "user", content: withPage(newest.content, page) }];
   }
 
-  private async readPage(): Promise<Page | null> {
+  private async readPage(mascot: MascotProfile): Promise<Page | null> {
     const tab = this.pageAccess ? this.activeTab : null;
-    if (!tab) return null;
+    // A mascot's limit covers the page that goes with a message too.
+    if (!tab || !siteAllowed(tab.url, mascot.sites)) return null;
 
     const [screenshot, text] = await Promise.all([
       tab.screenshot().then(
@@ -443,7 +466,7 @@ export class Chats {
       }),
     ]);
     // "Can see" may have been switched off while the page was being read, so nothing read goes out.
-    return this.pageAccess ? { url: tab.url, text, screenshot } : null;
+    return this.pageAccess && siteAllowed(tab.url, mascot.sites) ? { url: tab.url, text, screenshot } : null;
   }
 
   // The "Can see" toggle. Off means no page text or screenshot goes with a message.

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowRight, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { ArrowRight, Bird, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import { BerryDot } from '@common/components/Mascot'
-import { useLibrary } from '../contexts/LibraryContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Favicon } from '../components/Favicon'
 import { useAssistantName } from '../components/Berry'
@@ -29,13 +29,14 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const browser = window.chromeAPI.browser
     const library = useLibrary()
     const { layout, theme } = useShell()
+    const { chosen, choose } = useFlock()
 
     useEffect(() => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))
     }, [browser])
 
     const askBerry = async (message: string) => {
-        const chat = await window.chromeAPI.chat.send(null, message, { seePage: false })
+        const chat = await window.chromeAPI.chat.send(null, message, { seePage: false, mascotId: chosen.id })
         if (!chat) return
         await browser.openPage('chat', { param: chat.id, title: chat.title })
         await browser.closeTab(tab.id)
@@ -58,12 +59,13 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         submit(e.metaKey || e.ctrlKey)
     }
 
-    const name = useAssistantName()
-    const isBerry = name === 'Berry'
+    const name = useAssistantName(chosen)
+    const isBerry = name !== 'Assistant'
 
     const TRAY = [
         { label: 'Routines', Icon: RefreshCw, onClick: () => browser.openPage('routines') },
-        { label: 'New chat', Icon: MessageCircle, onClick: () => browser.openPage('chat') }
+        { label: 'New chat', Icon: MessageCircle, onClick: () => browser.openPage('chat') },
+        { label: 'Flock', Icon: Bird, onClick: () => browser.openPage('flock') }
     ]
 
     const IDEAS = [
@@ -121,8 +123,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
                     <div data-berry-home className="relative z-10 rounded-composer">
                         <Composer
-                            label={`Search, enter a URL, or ask ${isBerry ? 'Berry' : 'a question'}`}
-                            placeholder={isBerry ? 'Ask Berry anything, or enter a URL…' : 'Ask anything, or enter a URL…'}
+                            label={`Search, enter a URL, or ask ${isBerry ? name : 'a question'}`}
+                            placeholder={isBerry ? `Ask ${name} anything, or enter a URL…` : 'Ask anything, or enter a URL…'}
                             value={text}
                             onChange={setText}
                             onKeyDown={handleKeyDown}
@@ -130,6 +132,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             autoFocus
                             canSend={text.trim().length > 0}
                             onSend={() => submit(false)}
+                            mascot={chosen}
+                            onChooseMascot={choose}
                         />
                     </div>
                     {/* The sidebar holds these when it's open. */}

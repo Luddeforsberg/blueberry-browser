@@ -10,6 +10,8 @@ export interface RoutineFormValues {
     date: string
     days: number[]
     day: number
+    // Who runs it. Null is Berry.
+    mascotId: string | null
 }
 
 export type RoutinesView =
@@ -21,7 +23,7 @@ const pad = (value: number) => String(value).padStart(2, '0')
 
 const dateValue = (at: Date) => `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`
 
-export const blankForm = (name = '', instructions = ''): RoutineFormValues => {
+export const blankForm = (name = '', instructions = '', mascotId: string | null = null): RoutineFormValues => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
     return {
@@ -32,12 +34,13 @@ export const blankForm = (name = '', instructions = ''): RoutineFormValues => {
         time: '09:00',
         date: dateValue(tomorrow),
         days: [tomorrow.getDay()],
-        day: tomorrow.getDate()
+        day: tomorrow.getDate(),
+        mascotId
     }
 }
 
-export const formFor = ({ id, name, instructions, scheduleSpec: schedule }: Routine): RoutineFormValues => {
-    const values: RoutineFormValues = { ...blankForm(name, instructions), id, kind: schedule.kind }
+export const formFor = ({ id, name, instructions, mascotId, scheduleSpec: schedule }: Routine): RoutineFormValues => {
+    const values: RoutineFormValues = { ...blankForm(name, instructions, mascotId), id, kind: schedule.kind }
     if (schedule.kind === 'once') {
         const at = new Date(schedule.at)
         return { ...values, date: dateValue(at), time: `${pad(at.getHours())}:${pad(at.getMinutes())}` }
@@ -47,7 +50,7 @@ export const formFor = ({ id, name, instructions, scheduleSpec: schedule }: Rout
     return { ...values, time: schedule.time }
 }
 
-export const toDraft = ({ name, instructions, kind, time, date, days, day }: RoutineFormValues): RoutineDraft => {
+export const toDraft = ({ name, instructions, kind, time, date, days, day, mascotId }: RoutineFormValues): RoutineDraft => {
     const schedule = (): RoutineSchedule => {
         switch (kind) {
             case 'once':
@@ -60,7 +63,7 @@ export const toDraft = ({ name, instructions, kind, time, date, days, day }: Rou
                 return { kind, day, time }
         }
     }
-    return { name, instructions, schedule: schedule() }
+    return { name, instructions, schedule: schedule(), mascotId }
 }
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.

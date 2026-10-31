@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, LibrarySnapshot, RoutineDraft, RoutineRun } from "./library";
+import type { ChatThread, LibrarySnapshot, MascotDraft, RoutineDraft, RoutineRun } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -13,7 +13,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -157,6 +157,8 @@ export interface TabInfo {
   isLoading: boolean;
   // A running reply has used this tab, and hasn't finished yet.
   berryWorking: boolean;
+  // Who is working in it, if a mascot other than Berry is.
+  workingMascotId: string | null;
   canGoBack: boolean;
   canGoForward: boolean;
   zoomPercent: number;
@@ -185,6 +187,14 @@ export interface ChatChunk {
 }
 
 export type RoutineSaveResult = { ok: true; id: string } | { ok: false; error: string };
+
+export type MascotSaveResult = { ok: true; id: string } | { ok: false; error: string };
+
+// `mascotId` picks who a new chat runs as. An existing chat keeps the one it started with.
+export interface ChatSendOptions {
+  seePage: boolean;
+  mascotId?: string | null;
+}
 
 // Renderer asks, main answers. `region` names the views main accepts the call from.
 export interface InvokeChannels {
@@ -233,7 +243,7 @@ export interface InvokeChannels {
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
   "chat:send": {
     region: "chrome";
-    args: [chatId: string | null, text: string, options: { seePage: boolean }];
+    args: [chatId: string | null, text: string, options: ChatSendOptions];
     result: ChatThread | null;
   };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
@@ -258,6 +268,9 @@ export interface InvokeChannels {
   "routines:stop": { region: "chrome"; args: [runId: string]; result: boolean };
   "routines:runs": { region: "chrome"; args: [id: string]; result: RoutineRun[] };
   "routines:mark-seen": { region: "chrome"; args: []; result: void };
+  "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft]; result: MascotSaveResult };
+  // Asks first, in main.
+  "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
   "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
   "downloads:act": { region: "chrome"; args: [id: string, action: DownloadAction]; result: boolean };
   "downloads:choose-folder": { region: "chrome"; args: []; result: void };
@@ -345,7 +358,7 @@ export interface SettingsAPI {
 
 export interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
-  send: (chatId: string | null, text: string, options: { seePage: boolean }) => Promise<ChatThread | null>;
+  send: (chatId: string | null, text: string, options: ChatSendOptions) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
   decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => Promise<boolean>;
   rename: (chatId: string, title: string) => Promise<boolean>;
@@ -386,6 +399,11 @@ export interface RoutinesAPI {
   markSeen: () => Promise<void>;
 }
 
+export interface MascotsAPI {
+  save: (id: string | null, draft: MascotDraft) => Promise<MascotSaveResult>;
+  delete: (id: string) => Promise<boolean>;
+}
+
 export interface DownloadsAPI {
   list: () => Promise<DownloadInfo[]>;
   act: (id: string, action: DownloadAction) => Promise<boolean>;
@@ -413,6 +431,7 @@ export interface ChromeAPI {
   chat: ChatAPI;
   find: FindAPI;
   routines: RoutinesAPI;
+  mascots: MascotsAPI;
   downloads: DownloadsAPI;
   permissions: PermissionsAPI;
 }
