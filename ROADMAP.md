@@ -35,21 +35,22 @@ Berry has 9 tools today: `list_tabs`, `read_page`, `find_in_page`, `list_element
 | Work | State |
 |---|---|
 | Real routines: create, schedule, run, run history. Replaces the last sample data | Next |
-| Companions: saved assistants with their own instructions and files | After routines |
-| Editable memory | With companions |
+| Saved briefs: reusable setups with editable instructions and files. A full companion builder and automatic memory wait until people ask for them | After the agent stage |
 | Ask about selected text, chosen tabs, PDFs and attachments, with answers linking to their sources | After routines |
 
 Not planned before stage 5: app connections, extensions, meeting notes, generated slides. We can add one later if it serves the audience we choose.
 
 ### 4. Why people switch
 
-Decided from [docs/STRATEGY.md](./docs/STRATEGY.md), which covers where Strawberry falls short, who we're for and how we show it. Candidates so far:
+We're building for **general power users**: people who already hand real work to an AI and are tired of checking it. [docs/STRATEGY.md](./docs/STRATEGY.md) has the research. Strawberry's clearest weakness in it is the time spent supervising and checking agents, so we win on trust and less checking.
 
-- Tasks that survive a closed window or a lost connection, where Strawberry's routines wait until the browser reopens.
-- Results with a receipt: what changed, what was skipped and how it was checked.
-- Teaching a routine by doing it once, then testing it before it's scheduled.
-- Help from your phone: approvals and sign-ins while you're away.
-- Deadlines and budgets that change how Berry works, with useful partial results.
+| Work | State |
+|---|---|
+| Evidence workbook: every cell in a result opens its source, and conflicts and gaps stay flagged | Right after saved briefs |
+| Exception inbox: Berry finishes what it can, queues what's blocked with the reason, and resumes only those | After the workbook |
+| Task budgets: a spending limit and deadline, with useful partial results | After the inbox |
+
+Still candidates, not scheduled: tasks that survive a closed window, explicit task boundaries, safe batch changes, teaching a routine by doing it once, deadlines that change how Berry works, and help from your phone (Perplexity already offers phone approvals).
 
 ### 5. Ready for other people
 
