@@ -53,6 +53,7 @@ describe("whether an address with a query asks in the default mode", () => {
     ["a form anyone can publish on Google", "https://docs.google.com/forms/d/abc/formResponse?entry.1=jet", true],
     ["a redirect on a listed site", "https://www.google.com/url?q=https://evil.example/", true],
     ["another page on a listed site", "https://www.youtube.com/redirect?q=https://evil.example/", true],
+    ["a host named like an object's built-in property", "http://constructor/?q=jet", true],
     ["a listed site without www", "https://youtube.com/results?search_query=jet", false],
   ])("%s", async (_, url, expected) => {
     expect(await asks(url)).toBe(expected);

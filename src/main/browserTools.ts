@@ -178,19 +178,20 @@ const carriesData = (url: string): boolean => {
 
 // The search pages where a short query is an ordinary search, by exact host and path. Anything wider lets data out:
 // script.google.com and docs.google.com/forms run what anyone publishes, and most big sites have an open redirect.
-const SEARCH_PAGES: Record<string, string> = {
-  "www.youtube.com": "/results",
-  "m.youtube.com": "/results",
-  "www.google.com": "/search",
-  "www.bing.com": "/search",
-  "duckduckgo.com": "/",
-  "github.com": "/search",
-  "www.reddit.com": "/search",
-  "www.amazon.com": "/s",
+const SEARCH_PAGES = new Map([
+  ["www.youtube.com", "/results"],
+  ["m.youtube.com", "/results"],
+  ["www.google.com", "/search"],
+  ["www.bing.com", "/search"],
+  ["duckduckgo.com", "/"],
+  ["github.com", "/search"],
+  ["www.reddit.com", "/search"],
+  ["www.amazon.com", "/s"],
+]);
+const isSearchPage = ({ hostname, pathname }: URL): boolean => {
+  if (hostname.endsWith(".wikipedia.org")) return pathname === "/w/index.php";
+  return (SEARCH_PAGES.get(hostname) ?? SEARCH_PAGES.get(`www.${hostname}`)) === pathname;
 };
-const isSearchPage = ({ hostname, pathname }: URL): boolean =>
-  pathname.replace(/\/$/, "") === (SEARCH_PAGES[hostname] ?? SEARCH_PAGES[`www.${hostname}`] ?? "?").replace(/\/$/, "") ||
-  (hostname.endsWith(".wikipedia.org") && pathname === "/w/index.php");
 
 const NOT_WEB = "Only http and https addresses can be opened.";
 const STALE_ELEMENT = "That element is no longer on the page. Call list_elements and try again.";
