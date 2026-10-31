@@ -257,8 +257,7 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
-          const loading = tab.loadURL(url).catch((error) => console.error("A page failed to load:", error));
-          await Promise.race([loading, tab.settled()]);
+          await Promise.race([tab.loadURL(url), tab.settled()]);
           return whereNow(tab);
         }),
     }),

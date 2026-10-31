@@ -319,6 +319,27 @@ describe("Chats", () => {
       expect(content).not.toContain("example.com");
     });
 
+    it("say so when an address fails to load, rather than reporting it done", async () => {
+      const failing = {
+        ...tab(),
+        loadURL: async () => {
+          throw new Error("ERR_CONNECTION_REFUSED");
+        },
+        settled: () => new Promise((resolve) => setTimeout(resolve, 5)),
+      } as unknown as Tab;
+      const { chats, replyEnded } = setup(async function* (_, __, { tools }) {
+        yield await tools.find((tool) => tool.name === "go_to")!.run({ url: "https://down.example/" });
+      }, failing);
+
+      const ended = replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      const { content } = chats.thread(id)!.messages.at(-1)!;
+      expect(content).toMatch(/didn't work/);
+      expect(content).not.toMatch(/Done/);
+    });
+
     it("drop what they read if Can see is switched off while reading", async () => {
       let chats: Chats | null = null;
       let reads = 0;
