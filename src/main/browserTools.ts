@@ -118,12 +118,13 @@ export const createPageTools = ({ activeTab, allTabs, openTab, canSee }: PageToo
       return await act(tab);
     } catch (error) {
       console.error("A page tool failed:", error);
-      return `That didn't work on ${tab.url}.`;
+      return canSee() ? `That didn't work on ${tab.url}.` : NO_ACCESS;
     }
   };
 
   const whereNow = async (tab: Tab) => {
     await tab.settled();
+    if (!canSee()) return NO_ACCESS;
     return `Done. Tab ${tab.id} is now at ${tab.url}, titled ${tab.title}.`;
   };
 

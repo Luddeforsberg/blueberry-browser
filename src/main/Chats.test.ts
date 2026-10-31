@@ -292,6 +292,33 @@ describe("Chats", () => {
       expect(content).not.toContain("example.com");
     });
 
+    it("don't report where a page went if Can see is switched off during the action", async () => {
+      let chats: Chats | null = null;
+      const context = setup(
+        async function* (_, __, { tools }) {
+          yield await tools.find((tool) => tool.name === "click")!.run({ ref: "e1" });
+        },
+        {
+          ...tab(),
+          title: "Private title",
+          runInPage: async () => "done",
+          settled: async () => {
+            chats?.setPageAccess(false);
+          },
+        } as unknown as Tab
+      );
+      chats = context.chats;
+
+      const ended = context.replyEnded();
+      const { id } = send(chats, null, "first")!;
+      await ended;
+
+      const { content } = chats.thread(id)!.messages.at(-1)!;
+      expect(content).toMatch(/page access/);
+      expect(content).not.toContain("Private title");
+      expect(content).not.toContain("example.com");
+    });
+
     it("drop what they read if Can see is switched off while reading", async () => {
       let chats: Chats | null = null;
       let reads = 0;
