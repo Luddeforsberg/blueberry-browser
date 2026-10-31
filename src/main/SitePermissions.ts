@@ -124,7 +124,7 @@ export class SitePermissions {
       // An Allow that lasts for one request has to answer exactly one.
       const once = answer.some((name) => ASK_EVERY_TIME.includes(name));
       const same = !once && this.pending.find(
-        (entry) => entry.contents === contents && entry.origin === origin && entry.permissions.join() === answer.join()
+        (entry) => entry.contents === contents && entry.origin === origin && entry.wanted.join() === wanted.join() && entry.permissions.join() === answer.join()
       );
       if (same) {
         same.answers.push(resolve);

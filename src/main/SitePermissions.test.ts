@@ -115,6 +115,17 @@ describe("SitePermissions", () => {
     expect(permissions.promptFor(tab)).toBeNull();
   });
 
+  it("still refuses a blocked part when another request is waiting on the same question", async () => {
+    const { permissions, tab } = setup();
+    permissions.set(SITE, "camera", "allow");
+    const microphone = permissions.request(tab, "media", asked("media", { mediaTypes: ["audio"] }));
+    const both = permissions.request(tab, "media", asked("media", { mediaTypes: ["video", "audio"] }));
+    permissions.set(SITE, "camera", "block");
+    permissions.decide(permissions.promptFor(tab)!.id, true);
+    expect(await microphone).toBe(true);
+    expect(await both).toBe(false);
+  });
+
   it("asks about both when a media request doesn't say which", () => {
     const { permissions, tab } = setup();
     void permissions.request(tab, "media", asked("media", { mediaTypes: [] }));

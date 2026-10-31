@@ -142,7 +142,7 @@ export const readCalls = (app: ElectronApplication): Promise<ModelCall[]> =>
 const FINAL_STEP =
   /\/(checkout|buy|payment|purchase|place-?order|signup|sign-up|register)(\/|\?|$)|\/gp\/buy\/|\/book\.[a-z-]+\.html/i;
 const TEST_SITES =
-  /(saucedemo\.com|herokuapp\.com|demoqa\.com|todomvc\.com|toscrape\.com|127\.0\.0\.1)/;
+  /(^|\.)(saucedemo\.com|herokuapp\.com|demoqa\.com|todomvc\.com|toscrape\.com|127\.0\.0\.1)$/;
 
 // Records what it refused on a global, so the report can say so.
 export const installGuard = (app: ElectronApplication) =>
@@ -157,7 +157,7 @@ export const installGuard = (app: ElectronApplication) =>
         const stop =
           details.resourceType === "mainFrame" &&
           final.test(details.url) &&
-          !test.test(details.url);
+          !test.test(new URL(details.url).hostname);
         if (stop) refused.push(details.url.slice(0, 200));
         callback({ cancel: stop });
       });
