@@ -188,14 +188,24 @@ export class Tab {
   // For as long as `act` runs, the page can't take this tab anywhere `allows` says no to. The user's own use of the tab
   // is left alone outside these moments. Says which addresses it stopped.
   async withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
-    this.navigationLimits.add(allows);
+    // One of its own for each call, because calls can overlap and one ending mustn't lift the other's limit.
+    const limit = (url: string) => allows(url);
+    this.navigationLimits.add(limit);
     this.refused.clear();
     try {
       const result = await act();
       return { result, refused: [...this.refused] };
     } finally {
-      this.navigationLimits.delete(allows);
+      this.navigationLimits.delete(limit);
     }
+  }
+
+  // Opened by a page a limited mascot is acting in, so its first load can't go where the opener couldn't.
+  limitFirstLoadLike(opener: Tab): void {
+    const limits = [...opener.navigationLimits].map((allows) => (url: string) => allows(url));
+    if (limits.length === 0) return;
+    limits.forEach((limit) => this.navigationLimits.add(limit));
+    this.webContents.once("did-stop-loading", () => limits.forEach((limit) => this.navigationLimits.delete(limit)));
   }
 
   // The chrome draws what to do about it, in the space the page leaves.

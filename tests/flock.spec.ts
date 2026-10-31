@@ -24,8 +24,11 @@ test.beforeAll(async () => {
       response.end();
       return;
     }
+    const links: Record<string, string> = {
+      "/popup": `<a target="_blank" href="/redirect">A new tab away</a>`,
+    };
     response.setHeader("content-type", "text/html");
-    response.end(`<!doctype html><title>Page</title><body><a href="http://localhost:${port}/secret-link">A plain link away</a></body>`);
+    response.end(`<!doctype html><title>Page</title><body>${links[request.url ?? ""] ?? `<a href="http://localhost:${port}/secret-link">A plain link away</a>`}</body>`);
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   port = (server.address() as AddressInfo).port;
@@ -97,10 +100,15 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   model.callTools({ name: "list_elements", args: {} });
   model.callTools({ name: "click", args: { ref: "e1" } });
   model.callTools({ name: "open_tab", args: { url: `http://127.0.0.1:${port}/redirect` } });
+  // Nor through a new tab it opens.
+  model.callTools({ name: "open_tab", args: { url: `http://127.0.0.1:${port}/popup` } });
+  model.callTools({ name: "list_elements", args: {} });
+  model.callTools({ name: "click", args: { ref: "e1" } });
   await chrome.getByRole("textbox", { name: "Message" }).fill("Follow the link");
   await chrome.getByRole("textbox", { name: "Message" }).press("Enter");
-  await expect.poll(() => model.requests.at(-1)?.messages.filter((message) => message.role === "tool").length, { timeout: 15_000 }).toBeGreaterThanOrEqual(4);
+  await expect.poll(() => model.requests.at(-1)?.messages.filter((message) => message.role === "tool").length, { timeout: 15_000 }).toBeGreaterThanOrEqual(7);
   await expect(chrome.getByRole("button", { name: "Save as routine" })).toBeVisible({ timeout: 15_000 });
+  await chrome.waitForTimeout(800);
   const tools = JSON.stringify(model.requests.at(-1)?.messages.filter((message) => message.role === "tool"));
   expect(tools).toContain("tried to go to localhost");
   expect(requested).toEqual([]);

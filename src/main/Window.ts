@@ -247,8 +247,10 @@ export class Window {
         const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
         // A limited mascot's click can't open what it couldn't go to.
         if (opener?.refusesNavigation(url)) return { action: "deny" };
-        if (opener && opener.id !== this.activeTabId) this.chats.notePopup(opener.id, this.createBackgroundTab(url).id);
-        else this.createTab(url);
+        const behind = !!opener && opener.id !== this.activeTabId;
+        const popup = behind ? this.createBackgroundTab(url) : this.createTab(url);
+        if (opener) popup.limitFirstLoadLike(opener);
+        if (behind) this.chats.notePopup(opener.id, popup.id);
       }
       return { action: "deny" };
     });
