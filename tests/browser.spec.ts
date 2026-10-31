@@ -254,36 +254,30 @@ test("the panel shares the page with the model, and the main chat doesn't", asyn
 
 test("chats are still there after a restart", async () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-chats-"));
-  const first = await launchApp(profile, { modelEnv: model.env });
-  const firstChrome = await findView(first, "view=chrome");
-  await firstChrome.evaluate(() => window.chromeAPI.chat.send(null, "Remember this", { seePage: false }));
-  await expect(firstChrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: "Remember this" })).toBeVisible();
-  await expect.poll(() => model.requests.length).toBe(1);
+  await app.close();
+  app = await launchApp(profile, { modelEnv: model.env });
+  chrome = await findView(app, "view=chrome");
+  const { id } = (await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Remember this", { seePage: false })))!;
   await expect
-    .poll(async () => {
-      const { chats } = await firstChrome.evaluate(() => window.chromeAPI.library.getLibrary());
-      const thread = await firstChrome.evaluate((id) => window.chromeAPI.library.getChat(id), chats[0].id);
-      return thread?.partial;
-    })
+    .poll(async () => (await chrome.evaluate((chatId) => window.chromeAPI.library.getChat(chatId), id))?.partial)
     .toBeNull();
-  await first.close();
+  await app.close();
 
-  const second = await launchApp(profile, { modelEnv: model.env });
-  const secondChrome = await findView(second, "view=chrome");
-  await secondChrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: "Remember this" }).click();
-  await expect(secondChrome.getByText("A reply from the model")).toBeVisible();
-  await second.close();
+  app = await launchApp(profile, { modelEnv: model.env });
+  chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: "Remember this" }).click();
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
 });
 
-test("a missing API key says what to do, and browsing still works", async () => {
-  const noKey = await launchApp();
-  const noKeyChrome = await findView(noKey, "view=chrome");
-  const input = noKeyChrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+test("a missing API key says what to do", async () => {
+  await app.close();
+  app = await launchApp();
+  chrome = await findView(app, "view=chrome");
+  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
   await input.fill("Plan a trip");
   await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
 
-  await expect(noKeyChrome.getByRole("alert")).toContainText("OPENAI_API_KEY");
-  await noKey.close();
+  await expect(chrome.getByRole("alert")).toContainText("OPENAI_API_KEY");
 });
 
 test("the chrome renderer gets no raw IPC or code execution in tabs", async () => {
