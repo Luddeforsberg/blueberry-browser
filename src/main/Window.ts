@@ -10,6 +10,9 @@ import type { ChatStore } from "./ChatStore";
 import { Chats } from "./Chats";
 import { generateTitle, streamReply } from "./agent";
 import { createChromeView, type ChromeView } from "./chromeView";
+import { FindBar } from "./FindBar";
+import { attachPageMenu, printPage } from "./pageMenu";
+import { SiteZoom } from "./siteZoom";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -52,6 +55,8 @@ const MAC_BUTTONS_HEIGHT = 14;
 const MENU_CLICK_GRACE_MS = 1000;
 
 export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
+// App menu items that only do something on a web page.
+export const WEB_PAGE_MENU_IDS = ["zoom-in", "zoom-in-equals", "zoom-out", "zoom-reset", "print"];
 
 export class Window {
   private _baseWindow: BaseWindow;
@@ -61,6 +66,8 @@ export class Window {
   private closedTabs: TabInfo[] = [];
   private chrome: ChromeView;
   private overlay: ChromeView;
+  readonly findBar: FindBar;
+  readonly siteZoom: SiteZoom;
   private floatingSidebarVisible = false;
   private sidebarOpen = true;
   private chatOpen = false;
@@ -105,6 +112,17 @@ export class Window {
     this._baseWindow.contentView.addChildView(this.overlay.view);
     this.openLinksInTabs(this.overlay.view.webContents);
 
+    this.findBar = new FindBar(this._baseWindow.contentView);
+    this.openLinksInTabs(this.findBar.chromeView.view.webContents);
+    this.siteZoom = new SiteZoom({
+      levels: () => this.settings.siteZoom,
+      save: (siteZoom) => {
+        this.updateSettings({ siteZoom });
+        this.notifyTabs();
+      },
+      tabs: () => this.allTabs,
+    });
+
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
@@ -142,6 +160,7 @@ export class Window {
       this.tabsMap.clear();
       this.chrome.view.webContents.close();
       this.overlay.view.webContents.close();
+      this.findBar.destroy();
     });
   }
 
@@ -240,6 +259,7 @@ export class Window {
       berryWorking: tab.berryWorking,
       canGoBack: tab.canGoBack,
       canGoForward: tab.canGoForward,
+      zoomPercent: tab instanceof Tab ? this.siteZoom.percent(tab.url) : 100,
       page: tab instanceof InternalTab ? tab.page : null,
       pageParam: tab instanceof InternalTab ? tab.param : null,
     };
@@ -328,6 +348,12 @@ export class Window {
     this._baseWindow.contentView.addChildView(tab.view);
     tab.view.setBounds(this.layout.page);
     this.openLinksInTabs(tab.webContents);
+    this.siteZoom.track(tab);
+    attachPageMenu(tab, this._baseWindow, {
+      openTab: (address) => this.createTab(address),
+      askBerry: (text) => this.askBerryAbout(text),
+      assistantName: () => (this.settings.showBerry ? "Berry" : "Assistant"),
+    });
     return tab;
   }
 
@@ -376,6 +402,7 @@ export class Window {
       return false;
     }
 
+    if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
     this.activeTabId = tabId;
     this.chats.releaseTab(tabId);
     this.syncTabViews();
@@ -406,6 +433,52 @@ export class Window {
   private syncTabViews(): void {
     const { onboarded } = this.settings;
     this.allTabs.forEach((tab) => (onboarded && tab.id === this.activeTabId ? tab.show() : tab.hide()));
+    this.findBar.closeUnlessOn(this.findTarget);
+  }
+
+  // Internal pages are drawn by the chrome view, so finding on one searches that.
+  private get findTarget(): WebContents | null {
+    if (!this.settings.onboarded) return null;
+    return this.activeTab?.webContents ?? this.chrome.view.webContents;
+  }
+
+  openFindBar(): void {
+    const target = this.findTarget;
+    if (target) this.findBar.open(target);
+  }
+
+  // With the bar closed there's nothing to step through yet, so this opens it.
+  findStep(forward: boolean): void {
+    if (this.findBar.isOpen) this.findBar.step(forward);
+    else this.openFindBar();
+  }
+
+  zoomActiveTab(direction: 1 | -1): void {
+    if (this.activeTab) this.siteZoom.step(this.activeTab, direction);
+  }
+
+  resetActiveTabZoom(): void {
+    if (this.activeTab) this.siteZoom.reset(this.activeTab);
+  }
+
+  printActiveTab(): void {
+    if (this.activeTab) printPage(this.activeTab.webContents);
+  }
+
+  syncMenu(): void {
+    const menu = Menu.getApplicationMenu();
+    WEB_PAGE_MENU_IDS.forEach((id) => {
+      const item = menu?.getMenuItemById(id);
+      if (item) item.enabled = this.activeTab !== null;
+    });
+  }
+
+  // Puts the text in the panel's composer and leaves sending to the user.
+  private askBerryAbout(text: string): void {
+    this.chatOpen = true;
+    this.updateAllBounds();
+    this.chrome.view.webContents.focus();
+    sendToRenderer(this.chrome.view.webContents, "chat:draft", text);
   }
 
   private chatTabs(chatId: string): InternalTab[] {
@@ -607,12 +680,14 @@ export class Window {
     this.allTabs.forEach((tab) => tab.view.setBounds(layout.page));
     if (layout.floatingSidebar.width === 0) this.hideFloatingSidebar();
     else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
+    this.findBar.setBounds(layout.findBar);
     this.broadcast("layout:updated", layout);
   }
 
   private notifyTabs(): void {
     const active = this.activeEntry;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
+    this.syncMenu();
     this.broadcast("tabs:updated", this.tabInfos);
   }
 
@@ -621,6 +696,7 @@ export class Window {
       this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
     }
     this.broadcast("theme:updated", this.theme);
+    this.findBar.notifyTheme(this.theme);
   }
 
   private broadcast<C extends keyof EventChannels>(channel: C, payload: EventChannels[C]): void {

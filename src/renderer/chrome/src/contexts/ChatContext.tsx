@@ -23,6 +23,10 @@ interface ChatContextType {
     sendMessage: (content: string) => Promise<void>
     stop: () => void
     clearChat: () => void
+
+    // Text waiting to go into the panel's composer, which may only just be opening.
+    draft: string | null
+    takeDraft: () => void
 }
 
 // One saved chat, kept current while its reply streams.
@@ -72,10 +76,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [chatId, setChatId] = useState<string | null>(null)
     const thread = useChatThread(chatId)
     const [pageAccess, setPageAccessState] = useState(true)
+    const [draft, setDraft] = useState<string | null>(null)
 
     useEffect(() => {
         window.chromeAPI.chat.getPageAccess().then(setPageAccessState)
     }, [])
+
+    useEffect(() => window.chromeAPI.chat.onDraft(setDraft), [])
 
     const setPageAccess = useCallback((enabled: boolean) => {
         setPageAccessState(enabled)
@@ -102,6 +109,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [chatId])
 
     const clearChat = useCallback(() => setChatId(null), [])
+    const takeDraft = useCallback(() => setDraft(null), [])
 
     const value: ChatContextType = {
         messages: toMessages(thread),
@@ -113,7 +121,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPageAccess,
         sendMessage,
         stop,
-        clearChat
+        clearChat,
+        draft,
+        takeDraft
     }
 
     return (

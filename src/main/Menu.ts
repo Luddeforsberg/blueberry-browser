@@ -46,6 +46,13 @@ export class AppMenu {
           },
           { type: "separator" },
           {
+            id: "print",
+            label: "Print…",
+            accelerator: "CmdOrCtrl+P",
+            click: () => this.mainWindow.printActiveTab(),
+          },
+          { type: "separator" },
+          {
             label: "Quit",
             accelerator: process.platform === "darwin" ? "Cmd+Q" : "Ctrl+Q",
             click: () => app.quit(),
@@ -66,6 +73,22 @@ export class AppMenu {
             accelerator: "CmdOrCtrl+A",
             role: "selectAll",
           },
+          { type: "separator" },
+          {
+            label: "Find…",
+            accelerator: "CmdOrCtrl+F",
+            click: () => this.mainWindow.openFindBar(),
+          },
+          {
+            label: "Find Next",
+            accelerator: "CmdOrCtrl+G",
+            click: () => this.mainWindow.findStep(true),
+          },
+          {
+            label: "Find Previous",
+            accelerator: "CmdOrCtrl+Shift+G",
+            click: () => this.mainWindow.findStep(false),
+          },
         ],
       },
       {
@@ -80,6 +103,33 @@ export class AppMenu {
             label: "Force Reload",
             accelerator: "CmdOrCtrl+Shift+R",
             click: () => this.handleForceReload(),
+          },
+          { type: "separator" },
+          {
+            id: "zoom-reset",
+            label: "Actual Size",
+            accelerator: "CmdOrCtrl+0",
+            click: () => this.mainWindow.resetActiveTabZoom(),
+          },
+          {
+            id: "zoom-in",
+            label: "Zoom In",
+            accelerator: "CmdOrCtrl+Plus",
+            click: () => this.mainWindow.zoomActiveTab(1),
+          },
+          // On US keyboards + is Shift and =, and people press it without the Shift.
+          {
+            id: "zoom-in-equals",
+            label: "Zoom In",
+            accelerator: "CmdOrCtrl+=",
+            visible: false,
+            click: () => this.mainWindow.zoomActiveTab(1),
+          },
+          {
+            id: "zoom-out",
+            label: "Zoom Out",
+            accelerator: "CmdOrCtrl+-",
+            click: () => this.mainWindow.zoomActiveTab(-1),
           },
           { type: "separator" },
           {
@@ -138,6 +188,7 @@ export class AppMenu {
 
     const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
+    this.mainWindow.syncMenu();
   }
 
   // Menu action handlers

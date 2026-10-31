@@ -741,8 +741,8 @@ test("the chrome renderers run sandboxed", async () => {
       .map((contents) => metrics.find((metric) => metric.pid === contents.getOSProcessId())?.sandboxed);
   });
 
-  // The chrome view, and the overlay view for the floating sidebar.
-  expect(sandboxed).toEqual([true, true]);
+  // The chrome view, the overlay view for the floating sidebar, and the find bar.
+  expect(sandboxed).toEqual([true, true, true]);
 });
 
 test("the chrome renderer can't be navigated away from its own page", async () => {

@@ -10,6 +10,8 @@ import { ArtBlueberry } from '../components/ArtBlueberry'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
 import { ChatRow } from '../components/Sidebar'
+import { FindBarCard } from '../components/FindBarCard'
+import { ZoomButton } from '../components/Toolbar'
 import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
@@ -126,6 +128,18 @@ export const GalleryPage: React.FC = () => {
                             <Star className="size-4 fill-current text-bookmark" />
                         </ToolBarButton>
                         <ToolBarButton Icon={Star} label="Bookmark this page (unavailable on internal pages)" active={false} />
+                    </div>
+                </Section>
+
+                <Section title="Zoom level">
+                    <ZoomButton percent={125} onReset={() => undefined} />
+                </Section>
+
+                <Section title="Find bar">
+                    <div className="flex flex-col gap-3 max-w-sm">
+                        <FindBarCard glass={false} value="" onChange={() => undefined} result={null} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard glass={false} value="berry" onChange={() => undefined} result={{ active: 2, total: 14 }} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard glass={false} value="strawberry" onChange={() => undefined} result={{ active: 0, total: 0 }} onStep={() => undefined} onClose={() => undefined} />
                     </div>
                 </Section>
 

@@ -28,6 +28,7 @@ export class EventManager {
     return {
       chrome: endpoint(this.mainWindow.chromeView),
       overlay: endpoint(this.mainWindow.overlayView),
+      find: endpoint(this.mainWindow.findBar.chromeView),
     };
   }
 
@@ -82,6 +83,16 @@ export class EventManager {
     this.handle("tab:reload", (tabId) => this.withTab(tabId, (tab) => tab.reload()));
 
     this.handle("tab:stop", (tabId) => this.withTab(tabId, (tab) => tab.stop()));
+
+    this.handle("tab:zoom-reset", (tabId) => this.withTab(tabId, (tab) => this.mainWindow.siteZoom.reset(tab)));
+
+    this.handle("find:search", (text) => {
+      if (typeof text === "string") this.mainWindow.findBar.search(text);
+    });
+
+    this.handle("find:step", (forward) => this.mainWindow.findBar.step(forward === true));
+
+    this.handle("find:close", () => this.mainWindow.findBar.close());
   }
 
   private handleLayoutEvents(): void {

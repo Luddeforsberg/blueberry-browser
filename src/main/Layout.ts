@@ -14,6 +14,8 @@ export const PAGE_INSET = 8;
 // The window buttons line up with the address row, which sits one inset down.
 export const VERTICAL_TOP_ROW_HEIGHT = ADDRESS_ROW_HEIGHT + 2 * PAGE_INSET;
 export const FLOATING_INSET = 8;
+// The find bar's card with 12px on every side, for its shadow.
+export const FIND_BAR = { width: 384, height: 72 };
 export const MIN_PAGE_WIDTH = 480;
 export const MIN_WINDOW = { width: 900, height: 600 };
 
@@ -78,6 +80,8 @@ export function computeLayout(
   const toolbarY = vertical ? PAGE_INSET : TAB_ROW_HEIGHT;
   const toolbarHeight = vertical ? ADDRESS_ROW_HEIGHT : TOOLBAR_HEIGHT_WITH_BOOKMARKS;
   const pageY = toolbarY + toolbarHeight;
+  const pageHeight = Math.max(height - pageY - PAGE_INSET, 0);
+  const findBarWidth = Math.min(FIND_BAR.width, cardWidth);
 
   return {
     mode,
@@ -95,6 +99,13 @@ export function computeLayout(
     floatingSidebar: vertical && !sidebar
       ? { x: 0, y: 0, width: Math.min(sidebarWidth + 2 * FLOATING_INSET, window.width), height }
       : EMPTY,
+    // In the page's top right corner.
+    findBar: {
+      x: cardX + cardWidth - findBarWidth,
+      y: pageY,
+      width: findBarWidth,
+      height: Math.min(FIND_BAR.height, pageHeight),
+    },
     tabStrip,
     toolbar: { x: cardX, y: toolbarY, width: cardWidth, height: toolbarHeight },
     chat: chat ? { x: window.width - right, y: 0, width: right, height } : EMPTY,
@@ -102,7 +113,7 @@ export function computeLayout(
       x: cardX,
       y: pageY,
       width: cardWidth,
-      height: Math.max(height - pageY - PAGE_INSET, 0),
+      height: pageHeight,
     },
   };
 }

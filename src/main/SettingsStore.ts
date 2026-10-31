@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { Settings } from "../shared/ipc";
 import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "./Layout";
+import { sanitizeSiteZoom } from "./siteZoom";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keepBerryStill: false,
   actionApproval: "risky",
   onboarded: false,
+  siteZoom: {},
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -35,6 +37,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     keepBerryStill: bool(input.keepBerryStill, base.keepBerryStill),
     actionApproval: pick(input.actionApproval, ["risky", "always", "never"] as const, base.actionApproval),
     onboarded: bool(input.onboarded, base.onboarded),
+    siteZoom: sanitizeSiteZoom(input.siteZoom, base.siteZoom),
   };
 }
 
