@@ -45,6 +45,16 @@ describe("stepWalker", () => {
     expect(stepWalker(atEdge, bounds, never).walker.x).toBeLessThan(atEdge.x);
   });
 
+  it.each([0, Math.PI])("keeps moving away from the bottom after reflecting at heading %s", (heading) => {
+    const atEdge = { ...walker, y: bounds.height - 24, heading: heading + (heading === 0 ? 0.3 : -0.3) };
+    const reflected = stepWalker(atEdge, bounds, never).walker;
+    const next = stepWalker(reflected, bounds, never).walker;
+
+    expect(reflected.y).toBeLessThan(atEdge.y);
+    expect(next.y).toBeLessThan(reflected.y);
+    expect(Math.cos(next.heading)).toBeCloseTo(Math.cos(reflected.heading));
+  });
+
   it("stays on the page over a long walk, however it wanders", () => {
     let seed = 7;
     const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;

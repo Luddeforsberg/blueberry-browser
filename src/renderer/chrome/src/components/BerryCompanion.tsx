@@ -202,7 +202,7 @@ export const BerryCompanion: React.FC = () => {
             className="fixed left-0 top-0 z-40 pointer-events-none origin-top-left"
             style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible ? undefined : 'hidden' }}
         >
-            <div ref={body} className={atSpot ? 'pointer-events-auto' : undefined} style={{ transformOrigin: `50% ${SEAT * 100}%` }}>
+            <div ref={body} className={atSpot || mood === 'sitting' ? 'pointer-events-auto' : undefined} style={{ transformOrigin: `50% ${SEAT * 100}%` }}>
                 <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
                     <Berry mood={mood} size={BASE_SIZE} />
                 </div>

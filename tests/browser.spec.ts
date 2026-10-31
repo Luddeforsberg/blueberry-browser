@@ -717,9 +717,27 @@ test("Berry sits on the new tab composer, then on the active tab", async () => {
   expect((await seatGap("[data-berry-home]")).inside).toBe(true);
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(2);
-  expect((await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
   await expect(sitting).toBeVisible();
+  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(2);
+  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
+  await expect(sitting).toBeVisible();
+});
+
+test("right-clicking Berry opens its menu on the composer and active tab", async () => {
+  // Capture the native menu without opening a popup outside Playwright's renderer.
+  await app.evaluate(({ Menu }) => {
+    Menu.prototype.popup = function () { Menu.setApplicationMenu(this); };
+  });
+  const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
+
+  for (const page of ["new-tab", "settings"] as const) {
+    if (page === "settings") await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+    await expect(sitting).toBeVisible();
+    await app.evaluate(({ Menu }) => Menu.setApplicationMenu(null));
+    await sitting.click({ button: "right", timeout: 2000 });
+    await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label)))
+      .toEqual(["Keep Berry Still", "Hide Berry"]);
+  }
 });
 
 test("birds walk behind the new tab page unless Berry is kept still", async () => {

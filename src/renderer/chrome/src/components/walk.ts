@@ -56,7 +56,8 @@ export function stepWalker(
   }
 
   const level = facesLeft(walker.heading) ? Math.PI : 0;
-  const lean = clamp(walker.heading - level + (random() - 0.5) * 0.5, -MAX_LEAN, MAX_LEAN);
+  const relativeHeading = Math.atan2(Math.sin(walker.heading - level), Math.cos(walker.heading - level));
+  const lean = clamp(relativeHeading + (random() - 0.5) * 0.5, -MAX_LEAN, MAX_LEAN);
   let heading = level + lean;
 
   const nextX = walker.x + Math.cos(heading) * STRIDE;
