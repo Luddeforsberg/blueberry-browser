@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useLayoutEffect, useState } from 'react'
+import React, { useRef, useLayoutEffect } from 'react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useChat } from '../contexts/ChatContext'
 import { useAssistantName, BerrySpot } from './Berry'
@@ -64,29 +64,12 @@ const hostOf = (url: string) => {
     }
 }
 
-// Whether Berry can see the open page. The card on the composer is the signal, and + brings it back.
-const usePageAccess = () => {
-    const [enabled, setEnabled] = useState(true)
-
-    useEffect(() => {
-        window.chromeAPI.chat.getPageAccess().then(setEnabled)
-    }, [])
-
-    const change = (next: boolean) => {
-        setEnabled(next)
-        window.chromeAPI.chat.setPageAccess(next).then(setEnabled)
-    }
-
-    return { enabled, change }
-}
-
 // Main Chat Component
 export const Chat: React.FC = () => {
-    const { messages, isLoading, sendMessage } = useChat()
+    const { messages, isLoading, sendMessage, pageAccess: enabled, setPageAccess: change } = useChat()
     const scrollRef = useAutoScroll(messages)
     const name = useAssistantName()
     const { activeTab } = useBrowser()
-    const { enabled, change } = usePageAccess()
     const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
 
     // Group messages into conversation turns

@@ -271,19 +271,19 @@ test("the page card follows the sidebar and chat as they open and close", async 
   const size = () => page.evaluate(() => [window.innerWidth, window.innerHeight]);
 
   // Sidebar open and chat closed, which is how the app starts.
-  await expect.poll(size).toEqual([width - 280, height - 76]);
+  await expect.poll(size).toEqual([width - 280 - 8, height - 56]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
-  await expect.poll(size).toEqual([width - 280 - 400, height - 76]);
+  await expect.poll(size).toEqual([width - 280 - 400, height - 56]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
-  await expect.poll(size).toEqual([width - 4 - 400, height - 76]);
+  await expect.poll(size).toEqual([width - 8 - 400, height - 56]);
 
   // A tab opened now gets the same space as the others.
   const second = await openFixture("/second");
   await expect
     .poll(() => second.evaluate(() => window.innerWidth))
-    .toBe(width - 4 - 400);
+    .toBe(width - 8 - 400);
 });
 
 test("the chrome fills the window as it resizes", async () => {
@@ -334,7 +334,7 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect
     .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
-    .toEqual([width, height - 40 - 76]);
+    .toEqual([width - 16, height - 40 - 76 - 8]);
   expect(
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
   ).toBe(true);
@@ -350,10 +350,10 @@ test("the sidebar and chat resize within their limits, by pointer or keyboard", 
   const pageWidth = () => page.evaluate(() => window.innerWidth);
 
   await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 300));
-  await expect.poll(pageWidth).toBe(width - 300);
+  await expect.poll(pageWidth).toBe(width - 300 - 8);
 
   await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 9999));
-  await expect.poll(pageWidth).toBe(width - 360);
+  await expect.poll(pageWidth).toBe(width - 360 - 8);
 
   const handle = chrome.getByRole("separator", { name: "Resize sidebar" });
   await handle.focus();
@@ -721,6 +721,69 @@ test("Berry sits on the new tab composer, then on the active tab", async () => {
   await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(2);
   await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
   await expect(sitting).toBeVisible();
+});
+
+test("the new tab page paints the art blueberry, and web pages don't carry it", async () => {
+  const painted = () =>
+    chrome.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-berry-art]")!;
+      const { data } = canvas.getContext("2d")!.getImageData(canvas.width / 2, canvas.height / 2, 1, 1);
+      return data[3];
+    });
+  await expect(chrome.locator("[data-berry-art]")).toHaveCount(1);
+  await expect.poll(painted).toBe(255);
+
+  await openFixture();
+  await expect(chrome.locator("[data-berry-art]")).toHaveCount(0);
+});
+
+test("bookmarks are in the sidebar when vertical and under the address bar when horizontal", async () => {
+  const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
+  await expect(sidebar.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "GitHub" })).toBeVisible();
+  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveCount(1);
+
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
+  await expect(sidebar).toHaveCount(0);
+  await expect(chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "GitHub" })).toBeVisible();
+});
+
+test("the page's card rings while Berry reads it, and not once the page is taken away", async () => {
+  // Holds the reply open, so this never reaches a provider and the ring stays up to be seen.
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler("chat:send");
+    ipcMain.handle("chat:send", () => new Promise<void>((resolve) => {
+      (globalThis as unknown as { finishReply?: () => void }).finishReply = resolve;
+    }));
+  });
+  const replyHeld = () =>
+    app.evaluate(() => !!(globalThis as unknown as { finishReply?: () => void }).finishReply);
+  const finishReply = () =>
+    app.evaluate(() => {
+      const held = globalThis as unknown as { finishReply?: () => void };
+      held.finishReply?.();
+      delete held.finishReply;
+    });
+  const ring = chrome.locator("[data-berry-reading]");
+
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+  const message = panel.getByRole("textbox", { name: "Message" });
+  await expect(ring).toHaveCount(0);
+
+  await message.fill("What's on this page?");
+  await message.press("Enter");
+  await expect(ring).toHaveCount(1);
+  await finishReply();
+  await expect(ring).toHaveCount(0);
+
+  await panel.getByRole("group", { name: "Berry can see 127.0.0.1" }).hover();
+  await panel.getByRole("button", { name: "Remove this page" }).click();
+  await message.fill("And in general?");
+  await message.press("Enter");
+  await expect.poll(replyHeld).toBe(true);
+  await expect(ring).toHaveCount(0);
+  await finishReply();
 });
 
 test("right-clicking Berry opens its menu on the composer and active tab", async () => {

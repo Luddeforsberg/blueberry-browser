@@ -8,7 +8,7 @@ import { Berry } from './Berry'
 const BASE_SIZE = 112
 // How far down the drawing Berry's seat is in the sitting pose.
 const SEAT = 46 / 64
-const HOME_SIZE = 96
+const HOME_SIZE = 112
 // Clear of the composer's text, which starts on the left.
 const HOME_INSET = 150
 // Small enough to fit within the row above the tab, and clear of the tab's close button.

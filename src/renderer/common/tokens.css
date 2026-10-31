@@ -3,26 +3,28 @@
   :root {
     color-scheme: light;
 
-    --background: 238 238 238;
-    --canvas: 252 252 252;
+    --background: 220 223 245;
+    --canvas: 252 252 255;
     --surface: 255 255 255;
-    --tray: 244 244 244;
-    --card: 243 243 243;
+    --tray: 242 243 251;
+    --card: 243 244 251;
     --selected: 255 255 255;
-    --muted: 236 236 236;
-    --border: 228 228 228;
-    --foreground: 26 26 26;
-    --muted-foreground: 90 90 90;
-    --primary: 79 86 142;
+    --muted: 236 238 250;
+    --border: 225 227 242;
+    --foreground: 25 27 51;
+    --muted-foreground: 76 80 112;
+    --primary: 42 51 128;
     --primary-foreground: 255 255 255;
     --accent-ink: 47 58 168;
     --success: 23 101 60;
     --warning: 116 75 0;
     --destructive: 171 36 28;
     --destructive-foreground: 255 255 255;
-    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.03), 0 10px 32px rgb(0 0 0 / 0.05);
-    --shadow-selected: 0 1px 3px rgb(0 0 0 / 0.08);
-    --shadow-page: -2px 0 6px rgb(0 0 0 / 0.04);
+    --shadow-raised: 0 1px 3px rgb(46 52 120 / 0.08), 0 12px 40px rgb(46 52 120 / 0.16);
+    --shadow-selected: 0 2px 10px rgb(58 64 140 / 0.14);
+    --shadow-page: 0 1px 18px rgb(58 64 140 / 0.1);
+    --shadow-card: 0 14px 40px rgb(12 16 70 / 0.3);
+    --frame: linear-gradient(165deg, #c3cbf0 0%, #d6d9f4 30%, #e7e6f7 58%, #d4cfec 100%);
 
     /* Berry's own colours, never the UI accent. */
     --berry-ink: 24 28 46;
@@ -46,7 +48,7 @@
     --border: 64 64 64;
     --foreground: 242 242 242;
     --muted-foreground: 176 176 176;
-    --primary: 79 86 142;
+    --primary: 78 95 180;
     --primary-foreground: 255 255 255;
     --accent-ink: 163 174 251;
     --success: 111 207 151;
@@ -55,7 +57,9 @@
     --destructive-foreground: 31 31 31;
     --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.25), 0 10px 32px rgb(0 0 0 / 0.25);
     --shadow-selected: inset 0 0 0 1px rgb(255 255 255 / 0.08);
-    --shadow-page: -2px 0 6px rgb(0 0 0 / 0.12);
+    --shadow-page: 0 1px 18px rgb(0 0 0 / 0.24);
+    --shadow-card: 0 14px 40px rgb(0 0 0 / 0.4);
+    --frame: linear-gradient(165deg, #38383b 0%, #2e2e30 40%, #262628 100%);
 
     --berry-ink: 58 66 112;
     --berry-wing: 82 92 142;
@@ -70,10 +74,13 @@
     --glass-tint: rgb(var(--background) / 0.88);
 
     /* The blueberry looks the same in light and dark. */
-    --berry-fruit-mid: 85 104 178;
-    --berry-fruit-dark: 55 71 143;
-    --berry-fruit-bloom: 126 142 200;
-    --berry-fruit-crown: 24 32 84;
+    --berry-fruit-mid: 78 95 180;
+    --berry-fruit-dark: 42 51 128;
+    --berry-fruit-bloom: 164 175 224;
+    --berry-fruit-crown: 22 28 76;
+
+    /* The ring around a page while Berry is reading it. */
+    --shadow-reading: 0 0 0 2px rgb(127 139 216), 0 0 24px rgb(127 139 216 / 0.5);
 
     /* Names kept from the starter theme, as aliases of the tokens above. */
     --card-foreground: var(--foreground);

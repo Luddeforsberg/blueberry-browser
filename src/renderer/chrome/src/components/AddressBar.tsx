@@ -62,7 +62,7 @@ export const AddressBar: React.FC = () => {
 
     if (isFocused) {
         return (
-            <form onSubmit={handleSubmit} className="relative w-full max-w-[600px] min-w-0 app-region-no-drag">
+            <form onSubmit={handleSubmit} className="relative w-full min-w-0 app-region-no-drag">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <input
                     type="text"
@@ -94,8 +94,8 @@ export const AddressBar: React.FC = () => {
             aria-label="Address"
             onClick={() => setIsFocused(true)}
             className={cn(
-                "w-full max-w-[600px] min-w-0 h-8 px-3 flex items-center justify-center gap-2 rounded-card cursor-text group/address-bar",
-                "bg-muted hover:bg-border text-left app-region-no-drag outline-none transition-colors",
+                "w-full min-w-0 h-8 px-2.5 flex items-center gap-2 rounded-card cursor-text group/address-bar",
+                "hover:bg-foreground/5 text-left app-region-no-drag outline-none transition-colors",
                 "focus-visible:ring-2 focus-visible:ring-ring"
             )}
         >

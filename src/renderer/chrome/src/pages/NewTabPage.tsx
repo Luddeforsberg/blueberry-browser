@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowRight, Lightbulb, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { ArrowRight, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
+import { BerryDot } from '@common/components/Mascot'
+import { useLibrary } from '../contexts/LibraryContext'
+import { useShell } from '../contexts/ShellContext'
 import { Favicon } from '../components/Favicon'
 import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
+import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { cn } from '@common/lib/utils'
@@ -13,6 +17,8 @@ const TRAY_BUTTON = cn(
     "hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
 )
 
+const WORK_CARDS = 3
+
 const timeOf = (visitedAt: number) =>
     new Date(visitedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
@@ -21,6 +27,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [text, setText] = useState('')
     const [recent, setRecent] = useState<Visit[]>([])
     const browser = window.chromeAPI.browser
+    const library = useLibrary()
+    const { layout, theme } = useShell()
 
     useEffect(() => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))
@@ -75,72 +83,114 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         }
     ]
 
+    // Real work only: chats and routines from the library. With none, the ideas take their place.
+    const work = [
+        ...library.chats.map((chat) => ({
+            id: chat.id,
+            meta: 'Chat',
+            title: chat.title,
+            detail: null as string | null,
+            running: false,
+            onClick: () => browser.openPage('chat', { param: chat.id, title: chat.title })
+        })),
+        ...library.routines.map((routine) => ({
+            id: routine.id,
+            meta: routine.schedule,
+            title: routine.name,
+            detail: routine.lastResult,
+            running: routine.status === 'running',
+            onClick: () => browser.openPage('routines')
+        }))
+    ].slice(0, WORK_CARDS)
+
+    const glass = theme.glass ? "bg-surface/80 backdrop-blur-xl" : "bg-surface"
+    const cardClass = cn(
+        "flex flex-col p-4 rounded-panel shadow-card text-left outline-none transition-colors",
+        "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
+        glass
+    )
+
     return (
         <div className="relative h-full overflow-y-auto">
-            <Backdrop />
-            <div className="relative max-w-[800px] mx-auto px-6 pt-[22vh] pb-12">
-                <h1 className="sr-only">Where shall we start today?</h1>
-                {/* Room for Berry, who sits on the composer's top edge with its legs over it. */}
-                {isBerry && <div className="h-[84px]" />}
+            <div className="relative min-h-full overflow-hidden">
+                <Backdrop />
+                <div className="relative max-w-[800px] mx-auto px-6 pt-[22vh] pb-12">
+                    <h1 className="sr-only">Where shall we start today?</h1>
+                    {/* Room for Berry, who sits on the composer's top edge with its legs over it. */}
+                    {isBerry && <div className="h-[84px]" />}
 
-                <div data-berry-home className="rounded-composer bg-tray">
-                    <Composer
-                        label={`Search, enter a URL, or ask ${isBerry ? 'Berry' : 'a question'}`}
-                        placeholder={isBerry ? 'Ask Berry anything, or enter a URL…' : 'Ask anything, or enter a URL…'}
-                        value={text}
-                        onChange={setText}
-                        onKeyDown={handleKeyDown}
-                        spellCheck={false}
-                        autoFocus
-                        canSend={text.trim().length > 0}
-                        onSend={() => submit(false)}
-                    />
-                    <div className="flex items-center gap-1 h-11 px-3">
-                        {TRAY.map(({ label, Icon, onClick }) => (
-                            <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
-                                <Icon className="size-4" />
-                                {label}
-                            </button>
-                        ))}
-                        <div className="flex-1" />
-                        <button type="button" onClick={() => void browser.openPage('settings')} className={TRAY_BUTTON}>
-                            <SlidersHorizontal className="size-4" />
-                            Settings
-                        </button>
+                    <div data-berry-home className="relative z-10 rounded-composer">
+                        <Composer
+                            label={`Search, enter a URL, or ask ${isBerry ? 'Berry' : 'a question'}`}
+                            placeholder={isBerry ? 'Ask Berry anything, or enter a URL…' : 'Ask anything, or enter a URL…'}
+                            value={text}
+                            onChange={setText}
+                            onKeyDown={handleKeyDown}
+                            spellCheck={false}
+                            autoFocus
+                            canSend={text.trim().length > 0}
+                            onSend={() => submit(false)}
+                        />
                     </div>
-                </div>
+                    {/* The sidebar holds these when it's open. */}
+                    {!layout.sidebarOpen && (
+                        <div className="relative z-10 flex items-center gap-1 h-11 px-2 mt-1">
+                            {TRAY.map(({ label, Icon, onClick }) => (
+                                <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
+                                    <Icon className="size-4" />
+                                    {label}
+                                </button>
+                            ))}
+                            <div className="flex-1" />
+                            <button type="button" onClick={() => void browser.openPage('settings')} className={TRAY_BUTTON}>
+                                <SlidersHorizontal className="size-4" />
+                                Settings
+                            </button>
+                        </div>
+                    )}
 
-                <section aria-labelledby="ideas-heading" className="mt-6">
-                    <h2 id="ideas-heading" className="flex items-center gap-2 px-1 pb-2.5 text-14 text-muted-foreground">
-                        <Lightbulb className="size-4" />
-                        Some ideas
-                    </h2>
-                    <div className="grid grid-cols-2 gap-3">
-                        {IDEAS.map(({ Icon, title, text: body, action, onClick }) => (
-                            <button
-                                key={title}
-                                type="button"
-                                onClick={() => void onClick()}
-                                className={cn(
-                                    "group/idea p-4 rounded-panel bg-card border border-transparent dark:border-border text-left outline-none",
-                                    "hover:border-border transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                                )}
-                            >
-                                <Icon className="size-5 text-muted-foreground" />
-                                <span className="mt-2.5 block text-14 font-semibold">{title}</span>
-                                <span className="mt-1 block text-13 text-muted-foreground">{body}</span>
-                                <span className="mt-2.5 flex items-center gap-1.5 text-13">
-                                    {action}
-                                    <ArrowRight className="size-3.5 transition-transform group-hover/idea:translate-x-0.5" />
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </section>
+                    <div className="relative mt-12 pt-[210px]">
+                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
+
+                        {work.length > 0 ? (
+                            <section aria-labelledby="work-heading" className="relative">
+                                <h2 id="work-heading" className="sr-only">Your work</h2>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {work.map(({ id, meta, title, detail, running, onClick }) => (
+                                        <button key={id} type="button" onClick={() => void onClick()} className={cardClass}>
+                                            <span className="flex items-center justify-between gap-2 text-12 text-muted-foreground">
+                                                <span className="truncate">{meta}</span>
+                                                {running && <BerryDot working />}
+                                            </span>
+                                            <span className="mt-1 block text-14 font-semibold truncate">{title}</span>
+                                            {running && <span className="sr-only">Running now</span>}
+                                            {detail && <span className="mt-1 block text-13 text-muted-foreground line-clamp-2">{detail}</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        ) : (
+                            <section aria-labelledby="ideas-heading" className="relative">
+                                <h2 id="ideas-heading" className="sr-only">Some ideas</h2>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {IDEAS.map(({ Icon, title, text: body, action, onClick }) => (
+                                        <button key={title} type="button" onClick={() => void onClick()} className={cn("group/idea", cardClass)}>
+                                            <Icon className="size-5 text-muted-foreground" />
+                                            <span className="mt-2.5 block text-14 font-semibold">{title}</span>
+                                            <span className="mt-1 block text-13 text-muted-foreground">{body}</span>
+                                            <span className="mt-2.5 flex items-center gap-1.5 text-13">
+                                                {action}
+                                                <ArrowRight className="size-3.5 transition-transform group-hover/idea:translate-x-0.5" />
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
 
                 {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className="mt-6">
-                        <h2 id="recent-heading" className="px-1 pb-1.5 text-14 text-muted-foreground">
+                    <section aria-labelledby="recent-heading" className={cn("relative mt-3 p-2 rounded-panel shadow-card", glass)}>
+                        <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
                             Recent
                         </h2>
                         <ul>
@@ -165,6 +215,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         </ul>
                     </section>
                 )}
+                    </div>
+                </div>
             </div>
         </div>
     )

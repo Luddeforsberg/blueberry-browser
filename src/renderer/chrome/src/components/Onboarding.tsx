@@ -19,7 +19,7 @@ export const Onboarding: React.FC = () => {
         <div
             className={cn(
                 "absolute inset-0 flex flex-col items-center app-region-drag",
-                theme.glass ? "bg-glass-tint" : "bg-background"
+                theme.glass ? "bg-frame" : "bg-background"
             )}
         >
             <main className="flex-1 flex flex-col items-center justify-center max-w-md text-center app-region-no-drag">

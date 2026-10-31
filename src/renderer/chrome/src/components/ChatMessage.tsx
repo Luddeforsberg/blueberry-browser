@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
+import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
 
 export const Markdown: React.FC<{ content: string }> = ({ content }) => (
@@ -57,7 +58,7 @@ const StreamingText: React.FC<{ content: string }> = ({ content }) => {
         <div className="whitespace-pre-wrap text-16 text-foreground">
             {displayedContent}
             {currentIndex < content.length && (
-                <span className="inline-block w-2 h-5 bg-accent-ink ml-0.5 animate-pulse" />
+                <BerryDot working className="inline-block ml-1 align-baseline" />
             )}
         </div>
     )
@@ -81,6 +82,38 @@ export const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean
         )}
         {isStreaming ? <StreamingText content={content} /> : <Markdown content={content} />}
     </div>
+)
+
+export interface Step {
+    text: string
+    done: boolean
+}
+
+// What Berry did on the way to a reply: a footprint for each step behind it, and the berry on the one
+// it's on now. Nothing reports steps yet, so only the gallery shows this until the agent does.
+export const StepTrail: React.FC<{ steps: Step[] }> = ({ steps }) => (
+    <ol aria-label="Steps" className="flex flex-col gap-2.5 text-14 text-muted-foreground">
+        {steps.map((step, index) => (
+            <li key={index} className="flex items-center gap-3">
+                <span className="size-4 shrink-0 flex items-center justify-center text-primary" style={{ marginLeft: index % 2 ? 6 : 0 }}>
+                    {step.done ? (
+                        <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
+                            <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
+                            <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
+                            <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
+                            <ellipse cx={0} cy={3} rx={1} ry={2.1} />
+                        </svg>
+                    ) : (
+                        <BerryDot working />
+                    )}
+                </span>
+                <span className={step.done ? undefined : 'text-foreground'}>
+                    {step.text}
+                    {!step.done && <span className="sr-only"> (in progress)</span>}
+                </span>
+            </li>
+        ))}
+    </ol>
 )
 
 // Berry's working state while a reply is on its way.

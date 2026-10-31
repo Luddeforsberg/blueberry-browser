@@ -1,7 +1,8 @@
 import { NativeImage, WebContentsView } from "electron";
 
 // The page card radius from DESIGN.md.
-const PAGE_RADIUS = 0;
+// Matches the card the page sits in, `rounded-panel` in the chrome.
+const PAGE_RADIUS = 22;
 
 export interface TabEvents {
   onChange: () => void;

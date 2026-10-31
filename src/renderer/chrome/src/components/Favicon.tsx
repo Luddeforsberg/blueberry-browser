@@ -4,6 +4,8 @@ import { Globe } from "lucide-react";
 interface FaviconProps {
     src?: string | null;
     className?: string;
+    // Shown instead of the globe when the site has no icon.
+    fallback?: React.ReactNode;
 }
 
 // A saved site's own icon. It only ever asks that site, never a third-party icon service.
@@ -15,10 +17,11 @@ export const siteIcon = (url: string) => {
     }
 };
 
-export const Favicon: React.FC<FaviconProps> = ({ src, className }) => {
+export const Favicon: React.FC<FaviconProps> = ({ src, className, fallback }) => {
     const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
     if (!src || src === failedSrc) {
+        if (fallback) return <>{fallback}</>;
         return <Globe className={`size-4 shrink-0 text-muted-foreground ${className || ""}`} />;
     }
 
