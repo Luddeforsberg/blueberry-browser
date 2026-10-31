@@ -57,7 +57,7 @@ export interface PageTool {
   isRisky?: (args: unknown) => Promise<boolean>;
   // `run` answers with an image's data address when it worked, which the model gets as a picture.
   returnsImage?: boolean;
-  // Set while a mascot's limits apply. Says why this call can't happen at all, before anything asks or runs.
+  // Says why this call can't happen at all, before anything asks or runs: a mascot's limits, or a tab the user took over.
   refuses?: (args: unknown) => Promise<{ label: string; message: string } | null>;
 }
 
@@ -176,6 +176,9 @@ const carriesData = (url: string): boolean => {
   }
 };
 
+// Where a short query is an ordinary search. Each also covers its subdomains, and never a name that only starts like one.
+const SEARCH_SITES = ["youtube.com", "google.com", "bing.com", "duckduckgo.com", "wikipedia.org", "github.com", "reddit.com", "amazon.com"];
+
 const NOT_WEB = "Only http and https addresses can be opened.";
 const STALE_ELEMENT = "That element is no longer on the page. Call list_elements and try again.";
 
@@ -186,7 +189,16 @@ const SCRIPTED = "It got a scripted click rather than a real one, which some sit
 const SECRET_REQUEST =
   /pass ?(word|code|phrase)|lösenord|\b2fa\b|two.factor|one.time|\botp\b|(?<!(postal|zip|post|promo|discount|coupon|area|country|source) )\bcode\b|\bkod(en)?\b|engångskod|verifieringskod|\bcvc\b|\bcvv\b|card (number|details)|kortnummer|personnummer|\bpin\b/i;
 
-const tabId = z.string().optional().describe("The tab, from list_tabs. Leave out for the tab the user is on.");
+const tabId = z.string().optional().describe("The tab, from list_tabs. Leave out for the one this job is working in: the last you opened, or else the page that came with the message. It never follows the user to another tab.");
+
+const NO_CURRENT_TAB = "This job has no web page to work in. Use a tab from list_tabs, or open_tab.";
+
+// Said instead of a vaguer failure, so the model neither tries again nor tells the user the tab isn't there.
+const takenOverMessage = (id: string, url: string) =>
+  `The user took over tab ${id}, which was at ${url}, so nothing happened there and you can't use it any more. It's theirs now. Don't open that page again in another tab unless they ask. Stop work on it and say in your reply that you stopped because they took over the tab.`;
+
+// These don't reach into any tab.
+const NOT_ON_A_TAB = ["list_tabs", "wait", "ask_user", "open_tab"];
 
 // Said instead of a vaguer failure, so the model tells the user what to do rather than trying again.
 const inTrouble = (tab: Tab): string | null => {
@@ -207,6 +219,10 @@ export interface PageToolAccess {
   closeTab: (tab: Tab) => boolean;
   // Whether anything `allTabs` gives is Berry's own to close. Otherwise only what these tools opened.
   ownsEveryTab?: boolean;
+  // Whether this job opened the tab, in this reply or an earlier one, and the user hasn't taken it from it.
+  ownsTab?: (id: string) => boolean;
+  // Tabs this job opened that the user has since taken, with the address each was at. Nothing here reaches them.
+  takenOver?: ReadonlyMap<string, string>;
   // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped.
   ask: (question: string) => Promise<string | null>;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
@@ -223,6 +239,8 @@ export const createPageTools = ({
   openTab,
   closeTab,
   ownsEveryTab = false,
+  ownsTab = () => false,
+  takenOver,
   ask,
   canSee,
   onUse,
@@ -265,7 +283,25 @@ export const createPageTools = ({
     return tab.runInFrame<T | null>(entry.frame, script(ref.slice(ref.indexOf(".") + 1)));
   };
 
-  const find = (id?: string) => (id ? allTabs().find((tab) => tab.id === id) : activeTab()) ?? null;
+  const tookOver = (id: string | undefined) => {
+    const url = id === undefined ? undefined : takenOver?.get(id);
+    return id !== undefined && url !== undefined ? takenOverMessage(id, url) : null;
+  };
+  const find = (id?: string) => {
+    const tab = id ? allTabs().find((candidate) => candidate.id === id) : activeTab();
+    return tab && !takenOver?.has(tab.id) ? tab : null;
+  };
+  const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
+  // In the default mode, an address carrying data asks unless it's short and on a site that's an ordinary place to
+  // search, or short and on a site this job already has open.
+  const needsCard = (url: string) => {
+    if (!carriesData(url)) return false;
+    const { hostname, search, hash } = new URL(url);
+    if (search.length + hash.length > MAX_SAFE_TYPED_LENGTH) return true;
+    if (SEARCH_SITES.some((name) => hostname === name || hostname.endsWith(`.${name}`))) return false;
+    const jobTabs = [...allTabs().filter((tab) => ownsTab(tab.id)), activeTab()];
+    return !jobTabs.some((tab) => tab && !takenOver?.has(tab.id) && siteOf(tab.url) === siteOf(url));
+  };
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
     return tab ? siteOf(tab.url) : "a tab";
@@ -275,23 +311,26 @@ export const createPageTools = ({
   const withText = async (id: string | undefined, format: (tab: Tab, text: string) => string) => {
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
-    if (!tab) return id ? `There is no web page in tab ${id}.` : "The user's current tab has no web page.";
+    if (!tab) return noTab(id);
     onUse(tab);
     const text = await readText(tab, allowed);
     if (!canSee()) return NO_ACCESS;
+    const taken = tookOver(tab.id);
+    if (taken) return taken;
     return text === null ? (inTrouble(tab) ?? `The page at ${tab.url} could not be read.`) : format(tab, text);
   };
 
   const withTab = async (id: string | undefined, act: (tab: Tab) => Promise<string>) => {
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
-    if (!tab) return id ? `There is no web page in tab ${id}.` : "The user's current tab has no web page.";
+    if (!tab) return noTab(id);
     onUse(tab);
     try {
-      return await act(tab);
+      const result = await act(tab);
+      return tookOver(tab.id) ?? result;
     } catch (error) {
       console.error("A page tool failed:", error);
-      return canSee() ? (inTrouble(tab) ?? `That didn't work on ${tab.url}.`) : NO_ACCESS;
+      return canSee() ? (tookOver(tab.id) ?? inTrouble(tab) ?? `That didn't work on ${tab.url}.`) : NO_ACCESS;
     }
   };
 
@@ -389,7 +428,7 @@ export const createPageTools = ({
   const tools = [
     pageTool({
       name: "list_tabs",
-      description: "List the web pages open in the browser, with each tab's id, title and address.",
+      description: "List the web pages you can reach, with each tab's id, title and address. `active` marks the one tools use when you leave out the tab, and `yours` marks a tab you opened.",
       schema: z.object({}),
       label: () => "Checked your open tabs",
       run: async () => {
@@ -397,8 +436,14 @@ export const createPageTools = ({
         const active = activeTab();
         const tabs = allTabs()
           .filter((tab) => allowed(tab.url))
-          .map(({ id, title, url }) => ({ id, title, url, active: id === active?.id }));
-        return JSON.stringify(tabs);
+          .filter((tab) => !takenOver?.has(tab.id))
+          .map(({ id, title, url }) => ({ id, title, url, active: id === active?.id, ...(ownsTab(id) ? { yours: true } : {}) }));
+        const notes = [
+          // A chat with no page sees only its own tabs, so an empty list says nothing about what's open.
+          ...(ownsEveryTab ? ["This is only the tabs you opened in this chat. The user may have others, which you can't reach."] : []),
+          ...[...(takenOver ?? [])].map(([id, url]) => takenOverMessage(id, url)),
+        ];
+        return [JSON.stringify(tabs), ...notes].join("\n\n");
       },
     }),
     pageTool({
@@ -709,7 +754,7 @@ export const createPageTools = ({
           // History isn't a navigation the limit below gets to stop.
           const back = tab.backUrl;
           if (back && !allowed(back)) return offLimits(back).message;
-          tab.goBack();
+          tab.goBack(true);
           return whereNow(tab);
         }),
     }),
@@ -723,9 +768,9 @@ export const createPageTools = ({
       run: async ({ tabId: id }) => {
         if (!canSee()) return NO_ACCESS;
         const tab = find(id);
-        if (!tab) return `There is no web page in tab ${id}.`;
+        if (!tab) return noTab(id);
         if (!ownsEveryTab && !opened.has(id)) return "You didn't open that tab, so it stays open.";
-        if (!closeTab(tab)) return "That's the last tab in the window, so it stays open.";
+        if (!closeTab(tab)) return "That tab stays open, because it's the last in the window or the user is looking at it.";
         opened.delete(id);
         return `Closed tab ${id}.`;
       },
@@ -736,7 +781,7 @@ export const createPageTools = ({
       schema: z.object({ tabId, url: z.string().max(2000) }),
       label: ({ url }) => `Went to ${siteOf(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
-      isRisky: async ({ url }) => carriesData(url),
+      isRisky: async ({ url }) => needsCard(url),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
@@ -752,11 +797,11 @@ export const createPageTools = ({
     }),
     pageTool({
       name: "open_tab",
-      description: "Open an address in a new tab, which becomes the current tab. The user is asked first.",
+      description: "Open an address in a new tab behind the user, which never takes over their screen. It becomes the tab you're working in, and they can go to it with one click. The user is asked first when it could send something out.",
       schema: z.object({ url: z.string().max(2000) }),
       label: ({ url }) => `Opened ${siteOf(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
-      isRisky: async ({ url }) => carriesData(url),
+      isRisky: async ({ url }) => needsCard(url),
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
@@ -768,10 +813,19 @@ export const createPageTools = ({
     }),
   ];
 
-  if (!limits) return tools;
+  // A call into a tab the user took over gets no card, because there's nothing left for them to allow.
+  const refusedAsTaken = (tool: PageTool, args: unknown) => {
+    if (NOT_ON_A_TAB.includes(tool.name)) return null;
+    const message = tookOver((args as { tabId?: string } | null)?.tabId ?? activeTab()?.id);
+    return message ? { label: "Left the tab you took over", message } : null;
+  };
+
+  if (!limits) return tools.map((tool) => ({ ...tool, refuses: async (args: unknown) => refusedAsTaken(tool, args) }));
 
   // Where this call would reach: the tab, then any frame or address it names.
   const refuses = (tool: PageTool) => async (args: unknown) => {
+    const taken = refusedAsTaken(tool, args);
+    if (taken) return taken;
     const { tabId: id, url, ref, toRef } = (args ?? {}) as { tabId?: string; url?: string; ref?: string; toRef?: string };
     if (typeof url === "string" && !allowed(url)) return offLimits(url);
     if (ANY_TAB.includes(tool.name)) return null;

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
 import { LibraryProvider, useFlock } from './contexts/LibraryContext'
@@ -39,12 +39,15 @@ const Shell: React.FC = () => {
     const { activeTab, reload } = useBrowser()
     const { isLoading, pageAccess, mascotId } = useChat()
     const { find } = useFlock()
+    // Follows the user until a reply starts, and then stays on the page that reply was sent from.
+    const sentFrom = useRef<string | null>(null)
+    if (!isLoading) sentFrom.current = activeTab?.id ?? null
 
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
     // It also shows on any tab Berry is using in the reply it's working on.
-    const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && siteAllowed(activeTab.url, find(mascotId).sites)))
+    const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && activeTab.id === sentFrom.current && siteAllowed(activeTab.url, find(mascotId).sites)))
 
     return (
         <div className={cn("relative h-full", theme.glass ? "bg-frame" : "bg-background")}>

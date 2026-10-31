@@ -20,6 +20,42 @@ const screenshotTool = (tab: Tab, canSee: () => boolean) =>
     onUse: () => {},
   }).find((tool) => tool.name === "screenshot")!;
 
+describe("whether an address with a query asks in the default mode", () => {
+  const asks = (url: string, open = "https://page.example/") => {
+    const tab = { id: "tab-1", url: open } as unknown as Tab;
+    const openTab = createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+    }).find((tool) => tool.name === "open_tab")!;
+    return openTab.isRisky!({ url });
+  };
+  // Counts the "?" too, so this query and hash come to exactly `length`.
+  const ofLength = (length: number) => `?q=${"a".repeat(length - 3)}`;
+
+  it.each([
+    ["a short search on a listed site", "https://www.youtube.com/results?search_query=jet+engine", false],
+    ["a subdomain of one", "https://sv.wikipedia.org/w/index.php?search=jet", false],
+    ["no query, wherever it goes", "https://unknown.example/plain", false],
+    ["exactly 100 characters", `https://www.youtube.com/results${ofLength(100)}`, false],
+    ["101 characters", `https://www.youtube.com/results${ofLength(101)}`, true],
+    ["a hash counting towards the limit", `https://www.youtube.com/results${ofLength(95)}#${"b".repeat(5)}`, true],
+    ["a lookalike hostname", "https://youtube.com.evil.example/results?q=jet", true],
+    ["a name that only ends like one", "https://evilyoutube.com/results?q=jet", true],
+    ["a listed site as the username", "https://youtube.com@evil.example/?q=jet", true],
+    ["an unknown site", "https://unknown.example/?q=jet", true],
+    ["the site this job has open", "https://www.page.example/search?q=jet", false],
+    ["a subdomain of the site this job has open", "https://other.page.example/search?q=jet", true],
+    ["over the limit on the site this job has open", `https://page.example/${ofLength(101)}`, true],
+  ])("%s", async (_, url, expected) => {
+    expect(await asks(url)).toBe(expected);
+  });
+});
+
 describe("the screenshot tool", () => {
   const settled = async () => {};
 

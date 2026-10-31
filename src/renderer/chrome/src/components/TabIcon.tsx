@@ -21,8 +21,8 @@ const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
 export const TabIcon: React.FC<{ tab: Pick<TabInfo, 'page' | 'favicon' | 'isLoading' | 'berryWorking' | 'trouble'> & { workingMascotId?: string | null } }> = ({ tab }) => {
     const { find } = useFlock()
     if (tab.trouble) return <CircleAlert aria-label={tab.trouble === 'crashed' ? 'Page crashed' : 'Page not responding'} className="size-4 shrink-0 text-warning" />
-    if (tab.berryWorking && tab.workingMascotId) return <Berry mood="fetching" size={18} mascot={find(tab.workingMascotId)} className="-m-px" />
-    if (tab.isLoading || tab.berryWorking) return <span className="size-4 shrink-0 flex items-center justify-center"><BerryDot working /></span>
+    if (tab.berryWorking) return <Berry mood="fetching" size={18} mascot={find(tab.workingMascotId ?? null)} className="-m-px" />
+    if (tab.isLoading) return <span className="size-4 shrink-0 flex items-center justify-center"><BerryDot working /></span>
     if (!tab.page) return <Favicon src={tab.favicon} />
     const Icon = PAGE_ICONS[tab.page]
     return <Icon className="size-4 shrink-0 text-muted-foreground" />

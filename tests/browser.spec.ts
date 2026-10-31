@@ -770,7 +770,7 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies()).toHaveCount(++done);
-  await act("open_tab", { url: `${origin}/?secret=abc` });
+  await act("open_tab", { url: "https://unknown.example/?secret=abc" });
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies()).toHaveCount(++done);
@@ -823,7 +823,9 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
   expect(await getTabs()).toHaveLength(before);
   await card.getByRole("button", { name: "Allow" }).click();
   await expect.poll(async () => (await getTabs()).length).toBe(before + 1);
-  await expect.poll(async () => (await activeTab()).title).toBe("Form");
+  // It opens behind the user, who stays where they were.
+  await expect.poll(async () => (await getTabs()).at(-1)?.title).toBe("Form");
+  expect((await activeTab()).title).toBe("Fixture");
 });
 
 test("chats are still there after a restart", async () => {
