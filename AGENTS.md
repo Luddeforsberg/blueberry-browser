@@ -15,7 +15,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
 | `pnpm exec electron-builder --dir` | Package an unsigned app into `dist/` |
 
-CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and Windows. It doesn't package the app.
+CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-end tests run on macOS for every PR, and on Windows only for pushes to `main`. It doesn't package the app.
 
 ## Architecture
 
