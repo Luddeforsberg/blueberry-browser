@@ -167,6 +167,18 @@ export interface MascotProfile extends MascotDraft {
   id: string;
   // A deleted mascot stays on file, so its chats keep their look and, above all, their limits.
   deletedAt: number | null;
+  // The Gallery entry this is a copy of, only so the Gallery can say it's added. The copy never reads from the entry.
+  galleryId?: string;
+}
+
+// One card in the Gallery. Add makes a copy of `draft`, and only `draft`, through the same checks as a hand-made mascot.
+export interface GalleryMascot {
+  id: string;
+  author: string;
+  category: string;
+  // One line on what it does. Its limits come from `draft`, in `permissionsInWords`.
+  description: string;
+  draft: MascotDraft;
 }
 
 export type SuggestionKind = "prompt" | "routine" | "mascot";

@@ -40,6 +40,36 @@ describe("MascotStore", () => {
     expect(new MascotStore(path).all()).toEqual([BERRY]);
   });
 
+  it("adds a Gallery copy once, lets a deleted one be added again, and keeps what it came from through an edit", () => {
+    const path = file();
+    const store = new MascotStore(path);
+    const first = store.addFromGallery("entry", draft);
+    if (!first.ok) throw new Error(first.error);
+    expect(store.addFromGallery("entry", { ...draft, name: "Other" })).toEqual(first);
+    expect(store.all()).toHaveLength(2);
+
+    expect(store.save(first.id, { ...draft, name: "Mine", galleryId: "another" }).ok).toBe(true);
+    expect(new MascotStore(path).find(first.id)).toMatchObject({ name: "Mine", galleryId: "entry" });
+
+    expect(store.delete(first.id)).toBe(true);
+    const second = store.addFromGallery("entry", draft);
+    if (!second.ok) throw new Error(second.error);
+    expect(second.id).not.toBe(first.id);
+    expect(store.find(first.id)?.deletedAt).not.toBeNull();
+  });
+
+  it("holds a Gallery copy to everything a hand-made mascot is, and refuses a name that's taken", () => {
+    const store = new MascotStore(file());
+    expect(store.addFromGallery("a", { ...draft, name: "Berry" }).ok).toBe(false);
+    expect(store.addFromGallery("a", { ...draft, sites: ["com"] }).ok).toBe(false);
+    expect(store.addFromGallery("a", { ...draft, instructions: "x".repeat(2001) }).ok).toBe(false);
+
+    const added = store.addFromGallery("a", { ...draft, id: BERRY_ID, deletedAt: 1, galleryId: "b", skipApprovals: true, tools: ["visit", "everything"] });
+    if (!added.ok) throw new Error(added.error);
+    expect(store.find(added.id)).toEqual({ ...draft, sites: ["github.com"], id: added.id, deletedAt: null, galleryId: "a" });
+    expect(store.addFromGallery("b", draft)).toMatchObject({ ok: false, error: expect.stringContaining("already have a Scout") });
+  });
+
   it.each([
     ["", false],
     ["a".repeat(24), true],

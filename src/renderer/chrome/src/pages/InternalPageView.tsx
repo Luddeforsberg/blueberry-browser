@@ -8,6 +8,7 @@ import { GalleryPage } from './GalleryPage'
 import { DownloadsPage } from './DownloadsPage'
 import { HistoryPage } from './HistoryPage'
 import { FlockPage } from './FlockPage'
+import { MascotGalleryPage } from './MascotGalleryPage'
 import { NeedsYouPage } from './NeedsYouPage'
 
 export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
@@ -28,6 +29,8 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             return <HistoryPage />
         case 'flock':
             return <FlockPage />
+        case 'mascot-gallery':
+            return <MascotGalleryPage />
         case 'needs-you':
             return <NeedsYouPage tab={tab} />
         default:

@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, LibrarySnapshot, MascotDraft, RoutineDraft, RoutineRun, Suggestion } from "./library";
+import type { ChatThread, GalleryMascot, LibrarySnapshot, MascotDraft, RoutineDraft, RoutineRun, Suggestion } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -13,7 +13,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "needs-you";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -273,6 +273,9 @@ export interface InvokeChannels {
   "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft]; result: MascotSaveResult };
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
+  "mascots:gallery": { region: "chrome"; args: []; result: GalleryMascot[] };
+  // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
+  "mascots:add-from-gallery": { region: "chrome"; args: [galleryId: string, name: string | null]; result: MascotSaveResult };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
@@ -407,6 +410,8 @@ export interface RoutinesAPI {
 export interface MascotsAPI {
   save: (id: string | null, draft: MascotDraft) => Promise<MascotSaveResult>;
   delete: (id: string) => Promise<boolean>;
+  gallery: () => Promise<GalleryMascot[]>;
+  addFromGallery: (galleryId: string, name: string | null) => Promise<MascotSaveResult>;
 }
 
 export interface SuggestionsAPI {

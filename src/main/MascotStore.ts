@@ -15,6 +15,8 @@ const LOST: Omit<MascotProfile, "id"> = {
   deletedAt: null,
 };
 
+const galleryIdOf = (galleryId: unknown) => (typeof galleryId === "string" ? { galleryId } : {});
+
 // The flock, in a JSON file. Berry isn't in it: it's always there and can't be changed.
 export class MascotStore {
   private mascots: MascotProfile[] = [];
@@ -26,7 +28,7 @@ export class MascotStore {
         this.mascots = raw.flatMap((item: Partial<MascotProfile> | null) => {
           const parsed = parseMascotDraft(item);
           if ("error" in parsed || typeof item?.id !== "string" || item.id === BERRY_ID) return [];
-          return [{ ...parsed.draft, id: item.id, deletedAt: typeof item.deletedAt === "number" ? item.deletedAt : null }];
+          return [{ ...parsed.draft, id: item.id, deletedAt: typeof item.deletedAt === "number" ? item.deletedAt : null, ...galleryIdOf(item.galleryId) }];
         });
       }
     } catch {
@@ -48,7 +50,7 @@ export class MascotStore {
     return this.find(id) ?? { ...LOST, id };
   }
 
-  save(id: string | null, input: unknown): { ok: true; id: string } | { ok: false; error: string } {
+  save(id: string | null, input: unknown, galleryId?: string): { ok: true; id: string } | { ok: false; error: string } {
     if (id === BERRY_ID) return { ok: false, error: "Berry stays as it is. Make a new mascot instead." };
     if (id && !this.mascots.some((mascot) => mascot.id === id && mascot.deletedAt === null)) {
       return { ok: false, error: "This mascot no longer exists." };
@@ -59,9 +61,17 @@ export class MascotStore {
     const taken = this.all().some((mascot) => mascot.deletedAt === null && mascot.id !== id && mascot.name.toLowerCase() === draft.name.toLowerCase());
     if (taken) return { ok: false, error: `You already have a ${draft.name}. Give this one its own name.` };
     const savedId = id ?? randomUUID();
-    const saved: MascotProfile = { ...draft, id: savedId, deletedAt: null };
+    // Editing a copy from the Gallery leaves it that copy, so the Gallery doesn't offer a second one.
+    const from = id ? this.mascots.find((mascot) => mascot.id === id)?.galleryId : galleryId;
+    const saved: MascotProfile = { ...draft, id: savedId, deletedAt: null, ...galleryIdOf(from) };
     this.write(id ? this.mascots.map((mascot) => (mascot.id === id ? saved : mascot)) : [...this.mascots, saved]);
     return { ok: true, id: savedId };
+  }
+
+  // The user's own copy of a Gallery entry, checked like any other mascot. Adding it again finds the copy that's there.
+  addFromGallery(galleryId: string, input: unknown): { ok: true; id: string } | { ok: false; error: string } {
+    const copy = this.mascots.find((mascot) => mascot.galleryId === galleryId && mascot.deletedAt === null);
+    return copy ? { ok: true, id: copy.id } : this.save(null, input, galleryId);
   }
 
   // Kept on file, so its chats keep their look and limits.

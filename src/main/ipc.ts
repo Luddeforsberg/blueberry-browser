@@ -58,6 +58,8 @@ export const CHANNEL_REGIONS: {
   "routines:mark-seen": ["chrome"],
   "mascots:save": ["chrome"],
   "mascots:delete": ["chrome"],
+  "mascots:gallery": ["chrome"],
+  "mascots:add-from-gallery": ["chrome"],
   "suggestions:list": ["chrome"],
   "suggestions:dismiss": ["chrome"],
   "downloads:list": ["chrome"],

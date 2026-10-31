@@ -9,6 +9,7 @@ const TITLES: Record<InternalPage, string> = {
   gallery: "Component gallery",
   history: "History",
   flock: "Your flock",
+  "mascot-gallery": "Mascot gallery",
   "needs-you": "Needs you",
 };
 

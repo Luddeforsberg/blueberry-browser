@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Pin, Star } from 'lucide-react'
-import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
+import type { GalleryMascot, MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
@@ -18,6 +18,7 @@ import { HistoryRow } from './HistoryPage'
 import { ChatRow } from '../components/Sidebar'
 import { MascotPerch } from '../components/MascotPerch'
 import { MascotCard, Preview } from './FlockPage'
+import { GalleryCard } from './MascotGalleryPage'
 import { mascotForm } from '../flockView'
 import { ACCESSORIES, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
@@ -42,6 +43,14 @@ const SAMPLE_MASCOT: MascotProfile = {
     sites: ['github.com'],
     tools: ['visit'],
     deletedAt: null
+}
+
+const SAMPLE_GALLERY_ENTRY: GalleryMascot = {
+    id: 'gallery-entry',
+    author: 'Blueberry',
+    category: 'Work',
+    description: 'Tells you which pull requests need you, and why.',
+    draft: SAMPLE_MASCOT
 }
 
 const SAMPLE_STEPS = [
@@ -218,6 +227,12 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-20 max-w-[248px]">
                         <ul><MascotCard mascot={SAMPLE_MASCOT} landed={false} onEdit={() => undefined} /></ul>
                     </div>
+                    <ul className="mt-20 grid grid-cols-[repeat(auto-fill,minmax(248px,1fr))] gap-x-4 gap-y-20">
+                        <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={null} onReview={() => undefined} />
+                        <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={SAMPLE_MASCOT} onReview={() => undefined} />
+                        <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: ['visit', 'click', 'type'] } }} copy={null} onReview={() => undefined} />
+                        <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: [] } }} copy={null} onReview={() => undefined} />
+                    </ul>
                     <div className="mt-4 max-w-[288px]">
                         <Preview values={mascotForm(SAMPLE_MASCOT)} mood="curious" onMood={() => undefined} flying={false} />
                     </div>

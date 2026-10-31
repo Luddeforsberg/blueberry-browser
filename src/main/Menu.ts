@@ -202,6 +202,10 @@ export class AppMenu {
             click: () => this.mainWindow.openPage("flock"),
           },
           {
+            label: "Mascot Gallery",
+            click: () => this.mainWindow.openPage("mascot-gallery"),
+          },
+          {
             label: "Needs You",
             click: () => this.mainWindow.openPage("needs-you"),
           },

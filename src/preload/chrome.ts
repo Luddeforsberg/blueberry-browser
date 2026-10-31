@@ -100,6 +100,8 @@ const chromeAPI: ChromeAPI = {
   mascots: {
     save: (id, draft) => invoke("mascots:save", id, draft),
     delete: (id) => invoke("mascots:delete", id),
+    gallery: () => invoke("mascots:gallery"),
+    addFromGallery: (galleryId, name) => invoke("mascots:add-from-gallery", galleryId, name),
   },
   suggestions: {
     list: () => invoke("suggestions:list"),

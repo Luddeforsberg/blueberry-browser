@@ -28,6 +28,7 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     gallery: 'Component gallery',
     history: 'History',
     flock: 'Your flock',
+    'mascot-gallery': 'Mascot gallery',
     'needs-you': 'Needs you'
 }
 

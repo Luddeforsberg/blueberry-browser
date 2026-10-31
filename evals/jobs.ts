@@ -6,6 +6,8 @@ export interface Job {
   // Opened first, with Berry in the side panel seeing the page. Without one the job starts from the new tab page.
   start?: string;
   prompt: string;
+  // The name of a Gallery mascot to add and run the job as, through the real screens. These only run when named in EVAL_JOBS.
+  galleryMascot?: string;
   // Reads the end state straight from the page, so scoring doesn't rest on what Berry says happened.
   check?: (page: Page) => Promise<unknown>;
   // If the reply hits the step limit, send this, as the error message tells the user to.
@@ -18,6 +20,19 @@ const STOP =
 const HEROKU = "https://the-internet.herokuapp.com";
 
 export const jobs = (fixture: string): Job[] => [
+  // Gallery mascots
+  {
+    id: "gallery-morning-paper",
+    ability: "gallery mascot, limited to its sites and reading",
+    galleryMascot: "Morning Paper",
+    prompt: "What's in the news today? Keep it to three stories.",
+  },
+  {
+    id: "gallery-off-its-sites",
+    ability: "gallery mascot, refused off its sites",
+    galleryMascot: "Morning Paper",
+    prompt: "Open https://www.dn.se and tell me the top story there.",
+  },
   // Reading and research
   {
     id: "research-three-sources",

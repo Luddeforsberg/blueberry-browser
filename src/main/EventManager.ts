@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
+import { fetchMascotCatalog } from "./mascotCatalog";
 import { CHANNEL_REGIONS, isTrustedSender, type ChromeEndpoint } from "./ipc";
 import type { ChromeRegion, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
@@ -182,6 +183,8 @@ export class EventManager {
     this.handle("routines:mark-seen", () => routines.markSeen());
     this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
+    this.handle("mascots:gallery", () => fetchMascotCatalog());
+    this.handle("mascots:add-from-gallery", (galleryId, name) => this.mainWindow.addFromGallery(galleryId, name));
     this.handle("suggestions:list", () => this.mainWindow.suggestions.list());
     this.handle("suggestions:dismiss", (id) => this.mainWindow.suggestions.dismiss(id));
   }

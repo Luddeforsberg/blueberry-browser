@@ -12,6 +12,7 @@ import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
 import { confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
+import { fetchMascotCatalog } from "./mascotCatalog";
 import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
@@ -50,7 +51,7 @@ import { BERRY } from "../shared/mascots";
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "needs-you"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "mascot-gallery", "needs-you"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -803,6 +804,14 @@ export class Window {
 
   saveMascot(id: string | null, draft: unknown): MascotSaveResult {
     const result = this.mascotStore.save(id, draft);
+    if (result.ok) this.broadcast("library:updated", this.librarySnapshot);
+    return result;
+  }
+
+  async addFromGallery(galleryId: string, name: string | null): Promise<MascotSaveResult> {
+    const entry = (await fetchMascotCatalog()).find(({ id }) => id === galleryId);
+    if (!entry) return { ok: false, error: "This mascot is no longer in the Gallery." };
+    const result = this.mascotStore.addFromGallery(galleryId, name === null ? entry.draft : { ...entry.draft, name });
     if (result.ok) this.broadcast("library:updated", this.librarySnapshot);
     return result;
   }
