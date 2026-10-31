@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
-import type { ActionApproval, Appearance, LayoutMode, StartupChoice } from '@shared/ipc'
+import React, { useEffect, useState } from 'react'
+import type { ActionApproval, Appearance, LayoutMode, StartupChoice, TabInfo } from '@shared/ipc'
 import { useShell } from '../contexts/ShellContext'
 import { cn } from '@common/lib/utils'
 import { Choice, Switch } from '@common/components/Controls'
 import { SettingsRow } from '../components/SettingsRow'
 import { DownloadSettings, SitePermissionsSettings } from './SiteSettings'
+import { PhoneSettings } from './PhoneSettings'
 import { Button } from '@common/components/Button'
 
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
@@ -18,12 +19,18 @@ const STARTUP_DESCRIPTIONS: Record<StartupChoice, string> = {
     fresh: 'Blueberry opens a new tab, and doesn’t save your open tabs.'
 }
 
-const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
+const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Phone', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
 type Section = typeof SECTIONS[number]
 
-export const SettingsPage: React.FC = () => {
+export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { settings, updateSettings } = useShell()
     const [section, setSection] = useState<Section>('Layout')
+
+    // Another page can open Settings at a section.
+    useEffect(() => {
+        const asked = SECTIONS.find((name) => name === tab.pageParam)
+        if (asked) setSection(asked)
+    }, [tab.pageParam])
 
     return (
         <div className="h-full grid grid-cols-[240px_1fr]">
@@ -119,6 +126,8 @@ export const SettingsPage: React.FC = () => {
                                 <SettingsRow id="setting-berry-sees" title="What Berry can see" description="Berry only reads a page when you ask, and only speaks up about work you started. Your history and memory stay on this device, apart from what Suggestions sends, if it's on." />
                             </>
                         )}
+
+                        {section === 'Phone' && <PhoneSettings />}
 
                         {section === 'Downloads' && <DownloadSettings />}
 

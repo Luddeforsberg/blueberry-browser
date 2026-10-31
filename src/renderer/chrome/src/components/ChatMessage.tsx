@@ -177,30 +177,24 @@ const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval; masco
 }
 
 // What the user can do about a tab they've been handed. Words are never typed here, so there's nowhere for a secret to go.
-export const HandoffActions: React.FC<{
+const HandoffActions: React.FC<{
     chatId: string
     approval: ChatApproval
-    mascot?: MascotProfile
-    onAnswered?: (said: string) => void
-}> = ({ chatId, approval, mascot, onAnswered }) => {
-    const name = useAssistantName(mascot)
+}> = ({ chatId, approval }) => {
     const { tabs, switchTab } = useBrowser()
     const tabId = approval.handoff?.tabId
     const here = tabs.some((tab) => tab.id === tabId && tab.isActive)
-    const send = (allow: boolean, said: string) => {
-        onAnswered?.(said)
-        void window.chromeAPI.chat.decide(chatId, approval.id, allow)
-    }
+    const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
     return (
         <div className="flex flex-wrap items-center gap-2">
             {!here && tabId && <Button size="sm" onClick={() => void switchTab(tabId)}>Go to the tab</Button>}
-            <Button size="sm" variant={here ? 'default' : 'outline'} onClick={() => send(true, `${name} has the tab back.`)}>I’m done</Button>
-            <Button size="sm" variant="ghost" onClick={() => send(false, `${name} carries on without it.`)}>Not now</Button>
+            <Button size="sm" variant={here ? 'default' : 'outline'} onClick={() => send(true)}>I’m done</Button>
+            <Button size="sm" variant="ghost" onClick={() => send(false)}>Not now</Button>
         </div>
     )
 }
 
-export const handoffNote = (name: string) => `${name} can’t see that tab until you press I’m done. Your password or code goes in the page, and never in a chat.`
+const handoffNote = (name: string) => `${name} can’t see that tab until you press I’m done. Your password or code goes in the page, and never in a chat.`
 
 // Berry has handed a tab to the user, and waits here until they say they're done.
 const ChatHandoffCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
@@ -210,7 +204,7 @@ const ChatHandoffCard: React.FC<{ chatId: string; approval: ChatApproval; mascot
             <h3 className="text-13 font-semibold">{approval.text}</h3>
             <p className="mt-1 text-12 text-muted-foreground">{handoffNote(name)}</p>
             <div className="mt-3">
-                <HandoffActions chatId={chatId} approval={approval} mascot={mascot} />
+                <HandoffActions chatId={chatId} approval={approval} />
             </div>
         </section>
     )

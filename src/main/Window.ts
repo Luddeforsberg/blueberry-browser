@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, app, dialog, nativeTheme, session, type WebContents } from "electron";
+import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -8,6 +8,8 @@ import type { ChatStore } from "./ChatStore";
 import type { HistoryStore } from "./HistoryStore";
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
+import { Phone } from "./Phone";
+import { TelegramChannel } from "./TelegramChannel";
 import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
 import { confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
@@ -69,6 +71,8 @@ const MAC_BUTTONS_HEIGHT = 14;
 // macOS can report a menu closed before it runs the clicked item, so this waits well past that.
 const MENU_CLICK_GRACE_MS = 1000;
 // Plenty for a habit to show, and few enough to look through on every new tab.
+// How long with no input before the phone gets what's waiting, even with the window in front.
+const AWAY_AFTER_IDLE_SECONDS = 60;
 const MAX_SUGGESTION_VISITS = 5000;
 const MAX_SUGGESTION_CHATS = 100;
 
@@ -98,6 +102,8 @@ export class Window {
   private readonly tabsUnderChrome = new WeakSet<Tab>();
   // What Needs you held last time, so only something new gets a notification.
   private knownWaiting = new Set<string>();
+  readonly telegram: TelegramChannel;
+  private readonly phone: Phone;
   readonly chats: Chats;
   readonly routines: Routines;
   readonly suggestions: Suggestions;
@@ -170,6 +176,19 @@ export class Window {
     const onDownload = (_: unknown, __: unknown, contents: WebContents) => this.closeTabLeftEmpty(contents);
     session.defaultSession.on("will-download", onDownload);
 
+    this.telegram = new TelegramChannel(join(app.getPath("userData"), "phone.json"), () => {
+      sendToRenderer(this.chrome.view.webContents, "phone:updated", this.telegram.state);
+      this.phone.sync();
+    });
+    this.phone = new Phone(this.telegram, {
+      waiting: () => this.needsYou,
+      nameOf: ({ mascotId }) => this.mascotName(mascotId),
+      away: () => this.userIsAway,
+      decide: (id, approvalId, allow, answer) => this.chats.decide(id, approvalId, allow, answer),
+      enterCode: (id, approvalId, code) => this.chats.enterCode(id, approvalId, code),
+      onAnswered: (approvalId, said) => sendToRenderer(this.chrome.view.webContents, "phone:answered", { approvalId, said }),
+    });
+
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
@@ -186,6 +205,7 @@ export class Window {
         sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
       },
       onListChanged: () => this.publishLibrary(),
+      onDecided: (approvalId, allow) => this.phone.noteDecided(approvalId, allow),
       onWorkingTabs: (working, mascots) => {
         // A reply stopped by the window closing ends after the window has gone.
         if (this._baseWindow.isDestroyed()) return;
@@ -224,7 +244,8 @@ export class Window {
       routines: () => this.routines.list(),
       mascots: () => this.mascotStore.all(),
       hasModel,
-      write: (system, data) => writeWithCheapModel(system, data),
+      // Page titles go in this, and a careless page may have put a code from the phone in its title.
+      write: (system, data) => writeWithCheapModel(system, this.chats.withoutCodes(data)),
       onChanged: () => this.publishSuggestions(),
     });
 
@@ -232,6 +253,8 @@ export class Window {
     else this.createTab();
     this.updateAllBounds();
     this.routines.start();
+    this.telegram.start();
+    this.phone.start();
 
     this.windowSize = this._baseWindow.getBounds();
     this._baseWindow.on("resize", () => {
@@ -239,7 +262,10 @@ export class Window {
       this.updateAllBounds();
       this.saveSessionSoon();
     });
-    this._baseWindow.on("blur", () => this.hideFloatingSidebar());
+    this._baseWindow.on("blur", () => {
+      this.hideFloatingSidebar();
+      this.phone.sync();
+    });
 
     const onThemeUpdated = () => this.notifyTheme();
     nativeTheme.on("updated", onThemeUpdated);
@@ -247,6 +273,8 @@ export class Window {
     this._baseWindow.on("closed", () => {
       nativeTheme.off("updated", onThemeUpdated);
       this.routines.shutdown();
+      this.phone.stop();
+      this.telegram.close();
       this.permissionPrompt.destroy();
       session.defaultSession.off("will-download", onDownload);
       offDownloads();
@@ -341,9 +369,7 @@ export class Window {
       snapshot.needsYou
         .filter(({ approval }) => !known.has(approval.id))
         .forEach(({ approval, mascotId }) => {
-          const mascot = this.mascotStore.resolve(mascotId);
-          const name = mascot.id === BERRY.id && !this.settings.showBerry ? "Assistant" : mascot.name;
-          notifyNeedsYou(name, approval, () => {
+          notifyNeedsYou(this.mascotName(mascotId), approval, () => {
             this.show();
             this.focus();
             this.openPage("needs-you", { param: approval.id });
@@ -351,6 +377,12 @@ export class Window {
         });
     }
     this.broadcast("library:updated", snapshot);
+    this.phone.sync();
+  }
+
+  private mascotName(mascotId: string): string {
+    const mascot = this.mascotStore.resolve(mascotId);
+    return mascot.id === BERRY.id && !this.settings.showBerry ? "Assistant" : mascot.name;
   }
 
   get librarySnapshot(): LibrarySnapshot {
@@ -796,6 +828,12 @@ export class Window {
     return window.isFocused() || window.isFullScreen() || this.allTabs.some((tab) => tab.existingView?.webContents.isCurrentlyAudible());
   }
 
+  // The window isn't in front, or nobody has touched the computer for a little while. So nothing buzzes on someone
+  // reading the page, and a job asking during lunch gets through even with the window left in front.
+  private get userIsAway(): boolean {
+    return this.settings.phoneAlways || !this._baseWindow.isFocused() || powerMonitor.getSystemIdleTime() >= AWAY_AFTER_IDLE_SECONDS;
+  }
+
   async confirmDeleteRoutine(id: string): Promise<boolean> {
     const routine = this.routines.list().find((candidate) => candidate.id === id);
     if (!routine || !(await confirmDeleteRoutine(this._baseWindow, routine.name))) return false;
@@ -930,6 +968,7 @@ export class Window {
     if (after.onboarded !== before.onboarded) this.syncTabViews();
     if (after.onStartup !== before.onStartup) this.saveSessionSoon();
     if (after.suggestions !== before.suggestions) this.publishSuggestions();
+    if (after.phoneAlways !== before.phoneAlways) this.phone.sync();
 
     this.broadcast("settings:updated", after);
     this.updateAllBounds();

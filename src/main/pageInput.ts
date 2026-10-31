@@ -96,7 +96,7 @@ export const isHarmlessKey = (key: string): boolean => HARMLESS_KEYS.has(key);
 // when a page doesn't, and that includes closing the window and quitting.
 export const isKnownKey = (key: string): boolean => key in NAMED_KEYS || [...key].length === 1;
 
-export const pressKey = async (tab: Tab, key: string, shift: boolean): Promise<void> => {
+export const pressKey = async (tab: Pick<Tab, "sendAgentInput">, key: string, shift: boolean): Promise<void> => {
   const keyCode = NAMED_KEYS[key] ?? key;
   const modifiers: "shift"[] = shift ? ["shift"] : [];
   tab.sendAgentInput({ type: "keyDown", keyCode, modifiers });

@@ -500,3 +500,114 @@ export const scrollPage = (direction: "up" | "down"): string => `(() => {
   window.scrollBy({ top: ${direction === "up" ? -1 : 1} * window.innerHeight * 0.9, behavior: "instant" });
   return { top: Math.round(window.scrollY), height: document.documentElement.scrollHeight };
 })()`;
+
+// For typing a code from the phone, which `codeEntry.ts` does. These scripts never hold the code. The elements stay in
+// this isolated world, where the page can't change which ones they are.
+const CODE_SHARED = `
+  const code = (globalThis.__berryCode ??= { fields: [], submitted: false });
+  const activeOf = () => {
+    let at = document.activeElement;
+    while (at?.shadowRoot?.activeElement || at?.contentDocument?.activeElement) {
+      at = at.shadowRoot?.activeElement ?? at.contentDocument.activeElement;
+    }
+    return at;
+  };
+`;
+
+export const listCodeFields = `(() => {
+  const DESCEND = true;
+  ${SHARED}
+  ${LIST}
+  ${CODE_SHARED}
+  const inView = (el) => {
+    const box = el.getBoundingClientRect();
+    return box.right > 0 && box.bottom > 0;
+  };
+  const inputs = allElements(document).filter((el) => el.tagName === "INPUT" && visible(el) && inView(el));
+  code.fields = inputs.filter((el) => ["text", "tel", "number"].includes(el.type) && !el.disabled && !el.readOnly);
+  return {
+    fields: code.fields.map((el) => ({
+      autocomplete: el.autocomplete ?? "",
+      words: [el.name, el.id, nameOf(el), el.placeholder].filter(Boolean).join(" "),
+      type: el.type,
+      maxLength: el.maxLength,
+    })),
+    hasPasswordField: inputs.some((el) => el.type === "password"),
+  };
+})()`;
+
+export const focusCodeField = (index: number, keepValue = false): string => `(() => {
+  ${CODE_SHARED}
+  const el = code.fields[${index}];
+  if (!el?.isConnected || el.disabled) return false;
+  el.scrollIntoView({ block: "center" });
+  el.ownerDocument.defaultView.focus();
+  el.focus();
+  ${keepValue ? "" : "el.select?.();"}
+  return activeOf() === el;
+})()`;
+
+// Which field has the focus, or -1.
+export const codeFieldFocus = `(() => {
+  ${CODE_SHARED}
+  return code.fields.indexOf(activeOf());
+})()`;
+
+// Whether each field took what was typed in it. Only how much, as this answer needn't hold the code.
+export const codeFieldsFilled = (indexes: number[], length: number): string => `(() => {
+  ${CODE_SHARED}
+  const fields = ${JSON.stringify(indexes)}.map((index) => code.fields[index]);
+  const typed = fields.reduce((sum, el) => sum + (el?.value ?? "").replace(/[\\s-]/g, "").length, 0);
+  return typed === ${length} || !fields.every((el) => el?.isConnected && !el.disabled);
+})()`;
+
+export const watchCodeSubmit = `(() => {
+  ${CODE_SHARED}
+  code.submitted = false;
+  if (!code.watching) {
+    code.watching = true;
+    document.addEventListener("submit", () => (code.submitted = true), true);
+  }
+})()`;
+
+// Whether the page has done something about the code: a form went, or the fields are gone or locked while it checks.
+export const codeFieldsChanged = (indexes: number[]): string => `(() => {
+  ${CODE_SHARED}
+  return code.submitted || ${JSON.stringify(indexes)}.some((index) => {
+    const el = code.fields[index];
+    return !el?.isConnected || el.disabled || el.readOnly || el.getBoundingClientRect().width === 0;
+  });
+})()`;
+
+export const pressCodeSubmit = (indexes: number[]): string => `(() => {
+  ${CODE_SHARED}
+  const el = code.fields[${indexes[indexes.length - 1]}];
+  const root = el?.form ?? el?.ownerDocument;
+  if (!root) return "none";
+  const shown = (button) => button.getBoundingClientRect().width > 0 && !button.disabled;
+  const inForm = el.form ? [...root.querySelectorAll('button:not([type=button]):not([type=reset]), input[type=submit]')].filter(shown) : [];
+  if (inForm.length === 1) {
+    inForm[0].click();
+    return "clicked";
+  }
+  if (el.form) {
+    el.form.requestSubmit();
+    return "submitted";
+  }
+  const words = /verify|submit|continue|confirm|next|sign in|log in|fortsätt|bekräfta|verifiera|logga in|nästa/i;
+  const named = [...root.querySelectorAll('button, input[type=submit], [role=button]')].filter((button) => shown(button) && words.test(button.innerText || button.value || ""));
+  if (named.length !== 1) return "none";
+  named[0].click();
+  return "clicked";
+})()`;
+
+// Through the value's own setter, so a page's framework notices too.
+export const clearCodeFields = (indexes: number[]): string => `(() => {
+  ${CODE_SHARED}
+  for (const index of ${JSON.stringify(indexes)}) {
+    const el = code.fields[index];
+    if (!el?.isConnected || !el.value) continue;
+    Object.getOwnPropertyDescriptor(el.ownerDocument.defaultView.HTMLInputElement.prototype, "value").set.call(el, "");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+})()`;

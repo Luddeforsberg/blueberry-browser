@@ -319,7 +319,7 @@ Every mood has a text label for assistive technology.
 | Settings | Its own section |
 | Flock | Its own page, sitting on each card |
 | Gallery | Sitting on each card, Asking on the review screen, Delivered once added |
-| Needs you | Asking on each row, and off duty when nothing's waiting |
+| Needs you | Asking at 24px on each row, and off duty when nothing's waiting |
 | Over a web page | Only while acting on that page, in an overlay view |
 
 ### Where Berry goes
@@ -337,8 +337,9 @@ Berry only speaks about work the user started: a finished task, a routine result
 | Count on Needs you | Anything waiting, with the berry beside the number on the sidebar row, or words in the toolbar with no sidebar. Answering is what clears it, not looking |
 | Card in the panel | Only when Berry needs a decision to continue, and the same item is on Needs you |
 | Silent system notification | Something new is waiting, or a routine has news, and the app isn't in front |
+| Message on the user's phone | Something is waiting and they're away, only if they connected a bot. See Needs you |
 
-Berry never opens a modal, takes keyboard focus or makes a sound. A notification never comes during fullscreen or while a tab plays sound, and it says who and what kind of thing it is, never the question, the site or anything typed. Anything waiting holds until the user is done.
+Berry never opens a modal, takes keyboard focus or makes a sound. A notification never comes during fullscreen or while a tab plays sound, and it says who and what kind of thing it is, never the question, the site or anything typed. A phone message does say those, because it's how the user answers, and Settings says Telegram can read it. Anything waiting holds until the user is done.
 
 ### Reduced motion
 
@@ -451,19 +452,30 @@ Mascots made for one job, ready to add. Opens as a tab from the last tile on the
 
 The flock's whole story on one page: give it jobs, carry on with your day, and it only interrupts when it truly needs you. Opens as a tab from the sidebar, the Go menu or the toolbar notice, with only one open at a time.
 
-- **A row** is a `surface` card, oldest first: the mascot at 64px in Asking, its name and the job (the chat's title or the routine's name), how long it's waited, exactly what it's asking in the same words as the card in the chat, and its last finished step. Answering happens in the row, and the job goes on behind it. **Open the chat** or **Open the routine** and **Go to the tab** are one press away.
-- **Answers:** Allow and Don't allow for an action, a text box with Answer and Skip for a question. After an answer, the row becomes one quiet line for about a second and a half, the mascot flying and saying what happened, such as "Allowed. Scout carries on." It uses `chat:decide`, like the card in a chat.
+It's a plain list, like a mail inbox: rows split by `border` lines, oldest first, with no cards or shadows. Beside the heading is one small line about the phone: "Replies from your phone are on" when that's true, "Replies from your phone are paused" with a problem, or a quiet link to set it up, which opens Settings at Phone. Under the list is one short privacy note, and rows have no hints of their own.
+
+- **A row** starts with the request, as one 16px sentence such as "Scout needs a code for linkedin.com". Addresses in it become site names. Where that changed anything, the exact words are on a muted line beneath it, cut to one line until the row is hovered or focused and then in full, opening downwards so Allow stays where it is. Nothing can be allowed without that line open, whether by pointer or keyboard. Below is the mascot at 24px in Asking, its name, the job (the chat's title or the routine's name) and how long it's waited, in 12px.
+- **One action shows.** Allow for an action, filled, because it's a decision. An answer box with Answer for a question. **Go to the tab**, outlined, for a handed-over tab, or **I'm done** once on it. The rest (Don't allow, Skip, Not now, I'm done, Go to the tab, Open the chat or Open the routine) sit on the mascot's line, unseen until the row is hovered or focused. They can always be tabbed to, and reaching one shows them.
+- **Answers:** answering happens in the row, and the job goes on behind it. After an answer, from here or from the phone, the row becomes one quiet line for about a second and a half, the mascot flying and saying what happened, such as "Allowed. Scout carries on." It uses `chat:decide`, like the card in a chat.
 - **Empty:** the flock in a row, off duty, above "Nothing needs you right now." Anyone working flies and is named instead, because resting has to be true.
 
-**A blocked job asks.** A sign-in, a code or a captcha is something only the user does, so the job calls `hand_to_user` and the row says "Scout needs you to sign in on github.com". The site comes from the tab's address and the words from code, so a page can't write them.
+**A blocked job asks.** A sign-in, a code or a captcha is something only the user does, so the job calls `hand_to_user` and the row says "Scout needs you to sign in on github.com" or "Scout needs a code for linkedin.com". The site comes from the tab's address and the words from code, so a page can't write them.
 
-- **Go to the tab** goes there. The toolbar on that tab says "Scout can't see this tab" with **I'm done**, in both layouts, since that's where the user will be when they finish. The row has **I'm done** too, and **Not now**. No control takes text, so there's nowhere for a secret to go.
+- **Go to the tab** goes there. The toolbar on that tab says "Scout can't see this tab" with **I'm done**, in both layouts, since that's where the user will be when they finish. The row has **I'm done** too, and **Not now**. No control on the row or the tab takes a secret. The only text box answers a question, and the question can't ask for one.
 - **While the user has it,** no job can reach the tab: not the one that asked, not another with the page open, and no message sends it along. Tools get an error saying the user is busy there. The chat composer says the mascot can't see it, and the working icon and reading ring go away.
-- **I'm done** gives the tab back and Berry reads it again. This is the one way a taken tab returns to a job, apart from sending it with a message. The next click there takes it over again, as it would any other time.
+- **I'm done** gives the tab back and Berry reads it again. This is the one way a taken tab returns to a job, apart from sending it with a message or a code going in from the phone. The next click there takes it over again, as it would any other time.
 - **Not now** tells Berry no. If the user touched the tab it stays theirs and out of every job's reach, so Berry can't read something left half typed, until they close it or send it with a message. If they didn't, it stays the job's. Closing the tab counts as Not now. Stop or closing the app ends the job the same way.
 - Any Ask before acting setting hands over, because this isn't permission: Berry simply can't do it.
 
-**Phone preview.** While anything is waiting, a phone frame sits beside the rows, or under them below 860px of page, with the first plain yes-or-no on its lock screen, or else the first item. It's labelled "Coming to your phone" and says plainly that there's no phone app yet. Its buttons are real and answer the item. Its frame is the one place the page draws a device, with its own radii and the lock screen's clock.
+**From the phone.** The same items can be answered through the user's own Telegram bot, reached from this computer by long polling, so it works only while Blueberry is open and no server of ours is involved. It's off until they connect it in Settings, under Phone.
+
+- **When it sends:** when the Blueberry window isn't in front, or after a minute with no input. Whatever's waiting then goes once, and is checked again every 15 seconds. **Send even when I'm here** forces it, for filming and trying it out.
+- **Approvals** use the same exact words as the card, with Allow and Don't allow as buttons, through the same `chat:decide` and its checks. Whichever side answers first settles it. The phone message then says what happened, with its buttons gone, and the row goes.
+- **Questions:** a reply answers it, as if typed in the row. The filter that stops a question asking for a secret still applies.
+- **Codes:** "Scout needs a code for linkedin.com. Reply with it." The reply goes straight to the tab, typed with real keys by code the model can't call. The job hears only that a code was entered and to look at the page, and the model never gets it: not in a tool result, the chat, steps or logs. Anything a page repeats back is taken out of what goes to the model, the field is emptied after submitting, and that tab gives no screenshots for an hour, as a picture can't be cleaned. With more than one request taking a reply, only replying to the right message counts. Nothing that looks like a code answers a question: an answer like that is typed at the computer.
+- **A code is typed only** if the reply is plausible (4 to 12 letters or digits with an optional space or dash, with a digit or in capitals), the tab still exists, is still held for the user, is on the same host as when asked and hasn't been touched, and code in the page finds exactly one place for it: the field marked one-time-code, then one with an obvious name, then a row of one-character boxes, then the only field on a page with no password. Otherwise nothing is typed, the phone says why, and it waits at the computer with the tab still held. After typing it submits and lets go, as I'm done does. The user's message is deleted, and the phone says if it couldn't be.
+- **Sign-ins and captchas** can't be done from the phone. The message says it's waiting at the computer, with no buttons. Passwords are never sent this way.
+- **If Telegram can't be reached,** or the token is revoked, everything simply waits on this page and Settings says what's wrong. No job ever waits on Telegram.
 
 Not built: a job carrying on with other work while it waits. One reply runs one step at a time through the agent, so a waiting job waits, while other jobs go on.
 
@@ -487,7 +499,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Downloads
 

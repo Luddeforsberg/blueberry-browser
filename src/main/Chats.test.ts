@@ -425,6 +425,74 @@ describe("Chats", () => {
       expect(await readPage.run({})).toMatch(/user took over tab tab-own/);
     });
 
+    describe("a code from the phone", () => {
+      const handedOver = async (need: "code" | "sign-in") => {
+        const typed = vi.fn();
+        const looked = vi.fn(async () => ({ fields: [], hasPasswordField: false }));
+        const own = { ...tab(), id: "tab-own", settled: async () => {}, sendInputWhileHeld: typed, runInPageWhileHeld: looked } as unknown as Tab;
+        const open = [own];
+        const stream: StreamReply = async function* (_, __, { tools }) {
+          await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
+          await tools.find((tool) => tool.name === "hand_to_user")!.run({ need });
+          yield "ok";
+        };
+        const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
+          activeTab: () => null,
+          allTabs: () => open,
+          openBackgroundTab: () => own,
+          closeTab: () => true,
+          actionApproval: () => "always",
+        }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
+        send(chats, null, "Check my orders", false);
+        await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
+        const [{ id, approval }] = chats.waiting();
+        return { chats, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id };
+      };
+
+      it("takes a code out however a page says it back, even in text that looks like a picture", async () => {
+        const { chats, enter } = await handedOver("code");
+        await enter();
+        for (const said of ["123456", "123-456", "123 456", "1\n2\n3\n4\n5\n6", "data:image/png;base64,123456"]) expect(chats.withoutCodes(said)).not.toMatch(/1\s*-?2\s*3\s*-?4\s*5\s*6/);
+      });
+
+      it("only goes to the open request for a code", async () => {
+        const { chats, id, looked } = await handedOver("code");
+        expect(await chats.enterCode(id, "another", "123456")).toBe("closed");
+        expect(await chats.enterCode("another", "another", "123456")).toBe("closed");
+        const signIn = await handedOver("sign-in");
+        expect(await signIn.enter()).toBe("closed");
+        expect(looked).not.toHaveBeenCalled();
+        expect(signIn.looked).not.toHaveBeenCalled();
+      });
+
+      it("isn't typed in a tab that's gone, that the user touched, or that left the host", async () => {
+        const gone = await handedOver("code");
+        gone.open.length = 0;
+        expect(await gone.enter()).toBe("tab-gone");
+
+        const touched = await handedOver("code");
+        touched.chats.releaseTab("tab-own");
+        expect(await touched.enter()).toBe("touched");
+
+        const moved = await handedOver("code");
+        (moved.own as unknown as { url: string }).url = "https://evil.example/";
+        expect(await moved.enter()).toBe("moved");
+
+        for (const { looked, typed } of [gone, touched, moved]) {
+          expect(looked).not.toHaveBeenCalled();
+          expect(typed).not.toHaveBeenCalled();
+        }
+      });
+
+      it("keeps the tab held and waiting when there's nowhere to type it", async () => {
+        const { enter, typed, own, chats } = await handedOver("code");
+        expect(await enter()).toBe("no-field");
+        expect(typed).not.toHaveBeenCalled();
+        expect(own.heldForUser).toBe(true);
+        expect(chats.waiting()).toHaveLength(1);
+      });
+    });
+
     it("a handed-over tab the user typed in stays out of every job's reach, until they send it with a message", async () => {
       const page = { ...tab(), id: "tab-sent" } as unknown as Tab;
       const own = { ...tab(), id: "tab-own", settled: async () => {}, getTextWithFrames: async () => "half typed" } as unknown as Tab;
