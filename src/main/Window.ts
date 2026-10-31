@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, dialog, nativeTheme, type WebContents } from "electron";
+import { BaseWindow, Menu, dialog, nativeTheme, session, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -16,6 +16,9 @@ import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
 import { attachPageMenu, printPage } from "./pageMenu";
 import { SiteZoom } from "./siteZoom";
+import type { Downloads } from "./Downloads";
+import type { SitePermissions } from "./SitePermissions";
+import { PermissionPromptView } from "./PermissionPromptView";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -39,7 +42,7 @@ import type { ChatThread, LibrarySnapshot } from "../shared/library";
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -79,12 +82,15 @@ export class Window {
   private readonly library = new MockLibrary();
   readonly chats: Chats;
   readonly routines: Routines;
+  readonly permissionPrompt: PermissionPromptView;
 
   constructor(
     private readonly settingsStore: SettingsStore,
     private readonly chatStore: ChatStore,
     private readonly bookmarkStore: BookmarkStore,
-    routineStore: RoutineStore
+    routineStore: RoutineStore,
+    readonly downloads: Downloads,
+    readonly sitePermissions: SitePermissions
   ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
 
@@ -127,6 +133,17 @@ export class Window {
       },
       tabs: () => this.allTabs,
     });
+    this.permissionPrompt = new PermissionPromptView(this._baseWindow, sitePermissions, {
+      activeContents: () => (this.settings.onboarded ? this.activeTab?.webContents ?? null : null),
+      page: () => this.layout.page,
+    });
+    const offDownloads = downloads.onChange((list) => sendToRenderer(this.chrome.view.webContents, "downloads:updated", list));
+    const offSaved = sitePermissions.onChange(() =>
+      sendToRenderer(this.chrome.view.webContents, "permissions:saved-updated", sitePermissions.saved)
+    );
+
+    const onDownload = (_: unknown, __: unknown, contents: WebContents) => this.closeTabLeftEmpty(contents);
+    session.defaultSession.on("will-download", onDownload);
 
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
@@ -174,6 +191,10 @@ export class Window {
     this._baseWindow.on("closed", () => {
       nativeTheme.off("updated", onThemeUpdated);
       this.routines.shutdown();
+      this.permissionPrompt.destroy();
+      session.defaultSession.off("will-download", onDownload);
+      offDownloads();
+      offSaved();
       this.chats.stopAll();
       this.settingsStore.flush();
       this.tabsMap.forEach((tab) => tab.destroy());
@@ -597,6 +618,19 @@ export class Window {
     }
   }
 
+  // A link to a download in a new tab would otherwise leave that tab empty for good.
+  private closeTabLeftEmpty(contents: WebContents): void {
+    const tab = this.allTabs.find((candidate) => candidate.webContents === contents);
+    if (tab && !tab.hasLoaded && this.tabCount > 1) this.closeTab(tab.id, false);
+  }
+
+  async chooseDownloadFolder(): Promise<void> {
+    const { canceled, filePaths } = await dialog.showOpenDialog(this._baseWindow, {
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (!canceled && filePaths[0]) this.updateSettings({ downloadFolder: filePaths[0] });
+  }
+
   showBerryMenu(): void {
     const { keepBerryStill, showBerry } = this.settings;
     Menu.buildFromTemplate([
@@ -725,6 +759,7 @@ export class Window {
     else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
     this.findBar.setBounds(layout.findBar);
     this.broadcast("layout:updated", layout);
+    this.permissionPrompt.sync();
   }
 
   private notifyTabs(): void {
@@ -740,6 +775,7 @@ export class Window {
     }
     this.broadcast("theme:updated", this.theme);
     this.findBar.notifyTheme(this.theme);
+    sendToRenderer(this.permissionPrompt.chrome.view.webContents, "theme:updated", this.theme);
   }
 
   private broadcast<C extends keyof EventChannels>(channel: C, payload: EventChannels[C]): void {

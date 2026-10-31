@@ -59,8 +59,8 @@ describe("pageMenuTemplate", () => {
   it("offers image actions, and only saves images from the web", () => {
     const acting = actions();
     const items = build({ mediaType: "image", srcURL: "https://example.com/a.png" }, acting);
-    expect(labels(items)).toEqual(["Save Image…", "Copy Image", "-", "Inspect"]);
-    click(items, "Save Image…");
+    expect(labels(items)).toEqual(["Save Image", "Copy Image", "-", "Inspect"]);
+    click(items, "Save Image");
     expect(acting.saveImage).toHaveBeenCalledWith("https://example.com/a.png");
 
     expect(labels(build({ mediaType: "image", srcURL: "file:///etc/hosts" }))).toEqual(["Copy Image", "-", "Inspect"]);

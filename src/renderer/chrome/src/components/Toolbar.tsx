@@ -4,6 +4,7 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { AddressBar } from './AddressBar'
+import { DownloadsButton } from './DownloadsButton'
 import { Favicon, siteIcon } from './Favicon'
 import { ToolBarButton } from './ToolBarButton'
 import { RoutineNotice } from './RoutineNotice'
@@ -90,6 +91,8 @@ export const Toolbar: React.FC = () => {
                 >
                     <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
                 </ToolBarButton>
+
+                <DownloadsButton />
 
                 {activeTab?.page !== 'chat' && activeTab?.page !== 'new-tab' && (
                     <ToolBarButton

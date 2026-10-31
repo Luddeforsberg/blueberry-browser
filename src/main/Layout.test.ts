@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeLayout, MIN_PAGE_WIDTH } from "./Layout";
+import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH } from "./Layout";
 
 const mac = {
   platform: "darwin" as const,
@@ -132,5 +132,19 @@ describe("computeLayout", () => {
       width: 256,
       height: 800,
     });
+  });
+});
+
+describe("promptRect", () => {
+  const page = { x: 240, y: 48, width: 680, height: 744 };
+
+  it("sits in the page's corner at the card's height", () => {
+    expect(promptRect(page, 170)).toEqual({ x: 240, y: 48, width: PROMPT_WIDTH, height: 170 });
+  });
+
+  it("never leaves the page, whatever height it's told", () => {
+    expect(promptRect(page, 5000).height).toBe(744);
+    expect(promptRect(page, 0).height).toBe(1);
+    expect(promptRect({ ...page, width: 300 }, 170).width).toBe(300);
   });
 });

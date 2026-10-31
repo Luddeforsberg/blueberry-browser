@@ -93,6 +93,21 @@ const chromeAPI: ChromeAPI = {
     getRuns: (id) => invoke("routines:runs", id),
     markSeen: () => invoke("routines:mark-seen"),
   },
+  downloads: {
+    list: () => invoke("downloads:list"),
+    act: (id, action) => invoke("downloads:act", id, action),
+    chooseFolder: () => invoke("downloads:choose-folder"),
+    onUpdated: (callback) => subscribe("downloads:updated", callback),
+  },
+  permissions: {
+    saved: () => invoke("permissions:saved"),
+    set: (origin, permission, decision) => invoke("permissions:set", origin, permission, decision),
+    onSavedUpdated: (callback) => subscribe("permissions:saved-updated", callback),
+    current: () => invoke("permissions:current"),
+    decide: (promptId, allow) => invoke("permissions:decide", promptId, allow),
+    resizePrompt: (height) => invoke("permissions:resize", height),
+    onPrompt: (callback) => subscribe("permissions:prompt", callback),
+  },
 };
 
 contextBridge.exposeInMainWorld("chromeAPI", chromeAPI);

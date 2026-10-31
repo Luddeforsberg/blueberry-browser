@@ -20,6 +20,11 @@ export class AppMenu {
             click: () => this.mainWindow.openPage("settings"),
           },
           {
+            label: "Downloads",
+            accelerator: "CmdOrCtrl+Shift+J",
+            click: () => this.mainWindow.openPage("downloads"),
+          },
+          {
             label: "Open Location",
             accelerator: "CmdOrCtrl+L",
             click: () => this.mainWindow.focusAddressBar(),

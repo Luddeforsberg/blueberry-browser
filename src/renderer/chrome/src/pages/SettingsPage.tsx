@@ -3,21 +3,8 @@ import type { ActionApproval, Appearance, LayoutMode } from '@shared/ipc'
 import { useShell } from '../contexts/ShellContext'
 import { cn } from '@common/lib/utils'
 import { Choice, Switch } from '@common/components/Controls'
-
-const Row: React.FC<{ id: string; title: string; description?: string; children?: React.ReactNode }> = ({
-    id,
-    title,
-    description,
-    children
-}) => (
-    <div className="flex items-center gap-6 min-h-16 py-4 border-b last:border-b-0">
-        <div className="flex-1">
-            <h3 id={id} className="text-14 font-semibold">{title}</h3>
-            {description && <p className="mt-0.5 text-13 text-muted-foreground">{description}</p>}
-        </div>
-        {children}
-    </div>
-)
+import { SettingsRow } from '../components/SettingsRow'
+import { DownloadSettings, SitePermissionsSettings } from './SiteSettings'
 
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
     risky: 'Berry asks before anything that could delete, send, buy or change text. Opening pages and searching happen without asking.',
@@ -25,7 +12,7 @@ const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
     never: "Berry doesn't ask, so it can delete, send or buy without checking with you, including if a page tricks it. That includes routines, which run when you aren't watching."
 }
 
-const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Data and privacy', 'Account'] as const
+const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
 type Section = typeof SECTIONS[number]
 
 export const SettingsPage: React.FC = () => {
@@ -63,7 +50,7 @@ export const SettingsPage: React.FC = () => {
 
                         <div className="rounded-panel border bg-surface px-5">
                         {section === 'Layout' && (
-                            <Row id="setting-tabs" title="Tabs" description="Vertical tabs live in the sidebar. Horizontal tabs sit in a row above the address bar.">
+                            <SettingsRow id="setting-tabs" title="Tabs" description="Vertical tabs live in the sidebar. Horizontal tabs sit in a row above the address bar.">
                                 <Choice<LayoutMode>
                                     label="Tabs"
                                     value={settings.layoutMode}
@@ -73,11 +60,11 @@ export const SettingsPage: React.FC = () => {
                                         { value: 'horizontal', label: 'Horizontal' }
                                     ]}
                                 />
-                            </Row>
+                            </SettingsRow>
                         )}
 
                         {section === 'Appearance' && (
-                            <Row id="setting-appearance" title="Appearance" description="System follows your computer's light or dark setting.">
+                            <SettingsRow id="setting-appearance" title="Appearance" description="System follows your computer's light or dark setting.">
                                 <Choice<Appearance>
                                     label="Appearance"
                                     value={settings.appearance}
@@ -88,26 +75,26 @@ export const SettingsPage: React.FC = () => {
                                         { value: 'dark', label: 'Dark' }
                                     ]}
                                 />
-                            </Row>
+                            </SettingsRow>
                         )}
 
                         {section === 'Berry' && (
                             <>
-                                <Row id="setting-show-berry" title="Show Berry" description="Turn this off for a plain icon and neutral wording. Everything keeps working.">
+                                <SettingsRow id="setting-show-berry" title="Show Berry" description="Turn this off for a plain icon and neutral wording. Everything keeps working.">
                                     <Switch
                                         labelledBy="setting-show-berry"
                                         checked={settings.showBerry}
                                         onChange={(showBerry) => updateSettings({ showBerry })}
                                     />
-                                </Row>
-                                <Row id="setting-still-berry" title="Keep Berry still" description="Keeps the bird and stops all its animation. This is automatic with Reduce Motion.">
+                                </SettingsRow>
+                                <SettingsRow id="setting-still-berry" title="Keep Berry still" description="Keeps the bird and stops all its animation. This is automatic with Reduce Motion.">
                                     <Switch
                                         labelledBy="setting-still-berry"
                                         checked={settings.keepBerryStill}
                                         onChange={(keepBerryStill) => updateSettings({ keepBerryStill })}
                                     />
-                                </Row>
-                                <Row
+                                </SettingsRow>
+                                <SettingsRow
                                     id="setting-action-approval"
                                     title="Ask before acting"
                                     description={APPROVAL_DESCRIPTIONS[settings.actionApproval]}
@@ -122,20 +109,24 @@ export const SettingsPage: React.FC = () => {
                                             { value: 'never', label: 'Never' }
                                         ]}
                                     />
-                                </Row>
-                                <Row id="setting-berry-sees" title="What Berry can see" description="Berry only reads a page when you ask, and only speaks up about work you started. Your history and memory stay on this device." />
+                                </SettingsRow>
+                                <SettingsRow id="setting-berry-sees" title="What Berry can see" description="Berry only reads a page when you ask, and only speaks up about work you started. Your history and memory stay on this device." />
                             </>
                         )}
 
+                        {section === 'Downloads' && <DownloadSettings />}
+
+                        {section === 'Site permissions' && <SitePermissionsSettings />}
+
                         {section === 'Data and privacy' && (
                             <>
-                                <Row id="setting-local" title="Stays on this device" description="History, open tabs and settings are kept on this computer. Nothing is synced." />
-                                <Row id="setting-pages" title="Pages Berry reads" description="Messages in the Berry panel include the open page's text and a screenshot, which go to the AI service to answer them." />
+                                <SettingsRow id="setting-local" title="Stays on this device" description="History, open tabs and settings are kept on this computer. Nothing is synced." />
+                                <SettingsRow id="setting-pages" title="Pages Berry reads" description="Messages in the Berry panel include the open page's text and a screenshot, which go to the AI service to answer them." />
                             </>
                         )}
 
                         {section === 'Account' && (
-                            <Row id="setting-account" title="No account" description="Browsing, tabs and bookmarks never need one. Berry will ask you to sign in the first time you use it." />
+                            <SettingsRow id="setting-account" title="No account" description="Browsing, tabs and bookmarks never need one. Berry will ask you to sign in the first time you use it." />
                         )}
                         </div>
                     </section>

@@ -4,15 +4,16 @@
 import type { ChatThread, LibrarySnapshot, RoutineDraft, RoutineRun } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
-// find bar, which floats over a page in a view of its own.
-export type ChromeRegion = "chrome" | "overlay" | "find";
+// find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
+// nothing else can answer it.
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt";
 
 export type LayoutMode = "vertical" | "horizontal";
 
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "gallery";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -28,10 +29,65 @@ export interface Settings {
   showBerry: boolean;
   keepBerryStill: boolean;
   actionApproval: ActionApproval;
+  // An absolute path, or null for the system's Downloads folder.
+  downloadFolder: string | null;
+  askWhereToSave: boolean;
   // False until the first-launch steps are finished or skipped.
   onboarded: boolean;
   // Page zoom in percent, by site. Sites at 100% aren't listed.
   siteZoom: Record<string, number>;
+}
+
+export type DownloadState = "progressing" | "paused" | "completed" | "cancelled" | "interrupted";
+
+export type DownloadAction = "pause" | "resume" | "cancel" | "open" | "show" | "remove";
+
+export interface DownloadInfo {
+  id: string;
+  filename: string;
+  // Empty until the user has chosen where to save, if they're asked.
+  path: string;
+  // The site it came from. Null for a data: address or anything else with no site.
+  source: string | null;
+  state: DownloadState;
+  receivedBytes: number;
+  // 0 when the server didn't say.
+  totalBytes: number;
+  startedAt: number;
+  // Interrupted, but it can carry on from where it stopped.
+  canResume: boolean;
+  // Finished, and the file isn't there any more.
+  missing: boolean;
+}
+
+// What a site can ask for. Electron's many names for these only exist in main.
+export type SitePermission =
+  | "camera"
+  | "microphone"
+  | "location"
+  | "notifications"
+  | "midi"
+  | "screen"
+  | "clipboard-read"
+  | "idle-detection"
+  | "window-management"
+  | "local-fonts"
+  | "speaker-selection"
+  | "local-network"
+  | "open-external";
+
+export type SiteDecision = "allow" | "block";
+
+export interface SavedSitePermission {
+  origin: string;
+  permission: SitePermission;
+  decision: SiteDecision;
+}
+
+export interface PermissionPrompt {
+  id: string;
+  origin: string;
+  permissions: SitePermission[];
 }
 
 // A page the user really visited, newest first.
@@ -133,7 +189,7 @@ export interface InvokeChannels {
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
@@ -167,6 +223,18 @@ export interface InvokeChannels {
   "routines:stop": { region: "chrome"; args: [runId: string]; result: boolean };
   "routines:runs": { region: "chrome"; args: [id: string]; result: RoutineRun[] };
   "routines:mark-seen": { region: "chrome"; args: []; result: void };
+  "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
+  "downloads:act": { region: "chrome"; args: [id: string, action: DownloadAction]; result: boolean };
+  "downloads:choose-folder": { region: "chrome"; args: []; result: void };
+  "permissions:saved": { region: "chrome"; args: []; result: SavedSitePermission[] };
+  "permissions:set": {
+    region: "chrome";
+    args: [origin: string, permission: SitePermission, decision: SiteDecision | null];
+    result: boolean;
+  };
+  "permissions:current": { region: "prompt"; args: []; result: PermissionPrompt | null };
+  "permissions:decide": { region: "prompt"; args: [promptId: string, allow: boolean]; result: boolean };
+  "permissions:resize": { region: "prompt"; args: [height: number]; result: void };
 }
 
 export type InvokeChannel = keyof InvokeChannels;
@@ -187,6 +255,9 @@ export interface EventChannels {
   "chat:draft": string;
   "find:opened": null;
   "find:result": FindResult;
+  "downloads:updated": DownloadInfo[];
+  "permissions:saved-updated": SavedSitePermission[];
+  "permissions:prompt": PermissionPrompt | null;
 }
 
 export type Unsubscribe = () => void;
@@ -276,6 +347,24 @@ export interface RoutinesAPI {
   markSeen: () => Promise<void>;
 }
 
+export interface DownloadsAPI {
+  list: () => Promise<DownloadInfo[]>;
+  act: (id: string, action: DownloadAction) => Promise<boolean>;
+  chooseFolder: () => Promise<void>;
+  onUpdated: (callback: (downloads: DownloadInfo[]) => void) => Unsubscribe;
+}
+
+export interface PermissionsAPI {
+  saved: () => Promise<SavedSitePermission[]>;
+  set: (origin: string, permission: SitePermission, decision: SiteDecision | null) => Promise<boolean>;
+  onSavedUpdated: (callback: (saved: SavedSitePermission[]) => void) => Unsubscribe;
+  // Only the prompt view may call these.
+  current: () => Promise<PermissionPrompt | null>;
+  decide: (promptId: string, allow: boolean) => Promise<boolean>;
+  resizePrompt: (height: number) => Promise<void>;
+  onPrompt: (callback: (prompt: PermissionPrompt | null) => void) => Unsubscribe;
+}
+
 export interface ChromeAPI {
   browser: BrowserAPI;
   layout: LayoutAPI;
@@ -285,4 +374,6 @@ export interface ChromeAPI {
   chat: ChatAPI;
   find: FindAPI;
   routines: RoutinesAPI;
+  downloads: DownloadsAPI;
+  permissions: PermissionsAPI;
 }

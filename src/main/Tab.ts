@@ -38,6 +38,7 @@ export class Tab {
   private _isVisible: boolean = false;
   private _berryWorking = false;
   private workingStyle: Promise<string | null> | null = null;
+  private _hasLoaded = false;
   private events: TabEvents;
 
   constructor(
@@ -77,6 +78,7 @@ export class Tab {
     });
 
     contents.on("did-navigate", (_, url) => {
+      this._hasLoaded = true;
       this._url = url;
       this._favicon = null;
       // A new document has none of the old one's styles.
@@ -118,6 +120,11 @@ export class Tab {
 
   get isLoading(): boolean {
     return this.webContentsView.webContents.isLoading();
+  }
+
+  // False while the first address hasn't become a page, which a download never does.
+  get hasLoaded(): boolean {
+    return this._hasLoaded;
   }
 
   get berryWorking(): boolean {

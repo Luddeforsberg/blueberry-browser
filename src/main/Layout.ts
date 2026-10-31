@@ -17,6 +17,8 @@ export const FLOATING_INSET = 8;
 // The find bar's card with 12px on every side, for its shadow.
 export const FIND_BAR = { width: 384, height: 72 };
 export const MIN_PAGE_WIDTH = 480;
+export const PROMPT_WIDTH = 408;
+export const PROMPT_DEFAULT_HEIGHT = 200;
 export const MIN_WINDOW = { width: 900, height: 600 };
 
 // Room kept clear for the system's window buttons.
@@ -36,6 +38,12 @@ const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
 export const clampWidth = (width: number, range: { min: number; max: number }): number =>
   Math.round(Math.min(Math.max(width, range.min), range.max));
+
+// The site permission card, in the page's top corner with room around it for its shadow. The card sizes the height.
+export const promptRect = (page: Rect, cardHeight: number): Rect => {
+  const height = Math.round(Math.min(Math.max(cardHeight, 1), page.height));
+  return { x: page.x, y: page.y, width: Math.min(PROMPT_WIDTH, page.width), height };
+};
 
 // The only place that decides where the window's regions go.
 export function computeLayout(
