@@ -1,6 +1,6 @@
 # Blueberry roadmap
 
-The plan and how we build it. The goal comes from the README: a browser that is better than Strawberry, not a copy of it. We catch up only where people would otherwise not switch, then win where Strawberry is weak.
+The plan and how we build it. The goal is a browser that is better than Strawberry, not a copy of it.
 
 The promise we're testing: **give Blueberry the job, carry on with your day, and come back to verified work.**
 
