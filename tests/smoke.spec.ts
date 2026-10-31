@@ -48,8 +48,10 @@ test("an app that won't quit is killed, and one that quits is left alone", async
   expect(kills).toBe(0);
 
   const app = await launchApp();
-  const exited = new Promise((resolve) => app.process().once("exit", resolve));
+  // Playwright drops its process handle once it sees the exit, so this one is kept from before.
+  const child = app.process();
+  const exited = new Promise((resolve) => child.once("exit", resolve));
   await closeWithin(() => new Promise(() => {}), () => killApp(app), 10);
   await exited;
-  expect(app.process().exitCode !== null || app.process().signalCode !== null).toBe(true);
+  expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
 });
