@@ -245,6 +245,8 @@ test("the panel shares the page with the model, and the main chat doesn't", asyn
   expect(JSON.stringify(model.requests.at(-1)?.messages)).not.toContain("hello from the page");
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  // The panel stays open, so wait for the main chat's composer before picking it.
+  await expect(chrome.getByRole("textbox", { name: "Message" })).toHaveCount(2);
   const message = chrome.getByRole("textbox", { name: "Message" }).first();
   await message.fill("Something else");
   await message.press("Enter");
