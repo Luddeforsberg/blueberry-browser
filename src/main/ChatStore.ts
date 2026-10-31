@@ -3,12 +3,12 @@ import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { ChatThreadMessage, ChatThreadSummary } from "../shared/library";
+import { migrate } from "./database";
 
 export interface StoredChat extends ChatThreadSummary {
   messages: ChatThreadMessage[];
 }
 
-// Each step takes the database to the next `user_version`. Add new steps at the end.
 const MIGRATIONS = [
   `CREATE TABLE chats (
      id TEXT PRIMARY KEY,
@@ -36,16 +36,7 @@ export class ChatStore {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-    this.migrate();
-  }
-
-  private migrate(): void {
-    const { user_version: version } = this.db.prepare("PRAGMA user_version").get() as {
-      user_version: number;
-    };
-    MIGRATIONS.slice(version).forEach((step, index) => {
-      this.db.exec(`BEGIN; ${step} PRAGMA user_version = ${version + index + 1}; COMMIT;`);
-    });
+    migrate(this.db, MIGRATIONS);
   }
 
   summaries(): ChatThreadSummary[] {

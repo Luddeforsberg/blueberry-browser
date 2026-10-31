@@ -1,15 +1,21 @@
 import React, { useState } from 'react'
-import type { ActionApproval, Appearance, LayoutMode } from '@shared/ipc'
+import type { ActionApproval, Appearance, LayoutMode, StartupChoice } from '@shared/ipc'
 import { useShell } from '../contexts/ShellContext'
 import { cn } from '@common/lib/utils'
 import { Choice, Switch } from '@common/components/Controls'
 import { SettingsRow } from '../components/SettingsRow'
 import { DownloadSettings, SitePermissionsSettings } from './SiteSettings'
+import { Button } from '@common/components/Button'
 
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
     risky: 'Berry asks before anything that could delete, send, buy or change text. Opening pages and searching happen without asking.',
     always: 'Berry asks before every click, every typed word and every new page.',
     never: "Berry doesn't ask, so it can delete, send or buy without checking with you, including if a page tricks it. That includes routines, which run when you aren't watching."
+}
+
+const STARTUP_DESCRIPTIONS: Record<StartupChoice, string> = {
+    restore: 'Blueberry opens the tabs you had open, each loading when you first go to it. They are saved on this computer until you close them.',
+    fresh: 'Blueberry opens a new tab, and doesn’t save your open tabs.'
 }
 
 const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
@@ -120,7 +126,21 @@ export const SettingsPage: React.FC = () => {
 
                         {section === 'Data and privacy' && (
                             <>
-                                <SettingsRow id="setting-local" title="Stays on this device" description="History, open tabs and settings are kept on this computer. Nothing is synced." />
+                                <SettingsRow id="setting-local" title="Stays on this device" description="History, chats, bookmarks and settings are kept on this computer, and so are your open tabs unless you start fresh. Nothing is synced." />
+                                <SettingsRow id="setting-history" title="History" description="Every web page you visit is saved until you delete it or clear your history.">
+                                    <Button variant="outline" onClick={() => void window.chromeAPI.browser.openPage('history')}>Open history</Button>
+                                </SettingsRow>
+                                <SettingsRow id="setting-startup" title="When Blueberry opens" description={STARTUP_DESCRIPTIONS[settings.onStartup]}>
+                                    <Choice<StartupChoice>
+                                        label="When Blueberry opens"
+                                        value={settings.onStartup}
+                                        onChange={(onStartup) => updateSettings({ onStartup })}
+                                        options={[
+                                            { value: 'restore', label: 'Restore tabs' },
+                                            { value: 'fresh', label: 'Start fresh' }
+                                        ]}
+                                    />
+                                </SettingsRow>
                                 <SettingsRow id="setting-pages" title="Pages Berry reads" description="Messages in the Berry panel include the open page's text and a screenshot, which go to the AI service to answer them." />
                             </>
                         )}

@@ -14,6 +14,12 @@ describe("sanitizeSettings", () => {
     ).toEqual(DEFAULT_SETTINGS);
   });
 
+  it("only accepts the two startup choices", () => {
+    expect(sanitizeSettings({ onStartup: "fresh" }).onStartup).toBe("fresh");
+    expect(sanitizeSettings({ onStartup: "restore" }, { ...DEFAULT_SETTINGS, onStartup: "fresh" }).onStartup).toBe("restore");
+    expect(sanitizeSettings({ onStartup: "everything" }).onStartup).toBe("restore");
+  });
+
   it("keeps valid values and clamps panel widths to their limits", () => {
     expect(
       sanitizeSettings({ layoutMode: "horizontal", appearance: "dark", sidebarWidth: 9999, chatWidth: 1 })

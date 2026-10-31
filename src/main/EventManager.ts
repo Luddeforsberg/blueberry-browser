@@ -80,6 +80,12 @@ export class EventManager {
 
     this.handle("history:recent", () => this.mainWindow.recentVisits);
 
+    this.handle("history:search", (options) => this.mainWindow.searchHistory(options));
+
+    this.handle("history:delete", (id) => this.mainWindow.deleteHistoryEntry(id));
+
+    this.handle("history:clear", () => this.mainWindow.clearHistory());
+
     this.handle("tab:back", (tabId) => this.withTab(tabId, (tab) => tab.goBack()));
 
     this.handle("tab:forward", (tabId) => this.withTab(tabId, (tab) => tab.goForward()));

@@ -1,4 +1,4 @@
-import { app, BaseWindow, session, shell } from "electron";
+import { app, BaseWindow, dialog, session, shell } from "electron";
 import { electronApp } from "@electron-toolkit/utils";
 import { Window } from "./Window";
 import { AppMenu } from "./Menu";
@@ -10,6 +10,9 @@ import { RoutineStore } from "./RoutineStore";
 import { Downloads } from "./Downloads";
 import { SitePermissions } from "./SitePermissions";
 import { installSessionHandlers } from "./sessionHandlers";
+import { HistoryStore } from "./HistoryStore";
+import { SessionStore } from "./Session";
+import { openStore, type StoreProblem } from "./database";
 import { join } from "path";
 
 let mainWindow: Window | null = null;
@@ -20,10 +23,39 @@ let chatStore: ChatStore | null = null;
 let routineStore: RoutineStore | null = null;
 let downloads: Downloads | null = null;
 let sitePermissions: SitePermissions | null = null;
+let historyStore: HistoryStore | null = null;
+// Said once, after the window it sits on is open.
+let storeNotices: string[] = [];
+
+const storeNotice = (what: string, isAre: "is" | "are") => ({ movedTo }: StoreProblem) =>
+  storeNotices.push(
+    movedTo
+      ? `${what} ${isAre === "is" ? "was" : "were"} damaged and couldn't be read, so Blueberry started empty. The old file is at ${movedTo}.`
+      : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`
+  );
+
+const showStoreNotices = (window: Window): void => {
+  if (storeNotices.length === 0) return;
+  void dialog.showMessageBox(window.baseWindow, {
+    type: "warning",
+    message: "Some saved data couldn't be used",
+    detail: storeNotices.join("\n\n"),
+  });
+  storeNotices = [];
+};
 
 const createWindow = (): Window => {
   settings ??= new SettingsStore(join(app.getPath("userData"), "settings.json"));
-  chatStore ??= new ChatStore(join(app.getPath("userData"), "chats.db"));
+  chatStore ??= openStore(
+    join(app.getPath("userData"), "chats.db"),
+    (file) => new ChatStore(file),
+    storeNotice("Your saved chats", "are")
+  );
+  historyStore ??= openStore(
+    join(app.getPath("userData"), "history.db"),
+    (file) => new HistoryStore(file),
+    storeNotice("Your browsing history", "is")
+  );
   const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
   routineStore ??= new RoutineStore(join(app.getPath("userData"), "routines.db"));
   const savedSettings = settings;
@@ -37,7 +69,9 @@ const createWindow = (): Window => {
     sitePermissions = new SitePermissions(join(app.getPath("userData"), "site-permissions.json"));
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
-  const window = new Window(settings, chatStore, bookmarks, routineStore, downloads, sitePermissions);
+  const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
+  const window = new Window(settings, chatStore, bookmarks, routineStore, downloads, sitePermissions, historyStore, sessionStore);
+  showStoreNotices(window);
   menu = new AppMenu(window);
   eventManager = new EventManager(window);
   return window;

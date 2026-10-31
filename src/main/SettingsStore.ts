@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   actionApproval: "risky",
   downloadFolder: null,
   askWhereToSave: false,
+  onStartup: "restore",
   onboarded: false,
   siteZoom: {},
 };
@@ -45,6 +46,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     actionApproval: pick(input.actionApproval, ["risky", "always", "never"] as const, base.actionApproval),
     downloadFolder: folder(input.downloadFolder, base.downloadFolder),
     askWhereToSave: bool(input.askWhereToSave, base.askWhereToSave),
+    onStartup: pick(input.onStartup, ["restore", "fresh"] as const, base.onStartup),
     onboarded: bool(input.onboarded, base.onboarded),
     siteZoom: sanitizeSiteZoom(input.siteZoom, base.siteZoom),
   };

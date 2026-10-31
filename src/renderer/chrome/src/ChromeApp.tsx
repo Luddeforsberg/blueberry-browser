@@ -12,6 +12,7 @@ import { ChatPanel } from './components/ChatPanel'
 import { ResizeHandle } from './components/ResizeHandle'
 import { Onboarding } from './components/Onboarding'
 import { BerryCompanion } from './components/BerryCompanion'
+import { PageTrouble } from './components/PageTrouble'
 import { cn } from '@common/lib/utils'
 
 // Regions sit exactly where main's layout puts them, so the tab view lines up with the page card.
@@ -34,7 +35,7 @@ const Region: React.FC<{
 
 const Shell: React.FC = () => {
     const { layout, theme, settings } = useShell()
-    const { activeTab } = useBrowser()
+    const { activeTab, reload } = useBrowser()
     const { isLoading, pageAccess } = useChat()
 
     if (!settings.onboarded) return <Onboarding />
@@ -55,9 +56,10 @@ const Shell: React.FC = () => {
                     reading ? "shadow-reading" : "shadow-page"
                 )}
             />
-            {/* Internal pages draw here. For web pages it shows until the tab view paints. */}
+            {/* Internal pages draw here. For web pages it shows until the tab view paints, or when a page has crashed. */}
             <Region rect={page} className="overflow-hidden rounded-b-panel">
                 {activeTab?.page && <InternalPageView tab={activeTab} />}
+                {activeTab?.trouble && <PageTrouble trouble={activeTab.trouble} onReload={() => void reload()} />}
             </Region>
             {layout.sidebarOpen && (
                 <Region rect={layout.sidebar}>

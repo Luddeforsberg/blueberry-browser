@@ -107,14 +107,17 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   model.callTools({ name: "open_tab", args: { url: address } });
   await chrome.getByRole("button", { name: "Run now" }).click();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(1);
+  // Tabs come back on the next launch, and with Routines in front there would be no news left to show.
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
   await app.close();
   expect(requested).toEqual([]);
 
   // Next launch: it wasn't done, and it says what wasn't.
   app = await launchApp(profile, { modelEnv: model.env });
   chrome = await findView(app, "view=chrome");
-  await expect(chrome.getByRole("button", { name: /Routines.*Has news/ })).toBeVisible();
-  await chrome.getByRole("button", { name: /^Routines/ }).click();
+  const news = chrome.getByRole("button", { name: /Routines.*Has news/ });
+  await expect(news).toBeVisible();
+  await news.click();
   await chrome.getByRole("button", { name: /Flight watch/ }).click();
   await expect(chrome.getByText("Interrupted").first()).toBeVisible();
   await expect(chrome.getByText(`so it wasn’t done: “${question}”`)).toBeVisible();

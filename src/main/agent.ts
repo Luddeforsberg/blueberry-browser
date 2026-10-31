@@ -160,7 +160,7 @@ export async function* streamReply(
   );
   const agent = createAgent({
     model: model ?? (await createModel()),
-    // A reply's state lasts as long as the reply. Tabs don't survive a restart, so neither does a paused action.
+    // A reply's state lasts as long as the reply, so a paused action doesn't survive a restart.
     checkpointer: new MemorySaver(),
     middleware: [
       modelCallLimitMiddleware({ threadLimit: MAX_MODEL_CALLS, exitBehavior: "error" }),

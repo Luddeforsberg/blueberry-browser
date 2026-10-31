@@ -2,11 +2,12 @@ import { BaseWindow, Menu, dialog, nativeTheme, session, type WebContents } from
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
-import { History } from "./History";
 import { MockLibrary } from "./MockLibrary";
 import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
+import type { HistoryStore } from "./HistoryStore";
+import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
 import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
@@ -29,6 +30,8 @@ import {
 import { sendToRenderer } from "./ipc";
 import type {
   EventChannels,
+  HistoryCursor,
+  HistoryPage,
   InternalPage,
   LayoutMode,
   ResizablePanel,
@@ -42,7 +45,7 @@ import type { ChatThread, LibrarySnapshot } from "../shared/library";
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -77,8 +80,12 @@ export class Window {
   private floatingSidebarVisible = false;
   private sidebarOpen = true;
   private chatOpen = false;
+  private windowClosed = false;
+  // Tabs Berry opened behind the chat. Where it goes in them isn't the user's history until they go there too.
+  private readonly backgroundTabs = new Set<string>();
+  // Kept here because a closed window, which is when this is saved last, can't be asked.
+  private windowSize = { width: 0, height: 0 };
   private readonly glassSupported = supportsGlass();
-  private readonly history = new History();
   private readonly library = new MockLibrary();
   readonly chats: Chats;
   readonly routines: Routines;
@@ -90,13 +97,16 @@ export class Window {
     private readonly bookmarkStore: BookmarkStore,
     routineStore: RoutineStore,
     readonly downloads: Downloads,
-    readonly sitePermissions: SitePermissions
+    readonly sitePermissions: SitePermissions,
+    private readonly history: HistoryStore,
+    private readonly sessionStore: SessionStore
   ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
+    const restored = settingsStore.get().onStartup === "restore" ? sessionStore.load() : null;
 
     this._baseWindow = new BaseWindow({
-      width: 1280,
-      height: 800,
+      width: restored?.width || 1280,
+      height: restored?.height || 800,
       minWidth: MIN_WINDOW.width,
       minHeight: MIN_WINDOW.height,
       show: true,
@@ -131,7 +141,8 @@ export class Window {
         this.updateSettings({ siteZoom });
         this.notifyTabs();
       },
-      tabs: () => this.allTabs,
+      // A restored tab that hasn't loaded gets its zoom when it does.
+      tabs: () => this.allTabs.filter((tab) => tab.existingView),
     });
     this.permissionPrompt = new PermissionPromptView(this._baseWindow, sitePermissions, {
       activeContents: () => (this.settings.onboarded ? this.activeTab?.webContents ?? null : null),
@@ -178,11 +189,17 @@ export class Window {
       closeTab: (tabId) => this.closeTab(tabId, false),
     });
 
-    this.createTab();
+    if (restored) this.restoreSession(restored);
+    else this.createTab();
     this.updateAllBounds();
     this.routines.start();
 
-    this._baseWindow.on("resize", () => this.updateAllBounds());
+    this.windowSize = this._baseWindow.getBounds();
+    this._baseWindow.on("resize", () => {
+      this.windowSize = this._baseWindow.getBounds();
+      this.updateAllBounds();
+      this.saveSessionSoon();
+    });
     this._baseWindow.on("blur", () => this.hideFloatingSidebar());
 
     const onThemeUpdated = () => this.notifyTheme();
@@ -197,6 +214,10 @@ export class Window {
       offSaved();
       this.chats.stopAll();
       this.settingsStore.flush();
+      // Before the tabs close below, and nothing after this, which would save a window with none.
+      this.sessionStore.saveSoon(() => this.currentSession);
+      this.sessionStore.flush();
+      this.windowClosed = true;
       this.tabsMap.forEach((tab) => tab.destroy());
       this.tabsMap.clear();
       this.chrome.view.webContents.close();
@@ -210,7 +231,7 @@ export class Window {
     webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url)) {
         // A page behind the current one, perhaps one Berry is using, doesn't get to come to the front.
-        const opener = this.allTabs.find((tab) => tab.webContents === webContents);
+        const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
         if (opener && opener.id !== this.activeTabId) this.chats.notePopup(opener.id, this.createBackgroundTab(url).id);
         else this.createTab(url);
       }
@@ -311,6 +332,7 @@ export class Window {
       zoomPercent: tab instanceof Tab ? this.siteZoom.percent(tab.url) : 100,
       page: tab instanceof InternalTab ? tab.page : null,
       pageParam: tab instanceof InternalTab ? tab.param : null,
+      trouble: tab.trouble,
     };
   }
 
@@ -338,8 +360,54 @@ export class Window {
     return tab;
   }
 
+  private restoreSession({ tabs, active, sidebarOpen, chatOpen }: Session): void {
+    this.sidebarOpen = sidebarOpen;
+    this.chatOpen = chatOpen;
+    const ids = tabs.map((saved) => this.restoreTab(saved));
+    const open = ids.filter((id) => id !== null);
+    if (open.length === 0) this.createTab();
+    else this.switchActiveTab(ids[active] ?? open[0]);
+  }
+
+  // A web tab waits to load until it's first needed. A chat may have been deleted since, so it has no tab.
+  private restoreTab(saved: SavedTab): string | null {
+    const id = `tab-${++this.tabCounter}`;
+    if ("url" in saved) {
+      this.tabsMap.set(id, this.createWebTab(id, saved.url, saved));
+      return id;
+    }
+    const chat = saved.page === "chat" && saved.param ? this.chatStore.summaries().find(({ id: chatId }) => chatId === saved.param) : null;
+    if (saved.page === "chat" && saved.param && !chat) return null;
+    this.tabsMap.set(id, new InternalTab(id, saved.page, saved.param, chat?.title ?? saved.title));
+    return id;
+  }
+
+  private get currentSession(): Session | null {
+    if (this.settings.onStartup !== "restore") return null;
+    const { width, height } = this.windowSize;
+    // A chat's or routine's own tabs last as long as its work, so they aren't the user's to get back.
+    const entries = this.entries.filter((tab) => !this.backgroundTabs.has(tab.id));
+    return {
+      tabs: entries.map(
+        (tab): SavedTab =>
+          tab instanceof Tab ? tab.saved : { page: tab.page, param: tab.param, title: tab.title }
+      ),
+      active: entries.findIndex((tab) => tab.id === this.activeTabId),
+      sidebarOpen: this.sidebarOpen,
+      chatOpen: this.chatOpen,
+      width,
+      height,
+    };
+  }
+
+  private saveSessionSoon(): void {
+    if (!this.windowClosed) this.sessionStore.saveSoon(() => this.currentSession);
+  }
+
   private createBackgroundTab(url: string): Tab {
-    const tab = this.createWebTab(`tab-${++this.tabCounter}`, url);
+    const id = `tab-${++this.tabCounter}`;
+    this.backgroundTabs.add(id);
+    const tab = this.createWebTab(id, url);
     // Berry never makes a sound. Going to the tab turns it back on.
     tab.webContents.setAudioMuted(true);
     this.tabsMap.set(tab.id, tab);
@@ -385,27 +453,79 @@ export class Window {
     return true;
   }
 
-  private createWebTab(tabId: string, url: string): Tab {
+  private createWebTab(tabId: string, url: string, restored?: SavedWebTab): Tab {
     // Loading starts inside the constructor, so these can run before `tab` is assigned.
     let tab: Tab | null = null;
-    tab = new Tab(tabId, url, {
-      onChange: () => {
-        if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
-        this.notifyTabs();
+    tab = new Tab(
+      tabId,
+      url,
+      {
+        onChange: () => this.notifyTabs(),
+        // The title at this point is still the last page's, so the new page's arrives through `onDetails`.
+        onNavigate: (address) => this.saveVisit(tabId, () => this.history.record(address, "", null)),
+        onDetails: () =>
+          this.saveVisit(tabId, () => {
+            if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
+          }),
+        onView: (withView) => {
+          this._baseWindow.contentView.addChildView(withView.view);
+          withView.view.setBounds(this.layout.page);
+          this.openLinksInTabs(withView.webContents);
+          this.siteZoom.track(withView);
+          attachPageMenu(withView, this._baseWindow, {
+            openTab: (address) => this.createTab(address),
+            askBerry: (text) => this.askBerryAbout(text),
+            assistantName: () => (this.settings.showBerry ? "Berry" : "Assistant"),
+          });
+        },
       },
-      onNavigate: (address) => this.history.record(address, tab?.title ?? "", null),
-    });
-    tab.hide();
-    this._baseWindow.contentView.addChildView(tab.view);
-    tab.view.setBounds(this.layout.page);
-    this.openLinksInTabs(tab.webContents);
-    this.siteZoom.track(tab);
-    attachPageMenu(tab, this._baseWindow, {
-      openTab: (address) => this.createTab(address),
-      askBerry: (text) => this.askBerryAbout(text),
-      assistantName: () => (this.settings.showBerry ? "Berry" : "Assistant"),
-    });
+      restored
+    );
     return tab;
+  }
+
+  // A full disk or a damaged file shouldn't get in the way of browsing.
+  private saveVisit(tabId: string, save: () => void): void {
+    if (this.backgroundTabs.has(tabId)) return;
+    try {
+      save();
+    } catch (error) {
+      console.error("Failed to save a visit:", error);
+    }
+  }
+
+  searchHistory(options: { query?: string; before?: HistoryCursor }): HistoryPage {
+    return this.history.search(options);
+  }
+
+  deleteHistoryEntry(id: number): boolean {
+    const url = this.history.delete(id);
+    if (url === null) return false;
+    this.forgetPages(url);
+    return true;
+  }
+
+  async clearHistory(): Promise<boolean> {
+    const { response } = await dialog.showMessageBox(this._baseWindow, {
+      type: "warning",
+      message: "Clear all browsing history?",
+      detail: "It will be permanently removed from this computer. Open tabs stay open, but lose their back and forward pages.",
+      buttons: ["Clear History", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    if (response !== 0) return false;
+    this.history.clear();
+    this.forgetPages();
+    return true;
+  }
+
+  // History isn't really gone while back buttons, Reopen Closed Tab and the saved session still hold it.
+  private forgetPages(url?: string): void {
+    this.allTabs.forEach((tab) => tab.forget(url));
+    this.closedTabs = this.closedTabs.filter((tab) => tab.page !== null || (url !== undefined && tab.url !== url));
+    this.notifyTabs();
+    this.sessionStore.flush();
   }
 
   reopenClosedTab(): void {
@@ -426,9 +546,10 @@ export class Window {
     }
 
     if (remember) this.closedTabs.push(this.tabInfo(tab));
-    if (tab instanceof Tab) this._baseWindow.contentView.removeChildView(tab.view);
+    if (tab instanceof Tab && tab.existingView) this._baseWindow.contentView.removeChildView(tab.existingView);
     tab.destroy();
     this.tabsMap.delete(tabId);
+    this.backgroundTabs.delete(tabId);
 
     if (this.activeTabId === tabId) {
       this.activeTabId = null;
@@ -457,6 +578,9 @@ export class Window {
     this.activeTabId = tabId;
     this.chats.releaseTab(tabId);
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
+    if (this.backgroundTabs.delete(tabId) && tab instanceof Tab) {
+      this.saveVisit(tabId, () => this.history.record(tab.url, tab.title, tab.favicon));
+    }
     this.syncTabViews();
     this.notifyTabs();
     this.updateAllBounds();
@@ -581,7 +705,7 @@ export class Window {
   // In the app already, or somewhere a notification would interrupt: fullscreen, or anything playing sound.
   private get userIsBusyOrHere(): boolean {
     const window = this._baseWindow;
-    return window.isFocused() || window.isFullScreen() || this.allTabs.some((tab) => tab.webContents.isCurrentlyAudible());
+    return window.isFocused() || window.isFullScreen() || this.allTabs.some((tab) => tab.existingView?.webContents.isCurrentlyAudible());
   }
 
   async confirmDeleteRoutine(id: string): Promise<boolean> {
@@ -620,7 +744,7 @@ export class Window {
 
   // A link to a download in a new tab would otherwise leave that tab empty for good.
   private closeTabLeftEmpty(contents: WebContents): void {
-    const tab = this.allTabs.find((candidate) => candidate.webContents === contents);
+    const tab = this.allTabs.find((candidate) => candidate.existingView?.webContents === contents);
     if (tab && !tab.hasLoaded && this.tabCount > 1) this.closeTab(tab.id, false);
   }
 
@@ -658,6 +782,7 @@ export class Window {
     this.hideFloatingSidebar();
     this.sidebarOpen = !this.layout.sidebarOpen;
     this.updateAllBounds();
+    this.saveSessionSoon();
   }
 
   updateSettings(patch: Partial<Settings>): Settings {
@@ -677,6 +802,7 @@ export class Window {
     if (after.appearance !== before.appearance) nativeTheme.themeSource = after.appearance;
 
     if (after.onboarded !== before.onboarded) this.syncTabViews();
+    if (after.onStartup !== before.onStartup) this.saveSessionSoon();
 
     this.broadcast("settings:updated", after);
     this.updateAllBounds();
@@ -716,6 +842,7 @@ export class Window {
     if (!this.chatAvailable) return;
     this.chatOpen = !this.layout.chatOpen;
     this.updateAllBounds();
+    this.saveSessionSoon();
   }
 
   focusAddressBar(): void {
@@ -754,7 +881,7 @@ export class Window {
     const { width, height } = this._baseWindow.getContentBounds();
     const layout = this.layout;
     this.chrome.view.setBounds({ x: 0, y: 0, width, height });
-    this.allTabs.forEach((tab) => tab.view.setBounds(layout.page));
+    this.allTabs.forEach((tab) => tab.existingView?.setBounds(layout.page));
     if (layout.floatingSidebar.width === 0) this.hideFloatingSidebar();
     else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
     this.findBar.setBounds(layout.findBar);
@@ -767,6 +894,7 @@ export class Window {
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
     this.syncMenu();
     this.broadcast("tabs:updated", this.tabInfos);
+    this.saveSessionSoon();
   }
 
   private notifyTheme(): void {

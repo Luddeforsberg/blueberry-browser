@@ -11,6 +11,9 @@ import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } 
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
+import { PageTrouble } from '../components/PageTrouble'
+import { TabIcon } from '../components/TabIcon'
+import { HistoryRow } from './HistoryPage'
 import { ChatRow } from '../components/Sidebar'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
@@ -180,6 +183,26 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Routine form">
                     <div className="max-w-xl">
                         <RoutineForm preview values={routineForm} onChange={setRoutineForm} onCancel={() => undefined} onSaved={() => undefined} />
+                    </div>
+                </Section>
+
+                <Section title="History">
+                    <ul className="max-w-xl rounded-panel border bg-surface p-2">
+                        <HistoryRow
+                            entry={{ id: 1, url: 'https://en.wikipedia.org/wiki/Jackdaw', title: 'Jackdaw', favicon: null, visitedAt: Date.now() }}
+                            onOpen={() => undefined}
+                            onDelete={() => undefined}
+                        />
+                    </ul>
+                </Section>
+
+                <Section title="A page in trouble">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="h-72 rounded-panel border"><PageTrouble trouble="crashed" onReload={() => undefined} /></div>
+                        <div className="h-72 rounded-panel border"><PageTrouble trouble="unresponsive" onReload={() => undefined} /></div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-3 text-12 text-muted-foreground">
+                        <TabIcon tab={{ page: null, favicon: null, isLoading: false, berryWorking: false, trouble: 'crashed' }} /> Its tab shows this until it’s reloaded.
                     </div>
                 </Section>
 
