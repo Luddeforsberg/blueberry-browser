@@ -161,6 +161,8 @@ export class Window {
       allTabs: () => this.allTabs,
       openTab: (url) => this.createTab(url),
       openBackgroundTab: (url) => this.createBackgroundTab(url),
+      // The window closes with its last tab, so Berry never takes that one.
+      closeTab: (tabId) => this.tabCount > 1 && this.closeTab(tabId, false),
       actionApproval: () => this.settings.actionApproval,
     }, {
       onChunk: (chatId, content) =>

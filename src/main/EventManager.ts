@@ -143,8 +143,8 @@ export class EventManager {
     );
 
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
-    this.handle("chat:decide", (chatId, approvalId, allow) =>
-      this.mainWindow.chats.decide(chatId, approvalId, allow)
+    this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
+      this.mainWindow.chats.decide(chatId, approvalId, allow, answer)
     );
 
     this.handle("chat:rename", (chatId, title) =>

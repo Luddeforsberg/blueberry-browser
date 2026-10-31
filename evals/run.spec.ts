@@ -202,6 +202,14 @@ test.describe("Berry on real websites", () => {
             await new Promise((resolve) => setTimeout(resolve, 2_000));
             continue;
           }
+          // Nobody's there to answer a question, and Skip is what tells Berry so.
+          if (thread?.approval?.question) {
+            await chrome.evaluate(
+              ({ chat, approval }) =>
+                window.chromeAPI.chat.decide(chat, approval, false),
+              { chat: id, approval: thread.approval.id },
+            );
+          }
           const overBudget = spent() + costOf(calls) >= BUDGET_USD;
           if (overBudget || Date.now() - started > JOB_TIMEOUT_MS) {
             endedBy = overBudget ? "budget" : "timeout";

@@ -1,4 +1,4 @@
-import { NativeImage, WebContentsView, type WebContents } from "electron";
+import { NativeImage, WebContentsView, type WebContents, type WebFrameMain } from "electron";
 import type { Layout, TabTrouble } from "../shared/ipc";
 import { savedEntries, type SavedWebTab } from "./Session";
 
@@ -30,6 +30,11 @@ const ERR_ABORTED = -3;
 
 // A crashed or stuck page never answers, and no event says so for a page stuck with no input going to it.
 const PAGE_ANSWER_MS = 10_000;
+
+// Pages can carry dozens of frames for ads, and any of them can hang, so none can hold up reading the page.
+const FRAME_ANSWER_MS = 2_000;
+const MAX_FRAMES_READ = 30;
+const FRAME_TEXT = `innerWidth > 1 && innerHeight > 1 ? document.body?.innerText ?? "" : ""`;
 
 export interface TabEvents {
   onChange: () => void;
@@ -376,6 +381,21 @@ export class Tab {
     );
   }
 
+  // Frames an isolated world in the top page can't reach into, because they, or one around them, come from another
+  // origin. Each runs its own script, in its own page's world, since Electron has no isolated world for a frame.
+  get foreignFrames(): WebFrameMain[] {
+    const top = this.webContents.mainFrame;
+    return top.framesInSubtree.filter((frame) => {
+      for (let at = frame; at.parent; at = at.parent) if (at.origin !== top.origin) return true;
+      return false;
+    });
+  }
+
+  // The frame's page can see and change this script and what it returns, so believe nothing it says about itself.
+  async runInFrame<T = unknown>(frame: WebFrameMain, code: string): Promise<T> {
+    return await this.fromPage(() => frame.executeJavaScript(code, true) as Promise<T>);
+  }
+
   // Waits for whatever an action started to load, within reason.
   async settled(): Promise<void> {
     const contents = this.webContents;
@@ -398,6 +418,24 @@ export class Tab {
 
   async getTabText(): Promise<string> {
     return await this.runJs<string>("document.documentElement.innerText");
+  }
+
+  // The page and what's in its frames, each frame labelled with where it really comes from.
+  async getTextWithFrames(): Promise<string> {
+    const text = await this.getTabText();
+    const frames = this.webContents.mainFrame.framesInSubtree.filter((frame) => frame.parent).slice(0, MAX_FRAMES_READ);
+    const parts = await Promise.all(
+      frames.map(async (frame) => {
+        let timer: NodeJS.Timeout | undefined;
+        const timeout = new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), FRAME_ANSWER_MS);
+        });
+        const found = await Promise.race([frame.executeJavaScript(FRAME_TEXT).catch(() => null), timeout]);
+        clearTimeout(timer);
+        return typeof found === "string" && found.trim() ? `\n\n[Frame from ${frame.origin}]\n${found}` : "";
+      })
+    );
+    return text + parts.join("");
   }
 
   loadURL(url: string): Promise<void> {

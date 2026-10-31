@@ -18,7 +18,7 @@ No date is set. More time and more thought count in our favour, but what's finis
 
 | # | Work | State |
 |---|---|---|
-| 1 | **A good agent:** keeping progress at the step limit, real mouse and keyboard, hover, drag, iframes, and asking the user mid-job. Every mascot runs on this. Measured by `evals/`, starting from 14 of 29 jobs done on every run. Stop at about 20, or when the demo jobs work | Next |
+| 1 | **A good agent:** keeping progress at the step limit, real mouse and keyboard, hover, drag, iframes, and asking the user mid-job. Every mascot runs on this. Measured by `evals/`, starting from 14 of 29 jobs done on every run. Stop at about 20, or when the demo jobs work | Done: 25 of 29 on every run, though 17 of those ran once. See `evals/results/2026-10-31-after.md`. Not tried on a person yet: real approval cards and asking mid-job |
 | 2 | **Try Strawberry by hand:** its companion builder and one real job, so the claims against it are first-hand | Needs the user, before the gallery |
 | 3 | **Mascot profiles, local:** create, name, choose a look, write instructions and pick skills. Chats and routines run as a chosen mascot. A look is one drawing with changeable colours and an accessory. A skill is what we already have: allowed sites, allowed tools, routines and instructions | After the agent |
 | 4 | **Suggestions:** from history and routines, Berry proposes a routine or a new mascot, also on the start page. The bar is "you've done this three times", so it works without weeks of data | After profiles |

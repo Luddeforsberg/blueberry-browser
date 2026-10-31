@@ -1,10 +1,10 @@
 import { FakeListChatModel } from "@langchain/core/utils/testing";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { AIMessage, fakeModel } from "langchain";
+import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { generateTitle, isStepLimit, ModelConfigError, modelConfig, streamReply } from "./agent";
+import { generateTitle, ModelConfigError, modelConfig, shortenOldResults, streamReply } from "./agent";
 
 const NO_TOOLS = {
   tools: [],
@@ -315,16 +315,43 @@ describe("streamReply with an action that needs approval", () => {
     });
   });
 
-  it("stops a run that won't end, after 30 model calls", async () => {
+  it("ends a run that won't end with a last call that writes up, and no more tools", async () => {
     const model = fakeModel();
-    for (let call = 1; call <= 40; call++) {
-      model.respond(new AIMessage({ content: "", tool_calls: [{ name: "click", args: { ref: "e1" }, id: `${call}` }] }));
+    for (let call = 1; call <= 130; call++) {
+      model.respond(new AIMessage({ content: "found so far", tool_calls: [{ name: "click", args: { ref: "e1" }, id: `${call}` }] }));
     }
+    const tool = click();
 
-    const failure = await reply(click(), model, async () => true).catch((error) => error);
+    const text = await reply(tool, model, async () => true);
 
-    expect(isStepLimit(failure)).toBe(true);
-    expect(model.callCount).toBe(30);
+    expect(model.callCount).toBe(120);
+    expect(tool.run).toHaveBeenCalledTimes(119);
+    expect(text).toContain("found so far");
+    expect(text).toContain("limit of 120 steps");
+  });
+
+  describe("shortenOldResults", () => {
+    const results = (count: number) =>
+      Array.from({ length: count }, (_, at) => new ToolMessage({ tool_call_id: `${at}`, content: "x".repeat(1000) }));
+    const cut = async (count: number) =>
+      (await shortenOldResults(results(count))).filter((message) => String(message.content).length < 1000).length;
+
+    it("keeps the newest whole and cuts the rest in batches", async () => {
+      expect(await cut(0)).toBe(0);
+      expect(await cut(8)).toBe(0);
+      expect(await cut(15)).toBe(0);
+      expect(await cut(16)).toBe(8);
+      expect(await cut(24)).toBe(16);
+    });
+
+    it("drops old pictures, and leaves short results alone", async () => {
+      const picture = new ToolMessage({ tool_call_id: "p", content: [{ type: "text", text: "A page" }, { type: "image_url", image_url: { url: "data:image/jpeg;base64,x" } }] });
+      const short = new ToolMessage({ tool_call_id: "s", content: "short" });
+      const [first, second] = await shortenOldResults([picture, short, ...results(14)]);
+      expect(first.content).toContain("A page");
+      expect(JSON.stringify(first.content)).not.toContain("base64");
+      expect(second).toBe(short);
+    });
   });
 
   it("stops when the wait for an answer is cut short", async () => {

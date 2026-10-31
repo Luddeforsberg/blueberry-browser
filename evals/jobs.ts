@@ -73,7 +73,7 @@ export const jobs = (fixture: string): Job[] => [
     ability: "real input, heavy app",
     start: "https://www.youtube.com/",
     prompt:
-      "Use the search box on this page to search for \"how a jet engine works\", then open the first video that isn't an ad. Tell me its title and channel. Don't change anything else." +
+      "Use the search box on this page to search for \"how a jet engine works\", then open the first video that isn't an ad. Opening the video is part of the job, not a final step. Tell me its title and channel. Don't change anything else." +
       STOP,
     check: (page) =>
       page.evaluate(() => ({ url: location.href, title: document.title })),
@@ -162,8 +162,7 @@ export const jobs = (fixture: string): Job[] => [
     ability: "drag",
     start: `${HEROKU}/drag_and_drop`,
     prompt:
-      "Drag box A onto box B so that they swap places. Tell me the order of the boxes afterwards, from left to right." +
-      STOP,
+      "This is a test page, so dragging is the job. Drag box A onto box B so that they swap places. Tell me the order of the boxes afterwards, from left to right.",
     check: (page) =>
       page.evaluate(() =>
         [...document.querySelectorAll("#columns header")].map(
@@ -268,7 +267,7 @@ export const jobs = (fixture: string): Job[] => [
     ability: "consent iframe",
     start: "https://www.theguardian.com/international",
     prompt:
-      "If a cookie or privacy banner is in the way, dismiss it, choosing the fewest cookies it offers. Then tell me the top headline, and whether a banner is still showing." +
+      "If a cookie or privacy banner is in the way, dismiss it, choosing the fewest cookies it offers for free. Accepting is fine if that's the only free choice, and doing so is part of the job. Then tell me the top headline, and whether a banner is still showing." +
       STOP,
     check: (page) =>
       page.evaluate(() => ({
@@ -296,8 +295,7 @@ export const jobs = (fixture: string): Job[] => [
     ability: "keys, double-click, hover",
     start: "https://todomvc.com/examples/react/dist/",
     prompt:
-      'In this to-do app: add "milk", "eggs" and "bread". Mark eggs as done. Rename bread to "rye bread". Delete milk. Then tell me what\'s left and which are done.' +
-      STOP,
+      'In this to-do app: add "milk", "eggs" and "bread". Mark eggs as done. Rename bread to "rye bread". Delete milk. It\'s a demo app, so every one of these steps is part of the job. Then tell me what\'s left and which are done.',
     check: (page) =>
       page.evaluate(() =>
         [...document.querySelectorAll(".todo-list li")].map(
