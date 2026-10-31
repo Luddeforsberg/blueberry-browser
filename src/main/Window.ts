@@ -2,7 +2,6 @@ import { BaseWindow, Menu, dialog, nativeTheme, session, type WebContents } from
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
-import { MockLibrary } from "./MockLibrary";
 import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
@@ -86,7 +85,6 @@ export class Window {
   // Kept here because a closed window, which is when this is saved last, can't be asked.
   private windowSize = { width: 0, height: 0 };
   private readonly glassSupported = supportsGlass();
-  private readonly library = new MockLibrary();
   readonly chats: Chats;
   readonly routines: Routines;
   readonly permissionPrompt: PermissionPromptView;
@@ -95,6 +93,7 @@ export class Window {
     private readonly settingsStore: SettingsStore,
     private readonly chatStore: ChatStore,
     private readonly bookmarkStore: BookmarkStore,
+    private readonly pinnedStore: BookmarkStore,
     routineStore: RoutineStore,
     readonly downloads: Downloads,
     readonly sitePermissions: SitePermissions,
@@ -277,7 +276,7 @@ export class Window {
 
   get librarySnapshot(): LibrarySnapshot {
     return {
-      ...this.library.snapshot(),
+      pinned: this.pinnedStore.get(),
       bookmarks: this.bookmarkStore.get(),
       chats: this.chatStore.summaries(),
       routines: this.routines.list(),
@@ -720,12 +719,24 @@ export class Window {
     this.saveBookmarks(() => this.bookmarkStore.toggle(tab.url, tab.title));
   }
 
+  togglePin(): void {
+    const tab = this.activeTab;
+    if (!tab) return;
+    this.saveBookmarks(() => this.pinnedStore.toggle(tab.url, tab.title));
+  }
+
+  // One button can stand for a site that's both pinned and bookmarked, so it offers whatever applies.
   showBookmarkMenu(id: string): void {
-    if (!this.bookmarkStore.get().some((bookmark) => bookmark.id === id)) return;
-    Menu.buildFromTemplate([{
-      label: "Remove Bookmark",
-      click: () => this.saveBookmarks(() => this.bookmarkStore.remove(id)),
-    }]).popup({ window: this._baseWindow });
+    const pins = this.pinnedStore.get();
+    const bookmarks = this.bookmarkStore.get();
+    const site = [...pins, ...bookmarks].find((candidate) => candidate.id === id);
+    if (!site) return;
+    const pin = pins.find((candidate) => candidate.url === site.url);
+    const bookmark = bookmarks.find((candidate) => candidate.url === site.url);
+    Menu.buildFromTemplate([
+      ...(pin ? [{ label: "Unpin", click: () => this.saveBookmarks(() => this.pinnedStore.remove(pin.id)) }] : []),
+      ...(bookmark ? [{ label: "Remove Bookmark", click: () => this.saveBookmarks(() => this.bookmarkStore.remove(bookmark.id)) }] : []),
+    ]).popup({ window: this._baseWindow });
   }
 
   private saveBookmarks(save: () => void): void {
@@ -733,10 +744,10 @@ export class Window {
       save();
       this.broadcast("library:updated", this.librarySnapshot);
     } catch (error) {
-      console.error("Failed to save bookmarks:", error);
+      console.error("Failed to save pinned sites and bookmarks:", error);
       void dialog.showMessageBox(this._baseWindow, {
         type: "error",
-        message: "Could not save your bookmarks",
+        message: "Could not save your pinned sites and bookmarks",
         detail: "Check that there is space on your disk and try again.",
       });
     }

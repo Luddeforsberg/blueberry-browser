@@ -4,7 +4,7 @@ import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
-import { useLibrary } from '../contexts/LibraryContext'
+import { NO_SAVED_SITES, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
@@ -82,11 +82,12 @@ const clusterColumn = (index: number) => {
 const Cluster: React.FC = () => {
     const { createTab } = useBrowser()
     const { theme } = useShell()
-    const { pinned, bookmarks } = useLibrary()
+    const sites = useSavedSites()
 
     return (
         <ul aria-label="Bookmarks" className="grid grid-cols-8 gap-y-1.5 px-1 pb-3">
-            {[...pinned, ...bookmarks].map((site, index) => (
+            {sites.length === 0 && <li className="col-span-8 px-2 py-1 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
+            {sites.map((site, index) => (
                 <li key={site.id} className="col-span-2 flex justify-center" style={{ gridColumnStart: clusterColumn(index) }}>
                     <button
                         type="button"
@@ -282,24 +283,15 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 </Section>
             </div>
 
-            <div className="shrink-0 p-2">
-                <button
-                    type="button"
-                    aria-label={`Settings, ${library.account.name}`}
-                    aria-current={isOpen('settings') ? 'page' : undefined}
+            <ul className="shrink-0 p-2">
+                <SidebarRow
+                    muted
+                    leading={<Settings className={ICON} />}
+                    label="Settings"
+                    selected={isOpen('settings')}
                     onClick={() => void browser.openPage('settings')}
-                    className={cn(ROW, "h-12", isOpen('settings') ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
-                >
-                    <span className="size-7 shrink-0 flex items-center justify-center rounded-full bg-primary text-13 text-primary-foreground">
-                        {library.account.name.charAt(0)}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                        <span className="block truncate">{library.account.name}</span>
-                        <span className="block truncate text-12 text-muted-foreground">{library.account.email}</span>
-                    </span>
-                    <Settings className={cn(ICON, "text-muted-foreground")} />
-                </button>
-            </div>
+                />
+            </ul>
         </nav>
     )
 }

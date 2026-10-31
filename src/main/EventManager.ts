@@ -126,6 +126,8 @@ export class EventManager {
 
     this.handle("bookmarks:toggle", () => this.mainWindow.toggleBookmark());
 
+    this.handle("bookmarks:toggle-pin", () => this.mainWindow.togglePin());
+
     this.handle("bookmarks:menu", (id) => this.mainWindow.showBookmarkMenu(id));
 
     this.handle("library:chat", (chatId) => this.mainWindow.chats.thread(chatId));

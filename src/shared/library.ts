@@ -1,5 +1,5 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
-// Chats, bookmarks and routines are saved locally. The rest is sample content until storage replaces it.
+// All of it is saved locally.
 
 export interface PinnedSite {
   id: string;
@@ -102,13 +102,7 @@ export interface Routine {
   unseen: boolean;
 }
 
-export interface Account {
-  name: string;
-  email: string;
-}
-
 export interface LibrarySnapshot {
-  account: Account;
   pinned: PinnedSite[];
   bookmarks: Bookmark[];
   chats: ChatThreadSummary[];

@@ -1,7 +1,7 @@
 import React from 'react'
-import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, RotateCw, Star, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelLeft, PanelRight, Pin, RotateCw, Star, X } from 'lucide-react'
 import { useBrowser } from '../contexts/BrowserContext'
-import { useLibrary } from '../contexts/LibraryContext'
+import { NO_SAVED_SITES, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { AddressBar } from './AddressBar'
 import { DownloadsButton } from './DownloadsButton'
@@ -12,11 +12,12 @@ import { RoutineNotice } from './RoutineNotice'
 // Pinned sites and bookmarks, one row under the address bar. In the vertical layout they're in the sidebar.
 const BookmarksBar: React.FC = () => {
     const { createTab } = useBrowser()
-    const { pinned, bookmarks } = useLibrary()
+    const sites = useSavedSites()
 
     return (
         <ul aria-label="Bookmarks" className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-x-auto">
-            {[...pinned, ...bookmarks].map((site) => (
+            {sites.length === 0 && <li className="shrink-0 px-2 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
+            {sites.map((site) => (
                 <li key={site.id} className="shrink-0">
                     <button
                         type="button"
@@ -46,8 +47,10 @@ export const ZoomButton: React.FC<{ percent: number; onReset: () => void }> = ({
 export const Toolbar: React.FC = () => {
     const { activeTab, goBack, goForward, reload, stop } = useBrowser()
     const { layout, theme, toggleSidebar, toggleChat } = useShell()
-    const { bookmarks } = useLibrary()
+    const { pinned, bookmarks } = useLibrary()
     const bookmarked = bookmarks.some((bookmark) => bookmark.url === activeTab?.url)
+    const isPinned = pinned.some((pin) => pin.url === activeTab?.url)
+    const canSave = !!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url)
 
     // With no sidebar, the toolbar is the window's top-left corner, where macOS puts its buttons.
     // In horizontal mode the tab row above takes the window buttons instead.
@@ -84,12 +87,21 @@ export const Toolbar: React.FC = () => {
 
                 <ToolBarButton
                     label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-                    active={!!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url)}
+                    active={canSave}
                     toggled={bookmarked}
                     className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
                     onClick={() => void window.chromeAPI.library.toggleBookmark()}
                 >
                     <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
+                </ToolBarButton>
+
+                <ToolBarButton
+                    label={isPinned ? 'Unpin this page' : 'Pin this page'}
+                    active={canSave}
+                    toggled={isPinned}
+                    onClick={() => void window.chromeAPI.library.togglePin()}
+                >
+                    <Pin className={isPinned ? 'size-4 fill-current' : 'size-4'} />
                 </ToolBarButton>
 
                 <DownloadsButton />

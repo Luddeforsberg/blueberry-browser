@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Star } from 'lucide-react'
+import { Pin, Star } from 'lucide-react'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
@@ -249,6 +249,16 @@ export const GalleryPage: React.FC = () => {
                             <Star className="size-4 fill-current text-bookmark" />
                         </ToolBarButton>
                         <ToolBarButton Icon={Star} label="Bookmark this page (unavailable on internal pages)" active={false} />
+                    </div>
+                </Section>
+
+                <Section title="Pin button">
+                    <div className="flex items-center gap-3">
+                        <ToolBarButton Icon={Pin} label="Pin this page" onClick={() => undefined} />
+                        <ToolBarButton label="Unpin this page" toggled onClick={() => undefined}>
+                            <Pin className="size-4 fill-current" />
+                        </ToolBarButton>
+                        <ToolBarButton Icon={Pin} label="Pin this page (unavailable on internal pages)" active={false} />
                     </div>
                 </Section>
 
