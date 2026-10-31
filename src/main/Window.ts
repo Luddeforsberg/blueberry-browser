@@ -109,6 +109,7 @@ export class Window {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
       openTab: (url) => this.createTab(url),
+      openBackgroundTab: (url) => this.createBackgroundTab(url),
     }, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
@@ -262,6 +263,13 @@ export class Window {
     return tab;
   }
 
+  private createBackgroundTab(url: string): Tab {
+    const tab = this.createWebTab(`tab-${++this.tabCounter}`, url);
+    this.tabsMap.set(tab.id, tab);
+    this.notifyTabs();
+    return tab;
+  }
+
   openPage(page: InternalPage, options: { param?: string; title?: string } = {}): BrowserTab {
     const param = options.param ?? null;
     const existing = this.entries.find(
@@ -363,6 +371,7 @@ export class Window {
     }
 
     this.activeTabId = tabId;
+    this.chats.releaseTab(tabId);
     this.syncTabViews();
     this.notifyTabs();
     this.updateAllBounds();

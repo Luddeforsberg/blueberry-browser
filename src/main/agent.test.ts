@@ -4,7 +4,7 @@ import { AIMessage, fakeModel } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { generateTitle, ModelConfigError, modelConfig, streamReply } from "./agent";
+import { generateTitle, isStepLimit, ModelConfigError, modelConfig, streamReply } from "./agent";
 
 const NO_TOOLS = { tools: [], approve: async () => false, onStep: () => () => {} };
 
@@ -203,6 +203,18 @@ describe("streamReply with an action that needs approval", () => {
 
     expect(tool.run).not.toHaveBeenCalled();
     expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("page changed");
+  });
+
+  it("stops a run that won't end, after 30 model calls", async () => {
+    const model = fakeModel();
+    for (let call = 1; call <= 40; call++) {
+      model.respond(new AIMessage({ content: "", tool_calls: [{ name: "click", args: { ref: "e1" }, id: `${call}` }] }));
+    }
+
+    const failure = await reply(click(), model, async () => true).catch((error) => error);
+
+    expect(isStepLimit(failure)).toBe(true);
+    expect(model.callCount).toBe(30);
   });
 
   it("stops when the wait for an answer is cut short", async () => {
