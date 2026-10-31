@@ -12,21 +12,26 @@ So work is chosen by what improves the video, the growth story or the case again
 
 ## Order of work
 
-No date is set. Plan for about a week of evenings and weekends, then book it when the demo is good.
+No date is set. More time and more thought count in our favour, but what's finished comes first, so one thing at a time, merged before the next starts.
+
+**The product:** instead of one Berry, you grow a flock. Each mascot has a name, a look, instructions and skills. Blueberry notices what you repeat and suggests a routine or a new mascot for it, you can publish them to a gallery, and a team can keep a private library. It interrupts you only when it truly needs you. Strawberry's companions are the comparison: set up by hand and shared by email, as far as public sources show.
 
 | # | Work | State |
 |---|---|---|
-| 1 | **Evidence workbook, the main feature:** Berry researches across sites and fills a table. Each cell opens its source with the quote highlighted. A separate checker flags anything unsupported or conflicting, and the table exports | Next |
-| 2 | **Try Strawberry by hand:** run the demo job in Strawberry's free plan and record what happens, so the claim against it is first-hand | Needs the user, before the video |
-| 3 | **Berry in the demo job:** only the abilities and long-job fixes the demo job needs, found by running it | During the workbook |
-| 4 | **Berry as a guide:** the mascot reacts to the workbook, so it has a feel Strawberry lacks. See DESIGN.md section 8 | After the workbook |
-| 5 | **Growth:** landing page, a one-page growth plan for one sharp audience, and the demo job as the launch video | After the workbook |
-| 6 | **Repo clean-up:** a new README that explains the product and how it fits together, replacing the challenge text | Before sending |
-| 7 | **Sending it:** the script for the two-minute video, a rehearsed demo run, and giving Charles access to the private repo | Last |
+| 1 | **A good agent:** keeping progress at the step limit, real mouse and keyboard, hover, drag, iframes, and asking the user mid-job. Every mascot runs on this. Measured by `evals/`, starting from 14 of 29 jobs done on every run. Stop at about 20, or when the demo jobs work | Next |
+| 2 | **Try Strawberry by hand:** its companion builder and one real job, so the claims against it are first-hand | Needs the user, before the gallery |
+| 3 | **Mascot profiles, local:** create, name, choose a look, write instructions and pick skills. Chats and routines run as a chosen mascot. A look is one drawing with changeable colours and an accessory. A skill is what we already have: allowed sites, allowed tools, routines and instructions | After the agent |
+| 4 | **Suggestions:** from history and routines, Berry proposes a routine or a new mascot, also on the start page. The bar is "you've done this three times", so it works without weeks of data | After profiles |
+| 5 | **Needs-you inbox:** every waiting approval, 2FA code and captcha in one place, with a mocked phone notification. Passwords never reach the model or the chat | After suggestions |
+| 6 | **Gallery with sign-in:** a small hosted service, sign-in with GitHub or Google, publish and browse. Accounts arrive here, as the first thing that needs them | After the inbox |
+| 7 | **Team library:** private sharing, choosing between shared memory and your own copy | After the gallery |
+| 8 | **Deadlines on tasks:** "finish by 14:00", with a countdown and useful partial results rather than a predicted end time | If time remains |
+| 9 | **Growth:** landing page, a one-page plan for one sharp audience, and the launch video | Once the demo is filmable |
+| 10 | **Repo clean-up and sending:** a new README replacing the challenge text, a short architecture walkthrough, the two-minute video script in Swedish, a rehearsed demo run, and access to the private repo for Charles | Last |
 
 Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines. Page abilities is in progress.
 
-Parked unless the demo needs them: sign-ins, files, helpers, saved briefs, exception inbox, task budgets, importing, accounts, keys in the app, signed updates and a Windows pass. Real mouse and keyboard, and the rest of long jobs, are parked on the same terms.
+Parked unless the demo needs them: evidence workbook (a strong candidate for the day at Strawberry, with unfinished work in its worktree), files, helpers, exception inbox, task budgets, importing, keys in the app, signed updates and a Windows pass.
 
 ## How we build
 
