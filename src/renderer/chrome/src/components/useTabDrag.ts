@@ -52,6 +52,7 @@ export const useTabDrag = (
         let current: Drag | null = null
 
         const onPointerMove = (e: PointerEvent) => {
+            if (e.buttons === 0) return
             const delta = coordinate(e) - startAt
             if (!current) {
                 if (Math.abs(delta) < DRAG_THRESHOLD) return

@@ -40,7 +40,7 @@ test.beforeEach(async () => {
   app = await launchApp();
   chrome = await findView(app, "view=chrome");
 });
-test.afterEach(async () => { await app.close(); });
+test.afterEach(async () => { await app?.close(); });
 
 test("bookmarking a page saves it across restarts and both layouts, and the star removes it", async () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-bookmarks-"));
