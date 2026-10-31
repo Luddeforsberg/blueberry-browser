@@ -64,7 +64,12 @@ export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     </div>
 )
 
+const ThinkingWord: React.FC = () => (
+    <span className="bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer">Thinking</span>
+)
+
 // The main chat has room for Berry beside its replies. In the narrow panel, the reply takes the width.
+// With no words yet, it says Thinking in their place, so nothing moves when they arrive.
 export const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean; avatar?: boolean }> = ({
     content,
     isStreaming,
@@ -74,7 +79,13 @@ export const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean
         {avatar && (
             <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} className="absolute -left-11 top-0" />
         )}
-        <Markdown content={content} />
+        {content ? (
+            <Markdown content={content} />
+        ) : (
+            <div role="status" className="flex items-center h-7 text-14 text-muted-foreground">
+                <ThinkingWord />
+            </div>
+        )}
     </div>
 )
 
@@ -110,11 +121,11 @@ export const StepTrail: React.FC<{ steps: Step[] }> = ({ steps }) => (
     </ol>
 )
 
-// Berry's working state while a reply is on its way.
+// Berry's working state while a reply is on its way, where there's no room for Berry beside the reply.
 export const ThinkingMessage: React.FC = () => (
     <div role="status" className="flex items-center gap-2.5 text-14 text-muted-foreground animate-fade-in">
         <Berry mood="thinking" size={22} />
-        <span className="bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer">Thinking</span>
+        <ThinkingWord />
     </div>
 )
 
