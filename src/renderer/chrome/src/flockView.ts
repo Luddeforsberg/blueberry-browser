@@ -39,7 +39,7 @@ export const blankMascot = (): MascotFormValues => ({
 export const surprise = (values: MascotFormValues, taken: string[]): MascotFormValues => ({
     ...values,
     ...randomLook(),
-    name: oneOf(NAMES.filter((name) => name !== values.name && !taken.includes(name)))
+    name: oneOf(NAMES.filter((name) => name !== values.name && !taken.includes(name))) ?? values.name
 })
 
 export const mascotForm = ({ id, name, look, instructions, sites, tools }: MascotProfile): MascotFormValues => ({

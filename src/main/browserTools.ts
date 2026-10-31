@@ -375,7 +375,8 @@ export const createPageTools = ({
   const limitedRun = async (tab: Tab, act: () => Promise<string>): Promise<string> => {
     const { result, refused } = await tab.withNavigationLimit(allowed, act);
     if (!allowed(tab.url)) return `${offLimits(tab.url).message} The tab went there by itself. Don't use it again.`;
-    return refused.length === 0 ? result : `${result} The page tried to go to ${siteOf(refused[0])}, which ${limits?.name} isn't allowed on, so it stayed here.`;
+    // A picture can't carry words, and it shows where the tab stayed anyway.
+    return refused.length === 0 || result.startsWith("data:image/") ? result : `${result} The page tried to go to ${siteOf(refused[0])}, which ${limits?.name} isn't allowed on, so it stayed here.`;
   };
 
   const describeOn = async (id: string | undefined, ref: string, say: (info: ElementInfo) => string) => {

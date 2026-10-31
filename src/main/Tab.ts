@@ -69,7 +69,8 @@ export class Tab {
   workingMascotId: string | null = null;
   // Addresses this tab may not go to while a limited mascot is acting in it, and any it tried.
   private readonly navigationLimits = new Set<(url: string) => boolean>();
-  private readonly refused = new Set<string>();
+  // One set for each limited call running now, so overlapping calls each hear about every refusal.
+  private readonly refusalListeners = new Set<Set<string>>();
   // Calls to the page that are waiting for an answer it may never give.
   private readonly waiting = new Set<() => void>();
 
@@ -114,7 +115,7 @@ export class Tab {
     // Both are for the page itself: `will-navigate` for a link or script, `will-redirect` for a server sending it on.
     const limit = (event: { preventDefault: () => void }, url: string) => {
       if (this.refusesNavigation(url)) {
-        this.refused.add(url);
+        this.refusalListeners.forEach((refused) => refused.add(url));
         event.preventDefault();
       }
     };
@@ -190,13 +191,15 @@ export class Tab {
   async withNavigationLimit<T>(allows: (url: string) => boolean, act: () => Promise<T>): Promise<{ result: T; refused: string[] }> {
     // One of its own for each call, because calls can overlap and one ending mustn't lift the other's limit.
     const limit = (url: string) => allows(url);
+    const refused = new Set<string>();
     this.navigationLimits.add(limit);
-    this.refused.clear();
+    this.refusalListeners.add(refused);
     try {
       const result = await act();
-      return { result, refused: [...this.refused] };
+      return { result, refused: [...refused] };
     } finally {
       this.navigationLimits.delete(limit);
+      this.refusalListeners.delete(refused);
     }
   }
 
