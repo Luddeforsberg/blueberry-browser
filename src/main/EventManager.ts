@@ -140,6 +140,7 @@ export class EventManager {
     this.handle("phone:state", () => this.mainWindow.telegram.state);
     this.handle("phone:connect", (token) => this.mainWindow.telegram.connect(token));
     this.handle("phone:new-link", () => this.mainWindow.telegram.newLink());
+    this.handle("phone:open-link", () => this.mainWindow.telegram.openLink());
     this.handle("phone:disconnect", () => this.mainWindow.telegram.disconnect());
   }
 

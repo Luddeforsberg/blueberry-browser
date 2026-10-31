@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { app, safeStorage } from "electron";
+import { app, safeStorage, shell } from "electron";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { PhoneState } from "../shared/ipc";
@@ -27,6 +27,7 @@ const TOKEN_REJECTED = "Telegram no longer accepts this bot’s token. Disconnec
 const NO_NETWORK = "Can’t reach Telegram right now. Blueberry keeps trying, and everything still waits on Needs you.";
 const OTHER_POLLER = "Something else is reading this bot’s messages, so Blueberry can’t. Stop it, or use a bot of its own.";
 const NOT_SAVED = "Connected for now, but this couldn’t be saved, so you’d have to connect again after a restart.";
+const LINK_NOT_CURRENT = "That isn’t the current link. Get a new one in Blueberry, under Settings > Phone.";
 const CANT_MESSAGE = "Telegram says the bot can’t message you. Open its chat and press Start.";
 
 // Only an app we're developing or testing can be pointed elsewhere, and only at this computer. A real user's token
@@ -193,6 +194,13 @@ export class TelegramChannel implements PhoneChannel {
     return this.state;
   }
 
+  // In the user's own browser. In a tab here, Telegram's page has a Start button that goes to a tg: address, which tabs
+  // don't open. It takes no address from the renderer, so this can't open anything else.
+  async openLink(): Promise<void> {
+    const { pairLink } = this.state;
+    if (pairLink) await shell.openExternal(pairLink);
+  }
+
   async send(text: string, choices: PhoneChoice[] = []): Promise<string | null> {
     if (!this.ready) return null;
     try {
@@ -286,7 +294,12 @@ export class TelegramChannel implements PhoneChannel {
     if (text === undefined) return;
     if (this.chatId === null) {
       const { pairing } = this;
-      if (!pairing || chat.type !== "private" || Date.now() > pairing.until || text !== `/start ${pairing.token}`) return;
+      if (!pairing || chat.type !== "private") return;
+      if (Date.now() > pairing.until || text !== `/start ${pairing.token}`) {
+        // Silence looks broken, and this says nothing about the user.
+        if (text.startsWith("/start")) void this.call("sendMessage", { chat_id: chat.id, text: LINK_NOT_CURRENT }).catch(() => {});
+        return;
+      }
       this.chatId = chat.id;
       this.pairing = null;
       this.save();

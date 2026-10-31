@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import QRCode from 'qrcode'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
 import { SettingsRow } from '../components/SettingsRow'
@@ -6,6 +7,20 @@ import { useShell } from '../contexts/ShellContext'
 import { usePhone } from '../usePhone'
 
 const WHO_READS = 'Telegram can read these messages: what’s being asked, the site and any code you send. Passwords are never sent this way.'
+
+// White around it whatever the theme, because a phone's camera needs that.
+const PairingCode: React.FC<{ link: string }> = ({ link }) => {
+    const { size, cells } = useMemo(() => {
+        const { modules } = QRCode.create(link, { errorCorrectionLevel: 'M' })
+        return { size: modules.size, cells: Array.from(modules.data) }
+    }, [link])
+    return (
+        <svg role="img" aria-label="Code to scan with your phone" viewBox={`-2 -2 ${size + 4} ${size + 4}`} className="size-40 shrink-0 rounded-control" shapeRendering="crispEdges">
+            <rect x={-2} y={-2} width={size + 4} height={size + 4} fill="#fff" />
+            {cells.map((on, at) => (on ? <rect key={at} x={at % size} y={Math.floor(at / size)} width={1} height={1} fill="#000" /> : null))}
+        </svg>
+    )
+}
 
 // Your own Telegram bot, off until you connect one. The token leaves this page once, and never comes back to it.
 export const PhoneSettings: React.FC = () => {
@@ -56,11 +71,19 @@ export const PhoneSettings: React.FC = () => {
 
             {phone.status === 'pairing' && (
                 <>
-                    <SettingsRow id="setting-phone-link" title={`Now connect @${phone.botName}`} description="Open this link in Telegram and press Start. That chat is the only one Blueberry will listen to. The link works once, for ten minutes.">
+                    <SettingsRow id="setting-phone-link" title={`Now connect @${phone.botName}`} description="Scan this with your phone’s camera, open it in Telegram and press Start. That chat is the only one Blueberry will listen to. It works once, for ten minutes.">
                         <Button variant="outline" onClick={() => void api.newLink().then(setPhone)}>New link</Button>
                     </SettingsRow>
                     <div className="py-4 border-b last:border-b-0">
-                        {phone.pairLink && <a href={phone.pairLink} target="_blank" rel="noreferrer" className="text-13 text-accent-ink break-all rounded-control outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">{phone.pairLink}</a>}
+                        {phone.pairLink && (
+                            <div className="flex items-center gap-5">
+                                <PairingCode link={phone.pairLink} />
+                                <div className="min-w-0">
+                                    <p className="text-13 text-muted-foreground">Telegram on this computer instead?</p>
+                                    <Button variant="outline" className="mt-2" onClick={() => void api.openLink()}>Open in my browser</Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <SettingsRow id="setting-phone-cancel" title="Changed your mind?" description="This forgets the token.">
                         <Button variant="outline" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>

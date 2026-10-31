@@ -309,6 +309,7 @@ export interface InvokeChannels {
   // The token goes this way only.
   "phone:connect": { region: "chrome"; args: [token: string]; result: PhoneState };
   "phone:new-link": { region: "chrome"; args: []; result: PhoneState };
+  "phone:open-link": { region: "chrome"; args: []; result: void };
   "phone:disconnect": { region: "chrome"; args: []; result: PhoneState };
   "permissions:current": { region: "prompt"; args: []; result: PermissionPrompt | null };
   "permissions:decide": { region: "prompt"; args: [promptId: string, allow: boolean]; result: boolean };
@@ -467,6 +468,7 @@ export interface PhoneAPI {
   state: () => Promise<PhoneState>;
   connect: (token: string) => Promise<PhoneState>;
   newLink: () => Promise<PhoneState>;
+  openLink: () => Promise<void>;
   disconnect: () => Promise<PhoneState>;
   onUpdated: (callback: (state: PhoneState) => void) => Unsubscribe;
   onAnswered: (callback: (answered: PhoneAnswered) => void) => Unsubscribe;

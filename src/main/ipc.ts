@@ -70,6 +70,7 @@ export const CHANNEL_REGIONS: {
   "phone:state": ["chrome"],
   "phone:connect": ["chrome"],
   "phone:new-link": ["chrome"],
+  "phone:open-link": ["chrome"],
   "phone:disconnect": ["chrome"],
   "permissions:current": ["prompt"],
   "permissions:decide": ["prompt"],
