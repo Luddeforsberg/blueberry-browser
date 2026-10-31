@@ -84,6 +84,15 @@ const chromeAPI: ChromeAPI = {
     onOpened: (callback) => subscribe("find:opened", () => callback()),
     onResult: (callback) => subscribe("find:result", callback),
   },
+  routines: {
+    save: (id, draft) => invoke("routines:save", id, draft),
+    setPaused: (id, paused) => invoke("routines:set-paused", id, paused),
+    delete: (id) => invoke("routines:delete", id),
+    runNow: (id) => invoke("routines:run-now", id),
+    stop: (runId) => invoke("routines:stop", runId),
+    getRuns: (id) => invoke("routines:runs", id),
+    markSeen: () => invoke("routines:mark-seen"),
+  },
 };
 
 contextBridge.exposeInMainWorld("chromeAPI", chromeAPI);

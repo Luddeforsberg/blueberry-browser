@@ -68,6 +68,24 @@ interface Run {
   breakBeforeText: boolean;
   approval: (ChatApproval & { answer: (allow: boolean) => void }) | null;
   tabs: Set<Tab>;
+  // Set for a task, which belongs to its caller rather than to a saved chat.
+  onChange?: () => void;
+}
+
+export interface TaskProgress {
+  steps: ChatStep[];
+  approval: ChatApproval | null;
+  tokens: number;
+}
+
+export interface TaskResult {
+  text: string;
+  steps: ChatStep[];
+  error: string | null;
+  stopped: boolean;
+  tokens: number;
+  // The tabs it opened that are still its own. Any the user went to are theirs now, and aren't here.
+  tabIds: string[];
 }
 
 export interface ChatEvents {
@@ -84,6 +102,7 @@ export class Chats {
   private pageAccess = true;
   // The tabs each chat opened itself, which are all it can reach when it can't see the user's page.
   private readonly ownTabs = new Map<string, Set<string>>();
+  private readonly taskPopups = new Map<string, Set<string>>();
 
   constructor(
     private readonly store: ChatStore,
@@ -114,9 +133,18 @@ export class Chats {
     });
   }
 
+  // A page in a task's tab opened another. Nobody allowed that, so the task can't reach it, but it's cleared up with
+  // the task's own.
+  notePopup(openerId: string, tabId: string): void {
+    this.taskPopups.forEach((popups, id) => {
+      if (popups.has(openerId) || this.ownTabs.get(id)?.has(openerId)) popups.add(tabId);
+    });
+  }
+
   // A tab the user has gone to is theirs now, and may hold anything, so no chat reaches it this way any more.
   releaseTab(tabId: string): void {
     this.ownTabs.forEach((ids) => ids.delete(tabId));
+    this.taskPopups.forEach((popups) => popups.delete(tabId));
   }
 
   private get activeTab(): Tab | null {
@@ -202,19 +230,7 @@ export class Chats {
         seePage && this.pageAccess && this.activeTab
           ? createPageTools({ ...this.browser, canSee: () => this.pageAccess, onUse })
           : this.ownTabTools(chatId, onUse);
-      const onStep = (text: string) => this.startStep(chatId, run, text);
-      const approve = (text: string) => this.askToAllow(chatId, run, text);
-      for await (const words of this.streamReply(messages, signal, {
-        tools,
-        actionApproval: this.browser.actionApproval,
-        approve,
-        onStep,
-      })) {
-        const content = run.breakBeforeText ? `\n\n${words}` : words;
-        run.breakBeforeText = false;
-        run.partial += content;
-        this.events.onChunk(chatId, content);
-      }
+      await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
     } catch (error) {
       if (!signal.aborted) {
         console.error("Error in chat reply:", error);
@@ -235,11 +251,82 @@ export class Chats {
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
   }
 
+  private async consume(
+    id: string,
+    run: Run,
+    messages: ReplyMessage[],
+    tools: PageTool[],
+    onWords: (content: string) => void,
+    onUsage?: (tokens: number) => void
+  ): Promise<void> {
+    for await (const words of this.streamReply(messages, run.controller.signal, {
+      tools,
+      actionApproval: this.browser.actionApproval,
+      approve: (text) => this.askToAllow(id, run, text),
+      onStep: (text) => this.startStep(id, run, text),
+      onUsage,
+    })) {
+      const content = run.breakBeforeText ? `\n\n${words}` : words;
+      run.breakBeforeText = false;
+      run.partial += content;
+      onWords(content);
+    }
+  }
+
+  // Runs one message as a chat with no page would, with the same tools and the same approvals, under an id of the
+  // caller's. Nothing is saved here. `stop` and `decide` take that id. Never rejects.
+  async runTask(id: string, message: string, onProgress: (progress: TaskProgress) => void): Promise<TaskResult> {
+    let tokens = 0;
+    const run: Run = {
+      controller: new AbortController(),
+      partial: "",
+      steps: [],
+      breakBeforeText: false,
+      approval: null,
+      tabs: new Set(),
+      onChange: () =>
+        onProgress({
+          steps: run.steps.map((step) => ({ ...step })),
+          approval: run.approval && { id: run.approval.id, text: run.approval.text },
+          tokens,
+        }),
+    };
+    this.runs.set(id, run);
+    this.taskPopups.set(id, new Set());
+    let error: string | null = null;
+    try {
+      const tools = this.ownTabTools(id, (tab) => {
+        run.tabs.add(tab);
+        this.publishWorkingTabs();
+      });
+      await this.consume(id, run, [{ role: "user", content: message }], tools, () => {}, (used) => (tokens += used));
+    } catch (caught) {
+      if (!run.controller.signal.aborted) {
+        console.error("Error in a task:", caught);
+        error = isStepLimit(caught) ? "This took too many steps, so it stopped here." : errorMessage(caught);
+      }
+    }
+    this.runs.delete(id);
+    this.publishWorkingTabs();
+    const tabIds = [...(this.ownTabs.get(id) ?? []), ...(this.taskPopups.get(id) ?? [])];
+    this.ownTabs.delete(id);
+    this.taskPopups.delete(id);
+    return {
+      text: run.partial,
+      steps: run.steps.map((step) => ({ ...step, done: true })),
+      error,
+      stopped: run.controller.signal.aborted,
+      tokens,
+      tabIds,
+    };
+  }
+
   private publishWorkingTabs(): void {
     this.events.onWorkingTabs(new Set([...this.runs.values()].flatMap((run) => [...run.tabs])));
   }
 
   private publish(chatId: string, run: Run): void {
+    if (run.onChange) return run.onChange();
     const thread = this.runs.get(chatId) === run ? this.thread(chatId) : null;
     if (thread) this.events.onThread(thread);
   }

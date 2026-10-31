@@ -12,9 +12,44 @@ import { PageCard } from '../components/PageCard'
 import { ChatRow } from '../components/Sidebar'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
+import { RoutineForm } from '../components/RoutineForm'
+import { RoutineRunCard } from '../components/RoutineRunCard'
+import { blankForm } from '../routinesView'
+import type { RoutineRun } from '@shared/library'
 import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
+
+const SAMPLE_STEPS = [
+    { text: 'Opened norrskenair.com', done: true },
+    { text: 'Read norrskenair.com', done: true }
+]
+
+const SAMPLE_RUN: RoutineRun = {
+    id: 'gallery-run',
+    routineId: 'gallery',
+    status: 'finished',
+    startedAt: Date.now(),
+    endedAt: Date.now(),
+    lateFor: null,
+    steps: SAMPLE_STEPS,
+    result: 'Found three flights under €200.',
+    error: null,
+    approval: null,
+    tokens: 4210,
+    seen: true
+}
+
+const SAMPLE_APPROVAL = { id: 'gallery-approval', text: 'Click the button “Delete” on https://example.com/' }
+
+const SAMPLE_RUNS: RoutineRun[] = [
+    { ...SAMPLE_RUN, id: 'run-1', status: 'running', steps: [SAMPLE_STEPS[0], { text: 'Reading norrskenair.com', done: false }], result: null, tokens: null },
+    { ...SAMPLE_RUN, id: 'run-2', status: 'needs-approval', approval: SAMPLE_APPROVAL, result: null, tokens: null },
+    { ...SAMPLE_RUN, id: 'run-3', lateFor: Date.now() - 3_600_000 },
+    { ...SAMPLE_RUN, id: 'run-4', status: 'failed', result: null, error: 'The model is rate limited right now. Try again in a moment.' },
+    { ...SAMPLE_RUN, id: 'run-5', status: 'stopped', result: null },
+    { ...SAMPLE_RUN, id: 'run-6', status: 'interrupted', approval: SAMPLE_APPROVAL, result: null, tokens: null }
+]
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <section className="mt-10">
@@ -28,6 +63,7 @@ export const GalleryPage: React.FC = () => {
     const [on, setOn] = useState(true)
     const [choice, setChoice] = useState<'one' | 'two'>('one')
     const [still, setStill] = useState(false)
+    const [routineForm, setRoutineForm] = useState(() => blankForm('Flight price watch'))
     const { theme } = useShell()
 
     return (
@@ -105,6 +141,20 @@ export const GalleryPage: React.FC = () => {
                     </ul>
                 </Section>
 
+                <Section title="Routine runs">
+                    <ol className="max-w-xl flex flex-col gap-3">
+                        {SAMPLE_RUNS.map((run) => (
+                            <RoutineRunCard key={run.id} run={run} onStop={() => undefined} onRunAgain={() => undefined} />
+                        ))}
+                    </ol>
+                </Section>
+
+                <Section title="Routine form">
+                    <div className="max-w-xl">
+                        <RoutineForm preview values={routineForm} onChange={setRoutineForm} onCancel={() => undefined} onSaved={() => undefined} />
+                    </div>
+                </Section>
+
                 <Section title="Approval card">
                     <div className="max-w-sm">
                         <ApprovalCard
@@ -174,7 +224,7 @@ export const GalleryPage: React.FC = () => {
                         <li className="text-accent-ink">Running now</li>
                         <li className="text-success">Finished</li>
                         <li className="text-warning">Needs your OK</li>
-                        <li className="text-destructive">Couldn’t finish</li>
+                        <li className="text-destructive">Failed</li>
                     </ul>
                 </Section>
             </div>

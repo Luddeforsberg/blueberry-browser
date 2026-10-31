@@ -2,7 +2,7 @@ import type { LibrarySnapshot } from "../shared/library";
 
 // Sample content from the Paper mockups, so the screens can be built before the backend exists.
 export class MockLibrary {
-  snapshot(): Omit<LibrarySnapshot, "chats" | "bookmarks"> {
+  snapshot(): Omit<LibrarySnapshot, "chats" | "bookmarks" | "routines"> {
     return {
       account: { name: "Sam Rivera", email: "sam@example.com" },
       pinned: [
@@ -10,34 +10,6 @@ export class MockLibrary {
         { id: "pin-calendar", title: "Calendar", url: "https://calendar.google.com/" },
         { id: "pin-github", title: "GitHub", url: "https://github.com/" },
         { id: "pin-notion", title: "Notion", url: "https://www.notion.so/" },
-      ],
-      routines: [
-        {
-          id: "routine-flights",
-          name: "Flight price watch",
-          schedule: "Daily at 07:30",
-          lastResult: "Yesterday: no change",
-          status: "running",
-        },
-        {
-          id: "routine-digest",
-          name: "Monday digest",
-          schedule: "Mondays at 08:00",
-          lastResult: "Today: 2 things changed",
-          status: "finished",
-        },
-        {
-          id: "routine-invoice",
-          name: "Pay the studio invoice",
-          schedule: "1st of each month",
-          lastResult: "Sunday: draft prepared",
-          status: "needs-approval",
-        },
-      ],
-      todaysRun: [
-        { time: "07:30", text: "Searched flights from Stockholm to Lisbon", isCurrent: false },
-        { time: "07:31", text: "Compared 14 fares for your May dates", isCurrent: false },
-        { time: "07:32", text: "Checking the return flights", isCurrent: true },
       ],
     };
   }

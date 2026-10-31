@@ -8,6 +8,8 @@ import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
+import { RoutineApprovals } from './RoutineRunCard'
+import { RoutineDot } from './RoutineNotice'
 import { ToolBarButton } from './ToolBarButton'
 import { cn } from '@common/lib/utils'
 
@@ -19,7 +21,7 @@ const ROW = cn(
 const SidebarRow: React.FC<{
     leading?: React.ReactNode
     label: string
-    trailing?: string
+    trailing?: React.ReactNode
     onClick: () => void
     selected?: boolean
     muted?: boolean
@@ -247,10 +249,18 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         muted
                         leading={<RefreshCw className={ICON} />}
                         label="Routines"
+                        trailing={<RoutineDot />}
                         selected={isOpen('routines')}
                         onClick={() => void browser.openPage('routines')}
                     />
                 </ul>
+
+                {/* The Routines page shows these itself. */}
+                {!isOpen('routines') && (
+                    <div className="mt-3 empty:hidden">
+                        <RoutineApprovals />
+                    </div>
+                )}
 
                 {library.chats.length > 0 && (
                     <Section id="sidebar-chats" title="Chats" collapsible>

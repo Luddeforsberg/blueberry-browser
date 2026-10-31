@@ -22,8 +22,17 @@ class BackgroundWindow extends electron.BaseWindow {
   focus() {}
 }
 
+// A test run has nobody to notify, and an app that never comes to the front would notify every time.
+class NoNotification {
+  static isSupported() {
+    return false;
+  }
+}
+
+const REPLACED = { BaseWindow: BackgroundWindow, Notification: NoNotification };
+
 const wrapped = new Proxy(electron, {
-  get: (target, key) => (key === "BaseWindow" ? BackgroundWindow : target[key]),
+  get: (target, key) => REPLACED[key] ?? target[key],
 });
 
 const load = Module._load;

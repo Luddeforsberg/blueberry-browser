@@ -378,7 +378,14 @@ A full page for talking to Berry about anything, not about a particular web page
 
 ### Routines
 
-A list with schedule, last run and result, plus a run history showing what Berry did at each step. Anything risky waits for approval.
+A list with schedule, last result and status, plus a page for each routine with its instructions and run history. **New routine** and **Edit** open a form in the page, never a modal: a name, instructions in plain words, and when, as once, daily, weekly on chosen days or monthly, at a time. A day the month doesn't have means its last day. What's typed survives going to another tab. A finished main chat offers **Save as routine**, which fills in the form with what the user asked for, to change before saving.
+
+- **A run** works like a chat with no page: the same tools, the same Ask before acting setting and the same step limit. It opens its own tabs behind the current view and closes them when it ends, except any the user went to, which are theirs. It can't reach any other tab, including popups its pages open, which also stay behind and close with it. Its tabs are muted.
+- **Run history** shows each run as a card: when it started, its status in words, a footprint for each step, Berry's report and the tokens used. A run that's going has **Stop**. One that failed, was stopped or was interrupted has **Run again**. Each routine keeps its last 50 runs.
+- **Status** is one of Running now, Needs your OK, Finished, Failed, Stopped, Interrupted, Waiting to start, Paused or Scheduled.
+- **Approvals** use the same card and exact words as a chat. The card waits on the Routines page and, anywhere else, in the sidebar under Routines. With no sidebar, the toolbar says so. Nothing is ever allowed for later: closing the app stops the run with nothing done, and the next launch shows it as Interrupted, saying what it was waiting to do.
+- **Timing:** a routine runs only while a window is open. A time missed with the app closed or the computer asleep runs once on the next chance, however many were missed, and says it was late. Times missed while paused are not made up. A time that comes while the same routine is still going is skipped. A run starts only while fewer than two are working, and the rest wait to start. A run waiting for an OK doesn't count, and once allowed it goes straight on, even if two others have started meanwhile.
+- **Speaking up:** a result or a needed approval puts a dot on the Routines row until Routines is opened. If the app isn't in front, and the window isn't fullscreen and no tab is playing sound, a silent macOS notification says so, with no page text or approval wording in it. A run the user stopped says nothing.
 
 ### Settings
 

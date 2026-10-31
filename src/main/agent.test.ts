@@ -56,6 +56,24 @@ describe("streamReply", () => {
     expect(text).toBe("hello there");
   });
 
+  it("reports the tokens each model call used", async () => {
+    const model = fakeModel().respond(
+      new AIMessage({ content: "hello", usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } })
+    );
+    const used: number[] = [];
+
+    await collect(
+      streamReply(
+        [{ role: "user", content: "hi" }],
+        new AbortController().signal,
+        { ...NO_TOOLS, onUsage: (tokens) => used.push(tokens) },
+        model as unknown as BaseChatModel
+      )
+    );
+
+    expect(used.reduce((sum, tokens) => sum + tokens, 0)).toBe(15);
+  });
+
   it("runs a tool, reports it, and keeps its result out of the reply", async () => {
     const pageTool: PageTool = {
       name: "read_page",

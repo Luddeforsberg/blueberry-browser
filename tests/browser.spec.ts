@@ -949,7 +949,6 @@ test("the sidebar opens Routines and Settings as tabs, once each", async () => {
 
   await places.getByRole("button", { name: "Routines" }).click();
   await expect(chrome.getByRole("heading", { name: "Routines", level: 1 })).toBeVisible();
-  await expect(chrome.getByText("Needs your OK")).toBeVisible();
 
   await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: /^Settings/ }).click();
   await places.getByRole("button", { name: "Routines" }).click();
@@ -1346,5 +1345,5 @@ test("the component gallery shows Berry in every mood", async () => {
   for (const mood of ["at rest", "fetching", "something went wrong", "asleep"]) {
     await expect(chrome.getByRole("img", { name: `Berry, ${mood}` }).first()).toBeVisible();
   }
-  await expect(chrome.getByRole("region", { name: "Approval needed" })).toBeVisible();
+  await expect(chrome.getByRole("region", { name: "Approval needed" }).last()).toBeVisible();
 });

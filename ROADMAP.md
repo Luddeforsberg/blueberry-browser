@@ -34,7 +34,7 @@ Berry has 9 tools today: `list_tabs`, `read_page`, `find_in_page`, `list_element
 
 | Work | State |
 |---|---|
-| Real routines: create, schedule, run, run history. Replaces the last sample data | Next |
+| Real routines: create, schedule, run, run history. Replaces the routine sample data | Done |
 | Saved briefs: reusable setups with editable instructions and files. A full companion builder and automatic memory wait until people ask for them | After the agent stage |
 | Ask about selected text, chosen tabs, PDFs and attachments, with answers linking to their sources | After routines |
 
