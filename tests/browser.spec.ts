@@ -793,6 +793,20 @@ test("settings and the account sit at the bottom of the sidebar", async () => {
 });
 
 test("dragging a tab reorders it in both layouts, and a short press only selects it", async () => {
+  const pointerEvents = await chrome.evaluateHandle(() => {
+    const events: Array<{ type: string; pointerId: number; buttons: number; x: number; y: number; trusted: boolean }> = [];
+    for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture"] as const) {
+      window.addEventListener(type, (event) => events.push({
+        type: event.type,
+        pointerId: event.pointerId,
+        buttons: event.buttons,
+        x: event.clientX,
+        y: event.clientY,
+        trusted: event.isTrusted,
+      }), true);
+    }
+    return events;
+  });
   await openFixture("/a");
   await openFixture("/b");
   expect(await tabOrder()).toEqual(["new-tab", "/a", "/b"]);
@@ -812,7 +826,7 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   // A press with no movement selects and keeps the order.
   await tabs.nth(0).getByRole("button", { name: "New tab", exact: true }).click();
   await expect.poll(async () => (await activeTab()).page).toBe("new-tab");
-  expect(await tabOrder()).toEqual(["new-tab", "/a", "/b"]);
+  expect(await tabOrder(), `Stationary-click pointer events: ${JSON.stringify(await pointerEvents.jsonValue())}`).toEqual(["new-tab", "/a", "/b"]);
 
   await drag(0, 2, "y");
   await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
