@@ -5,8 +5,10 @@ import { InternalTab } from "./InternalTab";
 import { History } from "./History";
 import { MockLibrary } from "./MockLibrary";
 import type { SettingsStore } from "./SettingsStore";
+import type { ChatStore } from "./ChatStore";
+import { Chats } from "./Chats";
+import { streamReply } from "./agent";
 import { createChromeView, type ChromeView } from "./chromeView";
-import { LLMClient } from "./LLMClient";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -25,6 +27,7 @@ import type {
   ThemeState,
   Visit,
 } from "../shared/ipc";
+import type { LibrarySnapshot } from "../shared/library";
 
 export type BrowserTab = Tab | InternalTab;
 
@@ -54,14 +57,17 @@ export class Window {
   private chrome: ChromeView;
   private overlay: ChromeView;
   private floatingSidebarVisible = false;
-  private llmClient: LLMClient;
   private sidebarOpen = true;
   private chatOpen = false;
   private readonly glassSupported = supportsGlass();
   private readonly history = new History();
-  readonly library = new MockLibrary(() => this.broadcast("library:updated", this.library.snapshot()));
+  private readonly library = new MockLibrary();
+  readonly chats: Chats;
 
-  constructor(private readonly settingsStore: SettingsStore) {
+  constructor(
+    private readonly settingsStore: SettingsStore,
+    private readonly chatStore: ChatStore
+  ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
 
     this._baseWindow = new BaseWindow({
@@ -93,8 +99,12 @@ export class Window {
     this._baseWindow.contentView.addChildView(this.overlay.view);
     this.openLinksInTabs(this.overlay.view.webContents);
 
-    this.llmClient = new LLMClient(this.chrome.view.webContents);
-    this.llmClient.setWindow(this);
+    this.chats = new Chats(chatStore, streamReply, () => this.activeTab, {
+      onChunk: (chatId, content) =>
+        sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
+      onThread: (thread) => sendToRenderer(this.chrome.view.webContents, "chat:updated", thread),
+      onListChanged: () => this.broadcast("library:updated", this.librarySnapshot),
+    });
 
     this.createTab();
     this.updateAllBounds();
@@ -107,6 +117,7 @@ export class Window {
 
     this._baseWindow.on("closed", () => {
       nativeTheme.off("updated", onThemeUpdated);
+      this.chats.stopAll();
       this.settingsStore.flush();
       this.tabsMap.forEach((tab) => tab.destroy());
       this.tabsMap.clear();
@@ -161,8 +172,8 @@ export class Window {
     return this.overlay;
   }
 
-  get chat(): LLMClient {
-    return this.llmClient;
+  get librarySnapshot(): LibrarySnapshot {
+    return { ...this.library.snapshot(), chats: this.chatStore.summaries() };
   }
 
   // The active web tab. Internal pages have no page for Berry to read.

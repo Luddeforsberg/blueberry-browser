@@ -3,7 +3,7 @@ import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/c
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
-import { AssistantMessage, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
+import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
@@ -72,6 +72,7 @@ export const GalleryPage: React.FC = () => {
                         <UserMessage content="What did the Monday digest find?" />
                         <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." />
                         <ThinkingMessage />
+                        <ChatError message="The model is rate limited right now. Try again in a moment." />
                         <StepTrail
                             steps={[
                                 { text: 'Looked through your history for Lisbon', done: true },
@@ -88,6 +89,7 @@ export const GalleryPage: React.FC = () => {
                             attachment={<PageCard title="Jackdaw" host="en.wikipedia.org" onRemove={() => undefined} />}
                         />
                         <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
+                        <ChatComposer onSend={() => undefined} onStop={() => undefined} placeholder="While replying" disabled />
                     </div>
                 </Section>
 

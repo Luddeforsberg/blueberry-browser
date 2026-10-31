@@ -1,9 +1,28 @@
-import React, { useEffect, useState } from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
+
+const FOLLOW_DISTANCE = 120
+
+// Keeps the newest words in view while a reply streams, unless the reader has scrolled up to read.
+// Sending a message always comes back down to it.
+export const useFollowReply = (sentCount: number, partial: string | null | undefined) => {
+    const scrollerRef = useRef<HTMLDivElement>(null)
+    const lastSentCount = useRef(0)
+
+    useLayoutEffect(() => {
+        const scroller = scrollerRef.current
+        if (!scroller) return
+        const nearEnd = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < FOLLOW_DISTANCE
+        if (sentCount !== lastSentCount.current || nearEnd) scroller.scrollTop = scroller.scrollHeight
+        lastSentCount.current = sentCount
+    }, [sentCount, partial])
+
+    return scrollerRef
+}
 
 export const Markdown: React.FC<{ content: string }> = ({ content }) => (
     <div className="prose max-w-none prose-pre:p-3 prose-pre:overflow-x-auto">
@@ -39,31 +58,6 @@ export const Markdown: React.FC<{ content: string }> = ({ content }) => (
     </div>
 )
 
-const StreamingText: React.FC<{ content: string }> = ({ content }) => {
-    const [displayedContent, setDisplayedContent] = useState('')
-    const [currentIndex, setCurrentIndex] = useState(0)
-
-    useEffect(() => {
-        if (currentIndex < content.length) {
-            const timer = setTimeout(() => {
-                setDisplayedContent(content.slice(0, currentIndex + 1))
-                setCurrentIndex(currentIndex + 1)
-            }, 10)
-            return () => clearTimeout(timer)
-        }
-        return undefined
-    }, [content, currentIndex])
-
-    return (
-        <div className="whitespace-pre-wrap text-16 text-foreground">
-            {displayedContent}
-            {currentIndex < content.length && (
-                <BerryDot working className="inline-block ml-1 align-baseline" />
-            )}
-        </div>
-    )
-}
-
 export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     <div className="max-w-[85%] ml-auto px-4 py-2.5 rounded-panel bg-muted text-16 text-foreground whitespace-pre-wrap animate-fade-in">
         {content}
@@ -80,7 +74,7 @@ export const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean
         {avatar && (
             <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} className="absolute -left-11 top-0" />
         )}
-        {isStreaming ? <StreamingText content={content} /> : <Markdown content={content} />}
+        <Markdown content={content} />
     </div>
 )
 
@@ -122,4 +116,9 @@ export const ThinkingMessage: React.FC = () => (
         <Berry mood="thinking" size={22} />
         Thinking
     </div>
+)
+
+// Why a reply failed, worded with what to do about it.
+export const ChatError: React.FC<{ message: string }> = ({ message }) => (
+    <p role="alert" className="text-14 text-destructive animate-fade-in">{message}</p>
 )

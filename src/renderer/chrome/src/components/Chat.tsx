@@ -1,38 +1,10 @@
-import React, { useRef, useLayoutEffect } from 'react'
+import React from 'react'
 import { useBrowser } from '../contexts/BrowserContext'
-import { useChat } from '../contexts/ChatContext'
+import { useChat, type Message } from '../contexts/ChatContext'
 import { useAssistantName, BerrySpot } from './Berry'
-import { AssistantMessage, ThinkingMessage, UserMessage } from './ChatMessage'
+import { AssistantMessage, ChatError, ThinkingMessage, UserMessage, useFollowReply } from './ChatMessage'
 import { PageCard } from './PageCard'
 import { ChatComposer } from './Composer'
-
-interface Message {
-    id: string
-    role: 'user' | 'assistant'
-    content: string
-    timestamp: number
-    isStreaming?: boolean
-}
-
-// Auto-scroll hook
-const useAutoScroll = (messages: Message[]) => {
-    const scrollRef = useRef<HTMLDivElement>(null)
-    const prevCount = useRef(0)
-
-    useLayoutEffect(() => {
-        if (messages.length > prevCount.current) {
-            setTimeout(() => {
-                scrollRef.current?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'end'
-                })
-            }, 100)
-        }
-        prevCount.current = messages.length
-    }, [messages.length])
-
-    return scrollRef
-}
 
 // Conversation Turn Component
 interface ConversationTurn {
@@ -66,8 +38,11 @@ const hostOf = (url: string) => {
 
 // Main Chat Component
 export const Chat: React.FC = () => {
-    const { messages, isLoading, sendMessage, pageAccess: enabled, setPageAccess: change } = useChat()
-    const scrollRef = useAutoScroll(messages)
+    const { messages, isLoading, error, sendMessage, stop, pageAccess: enabled, setPageAccess: change } = useChat()
+    const scrollerRef = useFollowReply(
+        messages.filter((message) => message.role === 'user').length,
+        messages[messages.length - 1]?.content
+    )
     const name = useAssistantName()
     const { activeTab } = useBrowser()
     const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
@@ -95,7 +70,7 @@ export const Chat: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
                         {name === 'Berry' && <BerrySpot size={72} />}
@@ -115,7 +90,7 @@ export const Chat: React.FC = () => {
                                 }
                             />
                         ))}
-                        <div ref={scrollRef} />
+                        {error && <ChatError message={error} />}
                     </div>
                 )}
             </div>
@@ -124,6 +99,7 @@ export const Chat: React.FC = () => {
                 <ChatComposer
                     onSend={sendMessage}
                     disabled={isLoading}
+                    onStop={isLoading ? stop : undefined}
                     placeholder={name === 'Berry' ? 'Ask Berry' : 'Ask a question'}
                     attachment={
                         enabled && host ? (

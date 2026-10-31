@@ -11,9 +11,10 @@ import { join } from "node:path";
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
 // Pass a profile folder to launch again with the same saved settings.
 // Tests skip onboarding unless they ask for a first launch.
+// They have no model unless they pass one, and a .env file can't change that: it never overrides these.
 export async function launchApp(
   userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
-  { firstLaunch = false }: { firstLaunch?: boolean } = {}
+  { firstLaunch = false, modelEnv = {} }: { firstLaunch?: boolean; modelEnv?: Record<string, string> } = {}
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
@@ -21,7 +22,14 @@ export async function launchApp(
   }
 
   // Some shells export ELECTRON_RUN_AS_NODE, which would start Node instead of the app.
-  const env = { ...process.env } as Record<string, string>;
+  const env = {
+    ...process.env,
+    LLM_PROVIDER: "",
+    LLM_MODEL: "",
+    OPENAI_API_KEY: "",
+    ANTHROPIC_API_KEY: "",
+    ...modelEnv,
+  } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
 
   // CI has nobody to disturb, so it runs the app exactly as users get it.

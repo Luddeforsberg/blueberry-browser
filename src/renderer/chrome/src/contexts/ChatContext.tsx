@@ -1,34 +1,58 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ChatChunk, ChatMessage } from '@shared/ipc'
+import type { ChatThread } from '@shared/library'
 
-interface Message {
+export interface Message {
     id: string
     role: 'user' | 'assistant'
     content: string
-    timestamp: number
     isStreaming?: boolean
 }
 
 interface ChatContextType {
     messages: Message[]
     isLoading: boolean
+    error: string | null
     // Whether Berry can see the open page. The card on the composer is the signal, and + brings it back.
     pageAccess: boolean
     setPageAccess: (enabled: boolean) => void
 
     // Chat actions
     sendMessage: (content: string) => Promise<void>
+    stop: () => void
     clearChat: () => void
 }
 
-const toMessages = (stored: ChatMessage[]): Message[] =>
-    stored.map((msg, index) => ({
-        id: `msg-${index}`,
-        role: msg.role,
-        content: msg.content,
-        timestamp: Date.now(),
-        isStreaming: false
-    }))
+// One saved chat, kept current while its reply streams.
+export const useChatThread = (chatId: string | null): ChatThread | null => {
+    const [thread, setThread] = useState<ChatThread | null>(null)
+
+    useEffect(() => {
+        if (!chatId) return undefined
+        const { chat, library } = window.chromeAPI
+        const unsubscribeThread = chat.onChatUpdated((updated) => {
+            if (updated.id === chatId) setThread(updated)
+        })
+        const unsubscribeChunks = chat.onChatChunk(({ chatId: id, content }) => {
+            if (id === chatId) setThread((current) => current && { ...current, partial: (current.partial ?? '') + content })
+        })
+        library.getChat(chatId).then(setThread)
+        return () => {
+            unsubscribeThread()
+            unsubscribeChunks()
+        }
+    }, [chatId])
+
+    return thread?.id === chatId ? thread : null
+}
+
+const toMessages = (thread: ChatThread | null): Message[] => {
+    if (!thread) return []
+    const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
+    // Before the first words arrive, the thinking state stands in for the reply.
+    return thread.partial
+        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial, isStreaming: true }]
+        : saved
+}
 
 const ChatContext = createContext<ChatContextType | null>(null)
 
@@ -40,9 +64,10 @@ export const useChat = () => {
     return context
 }
 
+// The chat panel's conversation. New chat leaves this one in the sidebar and starts another.
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [messages, setMessages] = useState<Message[]>([])
-    const [isLoading, setIsLoading] = useState(false)
+    const [chatId, setChatId] = useState<string | null>(null)
+    const thread = useChatThread(chatId)
     const [pageAccess, setPageAccessState] = useState(true)
 
     useEffect(() => {
@@ -54,85 +79,29 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState)
     }, [])
 
-    // Load initial messages from main process
-    useEffect(() => {
-        const loadMessages = async () => {
-            try {
-                const storedMessages = await window.chromeAPI.chat.getMessages()
-                if (storedMessages.length > 0) {
-                    setMessages(toMessages(storedMessages))
-                }
-            } catch (error) {
-                console.error('Failed to load messages:', error)
-            }
-        }
-        loadMessages()
-    }, [])
-
     const sendMessage = useCallback(async (content: string) => {
-        setIsLoading(true)
-
         try {
-            const messageId = Date.now().toString()
-
-            // Send message to main process (which will handle context)
-            await window.chromeAPI.chat.sendChatMessage({
-                message: content,
-                messageId: messageId
-            })
-
-            // Messages will be updated via the chat-messages-updated event
+            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true })
+            if (sent) setChatId(sent.id)
         } catch (error) {
             console.error('Failed to send message:', error)
-        } finally {
-            setIsLoading(false)
         }
-    }, [])
+    }, [chatId])
 
-    const clearChat = useCallback(async () => {
-        try {
-            await window.chromeAPI.chat.clearChat()
-            setMessages([])
-        } catch (error) {
-            console.error('Failed to clear chat:', error)
-        }
-    }, [])
+    const stop = useCallback(() => {
+        if (chatId) void window.chromeAPI.chat.stop(chatId)
+    }, [chatId])
 
-    // Set up message listeners
-    useEffect(() => {
-        // Listen for streaming response updates
-        const handleChatChunk = (data: ChatChunk) => {
-            if (data.isComplete) {
-                setIsLoading(false)
-                return
-            }
-            setMessages((current) => {
-                const last = current[current.length - 1]
-                if (last?.role !== 'assistant') return current
-                return [...current.slice(0, -1), { ...last, content: last.content + data.content }]
-            })
-        }
-
-        // Listen for message updates from main process
-        const handleMessagesUpdated = (updatedMessages: ChatMessage[]) => {
-            setMessages(toMessages(updatedMessages))
-        }
-
-        const unsubscribeChunks = window.chromeAPI.chat.onChatChunk(handleChatChunk)
-        const unsubscribeMessages = window.chromeAPI.chat.onMessagesUpdated(handleMessagesUpdated)
-
-        return () => {
-            unsubscribeChunks()
-            unsubscribeMessages()
-        }
-    }, [])
+    const clearChat = useCallback(() => setChatId(null), [])
 
     const value: ChatContextType = {
-        messages,
-        isLoading,
+        messages: toMessages(thread),
+        isLoading: thread?.partial != null,
+        error: thread?.error ?? null,
         pageAccess,
         setPageAccess,
         sendMessage,
+        stop,
         clearChat
     }
 
@@ -142,4 +111,3 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         </ChatContext.Provider>
     )
 }
-

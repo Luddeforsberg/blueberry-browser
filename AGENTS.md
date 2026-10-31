@@ -24,7 +24,8 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 - `src/shared/ipc.ts`: the one IPC contract. Every channel, its arguments, its result and which chrome view may call it live here. Add a channel here first, then to `CHANNEL_REGIONS` in `src/main/ipc.ts`, and then to the preload.
 - `src/preload`: one sandboxed preload per chrome view, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.
 - `src/main/EventManager.ts`: registers every IPC handler, and rejects calls from any view or frame other than the one the contract names.
-- `src/shared/library.ts` and `src/main/MockLibrary.ts`: bookmarks, chats and routines. The mock serves sample data from the Paper mockups through the same IPC the real local store will use, so replacing it doesn't touch the UI.
+- `src/shared/library.ts` and `src/main/MockLibrary.ts`: bookmarks and routines. The mock serves sample data from the Paper mockups through the same IPC the real local store will use, so replacing it doesn't touch the UI.
+- `src/main/Chats.ts`, `ChatStore.ts` and `agent.ts`: every chat runs through `Chats`, which saves to SQLite and gets replies from a LangChain agent. Keys come from `.env` (see `.env.example`). LangChain loads on the first message, so startup never waits for it.
 - `src/main/SettingsStore.ts`: saved settings in the user data folder. Validate anything new in `sanitizeSettings`.
 - `src/renderer/chrome`: the one chrome renderer, drawing the sidebar or tab row, toolbar, chat panel, glass, and internal pages such as the new tab page, which open as tabs with no web view. The overlay view loads the same page with `?view=overlay`. Shared code lives in `src/renderer/common`.
 - `src/renderer/common/components/Mascot.tsx`: Berry, behind `<Mascot mood size>`. Screens use the chrome's `Berry` wrapper, which applies Show Berry and Keep Berry still. Replace the artwork here without touching screens, and add new components to the gallery page (View > Component Gallery).
@@ -34,7 +35,7 @@ CI runs typecheck, lint, unit tests, build and the end-to-end tests on macOS and
 ## Traps
 
 - **Blank app, but `pnpm dev` works:** the built renderer pages are at `out/renderer/<name>/index.html`. `src/main` must load that path.
-- **Packaged app stuck with no window:** a load error in the main process shows a modal dialog, which can sit behind other windows. Declare every runtime import in `dependencies`, including peer dependencies such as `zod` for `ai`. pnpm can resolve an undeclared package in development that packaging leaves out.
+- **Packaged app stuck with no window:** a load error in the main process shows a modal dialog, which can sit behind other windows. Declare every runtime import in `dependencies`, including peer dependencies such as `@langchain/core`. pnpm can resolve an undeclared package in development that packaging leaves out.
 - **Electron starts as Node:** some shells, including agent shells, export `ELECTRON_RUN_AS_NODE=1`. Unset it to run Electron by hand. `tests/app.ts` already removes it.
 - **`executeJavaScript`:** the code is a script, not a function body, so a top-level `return` is a syntax error.
 - **Preloads load nothing but `electron`:** they're sandboxed, so a shared runtime import becomes a chunk the preload can't `require`, and the chrome loses its API. Preloads may only `import type` from other files.

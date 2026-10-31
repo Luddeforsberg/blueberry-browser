@@ -101,13 +101,9 @@ export class EventManager {
   private handleThemeEvents(): void {
     this.handle("theme:get", () => this.mainWindow.theme);
 
-    this.handle("library:get", () => this.mainWindow.library.snapshot());
+    this.handle("library:get", () => this.mainWindow.librarySnapshot);
 
-    this.handle("library:chat", (chatId) => this.mainWindow.library.chat(chatId));
-
-    this.handle("library:send-chat", (chatId, text) =>
-      typeof text === "string" ? this.mainWindow.library.send(chatId, text) : null
-    );
+    this.handle("library:chat", (chatId) => this.mainWindow.chats.thread(chatId));
 
     this.handle("settings:get", () => this.mainWindow.settings);
 
@@ -115,15 +111,15 @@ export class EventManager {
   }
 
   private handleChatEvents(): void {
-    this.handle("chat:send", (request) => this.mainWindow.chat.sendChatMessage(request));
+    this.handle("chat:send", (chatId, text, options) =>
+      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, options) : null
+    );
 
-    this.handle("chat:clear", () => this.mainWindow.chat.clearMessages());
+    this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
 
-    this.handle("chat:messages", () => this.mainWindow.chat.getMessages());
+    this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 
-    this.handle("chat:page-access", () => this.mainWindow.chat.canSeePage);
-
-    this.handle("chat:set-page-access", (enabled) => this.mainWindow.chat.setPageAccess(enabled));
+    this.handle("chat:set-page-access", (enabled) => this.mainWindow.chats.setPageAccess(enabled));
 
     this.handle("berry:context-menu", () => this.mainWindow.showBerryMenu());
 
