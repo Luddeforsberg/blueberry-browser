@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPatterns, isShareable, topPatterns, type Pattern, type PatternVisit } from "./suggestionPatterns";
+import { findPatterns, isShareable, siteNamesIn, topPatterns, type Pattern, type PatternVisit } from "./suggestionPatterns";
 import { cardsFromReply } from "./Suggestions";
 
 const NOW = new Date(2026, 9, 31, 18, 0).getTime();
@@ -50,6 +50,10 @@ describe("sites", () => {
     const [pattern] = findPatterns([hn(1, 23, 50), hn(2, 0, 5), hn(3, 23, 55), hn(4, 0, 10)], [], NOW);
     expect(pattern.kind).toBe("routine");
     expect(pattern.schedule?.kind).toBe("daily");
+  });
+
+  it("names a site by more than its country's domain", () => {
+    expect(siteNamesIn([visit("https://www.bbc.co.uk/", "BBC", NOW), visit("https://old.reddit.com/", "Reddit", NOW)])).toEqual(["bbc", "reddit"]);
   });
 
   it("forgets a habit nobody has kept up", () => {

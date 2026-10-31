@@ -229,13 +229,14 @@ export class Suggestions {
     if (unwritten.length === 0 || !this.sources.hasModel()) return;
 
     this.asking = true;
-    this.save({ ...this.saved, askedAt: this.now, seen: newest });
+    // `seen` waits for words that can be used, so a failed try only waits out the hour.
+    this.save({ ...this.saved, askedAt: this.now });
     try {
       const reply = await this.sources.write(SUGGESTION_PROMPT, JSON.stringify({ patterns: unwritten.map(forTheModel) }));
       const otherNames = [...open.flatMap(({ sites }) => sites.flatMap(({ host, label }) => [host, label])), ...siteNamesIn(this.sources.visits())];
       const cards = cardsFromReply(reply, unwritten, otherNames);
       if (cards.length > 0) {
-        this.save({ ...this.saved, cards: [...this.saved.cards, ...cards] });
+        this.save({ ...this.saved, seen: newest, cards: [...this.saved.cards, ...cards] });
         this.sources.onChanged();
       }
     } catch (error) {

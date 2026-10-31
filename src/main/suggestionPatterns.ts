@@ -354,8 +354,13 @@ const chatPatterns = (chats: PatternChat[], now: number): Pattern[] => {
 };
 
 // Every site in the history by the name people would write, such as "reddit" for old.reddit.com.
+const COUNTRY_SECOND_LEVEL = /^(co|com|org|net|ac|gov|edu)$/;
+const nameOfSite = (host: string): string | undefined => {
+  const parts = host.split(".");
+  return parts.at(-1)?.length === 2 && COUNTRY_SECOND_LEVEL.test(parts.at(-2) ?? "") ? parts.at(-3) : parts.at(-2);
+};
 export const siteNamesIn = (visits: PatternVisit[]): string[] => [
-  ...new Set(visits.flatMap(({ url }) => normaliseSite(url)?.split(".").at(-2) ?? []).filter((name) => name.length > 2)),
+  ...new Set(visits.flatMap(({ url }) => nameOfSite(normaliseSite(url) ?? "") ?? []).filter((name) => name.length > 2)),
 ];
 
 // Everything the history and chats show, best first. Costs a few milliseconds and no money.
