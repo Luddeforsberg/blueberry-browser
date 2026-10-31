@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Pin, Star } from 'lucide-react'
-import type { MascotProfile } from '@shared/library'
+import type { MascotProfile, Suggestion } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
@@ -23,6 +23,7 @@ import { ACCESSORIES, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
+import { SuggestionCard } from '../components/SuggestionCard'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { blankForm } from '../routinesView'
 import type { RoutineRun } from '@shared/library'
@@ -95,6 +96,24 @@ const SAMPLE_DOWNLOADS: DownloadInfo[] = [
     { ...SAMPLE_DOWNLOAD, id: 'missing', state: 'completed', missing: true, receivedBytes: 9_100_000 },
     { ...SAMPLE_DOWNLOAD, id: 'cancelled', state: 'cancelled' },
     { ...SAMPLE_DOWNLOAD, id: 'failed', state: 'interrupted' }
+]
+
+const SAMPLE_SUGGESTIONS: Suggestion[] = [
+    { id: 'sample-prompt', kind: 'prompt', title: 'This week’s cheapest Lisbon flights', why: 'You’ve asked something like this 3 times', prompt: 'Find the cheapest flights to Lisbon this week.' },
+    {
+        id: 'sample-routine',
+        kind: 'routine',
+        title: 'Top 5 stories, waiting at 8:15',
+        why: 'You’ve opened Hacker News around 8:30 on 4 of the last 5 days',
+        draft: { name: 'Morning stories', instructions: 'Read the front page and list the top 5.', schedule: { kind: 'daily', time: '08:15' } }
+    },
+    {
+        id: 'sample-mascot',
+        kind: 'mascot',
+        title: 'Pip, your pull request runner',
+        why: 'You’ve gone back and forth between GitHub and Linear on 4 of the last 5 days',
+        draft: { name: 'Pip', look: { palette: 'kingfisher', accessory: 'glasses' }, instructions: 'Keep an eye on my pull requests.', sites: ['github.com', 'linear.app'], tools: ['visit'] }
+    }
 ]
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -184,6 +203,20 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-4 max-w-[288px]">
                         <Preview values={mascotForm(SAMPLE_MASCOT)} mood="curious" onMood={() => undefined} flying={false} />
                     </div>
+                </Section>
+
+                <Section title="Suggestions">
+                    <ul className="grid grid-cols-3 gap-3 pt-14">
+                        {SAMPLE_SUGGESTIONS.map((suggestion) => (
+                            <SuggestionCard
+                                key={suggestion.id}
+                                suggestion={suggestion}
+                                className="flex flex-col p-4 rounded-panel shadow-card text-left outline-none transition-colors bg-surface hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring"
+                                onUse={() => undefined}
+                                onDismiss={() => undefined}
+                            />
+                        ))}
+                    </ul>
                 </Section>
 
                 <Section title="Art blueberry">

@@ -82,6 +82,13 @@ export class HistoryStore {
       .all(limit) as unknown as Visit[];
   }
 
+  // Every visit since then, newest first, up to a limit.
+  since(time: number, limit: number): Visit[] {
+    return this.db
+      .prepare("SELECT url, title, favicon, visited_at AS visitedAt FROM visits WHERE visited_at >= ? ORDER BY visited_at DESC, id DESC LIMIT ?")
+      .all(time, limit) as unknown as Visit[];
+  }
+
   // Newest first. Pass the last page's `next` as `before` to go on from it.
   search({
     query = "",

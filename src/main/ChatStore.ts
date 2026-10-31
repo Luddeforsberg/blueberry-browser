@@ -47,6 +47,18 @@ export class ChatStore {
       .all() as unknown as ChatThreadSummary[];
   }
 
+  // What each of the newest chats began with, for noticing what the user keeps asking.
+  firstMessages(limit: number): Array<ChatThreadSummary & { firstMessage: string }> {
+    return this.db
+      .prepare(
+        `SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId,
+           (SELECT content FROM messages WHERE chat_id = chats.id AND role = 'user' ORDER BY id LIMIT 1) AS firstMessage
+         FROM chats ORDER BY updated_at DESC, rowid DESC LIMIT ?`
+      )
+      .all(limit)
+      .flatMap((row) => ((row as { firstMessage: string | null }).firstMessage ? [row as unknown as ChatThreadSummary & { firstMessage: string }] : []));
+  }
+
   chat(id: string): StoredChat | null {
     const summary = this.db
       .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId FROM chats WHERE id = ?")

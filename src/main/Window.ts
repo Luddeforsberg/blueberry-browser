@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, dialog, nativeTheme, session, type WebContents } from "electron";
+import { BaseWindow, Menu, app, dialog, nativeTheme, session, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -12,7 +12,10 @@ import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
 import { confirmDeleteMascot, confirmDeleteRoutine, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
-import { generateTitle, streamReply } from "./agent";
+import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
+import { join } from "path";
+import { Suggestions } from "./Suggestions";
+import { PATTERN_WINDOW_MS } from "./suggestionPatterns";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
 import { attachPageMenu, printPage } from "./pageMenu";
@@ -64,6 +67,9 @@ const MAC_BUTTONS_HEIGHT = 14;
 
 // macOS can report a menu closed before it runs the clicked item, so this waits well past that.
 const MENU_CLICK_GRACE_MS = 1000;
+// Plenty for a habit to show, and few enough to look through on every new tab.
+const MAX_SUGGESTION_VISITS = 5000;
+const MAX_SUGGESTION_CHATS = 100;
 
 export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 // App menu items that only do something on a web page.
@@ -91,6 +97,7 @@ export class Window {
   private readonly tabsUnderChrome = new WeakSet<Tab>();
   readonly chats: Chats;
   readonly routines: Routines;
+  readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
 
   constructor(
@@ -204,6 +211,18 @@ export class Window {
       },
     });
 
+    this.suggestions = new Suggestions(join(app.getPath("userData"), "suggestions.json"), {
+      enabled: () => this.settings.suggestions,
+      // Both newest first.
+      visits: () => this.history.since(Date.now() - PATTERN_WINDOW_MS, MAX_SUGGESTION_VISITS),
+      chats: () => chatStore.firstMessages(MAX_SUGGESTION_CHATS),
+      routines: () => this.routines.list(),
+      mascots: () => this.mascotStore.all(),
+      hasModel,
+      write: (system, data) => writeWithCheapModel(system, data),
+      onChanged: () => this.publishSuggestions(),
+    });
+
     if (restored) this.restoreSession(restored);
     else this.createTab();
     this.updateAllBounds();
@@ -293,6 +312,10 @@ export class Window {
 
   get overlayView(): ChromeView {
     return this.overlay;
+  }
+
+  private publishSuggestions(): void {
+    sendToRenderer(this.chrome.view.webContents, "suggestions:updated", this.suggestions.list());
   }
 
   get librarySnapshot(): LibrarySnapshot {
@@ -527,6 +550,7 @@ export class Window {
     const url = this.history.delete(id);
     if (url === null) return false;
     this.forgetPages(url);
+    this.publishSuggestions();
     return true;
   }
 
@@ -542,6 +566,7 @@ export class Window {
     if (response !== 0) return false;
     this.history.clear();
     this.forgetPages();
+    this.publishSuggestions();
     return true;
   }
 
@@ -857,6 +882,7 @@ export class Window {
 
     if (after.onboarded !== before.onboarded) this.syncTabViews();
     if (after.onStartup !== before.onStartup) this.saveSessionSoon();
+    if (after.suggestions !== before.suggestions) this.publishSuggestions();
 
     this.broadcast("settings:updated", after);
     this.updateAllBounds();

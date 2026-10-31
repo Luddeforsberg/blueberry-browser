@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
   onStartup: "restore",
   onboarded: false,
   siteZoom: {},
+  suggestions: true,
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -49,6 +50,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     onStartup: pick(input.onStartup, ["restore", "fresh"] as const, base.onStartup),
     onboarded: bool(input.onboarded, base.onboarded),
     siteZoom: sanitizeSiteZoom(input.siteZoom, base.siteZoom),
+    suggestions: bool(input.suggestions, base.suggestions),
   };
 }
 

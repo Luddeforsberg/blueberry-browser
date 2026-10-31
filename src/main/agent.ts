@@ -297,6 +297,26 @@ export async function* streamReply(
   }
 }
 
+// Whether there's a model to ask at all. Features that only add something stay quiet without one.
+export const hasModel = (): boolean => {
+  try {
+    modelConfig();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// One call to the cheap model, for what's too small to need the main one.
+export const writeWithCheapModel = async (system: string, data: string, model?: BaseChatModel): Promise<string> => {
+  const cheapModel = model ?? (await createModel("titleModel"));
+  const reply = await cheapModel.invoke([
+    ["system", system],
+    ["human", data],
+  ]);
+  return reply.text;
+};
+
 // Null until the conversation has a topic worth naming.
 export const generateTitle = async (
   messages: ChatThreadMessage[],

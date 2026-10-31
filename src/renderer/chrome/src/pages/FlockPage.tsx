@@ -169,6 +169,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
             setError(result.error)
             return
         }
+        if (values.suggestionId) void window.chromeAPI.suggestions.dismiss(values.suggestionId)
         setError(null)
         setFlying(true)
         leaving.current = setTimeout(() => onDone(result.id), FLY_OFF_MS)
