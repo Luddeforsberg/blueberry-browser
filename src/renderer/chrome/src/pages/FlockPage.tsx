@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Dices } from 'lucide-react'
+import { Dices, Feather } from 'lucide-react'
 import type { MascotLook, MascotProfile } from '@shared/library'
 import { BerryDot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
@@ -86,6 +86,16 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
                     >
                         <BerryDot size={44} className="motion-safe:transition-transform group-hover/new:-translate-y-1" />
                         New mascot
+                    </button>
+                </li>
+                <li className="flex">
+                    <button
+                        type="button"
+                        onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}
+                        className="group/new w-full min-h-[208px] flex flex-col items-center justify-center gap-3 rounded-panel border border-dashed text-14 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <Feather className="size-11 text-muted-foreground motion-safe:transition-transform group-hover/new:-translate-y-1" aria-hidden />
+                        Browse the Gallery
                     </button>
                 </li>
             </ul>

@@ -73,7 +73,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -318,6 +318,7 @@ Every mood has a text label for assistive technology.
 | Routines | Flies off when a routine runs and returns with the result |
 | Settings | Its own section |
 | Flock | Its own page, sitting on each card |
+| Gallery | Sitting on each card, Asking on the review screen, Delivered once added |
 | Needs you | Asking on each row, and off duty when nothing's waiting |
 | Over a web page | Only while acting on that page, in an overlay view |
 
@@ -433,6 +434,18 @@ Opens as a tab from the sidebar, the Go menu, or the new tab page when there's n
 - **Who's working:** a reply names any mascot but Berry above it. A chat in the sidebar shows its bird, and a running chat shows the working berry where its age goes. A tab anyone is working in shows that bird as the tab's icon, Berry's too, or the working berry when Berry is hidden, with a shimmering title. When there's no sidebar to show it and the work is in another tab, the toolbar says who's working, and pressing that goes to the tab. Berry's old chats stay plain.
 - **Routines:** **Who runs it** in the form uses the same row of birds, and a run keeps to that mascot's instructions and limits.
 - **Deleting:** asks first, in a native dialog. The mascot leaves the flock, and its chats keep its look and limits. Routines it runs pause and stay limited, because moving them to Berry could let them do more than they were set up to. Anything pointing at a mascot that's no longer on file can only talk.
+
+### Gallery
+
+Mascots made for one job, ready to add. Opens as a tab from the last tile on the Flock page or the Go menu, with only one open at a time. It needs no account, and everything in it comes with the app for now.
+
+- **The page:** a heading with a way back to **Your flock**, a search field that covers everything on a card and what the mascot is told, and categories as a segmented control. The grid works like the flock: `surface` cards with the bird sitting on the top edge.
+- **A card** has the name, "By" and its author, one line on what it does, and its permissions on a `card` block. Below them is **Add**, or **Chat** and **Details** with "In your flock" once there's a copy. There are no counts, ratings or anything else that isn't real.
+- **Permissions are the point of the page.** Each is a line of plain words with a lock, such as "Only visits hemnet.se" or "Can't type or click". What isn't limited, such as "Can go anywhere" or "Can click and type", has an open lock in `warning`, so a card with no limit can't look like one with limits. The words come from one function that reads the same sites and tools the tool layer enforces, never from what the entry says about itself.
+- **Review:** Add opens a screen in the page, never a modal, with the permissions larger, the instructions word for word and the bird in Asking beside them, or above them in a narrow window. It says that the same approval cards apply and that a copy is the user's own. Nothing is added until **Add to flock**.
+- **Added:** the same screen says it's in the flock, the bird lands in Delivered with a hop, and **Start a chat** is the main button.
+- **A clashing name:** the review asks for another, starting from "Morning Paper 2". Adding the same one twice can't happen, as the card offers a chat instead, and a deleted copy can be added again.
+- **A copy is independent.** It's a normal mascot, with Edit and Delete in the flock, and nothing in the Gallery can reach it afterwards. It goes through the same checks as one made by hand, and it keeps the same approvals and limits.
 
 ### Needs you
 

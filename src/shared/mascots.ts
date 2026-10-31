@@ -120,3 +120,32 @@ export const toolsInWords = (tools: readonly MascotTool[]): string => {
   if (can.length === 0) return "Only reads";
   return `Reads, ${can.map(({ id }) => TOOL_VERBS[id]).join(", ")}`;
 };
+
+const inList = (items: readonly string[]): string =>
+  items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+
+export interface PermissionLine {
+  text: string;
+  // True for what isn't limited, so a card can't look as safe as one that is.
+  open: boolean;
+}
+
+// What a mascot may do, for the Gallery. It reads the same `sites` and `tools` the tool layer enforces, and nothing else.
+export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" | "tools">): PermissionLine[] => {
+  const visits = tools.includes("visit");
+  const clicks = tools.includes("click");
+  const types = tools.includes("type");
+  const where: PermissionLine =
+    sites.length > 0
+      ? { text: `Only ${visits ? "visits" : "reads"} ${inList(sites)}`, open: false }
+      : { text: visits ? "Can go anywhere" : "Reads any page you have open", open: true };
+  const hands: PermissionLine =
+    clicks && types
+      ? { text: "Can click and type", open: true }
+      : clicks
+        ? { text: "Can click, but can’t type", open: false }
+        : types
+          ? { text: "Can type, but can’t click", open: false }
+          : { text: "Can’t type or click", open: false };
+  return visits ? [where, hands] : [where, { text: "Can’t open pages by itself", open: false }, hands];
+};

@@ -19,12 +19,12 @@ No date is set. More time and more thought count in our favour, but what's finis
 | # | Work | State |
 |---|---|---|
 | 1 | **A good agent:** keeping progress at the step limit, real mouse and keyboard, hover, drag, iframes, and asking the user mid-job. Every mascot runs on this. Measured by `evals/`, starting from 14 of 29 jobs done on every run. Stop at about 20, or when the demo jobs work | Done: 25 of 29 on every run, though 17 of those ran once. See `evals/results/2026-10-31-after.md`. Not tried on a person yet: real approval cards and asking mid-job |
-| 2 | **Try Strawberry by hand:** its companion builder and one real job, so the claims against it are first-hand | Needs the user, before the gallery |
+| 2 | **Try Strawberry by hand:** its companion builder and one real job, so the claims against it are first-hand | Needs the user, before the video script |
 | 3 | **Mascot profiles, local:** create, name, choose a look, write instructions and pick skills. Chats and routines run as a chosen mascot. A look is one drawing with changeable colours and an accessory. A skill is what we already have: allowed sites, allowed tools, routines and instructions | Done. Sites and tools are enforced in the tool layer. A limit applies from a mascot's next message, not mid-reply |
 | 3b | **Working in the background:** every tab Berry opens stays behind the user and the job stays tied to it. Watching changes nothing, and clicking, typing or navigating there takes it over. Short searches on big sites, or on a site the job already has open, need no card | Done |
 | 4 | **Suggestions:** from history, chats and routines, the new tab page offers a ready prompt, a routine or a new mascot. The bar is "you've done this three times", so it works without weeks of data | Done. Each one only fills something in for the user to confirm |
 | 5 | **Needs-you inbox:** every waiting approval, 2FA code and captcha in one place, with a mocked phone notification. Passwords never reach the model or the chat | Done. A job waits while it asks, and other jobs go on. The phone is a labelled preview |
-| 6 | **Gallery with sign-in:** a small hosted service, sign-in with GitHub or Google, publish and browse. Accounts arrive here, as the first thing that needs them | After the inbox |
+| 6 | **Gallery with sign-in:** a small hosted service, sign-in with GitHub or Google, publish and browse. Accounts arrive here, as the first thing that needs them | Browse and add are done, with mascots bundled in the app. Sign-in, publish and share pages remain |
 | 7 | **Team library:** private sharing, choosing between shared memory and your own copy | After the gallery |
 | 8 | **Deadlines on tasks:** "finish by 14:00", with a countdown and useful partial results rather than a predicted end time | If time remains |
 | 9 | **Growth:** landing page, a one-page plan for one sharp audience, and the launch video | Once the demo is filmable |
@@ -32,7 +32,7 @@ No date is set. More time and more thought count in our favour, but what's finis
 
 Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines; page abilities: dropdowns, shadow DOM, link addresses, screenshots, real size for tabs behind the chat, and real load errors.
 
-Parked unless the demo needs them: evidence workbook (a strong candidate for the day at Strawberry, with unfinished work in its worktree), files, helpers, exception inbox, task budgets, importing, keys in the app, signed updates and a Windows pass.
+Parked unless the demo needs them: evidence workbook (a strong candidate for the day at Strawberry, with unfinished work in its worktree), files, helpers, exception inbox, task budgets, importing, keys in the app, signed updates, a Windows pass, memory of what you've seen, and Berry floating in text boxes (too close to what Goldfish sells).
 
 ## How we build
 

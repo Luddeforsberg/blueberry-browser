@@ -1,6 +1,6 @@
 import React from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { Bird, CircleAlert, Compass, Download, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
+import { Bird, CircleAlert, Compass, Download, Feather, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
 import { BerryDot } from '@common/components/Mascot'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
@@ -15,6 +15,7 @@ const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
     gallery: LayoutGrid,
     history: History,
     flock: Bird,
+    'mascot-gallery': Feather,
     'needs-you': Hand
 }
 

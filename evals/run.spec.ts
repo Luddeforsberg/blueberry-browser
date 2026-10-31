@@ -120,7 +120,7 @@ test.describe("Berry on real websites", () => {
   test.afterAll(() => fixtures?.close());
 
   for (const job of jobs(FIXTURES).filter(
-    ({ id }) => !ONLY || ONLY.includes(id),
+    ({ id, galleryMascot }) => (ONLY ? ONLY.includes(id) : !galleryMascot),
   )) {
     test(job.id, async () => {
       test.setTimeout(JOB_TIMEOUT_MS + 2 * 60_000);
@@ -159,7 +159,21 @@ test.describe("Berry on real websites", () => {
 
         // Through the real screens: the side panel when there's a page, or the new tab page's box.
         let textbox;
-        if (start) {
+        if (job.galleryMascot) {
+          await chrome.evaluate(() =>
+            window.chromeAPI.browser.openPage("mascot-gallery"),
+          );
+          await chrome
+            .getByRole("button", { name: `Add ${job.galleryMascot}` })
+            .click();
+          await chrome.getByRole("button", { name: "Add to flock" }).click();
+          await chrome
+            .getByRole("button", { name: `Start a chat with ${job.galleryMascot}` })
+            .click();
+          textbox = chrome.getByRole("textbox", { name: "Message" });
+          await textbox.fill(job.prompt);
+          await textbox.press("Enter");
+        } else if (start) {
           await chrome.getByRole("button", { name: "Show Berry" }).click();
           textbox = chrome
             .getByRole("complementary", { name: "Berry" })
