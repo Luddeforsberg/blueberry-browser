@@ -404,6 +404,39 @@ test("Stop ends the job while the bird is on its way, so the click never happens
   }
 });
 
+test("turning off page access while the bird is on its way means the click never happens", async () => {
+  const { app, chrome, open, job, close } = await setup();
+  try {
+    const page = await open("/plain");
+    await job([
+      { name: "list_elements", args: {} },
+      { name: "click", args: { ref: "e1" } },
+    ]);
+    await expect.poll(async () => (await stateIn(app, "/plain"))?.flying ?? false, { intervals: [10] }).toBe(true);
+    await chrome.evaluate(() => window.chromeAPI.chat.setPageAccess(false));
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await expect(page).toHaveTitle("Plain");
+  } finally {
+    await close();
+  }
+});
+
+test("a page's change listener clearing the field gets the text typed again, not a false done", async () => {
+  const { open, job, close } = await setup();
+  try {
+    const form = await open("/form");
+    await form.evaluate(() => document.querySelector("#field")!.addEventListener("change", (event) => ((event.target as HTMLInputElement).value = ""), { once: true }));
+    const current = await job([
+      { name: "list_elements", args: {} },
+      { name: "type_text", args: { ref: "e1", text: "Ada Lovelace" } },
+    ]);
+    await current.finished();
+    await expect(form.locator("#field")).toHaveValue("Ada Lovelace");
+  } finally {
+    await close();
+  }
+});
+
 test("it works on a page with the strictest CSP, follows a scroll and types at a pace", async () => {
   const { app, open, job, close } = await setup();
   try {

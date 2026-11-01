@@ -497,9 +497,11 @@ export const finishTyping = (ref: string, text: string): string =>
   withElement(
     ref,
     `const text = ${JSON.stringify(text)};
-     if (el.isContentEditable ? !el.innerText.includes(text) : el.value !== text) return "again";
+     const isThere = () => (el.isContentEditable ? el.innerText.includes(text) : el.value === text);
+     if (!isThere()) return "again";
      el.dispatchEvent(new Event("change", { bubbles: true }));
-     return "done";`
+     // A page's own listener can change it, and what comes next mustn't go ahead on something else.
+     return isThere() ? "done" : "again";`
   );
 
 // A real key goes wherever the focus is, and a page can move that after typing.

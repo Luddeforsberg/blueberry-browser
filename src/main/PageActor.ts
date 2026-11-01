@@ -336,7 +336,9 @@ export class PageActor {
 
   // The tab has come to the front in the middle of a job.
   shown(): void {
-    if (this.showing) void this.say("", "thinking");
+    if (!this.showing) return;
+    if (this.waiting) void this.draw("pose", { name: "asking", words: WAITING_WORDS });
+    else void this.say("", "thinking");
   }
 
   // Gone at once, and the next look starts fresh.
@@ -350,7 +352,10 @@ export class PageActor {
 
   // The tab went behind something, so nothing is drawn or waited for from here.
   hidden(): void {
+    // Whoever it's waiting for hasn't answered just because they looked away.
+    const { waiting } = this;
     this.vanish();
+    this.waiting = waiting;
   }
 
   // A job has let go of the tab: it finished, was stopped, or moved on.

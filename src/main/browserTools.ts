@@ -429,9 +429,9 @@ export const createPageTools = ({
     const tab = canSee() ? find(id) : null;
     if (tab) void flyToRef(tab, ref, () => WAITING_WORDS, "ask");
   };
-  const carryOn = (tab: Tab) => !stopped() && !tookOver(tab.id);
+  const carryOn = (tab: Tab) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
-  const leftOff = (tab: Tab) => tookOver(tab.id) ?? STOPPED;
+  const leftOff = (tab: Tab) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
   const usersFields = new Set<string>();
@@ -541,11 +541,12 @@ export const createPageTools = ({
       if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
-      if (arrived === "lost") return finish(await scripted(), SCRIPTED);
+      if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
       await pause(SCROLL_SETTLE_MS);
       aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
     }
     if (aim === null) return STALE_ELEMENT;
+    if (!carryOn(tab)) return leftOff(tab);
     const covered = aim.status === "covered" ? ` Something else was on top of it (“${aim.by}”), which may still be in the way.` : "";
     return finish(await scripted(), `${SCRIPTED}${covered}`);
   };

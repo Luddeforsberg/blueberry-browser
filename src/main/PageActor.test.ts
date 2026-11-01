@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { flightMs, landingFor, PageActor, typingChunks, type ActorOptions, type Spot } from "./PageActor";
+import { describe, expect, it, vi } from "vitest";
+import { flightMs, landingFor, PageActor, typingChunks, WAITING_WORDS, type ActorOptions, type Spot } from "./PageActor";
 
 const spot = (over: Partial<Spot> = {}): Spot => ({ left: 300, top: 300, width: 100, height: 40, x: 350, y: 320, viewWidth: 1000, viewHeight: 800, ...over });
 
@@ -88,5 +88,32 @@ describe("when the tab is taken away mid-draw", () => {
     await actor.hop("Looking");
     expect(sent).toHaveLength(1);
     expect(sent[0]).not.toContain("attachShadow");
+  });
+
+  it("still faces the user when they come back to a tab that's waiting for them", async () => {
+    const sent: string[] = [];
+    const tab = {
+      isVisible: true,
+      berryWorking: true,
+      heldForUser: false,
+      existingView: {
+        webContents: {
+          isDestroyed: () => false,
+          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
+            sent.push(code);
+            return true;
+          },
+        },
+      },
+    };
+    const options: ActorOptions = { on: true, plain: false, still: false, look: { palette: "jackdaw", accessory: "none" }, dark: false, windowShowing: true };
+    const actor = new PageActor(tab as never, () => options, () => 1);
+    actor.waitingForUser();
+    tab.isVisible = false;
+    actor.hidden();
+    sent.length = 0;
+    tab.isVisible = true;
+    actor.shown();
+    await vi.waitFor(() => expect(sent.join("")).toContain(WAITING_WORDS));
   });
 });

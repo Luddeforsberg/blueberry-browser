@@ -483,6 +483,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
       anchor = null;
       if (quietMotion()) {
         place({ x, y });
+        placeLine();
         fade();
         return true;
       }
@@ -491,6 +492,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
         setPose("rest");
         landed();
       });
+      placeLine();
       return true;
     },
 

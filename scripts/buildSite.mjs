@@ -90,7 +90,9 @@ const toTree = (markup, pose) => {
         .replace(/\banimate-berry-pose\b/, "")
         // Each pose keeps its own gradient, as only one of them is ever drawn.
         .replace(/url\(#([^)]+)\)/, `url(#${pose}-$1)`);
-      if (["role", "aria-label", "width", "height", "data-mascot"].includes(name)) continue;
+      if (["role", "aria-label", "data-mascot"].includes(name)) continue;
+      // Only the drawing's own size, as a shape inside it needs its size to be there at all.
+      if (stack.length === 1 && ["width", "height"].includes(name)) continue;
       if (name === "class" && !value.trim()) continue;
       attrs[name] = name === "id" ? `${pose}-${value}` : value;
     }
