@@ -111,7 +111,8 @@ export class Gallery {
     try {
       const token = await this.account.accessToken();
       if (!token) return { ok: false, error: SIGN_IN_FIRST };
-      await this.server.deleteMascot(token, id);
+      // No row deleted means it's another account's, or already gone. Saying it worked could leave it public.
+      if (!(await this.server.deleteMascot(token, id))) return { ok: false, error: "That didn’t remove anything. It may be on another account, so sign in with the one that published it." };
       this.forgetPublished(id);
       this.shown.delete(id);
       this.onChange();
