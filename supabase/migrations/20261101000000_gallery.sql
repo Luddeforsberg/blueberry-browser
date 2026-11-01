@@ -108,8 +108,16 @@ declare
 begin
   if p_mascot is null or p_install is null then return; end if;
   if not exists (select 1 from public.mascots m where m.id = p_mascot and not m.hidden and m.owner is distinct from auth.uid()) then return; end if;
-  if exists (select 1 from public.mascot_adds a where a.mascot_id = p_mascot and a.adder in (account, install)) then return; end if;
-  if (select count(*) from public.mascot_adds a where a.mascot_id = p_mascot and a.added_at > now() - interval '1 hour') >= 60 then return; end if;
+  if exists (select 1 from public.mascot_adds a where a.mascot_id = p_mascot and a.adder = account) then return; end if;
+  if exists (select 1 from public.mascot_adds a where a.mascot_id = p_mascot and a.adder = install) then
+    -- Already counted from here, perhaps before signing in. That account has now added it, wherever it adds it next.
+    if account is not null then
+      insert into public.mascot_adds (mascot_id, adder) values (p_mascot, account) on conflict do nothing;
+    end if;
+    return;
+  end if;
+  -- Every counted add has one install row, and a signed-in one has an account row too.
+  if (select count(*) from public.mascot_adds a where a.mascot_id = p_mascot and a.adder like 'install:%' and a.added_at > now() - interval '1 hour') >= 60 then return; end if;
   insert into public.mascot_adds (mascot_id, adder) values (p_mascot, install);
   if account is not null then
     insert into public.mascot_adds (mascot_id, adder) values (p_mascot, account);

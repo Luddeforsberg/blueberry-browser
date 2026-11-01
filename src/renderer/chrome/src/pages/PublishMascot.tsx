@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeft, ExternalLink } from 'lucide-react'
 import type { PublishChoices } from '@shared/library'
 import { GALLERY_CATEGORIES, MAX_AUTHOR, MAX_DESCRIPTION, MAX_EXAMPLE_ANSWER, MAX_EXAMPLE_PROMPT, parsePublicDraft, parsePublishChoices, publishWarnings } from '@shared/publishing'
@@ -41,6 +41,10 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     const [error, setError] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
     const [link, setLink] = useState<string | null>(null)
+    const [loadTries, setLoadTries] = useState(0)
+    const [loadFailed, setLoadFailed] = useState(false)
+    const latest = useRef(values)
+    latest.current = values
     const mascot = flock.find(({ id }) => id === mascotId)
     const set = (patch: Partial<PublishValues>) => onChange({ ...values, ...patch })
     const own = chats.filter((chat) => chat.mascotId === mascotId)
@@ -48,25 +52,41 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     // Once, from what's already published, or the name they last used. It never starts from the account.
     useEffect(() => {
         if (values.filledIn || account.status !== 'signed-in') return
+        let left = false
         void (async () => {
             const [mine, author] = await Promise.all([window.chromeAPI.mascots.published(), window.chromeAPI.mascots.lastAuthor()])
+            if (left) return
+            // Blank defaults here would take what's public away on the next update, so it waits until it knows.
+            if (mine === null && mascot?.publishedId) {
+                setLoadFailed(true)
+                setError('Couldn’t get what’s already public, so it can’t be updated yet.')
+                return
+            }
+            if (loadFailed) setError(null)
+            setLoadFailed(false)
             const current = mine?.find(({ id }) => id === mascot?.publishedId)
             if (current?.link) setLink(current.link)
+            // Whatever was typed or picked while this was on its way stays.
+            const now = latest.current
+            const keepExample = now.exampleChatId !== null
             onChange({
-                ...values,
+                ...now,
                 filledIn: true,
-                author: current?.author ?? author,
-                description: current?.description ?? '',
-                category: current?.category ?? 'Other',
-                prompt: current?.example?.prompt ?? '',
-                answer: current?.example?.answer ?? '',
-                checked: Boolean(current?.example),
-                exampleChatId: current?.example ? 'published' : null,
+                author: now.author || (current?.author ?? author),
+                description: now.description || (current?.description ?? ''),
+                category: now.category !== 'Other' ? now.category : (current?.category ?? 'Other'),
+                prompt: keepExample ? now.prompt : (current?.example?.prompt ?? ''),
+                answer: keepExample ? now.answer : (current?.example?.answer ?? ''),
+                checked: keepExample ? now.checked : Boolean(current?.example),
+                exampleChatId: keepExample ? now.exampleChatId : current?.example ? 'published' : null,
             })
         })()
+        return () => {
+            left = true
+        }
         // Only when it's first possible, whatever's typed by then.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [values.filledIn, account.status])
+    }, [values.filledIn, account.status, loadTries])
 
     const hasExample = values.exampleChatId !== null
     const typed: PublishChoices = {
@@ -245,7 +265,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     {error && <div className="mt-4"><ChatError message={error} /></div>}
 
                     <div className="mt-6 flex items-center gap-3">
-                        <Button disabled={busy || (draft !== null && 'error' in draft)} onClick={() => void publish()}>{busy ? 'Publishing…' : mascot.publishedId ? 'Update what’s public' : 'Publish for anyone to read'}</Button>
+                        {loadFailed && <Button variant="outline" onClick={() => setLoadTries((tries) => tries + 1)}>Try again</Button>}
+                        <Button disabled={busy || (Boolean(mascot.publishedId) && !values.filledIn) || (draft !== null && 'error' in draft)} onClick={() => void publish()}>{busy ? 'Publishing…' : mascot.publishedId ? 'Update what’s public' : 'Publish for anyone to read'}</Button>
                         <Button variant="ghost" onClick={onBack}>Cancel</Button>
                     </div>
                 </>

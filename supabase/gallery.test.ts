@@ -123,6 +123,22 @@ describe("the Gallery's database rules", () => {
 
     await add(ALICE, id, "00000000-0000-4000-8000-000000000003");
     expect((await row(id)).add_count).toBe(1);
+
+    // Counted before signing in, and that account still counts once from another computer.
+    const anonymousFirst = await publish(ALICE);
+    await add(null, anonymousFirst);
+    await add(BOB, anonymousFirst);
+    await add(BOB, anonymousFirst, "00000000-0000-4000-8000-000000000004");
+    expect((await row(anonymousFirst)).add_count).toBe(1);
+
+    // The hourly limit counts adds, not rows, and a signed-in add has two.
+    const popular = await publish(ALICE);
+    const nth = (n: number) => `00000000-0000-4000-9000-${String(n).padStart(12, "0")}`;
+    for (let n = 1; n <= 40; n++) await add(nth(n), popular, nth(n + 100));
+    expect((await row(popular)).add_count).toBe(40);
+    for (let n = 41; n <= 65; n++) await add(null, popular, nth(n + 100));
+    expect((await row(popular)).add_count).toBe(60);
+
     await expect(as(null, `update public.mascots set add_count = 9 where id = '${id}'`)).rejects.toThrow(/permission denied/);
     await expect(as(null, `insert into public.mascot_adds values ('${id}', 'install:x')`)).rejects.toThrow(/permission denied/);
     await expect(as(null, "select public.mascots_before_write()")).rejects.toThrow();
