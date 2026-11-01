@@ -476,6 +476,16 @@ describe("Chats", () => {
         expect(refused?.message).not.toMatch(/s3cret|t0ken/);
       });
 
+      it("takes out the whole of a later address whose query begins with an earlier one's", async () => {
+        const { chats, own, id, approvalId, heard } = await handedOver("sign-in");
+        chats.decide(id, approvalId, true);
+        await vi.waitFor(() => expect(heard).toHaveLength(2));
+        (own as unknown as { url: string }).url = "https://example.com/a?state=abc";
+        chats.withoutCodes("");
+        (own as unknown as { url: string }).url = "https://example.com/a?state=abc&token=s3cret";
+        expect(chats.withoutCodes("https://example.com/a?state=abc&token=s3cret")).not.toContain("s3cret");
+      });
+
       it("leaves the model's text alone when a handed-back tab's address ends in a bare # or ?", async () => {
         const { chats, own, id, approvalId, heard } = await handedOver("sign-in");
         chats.decide(id, approvalId, true);

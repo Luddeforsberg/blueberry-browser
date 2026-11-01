@@ -236,9 +236,12 @@ export class Chats {
       // A bare "#" or "?" holds no secret, and taking it out would mangle everything else the model reads.
       if (details !== -1 && url.length - details >= 4) this.addressDetails.add(url.slice(details));
     });
-    this.addressDetails.forEach((details) => {
-      clean = clean.replaceAll(details, ADDRESS_DETAILS_REMOVED);
-    });
+    // Longest first, as one address's query can begin with another's and the rest would be left showing.
+    [...this.addressDetails]
+      .sort((a, b) => b.length - a.length)
+      .forEach((details) => {
+        clean = clean.replaceAll(details, ADDRESS_DETAILS_REMOVED);
+      });
     return clean;
   }
 
