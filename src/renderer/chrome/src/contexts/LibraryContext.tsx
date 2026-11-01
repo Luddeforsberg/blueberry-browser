@@ -34,12 +34,17 @@ export const useFlock = () => {
 export const LibraryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [library, setLibrary] = useState<LibrarySnapshot>(EMPTY)
     const [chosenId, setChosenId] = useState(BERRY_ID)
-    const choose = useCallback((id: string) => setChosenId(id), [])
+    // Saved, because the bird on the desktop goes by it too.
+    const choose = useCallback((id: string) => {
+        setChosenId(id)
+        void window.chromeAPI.settings.updateSettings({ chosenMascotId: id === BERRY_ID ? null : id })
+    }, [])
     const chosen = useMemo(() => ({ chosenId, choose }), [chosenId, choose])
 
     useEffect(() => {
         const api = window.chromeAPI.library
         api.getLibrary().then(setLibrary).catch((error) => console.error('Failed to load library:', error))
+        void window.chromeAPI.settings.getSettings().then(({ chosenMascotId }) => setChosenId(chosenMascotId ?? BERRY_ID))
         return api.onLibraryUpdated(setLibrary)
     }, [])
 

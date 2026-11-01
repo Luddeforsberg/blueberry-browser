@@ -21,12 +21,19 @@ const STARTUP_DESCRIPTIONS: Record<StartupChoice, string> = {
     fresh: 'Blueberry opens a new tab, and doesn’t save your open tabs.'
 }
 
+const DESKTOP_SHORTCUT = /Mac/.test(navigator.platform) ? '⌥Space' : 'Alt+Space'
+
 const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Phone', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
 type Section = typeof SECTIONS[number]
 
 export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { settings, updateSettings } = useShell()
     const [section, setSection] = useState<Section>('Layout')
+    const [shortcutTaken, setShortcutTaken] = useState(false)
+
+    useEffect(() => {
+        void window.chromeAPI.desktop.shortcutTaken().then(setShortcutTaken)
+    }, [settings.desktopBerry])
 
     // Another page can open Settings at a section.
     useEffect(() => {
@@ -107,6 +114,21 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         labelledBy="setting-still-berry"
                                         checked={settings.keepBerryStill}
                                         onChange={(keepBerryStill) => updateSettings({ keepBerryStill })}
+                                    />
+                                </SettingsRow>
+                                <SettingsRow
+                                    id="setting-desktop-berry"
+                                    title="Berry on your desktop"
+                                    description={
+                                        shortcutTaken
+                                            ? `Another app already uses ${DESKTOP_SHORTCUT}, so press the bird to give it a job instead. It can't see your screen or other apps, and jobs ask just as a chat does.`
+                                            : `When you leave Blueberry, the bird stands at the edge of your screen, and ${DESKTOP_SHORTCUT} gives it a job from any app. It can't see your screen or other apps, and jobs ask just as a chat does. Closing Blueberry's window takes it away and stops what's running.`
+                                    }
+                                >
+                                    <Switch
+                                        labelledBy="setting-desktop-berry"
+                                        checked={settings.desktopBerry}
+                                        onChange={(desktopBerry) => updateSettings({ desktopBerry })}
                                     />
                                 </SettingsRow>
                                 <SettingsRow id="setting-bird-on-pages" title="Show the bird on pages" description="While a mascot works in the page you're looking at, it's drawn there doing it. Turn this off if a site reacts badly. Mascots work the same either way.">

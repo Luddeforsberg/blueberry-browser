@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH } from "./Layout";
+import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH,
+  DESKTOP_BIRD_SIZE,
+  desktopBounds,
+  desktopFlightPoint,
+  desktopFractionAt,
+  desktopHit,
+  desktopSide,
+} from "./Layout";
 
 const mac = {
   platform: "darwin" as const,
@@ -155,5 +162,56 @@ describe("promptRect", () => {
     expect(promptRect(page, 5000).height).toBe(744);
     expect(promptRect(page, 0).height).toBe(1);
     expect(promptRect({ ...page, width: 300 }, 170).width).toBe(300);
+  });
+});
+
+describe("the bird on the desktop", () => {
+  const area = { x: 100, y: 25, width: 1000, height: 700 };
+  const room = area.width - DESKTOP_BIRD_SIZE;
+
+  it("stands on the bottom of the work area, from one end to the other", () => {
+    expect(desktopBounds(area, 0, { width: 0, height: 0 })).toEqual({ x: 100, y: 725 - DESKTOP_BIRD_SIZE, width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE });
+    expect(desktopBounds(area, 1, { width: 0, height: 0 }).x).toBe(100 + room);
+  });
+
+  it("keeps the bird where it is when the window grows, with the rest towards the middle", () => {
+    const small = desktopBounds(area, 0.9, { width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE });
+    const big = desktopBounds(area, 0.9, { width: 400, height: 200 });
+    expect(big.x + big.width).toBe(small.x + small.width);
+    expect(big.y + big.height).toBe(small.y + small.height);
+    expect(desktopSide(0.5)).toBe("right");
+    expect(desktopSide(0.51)).toBe("left");
+    expect(desktopBounds(area, 0.1, { width: 400, height: 200 }).x).toBe(desktopBounds(area, 0.1, { width: 0, height: 0 }).x);
+  });
+
+  it("stays inside the limits on what the view can ask for", () => {
+    expect(desktopBounds(area, 0, { width: 9000, height: 9000 })).toMatchObject({ width: 520, height: 320 });
+  });
+
+  it("turns a place on the screen into a fraction and stays on the edge", () => {
+    expect(desktopFractionAt(area, 100)).toBe(0);
+    expect(desktopFractionAt(area, 100 + room)).toBe(1);
+    expect(desktopFractionAt(area, -500)).toBe(0);
+    expect(desktopFractionAt(area, 5000)).toBe(1);
+    expect(desktopFractionAt({ ...area, width: DESKTOP_BIRD_SIZE }, 100)).toBe(0);
+  });
+
+  it("only lets the pointer land on what's listed, up to but not past its edge", () => {
+    const window = { x: 10, y: 20, width: 200, height: 100 };
+    const hits = [{ x: 150, y: 50, width: 50, height: 50 }];
+    expect(desktopHit({ x: 160, y: 70 }, window, hits)).toBe(true);
+    expect(desktopHit({ x: 159, y: 70 }, window, hits)).toBe(false);
+    expect(desktopHit({ x: 209, y: 119 }, window, hits)).toBe(true);
+    expect(desktopHit({ x: 210, y: 70 }, window, hits)).toBe(false);
+    expect(desktopHit({ x: 160, y: 70 }, window, [])).toBe(false);
+  });
+
+  it("leaves from where it is, lands where it's going, and rises on the way", () => {
+    const from = { x: 500, y: 300 };
+    const to = { x: 1200, y: 800 };
+    expect(desktopFlightPoint(from, to, 0)).toEqual(from);
+    expect(desktopFlightPoint(from, to, 1)).toEqual(to);
+    const straightLine = from.y + (to.y - from.y) * 0.5;
+    expect(desktopFlightPoint(from, to, 0.5).y).toBeLessThan(straightLine);
   });
 });

@@ -18,6 +18,19 @@ const subscribe = <C extends keyof EventChannels>(
 };
 
 const chromeAPI: ChromeAPI = {
+  desktop: {
+    shortcutTaken: () => invoke("desktop:shortcut-taken"),
+    onAway: (callback) => subscribe("desktop:away", callback),
+    state: () => invoke("desktop:state"),
+    layout: (layout) => invoke("desktop:layout", layout),
+    send: (text) => invoke("desktop:send", text),
+    closeComposer: () => invoke("desktop:close-composer"),
+    press: () => invoke("desktop:press"),
+    drag: (screenX) => invoke("desktop:drag", screenX),
+    dragEnd: () => invoke("desktop:drag-end"),
+    menu: () => invoke("desktop:menu"),
+    onState: (callback) => subscribe("desktop:state", callback),
+  },
   browser: {
     getTabs: () => invoke("tabs:list"),
     createTab: (url) => invoke("tabs:create", url),

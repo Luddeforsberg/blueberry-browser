@@ -21,9 +21,10 @@ export class EventManager {
     this.handleRoutineEvents();
     this.handleDownloadEvents();
     this.handlePermissionEvents();
+    this.handleDesktopEvents();
   }
 
-  private get endpoints(): Record<ChromeRegion, ChromeEndpoint> {
+  private get endpoints(): Record<ChromeRegion, ChromeEndpoint | null> {
     const endpoint = ({ view, url }: { view: { webContents: ChromeEndpoint["webContents"] }; url: string }) => ({
       webContents: view.webContents,
       url,
@@ -33,6 +34,8 @@ export class EventManager {
       overlay: endpoint(this.mainWindow.overlayView),
       find: endpoint(this.mainWindow.findBar.chromeView),
       prompt: endpoint(this.mainWindow.permissionPrompt.chrome),
+      // There's no such view while the feature is off, so nothing can claim to be it.
+      desktop: this.mainWindow.desktopBerry.chromeView && endpoint(this.mainWindow.desktopBerry.chromeView),
     };
   }
 
@@ -42,7 +45,11 @@ export class EventManager {
   ): void {
     ipcMain.handle(channel, (event, ...args) => {
       const endpoints = this.endpoints;
-      if (!CHANNEL_REGIONS[channel].some((region) => isTrustedSender(event, endpoints[region]))) {
+      const trusted = CHANNEL_REGIONS[channel].some((region) => {
+        const endpoint = endpoints[region];
+        return endpoint !== null && isTrustedSender(event, endpoint);
+      });
+      if (!trusted) {
         throw new Error(`Rejected ${channel} from ${event.senderFrame?.url ?? "an unknown frame"}`);
       }
       return listener(...(args as InvokeChannels[C]["args"]));
@@ -228,6 +235,19 @@ export class EventManager {
     this.handle("permissions:current", () => permissionPrompt.current);
     this.handle("permissions:decide", (id, allow) => permissionPrompt.decide(id, allow === true));
     this.handle("permissions:resize", (height) => permissionPrompt.resize(height));
+  }
+
+  private handleDesktopEvents(): void {
+    const { desktopBerry } = this.mainWindow;
+    this.handle("desktop:shortcut-taken", () => desktopBerry.shortcutTaken);
+    this.handle("desktop:state", () => desktopBerry.state);
+    this.handle("desktop:layout", (layout) => desktopBerry.setLayout(layout));
+    this.handle("desktop:send", (text) => desktopBerry.send(text));
+    this.handle("desktop:close-composer", () => desktopBerry.closeComposer());
+    this.handle("desktop:press", () => desktopBerry.press());
+    this.handle("desktop:drag", (screenX) => desktopBerry.drag(screenX));
+    this.handle("desktop:drag-end", () => desktopBerry.dragEnd());
+    this.handle("desktop:menu", () => desktopBerry.showMenu());
   }
 
   public cleanup(): void {

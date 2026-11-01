@@ -1,12 +1,12 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
-// nothing else can answer it.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt";
+// nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own.
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -46,6 +46,42 @@ export interface Settings {
   suggestions: boolean;
   // Send to the phone even while the user is at the computer, for filming and trying it out.
   phoneAlways: boolean;
+  // Who the next new chat runs as. Null is Berry.
+  chosenMascotId: string | null;
+  // The bird on the edge of the screen, and the shortcut that opens its composer.
+  desktopBerry: boolean;
+  // Where along the edge it stands, from 0 to 1. Null until it's been dragged.
+  desktopBerrySpot: DesktopBerrySpot | null;
+}
+
+export interface DesktopBerrySpot {
+  displayId: number;
+  fraction: number;
+}
+
+// Everything the desktop view draws. Main works all of it out, so the view knows nothing about chats or approvals.
+export interface DesktopBerryState {
+  // False while it's fading away, just before the window hides.
+  shown: boolean;
+  // Which way it's flying, or null when it's standing.
+  flying: "left" | "right" | null;
+  composing: boolean;
+  // Which side of the bird the words and the composer go, so they stay on the screen.
+  side: "left" | "right";
+  mood: "rest" | "fetching" | "asking" | "delivered" | "oops";
+  name: string;
+  look: MascotLook;
+  showBerry: boolean;
+  still: boolean;
+  // `lasting` stays until it's answered. Otherwise it shows for a moment, and again when the pointer comes to the bird.
+  line: { text: string; lasting: boolean } | null;
+}
+
+// What the view is drawing, relative to its window: how big the window needs to be and what in it can be clicked.
+export interface DesktopBerryLayout {
+  width: number;
+  height: number;
+  hits: Rect[];
 }
 
 // Replies from the phone, for Settings and Needs you. Nothing here can be used to read the bot's token, which never
@@ -282,7 +318,7 @@ export interface InvokeChannels {
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   "bookmarks:toggle-pin": { region: "chrome"; args: []; result: void };
@@ -290,6 +326,18 @@ export interface InvokeChannels {
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
+  // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
+  "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
+  "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
+  "desktop:layout": { region: "desktop"; args: [layout: DesktopBerryLayout]; result: void };
+  // Starts a job with no page, as whoever is chosen. It's the same as a chat started from the new tab page.
+  "desktop:send": { region: "desktop"; args: [text: string]; result: boolean };
+  "desktop:close-composer": { region: "desktop"; args: []; result: void };
+  // The bird or its words were pressed. Main decides what that opens, so the view never names a chat or an approval.
+  "desktop:press": { region: "desktop"; args: []; result: void };
+  "desktop:drag": { region: "desktop"; args: [screenX: number]; result: void };
+  "desktop:drag-end": { region: "desktop"; args: []; result: void };
+  "desktop:menu": { region: "desktop"; args: []; result: void };
   "chat:send": {
     region: "chrome";
     args: [chatId: string | null, text: string, options: ChatSendOptions];
@@ -377,6 +425,9 @@ export interface EventChannels {
   "phone:answered": PhoneAnswered;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
+  "desktop:state": DesktopBerryState;
+  // Whether the bird is out on the desktop, so the chrome doesn't draw a second one.
+  "desktop:away": boolean;
   "settings:updated": Settings;
   "library:updated": LibrarySnapshot;
   "toolbar:focus-address": null;
@@ -560,7 +611,23 @@ export interface PhoneAPI {
   onAnswered: (callback: (answered: PhoneAnswered) => void) => Unsubscribe;
 }
 
+export interface DesktopAPI {
+  // For Settings and the chrome's own bird. The chrome can't call the rest.
+  shortcutTaken: () => Promise<boolean>;
+  onAway: (callback: (away: boolean) => void) => Unsubscribe;
+  state: () => Promise<DesktopBerryState>;
+  layout: (layout: DesktopBerryLayout) => Promise<void>;
+  send: (text: string) => Promise<boolean>;
+  closeComposer: () => Promise<void>;
+  press: () => Promise<void>;
+  drag: (screenX: number) => Promise<void>;
+  dragEnd: () => Promise<void>;
+  menu: () => Promise<void>;
+  onState: (callback: (state: DesktopBerryState) => void) => Unsubscribe;
+}
+
 export interface ChromeAPI {
+  desktop: DesktopAPI;
   browser: BrowserAPI;
   layout: LayoutAPI;
   theme: ThemeAPI;

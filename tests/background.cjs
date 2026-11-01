@@ -20,6 +20,11 @@ class BackgroundWindow extends electron.BaseWindow {
   }
 
   focus() {}
+
+  // A window that moves itself, like the bird on the desktop, stays off-screen by the same distance.
+  setBounds(bounds, ...rest) {
+    super.setBounds({ ...bounds, x: bounds.x + OFF_SCREEN.x, y: bounds.y + OFF_SCREEN.y }, ...rest);
+  }
 }
 
 // A test run has nobody to notify, and an app that never comes to the front would notify every time.
@@ -39,5 +44,9 @@ const load = Module._load;
 Module._load = function (request, ...rest) {
   return request === "electron" ? wrapped : load.call(this, request, ...rest);
 };
+
+// Bringing the app forward is the one thing a click on the desktop bird does outside its own window.
+electron.app.focus = () => {};
+electron.app.show = () => {};
 
 if (process.platform === "darwin") electron.app.setActivationPolicy("accessory");

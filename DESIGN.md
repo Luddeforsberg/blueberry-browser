@@ -328,6 +328,7 @@ Clicking a bird anywhere in the chrome gets a small reaction: a hop, a curious l
 | Over a web page | Only while working in a page the user can see, in front of them or in the working view, drawn in the page. See Over a web page |
 | Show Berry how | Curious in the toolbar while it watches, and standing on the line over its notes |
 | The working view | In the picture while it works, and on the window's top edge when it isn't. See The working view |
+| On your desktop | Only if it's turned on, on the bottom edge of the screen while you're in other apps. See On your desktop |
 
 ### Where Berry goes
 
@@ -345,6 +346,7 @@ Berry only speaks about work the user started: a finished task, a routine result
 | Asking in the chat | Only when Berry needs a decision to continue, and the same item is on Needs you |
 | Silent system notification | Something new is waiting, or a routine has news, and the app isn't in front |
 | Message on the user's phone | Something is waiting and they're away, only if they connected a bot. See Needs you |
+| Bird on the desktop | A mood, and one short line beside it, only if it's turned on. It replaces the notification for Needs you. See On your desktop |
 
 Berry never opens a modal, takes keyboard focus or makes a sound. A notification never comes during fullscreen or while a tab plays sound, and it says who and what kind of thing it is, never the question, the site or anything typed. A phone message does say those, because it's how the user answers, and Settings says Telegram can read it. Anything waiting holds until the user is done.
 
@@ -426,6 +428,21 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 **Settings:** Keep Berry still and Reduce Motion give a small marker, the bird's head at 28px, that fades between spots with no flying, and text arrives at once. Show Berry off gives a plain pointer on the exact spot, with the same words. **Show the bird on pages** in Settings, under Berry, removes all of it for a site that reacts badly, and the inset glow comes back.
 
 **It stays out of the way:** no clicks, no box, no effect on the page's layout, no text the page or the agent can read, and out of every screenshot. It's in a closed shadow root in the top layer, and all its styles win over the page's. It works on the strictest content security policy. The bird may cover something for a moment, as a hand would. The real input goes through it regardless, and the watch that stops a press landing on anything but the named element isn't changed.
+
+### On your desktop
+
+Other AI browsers want you to come to them. This lets you start a job from any app, and it still runs in the browser where you're signed in. The bird leaves the browser and stands on the edge of the screen, and a shortcut gives it a job without leaving what you're doing. **It's off until it's turned on**, in Settings under Berry, because a thing above every app and a key taken from every app are for the user to ask for.
+
+- **Where it is:** one bird, at 72px, with its toes on the bottom of the work area, which is the top of the Dock or the bottom of the screen. It starts over to the right of the middle and can be dragged along the edge and to another display, and it stays there. There's no perch or box under it. It's there on every Space and over full-screen apps.
+- **One bird:** while Blueberry's window is the one in use, the bird is in there, as usual. Leaving for another app, it fades in on the edge after a moment, and coming back it fades away there and is in the window again. Turning it on is the exception: it goes straight out and stays out until you next leave and come back. While it's out, the window has an empty place where it would be.
+- **The flight:** minimising or hiding the window, or turning it on, and it takes off from where it's drawn in the window, over whatever is in the way in an arc, wings going, and lands on the edge with a small settle, in 0.7 to 1.2 seconds. Keep Berry still and reduced motion get the fade instead, and so does going to another app, since that happens all day. There's no flight back.
+- **The shortcut:** `⌥Space` (`Alt+Space` on Windows) opens the composer beside the bird, on the side with room. It's the one composer, small, with no + and no choosing: it goes to whoever is chosen on the other composers, and says so. The keyboard goes to it without Blueberry coming forward. Enter starts the job and the keyboard is back in your app, which never stopped being the one in front. `Esc`, or clicking anywhere else, closes it and keeps what was typed. If another app holds the shortcut, Settings says so, and pressing the bird does the same.
+- **What it shows:** one bird says one thing, whoever has the most to say, in this order. Asking, with who and what kind of thing it is, such as "Scout needs your OK.", until it's answered. Delivered, or Oops if it failed, with the first sentence of the reply, until it's opened or dismissed. Fetching, with "Working on" and the chat's name. Otherwise at rest as whoever is chosen, with nothing beside it. A line that doesn't need an answer shows for 8 seconds and comes back when the pointer does. Only what ends while you're away gets a line, and a job you stopped doesn't. No exact approval words, sites or anything from a page show except a finished reply's own first sentence, which the user asked for. It's on the screen, so someone sharing theirs is sharing that too.
+- **Pressing it:** opens what it's talking about, in Blueberry's window, brought forward. Needs you for anything waiting, or the chat for a result. Nothing is answered here, because the buttons are only ever in Blueberry. With nothing to say, it opens the composer. Either way it gets its usual reaction. Right-clicking offers Not Now on a result, Open Blueberry, Keep Berry Still, Hide Berry and Take Off the Desktop.
+- **It stays out of the way:** it never takes the keyboard unless the composer is opened, and clicks go through its window everywhere but on the bird, its words and the composer. Nothing loops at rest: the blink is left out here, and wings go only while something is really working.
+- **Hide Berry:** a plain icon stands there instead, with no flight, and "Assistant" in the words.
+- **What it can't do:** it doesn't read the screen, the clipboard, selected text or anything in another app, and needs no Screen Recording or Accessibility permission. A job from here is exactly a new chat with no page: the same tools, reaching only tabs it opens, and the same approvals on Needs you.
+- **Needing Blueberry open:** the jobs live in the window. Closing it stops what's running, as it always has, so the bird and the shortcut go with it, and opening a window brings them back. Quitting removes them. Hide Blueberry (`⌘H`) hides only the window while the bird is out, because hiding a whole app takes all its windows with it.
 
 ### Find in page
 
@@ -594,7 +611,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide, Show the bird on pages and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide, On your desktop, Show the bird on pages and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Downloads
 
@@ -662,7 +679,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 - Don't add a colour, weight, font or shadow that isn't in this document.
 - Don't add bounce to the chrome or loops without real work behind them. The exceptions are Berry's world on the new tab page, the legs of a sitting bird, and the preview on the Flock page.
 - Don't let Berry joke about permissions, payments, messages, data or failures.
-- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestions on the new tab page.
+- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestions on the new tab page. The composer on the desktop takes the keyboard only because the user pressed for it.
 - Don't read page content unless the user asked.
 - Don't send browsing data to third-party services for UI features such as favicons.
 - Don't make any feature depend on Berry being visible.

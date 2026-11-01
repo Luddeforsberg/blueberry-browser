@@ -45,6 +45,56 @@ export const promptRect = (page: Rect, cardHeight: number): Rect => {
   return { x: page.x, y: page.y, width: Math.min(PROMPT_WIDTH, page.width), height };
 };
 
+// The bird on the edge of the screen, in a window that fits it and whatever is showing beside it.
+// The drawing goes past its own box in places, such as the tail in flight, so this has room around a 72px bird.
+export const DESKTOP_BIRD_SIZE = 96;
+const DESKTOP_MAX_WINDOW = { width: 520, height: 320 };
+// With nothing saved, over to the right of the middle: on top of a Dock of the usual width, and clear of most work.
+export const DESKTOP_DEFAULT_FRACTION = 0.66;
+
+const desktopBirdX = (area: Rect, fraction: number): number =>
+  Math.round(area.x + Math.min(Math.max(fraction, 0), 1) * Math.max(area.width - DESKTOP_BIRD_SIZE, 0));
+
+export const desktopFractionAt = (area: Rect, birdX: number): number => {
+  const room = area.width - DESKTOP_BIRD_SIZE;
+  return room > 0 ? Math.min(Math.max((birdX - area.x) / room, 0), 1) : 0;
+};
+
+// What's beside the bird goes towards the middle of the screen, so it always has room.
+export const desktopSide = (fraction: number): "left" | "right" => (fraction > 0.5 ? "left" : "right");
+
+// Standing on the bottom of the work area, which is the top of a Dock or the bottom of the screen. The bird keeps its
+// place however big the window gets.
+export const desktopBounds = (area: Rect, fraction: number, size: { width: number; height: number }): Rect => {
+  const width = Math.round(Math.min(Math.max(size.width, DESKTOP_BIRD_SIZE), DESKTOP_MAX_WINDOW.width));
+  const height = Math.round(Math.min(Math.max(size.height, DESKTOP_BIRD_SIZE), DESKTOP_MAX_WINDOW.height));
+  const birdX = desktopBirdX(area, fraction);
+  return {
+    x: desktopSide(fraction) === "left" ? birdX + DESKTOP_BIRD_SIZE - width : birdX,
+    y: area.y + area.height - height,
+    width,
+    height,
+  };
+};
+
+export const desktopHit = (point: { x: number; y: number }, window: Rect, hits: Rect[]): boolean =>
+  hits.some(({ x, y, width, height }) => {
+    const left = window.x + x;
+    const top = window.y + y;
+    return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
+  });
+
+// The way there, as an arc over the straight line, for `t` from 0 to 1. It starts and lands gently.
+export const desktopFlightPoint = (from: { x: number; y: number }, to: { x: number; y: number }, t: number): { x: number; y: number } => {
+  const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+  const peak = Math.min(from.y, to.y) - Math.min(Math.hypot(to.x - from.x, to.y - from.y) * 0.18, 120);
+  const rest = 1 - eased;
+  return {
+    x: Math.round(from.x + (to.x - from.x) * eased),
+    y: Math.round(rest * rest * from.y + 2 * rest * eased * peak + eased * eased * to.y),
+  };
+};
+
 // The only place that decides where the window's regions go.
 export function computeLayout(
   window: { width: number; height: number },

@@ -97,6 +97,9 @@ export const BerryCompanion: React.FC = () => {
     const [atSpot, setAtSpot] = useState(false)
     // The composer it's standing on. It's drawn inside that box, so the page can't scroll one without the other.
     const [home, setHome] = useState<HTMLElement | null>(null)
+    // Out on the desktop, so there's an empty place here rather than a second bird.
+    const [away, setAway] = useState(false)
+    useEffect(() => window.chromeAPI.desktop.onAway(setAway), [])
 
     const activeId = activeTab?.id
     const canFly = useCallback(
@@ -211,7 +214,7 @@ export const BerryCompanion: React.FC = () => {
     if (!settings.showBerry) return null
 
     const bird = (
-        <div ref={body} className={atSpot || home || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: home ? `${FEET_X * 100}% ${STANDING_FEET * 100}%` : `50% ${SEAT * 100}%` }}>
+        <div ref={body} className={atSpot || home || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: home ? `${FEET_X * 100}% ${STANDING_FEET * 100}%` : `50% ${SEAT * 100}%`, opacity: away ? 0 : undefined }}>
             <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
                 <Berry mood={mood} size={home ? HOME_SIZE : BASE_SIZE} mascot={mascot} />
             </div>

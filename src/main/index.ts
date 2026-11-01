@@ -1,4 +1,4 @@
-import { app, BaseWindow, dialog, session, shell } from "electron";
+import { app, BaseWindow, dialog, globalShortcut, session, shell } from "electron";
 import { electronApp } from "@electron-toolkit/utils";
 import { Window } from "./Window";
 import { AppMenu } from "./Menu";
@@ -91,9 +91,15 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BaseWindow.getAllWindows().length === 0) {
       mainWindow = createWindow();
+    } else if (mainWindow && !mainWindow.baseWindow.isVisible() && !mainWindow.baseWindow.isMinimized()) {
+      // Hidden on its own, with the bird still out on the desktop.
+      mainWindow.show();
+      mainWindow.focus();
     }
   });
 });
+
+app.on("will-quit", () => globalShortcut.unregisterAll());
 
 app.on("window-all-closed", () => {
   if (eventManager) {

@@ -64,4 +64,16 @@ describe("SettingsStore", () => {
     expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({ layoutMode: "horizontal" });
     expect(new SettingsStore(file).get()).toMatchObject({ layoutMode: "horizontal", sidebarWidth: 300 });
   });
+
+  it("keeps the desktop bird on the edge, and refuses anything that isn't a place", () => {
+    const spot = (desktopBerrySpot: unknown) => sanitizeSettings({ desktopBerrySpot }).desktopBerrySpot;
+    expect(spot({ displayId: 1, fraction: 0 })).toEqual({ displayId: 1, fraction: 0 });
+    expect(spot({ displayId: 1, fraction: 1 })).toEqual({ displayId: 1, fraction: 1 });
+    expect(spot({ displayId: 1, fraction: 1.5 })).toEqual({ displayId: 1, fraction: 1 });
+    expect(spot({ displayId: 1, fraction: -1 })).toEqual({ displayId: 1, fraction: 0 });
+    expect(spot({ displayId: "1", fraction: 0.5 })).toBeNull();
+    expect(spot({ displayId: 1, fraction: Infinity })).toBeNull();
+    expect(spot(null)).toBeNull();
+    expect(spot(undefined)).toBeNull();
+  });
 });

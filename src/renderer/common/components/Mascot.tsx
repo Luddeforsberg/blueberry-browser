@@ -41,6 +41,8 @@ interface MascotProps {
   still?: boolean;
   // Reacts when clicked. Decoration only: any control it's inside still takes the click as well.
   lively?: boolean;
+  // Leaves out the blink where a bird is always on screen and nothing's happening. A click still gets its reaction.
+  noBlink?: boolean;
   className?: string;
   onContextMenu?: (event: React.MouseEvent) => void;
 }
@@ -288,14 +290,14 @@ const Sitting: React.FC<{ animate: boolean }> = ({ animate }) => (
 );
 
 // One drawing per mood, so each is recognisable from its outline alone.
-const Pose: React.FC<{ mood: Mood; animate: boolean }> = ({ mood, animate }) => {
+const Pose: React.FC<{ mood: Mood; animate: boolean; noBlink?: boolean }> = ({ mood, animate, noBlink = false }) => {
   switch (mood) {
     case "rest":
       return (
         <>
           <Legs />
           <Torso />
-          <Head berry blink={animate} />
+          <Head berry blink={animate && !noBlink} />
         </>
       );
 
@@ -470,6 +472,7 @@ export const Mascot: React.FC<MascotProps> = ({
   hidden = false,
   still = false,
   lively = false,
+  noBlink = false,
   className,
   onContextMenu,
 }) => {
@@ -507,7 +510,7 @@ export const Mascot: React.FC<MascotProps> = ({
       <GearContext.Provider value={look?.accessory ?? "none"}>
         {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
         <g key={drawn} className={cn(!still && "animate-berry-pose")}>
-          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={drawn} /> : <Pose mood={drawn} animate={!still} />}
+          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={drawn} /> : <Pose mood={drawn} animate={!still} noBlink={noBlink} />}
         </g>
         {reaction === "ruffle" && size >= SIMPLIFIED_BELOW && (
           <path d={FEATHER} className="fill-berry-wing motion-safe:animate-berry-feather" style={ownBox("center")} />
