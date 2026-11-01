@@ -20,7 +20,8 @@ const ConversationTurnComponent: React.FC<{
     isLoading?: boolean
     waiting?: boolean
     mascot: MascotProfile
-}> = ({ turn, isLoading, waiting, mascot }) => (
+    failed?: boolean
+}> = ({ turn, isLoading, waiting, mascot, failed }) => (
     <div className="flex flex-col gap-5">
         {turn.user && <UserMessage content={turn.user.content} />}
         {turn.assistant && (
@@ -30,6 +31,7 @@ const ConversationTurnComponent: React.FC<{
                 isStreaming={turn.assistant.isStreaming}
                 waiting={waiting}
                 mascot={mascot}
+                failed={failed}
             />
         )}
         {isLoading && <ThinkingMessage mascot={mascot} />}
@@ -100,6 +102,7 @@ export const Chat: React.FC = () => {
                                 turn={turn}
                                 waiting={approval !== null}
                                 mascot={mascot}
+                                failed={!!error && index === conversationTurns.length - 1}
                                 isLoading={
                                     showLoadingAfterLastTurn &&
                                     index === conversationTurns.length - 1

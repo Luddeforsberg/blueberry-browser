@@ -22,6 +22,10 @@ const WORKING_CSS = `
   @media (prefers-reduced-motion: reduce) { html::after { animation: none !important; } }
 `;
 
+const PICTURE_QUALITY = 72;
+// A job has let go of a tab with a picture on screen, and that picture gets to show the bird leaving.
+const LEAVING_MS = 720;
+
 // How long a click gets to start loading something, and that load to end.
 const LOAD_START_MS = 300;
 const LOAD_END_MS = 10_000;
@@ -58,6 +62,8 @@ export interface TabEvents {
   onDetails: () => void;
   // The tab has a view for the window to place.
   onView: (tab: Tab) => void;
+  // It's no longer drawn behind the user, so it needs placing again.
+  onStoppedLeaving: () => void;
   // The user clicked or typed in the page, or went back or forward in it. Berry's own input doesn't count.
   onUserInput: () => void;
   // What the bird on this page looks like and may do, read each time so a setting reaches it straight away.
@@ -96,6 +102,8 @@ export class Tab {
   private sendingAgentInput = false;
   // What's drawn on the page while a job works in it.
   readonly actor: PageActor;
+  private _pictureScale: number | null = null;
+  private leavingTimer: NodeJS.Timeout | null = null;
 
   constructor(
     id: string,
@@ -381,11 +389,20 @@ export class Tab {
   setBerryWorking(working: boolean): void {
     if (working === this._berryWorking) return;
     this._berryWorking = working;
+    // One from an earlier stop mustn't cut this one short.
+    if (this.leavingTimer) clearTimeout(this.leavingTimer);
+    this.leavingTimer = null;
     if (working) {
       this.addWorkingStyle();
     } else {
       this.removeWorkingStyle();
       this.actor.leave();
+      if (this._pictureScale !== null && !this._isVisible) {
+        this.leavingTimer = setTimeout(() => {
+          this.leavingTimer = null;
+          this.events.onStoppedLeaving();
+        }, LEAVING_MS);
+      }
     }
   }
 
@@ -446,14 +463,49 @@ export class Tab {
   hide(): void {
     this._isVisible = false;
     this.webContentsView?.setVisible(false);
-    this.actor.hidden();
+    if (this._pictureScale === null) this.actor.hidden();
+  }
+
+  // How much smaller the picture of this tab on the main chat is, while there is one on screen. To the bird that's as
+  // good as someone looking at the tab, with the same pacing.
+  get pictureScale(): number | null {
+    return this._pictureScale;
+  }
+
+  setPictureScale(scale: number | null): void {
+    const was = this._pictureScale;
+    this._pictureScale = scale;
+    if (this._isVisible || (was === null) === (scale === null)) return;
+    if (scale === null) this.actor.hidden();
+    else this.actor.shown();
+  }
+
+  // A small picture of the page, with the bird in it, for the working view in the chrome and for nothing else. Tools use
+  // `screenshot`, which is separate and keeps the bird out. It's asked again after the capture, because the user may have
+  // been handed the tab while that was on its way, and may even have finished and given it back, so that counts too.
+  async picture(width: number): Promise<Buffer | null> {
+    const view = this.webContentsView;
+    if (!view || !this.canBePictured) return null;
+    const { holdsStarted } = this;
+    const image = await this.fromPage(() => view.webContents.capturePage()).catch(() => null);
+    if (!image || image.isEmpty() || !this.canBePictured || holdsStarted !== this.holdsStarted) return null;
+    return image.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
+  }
+
+  private get canBePictured(): boolean {
+    return !this._heldForUser && !this.mayShowCode && !this._trouble && !this._loadError && !this.unloaded;
   }
 
   // A view that's never been shown has no width, and a hidden one doesn't draw, so pages hide their content from
   // Berry and a screenshot comes back empty. A tab Berry is working in behind the user's stays drawn, nearly all
   // outside the window, where it can't cover anything.
   get isParked(): boolean {
-    return this._berryWorking && !this._isVisible;
+    return (this._berryWorking || this.isLeaving) && !this._isVisible;
+  }
+
+  // The job has ended here, and a picture of the tab is still showing the bird on its way out.
+  get isLeaving(): boolean {
+    return this.leavingTimer !== null;
   }
 
   private get shouldDraw(): boolean {
@@ -473,12 +525,14 @@ export class Tab {
   // The user has been handed this tab. Everything Berry does to a page goes through these methods, so a call already
   // on its way when that happened stops here, rather than clicking or reading in the middle of their sign-in.
   private _heldForUser = false;
+  private holdsStarted = 0;
 
   get heldForUser(): boolean {
     return this._heldForUser;
   }
 
   set heldForUser(held: boolean) {
+    if (held && !this._heldForUser) this.holdsStarted++;
     this._heldForUser = held;
     if (held) this.actor.held();
   }
@@ -644,6 +698,8 @@ export class Tab {
   }
 
   destroy(): void {
+    if (this.leavingTimer) clearTimeout(this.leavingTimer);
+    this.leavingTimer = null;
     this.webContentsView?.webContents.close();
   }
 }

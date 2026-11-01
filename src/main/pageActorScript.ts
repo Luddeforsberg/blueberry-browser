@@ -44,6 +44,10 @@ const SHEET = `
     opacity: 0; transition: opacity 140ms ease-out;
   }
   .line.shown { opacity: 1; }
+  /* Far too small to read in a picture, and the chrome says the same words beside it. */
+  .sky.pictured .line { display: none; }
+  /* Between steps nothing moves in a picture, so the picture needn't change until there's something to see. */
+  .sky.pictured .pose[data-pose="thinking"] * { animation: none !important; }
   .line::after { content: attr(data-words); }
   .ripple {
     position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
@@ -64,6 +68,8 @@ export interface ActorLook {
   // The page's zoom, so the bird stays one size on screen.
   zoom: number;
   size: number;
+  // Drawn for a picture of the page in the chat, not for anyone looking at the page.
+  pictured: boolean;
 }
 
 // Where the feet were on the last page, so the bird carries on from there after a navigation.
@@ -109,6 +115,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
 
   const sky = div("sky", root);
   if (LOOK.dark) sky.classList.add("dark");
+  if (LOOK.pictured) sky.classList.add("pictured");
   if (LOOK.palette !== "jackdaw") sky.dataset.mascot = LOOK.palette;
   sky.style.setProperty("--unit", String(1 / LOOK.zoom));
   const bird = div("bird", sky);
@@ -119,6 +126,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   const addPose = (name, art, extra) => {
     const el = draw(art);
     el.setAttribute("class", "pose " + (extra ?? ""));
+    el.setAttribute("data-pose", name);
     body.append(el);
     poses[name] = el;
   };

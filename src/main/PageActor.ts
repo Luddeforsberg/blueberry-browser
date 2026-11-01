@@ -3,11 +3,16 @@ import { actorCommand, ifThere, installActor, type ActorLook } from "./pageActor
 import type { MascotLook } from "../shared/library";
 
 // The bird on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
-// happens. Every call here is a no-op unless the user is looking at this tab, so a job behind them pays nothing, not even
-// the waiting. `browserTools.ts` asks `showing` first, and takes the path it always took if the answer is no.
+// happens. Every call here is a no-op unless the user can see this tab, in front of them or as the picture of it in the
+// chat, so a job nobody's watching pays nothing, not even the waiting. `browserTools.ts` asks `showing` first, and takes
+// the path it always took if the answer is no.
 
 // Drawing size on screen. `.pose` is positioned from where the feet are, which is what everything here measures.
 const BIRD_SIZE = 56;
+// Its size in a picture of the page, which is much smaller than the page, so it's drawn larger there to still be a bird.
+const BIRD_SIZE_IN_PICTURE = 42;
+// How long the picture is worth updating quickly after the bird last did anything. The longest thing it does is a flight.
+const LIVELY_MS = 760;
 const FEET_X = 57 / 120;
 
 // How long a page gets to answer. Being late only means the bird is out of step, so nothing ever waits on a stuck page.
@@ -113,6 +118,8 @@ export const typingPauseMs = (chunk: string): number => {
 
 interface ActorTab {
   readonly isVisible: boolean;
+  // How much smaller the picture of this tab is than the tab, while one is on screen.
+  readonly pictureScale: number | null;
   readonly berryWorking: boolean;
   readonly heldForUser: boolean;
   readonly existingView: WebContentsView | null;
@@ -128,6 +135,9 @@ export class PageActor {
   // Answered, and the tool hasn't started: `describe` runs again to check nothing changed, and that isn't a new question.
   private justAnswered = false;
   private idleTimer: NodeJS.Timeout | null = null;
+  private livelyUntil = 0;
+  // What the line says now, for the chrome to say beside a picture, where the line itself would be too small to read.
+  private _saying = "";
   // Waits to end early, because the bird has gone. What happens next is the tools' to decide.
   private readonly waits = new Set<() => void>();
 
@@ -142,10 +152,24 @@ export class PageActor {
     return this.options().on;
   }
 
+  // In a picture, and not in front of the user.
+  private get pictured(): boolean {
+    return !this.tab.isVisible && this.tab.pictureScale !== null;
+  }
+
+  get saying(): string {
+    return this.showing ? this._saying : "";
+  }
+
+  // The bird is in the middle of something, so a picture of it needs to keep up.
+  get lively(): boolean {
+    return Date.now() < this.livelyUntil;
+  }
+
   // Whether anything should be drawn right now.
   get showing(): boolean {
     const { on, windowShowing } = this.options();
-    return on && windowShowing && this.tab.isVisible && this.tab.berryWorking && !this.tab.heldForUser && Date.now() >= this.quietUntil;
+    return on && windowShowing && (this.tab.isVisible || this.pictured) && this.tab.berryWorking && !this.tab.heldForUser && Date.now() >= this.quietUntil;
   }
 
   // Whether letters are paced and the page scrolled smoothly: not with a marker, and not where nobody's looking.
@@ -153,14 +177,21 @@ export class PageActor {
     return this.showing && !this.options().still;
   }
 
+  // Every size in the page is divided by this. It takes out the page's zoom, and in a picture, how much smaller that is.
+  private get drawZoom(): number {
+    const { pictureScale } = this.tab;
+    const inPicture = this.pictured && pictureScale ? Math.min(1, (pictureScale * BIRD_SIZE) / BIRD_SIZE_IN_PICTURE) : 1;
+    return this.zoom() * inPicture;
+  }
+
   private get key(): string {
     const { plain, still, look, dark } = this.options();
-    return [look.palette, look.accessory, plain, still, dark, this.zoom()].join("/");
+    return [look.palette, look.accessory, plain, still, dark, this.drawZoom, this.pictured].join("/");
   }
 
   private get look(): ActorLook {
     const { plain, still, look, dark } = this.options();
-    return { ...look, plain, still, dark, zoom: this.zoom(), size: BIRD_SIZE };
+    return { ...look, plain, still, dark, zoom: this.drawZoom, size: BIRD_SIZE, pictured: this.pictured };
   }
 
   private ask(code: string): Promise<unknown> {
@@ -186,6 +217,8 @@ export class PageActor {
   private async draw(name: string, args: { words?: string; [other: string]: unknown } = {}): Promise<boolean> {
     if (!this.showing) return false;
     if (args.words) this.justAnswered = false;
+    if (args.words !== undefined) this._saying = args.words;
+    this.livelyUntil = Date.now() + LIVELY_MS;
     this.clearIdle();
     const command = actorCommand(this.key, name, args);
     let answer = await this.ask(command);
@@ -238,7 +271,7 @@ export class PageActor {
     // Asking never scrolls anything, so what isn't in view leaves it where it is.
     if (asking && (this.justAnswered || spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return;
     const { still, plain } = this.options();
-    const unit = 1 / this.zoom();
+    const unit = 1 / this.drawZoom;
     const size = (still ? 28 : BIRD_SIZE) * unit;
     // A pointer's tip is the thing that's meant to be on the point.
     const place: Place = plain && kind !== "perch" ? { x: spot.x, y: spot.y, turn: 1 } : landingFor(spot, kind, size);
@@ -301,9 +334,12 @@ export class PageActor {
   typing(): void {
     this.clearIdle();
     void this.draw("typing");
+    // Until `doneTyping`, which comes within the longest typing takes.
+    this.livelyUntil = Date.now() + TYPE_MAX_MS + LIVELY_MS;
   }
 
   doneTyping(): void {
+    this.livelyUntil = Date.now() + LIVELY_MS;
     this.idleSoon();
   }
 
@@ -326,7 +362,7 @@ export class PageActor {
 
   // What a capture sees has no bird in it. Anything going wrong here mustn't get in the way of the capture.
   async whileHidden<T>(capture: () => Promise<T>): Promise<T> {
-    const there = this.tab.isVisible && (await this.ask(ifThere("hide")));
+    const there = (this.tab.isVisible || this.pictured) && (await this.ask(ifThere("hide")));
     try {
       return await capture();
     } finally {
@@ -344,6 +380,7 @@ export class PageActor {
   // Gone at once, and the next look starts fresh.
   private vanish(): void {
     this.waiting = false;
+    this._saying = "";
     this.clearIdle();
     this.endWaits();
     this.position = null;
@@ -364,7 +401,9 @@ export class PageActor {
     this.clearIdle();
     this.endWaits();
     this.position = null;
-    if (!this.tab.isVisible) return;
+    this._saying = "";
+    this.livelyUntil = Date.now() + LIVELY_MS;
+    if (!this.tab.isVisible && !this.pictured) return;
     void this.ask(ifThere("leave", { ms: LEAVE_MS }));
   }
 

@@ -95,6 +95,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   finishReply();
   await expect(chrome.getByText("Three flights under €200.")).toBeVisible();
   await expect(chrome.getByText("Finished")).toBeVisible();
+  await chrome.getByRole("button", { name: "2 steps on 127.0.0.1" }).click();
   await expect(chrome.getByRole("list", { name: "Steps" }).getByRole("listitem")).toHaveText([
     /Opened 127.0.0.1/,
     /Read 127.0.0.1/,

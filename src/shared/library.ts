@@ -82,6 +82,53 @@ export interface ChatThread extends ChatThreadSummary {
   error: string | null;
 }
 
+// Whether a tab in a job's working view has a picture, and why not if it doesn't.
+export type WorkTabState =
+  | "picture"
+  // Handed to the user, for a sign-in or a code.
+  | "held"
+  // The user took it from the job.
+  | "yours"
+  // The mascot isn't allowed on this site.
+  | "off-limits"
+  // The user has switched off what the job could see.
+  | "no-access"
+  // The page has crashed, couldn't load, or may be showing a code.
+  | "none";
+
+export interface WorkTab {
+  id: string;
+  site: string;
+  title: string;
+  favicon: string | null;
+  state: WorkTabState;
+  // Where it's working now. The rest are the job's other tabs.
+  current: boolean;
+}
+
+export type WorkOutcome = "done" | "stopped" | "failed";
+
+// What's said beside a job's pictures on the main chat. Only words: pictures come by themselves, as `WorkFrame`.
+export interface WorkView {
+  chatId: string;
+  mascotId: string;
+  tabs: WorkTab[];
+  // What it's doing now, in the bird's words. Null between steps, with nothing to say.
+  doing: string | null;
+  startedAt: number;
+  endedAt: number | null;
+  outcome: WorkOutcome | null;
+  // Every site it's been on, newest first.
+  sites: string[];
+}
+
+// A small picture of a tab. Only ever sent to the chrome, and never saved, sent on or read by anything.
+export interface WorkFrame {
+  chatId: string;
+  tabId: string;
+  picture: string;
+}
+
 export type RoutineSchedule =
   | { kind: "once"; at: number }
   | { kind: "daily"; time: string }

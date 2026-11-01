@@ -54,7 +54,7 @@ export const RoutineRunCard: React.FC<{
             )}
             {run.steps.length > 0 && (
                 <div className="mt-3">
-                    <StepTrail steps={run.steps} />
+                    <StepTrail steps={run.steps} running={open} cutShort={ended} />
                 </div>
             )}
             {run.status === 'needs-approval' && run.approval && (

@@ -154,6 +154,7 @@ export class EventManager {
       typeof text === "string" ? this.mainWindow.chats.send(chatId, text, options) : null
     );
 
+    this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
     this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
       this.mainWindow.chats.decide(chatId, approvalId, allow, answer)

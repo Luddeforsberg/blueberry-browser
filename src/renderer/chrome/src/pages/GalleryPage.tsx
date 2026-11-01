@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Pin, Star } from 'lucide-react'
-import type { GalleryMascot, MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
+import type { GalleryMascot, MascotProfile, NeedsYouItem, Suggestion, WorkTab, WorkView } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
 import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
@@ -20,7 +20,7 @@ import { MascotPerch } from '../components/MascotPerch'
 import { MascotCard, Preview } from './FlockPage'
 import { GalleryCard } from './MascotGalleryPage'
 import { mascotForm } from '../flockView'
-import { ACCESSORIES, BERRY_ID, PALETTES } from '@shared/mascots'
+import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
@@ -28,6 +28,7 @@ import { BirdSuggestions } from '../components/BirdsOnFruit'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
+import { WorkingStrip, WorkingView, type WorkFrames } from '../components/WorkingView'
 import type { RoutineRun } from '@shared/library'
 import { DownloadRow } from '../components/DownloadRow'
 import { DownloadsProgress } from '../components/DownloadsButton'
@@ -142,6 +143,22 @@ const SAMPLE_SUGGESTIONS: Suggestion[] = [
         why: 'You’ve gone back and forth between GitHub and Linear on 4 of the last 5 days',
         draft: { name: 'Pip', look: { palette: 'kingfisher', accessory: 'glasses' }, instructions: 'Keep an eye on my pull requests.', sites: ['github.com', 'linear.app'], tools: ['visit'] }
     }
+]
+
+const SAMPLE_PICTURE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 70"><rect width="100" height="70" fill="#fbf6ee"/><rect x="8" y="8" width="40" height="5" fill="#2a2118"/><rect x="8" y="20" width="25" height="30" fill="#e8b98a"/><rect x="38" y="20" width="25" height="30" fill="#b8d3a6"/><rect x="68" y="20" width="25" height="30" fill="#b39a86"/></svg>')}`
+const SAMPLE_FRAMES: WorkFrames = { get: () => SAMPLE_PICTURE, subscribe: () => () => {} }
+const SAMPLE_ASKING = { id: 'sample', text: 'Click the button “Place order”' }
+const sampleTab = (state: WorkTab['state'], site = 'alderandmoss.se', current = true): WorkTab => ({ id: site, site, title: site, favicon: null, state, current })
+const sampleWork = (tabs: WorkTab[], rest: Partial<WorkView> = {}): WorkView => ({ chatId: 'sample', mascotId: BERRY_ID, tabs, doing: 'Clicking Add to cart', startedAt: 0, endedAt: 42_000, outcome: null, sites: ['alderandmoss.se'], ...rest })
+const WORK_SAMPLES: Array<{ label: string; view: WorkView; asking?: boolean }> = [
+    { label: 'Working', view: sampleWork([sampleTab('picture')]) },
+    { label: 'Two tabs', view: sampleWork([sampleTab('picture'), sampleTab('picture', 'kaffekartan.se', false)], { sites: ['alderandmoss.se', 'kaffekartan.se'] }) },
+    { label: 'Waiting for an answer', view: sampleWork([sampleTab('picture')]), asking: true },
+    { label: 'Handed to the user', view: sampleWork([sampleTab('held')]), asking: true },
+    { label: 'Taken over', view: sampleWork([sampleTab('yours')]) },
+    { label: 'Off its sites', view: sampleWork([sampleTab('off-limits')]) },
+    { label: 'Finished', view: sampleWork([sampleTab('picture')], { outcome: 'done' }) },
+    { label: 'Stopped', view: sampleWork([sampleTab('picture')], { outcome: 'stopped' }) },
 ]
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -278,6 +295,20 @@ export const GalleryPage: React.FC = () => {
                         />
                         <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
                         <ChatComposer onSend={() => undefined} onStop={() => undefined} placeholder="While replying" disabled />
+                    </div>
+                </Section>
+
+                <Section title="Working view">
+                    <div className="mt-16 flex flex-wrap items-start gap-x-8 gap-y-20">
+                        {WORK_SAMPLES.map(({ label, view, asking }) => (
+                            <div key={label} className="w-[320px]">
+                                <WorkingView view={view} frames={SAMPLE_FRAMES} mascot={BERRY} approval={asking ? SAMPLE_ASKING : null} aspect={10 / 7} onStop={() => {}} onShowAsking={() => {}} />
+                                <p className="mt-2 text-11 text-muted-foreground">{label}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-8 w-[560px]">
+                        <WorkingStrip view={WORK_SAMPLES[0].view} mascot={BERRY} approval={null} />
                     </div>
                 </Section>
 

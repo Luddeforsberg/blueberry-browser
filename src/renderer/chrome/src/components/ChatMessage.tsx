@@ -4,9 +4,11 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, MascotProfile } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
+import { ChevronRight } from 'lucide-react'
 import { ApprovalCard, MascotSays } from '@common/components/ApprovalCard'
 import { useShell } from '../contexts/ShellContext'
 import { asContinuation, siteParts } from '../siteNames'
+import { trailFor } from '../stepTrail'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
@@ -102,7 +104,9 @@ export const AssistantMessage: React.FC<{
     waiting?: boolean
     // Who wrote it. Anyone but Berry is named, so one can always tell who's working.
     mascot?: MascotProfile
-}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot }) => (
+    // This reply went wrong on the way.
+    failed?: boolean
+}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot, failed = false }) => (
     // With nothing written yet, the mascot is already speaking in what it's waiting on.
     waiting && !content && steps.length === 0 ? null : <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
@@ -114,7 +118,7 @@ export const AssistantMessage: React.FC<{
                 {mascot.name}
             </p>
         )}
-        {steps.length > 0 && <StepTrail steps={steps} />}
+        {steps.length > 0 && <StepTrail steps={steps} running={isStreaming} cutShort={failed || (!isStreaming && !content)} />}
         {content ? (
             <Markdown content={content} />
         ) : (
@@ -129,32 +133,52 @@ export const AssistantMessage: React.FC<{
     </div>
 )
 
-// What Berry did on the way to a reply: a footprint for each step behind it, and the berry on the one
-// it's on now.
-export const StepTrail: React.FC<{ steps: ChatStep[] }> = ({ steps }) => (
-    <ol aria-label="Steps" className="flex flex-col gap-2.5 text-14 text-muted-foreground">
-        {steps.map((step, index) => (
-            <li key={index} className="flex items-center gap-3">
-                <span className="size-4 shrink-0 flex items-center justify-center text-primary">
-                    {step.done ? (
-                        <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
-                            <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
-                            <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
-                            <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
-                            <ellipse cx={0} cy={3} rx={1} ry={2.1} />
-                        </svg>
-                    ) : (
-                        <BerryDot working />
-                    )}
-                </span>
-                <span>
-                    <span className={step.done ? undefined : SHIMMER_TEXT}>{step.text}</span>
-                    {!step.done && <span className="sr-only"> (in progress)</span>}
-                </span>
-            </li>
-        ))}
-    </ol>
-)
+// What Berry did on the way to a reply: a footprint for each step behind it, and the berry on the one it's on now. Most of
+// it folds into one quiet line, and every step is there behind that line. `cutShort` is for a job that never got to its
+// answer, which keeps its last steps showing so you can see where it ended.
+export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShort?: boolean }> = ({ steps, running = false, cutShort = false }) => {
+    const [open, setOpen] = useState(false)
+    const { shown, line } = trailFor(steps, { running, cutShort, open })
+    return (
+        <div className="flex flex-col items-start gap-2.5 text-14 text-muted-foreground">
+            {line && (
+                <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpen(!open)}
+                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
+                    {line}
+                </button>
+            )}
+            {shown.length > 0 && (
+                <ol aria-label="Steps" className="flex flex-col gap-2.5">
+                    {shown.map(({ step, index }) => (
+                        <li key={index} className="flex items-center gap-3">
+                            <span className="size-4 shrink-0 flex items-center justify-center text-primary">
+                                {step.done ? (
+                                    <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
+                                        <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
+                                        <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
+                                        <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
+                                        <ellipse cx={0} cy={3} rx={1} ry={2.1} />
+                                    </svg>
+                                ) : (
+                                    <BerryDot working />
+                                )}
+                            </span>
+                            <span>
+                                <span className={step.done ? undefined : SHIMMER_TEXT}>{step.text}</span>
+                                {!step.done && <span className="sr-only"> (in progress)</span>}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            )}
+        </div>
+    )
+}
 
 // Berry's working state while a reply is on its way, where there's no room for Berry beside the reply.
 export const ThinkingMessage: React.FC<{ mascot?: MascotProfile }> = ({ mascot }) => (

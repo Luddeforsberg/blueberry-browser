@@ -9,6 +9,7 @@ import type { HistoryStore } from "./HistoryStore";
 import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHistory";
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
+import { WorkViews } from "./WorkViews";
 import { Phone } from "./Phone";
 import { TelegramChannel } from "./TelegramChannel";
 import type { RoutineStore } from "./RoutineStore";
@@ -112,6 +113,7 @@ export class Window {
   readonly gallery: Gallery;
   private readonly phone: Phone;
   readonly chats: Chats;
+  readonly workViews: WorkViews;
   readonly routines: Routines;
   readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
@@ -219,6 +221,7 @@ export class Window {
       onThread: (thread) => {
         this.syncChatTabTitle(thread);
         sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
+        this.workViews.sync();
       },
       onListChanged: () => this.publishLibrary(),
       onDecided: (approvalId, allow) => this.phone.noteDecided(approvalId, allow),
@@ -232,8 +235,24 @@ export class Window {
           this.placeTab(tab, layout);
         });
         this.notifyTabs();
+        this.workViews.sync();
       },
     }, (id) => this.mascotStore.resolve(id));
+
+    this.workViews = new WorkViews({
+      chrome: () => this.chrome.view.webContents,
+      work: (chatId) => this.chats.work(chatId),
+      onScreen: (chatId) => {
+        const entry = this.activeEntry;
+        return entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId && this.windowShowing;
+      },
+      pageWidth: () => this.layout.page.width,
+    });
+    const syncWork = () => this.workViews.sync();
+    this._baseWindow.on("minimize", syncWork);
+    this._baseWindow.on("restore", syncWork);
+    this._baseWindow.on("hide", syncWork);
+    this._baseWindow.on("show", syncWork);
 
     this.routines = new Routines(routineStore, this.chats, {
       onChanged: () => this.publishLibrary(),
@@ -287,6 +306,7 @@ export class Window {
     nativeTheme.on("updated", onThemeUpdated);
 
     this._baseWindow.on("closed", () => {
+      this.workViews.destroy();
       nativeTheme.off("updated", onThemeUpdated);
       this.routines.shutdown();
       this.phone.stop();
@@ -413,6 +433,10 @@ export class Window {
   }
 
   // The active web tab. Internal pages have no page for Berry to read.
+  private get windowShowing(): boolean {
+    return !this._baseWindow.isDestroyed() && this._baseWindow.isVisible() && !this._baseWindow.isMinimized();
+  }
+
   get activeTab(): Tab | null {
     const entry = this.activeEntry;
     return entry instanceof Tab ? entry : null;
@@ -602,13 +626,18 @@ export class Window {
         // The title at this point is still the last page's, so the new page's arrives through `onDetails`.
         onNavigate: (address) => this.saveVisit(tabId, () => this.history.record(address, "", null)),
         onUserInput: () => this.chats.releaseTab(tabId),
+        onStoppedLeaving: () => {
+          if (this._baseWindow.isDestroyed()) return;
+          if (tab) this.placeTab(tab, this.layout);
+          this.workViews.sync();
+        },
         actorOptions: () => ({
           on: this.settings.birdOnPages,
           plain: !this.settings.showBerry,
           still: this.settings.keepBerryStill || systemPreferences.getAnimationSettings().prefersReducedMotion,
           look: this.mascotStore.resolve(tab?.workingMascotId ?? null).look,
           dark: nativeTheme.shouldUseDarkColors,
-          windowShowing: !this._baseWindow.isDestroyed() && this._baseWindow.isVisible() && !this._baseWindow.isMinimized(),
+          windowShowing: this.windowShowing,
         }),
         onDetails: () =>
           this.saveVisit(tabId, () => {
@@ -729,6 +758,7 @@ export class Window {
     this.tabsMap.delete(tabId);
     this.backgroundTabs.delete(tabId);
     this.chats.tabClosed(tabId);
+    this.workViews.sync();
 
     if (this.activeTabId === tabId) {
       this.activeTabId = null;
@@ -760,6 +790,7 @@ export class Window {
       this.saveVisit(tabId, () => this.history.record(tab.url, tab.title, tab.favicon));
     }
     this.syncTabViews();
+    this.workViews.sync();
     this.notifyTabs();
     this.updateAllBounds();
 
