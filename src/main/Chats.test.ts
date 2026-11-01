@@ -431,9 +431,13 @@ describe("Chats", () => {
         const looked = vi.fn(async () => ({ fields: [], hasPasswordField: false }));
         const own = { ...tab(), id: "tab-own", settled: async () => {}, sendInputWhileHeld: typed, runInPageWhileHeld: looked } as unknown as Tab;
         const open = [own];
+        const heard: string[] = [];
+        let reached: PageTool[] = [];
         const stream: StreamReply = async function* (_, __, { tools }) {
+          reached = tools;
           await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
-          await tools.find((tool) => tool.name === "hand_to_user")!.run({ need });
+          heard.push(String(await tools.find((tool) => tool.name === "hand_to_user")!.run({ need })));
+          heard.push(String(await tools.find((tool) => tool.name === "list_tabs")!.run({})));
           yield "ok";
         };
         const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
@@ -446,8 +450,31 @@ describe("Chats", () => {
         send(chats, null, "Check my orders", false);
         await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
         const [{ id, approval }] = chats.waiting();
-        return { chats, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id };
+        return { chats, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id, heard, tools: () => reached };
       };
+
+      it("keeps the query and fragment of where the user landed from the model, but only for that tab", async () => {
+        const { chats, own, id, approvalId, heard, tools } = await handedOver("sign-in");
+        expect(chats.withoutCodes("https://example.com/search?q=shoes")).toContain("?q=shoes");
+        (own as unknown as { url: string }).url = "https://example.com/callback?code=s3cret&state=abc#token=t0ken";
+        chats.decide(id, approvalId, true);
+        await vi.waitFor(() => expect(heard).toHaveLength(2));
+        for (const said of heard) {
+          expect(said).toContain("https://example.com/callback");
+          expect(said).not.toMatch(/s3cret|t0ken/);
+        }
+        // Said back by the page later on, as well, and a different address elsewhere is left alone.
+        expect(chats.withoutCodes("Signed in from /callback?code=s3cret&state=abc#token=t0ken")).not.toMatch(/s3cret|t0ken/);
+        expect(chats.withoutCodes("https://example.com/search?q=shoes")).toContain("?q=shoes");
+
+        // A screenshot that fails says the address in words, and a tab the user takes after that is refused by address.
+        expect(await tools().find((tool) => tool.name === "screenshot")!.run({})).not.toMatch(/s3cret|t0ken/);
+        chats.releaseTab(own.id);
+        (own as unknown as { url: string }).url = "https://example.com/later";
+        const refused = await tools().find((tool) => tool.name === "read_page")!.refuses!({ tabId: own.id });
+        expect(refused?.message).toContain("https://example.com/callback");
+        expect(refused?.message).not.toMatch(/s3cret|t0ken/);
+      });
 
       it("takes a code out however a page says it back, even in text that looks like a picture", async () => {
         const { chats, enter } = await handedOver("code");

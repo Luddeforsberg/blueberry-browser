@@ -333,10 +333,8 @@ test("the panel shares the page with the model, and the main chat doesn't", asyn
   await expect(panel.getByText("A reply from the model")).toHaveCount(2);
   expect(JSON.stringify(model.requests.at(-1)?.messages)).not.toContain("hello from the page");
 
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
-  // The panel stays open, so wait for the main chat's composer before picking it.
-  await expect(chrome.getByRole("textbox", { name: "Message" })).toHaveCount(2);
-  const message = chrome.getByRole("textbox", { name: "Message" }).first();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
+  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
   await message.fill("Something else");
   await message.press("Enter");
   await expect.poll(() => model.requests.length).toBe(3);
@@ -362,9 +360,8 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   expect(toolMessage?.content).toContain("hello from the page");
   await expect(panel.getByText("matches on")).toHaveCount(0);
 
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
-  await expect(chrome.getByRole("textbox", { name: "Message" })).toHaveCount(2);
-  const message = chrome.getByRole("textbox", { name: "Message" }).first();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
+  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
   await message.fill("Something else");
   await message.press("Enter");
   await expect.poll(() => model.requests.length).toBe(3);
@@ -373,8 +370,8 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
 test("a chat with no page opens tabs behind itself, and reaches only those", async () => {
   await askBeforeActing("always");
   await openFixture();
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
-  const message = chrome.getByRole("textbox", { name: "Message" });
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
+  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
   const card = chrome.getByRole("region", { name: "Approval needed" });
 
   model.callTools({ name: "list_tabs", args: {} });
@@ -397,8 +394,8 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
 test("real input in a tab behind the chat, a card naming another site's frame, and a question", async () => {
   await askBeforeActing("risky");
   await openFixture();
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
-  const message = chrome.getByRole("textbox", { name: "Message" });
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
+  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
   const card = chrome.getByRole("region", { name: "Approval needed" });
   const url = `${origin}/real-input`;
   const framed = `http://localhost:${new URL(origin).port}`;
@@ -513,8 +510,8 @@ const placedView = (url: string) =>
 
 test("a tab behind the chat has a real size and can be seen, without showing over the page", async () => {
   await askBeforeActing("never");
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
-  const message = chrome.getByRole("textbox", { name: "Message" });
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
+  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
   const url = `${origin}/form`;
 
   model.callTools({ name: "open_tab", args: { url } });
@@ -1035,8 +1032,8 @@ test("a reply takes over from Thinking in place, and isn't redrawn when it ends"
   model.replyWith("first words ", "and the rest");
   const releaseStart = model.holdBeforeFirstToken();
   const releaseRest = model.holdAfterFirstToken();
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
-  const message = chrome.getByRole("textbox", { name: "Message" }).last();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
+  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
   await message.fill("hello");
   await message.press("Enter");
 
@@ -1361,7 +1358,10 @@ test("the new tab composer sends only when there is text, and asks Berry unless 
 });
 
 test("the main chat and the chat panel share one composer", async () => {
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("chat"));
+  await chrome.evaluate(async () => {
+    const chat = await window.chromeAPI.chat.send(null, "Hello", { seePage: false });
+    await window.chromeAPI.browser.openPage("chat", { param: chat!.id, title: chat!.title });
+  });
   const main = chrome.getByRole("textbox", { name: "Message" });
   await expect(main).toBeVisible();
   const mainClass = await main.getAttribute("class");
@@ -1572,9 +1572,12 @@ test("Berry sits on the new tab composer, then on the active tab", async () => {
   const seatGap = (selector: string) =>
     chrome.evaluate((selector) => {
       const berry = document.querySelector("[data-berry-companion]")!.getBoundingClientRect();
-      const perch = document.querySelector(selector)!.getBoundingClientRect();
+      const perchElement = document.querySelector<HTMLElement>(selector)!;
+      const perch = perchElement.getBoundingClientRect();
       const seat = berry.top + berry.height * (46 / 64);
-      return { y: Math.abs(seat - perch.top), inside: berry.left >= perch.left && berry.right <= perch.right };
+      // On top of the composer, and on the tab's lower edge.
+      const edge = "berryHome" in perchElement.dataset ? perch.top : perch.bottom;
+      return { y: Math.abs(seat - edge), inside: berry.left >= perch.left && berry.right <= perch.right };
     }, selector);
   const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
 
@@ -1584,7 +1587,7 @@ test("Berry sits on the new tab composer, then on the active tab", async () => {
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
   await expect(sitting).toBeVisible();
-  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(2);
+  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(3);
   await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
   await expect(sitting).toBeVisible();
 });

@@ -31,9 +31,10 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.getByRole("button", { name: "Flock", exact: true }).click();
     model.replyWith("Private first reply.");
     await chrome.getByRole("listitem").filter({ hasText: "Scout" }).getByRole("button", { name: "Chat", exact: true }).click();
+    const composer = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" });
+    await composer.fill("A private first question");
+    await composer.press("Enter");
     const message = chrome.getByRole("textbox", { name: "Message" });
-    await message.fill("A private first question");
-    await message.press("Enter");
     await expect(chrome.getByText("Private first reply.")).toBeVisible();
     model.replyWith("Three stories from SVT.");
     await message.fill("What's new today?");
@@ -166,8 +167,8 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     // It's a limited mascot, under the safety rules, and it never reads the entry again.
     model.replyWith("Hello.");
     await chrome.getByRole("button", { name: "Start a chat with Scout" }).click();
-    await chrome.getByRole("textbox", { name: "Message" }).fill("Hi");
-    await chrome.getByRole("textbox", { name: "Message" }).press("Enter");
+    await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).fill("Hi");
+    await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).press("Enter");
     await expect(chrome.getByText("Hello.", { exact: true })).toBeVisible();
     const request = model.requests.at(-1);
     const system = JSON.stringify(request?.messages[0]);

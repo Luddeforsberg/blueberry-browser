@@ -2,7 +2,7 @@ import React from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { useChatThread } from '../contexts/ChatContext'
 import { AssistantMessage, ChatApprovalCard, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
-import { BerryHero, useAssistantName } from '../components/Berry'
+import { useAssistantName } from '../components/Berry'
 import { ChatComposer } from '../components/Composer'
 import { useFlock } from '../contexts/LibraryContext'
 import { Button } from '@common/components/Button'
@@ -12,9 +12,9 @@ import { blankForm, setRoutinesView } from '../routinesView'
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const chatId = tab.pageParam
     const thread = useChatThread(chatId)
-    const { find, chosen, choose } = useFlock()
-    // A chat not started yet goes to whoever is chosen. After that, it stays with the mascot it started with.
-    const mascot = chatId ? find(thread?.mascotId ?? null) : chosen
+    const { find } = useFlock()
+    // A chat stays with the mascot it started with.
+    const mascot = find(thread?.mascotId ?? null)
     const name = useAssistantName(mascot)
     const partial = thread?.partial
     const running = partial != null
@@ -24,15 +24,6 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0)
     )
 
-    const send = async (message: string) => {
-        const chat = await window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id })
-        // A new chat gets its own tab, so it can be found again in the sidebar.
-        if (chat && !chatId) {
-            await window.chromeAPI.browser.openPage('chat', { param: chat.id, title: chat.title })
-            await window.chromeAPI.browser.closeTab(tab.id)
-        }
-    }
-
     // Only what the user asked for, which they can change before saving it.
     const saveAsRoutine = () => {
         if (!thread) return
@@ -41,30 +32,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         void window.chromeAPI.browser.openPage('routines')
     }
 
-    const empty = !thread || thread.messages.length === 0
-    const composer = (
-        <ChatComposer
-            onSend={(message) => void send(message)}
-            disabled={running}
-            onStop={running && chatId ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
-            placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
-            autoFocus
-            mascot={mascot}
-            onChooseMascot={chatId ? undefined : choose}
-        />
-    )
-
-    // A new chat looks like the new tab page. Once it has messages, the composer moves to the bottom.
-    if (empty) {
-        return (
-            <div className="h-full overflow-y-auto">
-                <div className="max-w-[800px] mx-auto px-6 pt-[18vh] pb-12">
-                    <BerryHero title="What are you working on?" />
-                    {composer}
-                </div>
-            </div>
-        )
-    }
+    // Chats begin on the new tab page, so this is only ever a moment while the chat loads, or one just deleted.
+    if (!chatId || !thread) return null
 
     // The reply being written holds the place it's saved in, so it stays the same element when it ends.
     const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps }] : thread.messages
@@ -88,7 +57,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             />
                         )
                     )}
-                    {chatId && thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} />}
+                    {thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} />}
                     {thread.error && <ChatError message={thread.error} />}
                     {!running && thread.messages.at(-1)?.role === 'assistant' && (
                         <div>
@@ -100,7 +69,16 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 </div>
             </div>
 
-            <div className="max-w-[800px] w-full mx-auto px-6 pb-5">{composer}</div>
+            <div className="max-w-[800px] w-full mx-auto px-6 pb-5">
+                <ChatComposer
+                    onSend={(message) => void window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id })}
+                    disabled={running}
+                    onStop={running ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
+                    placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
+                    autoFocus
+                    mascot={mascot}
+                />
+            </div>
         </div>
     )
 }

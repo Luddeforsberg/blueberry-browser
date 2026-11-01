@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Bird, ChevronDown, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Bird, ChevronDown, Ellipsis, Hand, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
@@ -252,12 +252,6 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 <Cluster />
                 <ul aria-label="Places">
                     <SidebarRow leading={<Plus className={ICON} />} label="New Tab" onClick={() => createTab()} />
-                    <SidebarRow
-                        muted
-                        leading={<MessageCircle className={ICON} />}
-                        label="New chat"
-                        onClick={() => void browser.openPage('chat')}
-                    />
                     <SidebarRow
                         muted={library.needsYou.length === 0}
                         leading={<Hand className={ICON} />}

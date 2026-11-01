@@ -25,7 +25,7 @@ describe('groupByDay', () => {
         expect(days.map((day) => [day.label, day.entries.length])).toEqual([
             ['Today', 1],
             ['Yesterday', 2],
-            [new Date(2026, 9, 29).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }), 1]
+            ['Thursday 29 October', 1]
         ])
     })
 

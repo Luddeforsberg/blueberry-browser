@@ -198,6 +198,10 @@ export class AppMenu {
             click: () => this.mainWindow.openPage("history"),
           },
           {
+            label: "Routines",
+            click: () => this.mainWindow.openPage("routines"),
+          },
+          {
             label: "Flock",
             click: () => this.mainWindow.openPage("flock"),
           },
@@ -238,9 +242,9 @@ export class AppMenu {
   }
 
   private handleForceReload(): void {
-    if (this.mainWindow.activeTab) {
-      this.mainWindow.activeTab.webContents.reloadIgnoringCache();
-    }
+    const tab = this.mainWindow.activeTab;
+    if (tab?.loadError) tab.reload();
+    else tab?.webContents.reloadIgnoringCache();
   }
 
   private handleToggleDevTools(): void {

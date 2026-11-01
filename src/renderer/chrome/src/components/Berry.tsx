@@ -36,12 +36,3 @@ export const BerrySpot: React.FC<{ size: number }> = ({ size }) => {
 
     return settings.showBerry ? <div data-berry-spot style={{ width: size, height: size }} /> : null
 }
-
-// Berry above the composer in an empty chat. The page title is for screen readers: the composer
-// already says what to do. With Berry hidden, the composer stands alone.
-export const BerryHero: React.FC<{ title: string }> = ({ title }) => (
-    <div className="flex justify-center pb-8">
-        <h1 className="sr-only">{title}</h1>
-        <BerrySpot size={112} />
-    </div>
-)

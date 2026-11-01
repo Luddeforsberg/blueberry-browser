@@ -126,6 +126,40 @@ test("a restart brings tabs back without loading them all, and history is kept",
   await app.close();
 });
 
+test("a page that can't load says so with its address, and Reload tries again", async () => {
+  test.setTimeout(THREE_LAUNCHES_MS);
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-test-"));
+  // A port nothing answers on, until the page is reloaded.
+  const late = createServer((_, response) => {
+    response.setHeader("content-type", "text/html");
+    response.end("<!doctype html><title>Up at last</title><body>Here now");
+  });
+  await new Promise<void>((resolve) => late.listen(0, "127.0.0.1", resolve));
+  const { port } = late.address() as AddressInfo;
+  await new Promise((resolve) => late.close(resolve));
+  const url = `http://127.0.0.1:${port}/missing`;
+
+  const { app, chrome } = await launch(profile);
+  try {
+    await chrome.evaluate((address) => window.chromeAPI.browser.createTab(address), url);
+    const notice = chrome.getByRole("alert").filter({ hasText: "This page couldn’t load" });
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText(url);
+    await expect(notice).toContainText("refused the connection");
+    const failed = (await tabs(chrome)).find((tab) => tab.isActive)!;
+    expect(failed).toMatchObject({ title: `127.0.0.1:${port}`, url, loadError: { url, description: "ERR_CONNECTION_REFUSED" } });
+
+    await new Promise<void>((resolve) => late.listen(port, "127.0.0.1", resolve));
+    await notice.getByRole("button", { name: "Reload" }).click();
+    await expect(notice).toBeHidden();
+    await expect.poll(async () => (await tabs(chrome)).find((tab) => tab.id === failed.id)?.title).toBe("Up at last");
+    expect((await tabs(chrome)).find((tab) => tab.id === failed.id)?.loadError).toBeNull();
+  } finally {
+    late.close();
+    await app.close();
+  }
+});
+
 test("a crashed page stays in its tab, tells Berry so, and reloads; damaged databases don't stop a launch", async () => {
   test.setTimeout(THREE_LAUNCHES_MS);
   const profile = mkdtempSync(join(tmpdir(), "blueberry-test-"));

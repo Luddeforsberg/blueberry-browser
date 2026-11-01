@@ -149,6 +149,12 @@ export interface HistoryPage {
 // Why a web tab can't show its page right now. Null when all is well.
 export type TabTrouble = "crashed" | "unresponsive";
 
+// Why the last address didn't load, with Chromium's code for it as `description`.
+export interface TabLoadError {
+  url: string;
+  description: string;
+}
+
 export interface Rect {
   x: number;
   y: number;
@@ -194,6 +200,7 @@ export interface TabInfo {
   page: InternalPage | null;
   pageParam: string | null;
   trouble: TabTrouble | null;
+  loadError: TabLoadError | null;
 }
 
 export interface ThemeState {

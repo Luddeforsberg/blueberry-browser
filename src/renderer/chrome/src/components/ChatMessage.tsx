@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, MascotProfile } from '@shared/library'
@@ -7,6 +7,7 @@ import { BERRY_ID } from '@shared/mascots'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
+import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
 
@@ -29,8 +30,21 @@ export const useFollowReply = (sentCount: number, partial: string | null | undef
     return scrollerRef
 }
 
-export const Markdown: React.FC<{ content: string }> = ({ content }) => (
-    <div className="prose max-w-none prose-pre:p-3 prose-pre:overflow-x-auto">
+// `fromStranger` is for what someone else wrote: nothing in it can load anything or take you anywhere. An image is
+// only its description, a link is its words and address as text, and raw HTML shows as text, which ReactMarkdown does
+// by itself as long as no plugin here parses it.
+const STRANGER_COMPONENTS: Components = {
+    img: ({ alt }) => <span>{alt}</span>,
+    a: ({ children, href }) => (
+        <span>
+            {children}
+            {href && String(children) !== href && ` (${href})`}
+        </span>
+    ),
+}
+
+export const Markdown: React.FC<{ content: string; fromStranger?: boolean; className?: string }> = ({ content, fromStranger, className }) => (
+    <div className={cn("prose max-w-none prose-pre:p-3 prose-pre:overflow-x-auto", className)}>
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
@@ -56,6 +70,7 @@ export const Markdown: React.FC<{ content: string }> = ({ content }) => (
                         {children}
                     </a>
                 ),
+                ...(fromStranger ? STRANGER_COMPONENTS : {}),
             }}
         >
             {content}
@@ -117,7 +132,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[] }> = ({ steps }) => (
     <ol aria-label="Steps" className="flex flex-col gap-2.5 text-14 text-muted-foreground">
         {steps.map((step, index) => (
             <li key={index} className="flex items-center gap-3">
-                <span className="size-4 shrink-0 flex items-center justify-center text-primary" style={{ marginLeft: index % 2 ? 6 : 0 }}>
+                <span className="size-4 shrink-0 flex items-center justify-center text-primary">
                     {step.done ? (
                         <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
                             <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />

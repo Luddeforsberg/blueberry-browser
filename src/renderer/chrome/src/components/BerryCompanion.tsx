@@ -13,10 +13,9 @@ const SEAT = 46 / 64
 const HOME_SIZE = 112
 // Between the composer's text, which starts on the left, and its controls on the right.
 const HOME_INSET = 250
-// Small enough to fit within the row above the tab, and clear of the tab's close button.
-const TAB_SIZE = 36
-const TAB_INSET = 50
-const TIGHT_TAB_SIZE = 32
+// In the slot the active tab keeps free for it, between its title and its close button.
+const TAB_SIZE = 32
+const TAB_INSET = 54
 const MIN_FLIGHT_GAP_MS = 15000
 const FLIGHT_FRAMES = 16
 
@@ -39,14 +38,11 @@ const targetFor = (element: HTMLElement): Target => {
     const rect = element.getBoundingClientRect()
     if ('berrySpot' in element.dataset) return { x: rect.left, y: rect.top, size: rect.width, mood: 'rest' }
 
-    const home = 'berryHome' in element.dataset
-    const size = home ? HOME_SIZE : TAB_SIZE
-    const seatX = rect.right - (home ? HOME_INSET : TAB_INSET)
-    // The horizontal tab row touches the top of the window, so there Berry sits on the tab's lower edge.
-    if (rect.top - size * SEAT < 0) {
-        return { x: seatX - TIGHT_TAB_SIZE / 2, y: rect.bottom - 2 - TIGHT_TAB_SIZE * SEAT, size: TIGHT_TAB_SIZE, mood: 'sitting' }
+    if ('berryHome' in element.dataset) {
+        return { x: rect.right - HOME_INSET - HOME_SIZE / 2, y: rect.top - HOME_SIZE * SEAT, size: HOME_SIZE, mood: 'sitting' }
     }
-    return { x: seatX - size / 2, y: rect.top - size * SEAT, size, mood: 'sitting' }
+    // On the tab's lower edge with its legs over it, in both layouts, so it covers no title.
+    return { x: rect.right - TAB_INSET - TAB_SIZE / 2, y: rect.bottom - 2 - TAB_SIZE * SEAT, size: TAB_SIZE, mood: 'sitting' }
 }
 
 const transformOf = ({ x, y, size }: Target) => `translate(${x}px, ${y}px) scale(${size / BASE_SIZE})`
@@ -209,7 +205,7 @@ export const BerryCompanion: React.FC = () => {
             className="fixed left-0 top-0 z-40 pointer-events-none origin-top-left"
             style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible ? undefined : 'hidden' }}
         >
-            <div ref={body} className={atSpot || mood === 'sitting' ? 'pointer-events-auto' : undefined} style={{ transformOrigin: `50% ${SEAT * 100}%` }}>
+            <div ref={body} className={atSpot || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: `50% ${SEAT * 100}%` }}>
                 <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
                     <Berry mood={mood} size={BASE_SIZE} mascot={mascot} />
                 </div>

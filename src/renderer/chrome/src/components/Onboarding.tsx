@@ -6,9 +6,9 @@ import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 
-const STEPS = 4
+const STEPS = 3
 
-// Four short steps on first launch. Every one can be skipped, and no account is asked for.
+// Three short steps on first launch. Every one can be skipped, and no account is asked for.
 export const Onboarding: React.FC = () => {
     const { settings, theme, updateSettings } = useShell()
     const [step, setStep] = useState(0)
@@ -64,16 +64,6 @@ export const Onboarding: React.FC = () => {
                 )}
 
                 {step === 2 && (
-                    <>
-                        <h1 className="text-34 font-semibold">Bring your bookmarks</h1>
-                        <p className="mt-3 text-15 text-muted-foreground">
-                            Importing from Chrome, Safari, Arc and Firefox isn’t ready yet. You’ll find it in Settings once it is.
-                        </p>
-                        <Button className="mt-8" onClick={next}>Continue</Button>
-                    </>
-                )}
-
-                {step === 3 && (
                     <>
                         <Berry mood="curious" size={96} />
                         <h1 className="mt-6 text-34 font-semibold">What I can see</h1>
