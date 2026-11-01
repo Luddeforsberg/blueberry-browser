@@ -516,7 +516,8 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     hop: ({ words, name }) => {
       if (!begin()) return false;
       if (entering()) place({ x: Math.max(4, innerWidth - size() * 1.4), y: size() * 1.5 });
-      if (name) setPose(name);
+      // The first thing it does may be this, and it has to be standing as something to be seen.
+      if (name || !pose) setPose(name ?? "rest");
       say(words);
       if (quietMotion()) {
         fade();

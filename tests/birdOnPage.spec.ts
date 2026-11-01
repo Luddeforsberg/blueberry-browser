@@ -404,6 +404,18 @@ test("Stop ends the job while the bird is on its way, so the click never happens
   }
 });
 
+test("a key press as the very first thing still shows the bird, not only its words", async () => {
+  const { app, open, job, close } = await setup();
+  try {
+    await open("/plain");
+    await job([{ name: "press_key", args: { key: "Escape" } }]);
+    await expect.poll(async () => (await stateIn(app, "/plain"))?.words, { intervals: [10] }).toBe("Pressing a key");
+    expect((await stateIn(app, "/plain"))?.pose).not.toBeNull();
+  } finally {
+    await close();
+  }
+});
+
 test("turning off page access while the bird is on its way means the click never happens", async () => {
   const { app, chrome, open, job, close } = await setup();
   try {
