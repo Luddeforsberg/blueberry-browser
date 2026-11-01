@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Dices, Feather } from 'lucide-react'
+import { Dices } from 'lucide-react'
 import type { MascotLook, MascotProfile } from '@shared/library'
-import { BerryDot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
+import { BerryDot, Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { ACCESSORIES, BERRY, BERRY_ID, MASCOT_TOOLS, MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME, PALETTES, normaliseSite, sitesInWords, toolsInWords } from '@shared/mascots'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
+import { useShell } from '../contexts/ShellContext'
 import { Berry } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
 import { useAccount } from '../useAccount'
@@ -17,27 +18,55 @@ import { blankForm, setRoutinesView } from '../routinesView'
 const api = () => window.chromeAPI.mascots
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 const INPUT = "w-full h-9 px-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-const TAG = "px-2 py-0.5 rounded-full bg-muted text-12 text-muted-foreground"
 // How long a saved mascot gets to fly off before the flock comes back.
 const FLY_OFF_MS = 520
 
 // A bird to press when choosing a look, named for what it's showing.
 const wearing = (name: string, look: MascotLook): MascotProfile => ({ ...BERRY, id: name, name, look })
 
-// One bird on its card. It sits on the edge, like Berry on the new tab composer, and looks up when you come near.
-export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; onEdit: () => void; onPublish?: () => void }> = ({ mascot, landed, onEdit, onPublish }) => {
+// Everything but the bird and its name stays quiet until you come near. The buttons can still be tabbed to.
+const QUIETLY = "opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
+const BIRD = 96
+// How far down the standing drawing its feet reach, and where along it.
+const FEET_Y = 113 / 120
+const FEET_X = 57 / 120
+const BIRD_LEFT = 12
+const WIRE_SAG = 5
+const HIDDEN_ICON = 32
+
+// One stretch of wire, sagging a little where a bird stands on it. Its flat part is at `top`. Only the last place on the
+// list has `runsOn`, since every row before it is full: its wire carries on to the end of the row, and the list clips it.
+const Wire: React.FC<{ top: number; sags: boolean; runsOn?: boolean }> = ({ top, sags, runsOn = false }) =>
+    runsOn ? (
+        <div aria-hidden className="absolute left-0 h-[1.5px] w-screen bg-muted-foreground/45 pointer-events-none" style={{ top: top - 0.75 }} />
+    ) : (
+        <svg aria-hidden className="absolute inset-x-0 w-full text-muted-foreground/45 pointer-events-none" style={{ top: top - 1, height: WIRE_SAG + 2 }} viewBox={`0 0 100 ${WIRE_SAG + 2}`} preserveAspectRatio="none">
+            <path d={sags ? `M0 1 C 8 1, 9 ${WIRE_SAG + 1}, 16 ${WIRE_SAG + 1} S 34 1, 100 1` : 'M0 1 L100 1'} fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        </svg>
+    )
+
+// One bird on the wire, with its name and what it's for below it. It looks up when you come near.
+export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flipped?: boolean; onEdit: () => void; onPublish?: () => void }> = ({ mascot, landed, flipped = false, onEdit, onPublish }) => {
     const { chats, routines } = useLibrary()
     const { choose } = useFlock()
+    const { showBerry, keepBerryStill } = useShell().settings
     const [near, setNear] = useState(false)
     const isBerry = mascot.id === BERRY_ID
     const own = (id: string | null) => (id ?? BERRY_ID) === mascot.id
     const runs = routines.filter((routine) => own(routine.mascotId))
     const working = chats.some((chat) => own(chat.mascotId) && chat.running) || runs.some((routine) => routine.status === 'running' || routine.status === 'needs-approval')
+    const standing = showBerry ? BIRD : HIDDEN_ICON
+    const line = standing * (showBerry ? FEET_Y : 1)
 
     const chat = () => {
         choose(mascot.id)
         void window.chromeAPI.browser.createTab()
     }
+
+    const limits = [
+        ...(isBerry ? [] : [sitesInWords(mascot.sites), toolsInWords(mascot.tools)]),
+        ...(runs.length > 0 ? [runs.length === 1 ? 'Runs a routine' : `Runs ${runs.length} routines`] : [])
+    ]
 
     return (
         <li
@@ -45,27 +74,56 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; onEd
             onMouseLeave={() => setNear(false)}
             onFocus={() => setNear(true)}
             onBlur={() => setNear(false)}
-            className={cn("relative flex flex-col p-4 pt-10 rounded-panel bg-surface shadow-raised", landed && "motion-safe:animate-berry-hop")}
+            className="group relative min-w-0"
         >
-            <div className="absolute left-1/2 -translate-x-1/2 -top-[68px]">
-                <Berry mood={working ? 'fetching' : near ? 'curious' : 'sitting'} size={96} mascot={mascot} />
+            <Wire top={line} sags={showBerry} />
+            <div className="relative" style={{ height: line + WIRE_SAG }}>
+                <div className="absolute" style={{ left: BIRD_LEFT, top: showBerry ? WIRE_SAG : 0, width: standing, transform: flipped && showBerry ? 'scaleX(-1)' : undefined }}>
+                    <div className={cn(landed && !keepBerryStill && "motion-safe:animate-berry-hop")} style={{ transformOrigin: `${FEET_X * 100}% ${FEET_Y * 100}%` }}>
+                        <Berry mood={working ? 'fetching' : near ? 'curious' : 'rest'} size={standing} mascot={mascot} />
+                    </div>
+                </div>
             </div>
-            <h2 className="flex items-center justify-center gap-2 text-14 font-semibold text-center [overflow-wrap:anywhere]">
-                {mascot.name}
-                {working && <BerryDot working />}
-            </h2>
-            <p className="mt-1 min-h-[36px] text-12 text-muted-foreground text-center line-clamp-2">
-                {isBerry ? 'The original. Always here, and it can do all you let it.' : mascot.instructions}
-            </p>
-            <div className="mt-3 flex flex-wrap justify-center gap-1">
-                {!isBerry && <span className={TAG}>{sitesInWords(mascot.sites)}</span>}
-                {!isBerry && <span className={TAG}>{toolsInWords(mascot.tools)}</span>}
-                {runs.length > 0 && <span className={TAG}>{runs.length === 1 ? 'Runs a routine' : `Runs ${runs.length} routines`}</span>}
+            <div className="mt-4 pr-6 [overflow-wrap:anywhere]" style={{ paddingLeft: BIRD_LEFT }}>
+                <h2 className="flex items-center gap-2 text-14 font-semibold">
+                    {mascot.name}
+                    {working && <BerryDot working />}
+                </h2>
+                <p className="mt-0.5 text-13 line-clamp-2" title={isBerry ? undefined : mascot.instructions}>
+                    {isBerry ? 'The original. Always here, and it can do all you let it.' : mascot.instructions}
+                </p>
+                {limits.length > 0 && <p className="mt-1 text-12 text-muted-foreground">{limits.join(' · ')}</p>}
+                <div className={cn("mt-1 -ml-2.5 flex flex-wrap", QUIETLY)}>
+                    <Button size="xs" variant="ghost" onClick={chat}>Chat</Button>
+                    {!isBerry && <Button size="xs" variant="ghost" aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
+                    {onPublish && !isBerry && !mascot.galleryId && <Button size="xs" variant="ghost" aria-label={`Publish ${mascot.name}`} onClick={onPublish}>{mascot.publishedId ? 'Published' : 'Publish'}</Button>}
+                </div>
             </div>
-            <div className="mt-auto pt-4 flex justify-center gap-2">
-                <Button size="sm" onClick={chat}>Chat</Button>
-                {!isBerry && <Button size="sm" variant="outline" aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
-                {onPublish && !isBerry && !mascot.galleryId && <Button size="sm" variant="outline" aria-label={`Publish ${mascot.name}`} onClick={onPublish}>{mascot.publishedId ? 'Published' : 'Publish'}</Button>}
+        </li>
+    )
+}
+
+// The next place along the wire: the shape of a bird that isn't there yet.
+const RoomForOneMore: React.FC<{ onNew: () => void }> = ({ onNew }) => {
+    const { showBerry } = useShell().settings
+    const standing = showBerry ? BIRD : HIDDEN_ICON
+    const line = standing * (showBerry ? FEET_Y : 1)
+    return (
+        <li className="group relative min-w-0">
+            <Wire top={line} sags={false} runsOn />
+            <div className="relative" style={{ height: line + WIRE_SAG }}>
+                {showBerry && (
+                    <div aria-hidden className="absolute opacity-[0.09] brightness-0 dark:opacity-[0.16] dark:invert motion-safe:transition-[opacity] group-hover:opacity-20 dark:group-hover:opacity-30" style={{ left: BIRD_LEFT, top: 0 }}>
+                        <Mascot mood="rest" size={BIRD} still />
+                    </div>
+                )}
+            </div>
+            <div className="mt-4 flex flex-col items-start" style={{ paddingLeft: BIRD_LEFT }}>
+                <p className="text-13 text-muted-foreground">Room for one more</p>
+                <div className="mt-1 -ml-2.5 flex flex-wrap">
+                    <Button size="xs" variant="outline" className="ml-2.5 mr-1" onClick={onNew}>New mascot</Button>
+                    <Button size="xs" variant="ghost" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Browse the Gallery</Button>
+                </div>
             </div>
         </li>
     )
@@ -78,30 +136,11 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
         <>
             <h1 className="text-20 font-semibold">Your flock</h1>
             <p className="mt-1 text-14 text-muted-foreground">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
-            <ul aria-label="Your flock" className="mt-6 pt-[68px] grid grid-cols-[repeat(auto-fill,minmax(216px,1fr))] gap-x-4 gap-y-[84px]">
-                {flock.map((mascot) => (
-                    <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} />
+            <ul aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid grid-cols-[repeat(auto-fill,minmax(232px,1fr))] gap-y-10">
+                {flock.map((mascot, index) => (
+                    <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} flipped={index % 3 === 2} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} />
                 ))}
-                <li className="flex">
-                    <button
-                        type="button"
-                        onClick={onNew}
-                        className="group/new w-full min-h-[208px] flex flex-col items-center justify-center gap-3 rounded-panel border border-dashed text-14 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <BerryDot size={44} className="motion-safe:transition-transform group-hover/new:-translate-y-1" />
-                        New mascot
-                    </button>
-                </li>
-                <li className="flex">
-                    <button
-                        type="button"
-                        onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}
-                        className="group/new w-full min-h-[208px] flex flex-col items-center justify-center gap-3 rounded-panel border border-dashed text-14 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <Feather className="size-11 text-muted-foreground motion-safe:transition-transform group-hover/new:-translate-y-1" aria-hidden />
-                        Browse the Gallery
-                    </button>
-                </li>
+                <RoomForOneMore onNew={onNew} />
             </ul>
         </>
     )
@@ -294,7 +333,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                                 className={cn(INPUT, "mt-3")}
                             />
                             <p className={cn("mt-1 text-12", badSite ? "text-warning" : "text-muted-foreground")}>
-                                {badSite ? `“${badSite}” doesn’t look like a site.` : 'Each one includes its subdomains. Anywhere else, it’s refused before anything happens.'}
+                                {badSite ? `“${badSite}” doesn’t look like a site.` : 'Each one includes its subdomains. It can’t use any other site.'}
                             </p>
                         </>
                     )}

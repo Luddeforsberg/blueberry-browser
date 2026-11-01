@@ -45,7 +45,7 @@ test("a card fills things in, and one dismissed stays gone", async () => {
 
     // A prompt waits in the composer with the cursor ready, and nothing has gone to the main model.
     const prompt = cards.first();
-    const words = await prompt.getByRole("button").first().locator("span").nth(1).textContent();
+    const words = await prompt.locator("p span").nth(1).textContent();
     await prompt.getByRole("button").first().click();
     await expect(composer).not.toHaveValue("");
     await expect(composer).toBeFocused();
@@ -54,7 +54,7 @@ test("a card fills things in, and one dismissed stays gone", async () => {
     expect(model.requests).toHaveLength(0);
 
     // Filled in and left for the user to save.
-    await chrome.getByRole("button", { name: /^A routine for this/ }).click();
+    await chrome.getByRole("button", { name: "Set it up" }).click();
     await expect(chrome.getByRole("heading", { name: "New routine" })).toBeVisible();
     await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Morning stories");
     await expect(chrome.getByLabel("Time")).toHaveValue(/^0[78]:\d\d$/);
@@ -62,7 +62,7 @@ test("a card fills things in, and one dismissed stays gone", async () => {
     expect(library.routines).toHaveLength(0);
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-    await chrome.getByRole("button", { name: /^A new bird for this/ }).click();
+    await chrome.getByRole("button", { name: "Meet Linus", exact: true }).click();
     await expect(chrome.getByRole("heading", { name: "New mascot" })).toBeVisible();
     await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Linus");
     await expect(chrome.getByLabel("Sites it may use")).toHaveValue("github.com, linear.app");
@@ -77,7 +77,7 @@ test("a card fills things in, and one dismissed stays gone", async () => {
     chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
 
-    await expect(chrome.getByRole("button", { name: /^A new bird for this/ })).toBeVisible();
+    await expect(chrome.getByRole("button", { name: "Meet Linus", exact: true })).toBeVisible();
     await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
     expect(model.titleRequests).toHaveLength(asked);
   } finally {

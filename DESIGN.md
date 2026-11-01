@@ -17,6 +17,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 - Humanoid companions, or a team you have to manage. The flock is birds you made yourself, and none appears until you ask.
 - Promo cards and upsells on the new tab. The idea cards there only link to real features, and suggestions only come from what the user really did.
+- Stacks of identical rounded, shadowed cards with an avatar, a title, pill chips and pill buttons. Where a page lists birds, they stand on something real: a wire, a divider or the fruit.
 - Glass that makes text harder to read, or glass on web pages.
 - Beige neutrals and blue-tinted dark mode.
 - Bounce in the chrome, and decorative loops that run when no work is happening.
@@ -84,7 +85,7 @@ There is one glass strength, not a user setting.
 | Solid | Web pages, always | An opaque view |
 | Frame | Window frame, sidebar, chat panel | The `frame` gradient with a fine grain, painted opaque over the native window material |
 | Card | The card internal pages sit on | `canvas` at 85% with `backdrop-filter` over the frame |
-| Panel | Cards over the art blueberry, bookmark buttons | `surface` at 60–80% with `backdrop-filter` |
+| Panel | Cards over the art blueberry, bookmark buttons | `surface` at 60–90% with `backdrop-filter` |
 | Floating | Anything over a web page | Overlay view with `backdrop-filter` plus the glass tint |
 
 The frame is opaque so its colour and text contrast don't depend on the desktop behind it. The glass tint is 88% of `background`, in both light and dark mode (*to tune*).
@@ -147,7 +148,7 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 | `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
 | `glass-tint` | `background` at 88% | `background` at 88% | All glass |
 
-Contrast is calculated against each mode's most difficult frame colour, and against a `surface` card at 80% over the art blueberry's darkest colour in light mode and lightest in dark mode. Re-measure on real windows.
+Contrast is calculated against each mode's most difficult frame colour, and against a `surface` card at 80% over the art blueberry's darkest colour in light mode and lightest in dark mode. Re-measure on real windows. Suggestions are `primary-foreground` directly on the fruit, over a pool of `berry-fruit-crown` shadow. Measured on real windows, white reaches at least 6.4:1 on the brightest pixel behind the words in light mode and 9.2:1 in dark.
 
 | Text colour | Light on frame | Dark on frame | Light on berry card | Dark on berry card |
 |---|---|---|---|---|
@@ -192,7 +193,7 @@ The flock's presets replace `berry-ink`, `wing`, `nape`, `beak`, `gear` and `gea
 
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
 - **Radius:** 8px for controls, 12px for sidebar rows and inputs, 22px for cards, panels and the page card, including the web page view itself, 26px for the composer, and full for buttons and segmented controls.
-- **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, cards on the art blueberry and selected rows in the sidebar also get a shadow.
+- **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, cards on the art blueberry and selected rows in the sidebar also get a shadow. A bird standing on the composer leaves a small soft `berry-pupil` shadow under its feet, only on the box.
 - **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration, and also shows while Berry is using the tab in a running reply. Inside the page, a matching inset glow pulses slowly, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
 
 ## 5. Typography
@@ -311,13 +312,13 @@ Every mood has a text label for assistive technology.
 | Place | What it does |
 |---|---|
 | Onboarding | Large, guides setup |
-| New tab | Large, sitting on the composer's top edge with its legs over it |
+| New tab | Large, standing on the composer's top edge with its toes gripping it. Smaller, standing on the art blueberry to say a suggestion |
 | Browsing | Small, sitting on the active tab's lower edge with its legs hanging, in a slot the tab keeps free between its title and its close button, so it covers no text. On a narrow row of tabs, the active one stays wide enough for the slot |
 | Chat | Working and waiting states beside its replies |
 | Routines | Flies off when a routine runs and returns with the result |
 | Settings | Its own section |
-| Flock | Its own page, sitting on each card |
-| Gallery | Sitting on each card, Asking on the review screen, Delivered once added |
+| Flock | Its own page, standing on a wire with the flock |
+| Gallery | Standing on the line under each row, Asking on the review screen, Delivered once added |
 | Needs you | Asking at 24px on each row, and off duty when nothing's waiting |
 | Over a web page | Only while acting on that page, in an overlay view |
 
@@ -327,7 +328,7 @@ Berry belongs to real parts of the interface, so it only ever sits in the places
 
 ### When Berry may interrupt
 
-Berry only speaks about work the user started: a finished task, a routine result, or something it can't go on without. Everything waiting is on one page, Needs you, so the flock can work on while the user carries on with their day. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear as cards on the new tab page, where the user is already choosing what to do next, and nothing about them moves, asks or waits. Berry does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
+Berry only speaks about work the user started: a finished task, a routine result, or something it can't go on without. Everything waiting is on one page, Needs you, so the flock can work on while the user carries on with their day. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear on the new tab page, said by a bird standing on the art blueberry, where the user is already choosing what to do next. A bird looks up and hops once when the pointer or keyboard comes to its words, and otherwise nothing about them moves, asks or waits. Berry does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
 
 | Level | Behaviour |
 |---|---|
@@ -361,19 +362,21 @@ Three short, skippable steps: meet Berry, choose layout and appearance, and what
 
 ### New tab
 
-Berry, large, sits on the top edge of a 752px composer with its legs over it. Below rises the art blueberry, the page's one big moment: thousands of tiny berries spiral out of a sunken crown like seeds in a sunflower head, swelling in the light and shrinking in shadow, under heavy grain, with dust drifting off the edge so it has no hard outline. It is 1240px across at any window size, painted once and never moves. Up to three frosted cards sit on it, showing suggestions if there are any, otherwise real chats and routines, or two idea cards linking to real features if there are none of those either, then recent pages in a frosted panel if there are any. When the sidebar is closed, links to Needs you, Routines, Flock and Settings sit under the composer, on a frosted strip the birds pass behind. Faint, irregular trails of alternating bird footprints sit in the background behind the art blueberry, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
+Berry, large, stands on the top edge of a 752px composer, right of centre, so it covers no text or control. It's drawn inside the composer's wrapper, so the two scroll as one. It only flies as a separate layer on its way there. Below rises the art blueberry, the page's one big moment: thousands of tiny berries spiral out of a sunken crown like seeds in a sunflower head, swelling in the light and shrinking in shadow, under heavy grain, with dust drifting off the edge so it has no hard outline. It is 1240px across at any window size, painted once and never moves. Birds stand on it to say suggestions if there are any. Otherwise up to three frosted cards sit on it, showing real chats and routines, or two idea cards linking to real features if there are none of those either, then recent pages in a frosted panel if there are any. When the sidebar is closed, links to Needs you, Routines, Flock and Settings sit under the composer, on a frosted strip the birds pass behind. Faint, irregular trails of alternating bird footprints sit in the background behind the art blueberry, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails, and so do suggestions, so that the birds saying something have the page to themselves. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
 
 `Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
 
-**Suggestions** are what Blueberry noticed you repeat, offered as work it can take over. The bar is three times: a site on three different days, at about the same time or weekday, two sites used together on three days, or three similar chat requests. Each card says plainly why it's there, and those words and numbers come from code, not from the model.
+**Suggestions** are what Blueberry noticed you repeat, offered as work it can take over. The bar is three times: a site on three different days, at about the same time or weekday, two sites used together on three days, or three similar chat requests. Each says plainly why it's there, and those words and numbers come from code, not from the model.
 
-- **Prompt:** puts a ready prompt in the composer with the cursor at the end. Enter sends it.
-- **Routine:** opens the routine form filled in with a name, instructions and a schedule that finishes 15 minutes before the user usually looks.
-- **Mascot:** opens the new-mascot form filled in with a look, name, instructions and limits, with the bird sitting on the card's top edge. It starts limited to the sites in the pattern, with only Go to pages switched on.
+**How they look:** not cards. Each is a bird at 76px standing on the fruit's real outline, in up to three columns of 224px, or stacked below it in a narrow space. The words are directly on the fruit, below its outline at every point of their column, so outer columns sit lower and the group follows the curve. The reason comes first in `primary-foreground`, then one semibold sentence the bird says. Under them is one action in words with an arrow, and Not now, shown on hover or focus. Berry says Prompt and Routine ideas. A Mascot idea is said by that new bird in its own colours, facing you in Asking, as if it has turned up to meet you. The last of several faces inwards. Hide Berry removes the birds and keeps everything else in place.
 
-A suggestion only ever fills something in for the user to confirm, so nothing runs, is saved or is sent until they act. Each card has a dismiss button, shown on hover or focus, and what's dismissed doesn't come back, along with anything else about the same sites or chats. Saving the form or sending the prompt also ends it. Card order is always prompt, routine, mascot.
+- **Prompt:** "Put it in the box" puts a ready prompt in the composer with the cursor at the end. Enter sends it.
+- **Routine:** "Set it up" opens the routine form filled in with a name, instructions and a schedule that finishes 15 minutes before the user usually looks.
+- **Mascot:** "Meet" and its name opens the new-mascot form filled in with a look, name, instructions and limits. It starts limited to the sites in the pattern, with only Go to pages switched on.
 
-The page shows saved cards at once or what it would show without them, and never waits. New cards are written at most about once an hour and only when history has grown, by one call to the cheap model, which gets only site names, page titles, chat titles and counts. Local addresses, banks, mail, search engines and addresses with tokens are never counted, and a title from an address with a query isn't sent. A card that names a site outside its pattern is dropped. Settings has an off switch, under Data and privacy, which also says what is sent.
+A suggestion only ever fills something in for the user to confirm, so nothing runs, is saved or is sent until they act. What's dismissed with Not now doesn't come back, along with anything else about the same sites or chats. Saving the form or sending the prompt also ends it. The order is always prompt, routine, mascot.
+
+The page shows saved suggestions at once or what it would show without them, and never waits. New words are written at most about once an hour and only when history has grown, by one call to the cheap model, which gets only site names, page titles, chat titles and counts. Local addresses, banks, mail, search engines and addresses with tokens are never counted, and a title from an address with a query isn't sent. A suggestion that names a site outside its pattern is dropped. Settings has an off switch, under Data and privacy, which also says what is sent.
 
 ### Browsing
 
@@ -425,9 +428,9 @@ A list with schedule, last result and status, plus a page for each routine with 
 
 Opens as a tab from the sidebar, the Go menu, or the new tab page when there's no sidebar, with only one open at a time.
 
-- **The flock:** a heading and a grid of `surface` cards, each with its bird sitting on the top edge, legs over it, as Berry sits on the new tab composer. Coming near makes it curious, and one that's working flies, with the berry beside its name. A card has the name, what it's for, its limits as small tags and the routines it runs, with **Chat** and **Edit**. **Chat** chooses that mascot and opens a new tab, whose composer goes to it. Berry comes first, can't be edited or deleted, and has no limit tags. The last tile, dashed with a blueberry, is **New mascot**.
+- **The flock:** a heading and birds standing on a wire, as many to a row as fit, with no cards. The wire is a 1.5px line in `muted-foreground` at 45%, and it sags a little under each bird's weight. The rows wrap into more wires, and every bird faces the same way except each third, which turns round. Coming near makes one curious, and one that's working flies, with the berry beside its name. Under each is its name, what it's for in at most two lines, and its limits and routines as one muted line of words. **Chat**, **Edit** and **Publish** are ghost buttons, unseen until that bird is hovered or focused, and they can always be tabbed to. **Chat** chooses that mascot and opens a new tab, whose composer goes to it. Berry comes first, can't be edited or deleted, and has no limits to list. The last place on the wire is the faint shape of a bird that isn't there yet, with no sag, "Room for one more", **New mascot** and **Browse the Gallery**. Its wire runs on to the end of the row. With Hide Berry, a small plain icon stands on a straight wire.
 - **Making one:** a form in the page, never a modal, numbered 1 to 4, with the preview beside it, or above it in a narrow window. Look, name and what it's for take under a minute, and the limits are optional. **Surprise me** picks a look and a name. Looks are chosen by pressing the bird wearing them. What's typed survives going to another tab.
-- **The preview:** the moment this page is for. The mascot, at 160px, hops when its look changes, gets curious while you name it, thinks while you say what it's for, and faces you while you set limits. Its nine moods sit below it, and pressing one shows it. Saving flies it off, and it lands on its new card with a hop. This is the one place a bird moves with no work behind it, and Still and reduced motion stop it as they do everywhere.
+- **The preview:** the moment this page is for. The mascot, at 160px, hops when its look changes, gets curious while you name it, thinks while you say what it's for, and faces you while you set limits. Its nine moods sit below it, and pressing one shows it. Saving flies it off, and it lands on the wire with a hop. This is the one place a bird moves with no work behind it, and Still and reduced motion stop it as they do everywhere.
 - **Limits only take away.** Any site, or only named sites with their subdomains. Reading is always on, with switches for going to pages, clicking and typing. The page says plainly that no limit changes when it asks: approvals work the same for every mascot, and a mascot has no setting that could skip one.
 - **Refusals:** something off its sites never reaches a card, because there's nothing to decide. It shows in the steps as "Stayed off example.com". With an off-limits page open, the composer says the mascot can't see it in place of the page card, and the reading ring doesn't show. Refused pages aren't read or sent, including the page that would go with a message, embedded frames from other sites, and a page that sends the tab somewhere else while the mascot acts. A click can't open what it couldn't go to.
 - **Choosing one:** the shared composer has a chip with the bird and its name. Pressing it opens the flock in a row inside the composer, in the flow rather than floating, so it works beside a web page. The bird on the new tab composer and the active tab becomes the chosen one. Once a chat has begun it keeps its mascot, and the chip just says who.
@@ -437,21 +440,21 @@ Opens as a tab from the sidebar, the Go menu, or the new tab page when there's n
 
 ### Gallery
 
-Mascots made for one job, ready to add, some from Blueberry and some from people you don't know. Opens as a tab from the last tile on the Flock page or the Go menu, with only one open at a time. Browsing and adding need no account. With no server set up, it shows just the starters, as it always has, and nothing about accounts appears.
+Mascots made for one job, ready to add, some from Blueberry and some from people you don't know. Opens as a tab from **Browse the Gallery** on the Flock page or the Go menu, with only one open at a time. Browsing and adding need no account. With no server set up, it shows just the starters, as it always has, and nothing about accounts appears.
 
-- **The page:** a heading with a way back to **Your flock**, a search field that covers everything on a card and what the mascot is told, categories as a segmented control, and **Newest** and **Most added** when a server answers. The grid works like the flock: `surface` cards with the bird sitting on the top edge. What people published comes first, and starters follow in their own order.
+- **The page:** a heading with a way back to **Your flock**, then a quiet row of filters, all as plain words: a search with no box that covers everything on a row and what the mascot is told, categories, and **Newest** and **Most added** when a server answers, with the chosen word underlined. The intro says plainly that strangers wrote these and nobody has checked them, only while a server answers. Then rows split by `border`, with no cards. What people published comes first, and starters follow in their own order.
 - **If the server can't be reached,** the starters still show, and a line in `warning` above them says only those are showing, with **Try again**.
-- **A card** has the name, "By" and its author, one line on what it does, and its permissions on a `card` block. Below them is **Add**, or **Chat** and **Details** with "In your flock" once there's a copy or it's your own. A published one shows how many adds it has, each account or install counted once. A starter isn't on the server, so it shows no count rather than a made-up one. There are no ratings or anything else that isn't real.
+- **A row** has the bird at 88px, unboxed, with its toes on the line beneath it, then the name, "By" and its author, whether it has an example, one line on what it does, and its permissions as one muted line of words. On the right is **Add**, or "In your flock" with **Details** and **Chat** once there's a copy or it's your own. A published one shows how many adds it has beside **Add**, each account or install counted once. A starter isn't on the server, so it shows no count rather than a made-up one. There are no ratings or anything else that isn't real.
 - **Permissions are the point of the page.** Each is a line of plain words with a lock, such as "Only visits hemnet.se" or "Can't type or click". What isn't limited, such as "Can go anywhere" or "Can click and type", has an open lock, so a card with no limit can't look like one with limits. Most starters are left open on purpose, so people can build on them, with the approval cards still asking, and limits are there for the few that are better for them. It isn't drawn as a warning, because it's the normal case. The words come from one function that reads the same sites and tools the tool layer enforces, never from what the entry says about itself.
-- **Review:** Add opens a screen in the page, never a modal, with the permissions larger, the instructions word for word and the bird in Asking beside them, or above them in a narrow window. It says that the same approval cards apply and that a copy is the user's own. On one a person published, it says that someone using Blueberry wrote it and that we haven't checked it. Under the instructions is the example, "I asked this" and "And here's what it gave me", and the public page's link if there is one. What was asked and the instructions are plain text, because the user must see exactly what the model reads. The answer is rendered markdown, as it was in the chat, but nothing in it can load or go anywhere: no raw HTML, an image is only its description, and a link is its words and address as text. A starter's example comes from a real run, and one without a real run shows none. Nothing is added until **Add to flock**, and what's added is what was on the screen, even if its author has changed it since.
+- **Review:** Add opens one continuous page, never a modal, in a 672px column of plain lines split by `border`, with no cards. The heading comes first with the bird in Asking beside it, at 148px, standing on the line under it. Below are the permissions larger, then the instructions word for word. It says that the same approval cards apply and that a copy is the user's own. On one a person published, it says that someone using Blueberry wrote it and that we haven't checked it. Under the instructions is the example, "I asked this" and "And here's what it gave me", and the public page's link if there is one. What was asked and the instructions are plain text, because the user must see exactly what the model reads. The answer is rendered markdown, as it was in the chat, but nothing in it can load or go anywhere: no raw HTML, an image is only its description, and a link is its words and address as text. A starter's example comes from a real run, and one without a real run shows none. Nothing is added until **Add to flock**, and what's added is what was on the screen, even if its author has changed it since.
 - **Added:** the same screen says it's in the flock, the bird lands in Delivered with a hop, and **Start a chat** is the main button, which chooses it and opens a new tab.
-- **A clashing name:** the review asks for another, starting from "Morning Paper 2". Adding the same one twice can't happen, as the card offers a chat instead, and a deleted copy can be added again.
+- **A clashing name:** the review asks for another, starting from "Morning Paper 2". Adding the same one twice can't happen, as the row offers a chat instead, and a deleted copy can be added again.
 - **A copy is independent.** It's a normal mascot, with Edit and Delete in the flock, and nothing in the Gallery can reach it afterwards. It goes through the same checks as one made by hand, and it keeps the same approvals and limits.
-- **What strangers can't do:** take the name Berry or Blueberry, write as Blueberry, or limit a mascot to this computer or the user's own network. Text a person can't see, such as invisible characters, is taken out. A row breaking any of this shows no card, and a name reaches the prompt in its own tag that says it's only a name.
+- **What strangers can't do:** take the name Berry or Blueberry, write as Blueberry, or limit a mascot to this computer or the user's own network. Text a person can't see, such as invisible characters, is taken out. A row from the server breaking any of this isn't shown, and a name reaches the prompt in its own tag that says it's only a name.
 
 ### Publishing
 
-From a mascot of your own, the card's **Publish** opens a page in the Flock tab. It's plain lines split by `border`, in one 672px column, with no cards. Copies from the Gallery can't be published, and with no server set up there's no button.
+From a mascot of your own, **Publish** opens a page in the Flock tab. It's plain lines split by `border`, in one 672px column, with no cards. Copies from the Gallery can't be published, and with no server set up there's no button.
 
 - **Signed out,** the page says why an account is needed, with the sign-in form in place. There's nothing else to do until then.
 - **What's chosen:** the name to publish under, which starts empty or as the one used last and never as anything from the account, one line on what it does, and a category. The example is a list of that mascot's chats. Picking one fills in the last thing asked and its answer as text to edit, and it needs the box saying they've read both.
@@ -582,7 +585,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 - Don't add a colour, weight, font or shadow that isn't in this document.
 - Don't add bounce to the chrome or loops without real work behind them. The exceptions are Berry's world on the new tab page, the legs of a sitting bird, and the preview on the Flock page.
 - Don't let Berry joke about permissions, payments, messages, data or failures.
-- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestion cards on the new tab page.
+- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestions on the new tab page.
 - Don't read page content unless the user asked.
 - Don't send browsing data to third-party services for UI features such as favicons.
 - Don't make any feature depend on Berry being visible.

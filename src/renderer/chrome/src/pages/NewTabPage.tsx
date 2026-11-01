@@ -10,7 +10,7 @@ import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
-import { SuggestionCard } from '../components/SuggestionCard'
+import { BirdSuggestions } from '../components/BirdSuggestions'
 import { setFlockView, suggestedMascot } from '../flockView'
 import { setRoutinesView, suggestedForm } from '../routinesView'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
@@ -135,7 +135,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         }))
     ].slice(0, WORK_CARDS)
 
-    const glass = theme.glass ? "bg-surface/80 backdrop-blur-xl" : "bg-surface"
+    const glass = theme.glass ? "bg-surface/90 backdrop-blur-xl" : "bg-surface"
     const cardClass = cn(
         "flex flex-col p-4 rounded-panel shadow-card text-left outline-none transition-colors",
         "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
@@ -145,10 +145,10 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="relative h-full overflow-y-auto">
             <div className="relative min-h-full overflow-hidden">
-                <Backdrop />
+                <Backdrop quiet={suggestions.length > 0} />
                 <div className="relative max-w-[800px] mx-auto px-6 pt-[22vh] pb-12">
                     <h1 className="sr-only">Where shall we start today?</h1>
-                    {/* Room for Berry, who sits on the composer's top edge with its legs over it. */}
+                    {/* Room for Berry, who stands on the composer's top edge. */}
                     {isBerry && <div className="h-[84px]" />}
 
                     <div data-berry-home className="relative z-10 rounded-composer">
@@ -189,23 +189,13 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     )}
 
                     {/* Suggestions sit nearer the composer, so they're in view on an ordinary window. It stays where it is. */}
-                    <div className={cn("relative", suggestions.length > 0 ? "mt-6 pt-[110px]" : "mt-12 pt-[210px]")}>
+                    <div className={cn("relative", suggestions.length > 0 ? "mt-8" : "mt-12 pt-[210px]")}>
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
 
                         {suggestions.length > 0 ? (
                             <section aria-labelledby="suggestions-heading" className="relative">
                                 <h2 id="suggestions-heading" className="sr-only">Things you repeat</h2>
-                                <ul className="grid grid-cols-3 gap-3">
-                                    {suggestions.map((suggestion) => (
-                                        <SuggestionCard
-                                            key={suggestion.id}
-                                            suggestion={suggestion}
-                                            className={cardClass}
-                                            onUse={() => takeUp(suggestion)}
-                                            onDismiss={() => dismiss(suggestion.id)}
-                                        />
-                                    ))}
-                                </ul>
+                                <BirdSuggestions suggestions={suggestions} onUse={takeUp} onDismiss={dismiss} />
                             </section>
                         ) : work.length > 0 ? (
                             <section aria-labelledby="work-heading" className="relative">
@@ -244,7 +234,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
 
                 {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className={cn("relative mt-3 p-2 rounded-panel shadow-card", glass)}>
+                    <section aria-labelledby="recent-heading" className={cn("relative p-2 rounded-panel shadow-card", suggestions.length > 0 ? "mt-8" : "mt-3", glass)}>
                         <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
                             Recent
                         </h2>

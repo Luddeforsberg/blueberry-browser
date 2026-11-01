@@ -90,7 +90,8 @@ const Walkers: React.FC = () => {
 }
 
 // Old tracks have different ages and lengths, as if birds wandered through at different times.
-export const Backdrop: React.FC = () => {
+// `quiet` keeps the old trails but sends the walking birds away, for when others on the page are saying something.
+export const Backdrop: React.FC<{ quiet?: boolean }> = ({ quiet = false }) => {
     const { settings } = useShell()
     const background = useRef<SVGSVGElement>(null)
     const [bounds, setBounds] = useState<Bounds>({ width: 0, height: 0 })
@@ -123,7 +124,7 @@ export const Backdrop: React.FC = () => {
         update()
         return () => media.removeEventListener('change', update)
     }, [])
-    const walking = settings.showBerry && !settings.keepBerryStill && !reducedMotion
+    const walking = !quiet && settings.showBerry && !settings.keepBerryStill && !reducedMotion
 
     return (
         <>

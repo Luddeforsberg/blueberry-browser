@@ -24,7 +24,7 @@ import { ACCESSORIES, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
-import { SuggestionCard } from '../components/SuggestionCard'
+import { BirdSuggestions } from '../components/BirdSuggestions'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
@@ -225,10 +225,10 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-4 max-w-xl p-2 rounded-composer border bg-surface">
                         <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} onClose={() => undefined} />
                     </div>
-                    <div className="mt-20 max-w-[248px]">
+                    <div className="mt-6 max-w-[248px]">
                         <ul><MascotCard mascot={SAMPLE_MASCOT} landed={false} onEdit={() => undefined} /></ul>
                     </div>
-                    <ul className="mt-20 grid grid-cols-[repeat(auto-fill,minmax(248px,1fr))] gap-x-4 gap-y-20">
+                    <ul className="mt-6 border-t">
                         <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={null} onReview={() => undefined} />
                         <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={SAMPLE_MASCOT} onReview={() => undefined} />
                         <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, author: 'Ana', addCount: 12, publishedAt: 1 }} copy={null} onReview={() => undefined} />
@@ -241,17 +241,12 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Suggestions">
-                    <ul className="grid grid-cols-3 gap-3 pt-14">
-                        {SAMPLE_SUGGESTIONS.map((suggestion) => (
-                            <SuggestionCard
-                                key={suggestion.id}
-                                suggestion={suggestion}
-                                className="flex flex-col p-4 rounded-panel shadow-card text-left outline-none transition-colors bg-surface hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring"
-                                onUse={() => undefined}
-                                onDismiss={() => undefined}
-                            />
-                        ))}
-                    </ul>
+                    <div className="relative h-[420px] rounded-panel overflow-hidden">
+                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
+                        <div className="relative max-w-[752px] mx-auto">
+                            <BirdSuggestions suggestions={SAMPLE_SUGGESTIONS} onUse={() => undefined} onDismiss={() => undefined} />
+                        </div>
+                    </div>
                 </Section>
 
                 <Section title="Art blueberry">

@@ -1568,22 +1568,24 @@ test("Hide Berry swaps the character for a plain icon and neutral words", async 
   await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask a question" })).toBeVisible();
 });
 
-test("Berry sits on the new tab composer, then on the active tab", async () => {
+test("Berry stands on the new tab composer, inside it, then sits on the active tab", async () => {
   const seatGap = (selector: string) =>
     chrome.evaluate((selector) => {
       const berry = document.querySelector("[data-berry-companion]")!.getBoundingClientRect();
-      const perchElement = document.querySelector<HTMLElement>(selector)!;
-      const perch = perchElement.getBoundingClientRect();
+      const perch = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
       const seat = berry.top + berry.height * (46 / 64);
-      // On top of the composer, and on the tab's lower edge.
-      const edge = "berryHome" in perchElement.dataset ? perch.top : perch.bottom;
-      return { y: Math.abs(seat - edge), inside: berry.left >= perch.left && berry.right <= perch.right };
+      return { y: Math.abs(seat - perch.bottom), inside: berry.left >= perch.left && berry.right <= perch.right };
     }, selector);
   const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
 
-  await expect(sitting).toBeVisible();
-  await expect.poll(async () => (await seatGap("[data-berry-home]")).y).toBeLessThan(2);
-  expect((await seatGap("[data-berry-home]")).inside).toBe(true);
+  // It's a child of the composer's wrapper, so scrolling can't separate them, with its feet on the top edge.
+  const standing = chrome.locator("[data-berry-home] [data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
+  await expect(standing).toBeVisible();
+  const feetGap = await chrome.evaluate(() => {
+    const bird = document.querySelector("[data-berry-perched]")!.getBoundingClientRect();
+    return Math.abs(bird.top + bird.height * (113 / 120) - document.querySelector("[data-berry-home]")!.getBoundingClientRect().top);
+  });
+  expect(feetGap).toBeLessThan(1);
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
   await expect(sitting).toBeVisible();
@@ -1644,13 +1646,14 @@ test("right-clicking Berry opens its menu on the composer and active tab", async
   await app.evaluate(({ Menu }) => {
     Menu.prototype.popup = function () { Menu.setApplicationMenu(this); };
   });
-  const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
-
   for (const page of ["new-tab", "settings"] as const) {
     if (page === "settings") await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-    await expect(sitting).toBeVisible();
+    const bird = page === "new-tab"
+      ? chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" })
+      : chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
+    await expect(bird).toBeVisible();
     await app.evaluate(({ Menu }) => Menu.setApplicationMenu(null));
-    await sitting.click({ button: "right", timeout: 2000 });
+    await bird.click({ button: "right", timeout: 2000 });
     await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label)))
       .toEqual(["Keep Berry Still", "Hide Berry"]);
   }

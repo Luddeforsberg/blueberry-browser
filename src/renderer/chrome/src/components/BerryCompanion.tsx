@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Mood } from '@common/components/Mascot'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
@@ -11,8 +12,12 @@ const BASE_SIZE = 112
 // How far down the drawing Berry's seat is in the sitting pose.
 const SEAT = 46 / 64
 const HOME_SIZE = 112
+// How far down the standing drawing its feet reach, so the toes grip the composer's top edge.
+const STANDING_FEET = 113 / 120
+const FEET_X = 57 / 120
 // Between the composer's text, which starts on the left, and its controls on the right.
 const HOME_INSET = 250
+const HOME_RIGHT = HOME_INSET - HOME_SIZE / 2
 // In the slot the active tab keeps free for it, between its title and its close button.
 const TAB_SIZE = 32
 const TAB_INSET = 54
@@ -39,7 +44,7 @@ const targetFor = (element: HTMLElement): Target => {
     if ('berrySpot' in element.dataset) return { x: rect.left, y: rect.top, size: rect.width, mood: 'rest' }
 
     if ('berryHome' in element.dataset) {
-        return { x: rect.right - HOME_INSET - HOME_SIZE / 2, y: rect.top - HOME_SIZE * SEAT, size: HOME_SIZE, mood: 'sitting' }
+        return { x: rect.right - HOME_RIGHT - HOME_SIZE, y: rect.top - HOME_SIZE * STANDING_FEET, size: HOME_SIZE, mood: 'rest' }
     }
     // On the tab's lower edge with its legs over it, in both layouts, so it covers no title.
     return { x: rect.right - TAB_INSET - TAB_SIZE / 2, y: rect.bottom - 2 - TAB_SIZE * SEAT, size: TAB_SIZE, mood: 'sitting' }
@@ -90,6 +95,8 @@ export const BerryCompanion: React.FC = () => {
     const [flipped, setFlipped] = useState(false)
     const [visible, setVisible] = useState(false)
     const [atSpot, setAtSpot] = useState(false)
+    // The composer it's standing on. It's drawn inside that box, so the page can't scroll one without the other.
+    const [home, setHome] = useState<HTMLElement | null>(null)
 
     const activeId = activeTab?.id
     const canFly = useCallback(
@@ -113,6 +120,7 @@ export const BerryCompanion: React.FC = () => {
         if (!element) {
             landed.current = null
             setVisible(false)
+            setHome(null)
             return
         }
 
@@ -127,6 +135,7 @@ export const BerryCompanion: React.FC = () => {
             setMood(target.mood)
             setFlipped(false)
             setAtSpot('berrySpot' in element.dataset)
+            setHome('berryHome' in element.dataset ? element : null)
         }
 
         // The same place, moved: the page scrolled or a tab was dragged, so Berry just stays on it.
@@ -142,6 +151,7 @@ export const BerryCompanion: React.FC = () => {
         flying.current = true
         lastFlight.current = Date.now()
         setAtSpot(false)
+        setHome(null)
         setMood('fetching')
         setFlipped(target.x < from.target.x)
         node.style.transform = transformOf(target)
@@ -153,10 +163,12 @@ export const BerryCompanion: React.FC = () => {
             flight.current = null
             flying.current = false
             arrive()
-            // Settles onto the perch, with its weight going down through its seat.
-            body.current?.animate([{ transform: 'scale(1.04, 0.92)' }, { transform: 'scale(1, 1)' }], {
-                duration: 220,
-                easing: 'ease-out'
+            // Settles onto the perch, with its weight going down through its seat, once it's drawn there.
+            requestAnimationFrame(() => {
+                body.current?.animate([{ transform: 'scale(1.04, 0.92)' }, { transform: 'scale(1, 1)' }], {
+                    duration: 220,
+                    easing: 'ease-out'
+                })
             })
             update()
         }
@@ -198,18 +210,38 @@ export const BerryCompanion: React.FC = () => {
 
     if (!settings.showBerry) return null
 
-    return (
-        <div
-            ref={box}
-            data-berry-companion
-            className="fixed left-0 top-0 z-40 pointer-events-none origin-top-left"
-            style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible ? undefined : 'hidden' }}
-        >
-            <div ref={body} className={atSpot || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: `50% ${SEAT * 100}%` }}>
-                <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
-                    <Berry mood={mood} size={BASE_SIZE} mascot={mascot} />
-                </div>
+    const bird = (
+        <div ref={body} className={atSpot || home || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: home ? `${FEET_X * 100}% ${STANDING_FEET * 100}%` : `50% ${SEAT * 100}%` }}>
+            <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
+                <Berry mood={mood} size={home ? HOME_SIZE : BASE_SIZE} mascot={mascot} />
             </div>
         </div>
+    )
+
+    return (
+        <>
+            <div
+                ref={box}
+                data-berry-companion
+                className="fixed left-0 top-0 z-40 pointer-events-none origin-top-left"
+                style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible && !home ? undefined : 'hidden' }}
+            >
+                {!home && bird}
+            </div>
+            {home && createPortal(
+                <div
+                    data-berry-perched
+                    className="absolute pointer-events-none"
+                    style={{ right: HOME_RIGHT, top: -HOME_SIZE * STANDING_FEET, width: HOME_SIZE, height: HOME_SIZE }}
+                >
+                    {/* The shadow its feet leave on the box, cut off at the edge so it only falls on the box. */}
+                    <div aria-hidden className="absolute h-2 overflow-hidden" style={{ left: HOME_SIZE * FEET_X - 24, width: 48, top: HOME_SIZE * STANDING_FEET }}>
+                        <div className="absolute inset-x-1 -top-1 h-2 rounded-full bg-berry-pupil/30 blur-[2px]" />
+                    </div>
+                    {bird}
+                </div>,
+                home
+            )}
+        </>
     )
 }
