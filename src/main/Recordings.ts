@@ -39,6 +39,8 @@ export class Recordings {
   private error: string | null = null;
   private readonly watched = new Map<Tab, Watched>();
   private current: Tab | null = null;
+  // One of our own pages is in front, so whatever the last tab does now, the user isn't doing it.
+  private onOurPage = false;
   // The address bar was used on this tab, so the next page's query may be a search typed there.
   private fromAddressBar: string | null = null;
   private timer: NodeJS.Timeout | null = null;
@@ -72,6 +74,7 @@ export class Recordings {
     this.cut = null;
     this.error = null;
     this.current = null;
+    this.onOurPage = false;
     this.timer = setTimeout(() => void this.stop("time"), MAX_RECORDING_MS);
     const tab = this.deps.activeTab();
     this.sync();
@@ -86,6 +89,7 @@ export class Recordings {
   sync(): void {
     if (!this.isRecording || this.stopping) return;
     const tab = this.deps.activeTab();
+    this.onOurPage = !tab;
     if (!tab || tab === this.current) return;
     this.current = tab;
     if (!this.watched.has(tab)) this.watch(tab);
@@ -133,7 +137,7 @@ export class Recordings {
   // The only tab that counts is the one in front, with the user on it. Berry's own input is real input too, so nothing
   // on a tab a job is using can count, and neither does anything from a tab held for a sign-in.
   private counts(tab: Tab): boolean {
-    return this.isRecording && tab === this.current && !tab.berryWorking && !tab.heldForUser;
+    return this.isRecording && tab === this.current && !this.onOurPage && !tab.berryWorking && !tab.heldForUser;
   }
 
   // Asks the page, which answers whenever the user next does something. The next page ends this by never answering.
@@ -159,7 +163,7 @@ export class Recordings {
     if (!this.counts(tab)) return;
     const address = trailAddress(tab.url);
     if (!address) return;
-    const frames = () => tab.webContents.mainFrame.framesInSubtree.map(({ url }) => trailAddress(url)?.place.split("/")[0]);
+    const frames = () => tab.webContents.mainFrame.framesInSubtree.map(({ url }) => trailAddress(url)?.host);
     notes.forEach((note) => this.trail.note(note, address.site, Date.now(), (host) => frames().includes(host.replace(/^www\./, ""))));
     this.publish();
     this.limitReached();

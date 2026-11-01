@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
-import { askForRecordedValue, changeRecordedValue, toDraft, type RoutineFormValues } from '../routinesView'
+import { applyRecordedValue, askForRecordedValue, changeRecordedValue, toDraft, type RoutineFormValues } from '../routinesView'
 import { ChatError } from './ChatMessage'
 import { MascotPerch } from './MascotPerch'
 import { BERRY_ID } from '@shared/mascots'
@@ -97,6 +97,7 @@ export const RoutineForm: React.FC<{
                                     <input
                                         value={row.value}
                                         onChange={(event) => onChange(changeRecordedValue(values, at, event.target.value))}
+                                        onBlur={() => onChange(applyRecordedValue(values, at))}
                                         className={INPUT}
                                     />
                                 </label>

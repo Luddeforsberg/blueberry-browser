@@ -20,6 +20,7 @@ const PAGES: Record<string, string> = {
     <form><input type="password" aria-label="Password"></form>
     <input name="cardnumber" aria-label="Card number">
     <input aria-label="Plain box">
+    <input type="password" id="pin" aria-label="Your PIN"><button onclick="document.getElementById('pin').type='text'">Show it</button>
     <select autocomplete="cc-exp-month" aria-label="Expiry month"><option>Month-01</option><option>Month-12</option></select>
     <iframe id="same" src="/pay" width="300" height="80"></iframe>
     <iframe id="other" src="http://localhost:PORT/pay" width="300" height="80"></iframe>`,
@@ -72,6 +73,10 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await page.keyboard.type(PASSWORD);
     await page.getByRole("textbox", { name: "Card number" }).click();
     await page.keyboard.type(CARD);
+    // Shown before it was ever touched, and still what it was.
+    await page.getByRole("button", { name: "Show it" }).click();
+    await page.getByRole("textbox", { name: "Your PIN" }).click();
+    await page.keyboard.type("revealed-pin");
     await page.getByRole("combobox", { name: "Expiry month" }).focus();
     // Typing to choose, as a click or an arrow key opens the Mac's own menu.
     await page.keyboard.type("Month-12");
@@ -91,6 +96,19 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.recording.state())).steps.at(-1)?.text).toBe("Opened 127.0.0.1 in a new tab");
     await chrome.evaluate((id) => window.chromeAPI.browser.closeTab(id), other);
 
+    // While the user is on one of our own pages, the tab behind isn't theirs to be watched on.
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+    await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.some(({ page }) => page === "settings")))).toBe(true);
+    await page.waitForTimeout(200);
+    await page.evaluate(() => history.pushState({}, "", "/product/1/elsewhere"));
+    await page.waitForTimeout(200);
+    await chrome.evaluate(async () => {
+      const { browser } = window.chromeAPI;
+      const tabs = await browser.getTabs();
+      await browser.switchTab(tabs.find(({ url }) => url.endsWith("/elsewhere"))!.id);
+      await browser.closeTab(tabs.find(({ page }) => page === "settings")!.id);
+    });
+
     // Left in the field when Stop is pressed, and not forgotten.
     await page.getByRole("textbox", { name: "Plain box" }).click();
     await page.keyboard.type("left over");
@@ -108,8 +126,8 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     const notes = chrome.locator("ol li");
     await expect(notes.filter({ hasText: "Searched for “usb-c cable”" })).toHaveCount(1);
     await expect(notes.filter({ hasText: "Clicked Add to cart" })).toHaveCount(1);
-    await expect(notes.filter({ hasText: "Typed in the password field" })).toHaveCount(1);
-    await expect(notes.filter({ hasText: "Typed in the card field" })).toHaveCount(1);
+    await expect(notes.filter({ hasText: "Typed in the password field" })).toHaveCount(2);
+    await expect(notes.filter({ hasText: "Typed in the card field" })).toHaveCount(2);
     await expect(notes.filter({ hasText: "left over" })).toHaveCount(1);
     await expect(notes.filter({ hasText: /Clicked Cable/ })).toHaveCount(1);
     await expect(notes.filter({ hasText: "Fake me" })).toHaveCount(0);
@@ -122,6 +140,8 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     expect(said).not.toContain(PASSWORD);
     expect(said).not.toContain(CARD);
     expect(said).not.toContain("Month-12");
+    expect(said).not.toContain("revealed-pin");
+    expect(said).not.toContain("elsewhere");
     expect(said).not.toContain("said in the frame");
     expect(said).not.toContain("private");
 
@@ -154,6 +174,7 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
 
     // Changing what might change changes the instructions.
     await chrome.getByRole("textbox", { name: "Search term" }).fill("hdmi cable");
+    await chrome.getByRole("textbox", { name: "Search term" }).blur();
     await expect(chrome.getByRole("textbox", { name: "What should it do?" })).toHaveValue(/hdmi cable/);
 
     // The run goes the normal way, and the tools stop it going off the sites it was shown.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftFromReply, MAX_STEPS, searchIn, siteOfHost, sitesOf, Trail, trailAddress, trailForModel } from "./recordingTrail";
+import { draftFromReply, MAX_STEPS, plainDraft, searchIn, siteOfHost, sitesOf, Trail, trailAddress, trailForModel } from "./recordingTrail";
 
 const trail = (site = "shop.example") => {
   const made = new Trail();
@@ -14,7 +14,7 @@ const trail = (site = "shop.example") => {
 
 describe("addresses", () => {
   it("loses its query, fragment, login and tokens", () => {
-    expect(trailAddress("https://me:pw@www.shop.example/a/b/?token=x#y")).toEqual({ site: "shop.example", place: "shop.example/a/b" });
+    expect(trailAddress("https://me:pw@www.shop.example/a/b/?token=x#y")).toEqual({ site: "shop.example", host: "shop.example", place: "shop.example/a/b" });
     expect(trailAddress("https://shop.example/reset/a1b2c3d4e5f6a1b2c3d4e5f6a1b2")?.place).toBe("shop.example/reset/…");
     expect(trailAddress("file:///etc/passwd")).toBeNull();
     expect(trailAddress("not an address")).toBeNull();
@@ -25,6 +25,13 @@ describe("addresses", () => {
     expect(siteOfHost("cdn.webhallen.com")).toBe("webhallen.com");
     expect(siteOfHost("127.0.0.1")).toBe("127.0.0.1");
     expect(siteOfHost("localhost")).toBe("localhost");
+  });
+
+  it("keeps a port, and a scheme that isn't https, so the routine can get back there", () => {
+    expect(trailAddress("http://localhost:3000/shop?x=1")?.place).toBe("http://localhost:3000/shop");
+    expect(plainDraft([{ id: "1", kind: "went", text: "Went to localhost", site: "localhost", path: "http://localhost:3000/shop", label: "", value: "" }]).instructions).toContain("Start at http://localhost:3000/shop");
+    expect(trailAddress("https://shop.example:8443/a")?.place).toBe("shop.example:8443/a");
+    expect(plainDraft([{ id: "1", kind: "went", text: "Went to", site: "shop.example", path: "shop.example/a", label: "", value: "" }]).instructions).toContain("https://shop.example/a");
   });
 
   it("only keeps a query that's plainly what was typed", () => {
@@ -48,6 +55,13 @@ describe("the trail", () => {
     note({ type: "click", label: "Add to cart", role: "button" });
     expect(texts()).toEqual(["Went to shop.example", "Searched for “usb-c cable” on shop.example", "Clicked Add to cart"]);
     expect(JSON.stringify(made.steps)).not.toContain("sid=secret");
+  });
+
+  it("tells the model when Enter sent what was typed", () => {
+    const { note, made } = trail();
+    note({ type: "typed", label: "Order number", value: "123" });
+    note({ type: "enter", label: "Order number" });
+    expect(trailForModel(made.steps).steps[0].did).toBe("typed and pressed Enter");
   });
 
   it("keeps the site a click led to, as the routine will need it", () => {

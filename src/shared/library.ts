@@ -302,6 +302,8 @@ export interface TrailStep {
   label: string;
   // What the user typed or chose. Never set for a secret field.
   value: string;
+  // Typed, and then sent with Enter.
+  submitted?: boolean;
 }
 
 export type RecordingStatus = "idle" | "recording" | "review" | "drafting";

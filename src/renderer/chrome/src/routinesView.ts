@@ -22,6 +22,8 @@ export interface RoutineFormValues {
 
 export interface RecordedChangeValue extends RecordedChange {
     ask: boolean
+    // What the instructions say at the moment, which `value` differs from while it's being typed.
+    applied: string
 }
 
 export type RoutinesView =
@@ -70,31 +72,43 @@ export const recordedForm = ({ name, instructions, sites, changes }: RecordedDra
     ...blankForm(name, instructions),
     kind: 'manual',
     sites: sites.join(', '),
-    recorded: changes.map((change) => ({ ...change, ask: false }))
+    recorded: changes.map((change) => ({ ...change, ask: false, applied: change.value }))
 })
 
-const askLine = ({ label, value }: RecordedChange) => `Before you start, ask me for the ${label.toLowerCase()} to use. Last time it was ${value}.`
+const askLine = (label: string, value: string) => `Before you start, ask me for the ${label.toLowerCase()} to use. Last time it was ${value}.`
 
-// Keeps the instructions saying what the row says. A value the user has since reworded there is left to them.
-export const changeRecordedValue = (values: RoutineFormValues, at: number, next: string): RoutineFormValues => {
+// Only as a whole value, so changing a 3 leaves 13:30 alone, and taken as written whatever's in it.
+const swapValue = (text: string, from: string, to: string) =>
+    text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu'), () => to)
+
+// While it's being typed, only the row changes. A half-typed value, or none, would wreck the instructions.
+export const changeRecordedValue = (values: RoutineFormValues, at: number, next: string): RoutineFormValues => ({
+    ...values,
+    recorded: values.recorded?.map((row, index) => (index === at ? { ...row, value: next } : row))
+})
+
+// Once it's finished with, the instructions come to say what the row says. Left empty, the row goes back to what they say.
+export const applyRecordedValue = (values: RoutineFormValues, at: number): RoutineFormValues => {
     const rows = values.recorded ?? []
     const row = rows[at]
-    const line = askLine(row)
-    const changed = { ...row, value: next }
+    const next = row.value.trim()
+    const settled = next ? { ...row, value: next, applied: next } : { ...row, value: row.applied }
     return {
         ...values,
-        instructions: values.instructions.replace(line, askLine(changed)).split(row.value).join(next),
-        recorded: rows.map((other, index) => (index === at ? changed : other))
+        instructions: next && next !== row.applied
+            ? swapValue(values.instructions.replace(askLine(row.label, row.applied), () => askLine(row.label, next)), row.applied, next)
+            : values.instructions,
+        recorded: rows.map((other, index) => (index === at ? settled : other))
     }
 }
 
 // A question goes through the same `ask_user` as any other, and it waits on Needs you.
 export const askForRecordedValue = (values: RoutineFormValues, at: number, ask: boolean): RoutineFormValues => {
     const rows = values.recorded ?? []
-    const line = askLine(rows[at])
+    const line = askLine(rows[at].label, rows[at].applied)
     return {
         ...values,
-        instructions: ask ? `${line}\n\n${values.instructions}` : values.instructions.replace(`${line}\n\n`, ''),
+        instructions: ask ? `${line}\n\n${values.instructions}` : values.instructions.replace(`${line}\n\n`, () => ''),
         recorded: rows.map((other, index) => (index === at ? { ...other, ask } : other))
     }
 }
@@ -102,7 +116,9 @@ export const askForRecordedValue = (values: RoutineFormValues, at: number, ask: 
 export const suggestedForm = ({ name, instructions, mascotId, schedule }: RoutineDraft, suggestionId: string): RoutineFormValues =>
     withSchedule({ ...blankForm(name, instructions, mascotId ?? null), suggestionId }, schedule)
 
-export const toDraft = ({ name, instructions, kind, time, date, days, day, mascotId, sites }: RoutineFormValues): RoutineDraft => {
+export const toDraft = (form: RoutineFormValues): RoutineDraft => {
+    // Saving with Enter leaves a field that hasn't been finished with.
+    const { name, instructions, kind, time, date, days, day, mascotId, sites } = (form.recorded ?? []).reduce((values, _, at) => applyRecordedValue(values, at), form)
     const schedule = (): RoutineSchedule => {
         switch (kind) {
             case 'manual':

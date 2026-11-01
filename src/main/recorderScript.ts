@@ -91,7 +91,20 @@ const SCRIPT = `
     if (event.isTrusted) listen(event);
   };
 
+  // A field that stops being a password is still one, even if nobody had touched it yet.
+  const rememberPasswords = (root) => {
+    root.querySelectorAll("input[type=password]").forEach((el) => secrets.set(el, "password"));
+    const seeing = new MutationObserver((changes) => {
+      changes.forEach(({ target, oldValue }) => {
+        if (oldValue?.toLowerCase() === "password") secrets.set(target, "password");
+      });
+    });
+    seeing.observe(root, { subtree: true, attributes: true, attributeFilter: ["type"], attributeOldValue: true });
+    stopping.signal.addEventListener("abort", () => seeing.disconnect());
+  };
+
   const watch = (where) => {
+    rememberPasswords(where.document);
     on(where, "focusin", trusted((event) => {
       const el = realTarget(event);
       if (el && holdsText(el)) secretKind(el);

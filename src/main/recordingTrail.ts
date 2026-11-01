@@ -44,21 +44,24 @@ export const siteOfHost = (hostname: string): string => {
 
 export interface TrailAddress {
   site: string;
-  // The host's own name with its path, and no query, fragment or login.
+  // The host's own name, without its port, for telling which frame is which.
+  host: string;
+  // The address with no query, fragment or login, and a scheme only if it isn't https.
   place: string;
 }
 
 // Null for anything that isn't a web page.
 export const trailAddress = (url: string): TrailAddress | null => {
   try {
-    const { protocol, hostname, pathname } = new URL(url);
+    const { protocol, hostname, host, pathname } = new URL(url);
     if (protocol !== "http:" && protocol !== "https:") return null;
     const path = pathname
       .split("/")
       .map((segment) => (TOKEN_SEGMENT.test(segment) ? "…" : segment))
       .join("/")
       .replace(/\/$/, "");
-    return { site: siteOfHost(hostname), place: clean(`${hostname.replace(/^www\./, "")}${path}`, MAX_PATH) };
+    const scheme = protocol === "http:" ? "http://" : "";
+    return { site: siteOfHost(hostname), host: hostname.replace(/^www\./, ""), place: clean(`${scheme}${host.replace(/^www\./, "")}${path}`, MAX_PATH) };
   } catch {
     return null;
   }
@@ -164,6 +167,7 @@ export class Trail {
     const last = this.list.at(-1);
     if (last?.kind === "typed" && last.label === named) {
       last.text = `${last.text} and pressed Enter`;
+      last.submitted = true;
       return;
     }
     this.push("pressed", named ? `Pressed Enter in ${named}` : "Pressed Enter", site, { label: named });
@@ -224,7 +228,8 @@ export const sitesOf = (steps: readonly TrailStep[]): string[] => [...new Set(st
 
 const startOf = (steps: readonly TrailStep[]): string | null => {
   const first = steps.find(({ path }) => path);
-  return first ? `https://${first.path}` : null;
+  if (!first) return null;
+  return first.path.startsWith("http://") ? first.path : `https://${first.path}`;
 };
 
 export const DRAFT_PROMPT = `You turn notes on what someone did once in a web browser into instructions an assistant can follow to do the same job again by itself, in a browser, in tabs of its own.
@@ -247,8 +252,8 @@ const NOT_A_SITE = /\.(js|ts|py|md|txt|pdf|csv|html|json)$/i;
 // Exactly what leaves this computer.
 export const trailForModel = (steps: readonly TrailStep[]) => ({
   sites: sitesOf(steps),
-  steps: steps.map(({ kind, site, path, label, value, text }) => ({
-    did: kind === "secret" ? `typed in a secret field: ${text.replace("Typed in the ", "")}` : kind,
+  steps: steps.map(({ kind, site, path, label, value, text, submitted }) => ({
+    did: kind === "secret" ? `typed in a secret field: ${text.replace("Typed in the ", "")}` : submitted ? "typed and pressed Enter" : kind,
     site,
     ...(path ? { at: path } : {}),
     ...(label ? { page_label: label } : {}),
