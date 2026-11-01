@@ -85,6 +85,15 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     id = server.rows[0].id;
     await expect(chrome.getByText(`https://gallery.example/m/?id=${id}`)).toBeVisible();
 
+    // Words typed and then cancelled never show as if they were public.
+    const looks = chrome.getByRole("region", { name: "How it looks" });
+    await expect(looks).toContainText("By Ana");
+    await chrome.getByRole("button", { name: "Edit the listing" }).click();
+    await authorName.fill("Not public");
+    await chrome.getByRole("button", { name: "Cancel" }).click();
+    await expect(looks).toContainText("By Ana");
+    await expect(looks).not.toContainText("Not public");
+
     // Only the listed fields left, and neither the password nor the session went anywhere but sign-in.
     const posted = server.received.find(({ method, path }) => method === "POST" && path.startsWith("/rest/v1/mascots"));
     expect(Object.keys(JSON.parse(posted?.body ?? "{}")).sort()).toEqual(["accessory", "author_name", "category", "description", "example_answer", "example_prompt", "instructions", "name", "palette", "sites", "tools"]);

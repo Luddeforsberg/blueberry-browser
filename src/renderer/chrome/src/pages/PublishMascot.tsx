@@ -74,6 +74,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     // Once it's public this page is about sharing it, and the form is one press away.
     const [editing, setEditing] = useState(false)
     const [addCount, setAddCount] = useState(0)
+    // What's public now, which the form's unsaved words aren't.
+    const [listed, setListed] = useState<PublishChoices | null>(null)
     const { showBerry } = useShell().settings
     const latest = useRef(values)
     latest.current = values
@@ -121,6 +123,21 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [values.filledIn, account.status, loadTries])
 
+    useEffect(() => {
+        if (account.status !== 'signed-in' || !mascot?.publishedId) return
+        let left = false
+        void window.chromeAPI.mascots.published().then((mine) => {
+            const current = mine?.find(({ id }) => id === mascot.publishedId)
+            if (left || !current) return
+            setListed({ author: current.author, description: current.description, category: current.category, example: current.example })
+            if (current.link) setLink(current.link)
+            setAddCount(current.addCount)
+        })
+        return () => {
+            left = true
+        }
+    }, [account.status, mascot?.publishedId])
+
     const hasExample = values.exampleChatId !== null
     const typed: PublishChoices = {
         author: values.author,
@@ -151,6 +168,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
         setError(result.ok ? null : result.error)
         if (result.ok) {
             setLink(result.link)
+            setListed(parsed.choices)
             setEditing(false)
             document.getElementById('publish-top')?.scrollIntoView()
         }
@@ -162,6 +180,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
         const result = await window.chromeAPI.mascots.unpublish(mascot.publishedId)
         if (result.ok) {
             setLink(null)
+            setListed(null)
             setEditing(false)
         }
         else if (result.error) setError(result.error)
@@ -205,7 +224,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     )}
                 </section>
 
-                {values.filledIn && (
+                {listed && (
                     <section aria-label="How it looks" className="pt-5">
                         <h2 className="text-14 font-semibold">How it looks in the Gallery</h2>
                         <ul aria-label="Preview of the Gallery" className="mt-1 border-b-0 [&>li:last-child]:border-b">
@@ -213,10 +232,10 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                                 entry={{
                                     id: mascot.publishedId,
                                     draft: mascot,
-                                    author: choices.author,
-                                    description: choices.description,
-                                    category: choices.category,
-                                    example: choices.example ?? undefined,
+                                    author: listed.author,
+                                    description: listed.description,
+                                    category: listed.category,
+                                    example: listed.example ?? undefined,
                                     addCount
                                 }}
                                 copy={null}
