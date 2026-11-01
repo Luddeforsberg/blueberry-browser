@@ -43,12 +43,12 @@ export const confirmDeleteRoutine = async (window: BaseWindow, name: string): Pr
   return response === 0;
 };
 
-export const confirmDeleteMascot = async (window: BaseWindow, name: string, routines: number): Promise<boolean> => {
+export const confirmDeleteMascot = async (window: BaseWindow, name: string, routines: number, published = false): Promise<boolean> => {
   const paused = routines === 0 ? "" : ` ${routines === 1 ? "The routine it runs pauses" : `The ${routines} routines it runs pause`}, and stay${routines === 1 ? "s" : ""} limited to what it could do.`;
   const { response } = await dialog.showMessageBox(window, {
     type: "warning",
     message: `Delete “${name}”?`,
-    detail: `It leaves your flock. Chats it had keep it, with the same limits.${paused}`,
+    detail: `It leaves your flock. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,
     buttons: ["Delete", "Cancel"],
     defaultId: 1,
     cancelId: 1,

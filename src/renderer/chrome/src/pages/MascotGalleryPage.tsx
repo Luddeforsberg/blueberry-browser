@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, Lock, LockOpen, Search } from 'lucide-react'
-import type { GalleryMascot, MascotProfile } from '@shared/library'
+import type { GalleryListing, GalleryMascot, MascotExample, MascotProfile } from '@shared/library'
 import { MAX_MASCOT_NAME, permissionsInWords } from '@shared/mascots'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
@@ -8,7 +8,8 @@ import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { filterGallery, freeName, GALLERY_VIEW_EVENT, galleryView, setGalleryView, type GalleryView } from '../galleryView'
+import { CopyLink } from '../components/CopyLink'
+import { filterGallery, freeName, GALLERY_VIEW_EVENT, galleryView, setGalleryView, sortGallery, type GallerySort, type GalleryView } from '../galleryView'
 
 const asMascot = (entry: GalleryMascot): MascotProfile => ({ ...entry.draft, id: entry.id, deletedAt: null })
 
@@ -30,6 +31,16 @@ export const Permissions: React.FC<{ draft: GalleryMascot['draft']; large?: bool
             )
         })}
     </ul>
+)
+
+// What strangers wrote, so it's plain text wherever it shows. Markdown could fetch an image or dress up a link.
+export const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) => (
+    <>
+        <h3 className="text-12 text-muted-foreground">I asked this</h3>
+        <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.prompt}</p>
+        <h3 className="mt-4 text-12 text-muted-foreground">And here’s what it gave me</h3>
+        <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.answer}</p>
+    </>
 )
 
 const InFlock: React.FC = () => (
@@ -56,8 +67,11 @@ export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile |
                 <Berry mood={near ? 'curious' : 'sitting'} size={96} mascot={asMascot(entry)} />
             </div>
             <h2 className="text-14 font-semibold text-center [overflow-wrap:anywhere]">{name}</h2>
-            <p className="text-12 text-muted-foreground text-center">By {entry.author}</p>
-            <p className="mt-2 text-13 text-center">{entry.description}</p>
+            <p className="text-12 text-muted-foreground text-center [overflow-wrap:anywhere]">
+                By {entry.author}
+                {entry.addCount !== undefined && <span className="tabular-nums"> · {entry.addCount === 1 ? '1 add' : `${entry.addCount} adds`}</span>}
+            </p>
+            <p className="mt-2 text-13 text-center [overflow-wrap:anywhere]">{entry.description}</p>
             <div className="mt-3 p-3 rounded-card bg-card">
                 <Permissions draft={entry.draft} />
             </div>
@@ -105,7 +119,10 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
                     Gallery
                 </Button>
                 <h1 className="mt-3 text-20 font-semibold [overflow-wrap:anywhere]">{copy ? `${copy.name} is in your flock` : `Add ${name} to your flock?`}</h1>
-                <p className="mt-1 text-14 text-muted-foreground">{entry.description} By {entry.author}.</p>
+                <p className="mt-1 text-14 text-muted-foreground [overflow-wrap:anywhere]">{entry.description} By {entry.author}.</p>
+                {entry.publishedAt !== undefined && (
+                    <p className="mt-1 text-14 text-muted-foreground">Someone using Blueberry wrote this, and we haven’t checked it, so read what it’s told.</p>
+                )}
 
                 <section className="mt-6 p-4 rounded-panel bg-surface shadow-raised">
                     <h2 className="text-14 font-semibold">What it’s allowed to do</h2>
@@ -120,6 +137,19 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
                     <h2 className="text-14 font-semibold">What it’s told, word for word</h2>
                     <p className="mt-2 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{entry.draft.instructions}</p>
                 </section>
+
+                {entry.example && (
+                    <section aria-label="Example" className="mt-4 p-4 rounded-panel bg-surface shadow-raised">
+                        <ExampleText example={entry.example} />
+                    </section>
+                )}
+
+                {entry.link && (
+                    <p className="mt-4 flex flex-wrap items-center gap-2 text-13 text-muted-foreground">
+                        <span className="[overflow-wrap:anywhere]">{entry.link}</span>
+                        <CopyLink link={entry.link} />
+                    </p>
+                )}
 
                 {clash && (
                     <section className="mt-4">
@@ -170,7 +200,10 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
 export const MascotGalleryPage: React.FC = () => {
     const { flock } = useFlock()
     const [view, setViewState] = useState<GalleryView>(galleryView)
-    const [entries, setEntries] = useState<GalleryMascot[] | null>(null)
+    const [listing, setListing] = useState<GalleryListing | null>(null)
+    const entries = listing?.entries ?? null
+    // Publishing or unpublishing changes this, and that changes what the page should show.
+    const ownPublished = flock.map((mascot) => mascot.publishedId ?? '').join()
 
     useEffect(() => {
         const follow = () => setViewState(galleryView())
@@ -178,13 +211,15 @@ export const MascotGalleryPage: React.FC = () => {
         return () => window.removeEventListener(GALLERY_VIEW_EVENT, follow)
     }, [])
 
-    useEffect(() => {
-        window.chromeAPI.mascots.gallery().then(setEntries).catch(() => setEntries([]))
+    const load = useCallback(() => {
+        window.chromeAPI.mascots.gallery().then(setListing).catch(() => setListing({ entries: [], status: 'unreachable' }))
     }, [])
+    useEffect(load, [load, ownPublished])
 
     const categories = useMemo(() => [...new Set((entries ?? []).map((entry) => entry.category))], [entries])
-    const shown = useMemo(() => filterGallery(entries ?? [], view.query, view.category), [entries, view.query, view.category])
-    const copyOf = (entry: GalleryMascot) => flock.find((mascot) => mascot.galleryId === entry.id) ?? null
+    const shown = useMemo(() => sortGallery(filterGallery(entries ?? [], view.query, view.category), view.sort), [entries, view.query, view.category, view.sort])
+    // Your own published one counts as in your flock, so it's never offered back to you.
+    const copyOf = (entry: GalleryMascot) => flock.find((mascot) => mascot.galleryId === entry.id || mascot.publishedId === entry.id) ?? null
     const reviewing = entries?.find((entry) => entry.id === view.reviewing)
 
     return (
@@ -197,7 +232,7 @@ export const MascotGalleryPage: React.FC = () => {
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <h1 className="text-20 font-semibold">Gallery</h1>
-                                <p className="mt-1 text-14 text-muted-foreground">Mascots made for one job. Every card says exactly what it can and can’t do, and adding one gives you your own copy.</p>
+                                <p className="mt-1 text-14 text-muted-foreground">Mascots made for one job, some by people you don’t know. Every card says exactly what it can and can’t do, and adding one gives you your own copy.</p>
                             </div>
                             <Button variant="outline" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Your flock</Button>
                         </div>
@@ -213,6 +248,14 @@ export const MascotGalleryPage: React.FC = () => {
                                     className="w-full h-9 pl-9 pr-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
                             </div>
+                            {listing?.status === 'live' && (
+                                <Choice<GallerySort>
+                                    label="Sort"
+                                    value={view.sort}
+                                    onChange={(sort) => setGalleryView({ sort })}
+                                    options={[{ value: 'newest', label: 'Newest' }, { value: 'added', label: 'Most added' }]}
+                                />
+                            )}
                             {categories.length > 0 && (
                                 <div className="max-w-full overflow-x-auto rounded-full">
                                     <Choice
@@ -224,6 +267,12 @@ export const MascotGalleryPage: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                        {listing?.status === 'unreachable' && (
+                            <p role="status" className="mt-4 flex flex-wrap items-center gap-3 text-14 text-warning">
+                                Couldn’t reach the Gallery’s server, so only the mascots that come with Blueberry are showing.
+                                <Button variant="outline" size="sm" onClick={load}>Try again</Button>
+                            </p>
+                        )}
                         {entries && shown.length === 0 ? (
                             <p className="mt-16 text-14 text-muted-foreground text-center">
                                 {entries.length === 0 ? 'The Gallery couldn’t be loaded.' : 'No mascot matches that. Try a site or another category.'}

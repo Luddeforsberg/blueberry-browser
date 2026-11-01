@@ -14,7 +14,9 @@ import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
 import { confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
-import { fetchMascotCatalog } from "./mascotCatalog";
+import { Account } from "./Account";
+import { Gallery } from "./Gallery";
+import { GalleryServer, serverConfig } from "./galleryServer";
 import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
@@ -47,7 +49,7 @@ import type {
   ThemeState,
   Visit,
 } from "../shared/ipc";
-import type { ChatThread, LibrarySnapshot, NeedsYouItem } from "../shared/library";
+import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 export type BrowserTab = Tab | InternalTab;
@@ -103,6 +105,8 @@ export class Window {
   // What Needs you held last time, so only something new gets a notification.
   private knownWaiting = new Set<string>();
   readonly telegram: TelegramChannel;
+  readonly account: Account;
+  readonly gallery: Gallery;
   private readonly phone: Phone;
   readonly chats: Chats;
   readonly routines: Routines;
@@ -175,6 +179,15 @@ export class Window {
 
     const onDownload = (_: unknown, __: unknown, contents: WebContents) => this.closeTabLeftEmpty(contents);
     session.defaultSession.on("will-download", onDownload);
+
+    const config = serverConfig(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, app.isPackaged);
+    const server = config && new GalleryServer(config);
+    this.account = new Account(server, join(app.getPath("userData"), "account.json"), () => {
+      sendToRenderer(this.chrome.view.webContents, "account:updated", this.account.state);
+    });
+    this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
+      this.broadcast("library:updated", this.librarySnapshot);
+    });
 
     this.telegram = new TelegramChannel(join(app.getPath("userData"), "phone.json"), () => {
       sendToRenderer(this.chrome.view.webContents, "phone:updated", this.telegram.state);
@@ -847,11 +860,26 @@ export class Window {
   }
 
   async addFromGallery(galleryId: string, name: string | null): Promise<MascotSaveResult> {
-    const entry = (await fetchMascotCatalog()).find(({ id }) => id === galleryId);
+    const entry = this.gallery.entry(galleryId);
     if (!entry) return { ok: false, error: "This mascot is no longer in the Gallery." };
     const result = this.mascotStore.addFromGallery(galleryId, name === null ? entry.draft : { ...entry.draft, name });
-    if (result.ok) this.broadcast("library:updated", this.librarySnapshot);
+    if (result.ok) {
+      this.gallery.countAdd(galleryId);
+      this.broadcast("library:updated", this.librarySnapshot);
+    }
     return result;
+  }
+
+  async confirmUnpublish(id: string): Promise<PublishResult> {
+    const { response } = await dialog.showMessageBox(this._baseWindow, {
+      type: "warning",
+      message: "Take this mascot out of the Gallery?",
+      detail: "Its public page and its count go. Your own mascot stays, and so do copies other people have already added, because nothing here can reach them.",
+      buttons: ["Unpublish", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    return response === 0 ? this.gallery.unpublish(id) : { ok: false, error: "" };
   }
 
   // Its routines pause rather than move to Berry, which could do more than the user set them up to.
@@ -859,7 +887,7 @@ export class Window {
     const mascot = this.mascotStore.find(id);
     if (!mascot || mascot.id === BERRY.id || mascot.deletedAt !== null) return false;
     const runs = this.routines.list().filter((routine) => routine.mascotId === id);
-    if (!(await confirmDeleteMascot(this._baseWindow, mascot.name, runs.length))) return false;
+    if (!(await confirmDeleteMascot(this._baseWindow, mascot.name, runs.length, Boolean(mascot.publishedId)))) return false;
     if (!this.mascotStore.delete(id)) return false;
     runs.forEach((routine) => this.routines.setPaused(routine.id, true));
     this.broadcast("library:updated", this.librarySnapshot);

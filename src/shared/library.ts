@@ -169,6 +169,14 @@ export interface MascotProfile extends MascotDraft {
   deletedAt: number | null;
   // The Gallery entry this is a copy of, only so the Gallery can say it's added. The copy never reads from the entry.
   galleryId?: string;
+  // Its row on the Gallery's server, if the user published it. Saving here doesn't change that row.
+  publishedId?: string;
+}
+
+// "I asked this, and here's what it gave me". Plain text everywhere it shows, never rendered as markdown.
+export interface MascotExample {
+  prompt: string;
+  answer: string;
 }
 
 // One card in the Gallery. Add makes a copy of `draft`, and only `draft`, through the same checks as a hand-made mascot.
@@ -179,6 +187,40 @@ export interface GalleryMascot {
   // One line on what it does. Its limits come from `draft`, in `permissionsInWords`.
   description: string;
   draft: MascotDraft;
+  // Starters only have one from a real run. Left out, there's none to show.
+  example?: MascotExample | null;
+  // These are for what people published. A starter has no server row, so it has no count to show.
+  addCount?: number;
+  publishedAt?: number;
+  // Its public page, once the site's address is set.
+  link?: string | null;
+}
+
+// What the Gallery page shows, and whether the published ones are among it. "starters" means no server is set up, so
+// there's nothing to report. "unreachable" means one is, and it couldn't be read.
+export interface GalleryListing {
+  entries: GalleryMascot[];
+  status: "starters" | "live" | "unreachable";
+}
+
+// What the user chooses when publishing. The rest of what goes public is read from the mascot in main.
+export interface PublishChoices {
+  author: string;
+  description: string;
+  category: string;
+  example: MascotExample | null;
+}
+
+export type PublishResult = { ok: true; id: string; link: string | null } | { ok: false; error: string };
+
+// One of the user's own, for Settings and for publishing again.
+export interface PublishedMascot extends PublishChoices {
+  id: string;
+  name: string;
+  addCount: number;
+  link: string | null;
+  // We took it out of the Gallery, from the dashboard.
+  hidden: boolean;
 }
 
 export type SuggestionKind = "prompt" | "routine" | "mascot";

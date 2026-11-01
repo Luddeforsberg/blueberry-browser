@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchMascotCatalog, parseGalleryMascot } from "./mascotCatalog";
+import { parseGalleryMascot, starterMascots } from "./mascotCatalog";
 import { MAX_MASCOT_NAME, parseMascotDraft } from "../shared/mascots";
 
 const entry = {
@@ -11,8 +11,8 @@ const entry = {
 };
 
 describe("the mascot catalog", () => {
-  it("has starters that pass a mascot's own checks unchanged, with one limited to reading and one that can go anywhere", async () => {
-    const catalog = await fetchMascotCatalog();
+  it("has starters that pass a mascot's own checks unchanged, with one limited to reading and one that can go anywhere", () => {
+    const catalog = starterMascots();
     expect(catalog.length).toBeGreaterThanOrEqual(10);
     expect(new Set(catalog.map(({ id }) => id)).size).toBe(catalog.length);
     expect(new Set(catalog.map(({ draft }) => draft.name.toLowerCase())).size).toBe(catalog.length);

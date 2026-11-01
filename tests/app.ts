@@ -71,6 +71,9 @@ export async function launchApp(
     LLM_TITLE_MODEL: "",
     OPENAI_API_KEY: "",
     ANTHROPIC_API_KEY: "",
+    SUPABASE_URL: "",
+    SUPABASE_PUBLISHABLE_KEY: "",
+    BLUEBERRY_SITE_URL: "",
     ...modelEnv,
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;

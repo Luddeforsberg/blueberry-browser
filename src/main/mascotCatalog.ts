@@ -1,5 +1,6 @@
-import type { GalleryMascot } from "../shared/library";
+import type { GalleryMascot, MascotExample } from "../shared/library";
 import { parseMascotDraft } from "../shared/mascots";
+import { STARTER_EXAMPLES } from "./starterExamples";
 
 const BY_BLUEBERRY = "Blueberry";
 
@@ -163,13 +164,14 @@ const STARTERS: GalleryMascot[] = [
 // Only what a card needs and what a mascot's own checks accept, so a bad entry shows nothing rather than something
 // the store would refuse or read differently. Anything else on it is dropped here, and again when it's added.
 export const parseGalleryMascot = (input: unknown): GalleryMascot | null => {
-  const { id, author, category, description, draft } = (input ?? {}) as Record<string, unknown>;
+  const { id, author, category, description, draft, example } = (input ?? {}) as Record<string, unknown>;
   const parsed = parseMascotDraft(draft);
   if ("error" in parsed) return null;
   if (typeof id !== "string" || typeof author !== "string" || typeof category !== "string" || typeof description !== "string") return null;
   if (!id || !author || !category || !description) return null;
-  return { id, author, category, description, draft: parsed.draft };
+  return { id, author, category, description, draft: parsed.draft, ...(example ? { example: example as MascotExample } : {}) };
 };
 
-// Where the Gallery comes from. Bundled with the app for now, and async because a server can take its place.
-export const fetchMascotCatalog = async (): Promise<GalleryMascot[]> => STARTERS.flatMap((entry) => parseGalleryMascot(entry) ?? []);
+// The ones that come with the app, so the Gallery always has something to show. What people publish is in `Gallery.ts`.
+export const starterMascots = (): GalleryMascot[] =>
+  STARTERS.flatMap((entry) => parseGalleryMascot({ ...entry, example: STARTER_EXAMPLES[entry.id] }) ?? []);

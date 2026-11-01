@@ -1,4 +1,4 @@
-import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from '@shared/library'
+import type { ChatThread, MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from '@shared/library'
 import { ACCESSORIES, MASCOT_TOOLS, PALETTES } from '@shared/mascots'
 
 export interface MascotFormValues {
@@ -15,7 +15,33 @@ export interface MascotFormValues {
     suggestionId?: string
 }
 
-export type FlockView = { page: 'list'; landed?: string } | { page: 'form'; values: MascotFormValues }
+// What's being chosen on the way to publishing. It's only what the user typed: nothing goes anywhere until they confirm.
+export interface PublishValues {
+    author: string
+    description: string
+    category: string
+    // The chat the example started from. The words below are what would go, and they've been checked only once `checked` is on.
+    exampleChatId: string | null
+    prompt: string
+    answer: string
+    checked: boolean
+    // Filled in from what's already published, so it only happens once.
+    filledIn: boolean
+}
+
+export const blankPublish = (): PublishValues => ({ author: '', description: '', category: 'Other', exampleChatId: null, prompt: '', answer: '', checked: false, filledIn: false })
+
+// The last thing asked and the answer it got, so the two go together. Nothing else in the chat comes along.
+export const lastExchange = ({ messages }: Pick<ChatThread, 'messages'>): { prompt: string; answer: string } | null => {
+    const answerAt = messages.findLastIndex((message) => message.role === 'assistant')
+    const prompt = messages.slice(0, Math.max(answerAt, 0)).findLast((message) => message.role === 'user')
+    return prompt ? { prompt: prompt.content, answer: messages[answerAt].content } : null
+}
+
+export type FlockView =
+    | { page: 'list'; landed?: string }
+    | { page: 'form'; values: MascotFormValues }
+    | { page: 'publish'; mascotId: string; values: PublishValues }
 
 const NAMES = ['Pip', 'Scout', 'Juno', 'Wren', 'Otis', 'Margot', 'Figaro', 'Mabel', 'Ziggy', 'Clementine', 'Rook', 'Nimbus']
 

@@ -33,6 +33,67 @@ export const jobs = (fixture: string): Job[] => [
     galleryMascot: "Morning Paper",
     prompt: "Open https://www.dn.se and tell me the top story there.",
   },
+  // Real runs for the examples on the Gallery's starters, which only run when named. Plain Words has none, as it needs a page.
+  {
+    id: "example-morning-paper",
+    ability: "gallery starter's example",
+    galleryMascot: "Morning Paper",
+    prompt: "What's in the news today? Keep it to three stories.",
+  },
+  {
+    id: "example-fact-checker",
+    ability: "gallery starter's example",
+    galleryMascot: "Fact Checker",
+    prompt: "Is it true that the Great Wall of China can be seen from space with the naked eye?",
+  },
+  {
+    id: "example-research-scout",
+    ability: "gallery starter's example",
+    galleryMascot: "Research Scout",
+    prompt: "How long is a Swedish passport valid for an adult, and what does it cost to get one? Start at polisen.se rather than a search engine.",
+  },
+  {
+    id: "example-nest-hunter",
+    ability: "gallery starter's example",
+    galleryMascot: "Nest Hunter",
+    prompt: "Three-room flats on Södermalm in Stockholm, under 6 million kronor, about 60 square metres. Show me five.",
+  },
+  {
+    id: "example-price-sleuth",
+    ability: "gallery starter's example",
+    galleryMascot: "Price Sleuth",
+    prompt: "What's the lowest price right now for Sony WH-1000XM5 headphones?",
+  },
+  {
+    id: "example-dinner-planner",
+    ability: "gallery starter's example",
+    galleryMascot: "Dinner Planner",
+    prompt: "Three vegetarian weeknight dinners for two people, no allergies.",
+  },
+  {
+    id: "example-train-scout",
+    ability: "gallery starter's example",
+    galleryMascot: "Train Scout",
+    prompt: "Stockholm Central to Göteborg Central next Friday, leaving around 08:00.",
+  },
+  {
+    id: "example-commute-check",
+    ability: "gallery starter's example",
+    galleryMascot: "Commute Check",
+    prompt: "Is the green line on the tunnelbana running normally right now?",
+  },
+  {
+    id: "example-repo-keeper",
+    ability: "gallery starter's example",
+    galleryMascot: "Repo Keeper",
+    prompt: "Go through the three newest open pull requests on github.com/electron/electron. I'm not a maintainer there.",
+  },
+  {
+    id: "example-job-scout",
+    ability: "gallery starter's example",
+    galleryMascot: "Job Scout",
+    prompt: "Junior developer jobs in Stockholm. I know TypeScript and would rather avoid consulting firms.",
+  },
   // Reading and research
   {
     id: "research-three-sources",

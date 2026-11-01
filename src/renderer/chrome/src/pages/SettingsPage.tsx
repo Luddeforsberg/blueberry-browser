@@ -6,6 +6,7 @@ import { Choice, Switch } from '@common/components/Controls'
 import { SettingsRow } from '../components/SettingsRow'
 import { DownloadSettings, SitePermissionsSettings } from './SiteSettings'
 import { PhoneSettings } from './PhoneSettings'
+import { AccountSettings } from './AccountSettings'
 import { Button } from '@common/components/Button'
 
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, string> = {
@@ -135,7 +136,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
                         {section === 'Data and privacy' && (
                             <>
-                                <SettingsRow id="setting-local" title="Stays on this device" description="History, chats, bookmarks and settings are kept on this computer, and so are your open tabs unless you start fresh. Nothing is synced." />
+                                <SettingsRow id="setting-local" title="Stays on this device" description="History, chats, bookmarks and settings are kept on this computer, and so are your open tabs unless you start fresh. Nothing is synced. Only a mascot you choose to publish goes public, and you see exactly what goes first." />
                                 <SettingsRow id="setting-history" title="History" description="Every web page you visit is saved until you delete it or clear your history.">
                                     <Button variant="outline" onClick={() => void window.chromeAPI.browser.openPage('history')}>Open history</Button>
                                 </SettingsRow>
@@ -165,9 +166,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             </>
                         )}
 
-                        {section === 'Account' && (
-                            <SettingsRow id="setting-account" title="No account" description="Browsing, tabs and bookmarks never need one. Berry will ask you to sign in the first time you use it." />
-                        )}
+                        {section === 'Account' && <AccountSettings />}
                         </div>
                     </section>
             </div>

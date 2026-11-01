@@ -1,0 +1,20 @@
+/* Only tokens from tokens.css, and plain lines rather than cards. */
+* { box-sizing: border-box; }
+html { background: rgb(var(--canvas)); color: rgb(var(--foreground)); }
+body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif; overflow-wrap: anywhere; }
+main { max-width: 680px; margin: 0 auto; padding: 48px 24px; }
+h1 { margin: 8px 0 0; font-size: 20px; font-weight: 600; }
+h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+h3 { margin: 16px 0 4px; font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+p { margin: 0; }
+section { padding: 24px 0; border-top: 1px solid rgb(var(--border)); }
+ul { margin: 0; padding: 0; list-style: none; }
+li { padding: 2px 0; font-size: 14px; }
+.muted { color: rgb(var(--muted-foreground)); font-size: 14px; }
+.open { color: rgb(var(--warning)); }
+.words { font-size: 14px; white-space: pre-wrap; }
+.bird { display: block; height: 160px; }
+.bird svg { overflow: visible; }
+.top { padding-bottom: 24px; }
+.button { display: inline-block; margin-top: 16px; padding: 8px 16px; border-radius: 999px; background: rgb(var(--primary)); color: rgb(var(--primary-foreground)); font-size: 14px; text-decoration: none; }
+.button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
