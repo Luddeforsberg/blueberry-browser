@@ -45,8 +45,9 @@ const RESULT_LASTS_MS = 10 * 60 * 1000;
 const LEAVING_SETTLES_MS = 800;
 const COMPOSER_WIDTH = 400;
 const COMPOSER_MIN_HEIGHT = 50;
-// In the composer these go to the text box. Anything else would reach the browser's menu, behind the user's back.
-const COMPOSER_MENU_KEYS = new Set(["a", "c", "v", "x", "z"]);
+// In the composer these go to the text box, for selecting, copying and moving around in it. Anything else would reach the
+// browser's menu, behind the user's back.
+const COMPOSER_MENU_KEYS = new Set(["a", "c", "v", "x", "z", "arrowleft", "arrowright", "arrowup", "arrowdown", "backspace", "delete", "home", "end"]);
 
 export interface DesktopBerryHost {
   settings: () => Settings;

@@ -77,7 +77,9 @@ export const DesktopApp: React.FC = () => {
             { duration: flight.ms, easing: 'linear', fill: 'forwards' }
         )
         return () => animation.cancel()
-    }, [flight])
+        // By its id: every state message brings a new object, and that mustn't start the flight over.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flight?.id])
 
     // Settles once it lands, with its weight going down through its feet.
     const wasFlying = useRef(false)
@@ -185,6 +187,14 @@ export const DesktopApp: React.FC = () => {
                 }}
                 onPointerUp={() => {
                     if (drag.current?.moved) void desktop().dragEnd()
+                }}
+                // However a drag gets cut off, or the bird's window would go on taking clicks across the screen.
+                onLostPointerCapture={() => {
+                    if (drag.current?.moved) void desktop().dragEnd()
+                }}
+                onPointerCancel={() => {
+                    if (drag.current?.moved) void desktop().dragEnd()
+                    drag.current = null
                 }}
                 onClickCapture={(event) => {
                     // The end of a drag isn't a click, for the bird's reaction or for what it opens.
