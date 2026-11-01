@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH,
   DESKTOP_BIRD_SIZE,
-  desktopBounds,
+  DESKTOP_PEEK,
+  desktopComposerBounds,
   desktopFlightPoint,
-  desktopFractionAt,
   desktopHit,
-  desktopSide,
+  desktopPeekHit,
+  desktopPlace,
+  desktopSpotAt,
+  desktopTucked,
 } from "./Layout";
 
 const mac = {
@@ -167,33 +170,109 @@ describe("promptRect", () => {
 
 describe("the bird on the desktop", () => {
   const area = { x: 100, y: 25, width: 1000, height: 700 };
-  const room = area.width - DESKTOP_BIRD_SIZE;
+  const right = area.x + area.width;
+  const bottom = area.y + area.height;
+  const EDGES = ["bottom", "top", "left", "right"] as const;
+  const FRACTIONS = [0, 0.25, 0.5, 0.51, 1];
+  const inside = (rect: { x: number; y: number; width: number; height: number }, within: typeof area) =>
+    rect.x >= within.x && rect.y >= within.y && rect.x + rect.width <= within.x + within.width && rect.y + rect.height <= within.y + within.height;
 
-  it("stands on the bottom of the work area, from one end to the other", () => {
-    expect(desktopBounds(area, 0, { width: 0, height: 0 })).toEqual({ x: 100, y: 725 - DESKTOP_BIRD_SIZE, width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE });
-    expect(desktopBounds(area, 1, { width: 0, height: 0 }).x).toBe(100 + room);
+  it("keeps its window one size and on screen, at every edge and corner", () => {
+    const { width, height } = desktopPlace(area, { edge: "bottom", fraction: 0 }).window;
+    EDGES.forEach((edge) =>
+      FRACTIONS.forEach((fraction) => {
+        const { window, out } = desktopPlace(area, { edge, fraction });
+        expect(inside(window, area)).toBe(true);
+        expect([window.width, window.height]).toEqual([width, height]);
+        // All of the bird is in the window, but for its toes going over the edge.
+        expect(out.x).toBeGreaterThanOrEqual(-2);
+        expect(out.y).toBeGreaterThanOrEqual(-2);
+        expect(out.x + DESKTOP_BIRD_SIZE).toBeLessThanOrEqual(window.width + 2);
+        expect(out.y + DESKTOP_BIRD_SIZE).toBeLessThanOrEqual(window.height + 2);
+      })
+    );
   });
 
-  it("keeps the bird where it is when the window grows, with the rest towards the middle", () => {
-    const small = desktopBounds(area, 0.9, { width: DESKTOP_BIRD_SIZE, height: DESKTOP_BIRD_SIZE });
-    const big = desktopBounds(area, 0.9, { width: 400, height: 200 });
-    expect(big.x + big.width).toBe(small.x + small.width);
-    expect(big.y + big.height).toBe(small.y + small.height);
-    expect(desktopSide(0.5)).toBe("right");
-    expect(desktopSide(0.51)).toBe("left");
-    expect(desktopBounds(area, 0.1, { width: 400, height: 200 }).x).toBe(desktopBounds(area, 0.1, { width: 0, height: 0 }).x);
+  it("puts the side of the window along the edge it's on, so that's what it tucks behind", () => {
+    expect(desktopPlace(area, { edge: "bottom", fraction: 0.3 }).window.y + desktopPlace(area, { edge: "bottom", fraction: 0.3 }).window.height).toBe(bottom);
+    expect(desktopPlace(area, { edge: "top", fraction: 0.3 }).window.y).toBe(area.y);
+    expect(desktopPlace(area, { edge: "left", fraction: 0.3 }).window.x).toBe(area.x);
+    const onRight = desktopPlace(area, { edge: "right", fraction: 0.3 }).window;
+    expect(onRight.x + onRight.width).toBe(right);
   });
 
-  it("stays inside the limits on what the view can ask for", () => {
-    expect(desktopBounds(area, 0, { width: 9000, height: 9000 })).toMatchObject({ width: 520, height: 320 });
+  it("shows only what peeks, and only that takes the pointer", () => {
+    EDGES.forEach((edge) =>
+      FRACTIONS.forEach((fraction) => {
+        const place = desktopPlace(area, { edge, fraction });
+        const window = { x: 0, y: 0, width: place.window.width, height: place.window.height };
+        const hit = desktopPeekHit(place, edge, DESKTOP_PEEK);
+        expect(inside(hit, window)).toBe(true);
+        expect(Math.min(hit.width, hit.height)).toBe(DESKTOP_PEEK);
+        // The hit touches the side of the window along the edge.
+        if (edge === "bottom") expect(hit.y + hit.height).toBe(window.height);
+        if (edge === "top") expect(hit.y).toBe(0);
+        if (edge === "left") expect(hit.x).toBe(0);
+        if (edge === "right") expect(hit.x + hit.width).toBe(window.width);
+      })
+    );
   });
 
-  it("turns a place on the screen into a fraction and stays on the edge", () => {
-    expect(desktopFractionAt(area, 100)).toBe(0);
-    expect(desktopFractionAt(area, 100 + room)).toBe(1);
-    expect(desktopFractionAt(area, -500)).toBe(0);
-    expect(desktopFractionAt(area, 5000)).toBe(1);
-    expect(desktopFractionAt({ ...area, width: DESKTOP_BIRD_SIZE }, 100)).toBe(0);
+  it("tucks along the edge it's on and no other way", () => {
+    const moved = (edge: (typeof EDGES)[number]) => {
+      const place = desktopPlace(area, { edge, fraction: 0.5 });
+      const tucked = desktopTucked(place, edge, DESKTOP_PEEK);
+      return [Math.sign(tucked.x - place.out.x), Math.sign(tucked.y - place.out.y)];
+    };
+    expect(moved("bottom")).toEqual([0, 1]);
+    expect(moved("top")).toEqual([0, -1]);
+    expect(moved("left")).toEqual([-1, 0]);
+    expect(moved("right")).toEqual([1, 0]);
+  });
+
+  it("faces the middle of the screen, and its words go that way", () => {
+    expect(desktopPlace(area, { edge: "bottom", fraction: 0.1 })).toMatchObject({ flip: false, line: { side: "left" } });
+    expect(desktopPlace(area, { edge: "bottom", fraction: 0.9 })).toMatchObject({ flip: true, line: { side: "right" } });
+    expect(desktopPlace(area, { edge: "left", fraction: 0.9 })).toMatchObject({ flip: true, line: { side: "left", across: "middle" } });
+    expect(desktopPlace(area, { edge: "right", fraction: 0.1 })).toMatchObject({ flip: true, line: { side: "right", across: "middle" } });
+  });
+
+  it("snaps to the nearest edge, and to a corner when it's let go near one", () => {
+    const at = (x: number, y: number) => desktopSpotAt(area, 7, { x: area.x + x, y: area.y + y });
+    expect(at(500, 690)).toMatchObject({ displayId: 7, edge: "bottom" });
+    expect(at(500, 10)).toMatchObject({ edge: "top" });
+    expect(at(10, 300)).toMatchObject({ edge: "left" });
+    expect(at(990, 300)).toMatchObject({ edge: "right" });
+    expect(at(20, 690)).toEqual({ displayId: 7, edge: "bottom", fraction: 0 });
+    expect(at(980, 690)).toEqual({ displayId: 7, edge: "bottom", fraction: 1 });
+    expect(at(980, 10).fraction).toBe(1);
+    expect(desktopSpotAt(area, 7, { x: -5000, y: 5000 })).toMatchObject({ edge: "left", fraction: 1 });
+  });
+
+  it("keeps the composer on screen and clear of the bird, towards the middle, at any size", () => {
+    const size = { width: 400, height: 50 };
+    EDGES.forEach((edge) =>
+      FRACTIONS.forEach((fraction) => {
+        const composer = desktopComposerBounds(area, { edge, fraction }, size);
+        expect(inside(composer, area)).toBe(true);
+        const { window, out } = desktopPlace(area, { edge, fraction });
+        const birdX = window.x + out.x;
+        const birdY = window.y + out.y;
+        const overlaps = composer.x < birdX + DESKTOP_BIRD_SIZE && composer.x + composer.width > birdX && composer.y < birdY + DESKTOP_BIRD_SIZE && composer.y + composer.height > birdY;
+        expect(overlaps).toBe(false);
+      })
+    );
+    const tiny = { x: 0, y: 0, width: 300, height: 200 };
+    EDGES.forEach((edge) => {
+      const composer = desktopComposerBounds(tiny, { edge, fraction: 1 }, { width: 400, height: 900 });
+      expect(inside(composer, tiny)).toBe(true);
+      expect(inside(desktopPlace(tiny, { edge, fraction: 1 }).window, tiny)).toBe(true);
+    });
+  });
+
+  it("works on a display that isn't the first, with a position below zero", () => {
+    const second = { x: -1200, y: -300, width: 1200, height: 800 };
+    EDGES.forEach((edge) => expect(inside(desktopPlace(second, { edge, fraction: 0.5 }).window, second)).toBe(true));
   });
 
   it("only lets the pointer land on what's listed, up to but not past its edge", () => {
@@ -211,7 +290,6 @@ describe("the bird on the desktop", () => {
     const to = { x: 1200, y: 800 };
     expect(desktopFlightPoint(from, to, 0)).toEqual(from);
     expect(desktopFlightPoint(from, to, 1)).toEqual(to);
-    const straightLine = from.y + (to.y - from.y) * 0.5;
-    expect(desktopFlightPoint(from, to, 0.5).y).toBeLessThan(straightLine);
+    expect(desktopFlightPoint(from, to, 0.5).y).toBeLessThan(from.y + (to.y - from.y) * 0.5);
   });
 });

@@ -41,9 +41,14 @@ const folder = (value: unknown, fallback: string | null): string | null => {
 
 const spot = (value: unknown, fallback: DesktopBerrySpot | null): DesktopBerrySpot | null => {
   if (value === null) return null;
-  const { displayId, fraction } = (value ?? {}) as Partial<DesktopBerrySpot>;
+  const { displayId, edge, fraction } = (value ?? {}) as Partial<DesktopBerrySpot>;
   return Number.isFinite(displayId) && Number.isFinite(fraction)
-    ? { displayId: displayId as number, fraction: Math.min(Math.max(fraction as number, 0), 1) }
+    ? {
+        displayId: displayId as number,
+        // Before it could stand anywhere else, it only stood on the bottom.
+        edge: pick(edge, ["bottom", "top", "left", "right"] as const, "bottom"),
+        fraction: Math.min(Math.max(fraction as number, 0), 1),
+      }
     : fallback;
 };
 

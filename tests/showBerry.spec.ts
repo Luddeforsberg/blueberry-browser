@@ -41,11 +41,18 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
 
   try {
     const chrome = await findView(app, "view=chrome");
+    // Started from Routines, as the one tab, so nothing else can come forward when a tab closes.
+    await chrome.evaluate(async () => {
+      const { browser } = window.chromeAPI;
+      const [newTab] = await browser.getTabs();
+      await browser.openPage("routines");
+      await browser.closeTab(newTab.id);
+    });
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
     const notice = chrome.getByRole("status").filter({ hasText: "Berry’s watching" });
     await expect(notice).toBeVisible();
 
-    // From the new tab page, through the address bar. Nothing on a page can answer this view's channels.
+    // From Routines, through the address bar. Nothing on a page can answer this view's channels.
     await chrome.evaluate(async (url) => {
       const { browser } = window.chromeAPI;
       const tabs = await browser.getTabs();
@@ -199,6 +206,10 @@ test("with nothing to go through, there's nothing to send", async () => {
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
+    // It's on Routines, and not on the new tab page any more.
+    await expect(chrome.getByRole("textbox", { name: /message|ask/i }).first()).toBeVisible();
+    await expect(chrome.getByRole("button", { name: "Show Berry how" })).toHaveCount(0);
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
     await chrome.getByRole("button", { name: "Stop" }).click();
     await expect(chrome.getByRole("button", { name: "Turn this into a routine" })).toBeDisabled();

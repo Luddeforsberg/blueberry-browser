@@ -5,8 +5,9 @@ import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, MascotLo
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
-// nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop";
+// nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own, and the
+// composer view is its prompt box, in another.
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -54,34 +55,62 @@ export interface Settings {
   desktopBerrySpot: DesktopBerrySpot | null;
 }
 
+export type DesktopEdge = "bottom" | "top" | "left" | "right";
+
 export interface DesktopBerrySpot {
   displayId: number;
+  edge: DesktopEdge;
+  // How far along that edge, from 0 to 1. Each end is a corner.
   fraction: number;
 }
 
-// Everything the desktop view draws. Main works all of it out, so the view knows nothing about chats or approvals.
+export interface Point {
+  x: number;
+  y: number;
+}
+
+// Where the words go beside the bird, in its window: on the side towards the middle of the screen.
+export interface DesktopLineAnchor {
+  side: "left" | "right";
+  // How far in from that side of the window.
+  fromSide: number;
+  maxWidth: number;
+  across: "top" | "bottom" | "middle";
+  middle: number;
+}
+
+// Everything the bird's view draws. Main works all of it out, so the view knows nothing about chats or approvals.
 export interface DesktopBerryState {
   // False while it's fading away, just before the window hides.
   shown: boolean;
-  // Which way it's flying, or null when it's standing.
-  flying: "left" | "right" | null;
-  composing: boolean;
-  // Which side of the bird the words and the composer go, so they stay on the screen.
-  side: "left" | "right";
+  // Goes up each time the window moves or changes size, when anything in it jumps with it rather than gliding.
+  frame: number;
+  // The window's top left on the screen.
+  origin: Point;
+  // The bird's top left in the window.
+  at: Point;
+  edge: DesktopEdge;
+  flip: boolean;
+  tucked: boolean;
+  dragging: boolean;
+  // A flight across the screen, drawn in the view so it doesn't depend on the main process keeping time.
+  flight: { id: number; path: Point[]; ms: number; left: boolean } | null;
   mood: "rest" | "fetching" | "asking" | "delivered" | "oops";
   name: string;
   look: MascotLook;
   showBerry: boolean;
   still: boolean;
-  // `lasting` stays until it's answered. Otherwise it shows for a moment, and again when the pointer comes to the bird.
-  line: { text: string; lasting: boolean } | null;
+  // The small mark beside a tucked bird, and only then.
+  sign: "working" | "waiting" | null;
+  line: string | null;
+  lineShowing: boolean;
+  lineAnchor: DesktopLineAnchor;
 }
 
-// What the view is drawing, relative to its window: how big the window needs to be and what in it can be clicked.
-export interface DesktopBerryLayout {
-  width: number;
-  height: number;
-  hits: Rect[];
+// The prompt box, in a window of its own with real glass.
+export interface DesktopComposerState {
+  open: boolean;
+  name: string;
 }
 
 // Replies from the phone, for Settings and Needs you. Nothing here can be used to read the bot's token, which never
@@ -318,7 +347,7 @@ export interface InvokeChannels {
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   "bookmarks:toggle-pin": { region: "chrome"; args: []; result: void };
@@ -329,15 +358,18 @@ export interface InvokeChannels {
   // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
   "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
   "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
-  "desktop:layout": { region: "desktop"; args: [layout: DesktopBerryLayout]; result: void };
-  // Starts a job with no page, as whoever is chosen. It's the same as a chat started from the new tab page.
-  "desktop:send": { region: "desktop"; args: [text: string]; result: boolean };
-  "desktop:close-composer": { region: "desktop"; args: []; result: void };
+  // Where the words are in the window, so the pointer can land on them, or null when they aren't showing.
+  "desktop:line-box": { region: "desktop"; args: [box: Rect | null]; result: void };
   // The bird or its words were pressed. Main decides what that opens, so the view never names a chat or an approval.
   "desktop:press": { region: "desktop"; args: []; result: void };
-  "desktop:drag": { region: "desktop"; args: [screenX: number]; result: void };
+  "desktop:drag-start": { region: "desktop"; args: []; result: void };
   "desktop:drag-end": { region: "desktop"; args: []; result: void };
   "desktop:menu": { region: "desktop"; args: []; result: void };
+  "desktop:composer-state": { region: "composer"; args: []; result: DesktopComposerState };
+  "desktop:composer-height": { region: "composer"; args: [height: number]; result: void };
+  // Starts a job with no page, as whoever is chosen. It's the same as a chat started from the new tab page.
+  "desktop:send": { region: "composer"; args: [text: string]; result: boolean };
+  "desktop:close-composer": { region: "composer"; args: []; result: void };
   "chat:send": {
     region: "chrome";
     args: [chatId: string | null, text: string, options: ChatSendOptions];
@@ -426,6 +458,7 @@ export interface EventChannels {
   "layout:updated": Layout;
   "theme:updated": ThemeState;
   "desktop:state": DesktopBerryState;
+  "desktop:composer-state": DesktopComposerState;
   // Whether the bird is out on the desktop, so the chrome doesn't draw a second one.
   "desktop:away": boolean;
   "settings:updated": Settings;
@@ -616,14 +649,17 @@ export interface DesktopAPI {
   shortcutTaken: () => Promise<boolean>;
   onAway: (callback: (away: boolean) => void) => Unsubscribe;
   state: () => Promise<DesktopBerryState>;
-  layout: (layout: DesktopBerryLayout) => Promise<void>;
-  send: (text: string) => Promise<boolean>;
-  closeComposer: () => Promise<void>;
+  lineBox: (box: Rect | null) => Promise<void>;
   press: () => Promise<void>;
-  drag: (screenX: number) => Promise<void>;
+  dragStart: () => Promise<void>;
   dragEnd: () => Promise<void>;
   menu: () => Promise<void>;
   onState: (callback: (state: DesktopBerryState) => void) => Unsubscribe;
+  composerState: () => Promise<DesktopComposerState>;
+  composerHeight: (height: number) => Promise<void>;
+  send: (text: string) => Promise<boolean>;
+  closeComposer: () => Promise<void>;
+  onComposerState: (callback: (state: DesktopComposerState) => void) => Unsubscribe;
 }
 
 export interface ChromeAPI {

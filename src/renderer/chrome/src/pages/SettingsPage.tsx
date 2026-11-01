@@ -122,7 +122,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     description={
                                         shortcutTaken
                                             ? `Another app already uses ${DESKTOP_SHORTCUT}, so press the bird to give it a job instead. It can't see your screen or other apps, and jobs ask just as a chat does.`
-                                            : `When you leave Blueberry, the bird stands at the edge of your screen, and ${DESKTOP_SHORTCUT} gives it a job from any app. It can't see your screen or other apps, and jobs ask just as a chat does. Closing Blueberry's window takes it away and stops what's running.`
+                                            : `When you leave Blueberry, the bird tucks in behind the edge of your screen, and ${DESKTOP_SHORTCUT} gives it a job from any app. Drag it to any edge. It can't see your screen or other apps, and jobs ask just as a chat does. Closing Blueberry's window takes it away and stops what's running.`
                                     }
                                 >
                                     <Switch

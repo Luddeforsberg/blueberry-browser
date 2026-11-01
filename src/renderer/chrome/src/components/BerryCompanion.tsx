@@ -214,7 +214,7 @@ export const BerryCompanion: React.FC = () => {
     if (!settings.showBerry) return null
 
     const bird = (
-        <div ref={body} className={atSpot || home || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: home ? `${FEET_X * 100}% ${STANDING_FEET * 100}%` : `50% ${SEAT * 100}%`, opacity: away ? 0 : undefined }}>
+        <div ref={body} className={atSpot || home || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: home ? `${FEET_X * 100}% ${STANDING_FEET * 100}%` : `50% ${SEAT * 100}%` }}>
             <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
                 <Berry mood={mood} size={home ? HOME_SIZE : BASE_SIZE} mascot={mascot} />
             </div>
@@ -227,7 +227,7 @@ export const BerryCompanion: React.FC = () => {
                 ref={box}
                 data-berry-companion
                 className="fixed left-0 top-0 z-40 pointer-events-none origin-top-left"
-                style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible && !home ? undefined : 'hidden' }}
+                style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible && !home ? undefined : 'hidden', opacity: away ? 0 : undefined }}
             >
                 {!home && bird}
             </div>
@@ -235,7 +235,7 @@ export const BerryCompanion: React.FC = () => {
                 <div
                     data-berry-perched
                     className="absolute pointer-events-none"
-                    style={{ right: HOME_RIGHT, top: -HOME_SIZE * STANDING_FEET, width: HOME_SIZE, height: HOME_SIZE }}
+                    style={{ right: HOME_RIGHT, top: -HOME_SIZE * STANDING_FEET, width: HOME_SIZE, height: HOME_SIZE, opacity: away ? 0 : undefined }}
                 >
                     {/* The shadow its feet leave on the box, cut off at the edge so it only falls on the box. */}
                     <div aria-hidden className="absolute h-2 overflow-hidden" style={{ left: HOME_SIZE * FEET_X - 24, width: 48, top: HOME_SIZE * STANDING_FEET }}>
