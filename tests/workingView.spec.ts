@@ -18,18 +18,21 @@ const startSite = async () => {
   return { origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, close: () => server.close() };
 };
 
-// A job that has opened a tab behind the chat, and is still going until `finish` is called.
-const startJob = async (chrome: Page, model: FakeModel, url: string) => {
-  model.callTools({ name: "open_tab", args: { url } });
-  model.replyWith("All done");
-  const finish = model.holdBeforeFirstToken();
-  const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Have a look", { seePage: false }));
-  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
-  await chrome.evaluate(() => {
+const countFrames = (chrome: Page) =>
+  chrome.evaluate(() => {
     const seen: string[] = [];
     Object.assign(window, { framesSeen: seen });
     window.chromeAPI.work.onFrame(({ picture }) => seen.push(picture));
   });
+
+// A job that has opened a tab behind the chat, and is still going until `finish` is called.
+const startJob = async (chrome: Page, model: FakeModel, url: string, mascotId?: string) => {
+  model.callTools({ name: "open_tab", args: { url } });
+  model.replyWith("All done");
+  const finish = model.holdBeforeFirstToken();
+  const sent = await chrome.evaluate((mascot) => window.chromeAPI.chat.send(null, "Have a look", { seePage: false, mascotId: mascot }), mascotId);
+  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+  await countFrames(chrome);
   return { chatId: sent!.id, finish };
 };
 
@@ -142,11 +145,7 @@ test.describe("the working view", () => {
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Sign me in", { seePage: false }));
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
-    await chrome.evaluate(() => {
-      const seen: string[] = [];
-      Object.assign(window, { framesSeen: seen });
-      window.chromeAPI.work.onFrame(({ picture: frame }) => seen.push(frame));
-    });
+    await countFrames(chrome);
     await expect(view().getByText("You have this tab")).toBeVisible({ timeout: 10_000 });
     await expect(picture()).toHaveCount(0);
     await expect(view().getByText("Waiting for you")).toBeVisible();
@@ -154,6 +153,51 @@ test.describe("the working view", () => {
     await new Promise((resolve) => setTimeout(resolve, 1200));
     expect(await framesSeen(chrome)).toBe(before);
     await chrome.evaluate((id) => window.chromeAPI.chat.stop(id), sent!.id);
+  });
+
+  test("a page off the mascot's sites shows no picture, and nothing more is captured", async () => {
+    const saved = await chrome.evaluate(() =>
+      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Stay here.", sites: ["127.0.0.1"], tools: ["visit"] })
+    );
+    if (!saved.ok) throw new Error("The mascot wasn't saved");
+    const { finish } = await startJob(chrome, model, `${site.origin}/job`, saved.id);
+    await expect(picture()).toBeVisible();
+
+    // The page sends itself somewhere the mascot may not go, between the job's calls, when no limit is on the tab.
+    const page = await findView(app, `${site.origin}/job`);
+    const away = site.origin.replace("127.0.0.1", "localhost");
+    await page.evaluate((url) => void (location.href = url), `${away}/away`);
+
+    await expect(view().getByText("Scout isn’t allowed on this site")).toBeVisible();
+    await expect(picture()).toHaveCount(0);
+    const before = await framesSeen(chrome);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(await framesSeen(chrome)).toBe(before);
+    finish();
+  });
+
+  test("turning page access off mid-job takes the picture away, and nothing more is captured", async () => {
+    await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${site.origin}/shared`);
+    const page = await findView(app, `${site.origin}/shared`);
+    await expect(page).toHaveTitle(/shared/);
+    // A job on the page sent with the message, which depends on the "Can see" toggle.
+    model.callTools({ name: "read_page", args: {} });
+    model.replyWith("All done");
+    const finish = model.holdBeforeFirstToken();
+    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "What does this say?", { seePage: true }));
+    await expect.poll(() => chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).some(({ berryWorking }) => berryWorking))).toBe(true);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+    await countFrames(chrome);
+    await expect(picture()).toBeVisible();
+
+    await chrome.evaluate(() => window.chromeAPI.chat.setPageAccess(false));
+
+    await expect(view().getByText("Berry can’t see this page")).toBeVisible();
+    await expect(picture()).toHaveCount(0);
+    const before = await framesSeen(chrome);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(await framesSeen(chrome)).toBe(before);
+    finish();
   });
 
   test("a job with no tab shows nothing, and a narrow window gets words with nothing captured", async () => {
