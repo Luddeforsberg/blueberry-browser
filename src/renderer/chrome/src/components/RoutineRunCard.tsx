@@ -3,7 +3,7 @@ import type { RoutineRun, RoutineStatus } from '@shared/library'
 import { BerryDot } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
-import { useLibrary } from '../contexts/LibraryContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { ChatApprovalCard, ChatError, Markdown, StepTrail } from './ChatMessage'
 
 // Status colours always come with words, so colour is never the only signal.
@@ -35,6 +35,9 @@ export const RoutineRunCard: React.FC<{
     onStop: () => void
     onRunAgain?: () => void
 }> = ({ run, onStop, onRunAgain }) => {
+    const { routines } = useLibrary()
+    const { find } = useFlock()
+    const mascot = find(routines.find((routine) => routine.id === run.routineId)?.mascotId ?? null)
     const open = run.status === 'running' || run.status === 'needs-approval'
     const ended = run.status === 'failed' || run.status === 'stopped' || run.status === 'interrupted'
 
@@ -56,7 +59,7 @@ export const RoutineRunCard: React.FC<{
             )}
             {run.status === 'needs-approval' && run.approval && (
                 <div className="mt-3">
-                    <ChatApprovalCard chatId={run.id} approval={run.approval} />
+                    <ChatApprovalCard chatId={run.id} approval={run.approval} mascot={mascot} />
                 </div>
             )}
             {run.result && (
@@ -97,15 +100,16 @@ export const RoutineRunCard: React.FC<{
 // Every decision routines are waiting on. The same card and the same words as in a chat.
 export const RoutineApprovals: React.FC = () => {
     const { routines } = useLibrary()
+    const { find } = useFlock()
     const waiting = routines.filter((routine) => routine.latestRun?.status === 'needs-approval' && routine.latestRun.approval)
     if (waiting.length === 0) return null
 
     return (
         <ul aria-label="Routines waiting for your OK" className="flex flex-col gap-2">
-            {waiting.map(({ id, name, latestRun }) => (
+            {waiting.map(({ id, name, latestRun, mascotId }) => (
                 <li key={id}>
                     <p className="px-1 pb-1 text-12 text-muted-foreground truncate">{name}</p>
-                    <ChatApprovalCard chatId={latestRun!.id} approval={latestRun!.approval!} />
+                    <ChatApprovalCard chatId={latestRun!.id} approval={latestRun!.approval!} mascot={find(mascotId)} />
                 </li>
             ))}
         </ul>

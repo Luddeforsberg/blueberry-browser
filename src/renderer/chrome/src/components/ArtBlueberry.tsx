@@ -19,6 +19,12 @@ const CROWN_FADE = 0.02
 const CROWN_SIZE = 74
 const CROWN_SQUASH = 0.56
 
+export const FRUIT_RADIUS = RADIUS
+export const FRUIT_CENTRE_Y = CENTRE.y
+
+// How far down the art the fruit's outline is, this far left or right of its centre, so a bird can stand on it.
+export const fruitTopAt = (fromCentre: number) => CENTRE.y - Math.sqrt(Math.max(0, RADIUS ** 2 - fromCentre ** 2))
+
 type Colour = [number, number, number]
 
 // From shadow to the dusty bloom in the light. Dark mode keeps the light dim, so the fruit doesn't glare.

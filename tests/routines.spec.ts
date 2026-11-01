@@ -75,7 +75,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
 
   const question = `Open ${address} in a new tab`;
   const cards = chrome.getByRole("region", { name: "Approval needed" });
-  await expect(cards.getByRole("heading")).toHaveText(question);
+  await expect(cards.getByText(question)).toBeVisible();
   await expect(chrome.getByText("Needs your OK").first()).toBeVisible();
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), (await tabs()).find((tab) => !tab.page || tab.page === "new-tab")!.id);
   await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible();

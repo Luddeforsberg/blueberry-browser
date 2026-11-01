@@ -60,7 +60,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.getByRole("button", { name: "Publish for anyone to read" }).click();
     await expect(chrome.getByRole("alert")).toContainText("can’t have an email address");
     await authorName.fill("Ana");
-    await chrome.getByLabel("Category").selectOption("News and research");
+    await chrome.getByRole("radio", { name: "News and research" }).click();
 
     // The warning about the address doesn't block.
     await expect(chrome.getByRole("list", { name: "Before you publish" })).toContainText("email address in its instructions");
@@ -84,6 +84,15 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     expect(server.rows).toHaveLength(1);
     id = server.rows[0].id;
     await expect(chrome.getByText(`https://gallery.example/m/?id=${id}`)).toBeVisible();
+
+    // Words typed and then cancelled never show as if they were public.
+    const looks = chrome.getByRole("region", { name: "How it looks" });
+    await expect(looks).toContainText("By Ana");
+    await chrome.getByRole("button", { name: "Edit the listing" }).click();
+    await authorName.fill("Not public");
+    await chrome.getByRole("button", { name: "Cancel" }).click();
+    await expect(looks).toContainText("By Ana");
+    await expect(looks).not.toContainText("Not public");
 
     // Only the listed fields left, and neither the password nor the session went anywhere but sign-in.
     const posted = server.received.find(({ method, path }) => method === "POST" && path.startsWith("/rest/v1/mascots"));

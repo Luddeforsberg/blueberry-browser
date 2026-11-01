@@ -4,7 +4,9 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, MascotProfile } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
-import { ApprovalCard } from '@common/components/ApprovalCard'
+import { ApprovalCard, MascotSays } from '@common/components/ApprovalCard'
+import { useShell } from '../contexts/ShellContext'
+import { asContinuation, siteParts } from '../siteNames'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
@@ -101,7 +103,8 @@ export const AssistantMessage: React.FC<{
     // Who wrote it. Anyone but Berry is named, so one can always tell who's working.
     mascot?: MascotProfile
 }> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot }) => (
-    <div className="relative flex flex-col gap-3 animate-fade-in">
+    // With nothing written yet, the mascot is already speaking in what it's waiting on.
+    waiting && !content && steps.length === 0 ? null : <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
             <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} mascot={mascot} className="absolute -left-11 top-0" />
         )}
@@ -161,17 +164,19 @@ export const ThinkingMessage: React.FC<{ mascot?: MascotProfile }> = ({ mascot }
     </div>
 )
 
+type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProfile; avatarOutside?: boolean }
+
+const Asking: React.FC<{ mascot?: MascotProfile }> = ({ mascot }) => <Berry mood="asking" size={32} mascot={mascot} />
+
 // Berry needs something only the user knows, and carries on with the answer. Secrets go in the page, never here.
-const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
+const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot, avatarOutside }) => {
     const [answer, setAnswer] = useState('')
     const name = useAssistantName(mascot)
     const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow, allow ? answer : undefined)
     return (
-        <section aria-label={`${name} is asking`} className="[overflow-wrap:anywhere] animate-fade-in rounded-panel border bg-surface p-3 shadow-float">
-            <h3 className="text-13 font-semibold">{approval.text}</h3>
-            <p className="mt-1 text-12 text-muted-foreground">{name} waits for your answer. Don’t type passwords or codes here.</p>
+        <MascotSays label={`${name} is asking`} avatar={<Asking mascot={mascot} />} avatarOutside={avatarOutside} title={approval.text} note="Don’t type passwords or codes here.">
             <form
-                className="mt-3 flex items-center gap-3"
+                className="flex items-center gap-2"
                 onSubmit={(event) => {
                     event.preventDefault()
                     if (answer.trim()) send(true)
@@ -182,12 +187,12 @@ const ChatQuestionCard: React.FC<{ chatId: string; approval: ChatApproval; masco
                     autoFocus
                     value={answer}
                     onChange={(event) => setAnswer(event.target.value)}
-                    className="min-w-0 flex-1 rounded-control border bg-background px-2 py-1 text-13"
+                    className="min-w-0 flex-1 h-8 rounded-card border bg-surface px-3 text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <Button size="sm" type="submit" disabled={!answer.trim()}>Answer</Button>
-                <Button size="sm" variant="ghost" type="button" onClick={() => send(false)}>Skip</Button>
+                <Button size="sm" variant="outline" type="button" onClick={() => send(false)}>Skip</Button>
             </form>
-        </section>
+        </MascotSays>
     )
 }
 
@@ -209,39 +214,51 @@ const HandoffActions: React.FC<{
     )
 }
 
-const handoffNote = (name: string) => `${name} can’t see that tab until you press I’m done. Your password or code goes in the page, and ${name} never sees it.`
+const Site: React.FC<{ children: React.ReactNode }> = ({ children }) => <strong className="font-semibold">{children}</strong>
 
-// Berry has handed a tab to the user, and waits here until they say they're done.
-const ChatHandoffCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
+// Berry has handed a tab to the user, and waits here until they say they're done. The words come from code, so only
+// who's speaking changes.
+const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot, avatarOutside }) => {
     const name = useAssistantName(mascot)
+    const { showBerry } = useShell().settings
+    const site = approval.handoff?.site ?? ''
+    const said = approval.text.startsWith(`${name} needs `) && showBerry ? `I need ${approval.text.slice(name.length + ' needs '.length)}` : approval.text
+    const at = site ? said.lastIndexOf(site) : -1
     return (
-        <section aria-label={`${name} needs you`} className="[overflow-wrap:anywhere] animate-fade-in rounded-panel border bg-surface p-3 shadow-float">
-            <h3 className="text-13 font-semibold">{approval.text}</h3>
-            <p className="mt-1 text-12 text-muted-foreground">{handoffNote(name)}</p>
-            <div className="mt-3">
-                <HandoffActions chatId={chatId} approval={approval} />
-            </div>
-        </section>
+        <MascotSays
+            label={`${name} needs you`}
+            avatar={<Asking mascot={mascot} />}
+            avatarOutside={avatarOutside}
+            title={at < 0 ? said : <>{said.slice(0, at)}<Site>{site}</Site>{said.slice(at + site.length)}</>}
+            note={`Your password or code goes in the page, and ${showBerry ? 'I never see it' : `${name} never sees it`}.`}
+        >
+            <HandoffActions chatId={chatId} approval={approval} />
+        </MascotSays>
     )
 }
 
-// An action Berry wants to take, which waits here until the user answers.
-export const ChatApprovalCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {
+// An action Berry wants to take, which waits here until the user answers. The sentence names the sites, and the exact
+// words stay under it in full, because that's what is being allowed.
+export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, mascot, avatarOutside }) => {
+    const name = useAssistantName(mascot)
+    const { showBerry } = useShell().settings
     const decide = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
-    if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} mascot={mascot} />
-    if (approval.handoff) return <ChatHandoffCard chatId={chatId} approval={approval} mascot={mascot} />
+    if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} mascot={mascot} avatarOutside={avatarOutside} />
+    if (approval.handoff) return <ChatHandoffCard chatId={chatId} approval={approval} mascot={mascot} avatarOutside={avatarOutside} />
     return (
-        <div className="[overflow-wrap:anywhere] animate-fade-in">
-            <ApprovalCard
-                request={{
-                    question: approval.text,
-                    details: 'Nothing happens until you allow it.',
-                    confirmLabel: 'Allow'
-                }}
-                onConfirm={() => decide(true)}
-                onCancel={() => decide(false)}
-            />
-        </div>
+        <ApprovalCard
+            avatar={<Asking mascot={mascot} />}
+            avatarOutside={avatarOutside}
+            question={
+                <>
+                    {showBerry ? 'I’d like to ' : `${name} wants to `}
+                    {siteParts(asContinuation(approval.text)).map((part, index) => (part.site ? <Site key={index}>{part.text}</Site> : part.text))}
+                </>
+            }
+            exactly={approval.text}
+            onConfirm={() => decide(true)}
+            onCancel={() => decide(false)}
+        />
     )
 }
 

@@ -57,3 +57,24 @@ export const Choice = <T extends string>({
         ))}
     </div>
 )
+
+// Words in a row, with the chosen one underlined. Quieter than a segmented control, for a row of filters.
+export const QuietChoice = <T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) => (
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-x-4">
+        {options.map((option) => (
+            <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={value === option.value}
+                onClick={() => onChange(option.value)}
+                className={cn(
+                    "h-7 text-13 outline-none rounded-control underline-offset-[6px] decoration-[1.5px] transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    value === option.value ? "underline" : "text-muted-foreground hover:text-foreground"
+                )}
+            >
+                {option.label}
+            </button>
+        ))}
+    </div>
+)
