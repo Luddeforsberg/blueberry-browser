@@ -28,6 +28,12 @@ describe('what might change', () => {
         expect(applyRecordedValue(changeRecordedValue(form('Find a cat in the category', 'cat'), 0, 'dog'), 0).instructions).toBe('Find a dog in the category')
     })
 
+    it("leaves an address's path alone, but not what it's searching for", () => {
+        expect(applyRecordedValue(changeRecordedValue(form('Go to shop.example/product/1 and buy 1', '1'), 0, '2'), 0).instructions).toBe('Go to shop.example/product/1 and buy 2')
+        expect(applyRecordedValue(changeRecordedValue(form('Go to https://shop.example/usb?q=usb', 'usb'), 0, 'hdmi'), 0).instructions).toBe('Go to https://shop.example/usb?q=hdmi')
+        expect(applyRecordedValue(changeRecordedValue(form('Book it on 12/03', '12/03'), 0, '14/03'), 0).instructions).toBe('Book it on 14/03')
+    })
+
     it('takes a value as written, and a pending one still gets saved', () => {
         const pending = changeRecordedValue(form('Find a+b now', 'a+b'), 0, '$& c')
         expect(toDraft(pending).instructions).toBe('Find $& c now')

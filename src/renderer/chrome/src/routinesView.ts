@@ -84,7 +84,10 @@ const swapValue = (text: string, from: string, to: string) => {
     const before = sameKind(from[0])
     const after = sameKind(from[from.length - 1])
     const value = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return text.replace(new RegExp(`${before ? `(?<!${before})` : ''}${value}${after ? `(?!${after})` : ''}`, 'gu'), () => to)
+    const whole = `${before ? `(?<!${before})` : ''}${value}${after ? `(?!${after})` : ''}`
+    // An address's path isn't the value, even where it looks like it, as a value of 1 in /product/1. Matched first to be passed over.
+    if (from.includes('/')) return text.replace(new RegExp(whole, 'gu'), () => to)
+    return text.replace(new RegExp(`\\S*/[^\\s?]*|${whole}`, 'gu'), (found) => (found.includes('/') ? found : to))
 }
 
 // While it's being typed, only the row changes. A half-typed value, or none, would wreck the instructions.
