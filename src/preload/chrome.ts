@@ -130,6 +130,12 @@ const chromeAPI: ChromeAPI = {
     getRuns: (id) => invoke("routines:runs", id),
     markSeen: () => invoke("routines:mark-seen"),
   },
+  memory: {
+    decide: (offerId, keep) => invoke("memory:decide", offerId, keep),
+    edit: (factId, text) => invoke("memory:edit", factId, text),
+    forget: (factId) => invoke("memory:forget", factId),
+    clear: (mascotId) => invoke("memory:clear", mascotId),
+  },
   mascots: {
     save: (id, draft) => invoke("mascots:save", id, draft),
     delete: (id) => invoke("mascots:delete", id),

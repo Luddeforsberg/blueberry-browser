@@ -59,6 +59,8 @@ export interface ChatThreadMessage {
   role: "user" | "assistant";
   content: string;
   steps?: ChatStep[];
+  // What its bird remembered going into this reply, by id, so forgetting one takes it off here too.
+  memoryIds?: string[];
 }
 
 export interface ChatThreadSummary {
@@ -80,6 +82,8 @@ export interface ChatThread extends ChatThreadSummary {
   approval: ChatApproval | null;
   // Why the last reply failed, until the next message.
   error: string | null;
+  // What the running reply went in remembering. Empty when no reply is running.
+  memoryIds: string[];
 }
 
 // Whether a tab in a job's working view has a picture, and why not if it doesn't.
@@ -171,6 +175,8 @@ export interface RoutineRun {
   tokens: number | null;
   // False until the user has opened Routines since it ended.
   seen: boolean;
+  // What its bird remembered going into this run, by id.
+  memoryIds?: string[];
 }
 
 export interface Routine {
@@ -224,6 +230,35 @@ export interface MascotProfile extends MascotDraft {
   // Its row on the Gallery's server, if the user published it. Saving here doesn't change that row.
   publishedId?: string;
 }
+
+// Something one mascot remembers about how the user likes things done, because they pressed Remember. It's kept apart from
+// the mascot, in a file of its own, so nothing that copies or publishes a mascot can take it along.
+export interface MemoryFact {
+  id: string;
+  mascotId: string;
+  // Exactly what the user saw, and exactly what the model reads.
+  text: string;
+  // The one site it's about, as a hostname. Null if it's about how they like things anywhere.
+  site: string | null;
+  savedAt: number;
+}
+
+// What a bird would like to remember, waiting for the user. It's not memory, and nothing reads it but the screen it's on.
+export interface MemoryOffer {
+  id: string;
+  mascotId: string;
+  // The chat or routine run it came after.
+  sourceId: string;
+  text: string;
+  site: string | null;
+}
+
+export interface MemoryState {
+  facts: MemoryFact[];
+  offers: MemoryOffer[];
+}
+
+export type MemoryResult = { ok: true } | { ok: false; error: string };
 
 // "I asked this, and here's what it gave me". Plain text everywhere it shows, never rendered as markdown.
 export interface MascotExample {
@@ -343,4 +378,5 @@ export interface LibrarySnapshot {
   mascots: MascotProfile[];
   // Oldest first.
   needsYou: NeedsYouItem[];
+  memory: MemoryState;
 }

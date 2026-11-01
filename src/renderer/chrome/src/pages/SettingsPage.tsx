@@ -193,6 +193,17 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         onChange={(suggestions) => updateSettings({ suggestions })}
                                     />
                                 </SettingsRow>
+                                <SettingsRow
+                                    id="setting-memory-offers"
+                                    title="Offers to remember"
+                                    description="After a job, a bird may offer to remember how you like something done. To word the offer, what you typed in that chat or routine and the names of the sites it used go to the AI service, never page text or the reply. Nothing is kept unless you press Remember, and each bird’s page in Flock shows all it has. Off means no more offers, and what’s kept stays in use until you forget it there."
+                                >
+                                    <Switch
+                                        labelledBy="setting-memory-offers"
+                                        checked={settings.memoryOffers}
+                                        onChange={(memoryOffers) => updateSettings({ memoryOffers })}
+                                    />
+                                </SettingsRow>
                                 <SettingsRow id="setting-pages" title="Pages Berry reads" description="Messages in the Berry panel include the open page's text and a screenshot, which go to the AI service to answer them." />
                             </>
                         )}

@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -45,6 +45,8 @@ export interface Settings {
   siteZoom: Record<string, number>;
   // Whether the new tab page offers what it noticed you repeat. Off means no model call.
   suggestions: boolean;
+  // Whether a bird may offer to remember something after a job. Off means no model call. What's kept stays in use.
+  memoryOffers: boolean;
   // Send to the phone even while the user is at the computer, for filming and trying it out.
   phoneAlways: boolean;
   // Who the next new chat runs as. Null is Berry.
@@ -421,6 +423,13 @@ export interface InvokeChannels {
   // Null if the server couldn't say.
   "mascots:published": { region: "chrome"; args: []; result: PublishedMascot[] | null };
   "mascots:last-author": { region: "chrome"; args: []; result: string };
+  // By the offer's id, so what's kept is what main showed, not what a renderer sends. Only the chrome can reach these: no
+  // page, tool or mascot can read or write memory.
+  "memory:decide": { region: "chrome"; args: [offerId: string, keep: boolean]; result: MemoryResult };
+  "memory:edit": { region: "chrome"; args: [factId: string, text: string]; result: MemoryResult };
+  "memory:forget": { region: "chrome"; args: [factId: string]; result: boolean };
+  // Asks first, in main.
+  "memory:clear": { region: "chrome"; args: [mascotId: string]; result: boolean };
   "account:state": { region: "chrome"; args: []; result: AccountState };
   "account:sign-in": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
   "account:sign-up": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
@@ -602,6 +611,13 @@ export interface MascotsAPI {
   lastAuthor: () => Promise<string>;
 }
 
+export interface MemoryAPI {
+  decide: (offerId: string, keep: boolean) => Promise<MemoryResult>;
+  edit: (factId: string, text: string) => Promise<MemoryResult>;
+  forget: (factId: string) => Promise<boolean>;
+  clear: (mascotId: string) => Promise<boolean>;
+}
+
 export interface AccountAPI {
   state: () => Promise<AccountState>;
   signIn: (email: string, password: string) => Promise<AccountState>;
@@ -675,6 +691,7 @@ export interface ChromeAPI {
   find: FindAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
+  memory: MemoryAPI;
   account: AccountAPI;
   suggestions: SuggestionsAPI;
   downloads: DownloadsAPI;

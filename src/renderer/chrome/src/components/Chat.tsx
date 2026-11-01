@@ -4,6 +4,7 @@ import { useChat, type Message } from '../contexts/ChatContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useAssistantName, BerrySpot } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, ThinkingMessage, UserMessage, useFollowReply } from './ChatMessage'
+import { MemoryOffers } from './MemoryInChat'
 import { PageCard } from './PageCard'
 import { ChatComposer } from './Composer'
 import { siteAllowed } from '@shared/mascots'
@@ -32,6 +33,7 @@ const ConversationTurnComponent: React.FC<{
                 waiting={waiting}
                 mascot={mascot}
                 failed={failed}
+                memoryIds={turn.assistant.memoryIds}
             />
         )}
         {isLoading && <ThinkingMessage mascot={mascot} />}
@@ -111,6 +113,7 @@ export const Chat: React.FC = () => {
                         ))}
                         {chatId && approval && <ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} />}
                         {error && <ChatError message={error} />}
+                        {!isLoading && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                     </div>
                 )}
             </div>

@@ -207,6 +207,10 @@ export class EventManager {
     this.handle("routines:stop", (runId) => routines.stop(runId));
     this.handle("routines:runs", (id) => routines.runs(id));
     this.handle("routines:mark-seen", () => routines.markSeen());
+    this.handle("memory:decide", (offerId, keep) => this.mainWindow.memory.decide(offerId, keep === true));
+    this.handle("memory:edit", (factId, text) => this.mainWindow.memory.edit(factId, text));
+    this.handle("memory:forget", (factId) => this.mainWindow.memory.forget(factId));
+    this.handle("memory:clear", (mascotId) => this.mainWindow.confirmClearMemory(mascotId));
     this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
     this.handle("mascots:gallery", () => this.mainWindow.gallery.list());

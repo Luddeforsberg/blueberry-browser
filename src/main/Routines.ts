@@ -156,12 +156,12 @@ export class Routines {
       .then((result) => this.finish(routine.id, run, result));
   }
 
-  private onProgress(routine: StoredRoutine, run: ActiveRun, { steps, approval, tokens }: TaskProgress): void {
+  private onProgress(routine: StoredRoutine, run: ActiveRun, { steps, approval, tokens, memoryIds }: TaskProgress): void {
     if (this.stopped) return;
     const asking = approval !== null && run.approval?.id !== approval.id;
     run.steps = steps;
     run.approval = approval;
-    this.store.updateRun(run.runId, steps, approval, tokens || null);
+    this.store.updateRun(run.runId, steps, approval, tokens || null, memoryIds);
     if (asking && this.store.routine(routine.id)) this.events.onAttention(routine, "needs-approval");
     this.events.onChanged();
     // A place may have come free, or been taken back, now this run is waiting or going again.

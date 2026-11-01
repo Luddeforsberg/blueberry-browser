@@ -5,6 +5,7 @@ import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { ChatApprovalCard, ChatError, Markdown, StepTrail } from './ChatMessage'
+import { MemoryOffers, RememberedLine } from './MemoryInChat'
 
 // Status colours always come with words, so colour is never the only signal.
 const STATUS: Record<RoutineStatus, { label: string; className: string }> = {
@@ -52,6 +53,11 @@ export const RoutineRunCard: React.FC<{
                     This ran late. It was due {formatTime(run.lateFor)}, when the app was closed or the computer was asleep.
                 </p>
             )}
+            {(run.memoryIds?.length ?? 0) > 0 && (
+                <div className="mt-3">
+                    <RememberedLine ids={run.memoryIds} />
+                </div>
+            )}
             {run.steps.length > 0 && (
                 <div className="mt-3">
                     <StepTrail steps={run.steps} running={open} cutShort={ended} />
@@ -65,6 +71,11 @@ export const RoutineRunCard: React.FC<{
             {run.result && (
                 <div className="mt-3">
                     <Markdown content={run.result} />
+                </div>
+            )}
+            {run.status === 'finished' && (
+                <div className="mt-3 empty:hidden">
+                    <MemoryOffers sourceId={run.id} mascot={mascot} />
                 </div>
             )}
             {run.status === 'finished' && !run.result && (

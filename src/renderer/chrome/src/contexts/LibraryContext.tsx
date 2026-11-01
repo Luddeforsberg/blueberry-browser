@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { LibrarySnapshot, MascotProfile } from '@shared/library'
 import { BERRY, BERRY_ID } from '@shared/mascots'
 
-const EMPTY: LibrarySnapshot = { pinned: [], bookmarks: [], chats: [], routines: [], mascots: [BERRY], needsYou: [] }
+const EMPTY: LibrarySnapshot = { pinned: [], bookmarks: [], chats: [], routines: [], mascots: [BERRY], needsYou: [], memory: { facts: [], offers: [] } }
 
 const LibraryContext = createContext<LibrarySnapshot>(EMPTY)
 

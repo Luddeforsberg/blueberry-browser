@@ -16,7 +16,7 @@ export const MAX_EXAMPLE_ANSWER = 6000;
 const INVISIBLE = /[\p{Cc}\p{Cf}\p{Co}\p{Default_Ignorable_Code_Point}]/gu;
 export const withoutInvisible = (text: unknown): string =>
   typeof text === "string" ? text.replace(/\r\n?/g, "\n").replace(INVISIBLE, (found) => (found === "\n" || found === "\t" ? found : "")).trim() : "";
-const cleanLine = (text: unknown): string => withoutInvisible(text).replace(/\s+/g, " ");
+export const cleanLine = (text: unknown): string => withoutInvisible(text).replace(/\s+/g, " ");
 
 const SAFE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} '’.&-]*$/u;
 const HOST_IS_LOCAL = /^(localhost|[\d.]+|\[.*\]|.*\.(local|internal|localhost|invalid|test))$/i;
@@ -112,7 +112,7 @@ export const parsePublishedRow = (input: unknown): GalleryMascot | null => {
   };
 };
 
-const SECRET_SHAPES: { name: string; shape: RegExp }[] = [
+export const SECRET_SHAPES: { name: string; shape: RegExp }[] = [
   { name: "an email address", shape: /[^\s@<>()]+@[^\s@<>()]+\.[a-z]{2,}/i },
   { name: "an API key or token", shape: /\b(?:sk|pk|rk|sb)[-_][a-z0-9_-]{16,}|\bgh[pousr]_[a-z0-9]{20,}|\bgithub_pat_\w{20,}|\bAKIA[0-9A-Z]{16}\b|\bxox[a-z]-[a-z0-9-]{10,}|\bBearer\s+[\w.-]{16,}|\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{5,}/i },
   { name: "a password", shape: /\b(?:password|passwd|lösenord|pwd|secret|api[ _-]?key)\b\s*(?:is|är|[:=])\s*\S+/i },

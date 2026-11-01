@@ -43,12 +43,24 @@ export const confirmDeleteRoutine = async (window: BaseWindow, name: string): Pr
   return response === 0;
 };
 
+export const confirmClearMemory = async (window: BaseWindow, name: string, count: number): Promise<boolean> => {
+  const { response } = await dialog.showMessageBox(window, {
+    type: "warning",
+    message: `Forget everything ${name} remembers?`,
+    detail: `${count === 1 ? "The one thing it remembers goes" : `All ${count} things it remembers go`}, and it can’t be undone. Other birds aren’t affected, because they never had it.`,
+    buttons: ["Forget Everything", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  return response === 0;
+};
+
 export const confirmDeleteMascot = async (window: BaseWindow, name: string, routines: number, published = false): Promise<boolean> => {
   const paused = routines === 0 ? "" : ` ${routines === 1 ? "The routine it runs pauses" : `The ${routines} routines it runs pause`}, and stay${routines === 1 ? "s" : ""} limited to what it could do.`;
   const { response } = await dialog.showMessageBox(window, {
     type: "warning",
     message: `Delete “${name}”?`,
-    detail: `It leaves your flock. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,
+    detail: `It leaves your flock, and what it remembers is forgotten. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,
     buttons: ["Delete", "Cancel"],
     defaultId: 1,
     cancelId: 1,
