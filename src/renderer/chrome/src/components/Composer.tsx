@@ -21,6 +21,10 @@ export const Composer: React.FC<{
     // The + button. With no handler it stays disabled until attachments exist.
     onAdd?: () => void
     addLabel?: string
+    // Leaves out the + button where there's nothing to add.
+    noAdd?: boolean
+    // With no box of its own, because the window it's in is the box.
+    bare?: boolean
     canSend: boolean
     onSend: () => void
     // While a reply is running, the send button stops it.
@@ -28,7 +32,7 @@ export const Composer: React.FC<{
     // Who this goes to. With `onChooseMascot`, pressing it opens the flock. Without, it just says who.
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, canSend, onSend, onStop, mascot, onChooseMascot }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
 
@@ -52,8 +56,8 @@ export const Composer: React.FC<{
                 if (!(event.target as Element).closest('button')) textareaRef.current?.focus()
             }}
             className={cn(
-                "relative w-full p-2 pl-3 rounded-composer border bg-surface shadow-raised cursor-text",
-                "transition-colors focus-within:border-muted-foreground/30"
+                "relative w-full cursor-text",
+                bare ? "p-1.5 pl-2" : "p-2 pl-3 rounded-composer border bg-surface shadow-raised transition-colors focus-within:border-muted-foreground/30"
             )}
         >
             {choosing && mascot && onChooseMascot && (
@@ -81,32 +85,35 @@ export const Composer: React.FC<{
                     spellCheck={spellCheck}
                     onChange={(event) => onChange(event.target.value)}
                     onKeyDown={onKeyDown}
-                    className="flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none placeholder:text-muted-foreground"
+                    className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
                 />
                 {mascot && (
                     <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
                 )}
-                <button
-                    type="button"
-                    aria-label={addLabel ?? 'Add to chat'}
-                    title={addLabel ?? 'Adding files arrives with the backend'}
-                    onClick={onAdd}
-                    disabled={!onAdd}
-                    className={cn(
-                        "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
-                        "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                        "disabled:hover:bg-transparent disabled:text-muted-foreground"
-                    )}
-                >
-                    <Plus className="size-5" />
-                </button>
+                {!noAdd && (
+                    <button
+                        type="button"
+                        aria-label={addLabel ?? 'Add to chat'}
+                        title={addLabel ?? 'Adding files arrives with the backend'}
+                        onClick={onAdd}
+                        disabled={!onAdd}
+                        className={cn(
+                            "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
+                            "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                            "disabled:hover:bg-transparent disabled:text-muted-foreground"
+                        )}
+                    >
+                        <Plus className="size-5" />
+                    </button>
+                )}
                 <button
                     type="button"
                     aria-label={onStop ? 'Stop' : 'Send'}
                     onClick={onStop ?? onSend}
                     disabled={!onStop && !canSend}
                     className={cn(
-                        "size-9 shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
+                        bare ? "size-8 mb-0.5 disabled:opacity-40" : "size-9",
+                        "shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
                         "bg-primary text-primary-foreground hover:brightness-110",
                         "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
                         "disabled:hover:brightness-100"

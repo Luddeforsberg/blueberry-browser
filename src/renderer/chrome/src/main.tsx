@@ -4,6 +4,7 @@ import { ChromeApp } from './ChromeApp'
 import { OverlayApp } from './OverlayApp'
 import { FindApp } from './FindApp'
 import { PromptApp } from './PromptApp'
+import { DesktopApp, DesktopComposerApp } from './DesktopApp'
 import './index.css'
 
 // Main loads this page into each chrome view, and `view` says which one it is.
@@ -11,6 +12,6 @@ const view = new URLSearchParams(window.location.search).get('view')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'prompt' ? <PromptApp /> : <ChromeApp />}
+        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
     </React.StrictMode>
 )

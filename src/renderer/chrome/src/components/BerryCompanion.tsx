@@ -97,6 +97,9 @@ export const BerryCompanion: React.FC = () => {
     const [atSpot, setAtSpot] = useState(false)
     // The composer it's standing on. It's drawn inside that box, so the page can't scroll one without the other.
     const [home, setHome] = useState<HTMLElement | null>(null)
+    // Out on the desktop, so there's an empty place here rather than a second bird.
+    const [away, setAway] = useState(false)
+    useEffect(() => window.chromeAPI.desktop.onAway(setAway), [])
 
     const activeId = activeTab?.id
     const canFly = useCallback(
@@ -224,7 +227,7 @@ export const BerryCompanion: React.FC = () => {
                 ref={box}
                 data-berry-companion
                 className="fixed left-0 top-0 z-40 pointer-events-none origin-top-left"
-                style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible && !home ? undefined : 'hidden' }}
+                style={{ width: BASE_SIZE, height: BASE_SIZE, visibility: visible && !home ? undefined : 'hidden', opacity: away ? 0 : undefined }}
             >
                 {!home && bird}
             </div>
@@ -232,7 +235,7 @@ export const BerryCompanion: React.FC = () => {
                 <div
                     data-berry-perched
                     className="absolute pointer-events-none"
-                    style={{ right: HOME_RIGHT, top: -HOME_SIZE * STANDING_FEET, width: HOME_SIZE, height: HOME_SIZE }}
+                    style={{ right: HOME_RIGHT, top: -HOME_SIZE * STANDING_FEET, width: HOME_SIZE, height: HOME_SIZE, opacity: away ? 0 : undefined }}
                 >
                     {/* The shadow its feet leave on the box, cut off at the edge so it only falls on the box. */}
                     <div aria-hidden className="absolute h-2 overflow-hidden" style={{ left: HOME_SIZE * FEET_X - 24, width: 48, top: HOME_SIZE * STANDING_FEET }}>

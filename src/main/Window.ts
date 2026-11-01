@@ -31,6 +31,7 @@ import { SiteZoom } from "./siteZoom";
 import type { Downloads } from "./Downloads";
 import type { SitePermissions } from "./SitePermissions";
 import { PermissionPromptView } from "./PermissionPromptView";
+import { DesktopBerry } from "./DesktopBerry";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -82,6 +83,8 @@ const MENU_CLICK_GRACE_MS = 1000;
 const AWAY_AFTER_IDLE_SECONDS = 60;
 const MAX_SUGGESTION_VISITS = 5000;
 const MAX_SUGGESTION_CHATS = 100;
+// A page in the chrome that's stuck doesn't get to hold up the bird.
+const TAKE_OFF_ASK_MS = 300;
 
 export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 // App menu items that only do something on a web page.
@@ -119,6 +122,7 @@ export class Window {
   readonly routines: Routines;
   readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
+  readonly desktopBerry: DesktopBerry;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -301,9 +305,40 @@ export class Window {
       onChanged: () => this.publishSuggestions(),
     });
 
+    this.desktopBerry = new DesktopBerry({
+      settings: () => this.settings,
+      update: (patch) => this.updateSettings(patch),
+      library: () => this.librarySnapshot,
+      mascot: (id) => this.mascotStore.resolve(id),
+      nameOf: (mascotId) => this.mascotName(mascotId),
+      inFront: () => this._baseWindow.isFocused() && this.windowShowing,
+      stillMotion: () => systemPreferences.getAnimationSettings().prefersReducedMotion,
+      theme: () => this.theme,
+      takeOffPoint: () => this.birdOnScreen(),
+      setAway: (away) => sendToRenderer(this.chrome.view.webContents, "desktop:away", away),
+      ended: (chatId) => {
+        const chat = this.chats.thread(chatId);
+        if (!chat || this.chats.work(chatId)?.outcome === "stopped") return null;
+        const last = chat.messages.at(-1);
+        return { mascotId: chat.mascotId ?? BERRY.id, error: chat.error, text: last?.role === "assistant" ? last.content : "" };
+      },
+      chatOnScreen: (chatId) => {
+        const entry = this.activeEntry;
+        return this._baseWindow.isFocused() && this.windowShowing && entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId;
+      },
+      send: (text, mascotId) => this.chats.send(null, text, { seePage: false, mascotId }) !== null,
+      open: (target) => {
+        this.bringForward();
+        if (target.page === "chat") this.openPage("chat", { param: target.chatId });
+        else this.openPage("needs-you", { param: target.approvalId });
+      },
+      showBlueberry: () => this.bringForward(),
+    });
+
     if (restored) this.restoreSession(restored);
     else this.createTab();
     this.updateAllBounds();
+    this.desktopBerry.sync();
     this.routines.start();
     this.telegram.start();
     this.phone.start();
@@ -317,12 +352,16 @@ export class Window {
     this._baseWindow.on("blur", () => {
       this.hideFloatingSidebar();
       this.phone.sync();
+      this.desktopBerry.mainWindowBlurred();
     });
+    this._baseWindow.on("focus", () => this.desktopBerry.mainWindowFocused());
+    this._baseWindow.on("minimize", () => this.desktopBerry.mainWindowGone());
 
     const onThemeUpdated = () => this.notifyTheme();
     nativeTheme.on("updated", onThemeUpdated);
 
     this._baseWindow.on("closed", () => {
+      this.desktopBerry.destroy();
       this.workViews.destroy();
       this.recordings.destroy();
       nativeTheme.off("updated", onThemeUpdated);
@@ -419,7 +458,8 @@ export class Window {
     const snapshot = this.librarySnapshot;
     const known = this.knownWaiting;
     this.knownWaiting = new Set(snapshot.needsYou.map(({ approval }) => approval.id));
-    if (!this.userIsBusyOrHere) {
+    // The bird on the desktop says so instead, and it isn't one more thing to clear.
+    if (!this.userIsBusyOrHere && !this.settings.desktopBerry) {
       snapshot.needsYou
         .filter(({ approval }) => !known.has(approval.id))
         .forEach(({ approval, mascotId }) => {
@@ -432,6 +472,7 @@ export class Window {
     }
     this.broadcast("library:updated", snapshot);
     this.phone.sync();
+    this.desktopBerry.libraryChanged(snapshot);
   }
 
   private mascotName(mascotId: string): string {
@@ -819,6 +860,7 @@ export class Window {
     this.workViews.sync();
     this.notifyTabs();
     this.updateAllBounds();
+    this.desktopBerry.sync();
 
     return true;
   }
@@ -1099,6 +1141,7 @@ export class Window {
     if (after.onStartup !== before.onStartup) this.saveSessionSoon();
     if (after.suggestions !== before.suggestions) this.publishSuggestions();
     if (after.phoneAlways !== before.phoneAlways) this.phone.sync();
+    this.desktopBerry.sync(after.desktopBerry && !before.desktopBerry);
 
     this.broadcast("settings:updated", after);
     this.updateAllBounds();
@@ -1148,6 +1191,39 @@ export class Window {
 
   show(): void {
     this._baseWindow.show();
+  }
+
+  // Hiding the whole app takes the bird with it, and showing the bird again brings everything back. So while it's out
+  // on the desktop, Hide Blueberry hides this window alone.
+  hideBlueberry(): void {
+    if (!this.settings.desktopBerry) return app.hide();
+    this._baseWindow.hide();
+    this.desktopBerry.mainWindowGone();
+  }
+
+  // The user pressed something outside Blueberry to come here, so this one time it may take the front.
+  private bringForward(): void {
+    if (this._baseWindow.isMinimized()) this._baseWindow.restore();
+    if (process.platform === "darwin") app.show();
+    this._baseWindow.show();
+    app.focus({ steal: true });
+    this._baseWindow.focus();
+  }
+
+  // The chrome's own bird, on the screen, or the middle of the window if it isn't drawing one right now.
+  private async birdOnScreen(): Promise<{ x: number; y: number }> {
+    const { x, y, width, height } = this._baseWindow.getContentBounds();
+    const middle = { x: x + width / 2, y: y + height / 2 };
+    const asked = this.chrome.view.webContents
+      .executeJavaScript(
+        `(() => {
+          const drawn = [...document.querySelectorAll("[data-berry-perched] svg, [data-berry-companion] svg")].map((bird) => bird.getBoundingClientRect()).find(({ width }) => width > 0);
+          return drawn ? { x: drawn.x + drawn.width / 2, y: drawn.y + drawn.height / 2 } : null;
+        })()`
+      )
+      .catch(() => null) as Promise<{ x: number; y: number } | null>;
+    const inChrome = await Promise.race([asked, new Promise<null>((resolve) => setTimeout(() => resolve(null), TAKE_OFF_ASK_MS))]);
+    return inChrome ? { x: x + inChrome.x, y: y + inChrome.y } : middle;
   }
 
   close(): void {
@@ -1217,6 +1293,7 @@ export class Window {
     }
     this.broadcast("theme:updated", this.theme);
     this.findBar.notifyTheme(this.theme);
+    this.desktopBerry.notifyTheme();
     sendToRenderer(this.permissionPrompt.chrome.view.webContents, "theme:updated", this.theme);
   }
 

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, isAbsolute } from "path";
-import type { Settings } from "../shared/ipc";
+import type { DesktopBerrySpot, Settings } from "../shared/ipc";
 import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "./Layout";
 import { sanitizeSiteZoom } from "./siteZoom";
 
@@ -20,6 +20,9 @@ export const DEFAULT_SETTINGS: Settings = {
   siteZoom: {},
   suggestions: true,
   phoneAlways: false,
+  chosenMascotId: null,
+  desktopBerry: false,
+  desktopBerrySpot: null,
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -34,6 +37,19 @@ const width = (value: unknown, range: { min: number; max: number }, fallback: nu
 const folder = (value: unknown, fallback: string | null): string | null => {
   if (value === null) return null;
   return typeof value === "string" && isAbsolute(value) && !value.includes("\0") ? value : fallback;
+};
+
+const spot = (value: unknown, fallback: DesktopBerrySpot | null): DesktopBerrySpot | null => {
+  if (value === null) return null;
+  const { displayId, edge, fraction } = (value ?? {}) as Partial<DesktopBerrySpot>;
+  return Number.isFinite(displayId) && Number.isFinite(fraction)
+    ? {
+        displayId: displayId as number,
+        // Before it could stand anywhere else, it only stood on the bottom.
+        edge: pick(edge, ["bottom", "top", "left", "right"] as const, "bottom"),
+        fraction: Math.min(Math.max(fraction as number, 0), 1),
+      }
+    : fallback;
 };
 
 // Whatever arrives, from disk or a renderer, only valid values get through.
@@ -55,6 +71,9 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     siteZoom: sanitizeSiteZoom(input.siteZoom, base.siteZoom),
     suggestions: bool(input.suggestions, base.suggestions),
     phoneAlways: bool(input.phoneAlways, base.phoneAlways),
+    chosenMascotId: input.chosenMascotId === null || typeof input.chosenMascotId === "string" ? input.chosenMascotId : base.chosenMascotId,
+    desktopBerry: bool(input.desktopBerry, base.desktopBerry),
+    desktopBerrySpot: spot(input.desktopBerrySpot, base.desktopBerrySpot),
   };
 }
 

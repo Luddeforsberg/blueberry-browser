@@ -64,4 +64,19 @@ describe("SettingsStore", () => {
     expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({ layoutMode: "horizontal" });
     expect(new SettingsStore(file).get()).toMatchObject({ layoutMode: "horizontal", sidebarWidth: 300 });
   });
+
+  it("keeps the desktop bird on the edge, and refuses anything that isn't a place", () => {
+    const spot = (desktopBerrySpot: unknown) => sanitizeSettings({ desktopBerrySpot }).desktopBerrySpot;
+    expect(spot({ displayId: 1, edge: "top", fraction: 0 })).toEqual({ displayId: 1, edge: "top", fraction: 0 });
+    expect(spot({ displayId: 1, edge: "left", fraction: 1 })).toEqual({ displayId: 1, edge: "left", fraction: 1 });
+    expect(spot({ displayId: 1, edge: "right", fraction: 1.5 })).toEqual({ displayId: 1, edge: "right", fraction: 1 });
+    expect(spot({ displayId: 1, edge: "bottom", fraction: -1 })).toEqual({ displayId: 1, edge: "bottom", fraction: 0 });
+    // Saved before it could stand anywhere else, or with an edge there's no such thing as.
+    expect(spot({ displayId: 1, fraction: 0.5 })).toEqual({ displayId: 1, edge: "bottom", fraction: 0.5 });
+    expect(spot({ displayId: 1, edge: "middle", fraction: 0.5 })).toEqual({ displayId: 1, edge: "bottom", fraction: 0.5 });
+    expect(spot({ displayId: "1", fraction: 0.5 })).toBeNull();
+    expect(spot({ displayId: 1, fraction: Infinity })).toBeNull();
+    expect(spot(null)).toBeNull();
+    expect(spot(undefined)).toBeNull();
+  });
 });

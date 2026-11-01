@@ -19,6 +19,9 @@ export class AppMenu {
             accelerator: "CmdOrCtrl+,",
             click: () => this.mainWindow.openPage("settings"),
           },
+          ...(process.platform === "darwin"
+            ? [{ label: "Hide Blueberry", accelerator: "Command+H", click: () => this.mainWindow.hideBlueberry() }]
+            : []),
           {
             label: "Downloads",
             accelerator: "CmdOrCtrl+Shift+J",
