@@ -233,7 +233,8 @@ export class Chats {
     });
     this.handedBack.forEach(({ url }) => {
       const details = url.search(/[?#]/);
-      if (details !== -1) this.addressDetails.add(url.slice(details));
+      // A bare "#" or "?" holds no secret, and taking it out would mangle everything else the model reads.
+      if (details !== -1 && url.length - details >= 4) this.addressDetails.add(url.slice(details));
     });
     this.addressDetails.forEach((details) => {
       clean = clean.replaceAll(details, ADDRESS_DETAILS_REMOVED);

@@ -476,6 +476,15 @@ describe("Chats", () => {
         expect(refused?.message).not.toMatch(/s3cret|t0ken/);
       });
 
+      it("leaves the model's text alone when a handed-back tab's address ends in a bare # or ?", async () => {
+        const { chats, own, id, approvalId } = await handedOver("sign-in");
+        chats.decide(id, approvalId, true);
+        for (const end of ["#", "?"]) {
+          (own as unknown as { url: string }).url = `https://example.com/account${end}`;
+          expect(chats.withoutCodes("# Orders? Issue #12")).toBe("# Orders? Issue #12");
+        }
+      });
+
       it("takes a code out however a page says it back, even in text that looks like a picture", async () => {
         const { chats, enter } = await handedOver("code");
         await enter();
