@@ -96,14 +96,14 @@ var MAX_DESCRIPTION = 140;
 var MAX_EXAMPLE_PROMPT = 2e3;
 var MAX_EXAMPLE_ANSWER = 6e3;
 var INVISIBLE = /[\p{Cc}\p{Cf}\p{Co}\p{Default_Ignorable_Code_Point}]/gu;
-var cleanText = (text) => typeof text === "string" ? text.replace(/\r\n?/g, "\n").replace(INVISIBLE, (found) => found === "\n" || found === "	" ? found : "").trim() : "";
-var cleanLine = (text) => cleanText(text).replace(/\s+/g, " ");
+var withoutInvisible = (text) => typeof text === "string" ? text.replace(/\r\n?/g, "\n").replace(INVISIBLE, (found) => found === "\n" || found === "	" ? found : "").trim() : "";
+var cleanLine = (text) => withoutInvisible(text).replace(/\s+/g, " ");
 var SAFE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} '’.&-]*$/u;
 var HOST_IS_LOCAL = /^(localhost|[\d.]+|\[.*\]|.*\.(local|internal|localhost|invalid|test))$/i;
 var isPublicSite = (site) => !HOST_IS_LOCAL.test(site);
 var parsePublicDraft = (input) => {
   const { name, instructions, ...rest } = input ?? {};
-  const parsed = parseMascotDraft({ ...rest, name: cleanLine(name), instructions: cleanText(instructions) });
+  const parsed = parseMascotDraft({ ...rest, name: cleanLine(name), instructions: withoutInvisible(instructions) });
   if ("error" in parsed) return parsed;
   const { draft } = parsed;
   if (!SAFE_NAME.test(draft.name)) return { error: "To publish it, its name can only have letters, numbers, spaces and ' . & -." };
@@ -115,7 +115,7 @@ var parsePublicDraft = (input) => {
 var parseExample = (input) => {
   if (input === null || input === void 0) return { example: null };
   const { prompt, answer } = input;
-  const clean = { prompt: cleanText(prompt), answer: cleanText(answer) };
+  const clean = { prompt: withoutInvisible(prompt), answer: withoutInvisible(answer) };
   if (!clean.prompt || !clean.answer) return { error: "An example needs both what was asked and what it gave. Or choose no example." };
   if (clean.prompt.length > MAX_EXAMPLE_PROMPT) return { error: `Keep what was asked under ${MAX_EXAMPLE_PROMPT} characters.` };
   if (clean.answer.length > MAX_EXAMPLE_ANSWER) return { error: `Keep the answer under ${MAX_EXAMPLE_ANSWER} characters. Cut it down to what shows the mascot best.` };

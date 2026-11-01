@@ -18,6 +18,7 @@ export interface PageMenuActions {
   replaceWord: (word: string) => void;
   addToDictionary: (word: string) => void;
   askBerry: (text: string) => void;
+  showHow: () => void;
   print: () => void;
   inspect: () => void;
 }
@@ -26,6 +27,7 @@ export interface PageMenuState {
   canGoBack: boolean;
   canGoForward: boolean;
   assistantName: string;
+  recording: boolean;
 }
 
 export type PageMenuParams = Pick<
@@ -97,6 +99,7 @@ export function pageMenuTemplate(
       { label: "Reload", click: actions.reload },
     ]);
     groups.push([{ label: "Select All", click: actions.selectAll }]);
+    groups.push([{ label: state.recording ? `Stop Showing ${state.assistantName}` : `Show ${state.assistantName} How`, click: actions.showHow }]);
   }
 
   groups.push([
@@ -117,7 +120,14 @@ export const printPage = (contents: WebContents): void => {
 export function attachPageMenu(
   tab: Tab,
   window: BaseWindow,
-  app: { openTab: (url: string) => void; askBerry: (text: string) => void; assistantName: () => string }
+  app: {
+    openTab: (url: string) => void;
+    askBerry: (text: string) => void;
+    assistantName: () => string;
+    recording: () => boolean;
+    startRecording: () => void;
+    stopRecording: () => void;
+  }
 ): void {
   const contents = tab.webContents;
   const live = (action: () => void) => () => {
@@ -142,10 +152,11 @@ export function attachPageMenu(
       replaceWord: (word) => live(() => contents.replaceMisspelling(word))(),
       addToDictionary: (word) => live(() => contents.session.addWordToSpellCheckerDictionary(word))(),
       askBerry: app.askBerry,
+      showHow: () => (app.recording() ? app.stopRecording() : app.startRecording()),
       print: live(() => printPage(contents)),
       inspect: live(() => contents.inspectElement(params.x, params.y)),
     };
-    const state = { canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, assistantName: app.assistantName() };
+    const state = { canGoBack: tab.canGoBack, canGoForward: tab.canGoForward, assistantName: app.assistantName(), recording: app.recording() };
     Menu.buildFromTemplate(pageMenuTemplate(params, state, actions)).popup({ window });
   });
 }

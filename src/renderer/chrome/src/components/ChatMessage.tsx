@@ -133,6 +133,16 @@ export const AssistantMessage: React.FC<{
     </div>
 )
 
+// Left foot, right foot.
+export const StepFootprint: React.FC<{ index: number }> = ({ index }) => (
+    <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
+        <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
+        <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
+        <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
+        <ellipse cx={0} cy={3} rx={1} ry={2.1} />
+    </svg>
+)
+
 // What Berry did on the way to a reply: a footprint for each step behind it, and the berry on the one it's on now. Most of
 // it folds into one quiet line, and every step is there behind that line. `cutShort` is for a job that never got to its
 // answer, which keeps its last steps showing so you can see where it ended.
@@ -158,12 +168,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
                         <li key={index} className="flex items-center gap-3">
                             <span className="size-4 shrink-0 flex items-center justify-center text-primary">
                                 {step.done ? (
-                                    <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
-                                        <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
-                                        <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
-                                        <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
-                                        <ellipse cx={0} cy={3} rx={1} ry={2.1} />
-                                    </svg>
+                                    <StepFootprint index={index} />
                                 ) : (
                                     <BerryDot working />
                                 )}

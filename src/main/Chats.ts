@@ -16,7 +16,7 @@ import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
-import { BERRY, siteAllowed } from "../shared/mascots";
+import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
@@ -219,7 +219,7 @@ export class Chats {
       takenOver: job.takenOver,
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
-      limits: run.mascot.id === BERRY.id ? undefined : run.mascot,
+      limits: run.mascot.id === BERRY.id && run.mascot.sites.length === 0 ? undefined : run.mascot,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
@@ -585,8 +585,9 @@ export class Chats {
 
   // Runs one message as a chat with no page would, with the same tools and the same approvals, under an id of the
   // caller's. Nothing is saved here. `stop` and `decide` take that id. Never rejects.
-  async runTask(id: string, message: string, onProgress: (progress: TaskProgress) => void, mascotId: string | null = null): Promise<TaskResult> {
+  async runTask(id: string, message: string, onProgress: (progress: TaskProgress) => void, mascotId: string | null = null, sites: string[] = []): Promise<TaskResult> {
     let tokens = 0;
+    const mascot = this.mascotOf(mascotId);
     const run: Run = {
       controller: new AbortController(),
       partial: "",
@@ -598,7 +599,8 @@ export class Chats {
       sites: new Set(),
       startedAt: Date.now(),
       withPage: false,
-      mascot: this.mascotOf(mascotId),
+      // A routine's own sites can only narrow what its mascot may do.
+      mascot: { ...mascot, sites: narrowSites(mascot.sites, sites) },
       onChange: () =>
         onProgress({
           steps: run.steps.map((step) => ({ ...step })),

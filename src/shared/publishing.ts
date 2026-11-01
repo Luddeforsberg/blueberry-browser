@@ -14,9 +14,9 @@ export const MAX_EXAMPLE_ANSWER = 6000;
 // Text a person can't see but a model can read, and text that shows in a different order than it's stored. What's on
 // the review screen has to be what the mascot is told. Newlines and tabs stay.
 const INVISIBLE = /[\p{Cc}\p{Cf}\p{Co}\p{Default_Ignorable_Code_Point}]/gu;
-const cleanText = (text: unknown): string =>
+export const withoutInvisible = (text: unknown): string =>
   typeof text === "string" ? text.replace(/\r\n?/g, "\n").replace(INVISIBLE, (found) => (found === "\n" || found === "\t" ? found : "")).trim() : "";
-const cleanLine = (text: unknown): string => cleanText(text).replace(/\s+/g, " ");
+const cleanLine = (text: unknown): string => withoutInvisible(text).replace(/\s+/g, " ");
 
 const SAFE_NAME = /^[\p{L}\p{N}][\p{L}\p{N} '’.&-]*$/u;
 const HOST_IS_LOCAL = /^(localhost|[\d.]+|\[.*\]|.*\.(local|internal|localhost|invalid|test))$/i;
@@ -27,7 +27,7 @@ const isPublicSite = (site: string) => !HOST_IS_LOCAL.test(site);
 // The same checks as a hand-made mascot, then the stricter ones for what comes from or goes to strangers.
 export const parsePublicDraft = (input: unknown): { draft: MascotDraft } | { error: string } => {
   const { name, instructions, ...rest } = (input ?? {}) as Record<string, unknown>;
-  const parsed = parseMascotDraft({ ...rest, name: cleanLine(name), instructions: cleanText(instructions) });
+  const parsed = parseMascotDraft({ ...rest, name: cleanLine(name), instructions: withoutInvisible(instructions) });
   if ("error" in parsed) return parsed;
   const { draft } = parsed;
   if (!SAFE_NAME.test(draft.name)) return { error: "To publish it, its name can only have letters, numbers, spaces and ' . & -." };
@@ -40,7 +40,7 @@ export const parsePublicDraft = (input: unknown): { draft: MascotDraft } | { err
 const parseExample = (input: unknown): { example: MascotExample | null } | { error: string } => {
   if (input === null || input === undefined) return { example: null };
   const { prompt, answer } = input as Record<string, unknown>;
-  const clean = { prompt: cleanText(prompt), answer: cleanText(answer) };
+  const clean = { prompt: withoutInvisible(prompt), answer: withoutInvisible(answer) };
   if (!clean.prompt || !clean.answer) return { error: "An example needs both what was asked and what it gave. Or choose no example." };
   if (clean.prompt.length > MAX_EXAMPLE_PROMPT) return { error: `Keep what was asked under ${MAX_EXAMPLE_PROMPT} characters.` };
   if (clean.answer.length > MAX_EXAMPLE_ANSWER) return { error: `Keep the answer under ${MAX_EXAMPLE_ANSWER} characters. Cut it down to what shows the mascot best.` };

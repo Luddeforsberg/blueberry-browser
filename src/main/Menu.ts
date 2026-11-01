@@ -210,6 +210,10 @@ export class AppMenu {
             click: () => this.mainWindow.openPage("mascot-gallery"),
           },
           {
+            label: "Show Berry How",
+            click: () => void (this.mainWindow.recordings.isRecording ? this.mainWindow.recordings.stop() : this.mainWindow.recordings.start()),
+          },
+          {
             label: "Needs You",
             click: () => this.mainWindow.openPage("needs-you"),
           },

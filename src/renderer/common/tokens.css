@@ -87,6 +87,8 @@
 
     /* The ring around a page while Berry is reading it. */
     --shadow-reading: 0 0 0 2px rgb(127 139 216), 0 0 24px rgb(127 139 216 / 0.5);
+    /* The ring around the page card while the user is showing Berry something. */
+    --shadow-recording: 0 0 0 2px rgb(var(--destructive)), 0 0 18px rgb(var(--destructive) / 0.3);
 
     /* Names kept from the starter theme, as aliases of the tokens above. */
     --card-foreground: var(--foreground);

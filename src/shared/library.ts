@@ -135,7 +135,9 @@ export type RoutineSchedule =
   // Days count from Sunday, as 0.
   | { kind: "weekly"; days: number[]; time: string }
   // A day the month doesn't have means its last day.
-  | { kind: "monthly"; day: number; time: string };
+  | { kind: "monthly"; day: number; time: string }
+  // Only ever by Run now. What a routine learnt from being shown starts here, so it does nothing until it's asked.
+  | { kind: "manual" };
 
 export interface RoutineDraft {
   name: string;
@@ -143,6 +145,8 @@ export interface RoutineDraft {
   schedule: RoutineSchedule;
   // Who runs it. Left out or null is Berry.
   mascotId?: string | null;
+  // The only sites a run may use, on top of its mascot's limits. Left out or empty adds no limit.
+  sites?: string[];
 }
 
 // How one run went, or is going.
@@ -175,6 +179,7 @@ export interface Routine {
   instructions: string;
   scheduleSpec: RoutineSchedule;
   mascotId: string | null;
+  sites: string[];
   // The schedule in words.
   schedule: string;
   paused: boolean;
@@ -281,6 +286,53 @@ export type SuggestionWords = { id: string; title: string } & (
 
 // With why it's there, worked out fresh from what's in the history now.
 export type Suggestion = SuggestionWords & { why: string };
+
+// One thing Berry saw the user do while it was being shown something. Only ever in memory, and only in main and the chrome.
+export type TrailKind = "went" | "searched" | "clicked" | "typed" | "secret" | "chose" | "ticked" | "pressed" | "switched" | "frame" | "file";
+
+export interface TrailStep {
+  id: string;
+  kind: TrailKind;
+  // The note, in plain words. Code writes these, with `label` and `value` the only parts that came from a page or a field.
+  text: string;
+  site: string;
+  // The page's address without its query or fragment, or where a click led. Empty on a page's front door.
+  path: string;
+  // What the page calls the thing. Untrusted, and a name only.
+  label: string;
+  // What the user typed or chose. Never set for a secret field.
+  value: string;
+  // Typed, and then sent with Enter.
+  submitted?: boolean;
+}
+
+export type RecordingStatus = "idle" | "recording" | "review" | "drafting";
+
+export interface RecordingState {
+  status: RecordingStatus;
+  startedAt: number | null;
+  steps: TrailStep[];
+  // It stopped by itself, because it had seen as much as it can keep or had run for too long.
+  cut: "full" | "time" | null;
+  // Why the last try at writing it up failed.
+  error: string | null;
+}
+
+// Something in the instructions that looks like it should change from run to run. `value` is in the instructions as it stands.
+export interface RecordedChange {
+  label: string;
+  value: string;
+}
+
+// What a recording becomes, to fill in the routine form. The sites come from the trail, in code, and never from the model.
+export interface RecordedDraft {
+  name: string;
+  instructions: string;
+  sites: string[];
+  changes: RecordedChange[];
+}
+
+export type RecordedDraftResult = { ok: true; draft: RecordedDraft } | { ok: false; error: string };
 
 export interface LibrarySnapshot {
   pinned: PinnedSite[];

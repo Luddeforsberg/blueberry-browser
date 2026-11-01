@@ -85,7 +85,7 @@ describe("parseDraft", () => {
 
   it("trims a good draft", () => {
     expect(parseDraft(valid)).toEqual({
-      draft: { name: "Watch", instructions: "Look", schedule: { kind: "daily", time: "07:30" } },
+      draft: { name: "Watch", instructions: "Look", schedule: { kind: "daily", time: "07:30" }, sites: [] },
     });
   });
 

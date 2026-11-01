@@ -89,6 +89,15 @@ const chromeAPI: ChromeAPI = {
     onUpdated: (callback) => subscribe("work:updated", callback),
     onFrame: (callback) => subscribe("work:frame", callback),
   },
+  recording: {
+    state: () => invoke("recording:state"),
+    start: () => invoke("recording:start"),
+    stop: () => invoke("recording:stop"),
+    removeStep: (stepId) => invoke("recording:remove-step", stepId),
+    discard: () => invoke("recording:discard"),
+    draft: () => invoke("recording:draft"),
+    onUpdated: (callback) => subscribe("recording:updated", callback),
+  },
   find: {
     search: (text) => invoke("find:search", text),
     step: (forward) => invoke("find:step", forward),

@@ -155,6 +155,12 @@ export class EventManager {
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
+    this.handle("recording:state", () => this.mainWindow.recordings.state);
+    this.handle("recording:start", () => this.mainWindow.recordings.start());
+    this.handle("recording:stop", () => this.mainWindow.recordings.stop());
+    this.handle("recording:remove-step", (stepId) => this.mainWindow.recordings.removeStep(stepId));
+    this.handle("recording:discard", () => this.mainWindow.recordings.discard());
+    this.handle("recording:draft", () => this.mainWindow.recordings.draft());
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
     this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
       this.mainWindow.chats.decide(chatId, approvalId, allow, answer)

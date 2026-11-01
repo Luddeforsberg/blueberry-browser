@@ -30,7 +30,7 @@ const actions = () =>
   }) as unknown as PageMenuActions;
 
 const build = (overrides: Partial<PageMenuParams> = {}, acting = actions()) =>
-  pageMenuTemplate(params(overrides), { canGoBack: false, canGoForward: true, assistantName: "Berry" }, acting);
+  pageMenuTemplate(params(overrides), { canGoBack: false, canGoForward: true, assistantName: "Berry", recording: false }, acting);
 
 const labels = (items: ReturnType<typeof build>) => items.map((item) => item.label ?? "-");
 
@@ -40,7 +40,7 @@ const click = (items: ReturnType<typeof build>, label: string) =>
 describe("pageMenuTemplate", () => {
   it("offers navigation on a plain page, from the tab's real state", () => {
     const items = build();
-    expect(labels(items)).toEqual(["Back", "Forward", "Reload", "-", "Select All", "-", "Print…", "Inspect"]);
+    expect(labels(items)).toEqual(["Back", "Forward", "Reload", "-", "Select All", "-", "Show Berry How", "-", "Print…", "Inspect"]);
     expect(items.find((item) => item.label === "Back")?.enabled).toBe(false);
     expect(items.find((item) => item.label === "Forward")?.enabled).toBe(true);
   });

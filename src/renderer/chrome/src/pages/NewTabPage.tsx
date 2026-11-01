@@ -11,6 +11,7 @@ import { Composer } from '../components/Composer'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
 import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
+import { ShowHowButton } from '../components/ShowBerry'
 import { setFlockView, suggestedMascot } from '../flockView'
 import { setRoutinesView, suggestedForm } from '../routinesView'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
@@ -178,6 +179,9 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             mascot={chosen}
                             onChooseMascot={choose}
                         />
+                    </div>
+                    <div className="relative z-10 mt-2 flex justify-center">
+                        <ShowHowButton size="sm" className={cn("text-muted-foreground", theme.glass ? "bg-canvas/70 backdrop-blur-xl" : "bg-canvas")} />
                     </div>
                     {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
                     {!layout.sidebarOpen && (
