@@ -155,6 +155,46 @@ test.describe("the working view", () => {
     await chrome.evaluate((id) => window.chromeAPI.chat.stop(id), sent!.id);
   });
 
+  test("a capture that began before a handoff is thrown away, even if the user has finished by the time it arrives", async () => {
+    model.thinkFor(2000);
+    model.callTools({ name: "open_tab", args: { url: `${site.origin}/job` } });
+    model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
+    const finish = model.holdBeforeFirstToken();
+    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Sign me in", { seePage: false }));
+    const chatId = sent!.id;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), chatId);
+    await countFrames(chrome);
+    await expect(picture()).toBeVisible({ timeout: 10_000 });
+
+    // The next capture stays on its way until told, and every one after it comes back with nothing.
+    await app.evaluate(({ nativeImage, webContents }, url) => {
+      const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === url)!;
+      const state = { arrive: () => {}, started: false };
+      Object.assign(globalThis, { slowCapture: state });
+      const capture = contents.capturePage.bind(contents);
+      contents.capturePage = (async () => {
+        if (state.started) return nativeImage.createEmpty();
+        state.started = true;
+        const image = await capture();
+        await new Promise<void>((resolve) => (state.arrive = resolve));
+        return image;
+      }) as typeof contents.capturePage;
+    }, `${site.origin}/job`);
+    const started = () => app.evaluate(() => (globalThis as unknown as { slowCapture: { started: boolean } }).slowCapture.started);
+    await expect.poll(started).toBe(true);
+    const before = await framesSeen(chrome);
+
+    await expect(view().getByText("You have this tab")).toBeVisible({ timeout: 10_000 });
+    const approval = await chrome.evaluate(async (id) => (await window.chromeAPI.library.getChat(id))?.approval?.id, chatId);
+    await chrome.evaluate(([id, asked]) => window.chromeAPI.chat.decide(id!, asked!, true), [chatId, approval]);
+    await expect(view().getByText("You have this tab")).toHaveCount(0);
+
+    await app.evaluate(() => (globalThis as unknown as { slowCapture: { arrive: () => void } }).slowCapture.arrive());
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(await framesSeen(chrome)).toBe(before);
+    finish();
+  });
+
   test("a page off the mascot's sites shows no picture, and nothing more is captured", async () => {
     const saved = await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Stay here.", sites: ["127.0.0.1"], tools: ["visit"] })

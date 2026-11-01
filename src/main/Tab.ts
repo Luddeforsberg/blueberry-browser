@@ -479,12 +479,13 @@ export class Tab {
 
   // A small picture of the page, with the bird in it, for the working view in the chrome and for nothing else. Tools use
   // `screenshot`, which is separate and keeps the bird out. It's asked again after the capture, because the user may have
-  // been handed the tab while that was on its way.
+  // been handed the tab while that was on its way, and may even have finished and given it back, so that counts too.
   async picture(width: number): Promise<Buffer | null> {
     const view = this.webContentsView;
     if (!view || !this.canBePictured) return null;
+    const { holdsStarted } = this;
     const image = await this.fromPage(() => view.webContents.capturePage()).catch(() => null);
-    if (!image || image.isEmpty() || !this.canBePictured) return null;
+    if (!image || image.isEmpty() || !this.canBePictured || holdsStarted !== this.holdsStarted) return null;
     return image.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
   }
 
@@ -521,12 +522,14 @@ export class Tab {
   // The user has been handed this tab. Everything Berry does to a page goes through these methods, so a call already
   // on its way when that happened stops here, rather than clicking or reading in the middle of their sign-in.
   private _heldForUser = false;
+  private holdsStarted = 0;
 
   get heldForUser(): boolean {
     return this._heldForUser;
   }
 
   set heldForUser(held: boolean) {
+    if (held && !this._heldForUser) this.holdsStarted++;
     this._heldForUser = held;
     if (held) this.actor.held();
   }

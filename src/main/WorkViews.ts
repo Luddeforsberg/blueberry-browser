@@ -84,6 +84,7 @@ export class WorkViews {
   private timer: NodeJS.Timeout | null = null;
   private capturing = false;
   private readonly pictured = new Set<Tab>();
+  private destroyed = false;
 
   constructor(private readonly deps: WorkViewsDeps) {}
 
@@ -104,6 +105,8 @@ export class WorkViews {
   // Anything a view depends on may have changed. Everything that stops a picture calls this, as well as the next capture
   // checking for itself.
   sync(): void {
+    // A capture or a reply can end after the window and its views have gone.
+    if (this.destroyed) return;
     const { watching } = this;
     const job = this.job;
     if (job && job.startedAt !== this.startedAt) {
@@ -238,6 +241,7 @@ export class WorkViews {
   }
 
   destroy(): void {
+    this.destroyed = true;
     if (this.timer) clearTimeout(this.timer);
     this.watching = null;
     this.seen.clear();
