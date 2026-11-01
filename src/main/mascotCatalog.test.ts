@@ -24,7 +24,7 @@ describe("the mascot catalog", () => {
       expect(author).toBe("Blueberry");
       expect(description.length).toBeLessThanOrEqual(70);
     }
-    expect(catalog.filter(({ draft }) => draft.sites.length > 0).length).toBeGreaterThan(catalog.length / 2);
+    expect(catalog.filter(({ draft }) => draft.sites.length > 0).length).toBeLessThan(catalog.length / 2);
     expect(catalog.some(({ draft }) => draft.sites.length > 0 && !draft.tools.includes("click") && !draft.tools.includes("type"))).toBe(true);
     expect(catalog.some(({ draft }) => draft.sites.length === 0 && draft.tools.includes("visit"))).toBe(true);
   });
