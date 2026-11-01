@@ -74,6 +74,17 @@ export const siteAllowed = (url: string, sites: readonly string[]): boolean => {
   }
 };
 
+// Where something may go when two lists both apply. It only ever gets narrower: with no overlap it can go nowhere,
+// which an empty list wouldn't say, because that means no limit.
+export const NOWHERE = "nowhere.invalid";
+
+export const narrowSites = (first: readonly string[], second: readonly string[]): string[] => {
+  if (first.length === 0) return [...second];
+  if (second.length === 0) return [...first];
+  const both = [...first.filter((site) => siteAllowed(`https://${site}`, second)), ...second.filter((site) => siteAllowed(`https://${site}`, first))];
+  return both.length > 0 ? [...new Set(both)] : [NOWHERE];
+};
+
 const isOneOf = <T extends string>(list: { id: T }[], value: unknown): value is T => list.some(({ id }) => id === value);
 
 // What comes from the renderer or a saved file is checked here. Anything else on the object is dropped, so nothing

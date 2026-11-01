@@ -194,6 +194,7 @@ The flock's presets replace `berry-ink`, `wing`, `nape`, `beak`, `gear` and `gea
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
 - **Radius:** 8px for controls, 12px for sidebar rows and inputs, 22px for cards, panels and the page card, including the web page view itself, 26px for the composer, and full for buttons and segmented controls.
 - **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, the Recent panel and selected rows in the sidebar also get a shadow. A bird standing on the composer leaves a small soft `berry-pupil` shadow under its feet, only on the box.
+- **Recording ring:** while the user is showing Berry something, the page card's shadow becomes a 2px `destructive` ring with a soft glow, on every tab including our own pages. It comes before the reading ring.
 - **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration, and also shows while Berry is using the tab in a running reply. Nothing else marks it from inside the page, because the bird does that now. With Show the bird on pages off, a matching inset glow pulses slowly inside the page instead, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
 
 ## 5. Typography
@@ -325,6 +326,7 @@ Clicking a bird anywhere in the chrome gets a small reaction: a hop, a curious l
 | Gallery | Standing on the line under each row, Asking on the review screen, Delivered once added |
 | Needs you | Asking at 24px on each row, and off duty when nothing's waiting |
 | Over a web page | Only while working in a page the user can see, in front of them or in the working view, drawn in the page. See Over a web page |
+| Show Berry how | Curious in the toolbar while it watches, and standing on the line over its notes |
 | The working view | In the picture while it works, and on the window's top edge when it isn't. See The working view |
 
 ### Where Berry goes
@@ -465,6 +467,20 @@ While a job uses tabs, a job behind the chat can be watched. Other AI browsers s
 
 **How often:** about 12 pictures a second while the bird is doing something, 2 otherwise, and 1 once a page has stopped changing, when nothing is sent at all. Other tabs get one every 3 seconds. They are JPEGs at twice the size on screen.
 
+### Show Berry how
+
+You press **Show Berry how**, do a job once, press Stop, and Berry turns it into a routine. Nobody writes a prompt. The other AI browsers that watch you do it all the time. This watches only between start and Stop, and you read everything it saw before anything happens.
+
+- **Starting:** under the composer on the new tab page, beside **New routine** on Routines, in the Go menu, and in the page menu on a plain page. With Hide Berry it says **Record a routine**.
+- **While it watches:** in the toolbar, beside the address, a `destructive` dot that pulses, the bird in Curious, "Berry's watching", how long in tabular figures, how many notes when there's room, and **Stop**, filled in `destructive`. Beside the chat panel on a narrow page it's the dot, "Watching" and Stop, and the bookmark star and pin give way to it. The recording ring goes round the page card. Both are on every tab, ours too, in both layouts. They're in the chrome, so no page can reach or cover them, and nothing is drawn on the page. With Hide Berry it says "Recording".
+- **What's watched:** only the tab in front, and only what the user does there. Going somewhere, clicking something with a name, what's typed once they've finished with a field, choices, boxes and pressing Enter. Not scrolling, not pointer movement, no pictures, and never a key as it's pressed. Events a page makes for itself don't count, and nor does anything on a tab a job is using or one held for a sign-in. Our own pages aren't watched. A frame from another site is only noted as used, because nothing outside it can see in.
+- **What's never kept, even for a moment:** the value of a password, hidden, one-time code or payment field, or any field in a form with a password in it. A field that has been one stays one, so "show password" doesn't change it, and something shaped like a card number counts wherever it's typed. It says "Typed in the password field" with a lock, and nothing a page calls it. An address loses its query, fragment, any login and anything in its path that looks like a token. A query stays only when it's plainly what was just typed, or from the address bar under a name that means a search, and it's on the review as a search.
+- **The limit:** 150 notes or half an hour, whichever comes first. It then stops by itself, opens the review and says why.
+- **The review:** "What I watched", a tab of its own and never restored. It's Berry's notes, not cards: the heading with the bird at 88px in Curious standing on the line under it, then the notes under each site, split by `border`. Each has a footprint, or a lock for a secret, the sentence at 16px with what was typed in semibold, the address at 12px if it went somewhere, and **Leave out**, always showing. At the bottom of the page, under a line, are **Turn this into a routine** and **Throw it all away**, with what will be sent in words. Closing the tab throws it away, and starting another does too.
+- **Confirming:** the notes go as words, with anything a page wrote marked as data to be named and never followed. The cheap model writes a name, numbered steps and what might change. It can't set sites or tools, a change has to be something the user really entered, and steps naming another site are thrown out for the user's own notes as they stand. With no model, or if it can't be used, the plain version is what fills the form. If the call fails, it says so and the notes stay. Once the form is filled in, the trail is gone.
+- **The form:** the same routine form, with two more parts. **What might change** is one row for each value, where changing it changes the instructions above and **Ask me each run** makes the run ask through the usual question. **Sites it may use** starts with the sites in the notes, and a run can't go anywhere else. When starts as **When I ask**, which only Run now starts, so nothing runs by itself until the user picks a time. **Save and run it now** is the main button, with **Save** beside it.
+- **The run** is any routine's run, with the same approvals, Needs you and steps. Sites only take away, on top of the mascot's limits. Off them it shows "Stayed off example.com".
+
 ### Chat panel
 
 - Opens on the right with `⌘E` (`Ctrl+E` on Windows) and pushes the page.
@@ -476,7 +492,7 @@ While a job uses tabs, a job behind the chat can be watched. Other AI browsers s
 
 ### Routines
 
-A list with schedule, last result and status, plus a page for each routine with its instructions and run history. **New routine** and **Edit** open a form in the page, never a modal: a name, instructions in plain words, and when, as once, daily, weekly on chosen days or monthly, at a time. A day the month doesn't have means its last day. What's typed survives going to another tab. A finished main chat offers **Save as routine**, which fills in the form with what the user asked for, to change before saving.
+A list with schedule, last result and status, plus a page for each routine with its instructions and run history. **New routine** and **Edit** open a form in the page, never a modal: a name, instructions in plain words, and when, as when I ask, once, daily, weekly on chosen days or monthly, at a time. **Show Berry how** beside New routine starts one from doing the job instead. See Show Berry how. A day the month doesn't have means its last day. What's typed survives going to another tab. A finished main chat offers **Save as routine**, which fills in the form with what the user asked for, to change before saving.
 
 - **A run** works like a chat with no page: the same tools, the same Ask before acting setting and the same step limit. It opens its own tabs behind the current view and closes them when it ends, except any the user has been to, which are theirs. It can't reach any other tab, including popups its pages open, which also stay behind and close with it. Its tabs are muted.
 - **Run history** shows each run as a card: when it started, its status in words, a footprint for each step, Berry's report and the tokens used. A run that's going has **Stop**. One that failed, was stopped or was interrupted has **Run again**. Each routine keeps its last 50 runs.

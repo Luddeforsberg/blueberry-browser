@@ -10,6 +10,7 @@ import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHisto
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
 import { WorkViews } from "./WorkViews";
+import { Recordings } from "./Recordings";
 import { Phone } from "./Phone";
 import { TelegramChannel } from "./TelegramChannel";
 import type { RoutineStore } from "./RoutineStore";
@@ -59,7 +60,7 @@ import { BERRY } from "../shared/mascots";
 export type BrowserTab = Tab | InternalTab;
 
 // Only one of these pages is open at a time, so opening it again switches to it.
-const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "mascot-gallery", "needs-you"];
+const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "mascot-gallery", "needs-you", "recording"];
 
 // Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
 const supportsGlass = (): boolean => {
@@ -114,6 +115,7 @@ export class Window {
   private readonly phone: Phone;
   readonly chats: Chats;
   readonly workViews: WorkViews;
+  readonly recordings: Recordings;
   readonly routines: Routines;
   readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
@@ -271,6 +273,21 @@ export class Window {
       },
     });
 
+    this.recordings = new Recordings({
+      chrome: () => this.chrome.view.webContents,
+      activeTab: () => this.activeTab,
+      openReview: () => this.openPage("recording"),
+      closeReview: () => {
+        const review = this.entries.find((tab) => tab instanceof InternalTab && tab.page === "recording");
+        if (!review) return;
+        if (this.tabCount === 1) this.openPage("new-tab");
+        this.closeTab(review.id, false);
+      },
+      hasModel,
+      // Page labels go in this, and a careless page may have put a code from the phone in one.
+      write: (system, data) => writeWithCheapModel(system, this.chats.withoutCodes(data)),
+    });
+
     this.suggestions = new Suggestions(join(app.getPath("userData"), "suggestions.json"), {
       enabled: () => this.settings.suggestions,
       // Both newest first.
@@ -307,6 +324,7 @@ export class Window {
 
     this._baseWindow.on("closed", () => {
       this.workViews.destroy();
+      this.recordings.destroy();
       nativeTheme.off("updated", onThemeUpdated);
       this.routines.shutdown();
       this.phone.stop();
@@ -601,9 +619,12 @@ export class Window {
     if (entry instanceof Tab) {
       // Only the address bar comes here, so the user has taken this tab from any job that opened it.
       this.chats.releaseTab(tabId);
+      this.recordings.addressBarUsed(tabId);
       await entry.loadURL(url);
       return true;
     }
+
+    this.recordings.addressBarUsed(tabId);
 
     const tab = this.createWebTab(tabId, url);
     this.tabsMap = new Map(
@@ -651,6 +672,9 @@ export class Window {
           attachPageMenu(withView, this._baseWindow, {
             openTab: (address) => this.createTab(address),
             askBerry: (text) => this.askBerryAbout(text),
+            recording: () => this.recordings.isRecording,
+            startRecording: () => void this.recordings.start(),
+            stopRecording: () => void this.recordings.stop(),
             assistantName: () => (this.settings.showBerry ? "Berry" : "Assistant"),
           });
         },
@@ -752,7 +776,9 @@ export class Window {
       return false;
     }
 
-    if (remember) this.closedTabs.push(this.tabInfo(tab));
+    // Leaving the review is the same as throwing it away, so a trail never outlasts the page showing it.
+    if (tab instanceof InternalTab && tab.page === "recording") this.recordings.discard();
+    if (remember && !(tab instanceof InternalTab && tab.page === "recording")) this.closedTabs.push(this.tabInfo(tab));
     if (tab instanceof Tab && tab.existingView) this._baseWindow.contentView.removeChildView(tab.existingView);
     tab.destroy();
     this.tabsMap.delete(tabId);
@@ -1177,6 +1203,7 @@ export class Window {
   }
 
   private notifyTabs(): void {
+    this.recordings.sync();
     const active = this.activeEntry;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
     this.syncMenu();

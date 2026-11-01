@@ -9,6 +9,8 @@ const PAGE_RADIUS = 22;
 
 // An id of our own, away from the page's world (0) and Electron's low numbers.
 const AGENT_WORLD = 1000;
+// Where the watching for Show Berry runs. It's apart from the tools' world, so no tool can reach what it's holding.
+const RECORDER_WORLD = 1001;
 // A glow around the page while Berry works in it. Added as a style, not an element, so the page's own content
 // and scripts are left alone, and it can't take a click.
 const WORKING_CSS = `
@@ -594,6 +596,12 @@ export class Tab {
     return await this.fromPage(() =>
       this.view.webContents.executeJavaScriptInIsolatedWorld(AGENT_WORLD, [{ code }], true)
     );
+  }
+
+  // For `Recordings` only. It waits for as long as the page takes, because the answer is the user's next move, so this
+  // isn't for anything that needs an answer. A new document never answers at all.
+  async listenInPage<T = unknown>(code: string): Promise<T> {
+    return await this.webContents.executeJavaScriptInIsolatedWorld(RECORDER_WORLD, [{ code }], false);
   }
 
   // Frames an isolated world in the top page can't reach into, because they, or one around them, come from another

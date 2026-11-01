@@ -13,6 +13,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { Onboarding } from './components/Onboarding'
 import { BerryCompanion } from './components/BerryCompanion'
 import { PageTrouble } from './components/PageTrouble'
+import { useRecording } from './components/ShowBerry'
 import { cn } from '@common/lib/utils'
 import { siteAllowed } from '@shared/mascots'
 
@@ -37,6 +38,7 @@ const Region: React.FC<{
 const Shell: React.FC = () => {
     const { layout, theme, settings } = useShell()
     const { activeTab, reload } = useBrowser()
+    const recordingState = useRecording()
     const { isLoading, pageAccess, mascotId } = useChat()
     const { find } = useFlock()
     // Follows the user until a reply starts, and then stays on the page that reply was sent from.
@@ -48,6 +50,7 @@ const Shell: React.FC = () => {
     const trouble = activeTab?.trouble ?? activeTab?.loadError
     // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
     // It also shows on any tab Berry is using in the reply it's working on.
+    const recording = recordingState.status === 'recording'
     const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && activeTab.id === sentFrom.current && siteAllowed(activeTab.url, find(mascotId).sites)))
 
     return (
@@ -59,7 +62,7 @@ const Shell: React.FC = () => {
                 className={cn(
                     "rounded-panel transition-shadow duration-layout",
                     theme.glass ? "bg-canvas/85 backdrop-blur-2xl" : "bg-canvas",
-                    reading ? "shadow-reading" : "shadow-page"
+                    recording ? "shadow-recording" : reading ? "shadow-reading" : "shadow-page"
                 )}
             />
             {/* Internal pages draw here. For web pages it shows until the tab view paints, or when a page has crashed. */}

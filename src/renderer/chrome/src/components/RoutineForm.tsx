@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
-import { toDraft, type RoutineFormValues } from '../routinesView'
+import { askForRecordedValue, changeRecordedValue, toDraft, type RoutineFormValues } from '../routinesView'
 import { ChatError } from './ChatMessage'
 import { MascotPerch } from './MascotPerch'
 import { BERRY_ID } from '@shared/mascots'
@@ -38,8 +38,11 @@ export const RoutineForm: React.FC<{
 }> = ({ values, onChange, onCancel, onSaved, preview = false }) => {
     const [error, setError] = useState<string | null>(null)
     const set = (patch: Partial<RoutineFormValues>) => onChange({ ...values, ...patch })
+    // Only a routine that has sites gets asked about them, and clearing the box doesn't make the box go away.
+    const [hasSites] = useState(values.sites !== '')
+    const scheduled = values.kind !== 'manual'
 
-    const save = async (event: React.FormEvent) => {
+    const save = async (event: React.FormEvent, runNow = false) => {
         event.preventDefault()
         if (preview) return
         const result = await window.chromeAPI.routines.save(values.id, toDraft(values))
@@ -47,6 +50,7 @@ export const RoutineForm: React.FC<{
             setError(result.error)
             return
         }
+        if (runNow) void window.chromeAPI.routines.runNow(result.id)
         if (values.suggestionId) void window.chromeAPI.suggestions.dismiss(values.suggestionId)
         onSaved(result.id)
     }
@@ -81,6 +85,41 @@ export const RoutineForm: React.FC<{
                 />
             </Field>
 
+            {values.recorded && values.recorded.length > 0 && (
+                <div>
+                    <span className="block text-14 font-semibold">What might change</span>
+                    <span className="block mt-0.5 text-13 text-muted-foreground">These look like they could be different next time. Change one here and it changes above.</span>
+                    <ul className="mt-2 divide-y border-y">
+                        {values.recorded.map((row, at) => (
+                            <li key={at} className="py-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <label className="flex-1 min-w-64 flex items-center gap-3">
+                                    <span className="w-28 shrink-0 text-14 text-muted-foreground">{row.label}</span>
+                                    <input
+                                        value={row.value}
+                                        onChange={(event) => onChange(changeRecordedValue(values, at, event.target.value))}
+                                        className={INPUT}
+                                    />
+                                </label>
+                                <label className="flex items-center gap-2 text-13 text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        checked={row.ask}
+                                        onChange={(event) => onChange(askForRecordedValue(values, at, event.target.checked))}
+                                    />
+                                    Ask me each run
+                                </label>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {hasSites && (
+                <Field label="Sites it may use" hint="From what you showed me. A run can’t go anywhere else, and empty means anywhere.">
+                    <input value={values.sites} onChange={(event) => set({ sites: event.target.value })} className={INPUT} />
+                </Field>
+            )}
+
             <div>
                 <span className="block text-14 font-semibold">Who runs it</span>
                 <span className="block mt-0.5 text-13 text-muted-foreground">It keeps to that mascot’s instructions and limits.</span>
@@ -100,6 +139,7 @@ export const RoutineForm: React.FC<{
                         value={values.kind}
                         onChange={(kind) => set({ kind })}
                         options={[
+                            { value: 'manual', label: 'When I ask' },
                             { value: 'once', label: 'Once' },
                             { value: 'daily', label: 'Daily' },
                             { value: 'weekly', label: 'Weekly' },
@@ -128,7 +168,7 @@ export const RoutineForm: React.FC<{
                     </div>
                 )}
 
-                <div className="mt-4 flex flex-wrap items-start gap-4">
+                {scheduled && <div className="mt-4 flex flex-wrap items-start gap-4">
                     {values.kind === 'once' && (
                         <Field label="Date">
                             <input
@@ -159,19 +199,28 @@ export const RoutineForm: React.FC<{
                             className={cn(INPUT, "w-32 tabular-nums")}
                         />
                     </Field>
-                </div>
+                </div>}
                 {values.kind === 'monthly' && values.day > 28 && (
                     <p className="mt-2 text-13 text-muted-foreground">In shorter months, it runs on the last day.</p>
                 )}
                 <p className="mt-2 text-13 text-muted-foreground">
-                    If the app is closed at this time, it runs once when you next open it and says it was late.
+                    {scheduled
+                        ? 'If the app is closed at this time, it runs once when you next open it and says it was late.'
+                        : 'It only runs when you press Run now.'}
                 </p>
             </div>
 
             {error && <ChatError message={error} />}
 
             <div className="flex items-center gap-3">
-                <Button type="submit">Save</Button>
+                {values.recorded ? (
+                    <>
+                        <Button type="button" onClick={(event) => void save(event, true)}>Save and run it now</Button>
+                        <Button type="submit" variant="outline">Save</Button>
+                    </>
+                ) : (
+                    <Button type="submit">Save</Button>
+                )}
                 <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
             </div>
         </form>

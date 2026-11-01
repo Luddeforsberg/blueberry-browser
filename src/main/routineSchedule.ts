@@ -1,7 +1,9 @@
 import type { RoutineDraft, RoutineSchedule } from "../shared/library";
+import { normaliseSite } from "../shared/mascots";
 
 const MAX_NAME_LENGTH = 100;
 const MAX_INSTRUCTIONS_LENGTH = 5000;
+const MAX_SITES = 20;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -18,6 +20,7 @@ const onDay = (date: Date, offset: number, time: string): Date =>
 // The first time after `after`, in local time so 07:30 stays 07:30 across a clock change. A time the clocks skip
 // runs just after the gap, and a time they repeat runs the first time only. Null if there won't be another.
 export const nextRun = (schedule: RoutineSchedule, after: number): number | null => {
+  if (schedule.kind === "manual") return null;
   const from = new Date(after);
   if (schedule.kind === "once") return schedule.at > after ? schedule.at : null;
   if (schedule.kind === "monthly") {
@@ -50,6 +53,8 @@ export const scheduleLabel = (schedule: RoutineSchedule): string => {
       const time = at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
       return `Once on ${date} at ${time}`;
     }
+    case "manual":
+      return "When you ask";
     case "daily":
       return `Daily at ${schedule.time}`;
     case "weekly": {
@@ -74,6 +79,7 @@ const parseSchedule = (input: unknown): RoutineSchedule | null => {
   if (value.kind === "once") {
     return Number.isFinite(value.at) && (value.at as number) > 0 ? { kind: "once", at: value.at as number } : null;
   }
+  if (value.kind === "manual") return { kind: "manual" };
   if (!isTime(value.time)) return null;
   if (value.kind === "daily") return { kind: "daily", time: value.time };
   if (value.kind === "weekly") {
@@ -89,7 +95,7 @@ const parseSchedule = (input: unknown): RoutineSchedule | null => {
 
 // What comes from the renderer is checked here, and its errors are worded for the form.
 export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: string } => {
-  const { name, instructions, schedule: rawSchedule, mascotId } = (input ?? {}) as Record<string, unknown>;
+  const { name, instructions, schedule: rawSchedule, mascotId, sites } = (input ?? {}) as Record<string, unknown>;
   const cleanName = typeof name === "string" ? name.trim() : "";
   const cleanInstructions = typeof instructions === "string" ? instructions.trim() : "";
   if (!cleanName) return { error: "Give the routine a name." };
@@ -100,5 +106,12 @@ export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: s
   }
   const schedule = parseSchedule(rawSchedule);
   if (!schedule) return { error: "Choose when the routine should run." };
-  return { draft: { name: cleanName, instructions: cleanInstructions, schedule, ...(typeof mascotId === "string" ? { mascotId } : {}) } };
+  const cleanSites: string[] = [];
+  for (const site of Array.isArray(sites) ? sites : []) {
+    const clean = typeof site === "string" ? normaliseSite(site) : null;
+    if (!clean) return { error: `“${String(site)}” doesn’t look like a site. Try something like example.com.` };
+    if (!cleanSites.includes(clean)) cleanSites.push(clean);
+  }
+  if (cleanSites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
+  return { draft: { name: cleanName, instructions: cleanInstructions, schedule, sites: cleanSites, ...(typeof mascotId === "string" ? { mascotId } : {}) } };
 };

@@ -11,6 +11,7 @@ const TITLES: Record<InternalPage, string> = {
   flock: "Your flock",
   "mascot-gallery": "Mascot gallery",
   "needs-you": "Needs you",
+  recording: "What I watched",
 };
 
 // A tab whose page the chrome renderer draws, so it has no web view and no navigation history.

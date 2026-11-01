@@ -31,6 +31,7 @@ import { blankForm } from '../routinesView'
 import { WorkingStrip, WorkingView, type WorkFrames } from '../components/WorkingView'
 import type { RoutineRun } from '@shared/library'
 import { DownloadRow } from '../components/DownloadRow'
+import { RecordingNotice, TrailNotes } from '../components/ShowBerry'
 import { DownloadsProgress } from '../components/DownloadsButton'
 import { useShell } from '../contexts/ShellContext'
 
@@ -296,6 +297,19 @@ export const GalleryPage: React.FC = () => {
                         <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
                         <ChatComposer onSend={() => undefined} onStop={() => undefined} placeholder="While replying" disabled />
                     </div>
+                </Section>
+
+                <Section title="Show Berry how">
+                    <RecordingNotice state={{ status: 'recording', startedAt: Date.now() - 42_000, steps: [], cut: null, error: null }} />
+                    <TrailNotes
+                        onRemove={() => {}}
+                        steps={[
+                            { id: 'a', kind: 'went', text: 'Went to example.com', site: 'example.com', path: 'example.com/shop', label: '', value: '' },
+                            { id: 'b', kind: 'searched', text: 'Searched for “usb-c cable” on example.com', site: 'example.com', path: 'example.com/search', label: '', value: 'usb-c cable' },
+                            { id: 'c', kind: 'clicked', text: 'Clicked Add to cart', site: 'example.com', path: '', label: 'Add to cart', value: '' },
+                            { id: 'd', kind: 'secret', text: 'Typed in the password field', site: 'example.com', path: '', label: '', value: '' }
+                        ]}
+                    />
                 </Section>
 
                 <Section title="Working view">

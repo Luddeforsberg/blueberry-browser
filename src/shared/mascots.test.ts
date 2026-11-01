@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { permissionsInWords } from "./mascots";
+import { narrowSites, NOWHERE, permissionsInWords, siteAllowed } from "./mascots";
 
 const words = (sites: string[], tools: ("visit" | "click" | "type")[]) => permissionsInWords({ sites, tools }).map(({ text }) => text);
 
@@ -19,5 +19,20 @@ describe("permissionsInWords", () => {
   it("marks only what isn't limited as open", () => {
     expect(permissionsInWords({ sites: [], tools: ["visit", "click", "type"] }).map(({ open }) => open)).toEqual([true, true]);
     expect(permissionsInWords({ sites: ["a.se"], tools: ["visit"] }).map(({ open }) => open)).toEqual([false, false]);
+  });
+});
+
+describe("narrowSites", () => {
+  it("only ever takes away", () => {
+    expect(narrowSites([], [])).toEqual([]);
+    expect(narrowSites([], ["a.example"])).toEqual(["a.example"]);
+    expect(narrowSites(["a.example"], [])).toEqual(["a.example"]);
+    expect(narrowSites(["a.example"], ["shop.a.example", "b.example"])).toEqual(["shop.a.example"]);
+    expect(narrowSites(["shop.a.example"], ["a.example"])).toEqual(["shop.a.example"]);
+  });
+
+  it("goes nowhere when the two don't meet, because an empty list would mean anywhere", () => {
+    expect(narrowSites(["a.example"], ["b.example"])).toEqual([NOWHERE]);
+    expect(siteAllowed("https://a.example/", [NOWHERE])).toBe(false);
   });
 });

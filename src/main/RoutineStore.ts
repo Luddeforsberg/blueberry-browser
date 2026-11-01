@@ -18,13 +18,16 @@ export interface StoredRoutine {
   schedule: RoutineSchedule;
   // Null is Berry.
   mascotId: string | null;
+  // The only sites a run may use. Empty adds no limit.
+  sites: string[];
   paused: boolean;
   // When it's next due. Null when paused, or for a one-off that's been used.
   nextRunAt: number | null;
 }
 
-interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused"> {
+interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused" | "sites"> {
   schedule: string;
+  sites: string;
   paused: number;
 }
 
@@ -63,15 +66,17 @@ const MIGRATIONS = [
    );
    CREATE INDEX runs_by_routine ON runs(routine_id, started_at);`,
   `ALTER TABLE routines ADD COLUMN mascot_id TEXT;`,
+  `ALTER TABLE routines ADD COLUMN sites TEXT NOT NULL DEFAULT '[]';`,
 ];
 
-const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, paused, next_run_at AS nextRunAt";
+const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, sites, paused, next_run_at AS nextRunAt";
 const RUN_COLUMNS =
   "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen";
 
-const toRoutine = ({ schedule, paused, ...row }: RoutineRow): StoredRoutine => ({
+const toRoutine = ({ schedule, sites, paused, ...row }: RoutineRow): StoredRoutine => ({
   ...row,
   schedule: JSON.parse(schedule),
+  sites: JSON.parse(sites),
   paused: paused === 1,
 });
 
@@ -119,18 +124,18 @@ export class RoutineStore {
     return row.at;
   }
 
-  create({ name, instructions, schedule, mascotId = null }: RoutineDraft, nextRunAt: number | null): string {
+  create({ name, instructions, schedule, mascotId = null, sites = [] }: RoutineDraft, nextRunAt: number | null): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO routines (id, name, instructions, schedule, mascot_id, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run(id, name, instructions, JSON.stringify(schedule), mascotId, nextRunAt, Date.now());
+      .prepare("INSERT INTO routines (id, name, instructions, schedule, mascot_id, sites, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(id, name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), nextRunAt, Date.now());
     return id;
   }
 
-  update(id: string, { name, instructions, schedule, mascotId = null }: RoutineDraft, nextRunAt: number | null): boolean {
+  update(id: string, { name, instructions, schedule, mascotId = null, sites = [] }: RoutineDraft, nextRunAt: number | null): boolean {
     const { changes } = this.db
-      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, mascot_id = ?, next_run_at = ? WHERE id = ?")
-      .run(name, instructions, JSON.stringify(schedule), mascotId, nextRunAt, id);
+      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, next_run_at = ? WHERE id = ?")
+      .run(name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), nextRunAt, id);
     return changes > 0;
   }
 

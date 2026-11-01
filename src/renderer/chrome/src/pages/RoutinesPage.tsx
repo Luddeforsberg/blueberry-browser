@@ -7,6 +7,7 @@ import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { RoutineForm } from '../components/RoutineForm'
+import { ShowHowButton } from '../components/ShowBerry'
 import { formatTime, RoutineApprovals, RoutineRunCard, RoutineStatusLabel } from '../components/RoutineRunCard'
 import { blankForm, formFor, routinesView, setRoutinesView, type RoutinesView } from '../routinesView'
 
@@ -40,7 +41,10 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                     <h1 className="text-20 font-semibold">Routines</h1>
                     <p className="mt-1 text-14 text-muted-foreground">Work done for you on a schedule, in tabs of its own.</p>
                 </div>
-                <Button onClick={onNew}>New routine</Button>
+                <div className="flex items-center gap-2">
+                    <ShowHowButton variant="outline" />
+                    <Button onClick={onNew}>New routine</Button>
+                </div>
             </div>
 
             <div className="mt-6 empty:hidden">
@@ -110,6 +114,7 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
                         {routine.schedule}
                         {routine.nextRunAt !== null && !routine.paused && ` · next ${formatTime(routine.nextRunAt)}`}
                         {routine.mascotId && ` · runs as ${mascot.name}`}
+                        {routine.sites.length > 0 && ` · ${routine.sites.length === 1 ? `stays on ${routine.sites[0]}` : `stays on ${routine.sites.length} sites`}`}
                     </p>
                 </div>
                 <Berry mood={moodFor(routine.status)} size={64} mascot={mascot} className="shrink-0" />

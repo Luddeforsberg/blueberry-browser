@@ -10,6 +10,7 @@ import { ToolBarButton } from './ToolBarButton'
 import { HandoffNotice, NeedsYouNotice } from './NeedsYou'
 import { RoutineNotice } from './RoutineNotice'
 import { StopWorkButton, WorkingNotice } from './WorkingNotice'
+import { NARROW_PAGE, RecordingNotice, useRecording } from './ShowBerry'
 
 // Pinned sites and bookmarks, one row under the address bar. In the vertical layout they're in the sidebar.
 const BookmarksBar: React.FC = () => {
@@ -64,6 +65,8 @@ export const Toolbar: React.FC = () => {
     // With no sidebar, the toolbar is the window's top-left corner, where macOS puts its buttons.
     // In horizontal mode the tab row above takes the window buttons instead.
     const vertical = layout.mode === 'vertical'
+    // Saying it's watching matters more, and these are in the File menu too.
+    const giveWay = useRecording().status === 'recording' && layout.page.width < NARROW_PAGE
     const leftClear = vertical && !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 8
     const rightClear = vertical && !layout.chatOpen && theme.platform === 'windows' ? layout.controls.width : 8
 
@@ -88,6 +91,7 @@ export const Toolbar: React.FC = () => {
                     <AddressBar />
                 </div>
 
+                <RecordingNotice />
                 <StopWorkButton />
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
@@ -98,24 +102,28 @@ export const Toolbar: React.FC = () => {
                 {(!vertical || !layout.sidebarOpen) && <WorkingNotice />}
                 {(!vertical || !layout.sidebarOpen) && <RoutineNotice />}
 
-                <ToolBarButton
-                    label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-                    active={canSave}
-                    toggled={bookmarked}
-                    className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
-                    onClick={() => void window.chromeAPI.library.toggleBookmark()}
-                >
-                    <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
-                </ToolBarButton>
+                {!giveWay && (
+                    <>
+                        <ToolBarButton
+                            label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                            active={canSave}
+                            toggled={bookmarked}
+                            className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
+                            onClick={() => void window.chromeAPI.library.toggleBookmark()}
+                        >
+                            <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
+                        </ToolBarButton>
 
-                <ToolBarButton
-                    label={isPinned ? 'Unpin this page' : 'Pin this page'}
-                    active={canSave}
-                    toggled={isPinned}
-                    onClick={() => void window.chromeAPI.library.togglePin()}
-                >
-                    <Pin className={isPinned ? 'size-4 fill-current' : 'size-4'} />
-                </ToolBarButton>
+                        <ToolBarButton
+                            label={isPinned ? 'Unpin this page' : 'Pin this page'}
+                            active={canSave}
+                            toggled={isPinned}
+                            onClick={() => void window.chromeAPI.library.togglePin()}
+                        >
+                            <Pin className={isPinned ? 'size-4 fill-current' : 'size-4'} />
+                        </ToolBarButton>
+                    </>
+                )}
 
                 <DownloadsButton />
 

@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, PublishChoices, PublishedMascot, PublishResult, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -13,7 +13,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you" | "recording";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -312,6 +312,14 @@ export interface InvokeChannels {
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
   "berry:context-menu": { region: "chrome"; args: []; result: void };
+  // Showing Berry how. Only the chrome can start, stop or read one, so no page, tool or mascot can.
+  "recording:state": { region: "chrome"; args: []; result: RecordingState };
+  "recording:start": { region: "chrome"; args: []; result: boolean };
+  "recording:stop": { region: "chrome"; args: []; result: void };
+  "recording:remove-step": { region: "chrome"; args: [stepId: string]; result: void };
+  "recording:discard": { region: "chrome"; args: []; result: void };
+  // The one call that sends anything anywhere. On success the trail is gone from main.
+  "recording:draft": { region: "chrome"; args: []; result: RecordedDraftResult };
   "routines:save": { region: "chrome"; args: [id: string | null, draft: RoutineDraft]; result: RoutineSaveResult };
   "routines:set-paused": { region: "chrome"; args: [id: string, paused: boolean]; result: boolean };
   // Asks first, in main.
@@ -373,6 +381,7 @@ export interface EventChannels {
   "library:updated": LibrarySnapshot;
   "toolbar:focus-address": null;
   "overlay:visibility": boolean;
+  "recording:updated": RecordingState;
   "work:updated": WorkView | null;
   "work:frame": WorkFrame;
   "chat:chunk": ChatChunk;
@@ -470,6 +479,16 @@ export interface WorkAPI {
   onFrame: (callback: (frame: WorkFrame) => void) => Unsubscribe;
 }
 
+export interface RecordingAPI {
+  state: () => Promise<RecordingState>;
+  start: () => Promise<boolean>;
+  stop: () => Promise<void>;
+  removeStep: (stepId: string) => Promise<void>;
+  discard: () => Promise<void>;
+  draft: () => Promise<RecordedDraftResult>;
+  onUpdated: (callback: (state: RecordingState) => void) => Unsubscribe;
+}
+
 export interface FindAPI {
   search: (text: string) => Promise<void>;
   step: (forward: boolean) => Promise<void>;
@@ -549,6 +568,7 @@ export interface ChromeAPI {
   library: LibraryAPI;
   chat: ChatAPI;
   work: WorkAPI;
+  recording: RecordingAPI;
   find: FindAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;

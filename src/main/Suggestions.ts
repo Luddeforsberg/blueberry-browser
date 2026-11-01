@@ -282,7 +282,7 @@ const forTheModel = ({ kind, sites, why, pageTitles, chatTitles, schedule }: Pat
   card: kind,
   ...(sites.length > 0 ? { sites: sites.map(({ host, label }) => ({ host, name: label })) } : {}),
   noticed: why,
-  ...(schedule && schedule.kind !== "once" ? { scheduleTime: schedule.time.replace(/^0/, "") } : {}),
+  ...(schedule && "time" in schedule ? { scheduleTime: schedule.time.replace(/^0/, "") } : {}),
   ...(pageTitles.length > 0 ? { pageTitles } : {}),
   ...(chatTitles.length > 0 ? { chatTitles } : {}),
 });
