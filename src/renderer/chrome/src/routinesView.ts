@@ -77,9 +77,15 @@ export const recordedForm = ({ name, instructions, sites, changes }: RecordedDra
 
 const askLine = (label: string, value: string) => `Before you start, ask me for the ${label.toLowerCase()} to use. Last time it was ${value}.`
 
-// Only as a whole value, so changing a 3 leaves 13:30 alone, and taken as written whatever's in it.
-const swapValue = (text: string, from: string, to: string) =>
-    text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'gu'), () => to)
+// Only as a whole value: a digit beside a digit or a letter beside a letter is part of something else. So changing a 3
+// leaves 13:30 alone, and changing a 10 still reaches 10px. Taken as written, whatever's in it.
+const sameKind = (char: string) => (/\p{L}/u.test(char) ? '\\p{L}' : /\p{N}/u.test(char) ? '\\p{N}' : null)
+const swapValue = (text: string, from: string, to: string) => {
+    const before = sameKind(from[0])
+    const after = sameKind(from[from.length - 1])
+    const value = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return text.replace(new RegExp(`${before ? `(?<!${before})` : ''}${value}${after ? `(?!${after})` : ''}`, 'gu'), () => to)
+}
 
 // While it's being typed, only the row changes. A half-typed value, or none, would wreck the instructions.
 export const changeRecordedValue = (values: RoutineFormValues, at: number, next: string): RoutineFormValues => ({

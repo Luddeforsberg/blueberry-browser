@@ -23,6 +23,11 @@ describe('what might change', () => {
         expect(values.instructions).toBe('Book 4 seats at 13:30 for $4')
     })
 
+    it('reaches a number with a unit on it, and leaves a word inside a longer one', () => {
+        expect(applyRecordedValue(changeRecordedValue(form('Set the width to 10px', '10'), 0, '20'), 0).instructions).toBe('Set the width to 20px')
+        expect(applyRecordedValue(changeRecordedValue(form('Find a cat in the category', 'cat'), 0, 'dog'), 0).instructions).toBe('Find a dog in the category')
+    })
+
     it('takes a value as written, and a pending one still gets saved', () => {
         const pending = changeRecordedValue(form('Find a+b now', 'a+b'), 0, '$& c')
         expect(toDraft(pending).instructions).toBe('Find $& c now')
