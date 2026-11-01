@@ -1330,6 +1330,8 @@ test("first launch shows onboarding until it's finished or skipped", async () =>
   chrome = await findView(app, "view=chrome");
 
   await expect(chrome.getByRole("heading", { name: "Hi, I’m Berry." })).toBeVisible();
+  // No browser to bring history from, so that step isn't counted.
+  await expect(chrome.getByLabel("Step 1 of 3")).toBeVisible();
   await chrome.getByRole("button", { name: "Nice to meet you" }).click();
   await chrome.getByRole("radio", { name: "Tabs along the top" }).click();
   await chrome.getByRole("button", { name: "Skip setup" }).click();

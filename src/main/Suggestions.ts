@@ -161,6 +161,7 @@ export class Suggestions {
   private asking = false;
   // Only in memory, so a relaunch can try again straight away.
   private triedAt = 0;
+  private freshTry = false;
 
   constructor(
     private readonly file: string,
@@ -226,11 +227,20 @@ export class Suggestions {
     return this.list();
   }
 
+  // Imported visits can be older than anything seen, and can come within the hour, so the next try is let through. Only
+  // that one: the limit holds again after it.
+  historyImported(): void {
+    this.freshTry = true;
+  }
+
   // At most once an hour, only when there's more to go on, and only for patterns with no words yet.
   private async refresh(open: Pattern[], newest: number): Promise<void> {
-    if (this.asking || (this.triedAt > 0 && this.now - this.triedAt < RETRY_MS)) return;
+    if (this.asking) return;
+    const fresh = this.freshTry;
+    this.freshTry = false;
     const { askedAt, seen } = this.saved;
-    if (askedAt > 0 && (this.now - askedAt < HOUR_MS || newest <= seen)) return;
+    const limited = (this.triedAt > 0 && this.now - this.triedAt < RETRY_MS) || (askedAt > 0 && (this.now - askedAt < HOUR_MS || newest <= seen));
+    if (limited && !fresh) return;
     const hasWords = (pattern: Pattern) => this.saved.cards.some((card) => wordsFit(card, pattern));
     const unwritten = topPatterns(open).filter((pattern) => !hasWords(pattern));
     if (unwritten.length === 0 || !this.sources.hasModel()) return;

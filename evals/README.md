@@ -7,6 +7,18 @@ Measures what Berry can really do on real websites. It launches the built app, s
 3. Look at each end state and write `results/<date>.scores.json`, plus `<date>.notes.md` for the summary. Scores are a person's or agent's judgement: a job that ran isn't a job that worked.
 4. `pnpm run eval -g "write report"` writes `results/<date>.md` without running any jobs.
 
+## Bringing in history on film
+
+`evals/seedBrowserFolder.ts` makes a folder that looks like a computer with Chrome on it, using the same demo visits. `BLUEBERRY_BROWSER_DATA` points an unpackaged app at it, and a packaged app ignores it. Use a new profile folder so onboarding shows, and no real browser folder is touched.
+
+```
+pnpm dlx tsx evals/seedBrowserFolder.ts /tmp/blueberry-demo-browsers
+pnpm exec electron-vite build
+env -u ELECTRON_RUN_AS_NODE BLUEBERRY_BROWSER_DATA=/tmp/blueberry-demo-browsers pnpm exec electron . --user-data-dir=/tmp/blueberry-demo-import
+```
+
+The birds need a model, so link `.env` into a worktree first. To start again, delete `/tmp/blueberry-demo-import`. The visits are relative to the day they were written, so reseed the browser folder on the day you film.
+
 ## Filling a profile for filming
 
 `evals/seedHistory.ts` gives a new profile folder a few days of realistic visits and chats, relative to today, so the new tab page has suggestions on a fresh install. It's only here for the demo and isn't in the app or its menus.

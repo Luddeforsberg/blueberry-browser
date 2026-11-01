@@ -14,7 +14,7 @@ So work is chosen by what improves the video, the growth story or the case again
 
 No date is set. More time and more thought count in our favour, but what's finished comes first, so one thing at a time, merged before the next starts.
 
-**The product:** instead of one Berry, you grow a flock. Each mascot has a name, a look, instructions and skills. Blueberry notices what you repeat and suggests a routine or a new mascot for it, you can publish them to a gallery, and a team can keep a private library. It interrupts you only when it truly needs you. Strawberry's companions are the comparison: set up by hand and shared by email, as far as public sources show.
+**The product:** instead of one Berry, you grow a flock. Each mascot has a name, a look, instructions and skills. Blueberry notices what you repeat and suggests a routine or a new mascot for it, and you can publish them to a gallery. It interrupts you only when it truly needs you. Strawberry's companions are the comparison: set up by hand and shared by email, as far as public sources show.
 
 | # | Work | State |
 |---|---|---|
@@ -23,17 +23,18 @@ No date is set. More time and more thought count in our favour, but what's finis
 | 3 | **Mascot profiles, local:** create, name, choose a look, write instructions and pick skills. Chats and routines run as a chosen mascot. A look is one drawing with changeable colours and an accessory. A skill is what we already have: allowed sites, allowed tools, routines and instructions | Done. Sites and tools are enforced in the tool layer. A limit applies from a mascot's next message, not mid-reply |
 | 3b | **Working in the background:** every tab Berry opens stays behind the user and the job stays tied to it. Watching changes nothing, and clicking, typing or navigating there takes it over. Short searches on big sites, or on a site the job already has open, need no card | Done |
 | 4 | **Suggestions:** from history, chats and routines, the new tab page offers a ready prompt, a routine or a new mascot. The bar is "you've done this three times", so it works without weeks of data | Done. Each one only fills something in for the user to confirm |
+| 4b | **History from another browser:** "Every browser can import your history. Blueberry reads it to work out what to do for you." Onboarding and Settings bring in the last 90 days from Chrome, Arc, Brave or Edge, so a new user gets personal suggestions on the first new tab rather than after three days | Built, and checked against fixture files, a fake model and a real Chrome file from a throwaway profile while Chrome was running. Not tried on a long-used profile or with a real model, and Arc, Brave, Edge and the Windows paths are untested |
 | 5 | **Needs-you inbox:** every waiting approval, 2FA code and captcha in one place, answerable from the phone. Passwords never reach the model or the chat | Page redesigned as a plain list, and the phone channel is real over the user's own Telegram bot: approvals, questions and codes, with the code typed into the page without reaching the model. A job waits while it asks, and other jobs go on. Remains: trying it on real Telegram and real 2FA pages, frames from another origin, and messages from the phone with the app closed |
 | 6 | **Gallery with sign-in:** a small hosted service, sign-in with email and password, publish and browse. Accounts arrive here, as the first thing that needs them | Built against a fake server, with the database rules tested on real Postgres. Publish, browse by author with real counts, examples and a public page per mascot. Remains: creating the Supabase project, deploying `site/` and trying it on them, none of which has run yet |
 | 6b | **Passwords from the phone:** a one-time, end-to-end encrypted link the user opens on their phone, so a password goes to the page without Telegram or the model seeing it. Needs the gallery's server | After the gallery |
-| 7 | **Team library:** private sharing, choosing between shared memory and your own copy | After the gallery |
-| 8 | **Deadlines on tasks:** "finish by 14:00", with a countdown and useful partial results rather than a predicted end time | If time remains |
-| 9 | **Growth:** landing page, a one-page plan for one sharp audience, and the launch video | Once the demo is filmable |
-| 10 | **Repo clean-up and sending:** a new README replacing the challenge text, a short architecture walkthrough, the two-minute video script in Swedish, a rehearsed demo run, and access to the private repo for Charles | Last |
+| 7 | **Growth:** landing page, a one-page plan for one sharp audience, and the launch video | Once the demo is filmable |
+| 8 | **Repo clean-up and sending:** a new README replacing the challenge text, a short architecture walkthrough, the two-minute video script in Swedish, a rehearsed demo run, and access to the private repo for Charles | Last |
 
 Already done: find, zoom, page menu and print; downloads and site permissions; history, tab restore and crash recovery; real pinned sites and no sample account; the real-site evaluation; routines; page abilities: dropdowns, shadow DOM, link addresses, screenshots, real size for tabs behind the chat, and real load errors.
 
-Parked unless the demo needs them: evidence workbook (a strong candidate for the day at Strawberry, with unfinished work in its worktree), files, helpers, exception inbox, task budgets, importing, keys in the app, signed updates, a Windows pass, memory of what you've seen, and Berry floating in text boxes (too close to what Goldfish sells).
+Parked unless the demo needs them: evidence workbook (a strong candidate for the day at Strawberry, with unfinished work in its worktree), files, helpers, exception inbox, task budgets, team library (private sharing, choosing between shared memory and your own copy), deadlines on tasks ("finish by 14:00", with a countdown and useful partial results), keys in the app, signed updates, a Windows pass, memory of what you've seen, and Berry floating in text boxes (too close to what Goldfish sells).
+
+Dropped: starting or steering Berry from Telegram, because Strawberry already has a Slack way to start agents. Telegram stays for answering Needs you.
 
 ## How we build
 

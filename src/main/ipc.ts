@@ -17,6 +17,8 @@ export const CHANNEL_REGIONS: {
   "history:search": ["chrome"],
   "history:delete": ["chrome"],
   "history:clear": ["chrome"],
+  "history:import-sources": ["chrome"],
+  "history:import": ["chrome"],
   "tab:navigate": ["chrome"],
   "tab:back": ["chrome"],
   "tab:forward": ["chrome"],

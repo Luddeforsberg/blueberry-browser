@@ -74,6 +74,8 @@ export async function launchApp(
     SUPABASE_URL: "",
     SUPABASE_PUBLISHABLE_KEY: "",
     BLUEBERRY_SITE_URL: "",
+    // A folder that isn't there, so no test looks at the real browsers on this computer.
+    BLUEBERRY_BROWSER_DATA: join(userDataDir, "no-browsers"),
     ...modelEnv,
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
