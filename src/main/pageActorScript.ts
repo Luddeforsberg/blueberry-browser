@@ -524,7 +524,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
         return true;
       }
       body.animate(
-        [{ transform: "none" }, { transform: "scale(1.06, 0.92)", offset: 0.2 }, { transform: "translateY(-22%) scale(0.97, 1.04)", offset: 0.55 }, { transform: "scale(1.04, 0.96)", offset: 0.85 }, { transform: "none" }],
+        [{ transform: "none" }, { transform: "scale(1.06, 0.92)", offset: 0.2 }, { transform: "translateY(" + -0.22 * size() + "px) scale(0.97, 1.04)", offset: 0.55 }, { transform: "scale(1.04, 0.96)", offset: 0.85 }, { transform: "none" }],
         { duration: 300, easing: "ease-out" }
       );
       return true;
