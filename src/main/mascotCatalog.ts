@@ -71,7 +71,7 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "parakeet", accessory: "crown" },
       instructions:
         "Help me look for a home in Sweden on Hemnet and Booli. Ask me for the area, budget and size if I haven't said. Compare the best matches in a short table: address, asking price, size, rooms, monthly fee, price per square metre and the link. Point out anything odd, such as a high fee or a very low asking price. Don't contact an agent, book a viewing, save a search or sign in: stop and tell me instead.",
-      sites: ["hemnet.se", "booli.se"],
+      sites: [],
       tools: ["visit", "click", "type"],
     },
   },
@@ -85,7 +85,7 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "flamingo", accessory: "glasses" },
       instructions:
         "When I name a product, find it on Prisjakt. Tell me the lowest price with shipping if it's shown, the shop, whether it's in stock, and how the price has moved lately if the page shows it. Make sure it's the exact model I asked for, and say so if you had to choose between variants. Link the Prisjakt page. Never go on to buy anything: Prisjakt is as far as you go.",
-      sites: ["prisjakt.nu"],
+      sites: [],
       tools: ["visit", "click", "type"],
     },
   },
@@ -99,7 +99,7 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "robin", accessory: "cap" },
       instructions:
         "Plan dinners using recipes from ica.se and koket.se. Ask how many days and how many people if I haven't said, and respect anything I've said about allergies or what I don't eat. Keep it weeknight-friendly. Give me each recipe with its link and its time, then one shopping list grouped by part of the store, with amounts added together. Translate into English as you go. Don't add anything to a cart.",
-      sites: ["ica.se", "koket.se"],
+      sites: [],
       tools: ["visit", "click", "type"],
     },
   },
@@ -113,7 +113,7 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "kingfisher", accessory: "cap" },
       instructions:
         "Find trains on SJ for the trip I describe. Ask for the stations, day and rough time if I haven't said. Give me the three best options with departure, arrival, changes and the lowest price shown. Point out if a slightly different time is much cheaper. Stop before choosing seats, signing in or paying, and tell me where you stopped.",
-      sites: ["sj.se"],
+      sites: [],
       tools: ["visit", "click", "type"],
     },
   },
@@ -127,8 +127,8 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "canary", accessory: "headphones" },
       instructions:
         "Check SL's traffic status on sl.se for the lines I name. Say first whether they're running normally. If not, say what's wrong, when it's expected to end and what SL suggests instead. Keep it to a few lines, in English. If the page doesn't say, tell me rather than guess.",
-      sites: ["sl.se"],
-      tools: ["visit", "click"],
+      sites: [],
+      tools: ["visit", "click", "type"],
     },
   },
   {
@@ -141,8 +141,8 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "flamingo", accessory: "headphones" },
       instructions:
         "Go through the pull requests I name, or the ones on the repository I give you. For each, say in one line what it changes, whether checks pass, whether anyone is waiting on me and what the next step is. Put the ones that need me first. You only look: never merge, close, approve or comment on anything.",
-      sites: ["github.com"],
-      tools: ["visit", "click"],
+      sites: [],
+      tools: ["visit", "click", "type"],
     },
   },
   {
@@ -155,7 +155,7 @@ const STARTERS: GalleryMascot[] = [
       look: { palette: "robin", accessory: "crown" },
       instructions:
         "Search Platsbanken on arbetsformedlingen.se for jobs that fit what I tell you: role, area and anything I'm looking for or want to avoid. Give me the ten best in a list with title, employer, town, last day to apply and the link, and one line on why each fits. Translate into English as you go. Never apply, sign in or send anything.",
-      sites: ["arbetsformedlingen.se"],
+      sites: [],
       tools: ["visit", "click", "type"],
     },
   },

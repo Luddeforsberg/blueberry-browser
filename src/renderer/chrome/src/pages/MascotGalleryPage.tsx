@@ -24,7 +24,7 @@ export const Permissions: React.FC<{ draft: GalleryMascot['draft']; large?: bool
         {permissionsInWords(draft).map(({ text, open }) => {
             const Icon = open ? LockOpen : Lock
             return (
-                <li key={text} className={cn("flex items-start gap-2 [overflow-wrap:anywhere]", open && "text-warning")}>
+                <li key={text} className="flex items-start gap-2 [overflow-wrap:anywhere]">
                     <Icon aria-hidden className={cn("shrink-0", large ? "mt-[3px] size-4" : "mt-[2px] size-3.5")} />
                     {text}
                 </li>
@@ -180,7 +180,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
                     )}
                 </div>
                 <p className="mt-3 text-12 text-muted-foreground">
-                    {copy ? 'It’s your own copy. Nothing in the Gallery can change it, and you can edit or delete it in your flock.' : 'You get your own copy. Nothing in the Gallery can change it later.'}
+                    {copy ? 'It’s your own copy. Nothing in the Gallery can change it, and in your flock you can edit it or take off its limits.' : 'You get your own copy. Nothing in the Gallery can change it later, and in your flock you can edit it or take off its limits.'}
                 </p>
             </div>
 
