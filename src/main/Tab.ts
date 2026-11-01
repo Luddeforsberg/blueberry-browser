@@ -389,6 +389,9 @@ export class Tab {
   setBerryWorking(working: boolean): void {
     if (working === this._berryWorking) return;
     this._berryWorking = working;
+    // One from an earlier stop mustn't cut this one short.
+    if (this.leavingTimer) clearTimeout(this.leavingTimer);
+    this.leavingTimer = null;
     if (working) {
       this.addWorkingStyle();
     } else {

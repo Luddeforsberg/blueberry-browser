@@ -112,6 +112,12 @@ test.describe("the working view", () => {
     expect(said).not.toContain("base64");
     expect(JSON.stringify(model.requests)).not.toContain("data:image");
 
+    // A new window size doesn't lose the finished view, once the bird has left and nothing is being captured.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await app.evaluate(({ BaseWindow }, { width, height }) => BaseWindow.getAllWindows()[0].setSize(width + 240, height), WIDE);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await expect(view().getByText("Done")).toBeVisible();
+
     // The next message starts over, with no old picture.
     model.replyWith("Just words");
     await chrome.evaluate((id) => window.chromeAPI.chat.send(id, "Thanks", { seePage: false }), chatId);

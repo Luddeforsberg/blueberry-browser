@@ -58,8 +58,9 @@ export const useWorkView = (chatId: string | null, pictureWidth: number): { view
 
     useEffect(() => {
         void window.chromeAPI.work.watch(chatId, pictureWidth)
-        return () => void window.chromeAPI.work.watch(null, 0)
     }, [chatId, pictureWidth])
+    // Only leaving the chat ends the watch: a new width on the same chat keeps what it's seen, or a finished job's view would go.
+    useEffect(() => () => void window.chromeAPI.work.watch(null, 0), [chatId])
 
     return { view: view?.chatId === chatId ? view : null, frames }
 }
