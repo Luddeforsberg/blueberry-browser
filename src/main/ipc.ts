@@ -44,6 +44,7 @@ export const CHANNEL_REGIONS: {
   "settings:get": BOTH,
   "settings:update": ["chrome"],
   "chat:send": ["chrome"],
+  "work:watch": ["chrome"],
   "chat:stop": ["chrome"],
   "chat:decide": BOTH,
   "chat:rename": BOTH,

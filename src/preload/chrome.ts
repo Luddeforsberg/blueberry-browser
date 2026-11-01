@@ -84,6 +84,11 @@ const chromeAPI: ChromeAPI = {
     onChatDeleted: (callback) => subscribe("chat:deleted", callback),
     onDraft: (callback) => subscribe("chat:draft", callback),
   },
+  work: {
+    watch: (chatId, pictureWidth) => invoke("work:watch", chatId, pictureWidth),
+    onUpdated: (callback) => subscribe("work:updated", callback),
+    onFrame: (callback) => subscribe("work:frame", callback),
+  },
   find: {
     search: (text) => invoke("find:search", text),
     step: (forward) => invoke("find:step", forward),

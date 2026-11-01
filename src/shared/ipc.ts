@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, PublishChoices, PublishedMascot, PublishResult, RoutineDraft, RoutineRun, Suggestion } from "./library";
+import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, PublishChoices, PublishedMascot, PublishResult, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -295,6 +295,9 @@ export interface InvokeChannels {
     args: [chatId: string | null, text: string, options: ChatSendOptions];
     result: ChatThread | null;
   };
+  // Says which chat's working view is on screen and how wide its picture is, or null for none. The answer and everything
+  // after it come as `work:updated` and `work:frame`, to the chrome and nowhere else. A width of 0 means words only.
+  "work:watch": { region: "chrome"; args: [chatId: string | null, pictureWidth: number]; result: void };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
   // A routine's run answers its approvals here too, under the run's id.
   "chat:decide": {
@@ -370,6 +373,8 @@ export interface EventChannels {
   "library:updated": LibrarySnapshot;
   "toolbar:focus-address": null;
   "overlay:visibility": boolean;
+  "work:updated": WorkView | null;
+  "work:frame": WorkFrame;
   "chat:chunk": ChatChunk;
   "chat:updated": ChatThread;
   "chat:deleted": string;
@@ -459,6 +464,12 @@ export interface LibraryAPI {
   onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;
 }
 
+export interface WorkAPI {
+  watch: (chatId: string | null, pictureWidth: number) => Promise<void>;
+  onUpdated: (callback: (view: WorkView | null) => void) => Unsubscribe;
+  onFrame: (callback: (frame: WorkFrame) => void) => Unsubscribe;
+}
+
 export interface FindAPI {
   search: (text: string) => Promise<void>;
   step: (forward: boolean) => Promise<void>;
@@ -537,6 +548,7 @@ export interface ChromeAPI {
   settings: SettingsAPI;
   library: LibraryAPI;
   chat: ChatAPI;
+  work: WorkAPI;
   find: FindAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;

@@ -14,7 +14,8 @@ import { mascotNote } from "./mascotNote";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, WorkTabState } from "../shared/library";
+import type { JobWork } from "./WorkViews";
 import { BERRY, siteAllowed } from "../shared/mascots";
 
 const MAX_TITLE_LENGTH = 40;
@@ -86,6 +87,12 @@ interface Run {
   breakBeforeText: boolean;
   approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void }) | null;
   tabs: Set<Tab>;
+  // Every tab it has used in this reply and every site it's been on, latest last.
+  used: Set<Tab>;
+  sites: Set<string>;
+  startedAt: number;
+  // Whether what it sees depends on the "Can see" toggle, because it was sent with a page.
+  withPage: boolean;
   mascot: MascotProfile;
   // Set for a task, which belongs to its caller rather than to a saved chat.
   onChange?: () => void;
@@ -156,6 +163,8 @@ export class Chats {
   private readonly handedBack = new Set<Tab>();
   // Query strings and fragments seen on those tabs, kept out of anything going to the model. Memory only.
   private readonly addressDetails = new Set<string>();
+  // Each chat's last reply once it's over, so its working view can settle on how it went. Memory only.
+  private readonly finished = new Map<string, { run: Run; endedAt: number }>();
 
   constructor(
     private readonly store: ChatStore,
@@ -198,6 +207,10 @@ export class Chats {
       canSee: () => !page || this.pageAccess,
       onUse: (tab) => {
         run.tabs.add(tab);
+        run.used.delete(tab);
+        run.used.add(tab);
+        run.sites.delete(siteOf(tab.url));
+        run.sites.add(siteOf(tab.url));
         this.publishWorkingTabs();
       },
       stopped: () => run.controller.signal.aborted,
@@ -400,6 +413,36 @@ export class Chats {
     return tab && !this.handedOver.get(tab.id)?.asking ? tab : null;
   }
 
+  // What a chat's working view shows: the tabs its latest reply has used, and whether each may be pictured. A tab the user
+  // has is theirs, and so is any the job can't see or reach, whatever the job did there earlier.
+  work(chatId: string): JobWork | null {
+    const ended = this.finished.get(chatId);
+    const run = this.runs.get(chatId) ?? ended?.run;
+    if (!run) return null;
+    const job = this.jobs.get(chatId);
+    const open = this.browser.allTabs();
+    const used = [...run.used].filter((tab) => open.includes(tab));
+    const running = this.runs.get(chatId) === run;
+    if (running) used.forEach((tab) => run.sites.add(siteOf(tab.url)));
+    const state = (tab: Tab): WorkTabState => {
+      if (this.handedOver.has(tab.id) || tab.heldForUser) return "held";
+      if (job?.takenOver.has(tab.id) || !(run.withPage || job?.own.has(tab.id))) return "yours";
+      if (!siteAllowed(tab.url, run.mascot.sites)) return "off-limits";
+      if (run.withPage && !this.pageAccess) return "no-access";
+      return tab.mayShowCode || tab.trouble || tab.loadError ? "none" : "picture";
+    };
+    return {
+      mascotId: run.mascot.id,
+      startedAt: run.startedAt,
+      endedAt: ended && !running ? ended.endedAt : null,
+      outcome: running ? null : run.controller.signal.aborted ? "stopped" : this.errors.has(chatId) ? "failed" : "done",
+      tabs: used.map((tab) => ({ tab, state: state(tab), site: siteOf(tab.url) })),
+      currentId: used.at(-1)?.id ?? null,
+      sites: [...run.sites].reverse(),
+      step: run.steps.filter((step) => !step.done).at(-1)?.text ?? null,
+    };
+  }
+
   thread(id: string): ChatThread | null {
     const chat = this.store.chat(id);
     return chat && this.toThread(chat);
@@ -434,8 +477,9 @@ export class Chats {
     const mascot = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
+    this.finished.delete(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), mascot };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot };
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
@@ -461,6 +505,7 @@ export class Chats {
     this.runs.delete(chatId);
     this.publishWorkingTabs();
     this.errors.delete(chatId);
+    this.finished.delete(chatId);
     this.jobs.delete(chatId);
     if (!this.store.deleteChat(chatId)) return false;
     this.events.onListChanged();
@@ -490,6 +535,7 @@ export class Chats {
       const page = seePage && this.pageAccess ? this.activeTab : null;
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
+      run.withPage = page !== null;
       const messages = await this.withNewestPage(chatId, seePage, run.mascot);
       const tools = this.jobTools(chatId, run, page);
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
@@ -502,6 +548,7 @@ export class Chats {
 
     // Deleted while replying, so there's nowhere to save it.
     if (this.runs.get(chatId) !== run) return;
+    this.finished.set(chatId, { run, endedAt: Date.now() });
     this.runs.delete(chatId);
     this.publishWorkingTabs();
     if (run.partial || run.steps.length > 0) {
@@ -547,6 +594,10 @@ export class Chats {
       breakBeforeText: false,
       approval: null,
       tabs: new Set(),
+      used: new Set(),
+      sites: new Set(),
+      startedAt: Date.now(),
+      withPage: false,
       mascot: this.mascotOf(mascotId),
       onChange: () =>
         onProgress({

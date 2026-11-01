@@ -320,7 +320,8 @@ Every mood has a text label for assistive technology.
 | Flock | Its own page, standing on a wire with the flock |
 | Gallery | Standing on the line under each row, Asking on the review screen, Delivered once added |
 | Needs you | Asking at 24px on each row, and off duty when nothing's waiting |
-| Over a web page | Only while working in the page the user is looking at, drawn in the page. See Over a web page |
+| Over a web page | Only while working in a page the user can see, in front of them or in the working view, drawn in the page. See Over a web page |
+| The working view | In the picture while it works, and on the window's top edge when it isn't. See The working view |
 
 ### Where Berry goes
 
@@ -403,7 +404,7 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 | A job waits for an answer | Asking, facing you, with "Waiting for you". On an approval about one element it stands on that element, so asking to click Place order puts it on Place order. It flies there as the card appears and the card doesn't wait for it. If that element is gone or out of view, it asks from where it is |
 | A frame from another site | Its script can say anything about itself, so nothing's asked of it. The bird stands near the top of that frame in the page around it |
 
-**The line** is one small pill near the bird, placed where it covers the least, staying off the target and off the text beside it where it can, always on screen, saying what's happening in the present tense: "Clicking Add to cart", "Typing in Email". The name is the label beside it on the page, which the chat steps leave out because they go back to the model. These words go nowhere. It never shows what's being typed, which key, the contents of a text box, or a secret field's label.
+**The line** is one small pill near the bird, placed where it covers the least, staying off the target and off the text beside it where it can, always on screen, saying what's happening in the present tense: "Clicking Add to cart", "Typing in Email". The name is the label beside it on the page, which the chat steps leave out because they go back to the model. These words go nowhere but the working view's own words in the chrome. It never shows what's being typed, which key, the contents of a text box, or a secret field's label.
 
 **Stop isn't on the page.** Anything a page can see it can fake, and a fake Stop or a real one a page could press is exactly what mustn't exist. The line is only words, and **Stop Berry** is in the toolbar just above it, for as long as anyone is working in this tab. It's the same as Stop in the chat or on a routine. Pressed while the bird is flying, the click it was flying to never happens.
 
@@ -411,7 +412,7 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 
 **When it isn't there:**
 
-- **Tabs not in front:** nothing is drawn and nothing waits. Going to one mid-job, it appears from then on.
+- **Tabs not in front:** nothing is drawn and nothing waits, unless the working view has a picture of that tab on screen, which counts as looking at it. Going to one mid-job, it appears from then on.
 - **The user touches the page:** it goes at once, and stays away for 5 seconds after their last click or key, even in a page a job can carry on reading. Typing stops there too, and what's in the field stays as it is, part typed and with anything of theirs, unsubmitted. A job with the page open hears why and carries on, and doesn't type in that field again in this reply.
 - **A tab handed to the user:** none, and none while the keyboard is in a password or code field, whoever is typing, or in a frame from another site, which could be one.
 - **The job ends or moves on:** it flies up off the page and fades, and nothing of it is left behind.
@@ -441,6 +442,24 @@ A full page for talking to Berry about anything, not about a particular web page
 - A chat is named automatically once it has a topic, and until then shows its first message. A name the user chose is never replaced.
 - In the sidebar, hovering or focusing a chat swaps its age for a button with Rename and Delete, also on right-click. Rename edits in place, and Delete asks first because it can't be undone.
 - Berry's working state says what it is doing and offers to show the work in a tab. Steps, once the agent reports them, form a trail: a footprint for each finished step and the berry on the current one.
+- **A shorter trail,** the same in the main chat, the panel and Routines. While a job runs, only its latest three steps show, with the current one last, under a quiet line such as "17 earlier steps" that opens to all of them. Once it has finished, the whole trail is one line, such as "20 steps on webhallen.com", which opens the same way. A job cut short, with an error or no answer, or a run that failed, stopped or was interrupted, keeps its latest three showing, so you can see where it ended. A lone step just shows. Anything it asked the user, or anywhere it stayed off, stays showing on any trail. Nothing about what's saved or told to the model changes.
+
+### The working view
+
+While a job uses tabs, a job behind the chat can be watched. Other AI browsers show a little window too. In ours **you watch the bird work inside it**. It's on the right of the main chat, drawn on the page's own `canvas`, with no card or panel around it, only words and thin lines. The side chat panel doesn't have it, because the page is already beside it. A job with no tab shows nothing.
+
+- **The window:** a picture of the tab it used last, the page's own shape, 32% of the page's width between 300px and 440px, with the site along its top like the page card's address row. It wears the reading ring while the job works. The job's other tabs are 104px thumbnails under a line, with their site beneath and no bird, as there's only one. Pressing any of them goes to that tab, which doesn't take it over.
+- **The bird in the picture** is the real one, drawn in the real page with the same pacing as if the user were looking, because a tab with a picture on screen counts as watched. It's drawn larger there, so it's 42px in the picture. The line near it isn't drawn, since the words under the window say the same at a size you can read. Thinking stays still between steps in a picture.
+- **The edge of the window:** nobody stands on it while the bird is in the picture, because two of the same bird would be two colleagues. A bird that isn't in the picture stands there instead, on a tab handed to the user, once the job has ended, or with Show the bird on pages or Keep Berry still on.
+- **The words under it:** what it's doing now at 16px, shimmering, in the bird's words, or a step in the present tense if there's no bird to say it. Then who, how long it's been going in tabular figures, and **Stop**, which does what Stop in the chat does. The sites it has been on come last, if there are two or more. There are no metrics, costs or token counts.
+- **Waiting:** "Waiting for your OK", "Has a question for you" or "Waiting for you", with **Answer in the chat**, which goes to it. The buttons themselves are only ever in the chat.
+- **The end:** the ring fades, the bird flies up out of the picture, and it stands on the edge, Delivered if it finished and at rest if it didn't, over the last picture and "Done", "Stopped here" or "It didn’t finish". It stays quiet like that until the next message, when it goes, or until the user leaves the chat, and it isn't there when they come back.
+- **No room:** below 960px of page, one line above the composer says the same with the bird, the site and the time, and pressing it goes to the tab. There's no picture and nothing is captured. It goes when the job ends.
+- **Show Berry off:** plain words and no bird on the edge. In the picture it's the plain pointer, as on a page.
+
+**Pictures protect the user.** They go only to the chrome renderer, through its own channel, and never to the model, a tool, a saved chat or the disk. A tab handed to the user, or taken over by them, shows "You have this tab" with no picture. Capture stops first, and one already on its way is thrown away. The same goes for a page off a mascot's sites, with page access off, for a page that may show a code from the phone, and for one that has crashed or couldn't load. Only tabs this job has used are ever pictured, and only while the chat is the tab in front and the window is showing. Berry's own `screenshot` tool is separate and still hides the bird.
+
+**How often:** about 12 pictures a second while the bird is doing something, 2 otherwise, and 1 once a page has stopped changing, when nothing is sent at all. Other tabs get one every 3 seconds. They are JPEGs at twice the size on screen.
 
 ### Chat panel
 
