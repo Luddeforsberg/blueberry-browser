@@ -9,7 +9,7 @@ import { Favicon, siteIcon } from './Favicon'
 import { ToolBarButton } from './ToolBarButton'
 import { HandoffNotice, NeedsYouNotice } from './NeedsYou'
 import { RoutineNotice } from './RoutineNotice'
-import { WorkingNotice } from './WorkingNotice'
+import { StopWorkButton, WorkingNotice } from './WorkingNotice'
 
 // Pinned sites and bookmarks, one row under the address bar. In the vertical layout they're in the sidebar.
 const BookmarksBar: React.FC = () => {
@@ -88,6 +88,7 @@ export const Toolbar: React.FC = () => {
                     <AddressBar />
                 </div>
 
+                <StopWorkButton />
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
                 )}

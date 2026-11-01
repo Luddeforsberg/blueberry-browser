@@ -24,6 +24,7 @@ export const CHANNEL_REGIONS: {
   "tab:forward": ["chrome"],
   "tab:reload": ["chrome"],
   "tab:stop": ["chrome"],
+  "tab:stop-work": ["chrome"],
   "tab:zoom-reset": ["chrome"],
   "find:search": ["find"],
   "find:step": ["find"],

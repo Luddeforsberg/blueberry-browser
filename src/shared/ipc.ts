@@ -31,6 +31,8 @@ export interface Settings {
   chatWidth: number;
   showBerry: boolean;
   keepBerryStill: boolean;
+  // Whether the working mascot is drawn on the page it works in. Off is for a site that reacts badly.
+  birdOnPages: boolean;
   actionApproval: ActionApproval;
   // An absolute path, or null for the system's Downloads folder.
   downloadFolder: string | null;
@@ -268,6 +270,8 @@ export interface InvokeChannels {
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:reload": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:stop": { region: "chrome"; args: [tabId: string]; result: boolean };
+  // Ends every job working in this tab. It's here, in the chrome, because no page can reach it.
+  "tab:stop-work": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:zoom-reset": { region: "chrome"; args: [tabId: string]; result: boolean };
   "find:search": { region: "find"; args: [text: string]; result: void };
   "find:step": { region: "find"; args: [forward: boolean]; result: void };
@@ -393,6 +397,7 @@ export interface BrowserAPI {
   goForward: (tabId: string) => Promise<boolean>;
   reload: (tabId: string) => Promise<boolean>;
   stop: (tabId: string) => Promise<boolean>;
+  stopWork: (tabId: string) => Promise<boolean>;
   resetZoom: (tabId: string) => Promise<boolean>;
   openPage: (page: InternalPage, options?: { param?: string; title?: string }) => Promise<TabInfo>;
   getRecent: () => Promise<Visit[]>;

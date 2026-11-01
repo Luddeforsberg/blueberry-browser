@@ -1,5 +1,6 @@
 import { NativeImage, WebContentsView, type WebContents, type WebFrameMain } from "electron";
 import type { Layout, TabLoadError, TabTrouble } from "../shared/ipc";
+import { PageActor, type ActorOptions } from "./PageActor";
 import { savedEntries, type SavedWebTab } from "./Session";
 
 // The page card radius from DESIGN.md.
@@ -59,6 +60,8 @@ export interface TabEvents {
   onView: (tab: Tab) => void;
   // The user clicked or typed in the page, or went back or forward in it. Berry's own input doesn't count.
   onUserInput: () => void;
+  // What the bird on this page looks like and may do, read each time so a setting reaches it straight away.
+  actorOptions: () => ActorOptions;
 }
 
 export class Tab {
@@ -91,6 +94,8 @@ export class Tab {
   private readonly waiting = new Set<() => void>();
   // True only inside `sendAgentInput`.
   private sendingAgentInput = false;
+  // What's drawn on the page while a job works in it.
+  readonly actor: PageActor;
 
   constructor(
     id: string,
@@ -102,6 +107,7 @@ export class Tab {
     this.events = events;
     this._url = url;
     this._title = "New Tab";
+    this.actor = new PageActor(this, events.actorOptions, () => this.webContentsView?.webContents.getZoomFactor() ?? 1);
 
     if (restored) {
       this._title = restored.title || this._title;
@@ -142,10 +148,10 @@ export class Tab {
 
     // Electron emits both of these from inside `sendInputEvent`, so `sendingAgentInput` tells Berry's input from a person's.
     contents.on("before-mouse-event", (_, { type }) => {
-      if (type === "mouseDown" && !this.sendingAgentInput) this.events.onUserInput();
+      if (type === "mouseDown" && !this.sendingAgentInput) this.userInput();
     });
     contents.on("before-input-event", (_, input) => {
-      if (isTyping(input) && !this.sendingAgentInput) this.events.onUserInput();
+      if (isTyping(input) && !this.sendingAgentInput) this.userInput();
     });
 
     contents.on("page-title-updated", (_, title) => {
@@ -167,6 +173,8 @@ export class Tab {
       this.notAVisit = null;
       this.events.onChange();
     });
+
+    contents.on("dom-ready", () => this.actor.pageReady());
 
     contents.on("page-favicon-updated", (_, favicons) => {
       this._favicon = favicons[0] ?? null;
@@ -210,7 +218,15 @@ export class Tab {
     contents.on("responsive", () => {
       if (this._trouble === "unresponsive") this.setTrouble(null);
     });
-    contents.on("destroyed", () => this.stopWaiting());
+    contents.on("destroyed", () => {
+      this.stopWaiting();
+      this.actor.destroyed();
+    });
+  }
+
+  private userInput(): void {
+    this.actor.userTouched();
+    this.events.onUserInput();
   }
 
   refusesNavigation(url: string): boolean {
@@ -365,13 +381,18 @@ export class Tab {
   setBerryWorking(working: boolean): void {
     if (working === this._berryWorking) return;
     this._berryWorking = working;
-    if (working) this.addWorkingStyle();
-    else this.removeWorkingStyle();
+    if (working) {
+      this.addWorkingStyle();
+    } else {
+      this.removeWorkingStyle();
+      this.actor.leave();
+    }
   }
 
-  // A tab with nothing loaded yet gets its style when it navigates.
+  // A tab with nothing loaded yet gets its style when it navigates. The bird says all this does and more, so it's only for
+  // anyone who has turned the bird off, and a capture for the model has one less thing in it.
   private addWorkingStyle(): void {
-    if (!this.webContentsView) return;
+    if (!this.webContentsView || this.actor.enabled) return;
     this.workingStyle = this.webContentsView.webContents.insertCSS(WORKING_CSS).catch(() => null);
   }
 
@@ -419,11 +440,13 @@ export class Tab {
     this._isVisible = true;
     this.loadIfUnloaded();
     this.webContentsView?.setVisible(this.shouldDraw);
+    this.actor.shown();
   }
 
   hide(): void {
     this._isVisible = false;
     this.webContentsView?.setVisible(false);
+    this.actor.hidden();
   }
 
   // A view that's never been shown has no width, and a hidden one doesn't draw, so pages hide their content from
@@ -449,7 +472,16 @@ export class Tab {
 
   // The user has been handed this tab. Everything Berry does to a page goes through these methods, so a call already
   // on its way when that happened stops here, rather than clicking or reading in the middle of their sign-in.
-  heldForUser = false;
+  private _heldForUser = false;
+
+  get heldForUser(): boolean {
+    return this._heldForUser;
+  }
+
+  set heldForUser(held: boolean) {
+    this._heldForUser = held;
+    if (held) this.actor.held();
+  }
 
   // A code from the phone went in here, and the page may show it, which can't be taken out of a picture.
   noScreenshotsUntil = 0;
@@ -494,7 +526,7 @@ export class Tab {
   async screenshot(): Promise<NativeImage> {
     this.refuseWhileHeld();
     if (this.mayShowCode) throw new Error("This page may show a code");
-    return await this.fromPage(() => this.view.webContents.capturePage());
+    return await this.fromPage(() => this.actor.whileHidden(() => this.view.webContents.capturePage()));
   }
 
   async runJs<T = unknown>(code: string): Promise<T> {

@@ -779,7 +779,8 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   expect(await clicked()).toBe("Delete");
 });
 
-test("a tab Berry is using glows and shimmers until the reply ends", async () => {
+test("with the bird off, a tab Berry is using glows and shimmers until the reply ends", async () => {
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ birdOnPages: false }));
   const page = await openFixture();
   await openChat();
   const row = chrome.getByRole("region", { name: "Tabs" }).getByRole("listitem").filter({ hasText: "Fixture" });

@@ -6,6 +6,8 @@ import type { Tab } from "./Tab";
 
 const STEP_MS = 30;
 const DRAG_STEPS = 8;
+// About how long a real drag takes from press to release.
+export const DRAG_MS = STEP_MS * (DRAG_STEPS + 1);
 // How long a page gets to show that real input reached it.
 const LANDED_MS = 500;
 const LANDED_POLL_MS = 50;
@@ -40,15 +42,18 @@ const release = (tab: Tab, at: Point, clickCount: number) => {
   tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
 };
 
-export const clickAt = async (tab: Tab, point: Point, clicks: 1 | 2): Promise<void> => {
+// False if `goOn` said no just before a press, so nothing was clicked.
+export const clickAt = async (tab: Tab, point: Point, clicks: 1 | 2, goOn: () => boolean = () => true): Promise<boolean> => {
   await moveTo(tab, point);
   const at = inView(tab, point);
   for (let count = 1; count <= clicks; count++) {
+    if (!goOn()) return false;
     press(tab, at, count);
     await pause(STEP_MS);
     release(tab, at, count);
     await pause(STEP_MS);
   }
+  return true;
 };
 
 export const dragBetween = async (tab: Tab, from: Point, to: Point): Promise<void> => {
