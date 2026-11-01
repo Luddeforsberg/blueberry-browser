@@ -231,6 +231,7 @@ export const GalleryPage: React.FC = () => {
                     <ul className="mt-20 grid grid-cols-[repeat(auto-fill,minmax(248px,1fr))] gap-x-4 gap-y-20">
                         <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={null} onReview={() => undefined} />
                         <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={SAMPLE_MASCOT} onReview={() => undefined} />
+                        <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, author: 'Ana', addCount: 12, publishedAt: 1 }} copy={null} onReview={() => undefined} />
                         <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: ['visit', 'click', 'type'] } }} copy={null} onReview={() => undefined} />
                         <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: [] } }} copy={null} onReview={() => undefined} />
                     </ul>

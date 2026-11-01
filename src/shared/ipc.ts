@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryMascot, LibrarySnapshot, MascotDraft, RoutineDraft, RoutineRun, Suggestion } from "./library";
+import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, PublishChoices, PublishedMascot, PublishResult, RoutineDraft, RoutineRun, Suggestion } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -60,6 +60,14 @@ export interface PhoneState {
 export interface PhoneAnswered {
   approvalId: string;
   said: string;
+}
+
+// Who's signed in, for publishing. Tokens never come back from main, and the password only ever goes the other way.
+export interface AccountState {
+  // "not-set-up" means this copy has no Gallery server, so nothing about accounts shows.
+  status: "not-set-up" | "signed-out" | "signed-in";
+  email: string | null;
+  problem: string | null;
 }
 
 export type DownloadState = "progressing" | "paused" | "completed" | "cancelled" | "interrupted";
@@ -291,9 +299,20 @@ export interface InvokeChannels {
   "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft]; result: MascotSaveResult };
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
-  "mascots:gallery": { region: "chrome"; args: []; result: GalleryMascot[] };
+  "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
   // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
   "mascots:add-from-gallery": { region: "chrome"; args: [galleryId: string, name: string | null]; result: MascotSaveResult };
+  // By the mascot's id, so what goes public is read in main, not sent by a renderer. Only the choices come from there.
+  "mascots:publish": { region: "chrome"; args: [mascotId: string, choices: PublishChoices]; result: PublishResult };
+  // Asks first, in main.
+  "mascots:unpublish": { region: "chrome"; args: [publishedId: string]; result: PublishResult };
+  // Null if the server couldn't say.
+  "mascots:published": { region: "chrome"; args: []; result: PublishedMascot[] | null };
+  "mascots:last-author": { region: "chrome"; args: []; result: string };
+  "account:state": { region: "chrome"; args: []; result: AccountState };
+  "account:sign-in": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
+  "account:sign-up": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
+  "account:sign-out": { region: "chrome"; args: []; result: AccountState };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
@@ -321,6 +340,7 @@ export type InvokeChannel = keyof InvokeChannels;
 // Main tells renderers.
 export interface EventChannels {
   "tabs:updated": TabInfo[];
+  "account:updated": AccountState;
   "phone:updated": PhoneState;
   "phone:answered": PhoneAnswered;
   "layout:updated": Layout;
@@ -436,8 +456,20 @@ export interface RoutinesAPI {
 export interface MascotsAPI {
   save: (id: string | null, draft: MascotDraft) => Promise<MascotSaveResult>;
   delete: (id: string) => Promise<boolean>;
-  gallery: () => Promise<GalleryMascot[]>;
+  gallery: () => Promise<GalleryListing>;
   addFromGallery: (galleryId: string, name: string | null) => Promise<MascotSaveResult>;
+  publish: (mascotId: string, choices: PublishChoices) => Promise<PublishResult>;
+  unpublish: (publishedId: string) => Promise<PublishResult>;
+  published: () => Promise<PublishedMascot[] | null>;
+  lastAuthor: () => Promise<string>;
+}
+
+export interface AccountAPI {
+  state: () => Promise<AccountState>;
+  signIn: (email: string, password: string) => Promise<AccountState>;
+  signUp: (email: string, password: string) => Promise<AccountState>;
+  signOut: () => Promise<AccountState>;
+  onUpdated: (callback: (state: AccountState) => void) => Unsubscribe;
 }
 
 export interface SuggestionsAPI {
@@ -484,6 +516,7 @@ export interface ChromeAPI {
   find: FindAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
+  account: AccountAPI;
   suggestions: SuggestionsAPI;
   downloads: DownloadsAPI;
   permissions: PermissionsAPI;

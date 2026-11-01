@@ -16,6 +16,7 @@ const LOST: Omit<MascotProfile, "id"> = {
 };
 
 const galleryIdOf = (galleryId: unknown) => (typeof galleryId === "string" ? { galleryId } : {});
+const publishedIdOf = (publishedId: unknown) => (typeof publishedId === "string" ? { publishedId } : {});
 
 // The flock, in a JSON file. Berry isn't in it: it's always there and can't be changed.
 export class MascotStore {
@@ -28,7 +29,7 @@ export class MascotStore {
         this.mascots = raw.flatMap((item: Partial<MascotProfile> | null) => {
           const parsed = parseMascotDraft(item);
           if ("error" in parsed || typeof item?.id !== "string" || item.id === BERRY_ID) return [];
-          return [{ ...parsed.draft, id: item.id, deletedAt: typeof item.deletedAt === "number" ? item.deletedAt : null, ...galleryIdOf(item.galleryId) }];
+          return [{ ...parsed.draft, id: item.id, deletedAt: typeof item.deletedAt === "number" ? item.deletedAt : null, ...galleryIdOf(item.galleryId), ...publishedIdOf(item.publishedId) }];
         });
       }
     } catch {
@@ -62,8 +63,8 @@ export class MascotStore {
     if (taken) return { ok: false, error: `You already have a ${draft.name}. Give this one its own name.` };
     const savedId = id ?? randomUUID();
     // Editing a copy from the Gallery leaves it that copy, so the Gallery doesn't offer a second one.
-    const from = id ? this.mascots.find((mascot) => mascot.id === id)?.galleryId : galleryId;
-    const saved: MascotProfile = { ...draft, id: savedId, deletedAt: null, ...galleryIdOf(from) };
+    const before = id ? this.mascots.find((mascot) => mascot.id === id) : undefined;
+    const saved: MascotProfile = { ...draft, id: savedId, deletedAt: null, ...galleryIdOf(before ? before.galleryId : galleryId), ...publishedIdOf(before?.publishedId) };
     this.write(id ? this.mascots.map((mascot) => (mascot.id === id ? saved : mascot)) : [...this.mascots, saved]);
     return { ok: true, id: savedId };
   }
@@ -72,6 +73,11 @@ export class MascotStore {
   addFromGallery(galleryId: string, input: unknown): { ok: true; id: string } | { ok: false; error: string } {
     const copy = this.mascots.find((mascot) => mascot.galleryId === galleryId && mascot.deletedAt === null);
     return copy ? { ok: true, id: copy.id } : this.save(null, input, galleryId);
+  }
+
+  // Null once it's been taken down. Nothing else about the mascot changes.
+  setPublished(id: string, publishedId: string | null): void {
+    this.write(this.mascots.map((mascot) => (mascot.id === id ? { ...mascot, publishedId: publishedId ?? undefined } : mascot)));
   }
 
   // Kept on file, so its chats keep their look and limits.

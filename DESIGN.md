@@ -53,7 +53,7 @@ Sizes (*to tune*):
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat, Needs you, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account joins it when real accounts arrive in stage 5 of the roadmap. Collapsed, the toolbar shows the button that brings the sidebar back.
+- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New Tab, New chat, Needs you, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account lives in it. Collapsed, the toolbar shows the button that brings the sidebar back.
 - **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. Sites with no icon show their first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. With nothing saved, the cluster and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
 - **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
 - **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
@@ -409,7 +409,7 @@ A full page for talking to Berry about anything, not about a particular web page
 - Approval requests are cards showing exactly what will happen. By default one appears only for what could delete, send, buy or change text, such as a Delete button or typing in a form, and for an address carrying data in its query. A query and hash of up to 100 characters don't ask on YouTube, Google, Bing, DuckDuckGo, Wikipedia, GitHub, Reddit or Amazon, or on the exact site of a page the job already has open. Going to a plain link or typing a search doesn't ask. Settings can make Berry ask always or never. Cancel tells Berry no.
 - When Berry can't go on without something only the user knows, it asks on the same card with a text box, Answer and Skip. It carries on with the answer, and a question waits like an approval, in any Ask before acting setting. Passwords, codes and card details are never asked for here.
 - When a page stops it with a sign-in, a code or a captcha, Berry hands the tab to the user, on the same card with Go to the tab, I'm done and Not now. See Needs you.
-- Using Berry requires an account, requested the first time someone uses it. Browsing, tabs and bookmarks never need one.
+- Using Berry needs no account. Only publishing a mascot does.
 
 ### Routines
 
@@ -438,15 +438,31 @@ Opens as a tab from the sidebar, the Go menu, or the new tab page when there's n
 
 ### Gallery
 
-Mascots made for one job, ready to add. Opens as a tab from the last tile on the Flock page or the Go menu, with only one open at a time. It needs no account, and everything in it comes with the app for now.
+Mascots made for one job, ready to add, some from Blueberry and some from people you don't know. Opens as a tab from the last tile on the Flock page or the Go menu, with only one open at a time. Browsing and adding need no account. With no server set up, it shows just the starters, as it always has, and nothing about accounts appears.
 
-- **The page:** a heading with a way back to **Your flock**, a search field that covers everything on a card and what the mascot is told, and categories as a segmented control. The grid works like the flock: `surface` cards with the bird sitting on the top edge.
-- **A card** has the name, "By" and its author, one line on what it does, and its permissions on a `card` block. Below them is **Add**, or **Chat** and **Details** with "In your flock" once there's a copy. There are no counts, ratings or anything else that isn't real.
-- **Permissions are the point of the page.** Each is a line of plain words with a lock, such as "Only visits hemnet.se" or "Can't type or click". What isn't limited, such as "Can go anywhere" or "Can click and type", has an open lock in `warning`, so a card with no limit can't look like one with limits. The words come from one function that reads the same sites and tools the tool layer enforces, never from what the entry says about itself.
-- **Review:** Add opens a screen in the page, never a modal, with the permissions larger, the instructions word for word and the bird in Asking beside them, or above them in a narrow window. It says that the same approval cards apply and that a copy is the user's own. Nothing is added until **Add to flock**.
+- **The page:** a heading with a way back to **Your flock**, a search field that covers everything on a card and what the mascot is told, categories as a segmented control, and **Newest** and **Most added** when a server answers. The grid works like the flock: `surface` cards with the bird sitting on the top edge. What people published comes first, and starters follow in their own order.
+- **If the server can't be reached,** the starters still show, and a line in `warning` above them says only those are showing, with **Try again**.
+- **A card** has the name, "By" and its author, one line on what it does, and its permissions on a `card` block. Below them is **Add**, or **Chat** and **Details** with "In your flock" once there's a copy or it's your own. A published one shows how many adds it has, each account or install counted once. A starter isn't on the server, so it shows no count rather than a made-up one. There are no ratings or anything else that isn't real.
+- **Permissions are the point of the page.** Each is a line of plain words with a lock, such as "Only visits hemnet.se" or "Can't type or click". What isn't limited, such as "Can go anywhere" or "Can click and type", has an open lock, so a card with no limit can't look like one with limits. Most starters are left open on purpose, so people can build on them, with the approval cards still asking, and limits are there for the few that are better for them. It isn't drawn as a warning, because it's the normal case. The words come from one function that reads the same sites and tools the tool layer enforces, never from what the entry says about itself.
+- **Review:** Add opens a screen in the page, never a modal, with the permissions larger, the instructions word for word and the bird in Asking beside them, or above them in a narrow window. It says that the same approval cards apply and that a copy is the user's own. On one a person published, it says that someone using Blueberry wrote it and that we haven't checked it. Under the instructions is the example, "I asked this" and "And here's what it gave me", as plain text and never markdown, and the public page's link if there is one. A starter's example comes from a real run, and one without a real run shows none. Nothing is added until **Add to flock**, and what's added is what was on the screen, even if its author has changed it since.
 - **Added:** the same screen says it's in the flock, the bird lands in Delivered with a hop, and **Start a chat** is the main button.
 - **A clashing name:** the review asks for another, starting from "Morning Paper 2". Adding the same one twice can't happen, as the card offers a chat instead, and a deleted copy can be added again.
 - **A copy is independent.** It's a normal mascot, with Edit and Delete in the flock, and nothing in the Gallery can reach it afterwards. It goes through the same checks as one made by hand, and it keeps the same approvals and limits.
+- **What strangers can't do:** take the name Berry or Blueberry, write as Blueberry, or limit a mascot to this computer or the user's own network. Text a person can't see, such as invisible characters, is taken out. A row breaking any of this shows no card, and a name reaches the prompt in its own tag that says it's only a name.
+
+### Publishing
+
+From a mascot of your own, the card's **Publish** opens a page in the Flock tab. It's plain lines split by `border`, in one 672px column, with no cards. Copies from the Gallery can't be published, and with no server set up there's no button.
+
+- **Signed out,** the page says why an account is needed, with the sign-in form in place. There's nothing else to do until then.
+- **What's chosen:** the name to publish under, which starts empty or as the one used last and never as anything from the account, one line on what it does, and a category. The example is a list of that mascot's chats. Picking one fills in the last thing asked and its answer as text to edit, and it needs the box saying they've read both.
+- **Exactly what goes public** is below that as term and value lines, with the bird, and it follows what's typed. It says that this is all that goes, never chats, history or the account's email.
+- **Warnings** in `warning`, with an icon, above the button when any text looks like it has an email address, a key, a password or a card number. They say where, and don't block.
+- **Published:** the heading says so, with the public page's link, **Copy link**, **Open it** and **Unpublish**, which asks first in a native dialog. Editing the mascot doesn't change what's public until **Update what's public**.
+
+### The public page
+
+What a shared link opens: `site/m/?id=`, a small static page with the same tokens, following the system's light or dark. The bird at rest, name, author and adds, the line on what it does and **Get Blueberry**, then lines split by `border`: what it's allowed to do, in the same words as the app, what it's told, the example and a note that someone wrote it and we haven't checked it. Everything from the server goes in as text, and its content security policy allows no other scripts. A mascot that's been removed or hidden says it isn't in the Gallery any more.
 
 ### Needs you
 
@@ -499,7 +515,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including layout, appearance, Berry (Still, Hide and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Downloads
 

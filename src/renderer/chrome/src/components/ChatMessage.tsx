@@ -194,7 +194,7 @@ const HandoffActions: React.FC<{
     )
 }
 
-const handoffNote = (name: string) => `${name} can’t see that tab until you press I’m done. Your password or code goes in the page, and never in a chat.`
+const handoffNote = (name: string) => `${name} can’t see that tab until you press I’m done. Your password or code goes in the page, and ${name} never sees it.`
 
 // Berry has handed a tab to the user, and waits here until they say they're done.
 const ChatHandoffCard: React.FC<{ chatId: string; approval: ChatApproval; mascot?: MascotProfile }> = ({ chatId, approval, mascot }) => {

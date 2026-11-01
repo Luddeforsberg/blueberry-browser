@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchMascotCatalog, parseGalleryMascot } from "./mascotCatalog";
+import { parseGalleryMascot, starterMascots } from "./mascotCatalog";
 import { MAX_MASCOT_NAME, parseMascotDraft } from "../shared/mascots";
 
 const entry = {
@@ -11,8 +11,8 @@ const entry = {
 };
 
 describe("the mascot catalog", () => {
-  it("has starters that pass a mascot's own checks unchanged, with one limited to reading and one that can go anywhere", async () => {
-    const catalog = await fetchMascotCatalog();
+  it("has starters that pass a mascot's own checks unchanged, with one limited to reading and one that can go anywhere", () => {
+    const catalog = starterMascots();
     expect(catalog.length).toBeGreaterThanOrEqual(10);
     expect(new Set(catalog.map(({ id }) => id)).size).toBe(catalog.length);
     expect(new Set(catalog.map(({ draft }) => draft.name.toLowerCase())).size).toBe(catalog.length);
@@ -24,7 +24,7 @@ describe("the mascot catalog", () => {
       expect(author).toBe("Blueberry");
       expect(description.length).toBeLessThanOrEqual(70);
     }
-    expect(catalog.filter(({ draft }) => draft.sites.length > 0).length).toBeGreaterThan(catalog.length / 2);
+    expect(catalog.filter(({ draft }) => draft.sites.length > 0).length).toBeLessThan(catalog.length / 2);
     expect(catalog.some(({ draft }) => draft.sites.length > 0 && !draft.tools.includes("click") && !draft.tools.includes("type"))).toBe(true);
     expect(catalog.some(({ draft }) => draft.sites.length === 0 && draft.tools.includes("visit"))).toBe(true);
   });

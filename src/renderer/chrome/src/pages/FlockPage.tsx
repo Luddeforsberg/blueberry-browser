@@ -9,7 +9,9 @@ import { ACCESSORIES, BERRY, BERRY_ID, MASCOT_TOOLS, MAX_MASCOT_INSTRUCTIONS, MA
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Berry } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { blankMascot, FLOCK_VIEW_EVENT, flockView, mascotForm, setFlockView, sitesFrom, surprise, toMascotDraft, type FlockView, type MascotFormValues } from '../flockView'
+import { useAccount } from '../useAccount'
+import { PublishMascot } from './PublishMascot'
+import { blankMascot, blankPublish, FLOCK_VIEW_EVENT, flockView, mascotForm, setFlockView, sitesFrom, surprise, toMascotDraft, type FlockView, type MascotFormValues } from '../flockView'
 import { blankForm, setRoutinesView } from '../routinesView'
 
 const api = () => window.chromeAPI.mascots
@@ -23,7 +25,7 @@ const FLY_OFF_MS = 520
 const wearing = (name: string, look: MascotLook): MascotProfile => ({ ...BERRY, id: name, name, look })
 
 // One bird on its card. It sits on the edge, like Berry on the new tab composer, and looks up when you come near.
-export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; onEdit: () => void }> = ({ mascot, landed, onEdit }) => {
+export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; onEdit: () => void; onPublish?: () => void }> = ({ mascot, landed, onEdit, onPublish }) => {
     const { chats, routines } = useLibrary()
     const { choose } = useFlock()
     const [near, setNear] = useState(false)
@@ -63,20 +65,22 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; onEd
             <div className="mt-auto pt-4 flex justify-center gap-2">
                 <Button size="sm" onClick={chat}>Chat</Button>
                 {!isBerry && <Button size="sm" variant="outline" aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
+                {onPublish && !isBerry && !mascot.galleryId && <Button size="sm" variant="outline" aria-label={`Publish ${mascot.name}`} onClick={onPublish}>{mascot.publishedId ? 'Published' : 'Publish'}</Button>}
             </div>
         </li>
     )
 }
 
-const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: MascotProfile) => void }> = ({ landed, onNew, onEdit }) => {
+const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: MascotProfile) => void; onPublish: (mascot: MascotProfile) => void }> = ({ landed, onNew, onEdit, onPublish }) => {
     const { flock } = useFlock()
+    const [account] = useAccount()
     return (
         <>
             <h1 className="text-20 font-semibold">Your flock</h1>
             <p className="mt-1 text-14 text-muted-foreground">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
             <ul aria-label="Your flock" className="mt-6 pt-[68px] grid grid-cols-[repeat(auto-fill,minmax(216px,1fr))] gap-x-4 gap-y-[84px]">
                 {flock.map((mascot) => (
-                    <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} onEdit={() => onEdit(mascot)} />
+                    <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} />
                 ))}
                 <li className="flex">
                     <button
@@ -371,11 +375,20 @@ export const FlockPage: React.FC = () => {
                         onChange={(values) => setFlockView({ page: 'form', values })}
                         onDone={(landed) => setFlockView({ page: 'list', landed })}
                     />
+                ) : view.page === 'publish' ? (
+                    <PublishMascot
+                        key={view.mascotId}
+                        mascotId={view.mascotId}
+                        values={view.values}
+                        onChange={(values) => setFlockView({ page: 'publish', mascotId: view.mascotId, values })}
+                        onBack={() => setFlockView({ page: 'list' })}
+                    />
                 ) : (
                     <List
                         landed={view.landed}
                         onNew={() => setFlockView({ page: 'form', values: blankMascot() })}
                         onEdit={(mascot) => setFlockView({ page: 'form', values: mascotForm(mascot) })}
+                        onPublish={(mascot) => setFlockView({ page: 'publish', mascotId: mascot.id, values: blankPublish() })}
                     />
                 )}
             </div>

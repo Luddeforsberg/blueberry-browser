@@ -8,12 +8,15 @@ export interface GalleryView {
     category: string | null
     // The entry being reviewed, by id.
     reviewing: string | null
+    sort: GallerySort
 }
+
+export type GallerySort = 'newest' | 'added'
 
 export const GALLERY_VIEW_EVENT = 'blueberry:gallery-view'
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose your place.
-let current: GalleryView = { query: '', category: null, reviewing: null }
+let current: GalleryView = { query: '', category: null, reviewing: null, sort: 'newest' }
 
 export const galleryView = () => current
 
@@ -34,6 +37,13 @@ export const filterGallery = (entries: readonly GalleryMascot[], query: string, 
         const text = forSearch([name, entry.description, entry.author, entry.category, instructions, ...sites, ...permissionsInWords({ sites, tools }).map((line) => line.text)].join(' '))
         return words.every((word) => text.includes(word))
     })
+}
+
+// What people published comes first, by the sort chosen. Starters have neither a date nor a count, so they keep their
+// order after them.
+export const sortGallery = (entries: readonly GalleryMascot[], sort: GallerySort): GalleryMascot[] => {
+    const newest = (a: GalleryMascot, b: GalleryMascot) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0)
+    return [...entries].sort((a, b) => (sort === 'added' ? (b.addCount ?? -1) - (a.addCount ?? -1) || newest(a, b) : newest(a, b)))
 }
 
 // A name that's free, to start from when the entry's own is taken: Scout, then Scout 2. It stays within the limit.

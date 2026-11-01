@@ -102,6 +102,17 @@ const chromeAPI: ChromeAPI = {
     delete: (id) => invoke("mascots:delete", id),
     gallery: () => invoke("mascots:gallery"),
     addFromGallery: (galleryId, name) => invoke("mascots:add-from-gallery", galleryId, name),
+    publish: (mascotId, choices) => invoke("mascots:publish", mascotId, choices),
+    unpublish: (publishedId) => invoke("mascots:unpublish", publishedId),
+    published: () => invoke("mascots:published"),
+    lastAuthor: () => invoke("mascots:last-author"),
+  },
+  account: {
+    state: () => invoke("account:state"),
+    signIn: (email, password) => invoke("account:sign-in", email, password),
+    signUp: (email, password) => invoke("account:sign-up", email, password),
+    signOut: () => invoke("account:sign-out"),
+    onUpdated: (callback) => subscribe("account:updated", callback),
   },
   phone: {
     state: () => invoke("phone:state"),
