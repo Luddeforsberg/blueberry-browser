@@ -60,7 +60,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await chrome.getByRole("button", { name: "Publish for anyone to read" }).click();
     await expect(chrome.getByRole("alert")).toContainText("can’t have an email address");
     await authorName.fill("Ana");
-    await chrome.getByLabel("Category").selectOption("News and research");
+    await chrome.getByRole("radio", { name: "News and research" }).click();
 
     // The warning about the address doesn't block.
     await expect(chrome.getByRole("list", { name: "Before you publish" })).toContainText("email address in its instructions");

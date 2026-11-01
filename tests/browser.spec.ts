@@ -380,7 +380,7 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   await message.fill("Look at the form");
   await message.press("Enter");
 
-  await expect(card.getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
   const reachable = JSON.stringify(model.requests.at(-1)?.messages.at(-1));
   expect(reachable).not.toContain(origin);
   await card.getByRole("button", { name: "Allow" }).click();
@@ -410,7 +410,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   await message.press("Enter");
 
   // Even a harmless-looking button in another site's frame asks, and says whose it is.
-  await expect(card.getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
   await card.getByRole("button", { name: "Allow" }).click();
 
   const question = chrome.getByRole("region", { name: "Berry is asking" });
@@ -602,7 +602,7 @@ test("Berry finds more on a page, chooses dropdown options, and says what really
   await askBeforeActing("risky");
   model.callTools({ name: "choose_option", args: { ref: named("Size").ref, option: "Medium" } });
   await askInPanel("Choose medium");
-  await expect(card.getByText(`Choose “Medium” (sent as “m”) in the dropdown “Size” on ${url}`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Choose “Medium” (sent as “m”) in the dropdown “Size” on ${url}`)).toBeVisible();
 
   // The page changes what that option sends while the user decides, so nothing happens.
   await page.evaluate(() => {
@@ -616,14 +616,14 @@ test("Berry finds more on a page, chooses dropdown options, and says what really
   // A click on an input nobody can see always asks.
   model.callTools({ name: "click", args: { ref: named("Finished").ref } });
   await askInPanel("Tick it");
-  await expect(card.getByText(`Click the checkbox “Finished” on ${url}`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Click the checkbox “Finished” on ${url}`)).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies).toHaveCount(++done);
 
   // An option with no text still says what it sends.
   model.callTools({ name: "choose_option", args: { ref: named("Size").ref, option: "" } });
   await askInPanel("Choose the blank one");
-  await expect(card.getByText(`Choose “” (sent as “blank”) in the dropdown “Size” on ${url}`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Choose “” (sent as “blank”) in the dropdown “Size” on ${url}`)).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies).toHaveCount(++done);
 
@@ -669,7 +669,7 @@ test("Berry does nothing if a link changes while the user decides", async () => 
   model.callTools({ name: "list_elements", args: { query: "Continue" } });
   model.callTools({ name: "click", args: { ref: "e1" } });
   await askInPanel("Continue");
-  await expect(card.getByText(`Click the link “Continue” on ${origin}/form, which goes to ${origin}/one`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Click the link “Continue” on ${origin}/form, which goes to ${origin}/one`)).toBeVisible();
 
   await page.evaluate(() => document.querySelector("a")!.setAttribute("href", "/delete"));
   await card.getByRole("button", { name: "Allow" }).click();
@@ -681,7 +681,7 @@ test("Berry does nothing if a link changes while the user decides", async () => 
   model.callTools({ name: "list_elements", args: { query: "Draft" } });
   model.callTools({ name: "click", args: { ref: "e2" } });
   await askInPanel("Save a draft");
-  await expect(card.getByText(`Click the button “Draft” on ${origin}/form, which goes to ${origin}/draft`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Click the button “Draft” on ${origin}/form, which goes to ${origin}/draft`)).toBeVisible();
 });
 
 test("Berry only acts on a page once allowed, and shows what will happen", async () => {
@@ -694,7 +694,7 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
   model.callTools({ name: "list_elements", args: {} });
   model.callTools({ name: "click", args: { ref: "e1" } });
   await askInPanel("Save it");
-  await expect(card.getByText(`Click the button “Save” on ${origin}/form`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Click the button “Save” on ${origin}/form`)).toBeVisible();
   expect(await page.title()).toBe("Form");
   const listed = String(model.requests.at(-1)?.messages.at(-1)?.content);
   expect(listed).toContain('"name":"Save"');
@@ -714,7 +714,7 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
 
   model.callTools({ name: "type_text", args: { ref: "e2", text: "hi there", submit: true } });
   await askInPanel("Write a note");
-  await expect(card.getByText(`Type “hi there” into the field “Note” and submit it on ${origin}/form, which goes to ${origin}/form`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Type “hi there” into the field “Note” and submit it on ${origin}/form, which goes to ${origin}/form`)).toBeVisible();
   await card.getByRole("button", { name: "Allow" }).click();
   await expect.poll(() => page.title()).toBe("Sent hi there");
   await expect(card).toHaveCount(0);
@@ -755,12 +755,12 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
 
   for (const [element, expected] of [[ref("Delete account"), "Delete account"], [ref("Ta bort inlägg"), "Ta bort inlägg"], [unnamed, "”"], [ref("Go"), "Go"]]) {
     await act("click", { ref: element });
-    await expect(card.getByText(expected, { exact: false })).toBeVisible();
+    await expect(card.locator("p").getByText(expected, { exact: false })).toBeVisible();
     await card.getByRole("button", { name: "Cancel" }).click();
     await expect(replies()).toHaveCount(++done);
   }
   await act("type_text", { ref: ref("Title"), text: "hello" });
-  await expect(card.getByText("Type “hello”", { exact: false })).toBeVisible();
+  await expect(card.locator("p").getByText("Type “hello”", { exact: false })).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies()).toHaveCount(++done);
   await act("type_text", { ref: ref("Search"), text: "x".repeat(101) });
@@ -816,7 +816,7 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
   const before = (await getTabs()).length;
   model.callTools({ name: "open_tab", args: { url: `${origin}/form` } });
   await askInPanel("Open the form");
-  await expect(card.getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
+  await expect(card.locator("p").getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
   expect(await getTabs()).toHaveLength(before);
   await card.getByRole("button", { name: "Allow" }).click();
   await expect.poll(async () => (await getTabs()).length).toBe(before + 1);

@@ -24,7 +24,7 @@ import { ACCESSORIES, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
-import { BirdSuggestions } from '../components/BirdSuggestions'
+import { BirdSuggestions } from '../components/BirdsOnFruit'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
@@ -326,14 +326,10 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Approval card">
                     <div className="max-w-sm">
                         <ApprovalCard
-                            request={{
-                                question: 'This will send the email to Anna. Send it?',
-                                details: 'To anna@example.com, from your Gmail. Nothing is sent until you say so.',
-                                confirmLabel: 'Send it',
-                                reviewLabel: 'See the draft'
-                            }}
+                            avatar={<Mascot mood="asking" size={32} />}
+                            question={<>I’d like to open <strong className="font-semibold">github.com</strong> in a new tab</>}
+                            exactly="Open https://github.com/acme/checkout/pull/412?diff=split in a new tab"
                             onConfirm={() => undefined}
-                            onReview={() => undefined}
                             onCancel={() => undefined}
                         />
                     </div>

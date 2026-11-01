@@ -57,7 +57,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             />
                         )
                     )}
-                    {thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} />}
+                    {thread.approval && <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} avatarOutside />}
                     {thread.error && <ChatError message={thread.error} />}
                     {!running && thread.messages.at(-1)?.role === 'assistant' && (
                         <div>

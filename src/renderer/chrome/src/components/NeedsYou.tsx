@@ -6,22 +6,11 @@ import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { setRoutinesView } from '../routinesView'
+import { withSiteNames } from '../siteNames'
 import { Berry, useAssistantName } from './Berry'
 
 // Whatever answers an item says so at once, because the page keeps the row for a moment in those words.
 type OnAnswered = (said: string) => void
-
-// Rows name sites. The exact words stay beside them, because that's what is being allowed.
-export const withSiteNames = (text: string) =>
-    text.replace(/https?:\/\/[^\s,”"<>]+/g, (found) => {
-        const trailing = /[.)]+$/.exec(found)?.[0] ?? ''
-        try {
-            const { hostname } = new URL(found.slice(0, found.length - trailing.length))
-            return `${hostname.replace(/^www\./, '')}${trailing}`
-        } catch {
-            return found
-        }
-    })
 
 const askedAgo = (at: number) => {
     const minutes = Math.floor((Date.now() - at) / 60000)
@@ -111,6 +100,7 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
     const { handoff, question } = approval
     const canGoToTab = item.tabId !== null && tabs.some((tab) => tab.id === item.tabId)
     const onThatTab = !!handoff && tabs.some((tab) => tab.id === handoff.tabId && tab.isActive)
+    // Rows name sites. The exact words stay beside them, because that's what is being allowed.
     const shortened = withSiteNames(approval.text)
 
     const send = (allow: boolean, said: string, words?: string) => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowRight, Bird, Hand, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { Bird, Hand, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import type { Suggestion } from '@shared/library'
 import { BerryDot } from '@common/components/Mascot'
@@ -10,7 +10,7 @@ import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
-import { BirdSuggestions } from '../components/BirdSuggestions'
+import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
 import { setFlockView, suggestedMascot } from '../flockView'
 import { setRoutinesView, suggestedForm } from '../routinesView'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
@@ -36,7 +36,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const browser = window.chromeAPI.browser
     const library = useLibrary()
     const { layout, theme } = useShell()
-    const { chosen, choose } = useFlock()
+    const { chosen, choose, find } = useFlock()
 
     useEffect(() => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))
@@ -98,50 +98,58 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         { label: 'Flock', Icon: Bird, onClick: () => browser.openPage('flock') }
     ]
 
-    const IDEAS = [
-        {
-            Icon: RefreshCw,
-            title: 'Put something on a schedule',
-            text: isBerry ? 'Hand Berry a task that repeats, and it reports back when it’s done.' : 'Set up a task that repeats, with results waiting for you.',
-            action: 'See routines',
-            onClick: () => browser.openPage('routines')
-        },
-        {
-            Icon: SlidersHorizontal,
-            title: 'Make the browser yours',
-            text: 'Choose your tab layout and theme, and what stays on this computer.',
-            action: 'Open settings',
-            onClick: () => browser.openPage('settings')
-        }
-    ]
-
-    // Real work only: chats and routines from the library. With none, the ideas take their place.
-    const work = [
+    // Real work only: chats and routines from the library. With none, the birds offer what there is to try.
+    const work: FruitIdea[] = [
         ...library.chats.map((chat) => ({
             id: chat.id,
-            meta: 'Chat',
-            title: chat.title,
-            detail: null as string | null,
-            running: false,
-            onClick: () => browser.openPage('chat', { param: chat.id, title: chat.title })
+            mascot: find(chat.mascotId),
+            mood: 'rest' as const,
+            words: <p className="font-semibold">{chat.title}</p>,
+            action: 'Open the chat',
+            actionLabel: `Open the chat: ${chat.title}`,
+            onUse: () => void browser.openPage('chat', { param: chat.id, title: chat.title })
         })),
         ...library.routines.map((routine) => ({
             id: routine.id,
-            meta: routine.schedule,
-            title: routine.name,
-            detail: routine.lastResult,
-            running: routine.status === 'running',
-            onClick: () => browser.openPage('routines')
+            mascot: find(routine.mascotId),
+            mood: routine.status === 'running' ? 'fetching' as const : 'rest' as const,
+            words: (
+                <>
+                    <p className="flex items-center gap-2 font-semibold">
+                        {routine.name}
+                        {routine.status === 'running' && <BerryDot working />}
+                        {routine.status === 'running' && <span className="sr-only">Running now</span>}
+                    </p>
+                    <p className="opacity-90">{routine.schedule}</p>
+                    {routine.lastResult && <p className="opacity-90 line-clamp-2">{routine.lastResult}</p>}
+                </>
+            ),
+            action: 'See the routine',
+            actionLabel: `See the routine: ${routine.name}`,
+            onUse: () => void browser.openPage('routines')
         }))
     ].slice(0, WORK_CARDS)
 
-    const glass = theme.glass ? "bg-surface/90 backdrop-blur-xl" : "bg-surface"
-    const cardClass = cn(
-        "flex flex-col p-4 rounded-panel shadow-card text-left outline-none transition-colors",
-        "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
-        glass
-    )
+    const IDEAS: FruitIdea[] = [
+        {
+            id: 'idea-routines',
+            mascot: find(null),
+            mood: 'rest',
+            words: <p><span className="font-semibold">Put something on a schedule.</span> <span className="opacity-90">{isBerry ? 'Hand me a task that repeats, and I’ll report back when it’s done.' : 'Set up a task that repeats, with results waiting for you.'}</span></p>,
+            action: 'See routines',
+            onUse: () => void browser.openPage('routines')
+        },
+        {
+            id: 'idea-settings',
+            mascot: find(null),
+            mood: 'rest',
+            words: <p><span className="font-semibold">Make the browser yours.</span> <span className="opacity-90">Choose your tab layout and theme, and what stays on this computer.</span></p>,
+            action: 'Open settings',
+            onUse: () => void browser.openPage('settings')
+        }
+    ]
 
+    const glass = theme.glass ? "bg-surface/90 backdrop-blur-xl" : "bg-surface"
     return (
         <div className="relative h-full overflow-y-auto">
             <div className="relative min-h-full overflow-hidden">
@@ -189,7 +197,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     )}
 
                     {/* Suggestions sit nearer the composer, so they're in view on an ordinary window. It stays where it is. */}
-                    <div className={cn("relative", suggestions.length > 0 ? "mt-8" : "mt-12 pt-[210px]")}>
+                    <div className="relative mt-8">
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
 
                         {suggestions.length > 0 ? (
@@ -200,41 +208,17 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         ) : work.length > 0 ? (
                             <section aria-labelledby="work-heading" className="relative">
                                 <h2 id="work-heading" className="sr-only">Your work</h2>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {work.map(({ id, meta, title, detail, running, onClick }) => (
-                                        <button key={id} type="button" onClick={() => void onClick()} className={cardClass}>
-                                            <span className="flex items-center justify-between gap-2 text-12 text-muted-foreground">
-                                                <span className="truncate">{meta}</span>
-                                                {running && <BerryDot working />}
-                                            </span>
-                                            <span className="mt-1 block text-14 font-semibold truncate">{title}</span>
-                                            {running && <span className="sr-only">Running now</span>}
-                                            {detail && <span className="mt-1 block text-13 text-muted-foreground line-clamp-2">{detail}</span>}
-                                        </button>
-                                    ))}
-                                </div>
+                                <BirdsOnFruit ideas={work} />
                             </section>
                         ) : (
                             <section aria-labelledby="ideas-heading" className="relative">
                                 <h2 id="ideas-heading" className="sr-only">Some ideas</h2>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {IDEAS.map(({ Icon, title, text: body, action, onClick }) => (
-                                        <button key={title} type="button" onClick={() => void onClick()} className={cn("group/idea", cardClass)}>
-                                            <Icon className="size-5 text-muted-foreground" />
-                                            <span className="mt-2.5 block text-14 font-semibold">{title}</span>
-                                            <span className="mt-1 block text-13 text-muted-foreground">{body}</span>
-                                            <span className="mt-2.5 flex items-center gap-1.5 text-13">
-                                                {action}
-                                                <ArrowRight className="size-3.5 transition-transform group-hover/idea:translate-x-0.5" />
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
+                                <BirdsOnFruit ideas={IDEAS} />
                             </section>
                         )}
 
                 {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className={cn("relative p-2 rounded-panel shadow-card", suggestions.length > 0 ? "mt-8" : "mt-3", glass)}>
+                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-panel shadow-card", glass)}>
                         <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
                             Recent
                         </h2>

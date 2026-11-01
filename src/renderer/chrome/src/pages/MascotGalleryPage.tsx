@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Lock, LockOpen, Search } from 'lucide-react'
 import type { GalleryListing, GalleryMascot, MascotExample, MascotProfile } from '@shared/library'
 import { MAX_MASCOT_NAME, permissionsInWords } from '@shared/mascots'
 import { Button } from '@common/components/Button'
+import { QuietChoice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -58,8 +59,8 @@ const HIDDEN_ICON = 32
 const FEET_Y = 113 / 120
 const FEET_X = 57 / 120
 
-// One line of the Gallery, with the bird standing on the divider under it.
-export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onReview: () => void }> = ({ entry, copy, onReview }) => {
+// One line of the Gallery, with the bird standing on the divider under it. With no `onReview`, it's only a picture of one.
+export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onReview?: () => void }> = ({ entry, copy, onReview }) => {
     const { choose } = useFlock()
     const { showBerry } = useShell().settings
     const [near, setNear] = useState(false)
@@ -85,7 +86,7 @@ export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile |
                 </div>
                 <div className="ml-auto shrink-0 flex items-center gap-3">
                     {entry.addCount !== undefined && !copy && <span className="text-12 text-muted-foreground tabular-nums">{entry.addCount === 1 ? '1 add' : `${entry.addCount} adds`}</span>}
-                    {copy ? (
+                    {!onReview ? null : copy ? (
                         <>
                             <InFlock />
                             <Button size="sm" variant="ghost" aria-label={`Details of ${name}`} onClick={onReview}>Details</Button>
@@ -99,27 +100,6 @@ export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile |
         </li>
     )
 }
-
-// Words in a row, with the chosen one underlined. Quieter than a segmented control, for a row of filters.
-const QuietChoice = <T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) => (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-x-4">
-        {options.map((option) => (
-            <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={value === option.value}
-                onClick={() => onChange(option.value)}
-                className={cn(
-                    "h-7 text-13 outline-none rounded-control underline-offset-[6px] decoration-[1.5px] transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                    value === option.value ? "underline" : "text-muted-foreground hover:text-foreground"
-                )}
-            >
-                {option.label}
-            </button>
-        ))}
-    </div>
-)
 
 // Everything the mascot would be told and allowed, before there's a copy of it. Nothing is added until Add is pressed.
 const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBack: () => void }> = ({ entry, copy, onBack }) => {

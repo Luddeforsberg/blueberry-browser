@@ -24,8 +24,7 @@ const FLY_OFF_MS = 520
 // A bird to press when choosing a look, named for what it's showing.
 const wearing = (name: string, look: MascotLook): MascotProfile => ({ ...BERRY, id: name, name, look })
 
-// Everything but the bird and its name stays quiet until you come near. The buttons can still be tabbed to.
-const QUIETLY = "opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
+const QUIET_ACTION = "text-muted-foreground"
 const BIRD = 96
 // How far down the standing drawing its feet reach, and where along it.
 const FEET_Y = 113 / 120
@@ -93,37 +92,56 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
                     {isBerry ? 'The original. Always here, and it can do all you let it.' : mascot.instructions}
                 </p>
                 {limits.length > 0 && <p className="mt-1 text-12 text-muted-foreground">{limits.join(' · ')}</p>}
-                <div className={cn("mt-1 -ml-2.5 flex flex-wrap", QUIETLY)}>
-                    <Button size="xs" variant="ghost" onClick={chat}>Chat</Button>
-                    {!isBerry && <Button size="xs" variant="ghost" aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
-                    {onPublish && !isBerry && !mascot.galleryId && <Button size="xs" variant="ghost" aria-label={`Publish ${mascot.name}`} onClick={onPublish}>{mascot.publishedId ? 'Published' : 'Publish'}</Button>}
+                <div className="mt-1 -ml-2.5 flex flex-wrap">
+                    <Button size="xs" variant="ghost" className={QUIET_ACTION} onClick={chat}>Chat</Button>
+                    {!isBerry && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
+                    {onPublish && !isBerry && !mascot.galleryId && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`Publish ${mascot.name}`} onClick={onPublish}>{mascot.publishedId ? 'Published' : 'Publish'}</Button>}
                 </div>
             </div>
         </li>
     )
 }
 
-// The next place along the wire: the shape of a bird that isn't there yet.
-const RoomForOneMore: React.FC<{ onNew: () => void }> = ({ onNew }) => {
+const COLUMN = 232
+const ROOM_BIRD = 56
+
+const RoomActions: React.FC<{ onNew: () => void }> = ({ onNew }) => (
+    <>
+        <Button size="xs" variant="outline" onClick={onNew}>New mascot</Button>
+        <Button size="xs" variant="ghost" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Browse the Gallery</Button>
+    </>
+)
+
+// The next place along the wire: the shape of a bird that isn't there yet. When the row above is full there's no bird
+// to share a wire with, so it's one low line instead of a whole row of nothing.
+const RoomForOneMore: React.FC<{ alone: boolean; onNew: () => void }> = ({ alone, onNew }) => {
     const { showBerry } = useShell().settings
-    const standing = showBerry ? BIRD : HIDDEN_ICON
-    const line = standing * (showBerry ? FEET_Y : 1)
+    const standing = alone ? ROOM_BIRD : showBerry ? BIRD : HIDDEN_ICON
+    const line = showBerry ? standing * FEET_Y : alone ? 0 : standing
+    const ghost = showBerry && (
+        <div aria-hidden className="absolute opacity-[0.09] brightness-0 dark:opacity-[0.16] dark:invert motion-safe:transition-[opacity] group-hover:opacity-20 dark:group-hover:opacity-30" style={{ left: BIRD_LEFT, top: 0 }}>
+            <Mascot mood="rest" size={standing} still />
+        </div>
+    )
+    if (alone) {
+        return (
+            <li className="group relative min-w-0 col-span-full -mt-4">
+                <Wire top={line} sags={false} runsOn />
+                <div className="relative" style={{ height: line }}>{ghost}</div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1" style={{ paddingLeft: BIRD_LEFT }}>
+                    <p className="text-13 text-muted-foreground">Room for one more</p>
+                    <RoomActions onNew={onNew} />
+                </div>
+            </li>
+        )
+    }
     return (
         <li className="group relative min-w-0">
             <Wire top={line} sags={false} runsOn />
-            <div className="relative" style={{ height: line + WIRE_SAG }}>
-                {showBerry && (
-                    <div aria-hidden className="absolute opacity-[0.09] brightness-0 dark:opacity-[0.16] dark:invert motion-safe:transition-[opacity] group-hover:opacity-20 dark:group-hover:opacity-30" style={{ left: BIRD_LEFT, top: 0 }}>
-                        <Mascot mood="rest" size={BIRD} still />
-                    </div>
-                )}
-            </div>
+            <div className="relative" style={{ height: line + WIRE_SAG }}>{ghost}</div>
             <div className="mt-4 flex flex-col items-start" style={{ paddingLeft: BIRD_LEFT }}>
                 <p className="text-13 text-muted-foreground">Room for one more</p>
-                <div className="mt-1 -ml-2.5 flex flex-wrap">
-                    <Button size="xs" variant="outline" className="ml-2.5 mr-1" onClick={onNew}>New mascot</Button>
-                    <Button size="xs" variant="ghost" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Browse the Gallery</Button>
-                </div>
+                <div className="mt-1 flex flex-col items-start gap-1 [&>*:last-child]:-ml-2.5"><RoomActions onNew={onNew} /></div>
             </div>
         </li>
     )
@@ -132,15 +150,25 @@ const RoomForOneMore: React.FC<{ onNew: () => void }> = ({ onNew }) => {
 const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: MascotProfile) => void; onPublish: (mascot: MascotProfile) => void }> = ({ landed, onNew, onEdit, onPublish }) => {
     const { flock } = useFlock()
     const [account] = useAccount()
+    // How many fit in a row, which is what the grid works out too, so this knows when the row before the last spot is full.
+    const list = useRef<HTMLUListElement>(null)
+    const [columns, setColumns] = useState(3)
+    useEffect(() => {
+        const node = list.current
+        if (!node) return
+        const observer = new ResizeObserver(([entry]) => setColumns(Math.max(1, Math.floor(entry.contentRect.width / COLUMN))))
+        observer.observe(node)
+        return () => observer.disconnect()
+    }, [])
     return (
         <>
             <h1 className="text-20 font-semibold">Your flock</h1>
             <p className="mt-1 text-14 text-muted-foreground">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
-            <ul aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid grid-cols-[repeat(auto-fill,minmax(232px,1fr))] gap-y-10">
+            <ul ref={list} aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid gap-y-10" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${COLUMN}px,1fr))` }}>
                 {flock.map((mascot, index) => (
                     <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} flipped={index % 3 === 2} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} />
                 ))}
-                <RoomForOneMore onNew={onNew} />
+                <RoomForOneMore alone={flock.length % columns === 0} onNew={onNew} />
             </ul>
         </>
     )
