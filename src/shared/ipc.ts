@@ -135,6 +135,14 @@ export interface HistoryEntry extends Visit {
   id: number;
 }
 
+// A browser whose history can be brought in. Main knows where it lives, so a renderer only ever names it by id.
+export interface ImportSource {
+  id: string;
+  name: string;
+}
+
+export type HistoryImportResult = { ok: true; added: number } | { ok: false };
+
 export interface HistoryCursor {
   visitedAt: number;
   id: number;
@@ -253,6 +261,8 @@ export interface InvokeChannels {
   "history:delete": { region: "chrome"; args: [id: number]; result: boolean };
   // Asks first, in main. False if the user said no.
   "history:clear": { region: "chrome"; args: []; result: boolean };
+  "history:import-sources": { region: "chrome"; args: []; result: ImportSource[] };
+  "history:import": { region: "chrome"; args: [sourceId: string]; result: HistoryImportResult };
   "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
   "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
@@ -389,6 +399,8 @@ export interface BrowserAPI {
   searchHistory: (options: { query?: string; before?: HistoryCursor }) => Promise<HistoryPage>;
   deleteHistoryEntry: (id: number) => Promise<boolean>;
   clearHistory: () => Promise<boolean>;
+  importSources: () => Promise<ImportSource[]>;
+  importHistory: (sourceId: string) => Promise<HistoryImportResult>;
   onTabsUpdated: (callback: (tabs: TabInfo[]) => void) => Unsubscribe;
   onFocusAddress: (callback: () => void) => Unsubscribe;
 }

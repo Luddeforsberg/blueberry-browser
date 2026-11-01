@@ -12,10 +12,11 @@ const CARD = JSON.stringify({ cards: [{ id: "p1", title: "Five stories picked by
 const setup = () => {
   const file = join(mkdtempSync(join(tmpdir(), "blueberry-suggestions-")), "suggestions.json");
   let now = NOW;
+  let visits = VISITS;
   const write = vi.fn<(system: string, data: string) => Promise<string>>();
   const suggestions = new Suggestions(file, {
     enabled: () => true,
-    visits: () => VISITS,
+    visits: () => visits,
     chats: () => [],
     routines: () => [],
     mascots: () => [],
@@ -32,7 +33,10 @@ const setup = () => {
     await new Promise((resolve) => setImmediate(resolve));
     return cards;
   };
-  return { file, write, newTabAt };
+  const addSite = (host: string) => {
+    visits = [...visits, ...VISITS.map((visit) => ({ ...visit, url: `https://${host}/`, title: host }))];
+  };
+  return { file, write, newTabAt, addSite, suggestions };
 };
 
 describe("asking the model for suggestions", () => {
@@ -63,5 +67,25 @@ describe("asking the model for suggestions", () => {
     expect(write).toHaveBeenCalledTimes(1);
     expect(() => readFileSync(file, "utf8")).toThrow();
     vi.restoreAllMocks();
+  });
+
+  it("lets one try through after an import, and holds the limit before and after it", async () => {
+    const { write, newTabAt, addSite, suggestions } = setup();
+    write.mockResolvedValue(CARD);
+    await newTabAt(0);
+    expect(write).toHaveBeenCalledTimes(1);
+
+    // New to go on, but inside the hour.
+    addSite("lobste.rs");
+    await newTabAt(10);
+    expect(write).toHaveBeenCalledTimes(1);
+
+    suggestions.historyImported();
+    await newTabAt(11);
+    expect(write).toHaveBeenCalledTimes(2);
+
+    addSite("tildes.net");
+    await newTabAt(12);
+    expect(write).toHaveBeenCalledTimes(2);
   });
 });

@@ -86,6 +86,10 @@ export class EventManager {
 
     this.handle("history:clear", () => this.mainWindow.clearHistory());
 
+    this.handle("history:import-sources", () => this.mainWindow.importSources());
+
+    this.handle("history:import", (sourceId) => this.mainWindow.importHistory(sourceId));
+
     this.handle("tab:back", (tabId) => this.withTab(tabId, (tab) => tab.goBack()));
 
     this.handle("tab:forward", (tabId) => this.withTab(tabId, (tab) => tab.goForward()));

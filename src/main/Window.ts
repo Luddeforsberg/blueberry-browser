@@ -6,6 +6,7 @@ import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
 import type { HistoryStore } from "./HistoryStore";
+import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHistory";
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
 import { Phone } from "./Phone";
@@ -39,7 +40,9 @@ import { sendToRenderer } from "./ipc";
 import type {
   EventChannels,
   HistoryCursor,
+  HistoryImportResult,
   HistoryPage,
+  ImportSource,
   InternalPage,
   LayoutMode,
   ResizablePanel,
@@ -640,6 +643,35 @@ export class Window {
     this.forgetPages(url);
     this.publishSuggestions();
     return true;
+  }
+
+  private get browserData() {
+    return browserDataFor(process.platform, {
+      appData: app.getPath("appData"),
+      localAppData: process.env.LOCALAPPDATA,
+      override: process.env.BLUEBERRY_BROWSER_DATA,
+      packaged: app.isPackaged,
+    });
+  }
+
+  importSources(): Promise<ImportSource[]> {
+    return findBrowsers(this.browserData);
+  }
+
+  async importHistory(sourceId: string): Promise<HistoryImportResult> {
+    const visits = await readBrowserHistory(this.browserData, sourceId);
+    if (!visits) return { ok: false };
+    try {
+      const added = this.history.importVisits(visits);
+      if (added > 0) {
+        this.suggestions.historyImported();
+        this.publishSuggestions();
+      }
+      return { ok: true, added };
+    } catch (error) {
+      console.error("Failed to save imported history:", (error as Error).message);
+      return { ok: false };
+    }
   }
 
   async clearHistory(): Promise<boolean> {

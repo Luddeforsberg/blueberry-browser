@@ -36,6 +36,8 @@ const chromeAPI: ChromeAPI = {
     searchHistory: (options) => invoke("history:search", options),
     deleteHistoryEntry: (id) => invoke("history:delete", id),
     clearHistory: () => invoke("history:clear"),
+    importSources: () => invoke("history:import-sources"),
+    importHistory: (sourceId) => invoke("history:import", sourceId),
     onTabsUpdated: (callback) => subscribe("tabs:updated", callback),
     onFocusAddress: (callback) => subscribe("toolbar:focus-address", () => callback()),
   },

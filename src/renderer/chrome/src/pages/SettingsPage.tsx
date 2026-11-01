@@ -5,6 +5,7 @@ import { cn } from '@common/lib/utils'
 import { Choice, Switch } from '@common/components/Controls'
 import { SettingsRow } from '../components/SettingsRow'
 import { DownloadSettings, SitePermissionsSettings } from './SiteSettings'
+import { HistoryImportSettings } from '../components/HistoryImport'
 import { PhoneSettings } from './PhoneSettings'
 import { AccountSettings } from './AccountSettings'
 import { Button } from '@common/components/Button'
@@ -140,6 +141,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <SettingsRow id="setting-history" title="History" description="Every web page you visit is saved until you delete it or clear your history.">
                                     <Button variant="outline" onClick={() => void window.chromeAPI.browser.openPage('history')}>Open history</Button>
                                 </SettingsRow>
+                                <HistoryImportSettings />
                                 <SettingsRow id="setting-startup" title="When Blueberry opens" description={STARTUP_DESCRIPTIONS[settings.onStartup]}>
                                     <Choice<StartupChoice>
                                         label="When Blueberry opens"
@@ -154,7 +156,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <SettingsRow
                                     id="setting-suggestions"
                                     title="Suggestions"
-                                    description="The new tab page offers to take over what you repeat. Finding it happens on this computer. To word the cards, site names, page titles, chat titles and counts go to the AI service, never page text or full addresses. Local addresses, banks, mail and addresses with tokens are left out. Off means nothing is sent."
+                                    description="The new tab page offers to take over what you repeat. Finding it happens on this computer. To word the cards, site names, page titles, chat titles, and how often and when you visit go to the AI service, never page text or full addresses. Local addresses, addresses with tokens, and sites it recognises as banks or mail are left out. Off means nothing is sent."
                                 >
                                     <Switch
                                         labelledBy="setting-suggestions"

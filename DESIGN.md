@@ -358,7 +358,9 @@ Every feature keeps working either way, and turning it off never prompts the use
 
 ### Onboarding
 
-Three short, skippable steps: meet Berry, choose layout and appearance, and what Berry can and can't see. No account is requested.
+Short, skippable steps: meet Berry, choose layout and appearance, bring in history, and what Berry can and can't see. No account is requested.
+
+**Bringing in history** is the third of four, with no card: Berry, a question, the browsers found to choose from if there's more than one, and plain lines saying what happens. Only addresses, page titles and visit times from the last 90 days come across, from every profile of that browser, and never passwords or cookies. It stays on this computer, apart from what it takes to word a suggestion, and the lines say exactly what that is. **Bring it in** or **Skip**. It then says how many visits came across, or that it couldn't read them, and a failure can be tried again or skipped. If no browser is found the step isn't there and isn't counted, which is what a Safari user gets, because reading Safari needs Full Disk Access. Finishing lands on the new tab, where the birds speak about what came across.
 
 ### New tab
 
@@ -376,7 +378,7 @@ Berry, large, stands on the top edge of a 752px composer, right of centre, so it
 
 A suggestion only ever fills something in for the user to confirm, so nothing runs, is saved or is sent until they act. What's dismissed with Not now doesn't come back, along with anything else about the same sites or chats. Saving the form or sending the prompt also ends it. The order is always prompt, routine, mascot.
 
-The page shows saved suggestions at once or what it would show without them, and never waits. New words are written at most about once an hour and only when history has grown, by one call to the cheap model, which gets only site names, page titles, chat titles and counts. Local addresses, banks, mail, search engines and addresses with tokens are never counted, and a title from an address with a query isn't sent. A suggestion that names a site outside its pattern is dropped. Settings has an off switch, under Data and privacy, which also says what is sent.
+The page shows saved suggestions at once or what it would show without them, and never waits. New words are written at most about once an hour and only when history has grown, by one call to the cheap model, which gets only site names, page titles, chat titles, and how often and when. Bringing in history that adds visits lets one call through at once, and the limit holds again after it. Local addresses, addresses with tokens, and sites recognised as banks, mail or search engines are never counted, though that recognition can miss one, and a title from an address with a query isn't sent. A suggestion that names a site outside its pattern is dropped. Settings has an off switch, under Data and privacy, which also says what is sent.
 
 ### Browsing
 
@@ -517,7 +519,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Downloads
 
