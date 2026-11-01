@@ -120,6 +120,8 @@ test("the bird clicks without changing what's clicked, and nothing it draws reac
     await expect(page).toHaveTitle("Pressed by true");
     await expect.poll(() => stateIn(app, "/plain")).toMatchObject({ attached: true });
     const state = (await stateIn(app, "/plain"))!;
+    // The bird says what the inset glow said, so there's only the ring around the card.
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement, "::after").boxShadow)).toBe("none");
 
     // It's there, and the page can't see inside it or hit it.
     expect(await page.evaluate(() => document.querySelector("blueberry-actor")?.shadowRoot ?? null)).toBeNull();
