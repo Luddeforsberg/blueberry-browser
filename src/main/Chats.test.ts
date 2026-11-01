@@ -477,8 +477,9 @@ describe("Chats", () => {
       });
 
       it("leaves the model's text alone when a handed-back tab's address ends in a bare # or ?", async () => {
-        const { chats, own, id, approvalId } = await handedOver("sign-in");
+        const { chats, own, id, approvalId, heard } = await handedOver("sign-in");
         chats.decide(id, approvalId, true);
+        await vi.waitFor(() => expect(heard).toHaveLength(2));
         for (const end of ["#", "?"]) {
           (own as unknown as { url: string }).url = `https://example.com/account${end}`;
           expect(chats.withoutCodes("# Orders? Issue #12")).toBe("# Orders? Issue #12");
