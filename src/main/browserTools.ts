@@ -441,8 +441,7 @@ export const createPageTools = ({
   // At a pace, one piece at a time, with the same result as all at once. Only where someone is watching, and never in a
   // secret field, where it's over as quickly as it can be. The user clicking or typing in the page ends it there, and
   // what's in the field is then theirs: nothing here goes back to fill it in.
-  const typeInField = async (tab: Tab, ref: string, text: string): Promise<string | null> => {
-    const started = Date.now();
+  const typeInField = async (tab: Tab, ref: string, text: string, started: number): Promise<string | null> => {
     const field = `${tab.id}/${ref}`;
     const stepAside = () => {
       usersFields.add(field);
@@ -539,7 +538,7 @@ export const createPageTools = ({
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
       if (!carryOn(tab)) return leftOff(tab);
-      await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks);
+      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return finish(await scripted(), SCRIPTED);
@@ -662,6 +661,7 @@ export const createPageTools = ({
         withTab(id, async (tab) => {
           const actor = actorOn(tab);
           await actor?.say("Scrolling", "flying");
+          if (!carryOn(tab)) return leftOff(tab);
           const result = await tab.runInPage(scrollPage(direction, !!actor?.moving));
           return JSON.stringify(result);
         }),
@@ -851,9 +851,10 @@ export const createPageTools = ({
       },
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
+          const started = Date.now();
           // What's typed is never in these words, only where it's going.
           if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch"))) return leftOff(tab);
-          const result = await typeInField(tab, ref, text);
+          const result = await typeInField(tab, ref, text, started);
           if (result === "stopped") return leftOff(tab);
           if (result === "user-in-field") return USER_IN_FIELD;
           if (result === null) return STALE_ELEMENT;
@@ -865,6 +866,10 @@ export const createPageTools = ({
           if (submit) {
             await actorOn(tab)?.hop("Submitting");
             if (!carryOn(tab)) return leftOff(tab);
+            if (tab.actor?.touchedSince(started)) {
+              usersFields.add(`${tab.id}/${ref}`);
+              return USER_IN_FIELD;
+            }
             await pressEnter(tab, ref);
           }
           return whereNow(tab);
@@ -945,6 +950,7 @@ export const createPageTools = ({
           const back = tab.backUrl;
           if (back && !allowed(back)) return offLimits(back).message;
           await actorOn(tab)?.say("Going back", "flying");
+          if (!carryOn(tab)) return leftOff(tab);
           tab.goBack(true);
           return whereNow(tab);
         }),
@@ -977,6 +983,7 @@ export const createPageTools = ({
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
           await actorOn(tab)?.say(`Going to ${siteOf(url)}`, "flying");
+          if (!carryOn(tab)) return leftOff(tab);
           // A failed load is reported by `whereNow`. Anything else, like a download, still counts as not working.
           await Promise.race([
             tab.loadURL(url).catch((error) => {

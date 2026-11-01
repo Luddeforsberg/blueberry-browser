@@ -37,6 +37,7 @@ const PAGES: Record<string, { body: string; csp?: string }> = {
     body: `<title>Crowded</title><body style="margin:0;font:16px/22px sans-serif"><p id="words" style="position:absolute;left:150px;top:190px;width:460px;margin:0">Words someone might be reading, a good few of them, set out over several lines so they fill all of the space directly above the button and around where the bird will stand. They carry on for a while yet, so that nothing above it is clear.</p><button id="go" style="position:absolute;left:300px;top:300px;width:160px;height:44px" onclick="document.title='Pressed'">Press me now</button>`,
   },
   "/two": { body: `<title>Two</title><body style="margin:0"><button id="a" style="position:absolute;left:60px;top:80px;width:120px;height:40px">First</button><button id="b" style="position:absolute;left:500px;top:420px;width:160px;height:44px" onclick="document.title='Placed'">Place order</button>` },
+  "/submit": { body: `<title>Submit</title><body style="margin:0"><form onsubmit="event.preventDefault();document.title='Submitted'"><input id="field" aria-label="Name" style="position:absolute;left:100px;top:300px;width:300px"></form>` },
   "/next": { body: `<title>Next</title><body>The next page` },
 };
 
@@ -310,10 +311,30 @@ test("the user stepping into a field stops the typing, and what's in it stays th
   }
 });
 
+test("the user stepping in just before Enter stops the submit too", async () => {
+  const { app, open, job, close } = await setup();
+  try {
+    const page = await open("/submit");
+    const { allAsked, toolResults, finished } = await job([
+      { name: "list_elements", args: {} },
+      { name: "type_text", args: { ref: "e1", text: "Ada", submit: true } },
+    ]);
+    await expect.poll(async () => (await stateIn(app, "/submit"))?.words, { intervals: [10] }).toBe("Submitting");
+    await page.mouse.click(600, 600);
+    await allAsked();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await expect(page).toHaveTitle("Submit");
+    expect(toolResults()).toContain("nothing was submitted");
+    await finished();
+  } finally {
+    await close();
+  }
+});
+
 test("for a frame from another origin it stands at the frame in the top page", async () => {
   const { app, open, job, close, model } = await setup();
   try {
-    await open("/framed");
+    const page = await open("/framed");
     const { allAsked, finished } = await job([
       { name: "list_elements", args: {} },
       { name: "click", args: { ref: "f1.e1" } },
@@ -325,6 +346,9 @@ test("for a frame from another origin it stands at the frame in the top page", a
     expect(state.spot!.x).toBeLessThan(600);
     expect(state.spot!.y).toBeGreaterThan(200);
     expect(state.spot!.y).toBeLessThan(330);
+    // Focus in there could be on a password, which it can't see, so it hides until focus comes out.
+    await page.locator("iframe").focus();
+    await expect.poll(async () => (await stateIn(app, "/framed"))?.covered).toBe(true);
     await finished();
   } finally {
     await close();

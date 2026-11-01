@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flightMs, landingFor, typingChunks, type Spot } from "./PageActor";
+import { flightMs, landingFor, PageActor, typingChunks, type ActorOptions, type Spot } from "./PageActor";
 
 const spot = (over: Partial<Spot> = {}): Spot => ({ left: 300, top: 300, width: 100, height: 40, x: 350, y: 320, viewWidth: 1000, viewHeight: 800, ...over });
 
@@ -61,5 +61,32 @@ describe("typing in pieces", () => {
     const text = "Hej 🐦 på dig ".repeat(40);
     expect(typingChunks(text).join("")).toBe(text);
     expect(typingChunks("🐦🐦")).toEqual(["🐦", "🐦"]);
+  });
+});
+
+describe("when the tab is taken away mid-draw", () => {
+  it("doesn't put the bird back on a tab held for the user", async () => {
+    const sent: string[] = [];
+    const tab = {
+      isVisible: true,
+      berryWorking: true,
+      heldForUser: false,
+      existingView: {
+        webContents: {
+          isDestroyed: () => false,
+          // The page has no bird yet, and the tab is handed over while that answer is on its way.
+          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
+            sent.push(code);
+            tab.heldForUser = true;
+            return "absent";
+          },
+        },
+      },
+    };
+    const options: ActorOptions = { on: true, plain: false, still: false, look: { palette: "jackdaw", accessory: "none" }, dark: false, windowShowing: true };
+    const actor = new PageActor(tab as never, () => options, () => 1);
+    await actor.hop("Looking");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).not.toContain("attachShadow");
   });
 });

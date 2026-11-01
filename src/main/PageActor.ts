@@ -190,7 +190,11 @@ export class PageActor {
     const command = actorCommand(this.key, name, args);
     let answer = await this.ask(command);
     if (answer === "absent") {
+      // The tab may have been held or touched while that was on its way, and nothing comes back after that. Whatever
+      // takes the bird away is sent after anything sent here, so it's only this one that can come too late.
+      if (!this.showing) return false;
       await this.ask(installActor(this.key, this.look, this.position));
+      if (!this.showing) return false;
       answer = await this.ask(command);
     }
     return answer === true && this.showing;
@@ -313,6 +317,7 @@ export class PageActor {
     if (!this.showing) return null;
     const found = await this.ask(actorCommand(this.key, "frameSpot", { origin }));
     if (found === "absent") {
+      if (!this.showing) return null;
       await this.ask(installActor(this.key, this.look, this.position));
       return (await this.ask(actorCommand(this.key, "frameSpot", { origin }))) as Spot | null;
     }

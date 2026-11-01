@@ -341,6 +341,8 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   };
   const inSecret = () => {
     const at = activeEl();
+    // Focus in a frame from another origin could be on anything, and that frame can't be asked.
+    if (at?.matches(FRAME_TAGS) && !at.contentDocument) return true;
     return !!at && at.tagName === "INPUT" && isSecret(at);
   };
   const cover = (on) => {

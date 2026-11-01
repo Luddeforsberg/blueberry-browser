@@ -413,7 +413,7 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 
 - **Tabs not in front:** nothing is drawn and nothing waits. Going to one mid-job, it appears from then on.
 - **The user touches the page:** it goes at once, and stays away for 5 seconds after their last click or key, even in a page a job can carry on reading. Typing stops there too, and what's in the field stays as it is, part typed and with anything of theirs, unsubmitted. A job with the page open hears why and carries on, and doesn't type in that field again in this reply.
-- **A tab handed to the user:** none, and none while the keyboard is in a password or code field, whoever is typing.
+- **A tab handed to the user:** none, and none while the keyboard is in a password or code field, whoever is typing, or in a frame from another site, which could be one.
 - **The job ends or moves on:** it flies up off the page and fades, and nothing of it is left behind.
 
 **Settings:** Keep Berry still and Reduce Motion give a small marker, the bird's head at 28px, that fades between spots with no flying, and text arrives at once. Show Berry off gives a plain pointer on the exact spot, with the same words. **Show the bird on pages** in Settings, under Berry, removes all of it for a site that reacts badly, and the inset glow comes back.
