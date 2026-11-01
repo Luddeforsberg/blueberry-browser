@@ -3,6 +3,7 @@ import type { TabInfo } from '@shared/ipc'
 import { useChatThread } from '../contexts/ChatContext'
 import { AssistantMessage, ChatApprovalCard, ChatError, UserMessage, useFollowReply } from '../components/ChatMessage'
 import { useAssistantName } from '../components/Berry'
+import { MemoryOffers } from '../components/MemoryInChat'
 import { ChatComposer } from '../components/Composer'
 import { useFlock } from '../contexts/LibraryContext'
 import { Button } from '@common/components/Button'
@@ -62,7 +63,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const gutter = pageWidth < COLUMN_WITH_BIRD || (work && roomBeside) ? "pl-14" : "pl-6"
 
     // The reply being written holds the place it's saved in, so it stays the same element when it ends.
-    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps }] : thread.messages
+    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps, memoryIds: thread.memoryIds }] : thread.messages
 
     return (
         <div ref={pageRef} className="h-full flex">
@@ -82,6 +83,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     waiting={thread.approval !== null}
                                     mascot={mascot}
                                     failed={!!thread.error && index === messages.length - 1}
+                                    memoryIds={message.memoryIds}
                                 />
                             )
                         )}
@@ -91,6 +93,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             </div>
                         )}
                         {thread.error && <ChatError message={thread.error} />}
+                        {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                         {!running && thread.messages.at(-1)?.role === 'assistant' && (
                             <div>
                                 <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>

@@ -6,6 +6,7 @@ export interface Message {
     role: 'user' | 'assistant'
     content: string
     steps?: ChatStep[]
+    memoryIds?: string[]
     isStreaming?: boolean
 }
 
@@ -60,7 +61,7 @@ const toMessages = (thread: ChatThread | null): Message[] => {
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
     // Before the first words arrive, the thinking state stands in for the reply.
     return thread.partial || thread.steps.length > 0 || thread.approval
-        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', steps: thread.steps, isStreaming: true }]
+        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', steps: thread.steps, memoryIds: thread.memoryIds, isStreaming: true }]
         : saved
 }
 

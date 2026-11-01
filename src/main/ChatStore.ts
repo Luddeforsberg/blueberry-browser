@@ -27,6 +27,7 @@ const MIGRATIONS = [
   `ALTER TABLE messages ADD COLUMN steps TEXT;`,
   // Chats from before the flock have none, which means Berry.
   `ALTER TABLE chats ADD COLUMN mascot_id TEXT;`,
+  `ALTER TABLE messages ADD COLUMN memory TEXT;`,
 ];
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
@@ -65,11 +66,13 @@ export class ChatStore {
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
-      .prepare("SELECT role, content, steps FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as Array<Omit<ChatThreadMessage, "steps"> & { steps: string | null }>;
-    const messages = rows.map(({ steps, ...message }): ChatThreadMessage =>
-      steps ? { ...message, steps: JSON.parse(steps) } : message
-    );
+      .prepare("SELECT role, content, steps, memory FROM messages WHERE chat_id = ? ORDER BY id")
+      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null }>;
+    const messages = rows.map(({ steps, memory, ...message }): ChatThreadMessage => ({
+      ...message,
+      ...(steps ? { steps: JSON.parse(steps) } : {}),
+      ...(memory ? { memoryIds: JSON.parse(memory) } : {}),
+    }));
     return { ...summary, messages };
   }
 
@@ -107,8 +110,8 @@ export class ChatStore {
 
   addMessage(chatId: string, message: ChatThreadMessage): void {
     this.db
-      .prepare("INSERT INTO messages (chat_id, role, content, steps) VALUES (?, ?, ?, ?)")
-      .run(chatId, message.role, message.content, message.steps?.length ? JSON.stringify(message.steps) : null);
+      .prepare("INSERT INTO messages (chat_id, role, content, steps, memory) VALUES (?, ?, ?, ?, ?)")
+      .run(chatId, message.role, message.content, message.steps?.length ? JSON.stringify(message.steps) : null, message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null);
     this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
   }
 }

@@ -31,8 +31,9 @@ interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused" | "sites"
   paused: number;
 }
 
-interface RunRow extends Omit<RoutineRun, "steps" | "approval" | "seen"> {
+interface RunRow extends Omit<RoutineRun, "steps" | "approval" | "seen" | "memoryIds"> {
   steps: string;
+  memory: string;
   approval: string | null;
   seen: number;
 }
@@ -67,11 +68,12 @@ const MIGRATIONS = [
    CREATE INDEX runs_by_routine ON runs(routine_id, started_at);`,
   `ALTER TABLE routines ADD COLUMN mascot_id TEXT;`,
   `ALTER TABLE routines ADD COLUMN sites TEXT NOT NULL DEFAULT '[]';`,
+  `ALTER TABLE runs ADD COLUMN memory TEXT NOT NULL DEFAULT '[]';`,
 ];
 
 const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, sites, paused, next_run_at AS nextRunAt";
 const RUN_COLUMNS =
-  "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen";
+  "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen, memory";
 
 const toRoutine = ({ schedule, sites, paused, ...row }: RoutineRow): StoredRoutine => ({
   ...row,
@@ -80,8 +82,9 @@ const toRoutine = ({ schedule, sites, paused, ...row }: RoutineRow): StoredRouti
   paused: paused === 1,
 });
 
-const toRun = ({ steps, approval, seen, ...row }: RunRow): RoutineRun => ({
+const toRun = ({ steps, approval, seen, memory, ...row }: RunRow): RoutineRun => ({
   ...row,
+  memoryIds: JSON.parse(memory),
   steps: JSON.parse(steps),
   approval: approval ? JSON.parse(approval) : null,
   seen: seen === 1,
@@ -168,10 +171,10 @@ export class RoutineStore {
     return id;
   }
 
-  updateRun(id: string, steps: ChatStep[], approval: ChatApproval | null, tokens: number | null): void {
+  updateRun(id: string, steps: ChatStep[], approval: ChatApproval | null, tokens: number | null, memoryIds: string[] = []): void {
     this.db
-      .prepare("UPDATE runs SET status = ?, steps = ?, approval = ?, tokens = ? WHERE id = ?")
-      .run(approval ? "needs-approval" : "running", JSON.stringify(steps), approval && JSON.stringify(approval), tokens, id);
+      .prepare("UPDATE runs SET status = ?, steps = ?, approval = ?, tokens = ?, memory = ? WHERE id = ?")
+      .run(approval ? "needs-approval" : "running", JSON.stringify(steps), approval && JSON.stringify(approval), tokens, JSON.stringify(memoryIds), id);
   }
 
   finishRun(

@@ -12,6 +12,7 @@ import { Berry } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
 import { useAccount } from '../useAccount'
 import { PublishMascot } from './PublishMascot'
+import { MascotMemory } from './MascotMemory'
 import { blankMascot, blankPublish, FLOCK_VIEW_EVENT, flockView, mascotForm, setFlockView, sitesFrom, surprise, toMascotDraft, type FlockView, type MascotFormValues } from '../flockView'
 import { blankForm, setRoutinesView } from '../routinesView'
 
@@ -45,8 +46,8 @@ const Wire: React.FC<{ top: number; sags: boolean; runsOn?: boolean }> = ({ top,
     )
 
 // One bird on the wire, with its name and what it's for below it. It looks up when you come near.
-export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flipped?: boolean; onEdit: () => void; onPublish?: () => void }> = ({ mascot, landed, flipped = false, onEdit, onPublish }) => {
-    const { chats, routines } = useLibrary()
+export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flipped?: boolean; onEdit: () => void; onPublish?: () => void; onMemory?: () => void }> = ({ mascot, landed, flipped = false, onEdit, onPublish, onMemory }) => {
+    const { chats, routines, memory } = useLibrary()
     const { choose } = useFlock()
     const { showBerry, keepBerryStill } = useShell().settings
     const [near, setNear] = useState(false)
@@ -56,6 +57,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
     const working = chats.some((chat) => own(chat.mascotId) && chat.running) || runs.some((routine) => routine.status === 'running' || routine.status === 'needs-approval')
     const standing = showBerry ? BIRD : HIDDEN_ICON
     const line = standing * (showBerry ? FEET_Y : 1)
+    const remembers = memory.facts.filter((fact) => fact.mascotId === mascot.id).length
 
     const chat = () => {
         choose(mascot.id)
@@ -95,6 +97,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
                 <div className="mt-1 -ml-2.5 flex flex-wrap">
                     <Button size="xs" variant="ghost" className={QUIET_ACTION} onClick={chat}>Chat</Button>
                     {!isBerry && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
+                    {onMemory && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`What ${isBerry && !showBerry ? 'Assistant' : mascot.name} remembers`} onClick={onMemory}>{remembers > 0 ? `Remembers ${remembers}` : 'Memory'}</Button>}
                     {onPublish && !isBerry && !mascot.galleryId && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`Publish ${mascot.name}`} onClick={onPublish}>{mascot.publishedId ? 'Published' : 'Publish'}</Button>}
                 </div>
             </div>
@@ -147,7 +150,7 @@ const RoomForOneMore: React.FC<{ alone: boolean; onNew: () => void }> = ({ alone
     )
 }
 
-const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: MascotProfile) => void; onPublish: (mascot: MascotProfile) => void }> = ({ landed, onNew, onEdit, onPublish }) => {
+const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: MascotProfile) => void; onPublish: (mascot: MascotProfile) => void; onMemory: (mascot: MascotProfile) => void }> = ({ landed, onNew, onEdit, onPublish, onMemory }) => {
     const { flock } = useFlock()
     const [account] = useAccount()
     // How many fit in a row, which is what the grid works out too, so this knows when the row before the last spot is full.
@@ -166,7 +169,7 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
             <p className="mt-1 text-14 text-muted-foreground">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
             <ul ref={list} aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid gap-y-10" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${COLUMN}px,1fr))` }}>
                 {flock.map((mascot, index) => (
-                    <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} flipped={index % 3 === 2} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} />
+                    <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} flipped={index % 3 === 2} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} onMemory={() => onMemory(mascot)} />
                 ))}
                 <RoomForOneMore alone={flock.length % columns === 0} onNew={onNew} />
             </ul>
@@ -391,6 +394,15 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
 
                 {values.id && (
                     <section>
+                        <h2 className="text-14 font-semibold">What it remembers</h2>
+                        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setFlockView({ page: 'memory', mascotId: values.id ?? '' })}>
+                            See what {values.name.trim() || 'it'} remembers
+                        </Button>
+                    </section>
+                )}
+
+                {values.id && (
+                    <section>
                         <h2 className="text-14 font-semibold">Routines it runs</h2>
                         {own.length > 0 && <p className="mt-1 text-14 text-muted-foreground">{own.map((routine) => routine.name).join(', ')}</p>}
                         <Button
@@ -450,12 +462,15 @@ export const FlockPage: React.FC = () => {
                         onChange={(values) => setFlockView({ page: 'publish', mascotId: view.mascotId, values })}
                         onBack={() => setFlockView({ page: 'list' })}
                     />
+                ) : view.page === 'memory' ? (
+                    <MascotMemory mascotId={view.mascotId} onBack={() => setFlockView({ page: 'list' })} />
                 ) : (
                     <List
                         landed={view.landed}
                         onNew={() => setFlockView({ page: 'form', values: blankMascot() })}
                         onEdit={(mascot) => setFlockView({ page: 'form', values: mascotForm(mascot) })}
                         onPublish={(mascot) => setFlockView({ page: 'publish', mascotId: mascot.id, values: blankPublish() })}
+                        onMemory={(mascot) => setFlockView({ page: 'memory', mascotId: mascot.id })}
                     />
                 )}
             </div>

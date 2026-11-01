@@ -10,13 +10,15 @@ import { createPageTools, HANDOFF_WORDS, siteOf, type PageTool, type PageToolAcc
 import { enterCodeInTab } from "./codeEntry";
 import type { CodeResult } from "./Phone";
 import { codeEcho } from "./phoneReplies";
-import { mascotNote } from "./mascotNote";
+import { mascotNote, memoryNote } from "./mascotNote";
+import { relevantFacts, worthRemembering } from "./mascotMemory";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, WorkTabState } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
+import type { MemoryToOffer } from "./MemoryStore";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
@@ -96,6 +98,22 @@ interface Run {
   mascot: MascotProfile;
   // Set for a task, which belongs to its caller rather than to a saved chat.
   onChange?: () => void;
+  // Sites earlier replies in this chat were on, which give a reason to remember what's about them.
+  earlierSites: Set<string>;
+  // What its bird remembered going in, by id, and the words the model got.
+  memoryIds: string[];
+  memoryNote: string;
+  // Questions it asked and what the user typed back.
+  answers: { question: string; answer: string }[];
+  // A tab went to the user during this reply, so nothing about this job is offered for remembering.
+  handedOver: boolean;
+}
+
+// What a job needs of a bird's memory. No tool can reach any of this.
+export interface ChatMemory {
+  factsOf: (mascotId: string) => MemoryFact[];
+  propose: (job: MemoryToOffer) => Promise<void>;
+  dropOffers: (sourceId: string) => void;
 }
 
 // What a chat or task has to do with tabs. It outlasts a reply, so the next message can go on where the last one left off.
@@ -124,6 +142,7 @@ export interface TaskProgress {
   steps: ChatStep[];
   approval: ChatApproval | null;
   tokens: number;
+  memoryIds?: string[];
 }
 
 export interface TaskResult {
@@ -179,7 +198,8 @@ export class Chats {
     },
     private readonly events: ChatEvents,
     // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
-    private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY
+    private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY,
+    private readonly memory: ChatMemory | null = null
   ) {}
 
   // Tabs always open behind the user, so the approval cards, the reply and whatever they're doing stay in front. With
@@ -274,6 +294,7 @@ export class Chats {
   private async handOver(chatId: string, run: Run, job: Job, tab: Tab, need: HandoffNeed): Promise<boolean | "code"> {
     // Another job got there first and only its answer may let the tab go, or the user left it half typed and it stays theirs.
     if (this.handedOver.has(tab.id)) return false;
+    run.handedOver = true;
     const wasOwn = job.own.delete(tab.id);
     job.takenOver.set(tab.id, tab.url);
     const held = { touched: false, asking: true, host: hostOf(tab.url), entering: false, codeEntered: false };
@@ -456,6 +477,7 @@ export class Chats {
       steps: run?.steps ?? [],
       approval: run?.approval ? publicApproval(run.approval) : null,
       error: this.errors.get(chat.id) ?? null,
+      memoryIds: run?.memoryIds ?? [],
     };
   }
 
@@ -477,9 +499,11 @@ export class Chats {
     const mascot = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
+    const earlier = this.finished.get(id)?.run;
     this.finished.delete(id);
+    this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false };
     this.runs.set(id, run);
     void this.reply(id, run, seePage);
 
@@ -507,6 +531,7 @@ export class Chats {
     this.errors.delete(chatId);
     this.finished.delete(chatId);
     this.jobs.delete(chatId);
+    this.memory?.dropOffers(chatId);
     if (!this.store.deleteChat(chatId)) return false;
     this.events.onListChanged();
     return true;
@@ -538,6 +563,7 @@ export class Chats {
       run.withPage = page !== null;
       const messages = await this.withNewestPage(chatId, seePage, run.mascot);
       const tools = this.jobTools(chatId, run, page);
+      this.recall(chatId, run, this.userWords(chatId).join("\n"));
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
     } catch (error) {
       if (!signal.aborted) {
@@ -554,10 +580,53 @@ export class Chats {
     if (run.partial || run.steps.length > 0) {
       // A step cut off by Stop is over too.
       const steps = run.steps.map((step) => ({ ...step, done: true }));
-      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps });
+      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds });
     }
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
+    this.offerToRemember(chatId, run, this.errors.has(chatId), {
+      said: this.userWords(chatId),
+      routine: null,
+      stillWanted: () => this.finished.get(chatId)?.run === run,
+    });
+  }
+
+  // What the user typed in this chat, which is saved without any page that went with it.
+  private userWords(chatId: string): string[] {
+    return (this.store.chat(chatId)?.messages ?? []).filter(({ role }) => role === "user").map(({ content }) => content);
+  }
+
+  // What this bird remembers that's about this job, which goes into its prompt and shows on the reply.
+  private recall(id: string, run: Run, text: string): void {
+    const facts = this.memory?.factsOf(run.mascot.id) ?? [];
+    if (facts.length === 0) return;
+    const job = this.jobs.get(id);
+    const tabs = this.browser.allTabs().filter((tab) => tab.id === job?.current || job?.own.has(tab.id));
+    const sites = [...run.mascot.sites, ...run.earlierSites, ...tabs.map((tab) => siteOf(tab.url))];
+    const relevant = relevantFacts(facts, { sites, text, allowed: run.mascot.sites });
+    run.memoryIds = relevant.map((fact) => fact.id);
+    run.memoryNote = memoryNote(relevant);
+    this.publish(id, run);
+  }
+
+  // The model only gets what the user typed, any question they answered, and the names of the sites used, never a page or
+  // the reply. A site's name and a question's wording are as close as a page can get, and whatever comes back goes through
+  // `parseProposals` and waits for the user, so nothing is kept until they press Remember.
+  private offerToRemember(sourceId: string, run: Run, failed: boolean, job: Pick<MemoryToOffer, "said" | "routine" | "stillWanted">): void {
+    const handedOver = run.handedOver || [...run.used].some((tab) => this.handedBack.has(tab) || this.handedOver.has(tab.id) || tab.heldForUser || tab.mayShowCode);
+    const sites = [...run.sites].filter((site) => site.includes("."));
+    if (!this.memory || !worthRemembering({ stopped: run.controller.signal.aborted, failed, replied: !!run.partial, steps: run.steps.length, sites: sites.length, handedOver })) return;
+    // A routine's words were written earlier, so what's new is only what the user said during this run.
+    if (job.routine !== null && run.answers.length === 0) return;
+    void this.memory.propose({
+      ...job,
+      sourceId,
+      mascotId: run.mascot.id,
+      said: job.said.map((text) => this.withoutCodes(text)),
+      routine: job.routine && this.withoutCodes(job.routine),
+      answers: run.answers.map(({ question, answer }) => ({ question: this.withoutCodes(question), answer: this.withoutCodes(answer) })),
+      sites,
+    });
   }
 
   private async consume(
@@ -574,7 +643,7 @@ export class Chats {
       approve: (text) => this.askToAllow(id, run, text),
       onStep: (text) => this.startStep(id, run, text),
       onUsage,
-      mascotNote: run.mascot.id === BERRY.id ? undefined : mascotNote(run.mascot),
+      mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
     })) {
       const content = run.breakBeforeText ? `\n\n${words}` : words;
       run.breakBeforeText = false;
@@ -606,13 +675,20 @@ export class Chats {
           steps: run.steps.map((step) => ({ ...step })),
           approval: run.approval && publicApproval(run.approval),
           tokens,
+          memoryIds: run.memoryIds,
         }),
+      earlierSites: new Set(),
+      memoryIds: [],
+      memoryNote: "",
+      answers: [],
+      handedOver: false,
     };
     this.runs.set(id, run);
     this.taskPopups.set(id, new Set());
     let error: string | null = null;
     try {
       const tools = this.jobTools(id, run, null);
+      this.recall(id, run, message);
       await this.consume(id, run, [{ role: "user", content: message }], tools, () => {}, (used) => (tokens += used));
     } catch (caught) {
       if (!run.controller.signal.aborted) {
@@ -622,6 +698,7 @@ export class Chats {
     }
     this.runs.delete(id);
     this.publishWorkingTabs();
+    this.offerToRemember(id, run, error !== null, { said: [], routine: message, stillWanted: () => true });
     const tabIds = [...(this.jobs.get(id)?.own ?? []), ...(this.taskPopups.get(id) ?? [])];
     this.jobs.delete(id);
     this.taskPopups.delete(id);
@@ -688,7 +765,11 @@ export class Chats {
 
   // Null if the user would rather not answer.
   private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
-    return this.wait(chatId, run, question, { question: true }, (allow, answer) => (allow && answer ? answer : null));
+    return this.wait(chatId, run, question, { question: true }, (allow, answer) => {
+      if (!allow || !answer) return null;
+      run.answers.push({ question, answer });
+      return answer;
+    });
   }
 
   // False if that request has already been answered or its reply has ended. `answer` is for a question.

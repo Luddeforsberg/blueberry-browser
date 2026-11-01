@@ -14,6 +14,7 @@ import { BerryDot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
+import { RememberedLine } from './MemoryInChat'
 
 const FOLLOW_DISTANCE = 120
 
@@ -106,7 +107,9 @@ export const AssistantMessage: React.FC<{
     mascot?: MascotProfile
     // This reply went wrong on the way.
     failed?: boolean
-}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot, failed = false }) => (
+    // What its bird went into this reply remembering.
+    memoryIds?: string[]
+}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot, failed = false, memoryIds }) => (
     // With nothing written yet, the mascot is already speaking in what it's waiting on.
     waiting && !content && steps.length === 0 ? null : <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
@@ -118,6 +121,7 @@ export const AssistantMessage: React.FC<{
                 {mascot.name}
             </p>
         )}
+        {mascot && <RememberedLine ids={memoryIds} mascot={mascot} />}
         {steps.length > 0 && <StepTrail steps={steps} running={isStreaming} cutShort={failed || (!isStreaming && !content)} />}
         {content ? (
             <Markdown content={content} />

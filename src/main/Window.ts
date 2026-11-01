@@ -15,7 +15,7 @@ import { Phone } from "./Phone";
 import { TelegramChannel } from "./TelegramChannel";
 import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
-import { confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
+import { confirmClearMemory, confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
 import { Account } from "./Account";
 import { Gallery } from "./Gallery";
@@ -23,6 +23,7 @@ import { GalleryServer, serverConfig } from "./galleryServer";
 import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
+import { MemoryStore } from "./MemoryStore";
 import { PATTERN_WINDOW_MS } from "./suggestionPatterns";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
@@ -123,6 +124,7 @@ export class Window {
   readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
   readonly desktopBerry: DesktopBerry;
+  readonly memory: MemoryStore;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -213,6 +215,14 @@ export class Window {
       onAnswered: (approvalId, said) => sendToRenderer(this.chrome.view.webContents, "phone:answered", { approvalId, said }),
     });
 
+    this.memory = new MemoryStore(join(app.getPath("userData"), "memory.json"), {
+      onChanged: () => this.publishLibrary(),
+      enabled: () => this.settings.memoryOffers,
+      hasModel,
+      write: (system, data) => writeWithCheapModel(system, this.chats.withoutCodes(data)),
+      isClean: (text) => this.chats.withoutCodes(text) === text,
+    });
+
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
@@ -243,7 +253,7 @@ export class Window {
         this.notifyTabs();
         this.workViews.sync();
       },
-    }, (id) => this.mascotStore.resolve(id));
+    }, (id) => this.mascotStore.resolve(id), this.memory);
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -488,6 +498,7 @@ export class Window {
       routines: this.routines.list(),
       mascots: this.mascotStore.all(),
       needsYou: this.needsYou,
+      memory: this.memory.state,
     };
   }
 
@@ -1033,8 +1044,16 @@ export class Window {
     const runs = this.routines.list().filter((routine) => routine.mascotId === id);
     if (!(await confirmDeleteMascot(this._baseWindow, mascot.name, runs.length, Boolean(mascot.publishedId)))) return false;
     if (!this.mascotStore.delete(id)) return false;
+    this.memory.clear(id);
     runs.forEach((routine) => this.routines.setPaused(routine.id, true));
     this.broadcast("library:updated", this.librarySnapshot);
+    return true;
+  }
+
+  async confirmClearMemory(mascotId: string): Promise<boolean> {
+    const count = this.memory.factsOf(mascotId).length;
+    if (count === 0 || !(await confirmClearMemory(this._baseWindow, this.mascotName(mascotId), count))) return false;
+    this.memory.clear(mascotId);
     return true;
   }
 

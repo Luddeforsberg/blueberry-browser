@@ -28,6 +28,8 @@ export const startFakeModel = async () => {
   let thinkMs = 0;
   const requests: FakeModelRequest[] = [];
   const titleRequests: FakeModelRequest[] = [];
+  let memory = '{"facts":[]}';
+  const memoryRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -40,7 +42,8 @@ export const startFakeModel = async () => {
     const parsed = JSON.parse(body);
 
     if (parsed.model === TITLE_MODEL) {
-      titleRequests.push(parsed);
+      const asksWhatToRemember = JSON.stringify(parsed.messages[0]).includes("offer to remember");
+      (asksWhatToRemember ? memoryRequests : titleRequests).push(parsed);
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -48,7 +51,7 @@ export const startFakeModel = async () => {
           object: "chat.completion",
           created: 0,
           model: TITLE_MODEL,
-          choices: [{ index: 0, message: { role: "assistant", content: title }, finish_reason: "stop" }],
+          choices: [{ index: 0, message: { role: "assistant", content: asksWhatToRemember ? memory : title }, finish_reason: "stop" }],
         })
       );
       return;
@@ -94,7 +97,10 @@ export const startFakeModel = async () => {
     },
     requests,
     titleRequests,
+    memoryRequests,
     reset() {
+      memory = '{"facts":[]}';
+      memoryRequests.length = 0;
       tokens = DEFAULT_TOKENS;
       holdStart = null;
       hold = null;
@@ -107,6 +113,10 @@ export const startFakeModel = async () => {
     // What the title model answers. NONE means the chat has no topic yet.
     titleWith(next: string) {
       title = next;
+    },
+    // What the cheap model proposes for a bird to remember.
+    proposeMemory(...facts: Array<{ text: string; site: string | null }>) {
+      memory = JSON.stringify({ facts });
     },
     // The next reply asks for these tools instead of answering. Call again for the reply after that.
     callTools(...calls: Array<{ name: string; args: object }>) {
