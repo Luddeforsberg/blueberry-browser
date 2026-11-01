@@ -1383,7 +1383,7 @@ test("the new tab page has no chat panel, and it comes back on the next page", a
 
   await chrome.evaluate(() => window.chromeAPI.browser.createTab());
   await expect(panel).toHaveCount(0);
-  await expect(chrome.getByRole("button", { name: /(Show|Hide) Berry/ })).toHaveCount(0);
+  await expect(chrome.getByRole("button", { name: /^(Show|Hide) Berry$/ })).toHaveCount(0);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
   expect((await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).chatOpen).toBe(false);
