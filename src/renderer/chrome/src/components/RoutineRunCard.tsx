@@ -55,7 +55,7 @@ export const RoutineRunCard: React.FC<{
             )}
             {(run.memoryIds?.length ?? 0) > 0 && (
                 <div className="mt-3">
-                    <RememberedLine ids={run.memoryIds} mascot={mascot} />
+                    <RememberedLine ids={run.memoryIds} />
                 </div>
             )}
             {run.steps.length > 0 && (

@@ -210,7 +210,7 @@ export class Window {
       waiting: () => this.needsYou,
       nameOf: ({ mascotId }) => this.mascotName(mascotId),
       away: () => this.userIsAway,
-      decide: (id, approvalId, allow, answer) => this.chats.decide(id, approvalId, allow, answer),
+      decide: (id, approvalId, allow, answer) => this.chats.decide(id, approvalId, allow, answer, { fromPhone: true }),
       enterCode: (id, approvalId, code) => this.chats.enterCode(id, approvalId, code),
       onAnswered: (approvalId, said) => sendToRenderer(this.chrome.view.webContents, "phone:answered", { approvalId, said }),
     });

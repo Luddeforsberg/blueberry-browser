@@ -15,15 +15,16 @@ const openMemory = (mascotId: string) => {
     void window.chromeAPI.browser.openPage('flock')
 }
 
-const ChangeIt: React.FC<{ mascot: MascotProfile; children: React.ReactNode }> = ({ mascot, children }) => (
-    <button type="button" onClick={() => openMemory(mascot.id)} className="rounded-control text-accent-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+const ChangeIt: React.FC<{ mascotId: string; children: React.ReactNode }> = ({ mascotId, children }) => (
+    <button type="button" onClick={() => openMemory(mascotId)} className="rounded-control text-accent-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
         {children}
     </button>
 )
 
 // What this reply went in knowing. It says what the model was given, so it's "keeping in mind" and never a claim that it
 // made a difference. Words about a difference are the reply's own. Up to two show, and more fold into one quiet line.
-export const RememberedFacts: React.FC<{ used: MemoryFact[]; mascot: MascotProfile }> = ({ used, mascot }) => {
+// Change goes to the bird that holds the facts, which an old routine run's current bird may not be.
+export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
     const [open, setOpen] = useState(false)
     const line = (fact: MemoryFact) => <>{fact.text}{fact.site && <span className="whitespace-nowrap"> ({fact.site})</span>}</>
     if (used.length <= MAX_SHOWN) {
@@ -31,7 +32,7 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[]; mascot: MascotProfi
             <div aria-label="What it’s keeping in mind" className="text-13 text-muted-foreground [overflow-wrap:anywhere]">
                 {used.map((fact, index) => (
                     <p key={fact.id}>
-                        {index === 0 && 'Keeping in mind: '}{line(fact)}{index === used.length - 1 && <> <ChangeIt mascot={mascot}>Change</ChangeIt></>}
+                        {index === 0 && 'Keeping in mind: '}{line(fact)}{index === used.length - 1 && <> <ChangeIt mascotId={fact.mascotId}>Change</ChangeIt></>}
                     </p>
                 ))}
             </div>
@@ -53,17 +54,17 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[]; mascot: MascotProfi
                     <ul className="flex flex-col gap-1">
                         {used.map((fact) => <li key={fact.id}>{line(fact)}</li>)}
                     </ul>
-                    <ChangeIt mascot={mascot}>Change</ChangeIt>
+                    <ChangeIt mascotId={used[0].mascotId}>Change</ChangeIt>
                 </>
             )}
         </div>
     )
 }
 
-export const RememberedLine: React.FC<{ ids?: string[]; mascot: MascotProfile }> = ({ ids = [], mascot }) => {
+export const RememberedLine: React.FC<{ ids?: string[] }> = ({ ids = [] }) => {
     const { facts } = useLibrary().memory
     const used = ids.flatMap((id) => facts.filter((fact) => fact.id === id))
-    return used.length > 0 ? <RememberedFacts used={used} mascot={mascot} /> : null
+    return used.length > 0 ? <RememberedFacts used={used} /> : null
 }
 
 // A fact a bird could keep, word for word, opened from the quiet line. As quiet as the line itself.
@@ -79,7 +80,7 @@ const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; erro
 )
 
 // One line, folded however many there are. Nothing about it waits, counts or asks, so leaving it alone is as good as No thanks.
-export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text' | 'site'>[]; mascot: MascotProfile; kept: boolean; errors?: Record<string, string>; startOpen?: boolean; onAnswer: (id: string, keep: boolean) => void }> = ({ offers, mascot, kept, errors = {}, startOpen = false, onAnswer }) => {
+export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text' | 'site'>[]; mascot: MascotProfile; kept: boolean; keptBy?: string; errors?: Record<string, string>; startOpen?: boolean; onAnswer: (id: string, keep: boolean) => void }> = ({ offers, mascot, kept, keptBy, errors = {}, startOpen = false, onAnswer }) => {
     const { showBerry } = useShell().settings
     const name = useAssistantName(mascot)
     const [open, setOpen] = useState(startOpen)
@@ -101,7 +102,7 @@ export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text
                     {offers.map((offer) => <MemoryOfferRow key={offer.id} offer={offer} error={errors[offer.id]} onAnswer={(keep) => onAnswer(offer.id, keep)} />)}
                 </ul>
             )}
-            {kept && <p role="status">Noted. <ChangeIt mascot={mascot}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
+            {kept && <p role="status">Noted. <ChangeIt mascotId={keptBy ?? mascot.id}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
         </div>
     )
 }
@@ -110,16 +111,18 @@ export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text
 // sits here, so a job nobody was watching says nothing about it until they look, and then only this.
 export const MemoryOffers: React.FC<{ sourceId: string | null; mascot: MascotProfile }> = ({ sourceId, mascot }) => {
     const { memory: { offers } } = useLibrary()
-    const [kept, setKept] = useState(false)
+    // Whose it went to, which an old routine run's current bird may not be.
+    const [keptBy, setKeptBy] = useState<string | null>(null)
     const [errors, setErrors] = useState<Record<string, string>>({})
     const waiting = offers.filter((offer) => offer.sourceId === sourceId)
 
     const answer = async (id: string, keep: boolean) => {
+        const owner = waiting.find((offer) => offer.id === id)?.mascotId
         const result = await window.chromeAPI.memory.decide(id, keep)
         if (!result.ok) setErrors({ ...errors, [id]: result.error })
-        else if (keep) setKept(true)
+        else if (keep && owner) setKeptBy(owner)
     }
 
-    if (waiting.length === 0 && !kept) return null
-    return <MemoryOffersLine offers={waiting} mascot={mascot} kept={kept} errors={errors} onAnswer={(id, keep) => void answer(id, keep)} />
+    if (waiting.length === 0 && !keptBy) return null
+    return <MemoryOffersLine offers={waiting} mascot={mascot} kept={!!keptBy} keptBy={keptBy ?? undefined} errors={errors} onAnswer={(id, keep) => void answer(id, keep)} />
 }

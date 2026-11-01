@@ -78,8 +78,10 @@ export class MemoryStore {
     const clearedBefore = this.cleared.get(mascotId) ?? 0;
     try {
       const reply = await this.sources.write(MEMORY_PROMPT, proposalData(job, kept, declined));
-      if (!stillWanted() || (this.cleared.get(mascotId) ?? 0) !== clearedBefore) return;
-      const proposals = parseProposals(reply, { sites: job.sites, kept, declined }).filter(({ text }) => this.sources.isClean(text));
+      if (!stillWanted() || !this.sources.enabled() || (this.cleared.get(mascotId) ?? 0) !== clearedBefore) return;
+      // As things stand now, as the user may have answered another chat's offer while this was on its way.
+      const known = this.factsOf(mascotId).map(({ text, site }) => ({ text, site }));
+      const proposals = parseProposals(reply, { sites: job.sites, kept: known, declined: this.declined.get(mascotId) ?? [] }).filter(({ text }) => this.sources.isClean(text));
       if (proposals.length === 0) return;
       const offers = proposals.map((proposal) => ({ ...proposal, id: randomUUID(), mascotId, sourceId }));
       this.offers = [...this.offers, ...offers].slice(-MAX_OFFERS);

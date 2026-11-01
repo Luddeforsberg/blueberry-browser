@@ -285,6 +285,41 @@ describe("memory and everything that copies a mascot", () => {
 });
 
 describe("forgetting while a proposal is on its way", () => {
+  const waiting = (enabled: () => boolean) => {
+    let answer: (text: string) => void = () => {};
+    const store = new MemoryStore(join(mkdtempSync(join(tmpdir(), "memory-")), "memory.json"), {
+      enabled,
+      hasModel: () => true,
+      isClean: () => true,
+      onChanged: () => {},
+      write: () => new Promise<string>((resolve) => (answer = resolve)),
+    } as never);
+    const job = { sourceId: "chat", mascotId: "scout", stillWanted: () => true, said: ["I always want the cheapest"], routine: null, answers: [], sites: [] } as never;
+    return { store, job, reply: (text: string) => answer(JSON.stringify({ facts: [{ text, site: null }] })) };
+  };
+
+  it("offers nothing once offers have been turned off", async () => {
+    let on = true;
+    const { store, job, reply } = waiting(() => on);
+    const asking = store.propose(job);
+    on = false;
+    reply("You want the cheapest.");
+    await asking;
+    expect(store.state.offers).toEqual([]);
+  });
+
+  it("doesn't bring back what was declined while it was waiting", async () => {
+    const first = waiting(() => true);
+    const asking = first.store.propose(first.job);
+    first.reply("You want the cheapest.");
+    await asking;
+    const second = first.store.propose(first.job);
+    first.store.decide(first.store.state.offers[0].id, false);
+    first.reply("You want the cheapest.");
+    await second;
+    expect(first.store.state.offers).toEqual([]);
+  });
+
   it("offers nothing for a bird that was cleared in the meantime", async () => {
     let answer: (reply: string) => void = () => {};
     const store = new MemoryStore(join(mkdtempSync(join(tmpdir(), "memory-")), "memory.json"), {

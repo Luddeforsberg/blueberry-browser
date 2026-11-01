@@ -105,6 +105,8 @@ interface Run {
   memoryNote: string;
   // Questions it asked and what the user typed back.
   answers: { question: string; answer: string }[];
+  // This answer came from the phone, so it stays out of what's offered for remembering.
+  answeredByPhone?: boolean;
   // A tab went to the user during this reply, so nothing about this job is offered for remembering.
   handedOver: boolean;
 }
@@ -766,15 +768,16 @@ export class Chats {
   private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
     return this.wait(chatId, run, question, { question: true }, (allow, answer) => {
       if (!allow || !answer) return null;
-      run.answers.push({ question, answer });
+      if (!run.answeredByPhone) run.answers.push({ question, answer });
       return answer;
     });
   }
 
   // False if that request has already been answered or its reply has ended. `answer` is for a question.
-  decide(chatId: string, approvalId: string, allow: boolean, answer?: string): boolean {
+  decide(chatId: string, approvalId: string, allow: boolean, answer?: string, { fromPhone = false }: { fromPhone?: boolean } = {}): boolean {
     const run = this.runs.get(chatId);
     if (run?.approval?.id !== approvalId) return false;
+    run.answeredByPhone = fromPhone;
     const { answer: finish } = run.approval;
     run.approval = null;
     this.events.onDecided?.(approvalId, allow === true);

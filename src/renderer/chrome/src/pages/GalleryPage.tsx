@@ -345,9 +345,9 @@ export const GalleryPage: React.FC = () => {
                         <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} onAnswer={() => undefined} />
                         <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} startOpen errors={{ 'gallery-fact-1': 'This bird already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
                         <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
-                        <RememberedFacts mascot={SAMPLE_MASCOT} used={SAMPLE_FACTS.slice(0, 1)} />
-                        <RememberedFacts mascot={SAMPLE_MASCOT} used={SAMPLE_FACTS} />
-                        <RememberedFacts mascot={SAMPLE_MASCOT} used={[...SAMPLE_FACTS, { ...SAMPLE_FACTS[0], id: 'gallery-fact-3', text: 'You never buy refurbished.' }]} />
+                        <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
+                        <RememberedFacts used={SAMPLE_FACTS} />
+                        <RememberedFacts used={[...SAMPLE_FACTS, { ...SAMPLE_FACTS[0], id: 'gallery-fact-3', text: 'You never buy refurbished.' }]} />
                         <MascotMemoryView mascot={SAMPLE_MASCOT} facts={[]} onBack={() => undefined} />
                         <MascotMemoryView
                             mascot={SAMPLE_MASCOT}

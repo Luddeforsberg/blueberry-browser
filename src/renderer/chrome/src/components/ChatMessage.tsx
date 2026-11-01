@@ -121,7 +121,7 @@ export const AssistantMessage: React.FC<{
                 {mascot.name}
             </p>
         )}
-        {mascot && <RememberedLine ids={memoryIds} mascot={mascot} />}
+        {mascot && <RememberedLine ids={memoryIds} />}
         {steps.length > 0 && <StepTrail steps={steps} running={isStreaming} cutShort={failed || (!isStreaming && !content)} />}
         {content ? (
             <Markdown content={content} />

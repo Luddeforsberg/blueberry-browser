@@ -395,7 +395,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                 {values.id && (
                     <section>
                         <h2 className="text-14 font-semibold">What it remembers</h2>
-                        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setFlockView({ page: 'memory', mascotId: values.id ?? '' })}>
+                        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setFlockView({ page: 'memory', mascotId: values.id ?? '', returnTo: values })}>
                             See what {values.name.trim() || 'it'} remembers
                         </Button>
                     </section>
@@ -463,7 +463,7 @@ export const FlockPage: React.FC = () => {
                         onBack={() => setFlockView({ page: 'list' })}
                     />
                 ) : view.page === 'memory' ? (
-                    <MascotMemory mascotId={view.mascotId} onBack={() => setFlockView({ page: 'list' })} />
+                    <MascotMemory mascotId={view.mascotId} onBack={() => setFlockView(view.returnTo ? { page: 'form', values: view.returnTo } : { page: 'list' })} />
                 ) : (
                     <List
                         landed={view.landed}

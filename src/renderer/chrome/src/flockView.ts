@@ -42,7 +42,8 @@ export type FlockView =
     | { page: 'list'; landed?: string }
     | { page: 'form'; values: MascotFormValues }
     | { page: 'publish'; mascotId: string; values: PublishValues }
-    | { page: 'memory'; mascotId: string }
+    // `returnTo` is a form left to look at this, with whatever had been changed in it.
+    | { page: 'memory'; mascotId: string; returnTo?: MascotFormValues }
 
 const NAMES = ['Pip', 'Scout', 'Juno', 'Wren', 'Otis', 'Margot', 'Figaro', 'Mabel', 'Ziggy', 'Clementine', 'Rook', 'Nimbus']
 

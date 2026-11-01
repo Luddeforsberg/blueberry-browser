@@ -102,6 +102,15 @@ describe("Chats", () => {
         yield "report";
       };
 
+    it("an answer from the phone stays out of what's offered", async () => {
+      const ask = (tools: PageTool[]) => tools.find((tool) => tool.name === "ask_user")!.run({ question: "Which size?" });
+      const { chats, propose } = remembering(job(ask));
+      await chats.runTask("run-1", "The routine", ({ approval }) => {
+        if (approval) chats.decide("run-1", approval.id, true, "Always 2 metres", { fromPhone: true });
+      });
+      expect(propose).not.toHaveBeenCalled();
+    });
+
     it("a bird deleted while it worked offers nothing, as there's no one left to remember it", async () => {
       let deletedAt: number | null = null;
       const ask = async (tools: PageTool[]) => {
