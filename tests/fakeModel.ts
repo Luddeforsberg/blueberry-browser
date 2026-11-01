@@ -25,6 +25,7 @@ export const startFakeModel = async () => {
   let hold: Promise<void> | null = null;
   let title = "NONE";
   let toolCalls: Array<Array<{ name: string; args: object }>> = [];
+  let thinkMs = 0;
   const requests: FakeModelRequest[] = [];
   const titleRequests: FakeModelRequest[] = [];
 
@@ -55,6 +56,7 @@ export const startFakeModel = async () => {
 
     requests.push(parsed);
     const nextCalls = toolCalls.shift();
+    if (thinkMs) await new Promise((resolve) => setTimeout(resolve, thinkMs));
     if (nextCalls) {
       const calls = nextCalls.map(({ name, args }, index) => ({
         index,
@@ -98,6 +100,7 @@ export const startFakeModel = async () => {
       hold = null;
       title = "NONE";
       toolCalls = [];
+      thinkMs = 0;
       requests.length = 0;
       titleRequests.length = 0;
     },
@@ -108,6 +111,10 @@ export const startFakeModel = async () => {
     // The next reply asks for these tools instead of answering. Call again for the reply after that.
     callTools(...calls: Array<{ name: string; args: object }>) {
       toolCalls.push(calls);
+    },
+    // How long each answer takes, as a real model's does, for anything watching the time between steps.
+    thinkFor(ms: number) {
+      thinkMs = ms;
     },
     replyWith(...next: string[]) {
       tokens = next;

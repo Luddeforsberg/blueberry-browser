@@ -109,6 +109,13 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         onChange={(keepBerryStill) => updateSettings({ keepBerryStill })}
                                     />
                                 </SettingsRow>
+                                <SettingsRow id="setting-bird-on-pages" title="Show the bird on pages" description="While a mascot works in the page you're looking at, it's drawn there doing it. Turn this off if a site reacts badly. Mascots work the same either way.">
+                                    <Switch
+                                        labelledBy="setting-bird-on-pages"
+                                        checked={settings.birdOnPages}
+                                        onChange={(birdOnPages) => updateSettings({ birdOnPages })}
+                                    />
+                                </SettingsRow>
                                 <SettingsRow
                                     id="setting-action-approval"
                                     title="Ask before acting"

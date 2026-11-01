@@ -1,0 +1,349 @@
+import type { WebContentsView } from "electron";
+import { actorCommand, ifThere, installActor, type ActorLook } from "./pageActorScript";
+import type { MascotLook } from "../shared/library";
+
+// The bird on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
+// happens. Every call here is a no-op unless the user is looking at this tab, so a job behind them pays nothing, not even
+// the waiting. `browserTools.ts` asks `showing` first, and takes the path it always took if the answer is no.
+
+// Drawing size on screen. `.pose` is positioned from where the feet are, which is what everything here measures.
+const BIRD_SIZE = 56;
+const FEET_X = 57 / 120;
+
+// How long a page gets to answer. Being late only means the bird is out of step, so nothing ever waits on a stuck page.
+const PAGE_ANSWER_MS = 400;
+
+// Flight time grows with distance, within what a fraction of a second allows.
+const FLIGHT_BASE_MS = 200;
+const FLIGHT_MS_PER_PIXEL = 0.35;
+const FLIGHT_MAX_MS = 520;
+const ENTRY_MS = 520;
+const MARKER_MS = 130;
+const CARRY_MS = 240;
+const LEAVE_MS = 340;
+// Lets the head start down so the beak arrives with the press.
+const PECK_LEAD_MS = 70;
+const HOP_MS = 180;
+// A first look before the read comes back, so reading is seen even when the answer is instant.
+const READ_MS = 320;
+
+// Letters arrive one tick at a time. Longer text gets bigger chunks rather than more time.
+const TYPE_TICK_MS = 34;
+const TYPE_MAX_MS = 1300;
+
+// After the user's own click or key, the bird stays away this long, even in a page a job can go on reading.
+const QUIET_AFTER_USER_MS = 5000;
+// A job between steps is mostly waiting for the model, and that's the bird working something out.
+const IDLE_AFTER_MS = 650;
+
+export interface ActorOptions {
+  // The setting: off means nothing is ever drawn in a page.
+  on: boolean;
+  // Show Berry off: a plain pointer, no bird.
+  plain: boolean;
+  // Keep Berry still, or Reduce Motion: a small marker that fades between spots.
+  still: boolean;
+  look: MascotLook;
+  dark: boolean;
+  // False if the window is minimised or hidden.
+  windowShowing: boolean;
+}
+
+// Where an element is, in the top page's pixels, from `spotOf`.
+export interface Spot {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  // Where a click would go.
+  x: number;
+  y: number;
+  viewWidth: number;
+  viewHeight: number;
+  // Its label, unless it's a secret field or holds what's typed in it, so never anything the user typed.
+  name?: string;
+  secret?: boolean;
+}
+
+export type Landing = "land" | "perch" | "look";
+
+interface Place {
+  x: number;
+  y: number;
+  // 1 faces right, -1 faces left.
+  turn: 1 | -1;
+}
+
+// Where the feet go. Over a short target it stands on the top edge, so it hides none of the label, and leans in to peck.
+// Over a tall one, near the point. It faces into the page wherever the left side is too tight.
+export const landingFor = ({ left, top, width, height, x, y, viewWidth }: Spot, kind: Landing, size = BIRD_SIZE): Place => {
+  if (kind === "perch") {
+    // Sat on the edge at the far end, clear of the letters coming in from the start.
+    const seat = left + width - Math.min(width * 0.25, size);
+    return { x: Math.max(size * 0.6, Math.min(seat, viewWidth - size * 0.6)), y: Math.max(size * 0.7, top), turn: 1 };
+  }
+  const reach = size * 0.42;
+  const turn: 1 | -1 = x - reach - size * FEET_X < 0 ? -1 : x + reach + size * 0.6 > viewWidth && x > viewWidth / 2 ? -1 : 1;
+  const edge = height <= size * 1.5 ? top + Math.min(height * 0.2, 6) : y - size * 0.3;
+  return { x: x - turn * reach, y: Math.max(size * 0.9, edge), turn };
+};
+
+export const flightMs = (from: { x: number; y: number } | null, to: { x: number; y: number }): number => {
+  if (!from) return ENTRY_MS;
+  return Math.round(Math.min(FLIGHT_MAX_MS, FLIGHT_BASE_MS + Math.hypot(to.x - from.x, to.y - from.y) * FLIGHT_MS_PER_PIXEL));
+};
+
+// A short text one letter at a time, and a long one in as many chunks as fit, so 5000 characters take no longer than 40.
+export const typingChunks = (text: string): string[] => {
+  const letters = [...text];
+  const size = Math.max(1, Math.ceil(letters.length / Math.floor(TYPE_MAX_MS / TYPE_TICK_MS)));
+  const chunks: string[] = [];
+  for (let at = 0; at < letters.length; at += size) chunks.push(letters.slice(at, at + size).join(""));
+  return chunks;
+};
+
+// Not metronomic: a bit of variation between ticks, and a small pause after a word.
+export const typingPauseMs = (chunk: string): number => {
+  const jitter = TYPE_TICK_MS * (0.7 + Math.random() * 0.6);
+  return /\s$/.test(chunk) ? jitter * 1.6 : jitter;
+};
+
+interface ActorTab {
+  readonly isVisible: boolean;
+  readonly berryWorking: boolean;
+  readonly heldForUser: boolean;
+  readonly existingView: WebContentsView | null;
+}
+
+export class PageActor {
+  // Where the feet are, so a flight's length is known and a new page carries on from there.
+  private position: { x: number; y: number } | null = null;
+  private quietUntil = 0;
+  private idleTimer: NodeJS.Timeout | null = null;
+  // Waits to end early, because the bird has gone. What happens next is the tools' to decide.
+  private readonly waits = new Set<() => void>();
+
+  constructor(
+    private readonly tab: ActorTab,
+    private readonly options: () => ActorOptions,
+    // Read each time, because it changes with the site.
+    private readonly zoom: () => number
+  ) {}
+
+  get enabled(): boolean {
+    return this.options().on;
+  }
+
+  // Whether anything should be drawn right now.
+  get showing(): boolean {
+    const { on, windowShowing } = this.options();
+    return on && windowShowing && this.tab.isVisible && this.tab.berryWorking && !this.tab.heldForUser && Date.now() >= this.quietUntil;
+  }
+
+  // Whether letters are paced and the page scrolled smoothly: not with a marker, and not where nobody's looking.
+  get moving(): boolean {
+    return this.showing && !this.options().still;
+  }
+
+  private get key(): string {
+    const { plain, still, look, dark } = this.options();
+    return [look.palette, look.accessory, plain, still, dark, this.zoom()].join("/");
+  }
+
+  private get look(): ActorLook {
+    const { plain, still, look, dark } = this.options();
+    return { ...look, plain, still, dark, zoom: this.zoom(), size: BIRD_SIZE };
+  }
+
+  private ask(code: string): Promise<unknown> {
+    const contents = this.tab.existingView?.webContents;
+    if (!contents || contents.isDestroyed()) return Promise.resolve(null);
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), PAGE_ANSWER_MS);
+    });
+    // The page's own world is never involved, so a page can't answer for this.
+    return Promise.race([contents.executeJavaScriptInIsolatedWorld(1000, [{ code }], true).catch(() => null), late]).finally(() => clearTimeout(timer));
+  }
+
+  private async draw(name: string, args: object = {}): Promise<boolean> {
+    if (!this.showing) return false;
+    this.clearIdle();
+    const command = actorCommand(this.key, name, args);
+    let answer = await this.ask(command);
+    if (answer === "absent") {
+      await this.ask(installActor(this.key, this.look, this.position));
+      answer = await this.ask(command);
+    }
+    return answer === true && this.showing;
+  }
+
+  private wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.waits.delete(done);
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      this.waits.add(done);
+    });
+  }
+
+  private endWaits(): void {
+    [...this.waits].forEach((done) => done());
+  }
+
+  private clearIdle(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  // Between steps. Called once a step's drawing is done.
+  private idleSoon(): void {
+    this.clearIdle();
+    if (!this.showing) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      void this.draw("pose", { name: "thinking", words: "" });
+    }, IDLE_AFTER_MS);
+  }
+
+  // Flies to where it can do this. Resolves once it has landed, or at once if nobody can see it.
+  async goTo(spot: Spot, words: string, kind: Landing, ref?: string): Promise<void> {
+    if (!this.showing) return;
+    const { still, plain } = this.options();
+    const unit = 1 / this.zoom();
+    const size = (still ? 28 : BIRD_SIZE) * unit;
+    // A pointer's tip is the thing that's meant to be on the point.
+    const place: Place = plain && kind !== "perch" ? { x: spot.x, y: spot.y, turn: 1 } : landingFor(spot, kind, size);
+    const ms = still ? MARKER_MS : flightMs(this.position, place);
+    const then = kind === "perch" ? "sitting" : kind === "look" ? "looking" : "rest";
+    const arc = Math.min(size, Math.hypot(place.x - (this.position?.x ?? place.x), place.y - (this.position?.y ?? place.y)) * 0.18);
+    const drawn = await this.draw("go", { x: place.x, y: place.y, ms, arc, turn: place.turn, ref, words, then });
+    if (!drawn) return;
+    this.position = place;
+    await this.wait(ms);
+    this.idleSoon();
+  }
+
+  // Starts the jab, and resolves as the beak is coming down, so the press and the beak arrive together.
+  async peck(x: number, y: number, clicks: 1 | 2): Promise<void> {
+    if (!(await this.draw("peck", { x, y, clicks }))) return;
+    await this.wait(PECK_LEAD_MS);
+    this.idleSoon();
+  }
+
+  // Along with a real drag, which takes `ms`.
+  carry(to: { x: number; y: number }, words: string, ms = CARRY_MS): void {
+    void this.draw("carry", { ...to, ms, words }).then((drawn) => {
+      if (drawn) this.position = to;
+      this.idleSoon();
+    });
+  }
+
+  async hop(words: string, name?: string): Promise<void> {
+    if (!(await this.draw("hop", { words, name }))) return;
+    await this.wait(HOP_MS);
+    this.idleSoon();
+  }
+
+  // A mood and the words, with no waiting. For a load or a look at the page.
+  async say(words: string, name: string): Promise<void> {
+    await this.draw("pose", { name, words });
+    this.idleSoon();
+  }
+
+  // A job has stopped to ask the user something. It faces them, as it does anywhere it needs a decision.
+  waitingForUser(): void {
+    void this.draw("pose", { name: "asking", words: "Waiting for you" });
+  }
+
+  answered(): void {
+    this.idleSoon();
+  }
+
+  typing(): void {
+    this.clearIdle();
+    void this.draw("typing");
+  }
+
+  doneTyping(): void {
+    this.idleSoon();
+  }
+
+  async read(words: string): Promise<void> {
+    if (!(await this.draw("read", { words }))) return;
+    await this.wait(READ_MS);
+  }
+
+  // Where a frame from another origin is on the top page. Only that: what the frame says about itself isn't asked.
+  async frameSpot(origin: string): Promise<Spot | null> {
+    if (!this.showing) return null;
+    const found = await this.ask(actorCommand(this.key, "frameSpot", { origin }));
+    if (found === "absent") {
+      await this.ask(installActor(this.key, this.look, this.position));
+      return (await this.ask(actorCommand(this.key, "frameSpot", { origin }))) as Spot | null;
+    }
+    return found as Spot | null;
+  }
+
+  // What a capture sees has no bird in it. Anything going wrong here mustn't get in the way of the capture.
+  async whileHidden<T>(capture: () => Promise<T>): Promise<T> {
+    const there = this.tab.isVisible && (await this.ask(ifThere("hide")));
+    try {
+      return await capture();
+    } finally {
+      if (there) void this.ask(ifThere("show"));
+    }
+  }
+
+  // The tab has come to the front in the middle of a job.
+  shown(): void {
+    if (this.showing) void this.say("", "thinking");
+  }
+
+  // Gone at once, and the next look starts fresh.
+  private vanish(): void {
+    this.clearIdle();
+    this.endWaits();
+    this.position = null;
+    void this.ask(ifThere("remove"));
+  }
+
+  // The tab went behind something, so nothing is drawn or waited for from here.
+  hidden(): void {
+    this.vanish();
+  }
+
+  // A job has let go of the tab: it finished, was stopped, or moved on.
+  leave(): void {
+    this.clearIdle();
+    this.endWaits();
+    this.position = null;
+    if (!this.tab.isVisible) return;
+    void this.ask(ifThere("leave", { ms: LEAVE_MS }));
+  }
+
+  // The user clicked or typed here. Whatever happens to the job, it goes and stays away a while.
+  userTouched(): void {
+    if (!this.options().on) return;
+    this.quietUntil = Date.now() + QUIET_AFTER_USER_MS;
+    this.vanish();
+  }
+
+  // The user has been handed this tab.
+  held(): void {
+    this.vanish();
+  }
+
+  // A new document has nothing in it, and it comes back where it was.
+  pageReady(): void {
+    if (this.showing && this.position) void this.say("", "rest");
+  }
+
+  destroyed(): void {
+    this.clearIdle();
+    this.endWaits();
+  }
+}

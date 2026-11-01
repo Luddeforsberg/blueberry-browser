@@ -67,12 +67,12 @@ From bottom to top:
 
 1. **Chrome view:** one transparent, window-sized renderer that draws all our UI.
 2. **Tab views:** one solid view per tab. Only the active tab is visible.
-3. **Overlay views:** small transparent views for anything that floats over a page, such as address suggestions, menus, the revealed sidebar, and Berry while it acts on a page.
+3. **Overlay views:** small transparent views for anything that floats over a page, such as address suggestions, menus and the revealed sidebar. The bird working on a page isn't one, because a view takes clicks: see Over a web page.
 
 Rules:
 
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
-- **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them.
+- **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them. The one exception is the bird on the page.
 - **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
 - **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
@@ -194,7 +194,7 @@ The flock's presets replace `berry-ink`, `wing`, `nape`, `beak`, `gear` and `gea
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
 - **Radius:** 8px for controls, 12px for sidebar rows and inputs, 22px for cards, panels and the page card, including the web page view itself, 26px for the composer, and full for buttons and segmented controls.
 - **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, the Recent panel and selected rows in the sidebar also get a shadow. A bird standing on the composer leaves a small soft `berry-pupil` shadow under its feet, only on the box.
-- **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration, and also shows while Berry is using the tab in a running reply. Inside the page, a matching inset glow pulses slowly, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
+- **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration, and also shows while Berry is using the tab in a running reply. Nothing else marks it from inside the page, because the bird does that now. With Show the bird on pages off, a matching inset glow pulses slowly inside the page instead, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
 
 ## 5. Typography
 
@@ -226,7 +226,7 @@ The chrome is crisp: quick to start, gently settling, with no bounce.
 
 - **Easing:** start with `cubic-bezier(.32, .72, 0, 1)` (*to tune*).
 - **Interruptible:** every transition can reverse from wherever it is.
-- **Web pages:** never animate page content, only the frame around it.
+- **Web pages:** never animate page content, only the frame around it and the bird working on the page.
 - **Bounce and squash:** reserved for Berry.
 - **Loops:** only while real work is happening, stopping as soon as it ends.
 - **Thinking:** a soft shimmer sweeps across the word while a reply is on its way. Reduced motion leaves the word still.
@@ -320,7 +320,7 @@ Every mood has a text label for assistive technology.
 | Flock | Its own page, standing on a wire with the flock |
 | Gallery | Standing on the line under each row, Asking on the review screen, Delivered once added |
 | Needs you | Asking at 24px on each row, and off duty when nothing's waiting |
-| Over a web page | Only while acting on that page, in an overlay view |
+| Over a web page | Only while working in the page the user is looking at, drawn in the page. See Over a web page |
 
 ### Where Berry goes
 
@@ -383,6 +383,42 @@ The page shows saved suggestions at once or what it would show without them, and
 ### Browsing
 
 The page gets the space. The address bar shows the real URL and real navigation state. Berry stays small and only shows a mood when something is happening.
+
+### Over a web page
+
+The moment an AI browser is most impressive is when it acts on a page, and a floating cursor could be anyone's. So the working mascot itself does the work, in its own colours and accessory, at 56px, drawn in the page from the same artwork as everywhere else.
+
+| What the job does | What the bird does |
+|---|---|
+| Click, double-click | Flies there, lands on the target's top edge beside the point, so it hides none of the label, and pecks it, with a ripple where the click lands. The real click waits for it |
+| Type | Flies to the field and sits on its top edge at the far end, its head bobbing while the letters appear. One letter about every 34ms, so a name takes about half a second. Longer text comes in bigger pieces, so nothing takes more than 1.3s. In a password or code field, it's all at once and nothing is drawn |
+| Read, find | Hops down what's in view, stopping beside each thing to look at it, Curious. It never scrolls the page |
+| Look over, screenshot | A hop on the spot, Curious. It's out of sight for the capture itself |
+| Scroll | Hangs in the air, wings going, while the page slides under it. Smooth only while someone is watching |
+| Point at | Flies there and looks at it, without pecking |
+| Drag | Takes hold, and carries on across to where it goes, in time with the real drag |
+| Choose an option, press a key | Lands and pecks, or a hop on the spot |
+| Go somewhere | Takes off, and comes back where it was once the new page is there |
+| Between steps | Thinking, with the berry going up and down |
+| A job waits for an answer | Asking, facing you, with "Waiting for you" |
+| A frame from another site | Its script can say anything about itself, so nothing's asked of it. The bird stands near the top of that frame in the page around it |
+
+**The line** is one small pill near the bird, above it if there's room, always on screen, saying what's happening in the present tense: "Clicking Add to cart", "Typing in Email". The name is the label beside it on the page, which the chat steps leave out because they go back to the model. These words go nowhere. It never shows what's being typed, which key, the contents of a text box, or a secret field's label.
+
+**Stop isn't on the page.** Anything a page can see it can fake, and a fake Stop or a real one a page could press is exactly what mustn't exist. The line is only words, and **Stop Berry** is in the toolbar just above it, for as long as anyone is working in this tab. It's the same as Stop in the chat or on a routine. Pressed while the bird is flying, the click it was flying to never happens.
+
+**How long:** a click costs its flight, 200ms plus 0.35ms a pixel up to 520ms, and 70ms for the beak to come down. Nothing is added in a tab behind the user's, or with the bird turned off.
+
+**When it isn't there:**
+
+- **Tabs not in front:** nothing is drawn and nothing waits. Going to one mid-job, it appears from then on.
+- **The user touches the page:** it goes at once, and stays away for 5 seconds after their last click or key, even in a page a job can carry on reading.
+- **A tab handed to the user:** none, and none while the keyboard is in a password or code field, whoever is typing.
+- **The job ends or moves on:** it flies up off the page and fades, and nothing of it is left behind.
+
+**Settings:** Keep Berry still and Reduce Motion give a small marker, the bird's head at 28px, that fades between spots with no flying, and text arrives at once. Show Berry off gives a plain pointer on the exact spot, with the same words. **Show the bird on pages** in Settings, under Berry, removes all of it for a site that reacts badly, and the inset glow comes back.
+
+**It stays out of the way:** no clicks, no box, no effect on the page's layout, no text the page or the agent can read, and out of every screenshot. It's in a closed shadow root in the top layer, and all its styles win over the page's. It works on the strictest content security policy. The bird may cover something for a moment, as a hand would. The real input goes through it regardless, and the watch that stops a press landing on anything but the named element isn't changed.
 
 ### Find in page
 
@@ -519,7 +555,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide, Show the bird on pages and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions switch with what it sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Downloads
 
@@ -572,7 +608,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 - Use tokens for every colour, size and duration.
 - Build one component that adapts to both layouts.
 - Get sizes from the layout owner.
-- Put anything that floats over a page in an overlay view sized to its content.
+- Put anything that floats over a page in an overlay view sized to its content, except the bird on the page, which is drawn in it.
 - Keep AI calls and agent actions in the main process, behind the typed IPC contract.
 - Show real state: navigation, loading and what Berry can see.
 - Add every new component to the gallery, in every state, in light and dark.
@@ -582,7 +618,7 @@ The Windows column comes from documentation and has not been tested. If Windows 
 
 ### Don't
 
-- Don't put glass on web pages or inject styles into them for chrome effects.
+- Don't put glass on web pages or inject styles into them for chrome effects. The bird on the page is the one thing drawn there, and it has no controls.
 - Don't use raw hex values or hard-coded sizes in components.
 - Don't add a colour, weight, font or shadow that isn't in this document.
 - Don't add bounce to the chrome or loops without real work behind them. The exceptions are Berry's world on the new tab page, the legs of a sitting bird, and the preview on the Flock page.

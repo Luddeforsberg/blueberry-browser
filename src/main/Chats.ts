@@ -200,6 +200,7 @@ export class Chats {
         run.tabs.add(tab);
         this.publishWorkingTabs();
       },
+      stopped: () => run.controller.signal.aborted,
       ownsEveryTab: !page,
       ownsTab: (id) => job.own.has(id),
       takenOver: job.takenOver,
@@ -470,6 +471,13 @@ export class Chats {
     this.runs.get(chatId)?.controller.abort();
   }
 
+  // Stop in the toolbar, from the tab being worked in rather than from a chat. The same as Stop in the chat or on a routine.
+  stopWorkIn(tabId: string): boolean {
+    const working = [...this.runs.values()].filter((run) => [...run.tabs].some((tab) => tab.id === tabId));
+    working.forEach((run) => run.controller.abort());
+    return working.length > 0;
+  }
+
   stopAll(): void {
     this.runs.forEach((run) => run.controller.abort());
   }
@@ -602,6 +610,7 @@ export class Chats {
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
       if (signal.aborted) return stopped();
+      const tab = this.browser.allTabs().find(({ id }) => id === this.jobs.get(chatId)?.current);
       signal.addEventListener("abort", stopped, { once: true });
       run.approval = {
         id: randomUUID(),
@@ -610,9 +619,11 @@ export class Chats {
         askedAt: Date.now(),
         answer: (allow, answer) => {
           signal.removeEventListener("abort", stopped);
+          tab?.actor?.answered();
           resolve(onAnswer(allow, answer));
         },
       };
+      tab?.actor?.waitingForUser();
       this.publish(chatId, run);
       this.events.onListChanged();
     });

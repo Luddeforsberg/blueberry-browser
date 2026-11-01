@@ -6,6 +6,8 @@ import type { Tab } from "./Tab";
 
 const STEP_MS = 30;
 const DRAG_STEPS = 8;
+// About how long a real drag takes from press to release.
+export const DRAG_MS = STEP_MS * (DRAG_STEPS + 1);
 // How long a page gets to show that real input reached it.
 const LANDED_MS = 500;
 const LANDED_POLL_MS = 50;

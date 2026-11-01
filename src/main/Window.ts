@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, type WebContents } from "electron";
+import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, systemPreferences, type WebContents } from "electron";
 import { release } from "os";
 import { Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -602,6 +602,14 @@ export class Window {
         // The title at this point is still the last page's, so the new page's arrives through `onDetails`.
         onNavigate: (address) => this.saveVisit(tabId, () => this.history.record(address, "", null)),
         onUserInput: () => this.chats.releaseTab(tabId),
+        actorOptions: () => ({
+          on: this.settings.birdOnPages,
+          plain: !this.settings.showBerry,
+          still: this.settings.keepBerryStill || systemPreferences.getAnimationSettings().prefersReducedMotion,
+          look: this.mascotStore.resolve(tab?.workingMascotId ?? null).look,
+          dark: nativeTheme.shouldUseDarkColors,
+          windowShowing: !this._baseWindow.isDestroyed() && this._baseWindow.isVisible() && !this._baseWindow.isMinimized(),
+        }),
         onDetails: () =>
           this.saveVisit(tabId, () => {
             if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });

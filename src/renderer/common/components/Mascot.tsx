@@ -244,7 +244,8 @@ const Head: React.FC<{ turn?: number; eyes?: Eyes; berry?: boolean; open?: boole
   open = false,
   blink = false,
 }) => (
-  <g transform={`rotate(${turn} ${NECK})`}>
+  // `data-part` is how the bird drawn on web pages finds the head it pecks with.
+  <g data-part="head" transform={`rotate(${turn} ${NECK})`}>
     <path d={HEAD} className="fill-berry-ink" />
     <path d={NAPE} className="fill-berry-nape" />
     <g className={cn(blink && "motion-safe:animate-berry-blink")} style={blink ? ownBox("center") : undefined}>

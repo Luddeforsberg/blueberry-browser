@@ -7,6 +7,12 @@ import { DEFAULT_SETTINGS, sanitizeSettings, SettingsStore } from "./SettingsSto
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-settings-")), "settings.json");
 
 describe("sanitizeSettings", () => {
+  it("keeps the bird on pages on unless it's really turned off", () => {
+    expect(DEFAULT_SETTINGS.birdOnPages).toBe(true);
+    expect(sanitizeSettings({ birdOnPages: false }).birdOnPages).toBe(false);
+    expect(sanitizeSettings({ birdOnPages: "no" }).birdOnPages).toBe(true);
+  });
+
   it("falls back to the defaults for anything missing or invalid", () => {
     expect(sanitizeSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(

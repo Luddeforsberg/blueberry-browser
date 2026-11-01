@@ -7,8 +7,10 @@ const MAX_OPTIONS = 50;
 const MAX_PLAIN = 40;
 // Long enough for a click to arrive, and short enough not to catch one of the user's own.
 const WATCH_PRESS_MS = 1500;
+const MAX_SMOOTH_SCROLL_MS = 700;
+const SMOOTH_SCROLL_START_MS = 120;
 
-const SHARED = `
+export const SHARED = `
   const state = (globalThis.__berry ??= { next: 1, byRef: new Map(), refs: new WeakMap() });
   const clip = (text) => {
     const clean = (text ?? "").replace(/\\s+/g, " ").trim();
@@ -269,7 +271,8 @@ export interface Aim {
 // Scrolled to it and ready for a real click. A dropdown opens a native menu and a file field the Mac's file
 // picker, which nobody here can answer, so those are never really clicked.
 // Pages often move when they're scrolled, so it only scrolls if it has to, and never in the same step as aiming.
-export const aimClick = (ref: string, mayScroll: boolean): string =>
+// `arm: false` is only for finding out where it is, with no watch set on the page.
+export const aimClick = (ref: string, mayScroll: boolean, arm = true): string =>
   withElement(
     ref,
     `${AIM}
@@ -285,7 +288,7 @@ export const aimClick = (ref: string, mayScroll: boolean): string =>
        if (!point) return { status: "scripted" };
        return { status: "covered", by: (hit && nameOf(hit)) || hit?.tagName.toLowerCase() || "nothing" };
      }
-     expectPressOn(el);
+     ${arm ? "expectPressOn(el);" : ""}
      return { status: "aimed", ...point };`
   );
 
@@ -327,6 +330,32 @@ export const aimHover = (ref: string, mayScroll: boolean): string =>
      if (!${mayScroll}) return { status: "scripted" };
      el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
      return { status: "scrolled" };`
+  );
+
+// Where an element is, for drawing only. Its name is the label a person reads beside it, never what's in a field.
+export const spotOf = (ref: string): string =>
+  withElement(
+    ref,
+    `const box = el.getBoundingClientRect();
+     let left = box.left;
+     let top = box.top;
+     for (let win = el.ownerDocument.defaultView; win !== window; win = win.parent) {
+       const owner = win.frameElement;
+       if (!owner) return null;
+       const outer = owner.getBoundingClientRect();
+       left += outer.left + owner.clientLeft;
+       top += outer.top + owner.clientTop;
+     }
+     const secret = isSecret(el);
+     // A label can wrap the box, and a box's own text may be what someone wrote, so it's left out of that.
+     const labelWithoutBox = () => {
+       const copy = el.labels?.[0]?.cloneNode(true);
+       copy?.querySelectorAll("textarea,[contenteditable]").forEach((inner) => inner.remove());
+       return copy?.textContent ?? "";
+     };
+     const holdsText = el.isContentEditable || el.tagName === "TEXTAREA";
+     const name = secret ? "" : holdsText ? clip(el.getAttribute("aria-label") || labelWithoutBox() || el.placeholder || "") : nameOf(el);
+     return { left, top, width: box.width, height: box.height, x: left + box.width / 2, y: top + box.height / 2, viewWidth: innerWidth, viewHeight: innerHeight, name, secret };`
   );
 
 export const isHovered = (ref: string): string => withElement(ref, `return el.matches(":hover");`);
@@ -438,6 +467,40 @@ export const typeIntoElement = (ref: string, text: string): string =>
      return "done";`
   );
 
+// The same as `typeIntoElement`, a piece at a time, while someone is watching. Ends in `finishTyping`, which falls back
+// on `typeIntoElement` if what's there isn't what was meant, so a page gets the same result either way.
+export const beginTyping = (ref: string): string =>
+  withElement(
+    ref,
+    `if (el.tagName === "SELECT") return "dropdown";
+     if (["checkbox", "radio", "button", "submit", "reset", "image", "file"].includes(el.type)) return "not-a-field";
+     if (el.disabled || el.readOnly) return "disabled";
+     if (!el.isContentEditable && !("value" in el)) return "not-a-field";
+     const doc = el.ownerDocument;
+     el.scrollIntoView({ block: "center" });
+     doc.defaultView.focus();
+     el.focus();
+     if (el.isContentEditable) doc.getSelection().selectAllChildren(el);
+     else el.select?.();
+     return "ready";`
+  );
+
+export const typeChunk = (ref: string, chunk: string): string =>
+  withElement(
+    ref,
+    `if (el.getRootNode().activeElement !== el) el.focus();
+     return el.ownerDocument.execCommand("insertText", false, ${JSON.stringify(chunk)});`
+  );
+
+export const finishTyping = (ref: string, text: string): string =>
+  withElement(
+    ref,
+    `const text = ${JSON.stringify(text)};
+     if (el.isContentEditable ? !el.innerText.includes(text) : el.value !== text) return "again";
+     el.dispatchEvent(new Event("change", { bubbles: true }));
+     return "done";`
+  );
+
 // A real key goes wherever the focus is, and a page can move that after typing.
 export const hasFocus = (ref: string): string => withElement(ref, `return el.getRootNode().activeElement === el;`);
 
@@ -496,8 +559,20 @@ export const chooseOption = (ref: string, option: string): string =>
 export const selectedOptions = (ref: string): string =>
   withElement(ref, `return el.tagName === "SELECT" ? optionLabels(el.selectedOptions) : null;`);
 
-export const scrollPage = (direction: "up" | "down"): string => `(() => {
-  window.scrollBy({ top: ${direction === "up" ? -1 : 1} * window.innerHeight * 0.9, behavior: "instant" });
+// `smooth` is for someone watching, so the page slides rather than jumps. It answers when that's over, or straight away if
+// the page didn't move.
+export const scrollPage = (direction: "up" | "down", smooth = false): string => `(async () => {
+  const before = window.scrollY;
+  window.scrollBy({ top: ${direction === "up" ? -1 : 1} * window.innerHeight * 0.9, behavior: ${smooth ? '"smooth"' : '"instant"'} });
+  ${
+    smooth
+      ? `await new Promise((resolve) => {
+    addEventListener("scrollend", resolve, { once: true });
+    setTimeout(resolve, ${MAX_SMOOTH_SCROLL_MS});
+    setTimeout(() => window.scrollY === before && resolve(), ${SMOOTH_SCROLL_START_MS});
+  });`
+      : ""
+  }
   return { top: Math.round(window.scrollY), height: document.documentElement.scrollHeight };
 })()`;
 

@@ -4,9 +4,11 @@ import {
   aimClick,
   aimHover,
   aimKey,
+  beginTyping,
   chooseOption,
   describeElement,
   describeOption,
+  finishTyping,
   hasFocus,
   inputLanded,
   isHovered,
@@ -17,12 +19,15 @@ import {
   scriptedHover,
   scrollPage,
   selectedOptions,
+  spotOf,
+  typeChunk,
   typeIntoElement,
   type Aim,
   type DragPlan,
   type FocusInfo,
 } from "./pageScripts";
-import { clickAt, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
+import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
+import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { Tab } from "./Tab";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { siteAllowed } from "../shared/mascots";
@@ -212,6 +217,13 @@ export const HANDOFF_WORDS: Record<HandoffNeed, string> = {
   captcha: "solve a captcha",
 };
 
+const MAX_WORDS_NAME_LENGTH = 48;
+// A long name is only ever a page's button text going on, and the line has little room.
+const clipWords = (name: string | undefined) => {
+  const clean = (name ?? "").trim();
+  return clean.length > MAX_WORDS_NAME_LENGTH ? `${clean.slice(0, MAX_WORDS_NAME_LENGTH - 1).trimEnd()}…` : clean;
+};
+
 const tabId = z.string().optional().describe("The tab, from list_tabs. Leave out for the one this job is working in: the last you opened, or else the page that came with the message. It never follows the user to another tab.");
 
 const NO_CURRENT_TAB = "This job has no web page to work in. Use a tab from list_tabs, or open_tab.";
@@ -263,6 +275,8 @@ export interface PageToolAccess {
   onUse: (tab: Tab) => void;
   // A mascot other than Berry. It only ever takes tools and sites away. Approvals work the same either way.
   limits?: Pick<MascotProfile, "name" | "sites" | "tools">;
+  // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
+  stopped?: () => boolean;
 }
 
 export const createPageTools = ({
@@ -279,6 +293,7 @@ export const createPageTools = ({
   canSee,
   onUse,
   limits,
+  stopped = () => false,
 }: PageToolAccess): PageTool[] => {
   const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
   const offLimits = (url: string) => {
@@ -348,12 +363,12 @@ export const createPageTools = ({
   };
 
   // Everything these tools return is the page's words, so the system prompt tells the model not to obey them.
-  const withText = async (id: string | undefined, format: (tab: Tab, text: string) => string) => {
+  const withText = async (id: string | undefined, doing: string, format: (tab: Tab, text: string) => string) => {
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return noTab(id);
     onUse(tab);
-    const text = await readText(tab, allowed);
+    const [text] = await Promise.all([readText(tab, allowed), actorOn(tab)?.read(`${doing} ${siteOf(tab.url)}`)]);
     if (!canSee()) return NO_ACCESS;
     const taken = tookOver(tab.id);
     if (taken) return taken;
@@ -385,6 +400,50 @@ export const createPageTools = ({
       }
     }
     await onRef<string>(tab, ref, scriptedEnter);
+  };
+
+  // The bird, if anyone's there to see it. With none, every tool does just what it would do anyway, at the same speed.
+  const actorOn = (tab: Tab): PageActor | null => (tab.actor?.showing ? tab.actor : null);
+  const unnamed = (name: string | undefined, fallback: string) => clipWords(name) || fallback;
+
+  // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
+  // or the tab taken over while it flew, and an action must not follow that.
+  const flyToRef = async (tab: Tab, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
+    const actor = actorOn(tab);
+    if (!actor) return true;
+    const entry = frameOf(tab, ref);
+    if (entry === "gone") return true;
+    // What a frame from another origin says about itself isn't believed, so its name isn't asked for, and it's only the frame's own edge.
+    const spot = entry
+      ? await actor.frameSpot(entry.origin)
+      : await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
+    if (spot) await actor.goTo(spot, entry ? words(`a frame from ${siteOf(entry.origin)}`) : words(spot.name), kind, entry ? undefined : ref);
+    return carryOn(tab);
+  };
+  const carryOn = (tab: Tab) => !stopped() && !tookOver(tab.id);
+  const STOPPED = "The job was stopped, so that didn't happen.";
+  const leftOff = (tab: Tab) => tookOver(tab.id) ?? STOPPED;
+
+  // At a pace, one piece at a time, with the same result as all at once. Only where someone is watching, and never in a
+  // secret field, where it's over as quickly as it can be.
+  const typeInField = async (tab: Tab, ref: string, text: string): Promise<string | null> => {
+    const actor = actorOn(tab);
+    const whole = () => onRef<string>(tab, ref, (inner) => typeIntoElement(inner, text));
+    if (!actor?.moving || frameOf(tab, ref) || !text) return whole();
+    const spot = await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
+    if (!spot || spot.secret) return whole();
+    const begun = await tab.runInPage<string | null>(beginTyping(ref));
+    if (begun !== "ready") return begun;
+    actor.typing();
+    for (const chunk of typingChunks(text)) {
+      if (!carryOn(tab) || !actor.moving) break;
+      if (!(await tab.runInPage<boolean | null>(typeChunk(ref, chunk)))) break;
+      await pause(typingPauseMs(chunk));
+    }
+    actor.doneTyping();
+    if (!carryOn(tab)) return "stopped";
+    const finished = await tab.runInPage<string | null>(finishTyping(ref, text));
+    return finished === "again" ? whole() : finished;
   };
 
   const whereNow = async (tab: Tab) => {
@@ -423,27 +482,42 @@ export const createPageTools = ({
   // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
   // something covering it gets the scripted click sent straight to the element, not the real one.
   const clickRef = async (tab: Tab, ref: string, clicks: 1 | 2) => {
+    const doing = clicks === 2 ? "Double-clicking" : "Clicking";
     const scripted = () => onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks));
     const finish = (result: string | null, note = "") => {
       if (result === null) return STALE_ELEMENT;
       if (result === "disabled") return "That element is disabled, so nothing happened.";
       return whereNow(tab).then((where) => (note ? `${where} ${note}` : where));
     };
-    if (frameOf(tab, ref)) return finish(await scripted(), SCRIPTED);
+    if (frameOf(tab, ref)) {
+      if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look"))) return leftOff(tab);
+      return finish(await scripted(), SCRIPTED);
+    }
+    // With a bird on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
+    const arm = !actorOn(tab);
     const aimAgain = async () => {
       await pause(SCROLL_SETTLE_MS);
-      return tab.runInPage<Aim | null>(aimClick(ref, false));
+      return tab.runInPage<Aim | null>(aimClick(ref, false, arm));
     };
-    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true));
+    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm));
     if (aim?.status === "scrolled") aim = await aimAgain();
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
+    if (!arm) {
+      if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
+      // Where it is now, as the page may have moved while the bird flew, and now the watch goes on.
+      if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
+      if (aim === null) return STALE_ELEMENT;
+    }
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
+      await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
+      if (!carryOn(tab)) return leftOff(tab);
       await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return finish(await scripted(), SCRIPTED);
-      aim = await aimAgain();
+      await pause(SCROLL_SETTLE_MS);
+      aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
     }
     if (aim === null) return STALE_ELEMENT;
     const covered = aim.status === "covered" ? ` Something else was on top of it (“${aim.by}”), which may still be in the way.` : "";
@@ -495,7 +569,7 @@ export const createPageTools = ({
       }),
       label: ({ tabId: id }) => `Read ${site(id)}`,
       run: ({ tabId: id, offset = 0 }) =>
-        withText(id, (tab, text) => {
+        withText(id, "Reading", (tab, text) => {
           const end = offset + MAX_READ_LENGTH;
           const more = end < text.length ? `Continue with offset ${end}.` : "This is the end of the page.";
           return `${tab.url}, characters ${offset} to ${Math.min(end, text.length)} of ${text.length}. ${more}\n\n${text.slice(offset, end)}`;
@@ -507,7 +581,7 @@ export const createPageTools = ({
       schema: z.object({ query: z.string().min(1).max(100), tabId }),
       label: ({ tabId: id }) => `Searched ${site(id)}`,
       run: ({ query, tabId: id }) =>
-        withText(id, (tab, text) => {
+        withText(id, "Searching", (tab, text) => {
           const haystack = text.toLowerCase();
           const needle = query.toLowerCase();
           const matches: string[] = [];
@@ -534,6 +608,7 @@ export const createPageTools = ({
       label: ({ tabId: id }) => `Looked over ${site(id)}`,
       run: ({ tabId: id, query, everything }) =>
         withTab(id, async (tab) => {
+          void actorOn(tab)?.hop(`Looking over ${siteOf(tab.url)}`, "looking");
           const top = await tab.runInPage<ListedElements>(listElements({ query, limit: MAX_ELEMENTS, everything, descend: true }));
           const script = listElements({ query, limit: MAX_FRAME_ELEMENTS, everything, descend: false });
           const frames = await Promise.all(
@@ -556,7 +631,12 @@ export const createPageTools = ({
       schema: z.object({ tabId, direction: z.enum(["up", "down"]) }),
       label: ({ tabId: id }) => `Scrolled ${site(id)}`,
       run: ({ tabId: id, direction }) =>
-        withTab(id, async (tab) => JSON.stringify(await tab.runInPage(scrollPage(direction)))),
+        withTab(id, async (tab) => {
+          const actor = actorOn(tab);
+          await actor?.say("Scrolling", "flying");
+          const result = await tab.runInPage(scrollPage(direction, !!actor?.moving));
+          return JSON.stringify(result);
+        }),
     }),
     pageTool({
       name: "click",
@@ -591,11 +671,17 @@ export const createPageTools = ({
             }
             if (aim === null) return STALE_ELEMENT;
             if (aim.status === "aimed") {
-              await moveTo(tab, { x: aim.x!, y: aim.y! });
+              if (actorOn(tab)) {
+                if (!(await flyToRef(tab, ref, (name) => `Pointing at ${unnamed(name, "something")}`, "look"))) return leftOff(tab);
+                aim = await tab.runInPage<Aim | null>(aimHover(ref, false));
+                if (aim === null) return STALE_ELEMENT;
+              }
+              if (aim.status === "aimed") await moveTo(tab, { x: aim.x!, y: aim.y! });
               const over = await tab.runInPage<boolean | null>(isHovered(ref));
               if (over) return "The pointer is over it now. Look again to see what appeared.";
             }
           }
+          if (frameOf(tab, ref) && !(await flyToRef(tab, ref, (name) => `Pointing at ${name}`, "look"))) return leftOff(tab);
           const result = await onRef<string>(tab, ref, scriptedHover);
           if (result === null) return STALE_ELEMENT;
           return "A scripted hover went to it, because the real pointer couldn't get there. A page that reveals things by CSS won't respond, so look again before saying anything appeared.";
@@ -618,6 +704,11 @@ export const createPageTools = ({
           const frame = frameOf(tab, ref);
           if (frame !== frameOf(tab, toRef)) return "Those two aren't in the same frame, so nothing was dragged.";
           const inner = frame ? toRef.slice(toRef.indexOf(".") + 1) : toRef;
+          const dragging = (name: string | undefined) => `Dragging ${unnamed(name, "something")}`;
+          let words = "Dragging something";
+          // Asked before it moves anything, because a page's own drag-and-drop is played as events in one go.
+          if (!(await flyToRef(tab, ref, (name) => (words = dragging(name)), "land"))) return leftOff(tab);
+          const end = actorOn(tab) && !frame ? await tab.runInPage<Spot | null>(spotOf(toRef)).catch(() => null) : null;
           let plan = await onRef<DragPlan>(tab, ref, (from) => planDrag(from, inner));
           // It may have just scrolled them into view, so where they are now is what counts.
           if (plan?.status === "aimed") {
@@ -632,11 +723,13 @@ export const createPageTools = ({
           if (plan.status === "aimed") {
             // A frame's page writes its own answers, so it never gets to choose where the real mouse goes.
             if (frame) return "That needs a real mouse, which can't reach a frame from another site, so nothing was dragged.";
+            if (end) actorOn(tab)?.carry(plan.to!, words, DRAG_MS);
             await dragBetween(tab, plan.from!, plan.to!);
             if ((await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded))) !== "landed") {
               return "The press didn't land on that element, so nothing was dragged.";
             }
           }
+          if (plan.status === "native" && end) actorOn(tab)?.carry({ x: end.x, y: end.y }, words);
           return `${await whereNow(tab)} ${check}`;
         }),
     }),
@@ -657,6 +750,9 @@ export const createPageTools = ({
           if (!isKnownKey(key)) return `That isn't a key this can press. It can press ${KEY_NAMES.join(", ")}, or a single character.`;
           const focus = await tab.runInPage<FocusInfo>(aimKey);
           if (focus.foreignFrame) return "The focus is in a frame from another site, where real keys can't reach, so nothing was pressed. Click something there instead.";
+          // Which key isn't said: one at a time, a run of these could spell out anything.
+          await actorOn(tab)?.hop("Pressing a key");
+          if (!carryOn(tab)) return leftOff(tab);
           await pressKey(tab, key, shift);
           if ((await landed(() => tab.runInPage<boolean | null>(inputLanded))) === "lost") return "The page didn't receive that key, so it may not have done anything.";
           return whereNow(tab);
@@ -726,14 +822,21 @@ export const createPageTools = ({
       },
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
-          const result = await onRef<string>(tab, ref, (inner) => typeIntoElement(inner, text));
+          // What's typed is never in these words, only where it's going.
+          if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch"))) return leftOff(tab);
+          const result = await typeInField(tab, ref, text);
+          if (result === "stopped") return leftOff(tab);
           if (result === null) return STALE_ELEMENT;
           if (result === "dropdown") return "That's a dropdown, so nothing was typed. Use choose_option.";
           if (result === "not-kept") {
             return "The field holds something other than that text now, so it may not have taken it. Nothing was submitted. Look at it again before saying it worked.";
           }
           if (result !== "done") return "That element can't be typed into, so nothing happened.";
-          if (submit) await pressEnter(tab, ref);
+          if (submit) {
+            await actorOn(tab)?.hop("Submitting");
+            if (!carryOn(tab)) return leftOff(tab);
+            await pressEnter(tab, ref);
+          }
           return whereNow(tab);
         }),
     }),
@@ -760,6 +863,7 @@ export const createPageTools = ({
       },
       run: ({ tabId: id, ref, option }) =>
         withTab(id, async (tab) => {
+          if (!(await flyToRef(tab, ref, (name) => `Choosing in ${unnamed(name, "a dropdown")}`, "land"))) return leftOff(tab);
           const result = await onRef<ChooseResult>(tab, ref, (inner) => chooseOption(inner, option));
           if (result === null) return STALE_ELEMENT;
           if (result.status === "not-a-dropdown") return "That element isn't a dropdown, so nothing happened.";
@@ -787,6 +891,7 @@ export const createPageTools = ({
       run: ({ tabId: id }) =>
         withTab(id, async (tab) => {
           if (tab.mayShowCode) return `Screenshots of tab ${tab.id} aren't available for now, because a code from the user's phone went in there and the page might show it. Read its text instead.`;
+          await actorOn(tab)?.say(`Looking at ${siteOf(tab.url)}`, "looking");
           await tab.settled();
           const image = await tab.screenshot();
           if (!canSee()) return NO_ACCESS;
@@ -808,6 +913,7 @@ export const createPageTools = ({
           // History isn't a navigation the limit below gets to stop.
           const back = tab.backUrl;
           if (back && !allowed(back)) return offLimits(back).message;
+          await actorOn(tab)?.say("Going back", "flying");
           tab.goBack(true);
           return whereNow(tab);
         }),
@@ -839,6 +945,7 @@ export const createPageTools = ({
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
+          await actorOn(tab)?.say(`Going to ${siteOf(url)}`, "flying");
           // A failed load is reported by `whereNow`. Anything else, like a download, still counts as not working.
           await Promise.race([
             tab.loadURL(url).catch((error) => {
