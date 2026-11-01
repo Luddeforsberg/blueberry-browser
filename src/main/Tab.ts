@@ -1,5 +1,5 @@
 import { NativeImage, WebContentsView, type WebContents, type WebFrameMain } from "electron";
-import type { Layout, TabTrouble } from "../shared/ipc";
+import type { Layout, TabLoadError, TabTrouble } from "../shared/ipc";
 import { savedEntries, type SavedWebTab } from "./Session";
 
 // The page card radius from DESIGN.md.
@@ -41,6 +41,15 @@ const FRAME_TEXT = `innerWidth > 1 && innerHeight > 1 ? document.body?.innerText
 const isTyping = ({ type, key, meta, control }: Electron.Input): boolean =>
   type === "keyDown" && !meta && !control && ([...key].length === 1 || ["Enter", "Backspace", "Delete"].includes(key));
 
+// A page that never loaded has no title of its own.
+const titleForAddress = (url: string): string => {
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
+};
+
 export interface TabEvents {
   onChange: () => void;
   onNavigate: (url: string) => void;
@@ -70,7 +79,7 @@ export class Tab {
   // Coming back to a page after a restart isn't a new visit.
   private notAVisit: string | null = null;
   private _trouble: TabTrouble | null = null;
-  private _loadError: { url: string; description: string } | null = null;
+  private _loadError: TabLoadError | null = null;
   private reloadOnceGone = false;
   // Who is working here, if a mascot other than Berry is.
   workingMascotId: string | null = null;
@@ -175,11 +184,16 @@ export class Tab {
     // A reload, a typed address or going back all bring the page back in a new process.
     contents.on("did-start-loading", () => {
       this.setTrouble(null);
-      this._loadError = null;
+      this.setLoadError(null);
       this.events.onChange();
     });
     contents.on("did-fail-load", (_, code, description, url, isMainFrame) => {
-      if (isMainFrame && code !== ERR_ABORTED) this._loadError = { url, description };
+      if (!isMainFrame || code === ERR_ABORTED) return;
+      this._url = url;
+      this._title = titleForAddress(url);
+      this._favicon = null;
+      this.setLoadError({ url, description });
+      this.events.onChange();
     });
     contents.on("did-stop-loading", () => this.events.onChange());
 
@@ -235,6 +249,11 @@ export class Tab {
     this.webContentsView?.setVisible(this.shouldDraw);
     if (trouble) this.stopWaiting();
     this.events.onChange();
+  }
+
+  private setLoadError(error: TabLoadError | null): void {
+    this._loadError = error;
+    this.webContentsView?.setVisible(this.shouldDraw);
   }
 
   private stopWaiting(): void {
@@ -309,7 +328,7 @@ export class Tab {
   }
 
   // Why the last address didn't load, until another load starts.
-  get loadError(): { url: string; description: string } | null {
+  get loadError(): TabLoadError | null {
     return this._loadError;
   }
 
@@ -399,7 +418,7 @@ export class Tab {
   show(): void {
     this._isVisible = true;
     this.loadIfUnloaded();
-    this.webContentsView?.setVisible(!this._trouble);
+    this.webContentsView?.setVisible(this.shouldDraw);
   }
 
   hide(): void {
@@ -415,7 +434,7 @@ export class Tab {
   }
 
   private get shouldDraw(): boolean {
-    return (this._isVisible || this.isParked) && !this._trouble;
+    return (this._isVisible || this.isParked) && !this._trouble && !this._loadError;
   }
 
   // Hides before moving and moves before showing, so the view never crosses the page the user is looking at.
@@ -580,6 +599,9 @@ export class Tab {
       // A stuck page can't be reloaded from inside. A new process comes once this one has gone.
       this.reloadOnceGone = true;
       this.webContents.forcefullyCrashRenderer();
+    } else if (this._loadError) {
+      // A failed first load may leave nothing for a reload to go back to. How it goes shows on the tab.
+      this.loadURL(this._loadError.url).catch(() => {});
     } else {
       this.webContents.reload();
     }

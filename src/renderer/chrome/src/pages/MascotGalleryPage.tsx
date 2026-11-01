@@ -7,7 +7,7 @@ import { Choice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from '../components/Berry'
-import { ChatError } from '../components/ChatMessage'
+import { ChatError, Markdown } from '../components/ChatMessage'
 import { CopyLink } from '../components/CopyLink'
 import { filterGallery, freeName, GALLERY_VIEW_EVENT, galleryView, setGalleryView, sortGallery, type GallerySort, type GalleryView } from '../galleryView'
 
@@ -15,7 +15,7 @@ const asMascot = (entry: GalleryMascot): MascotProfile => ({ ...entry.draft, id:
 
 const startChat = (id: string, choose: (id: string) => void) => {
     choose(id)
-    void window.chromeAPI.browser.openPage('chat')
+    void window.chromeAPI.browser.createTab()
 }
 
 // The page's main idea: what a mascot may do, in words, read from its real limits. Open means it isn't limited.
@@ -33,13 +33,14 @@ export const Permissions: React.FC<{ draft: GalleryMascot['draft']; large?: bool
     </ul>
 )
 
-// What strangers wrote, so it's plain text wherever it shows. Markdown could fetch an image or dress up a link.
+// What strangers wrote. The question stays as typed, and the answer reads as it did in the chat, but can't fetch an
+// image or dress up a link.
 export const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) => (
     <>
         <h3 className="text-12 text-muted-foreground">I asked this</h3>
         <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.prompt}</p>
         <h3 className="mt-4 text-12 text-muted-foreground">And here’s what it gave me</h3>
-        <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.answer}</p>
+        <Markdown content={example.answer} fromStranger className="mt-1 text-14 [overflow-wrap:anywhere]" />
     </>
 )
 

@@ -15,7 +15,8 @@ const dayLabel = (time: number, now: number) => {
     // Worked out from the date rather than by counting hours, because a day can have 23 or 25 of them.
     const yesterday = new Date(today).setDate(new Date(today).getDate() - 1)
     if (start === yesterday) return 'Yesterday'
-    return new Date(time).toLocaleDateString([], {
+    // The app is in English, whatever language the system is in.
+    return new Date(time).toLocaleDateString('en-GB', {
         weekday: 'long',
         month: 'long',
         day: 'numeric',

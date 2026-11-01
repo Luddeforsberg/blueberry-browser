@@ -116,7 +116,7 @@ export const AddressBar: React.FC = () => {
                     <>
                         <span className="text-foreground">{domain}</span>
                         <span className="group-hover/address-bar:hidden text-muted-foreground">
-                            {activeTab.title && ` / ${activeTab.title}`}
+                            {activeTab.title && !activeTab.loadError && ` / ${activeTab.title}`}
                         </span>
                         <span className="group-hover/address-bar:inline hidden text-muted-foreground">
                             {path}

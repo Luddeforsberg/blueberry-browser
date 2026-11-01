@@ -2,7 +2,7 @@ import type { InternalPage } from "../shared/ipc";
 
 const TITLES: Record<InternalPage, string> = {
   "new-tab": "New tab",
-  chat: "New chat",
+  chat: "Chat",
   routines: "Routines",
   settings: "Settings",
   downloads: "Downloads",
@@ -23,6 +23,7 @@ export class InternalTab {
   readonly canGoBack = false;
   readonly canGoForward = false;
   readonly trouble = null;
+  readonly loadError = null;
   title: string;
 
   constructor(

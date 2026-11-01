@@ -17,7 +17,14 @@ const BookmarksBar: React.FC = () => {
     const sites = useSavedSites()
 
     return (
-        <ul aria-label="Bookmarks" className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-x-auto">
+        <ul
+            aria-label="Bookmarks"
+            // Too many still scroll, by trackpad or an ordinary wheel, and the one cut off at the edge says there's more.
+            onWheel={(event) => {
+                if (event.deltaX === 0) event.currentTarget.scrollLeft += event.deltaY
+            }}
+            className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-x-auto [&::-webkit-scrollbar]:hidden"
+        >
             {sites.length === 0 && <li className="shrink-0 px-2 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
             {sites.map((site) => (
                 <li key={site.id} className="shrink-0">

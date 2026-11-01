@@ -459,6 +459,7 @@ export class Window {
       page: tab instanceof InternalTab ? tab.page : null,
       pageParam: tab instanceof InternalTab ? tab.param : null,
       trouble: tab.trouble,
+      loadError: tab.loadError,
     };
   }
 
@@ -543,6 +544,8 @@ export class Window {
 
   openPage(page: InternalPage, options: { param?: string; title?: string } = {}): BrowserTab {
     const param = options.param ?? null;
+    // A chat only starts from the new tab page, so a chat tab always has a chat.
+    if (page === "chat" && param === null) return this.openPage("new-tab");
     const existing = this.entries.find(
       (tab) =>
         tab instanceof InternalTab &&
@@ -556,7 +559,9 @@ export class Window {
       return existing;
     }
 
-    const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, options.title);
+    // The chat's own title, whoever asked, or the tab says "Chat" until the thread next changes.
+    const chatTitle = page === "chat" && param ? this.chatStore.chat(param)?.title : undefined;
+    const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, chatTitle ?? options.title);
     this.tabsMap.set(tab.id, tab);
     this.switchActiveTab(tab.id);
     return tab;

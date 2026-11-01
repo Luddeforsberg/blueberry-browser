@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowRight, Bird, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { ArrowRight, Bird, Hand, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import type { Suggestion } from '@shared/library'
 import { BerryDot } from '@common/components/Mascot'
@@ -93,8 +93,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const isBerry = name !== 'Assistant'
 
     const TRAY = [
+        { label: 'Needs you', Icon: Hand, onClick: () => browser.openPage('needs-you') },
         { label: 'Routines', Icon: RefreshCw, onClick: () => browser.openPage('routines') },
-        { label: 'New chat', Icon: MessageCircle, onClick: () => browser.openPage('chat') },
         { label: 'Flock', Icon: Bird, onClick: () => browser.openPage('flock') }
     ]
 
@@ -171,9 +171,9 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             onChooseMascot={choose}
                         />
                     </div>
-                    {/* The sidebar holds these when it's open. */}
+                    {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
                     {!layout.sidebarOpen && (
-                        <div className="relative z-10 flex items-center gap-1 h-11 px-2 mt-1">
+                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-card", theme.glass ? "bg-canvas/70 backdrop-blur-xl" : "bg-canvas")}>
                             {TRAY.map(({ label, Icon, onClick }) => (
                                 <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
                                     <Icon className="size-4" />

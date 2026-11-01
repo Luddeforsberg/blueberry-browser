@@ -5,6 +5,8 @@ import { ACCESSORIES, PALETTES, parseMascotDraft } from "../shared/mascots";
 import { findPatterns, plainText, siteNamesIn, topPatterns, type Pattern, type PatternChat, type PatternVisit } from "./suggestionPatterns";
 
 const HOUR_MS = 3_600_000;
+// A try that gave no cards doesn't count, but being offline mustn't mean a model call on every new tab.
+const RETRY_MS = 300_000;
 const SHOWN = 3;
 const KIND_ORDER: SuggestionKind[] = ["prompt", "routine", "mascot"];
 const MAX_CARD_TITLE = 60;
@@ -42,7 +44,7 @@ Reply with JSON only, in this shape: {"cards":[{"id":"p1", ...}]}. One card per 
 interface SavedSuggestions {
   cards: SuggestionWords[];
   dismissed: string[];
-  // When the model was last asked, and the newest visit or chat it had then.
+  // When the model last gave cards, and the newest visit or chat it had then.
   askedAt: number;
   seen: number;
 }
@@ -157,6 +159,8 @@ const pickShown = (cards: Suggestion[]): Suggestion[] => {
 export class Suggestions {
   private saved: SavedSuggestions = { cards: [], dismissed: [], askedAt: 0, seen: 0 };
   private asking = false;
+  // Only in memory, so a relaunch can try again straight away.
+  private triedAt = 0;
 
   constructor(
     private readonly file: string,
@@ -224,7 +228,7 @@ export class Suggestions {
 
   // At most once an hour, only when there's more to go on, and only for patterns with no words yet.
   private async refresh(open: Pattern[], newest: number): Promise<void> {
-    if (this.asking) return;
+    if (this.asking || (this.triedAt > 0 && this.now - this.triedAt < RETRY_MS)) return;
     const { askedAt, seen } = this.saved;
     if (askedAt > 0 && (this.now - askedAt < HOUR_MS || newest <= seen)) return;
     const hasWords = (pattern: Pattern) => this.saved.cards.some((card) => wordsFit(card, pattern));
@@ -232,14 +236,13 @@ export class Suggestions {
     if (unwritten.length === 0 || !this.sources.hasModel()) return;
 
     this.asking = true;
-    // `seen` waits for words that can be used, so a failed try only waits out the hour.
-    this.save({ ...this.saved, askedAt: this.now });
+    this.triedAt = this.now;
     try {
       const reply = await this.sources.write(SUGGESTION_PROMPT, JSON.stringify({ patterns: unwritten.map(forTheModel) }));
       const otherNames = [...open.flatMap(({ sites }) => sites.flatMap(({ host, label }) => [host, label])), ...siteNamesIn(this.sources.visits())];
       const cards = cardsFromReply(reply, unwritten, otherNames);
       if (cards.length > 0) {
-        this.save({ ...this.saved, seen: newest, cards: [...this.saved.cards.filter(({ id }) => !cards.some((card) => card.id === id)), ...cards] });
+        this.save({ ...this.saved, askedAt: this.now, seen: newest, cards: [...this.saved.cards.filter(({ id }) => !cards.some((card) => card.id === id)), ...cards] });
         this.sources.onChanged();
       }
     } catch (error) {

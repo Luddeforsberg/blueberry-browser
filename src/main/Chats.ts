@@ -26,6 +26,7 @@ const MAX_ANSWER_LENGTH = 2000;
 // A page may repeat a code back, in its words or its address, for as long as a job could plausibly still be there.
 const REMEMBER_CODE_MS = 60 * 60 * 1000;
 const CODE_REMOVED = "[code removed]";
+const ADDRESS_DETAILS_REMOVED = "[address details removed]";
 
 const hostOf = (url: string): string | null => {
   try {
@@ -150,6 +151,11 @@ export class Chats {
   private readonly handedOver = new Map<string, { touched: boolean; asking: boolean; host: string | null; entering: boolean; codeEntered: boolean }>();
   // Codes sent from the phone, and until when to keep them out of anything going to the model. Memory only.
   private readonly enteredCodes = new Map<RegExp, number>();
+  // Tabs that have been back from the user. A sign-in lands on an address that can carry a code or a token, and any
+  // later address in that tab can too, so only the site and path of it go to the model while the tab is open.
+  private readonly handedBack = new Set<Tab>();
+  // Query strings and fragments seen on those tabs, kept out of anything going to the model. Memory only.
+  private readonly addressDetails = new Set<string>();
 
   constructor(
     private readonly store: ChatStore,
@@ -203,8 +209,18 @@ export class Chats {
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
-    // A picture can't be gone through, so `Tab` refuses to take one instead.
-    return tools.map((tool) => (tool.name === "screenshot" ? tool : { ...tool, run: async (args) => this.withoutCodes(await tool.run(args)) }));
+    // A picture can't be gone through, so `Tab` refuses to take one instead. A refusal goes straight to the model too.
+    return tools.map((tool) => ({
+      ...tool,
+      run: async (args) => {
+        const result = await tool.run(args);
+        return tool.returnsImage && result.startsWith("data:image/") ? result : this.withoutCodes(result);
+      },
+      refuses: async (args) => {
+        const refused = (await tool.refuses?.(args)) ?? null;
+        return refused && { ...refused, message: this.withoutCodes(refused.message) };
+      },
+    }));
   }
 
   // What a page might say back after a code went in.
@@ -215,6 +231,17 @@ export class Chats {
       if (until < now) this.enteredCodes.delete(echo);
       else clean = clean.replace(echo, CODE_REMOVED);
     });
+    this.handedBack.forEach(({ url }) => {
+      const details = url.search(/[?#]/);
+      // A bare "#" or "?" holds no secret, and taking it out would mangle everything else the model reads.
+      if (details !== -1 && url.length - details >= 4) this.addressDetails.add(url.slice(details));
+    });
+    // Longest first, as one address's query can begin with another's and the rest would be left showing.
+    [...this.addressDetails]
+      .sort((a, b) => b.length - a.length)
+      .forEach((details) => {
+        clean = clean.replaceAll(details, ADDRESS_DETAILS_REMOVED);
+      });
     return clean;
   }
 
@@ -296,13 +323,17 @@ export class Chats {
   }
 
   private letGo(tab: Tab): void {
-    this.handedOver.delete(tab.id);
+    // This also runs for any page sent with a message, which was never away.
+    if (this.handedOver.delete(tab.id)) this.handedBack.add(tab);
     tab.heldForUser = false;
   }
 
   // Nothing's left to wait for once a handed-over tab has gone.
   tabClosed(tabId: string): void {
     this.handedOver.delete(tabId);
+    this.handedBack.forEach((tab) => {
+      if (tab.id === tabId) this.handedBack.delete(tab);
+    });
     this.runs.forEach((run, id) => {
       if (run.approval?.handoff?.tabId === tabId) this.decide(id, run.approval.id, false);
     });
@@ -355,7 +386,8 @@ export class Chats {
     const tab = this.browser.allTabs().find((candidate) => candidate.id === tabId);
     this.jobs.forEach((job, id) => {
       if (!job.own.delete(tabId)) return;
-      job.takenOver.set(tabId, tab?.url ?? "an earlier page");
+      // Said to the model later, when the tab may be somewhere else, so it's cleaned now.
+      job.takenOver.set(tabId, tab ? this.withoutCodes(tab.url) : "an earlier page");
       if (tab) this.runs.get(id)?.tabs.delete(tab);
     });
     this.publishWorkingTabs();

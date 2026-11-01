@@ -62,6 +62,8 @@ export const savedEntries = (
 const sanitizeTab = (raw: unknown): SavedTab | null => {
   const tab = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   if (PAGES.includes(tab.page as InternalPage)) {
+    // From when a chat could be open before it began. Chats start on the new tab page now.
+    if (tab.page === "chat" && typeof tab.param !== "string") return null;
     return {
       page: tab.page as InternalPage,
       param: typeof tab.param === "string" ? tab.param : null,

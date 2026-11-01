@@ -45,6 +45,7 @@ const Shell: React.FC = () => {
 
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
+    const trouble = activeTab?.trouble ?? activeTab?.loadError
     // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
     // It also shows on any tab Berry is using in the reply it's working on.
     const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && activeTab.id === sentFrom.current && siteAllowed(activeTab.url, find(mascotId).sites)))
@@ -64,7 +65,7 @@ const Shell: React.FC = () => {
             {/* Internal pages draw here. For web pages it shows until the tab view paints, or when a page has crashed. */}
             <Region rect={page} className="overflow-hidden rounded-b-panel">
                 {activeTab?.page && <InternalPageView tab={activeTab} />}
-                {activeTab?.trouble && <PageTrouble trouble={activeTab.trouble} onReload={() => void reload()} />}
+                {trouble && <PageTrouble trouble={trouble} onReload={() => void reload()} />}
             </Region>
             {layout.sidebarOpen && (
                 <Region rect={layout.sidebar}>

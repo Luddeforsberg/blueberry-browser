@@ -55,8 +55,8 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
     model.replyWith("Good morning.");
     await chrome.getByRole("button", { name: "Start a chat with Ekot" }).click();
     await expect(chrome.getByLabel(/Ekot/).first()).toBeVisible();
-    await chrome.getByRole("textbox", { name: "Message" }).fill("What's new?");
-    await chrome.getByRole("textbox", { name: "Message" }).press("Enter");
+    await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Ekot" }).fill("What's new?");
+    await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Ekot" }).press("Enter");
     await expect(chrome.getByText("Good morning.")).toBeVisible();
     const system = JSON.stringify(model.requests[0].messages[0]);
     expect(system).toContain("<mascot_name>Ekot</mascot_name>");

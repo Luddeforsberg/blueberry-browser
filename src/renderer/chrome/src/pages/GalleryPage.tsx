@@ -321,6 +321,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3">
                         <div className="h-72 rounded-panel border"><PageTrouble trouble="crashed" onReload={() => undefined} /></div>
                         <div className="h-72 rounded-panel border"><PageTrouble trouble="unresponsive" onReload={() => undefined} /></div>
+                        <div className="h-72 rounded-panel border"><PageTrouble trouble={{ url: 'https://example.com/missing', description: 'ERR_NAME_NOT_RESOLVED' }} onReload={() => undefined} /></div>
                     </div>
                     <div className="mt-3 flex items-center gap-3 text-12 text-muted-foreground">
                         <TabIcon tab={{ page: null, favicon: null, isLoading: false, berryWorking: false, trouble: 'crashed' }} /> Its tab shows this until it’s reloaded.

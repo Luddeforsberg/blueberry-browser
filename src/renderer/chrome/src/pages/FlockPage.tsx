@@ -36,7 +36,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; onEd
 
     const chat = () => {
         choose(mascot.id)
-        void window.chromeAPI.browser.openPage('chat')
+        void window.chromeAPI.browser.createTab()
     }
 
     return (

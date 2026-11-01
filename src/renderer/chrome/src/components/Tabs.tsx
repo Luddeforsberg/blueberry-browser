@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock } from '../contexts/LibraryContext'
+import { useShell } from '../contexts/ShellContext'
 import { TabIcon } from './TabIcon'
 import { SHIMMER_TEXT } from './ChatMessage'
 import { useTabDrag } from './useTabDrag'
@@ -20,6 +21,9 @@ const TabItem: React.FC<{
     style?: React.CSSProperties
 }> = ({ tab, mode, onActivate, onClose, onPress, onNudge, dragged, shifting, style }) => {
     const { find } = useFlock()
+    const { settings } = useShell()
+    // BerryCompanion perches here, except on the new tab page, where it sits on the composer.
+    const perch = tab.isActive && settings.showBerry && tab.page !== 'new-tab'
     return (
     <li
         data-berry-tab={tab.id}
@@ -29,6 +33,7 @@ const TabItem: React.FC<{
         className={cn(
             "group/tab flex items-center h-[34px] pl-3 pr-1.5 gap-2 rounded-card transition-colors app-region-no-drag",
             mode === 'horizontal' && "flex-1 min-w-12 max-w-56",
+            mode === 'horizontal' && perch && "min-w-36",
             tab.isActive ? "bg-selected shadow-selected" : "hover:bg-foreground/5",
             shifting && "transition-transform",
             dragged && "relative z-10 shadow-float"
@@ -49,7 +54,8 @@ const TabItem: React.FC<{
             className="flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
         >
             <TabIcon tab={tab} />
-            <span className={cn("text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New Tab'}</span>
+            <span className={cn("flex-1 min-w-0 text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New Tab'}</span>
+            {perch && <span aria-hidden className="w-8 shrink-0" />}
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>
         <button
