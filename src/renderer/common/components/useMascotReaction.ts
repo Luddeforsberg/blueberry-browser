@@ -56,6 +56,13 @@ export const useMascotReaction = (element: React.RefObject<SVGSVGElement | null>
 
   useEffect(() => stop, [stop]);
 
+  // Keep Berry still stops it now, not when it would have finished.
+  useEffect(() => {
+    if (enabled) return;
+    stop();
+    setReaction(null);
+  }, [enabled, stop]);
+
   const play = useCallback(
     (chosen: Reaction) => {
       stop();

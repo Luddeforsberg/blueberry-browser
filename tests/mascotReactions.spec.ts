@@ -36,6 +36,24 @@ test("a bird reacts to clicks, in turn, and turns its back when clicked too much
   }
 });
 
+test("Keep Berry still ends a reaction that's already showing", async () => {
+  const app = await launchApp();
+  try {
+    const chrome = await findView(app, "view=chrome");
+    const bird = chrome.locator("[data-berry-perched] svg");
+    await expect(bird).toBeVisible();
+    for (const reaction of ["hop", "look", "toss"]) {
+      await bird.click({ position: { x: 60, y: 70 } });
+      await expect(bird).toHaveAttribute("data-reaction", reaction);
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: true }));
+    // Well inside the 1400ms a toss lasts on its own.
+    await expect(bird).not.toHaveAttribute("data-reaction", { timeout: 500 });
+  } finally {
+    await app.close();
+  }
+});
+
 test("a bird sitting on the tab can be clicked, and keeps sitting", async () => {
   const app = await launchApp();
   try {
