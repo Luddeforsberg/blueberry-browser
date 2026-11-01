@@ -616,7 +616,7 @@ export class Chats {
     const handedOver = run.handedOver || [...run.used].some((tab) => this.handedBack.has(tab) || this.handedOver.has(tab.id) || tab.heldForUser || tab.mayShowCode);
     const sites = [...run.sites].filter((site) => site.includes("."));
     // A routine's words were written earlier, so what's new is only what the user said during this run.
-    if (!this.memory || !worthRemembering({ stopped: run.controller.signal.aborted, failed, replied: !!run.partial, handedOver, said: job.said.at(-1), answers: run.answers })) return;
+    if (!this.memory || this.mascotOf(run.mascot.id).deletedAt !== null || !worthRemembering({ stopped: run.controller.signal.aborted, failed, replied: !!run.partial, handedOver, said: job.said.at(-1), answers: run.answers })) return;
     void this.memory.propose({
       ...job,
       sourceId,
