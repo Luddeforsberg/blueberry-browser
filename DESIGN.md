@@ -400,10 +400,10 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 | Choose an option, press a key | Lands and pecks, or a hop on the spot |
 | Go somewhere | Takes off, and comes back where it was once the new page is there |
 | Between steps | Thinking, with the berry going up and down |
-| A job waits for an answer | Asking, facing you, with "Waiting for you" |
+| A job waits for an answer | Asking, facing you, with "Waiting for you". On an approval about one element it stands on that element, so asking to click Place order puts it on Place order. It flies there as the card appears and the card doesn't wait for it. If that element is gone or out of view, it asks from where it is |
 | A frame from another site | Its script can say anything about itself, so nothing's asked of it. The bird stands near the top of that frame in the page around it |
 
-**The line** is one small pill near the bird, above it if there's room, always on screen, saying what's happening in the present tense: "Clicking Add to cart", "Typing in Email". The name is the label beside it on the page, which the chat steps leave out because they go back to the model. These words go nowhere. It never shows what's being typed, which key, the contents of a text box, or a secret field's label.
+**The line** is one small pill near the bird, placed where it covers the least, staying off the target and off the text beside it where it can, always on screen, saying what's happening in the present tense: "Clicking Add to cart", "Typing in Email". The name is the label beside it on the page, which the chat steps leave out because they go back to the model. These words go nowhere. It never shows what's being typed, which key, the contents of a text box, or a secret field's label.
 
 **Stop isn't on the page.** Anything a page can see it can fake, and a fake Stop or a real one a page could press is exactly what mustn't exist. The line is only words, and **Stop Berry** is in the toolbar just above it, for as long as anyone is working in this tab. It's the same as Stop in the chat or on a routine. Pressed while the bird is flying, the click it was flying to never happens.
 
@@ -412,7 +412,7 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 **When it isn't there:**
 
 - **Tabs not in front:** nothing is drawn and nothing waits. Going to one mid-job, it appears from then on.
-- **The user touches the page:** it goes at once, and stays away for 5 seconds after their last click or key, even in a page a job can carry on reading.
+- **The user touches the page:** it goes at once, and stays away for 5 seconds after their last click or key, even in a page a job can carry on reading. Typing stops there too, and what's in the field stays as it is, part typed and with anything of theirs, unsubmitted. A job with the page open hears why and carries on, and doesn't type in that field again in this reply.
 - **A tab handed to the user:** none, and none while the keyboard is in a password or code field, whoever is typing.
 - **The job ends or moves on:** it flies up off the page and fades, and nothing of it is left behind.
 

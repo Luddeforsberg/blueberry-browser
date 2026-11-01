@@ -65,7 +65,10 @@ export interface Spot {
   secret?: boolean;
 }
 
-export type Landing = "land" | "perch" | "look";
+// "ask" stands where "land" would, and faces the user there until they answer.
+export type Landing = "land" | "perch" | "look" | "ask";
+
+export const WAITING_WORDS = "Waiting for you";
 
 interface Place {
   x: number;
@@ -119,6 +122,11 @@ export class PageActor {
   // Where the feet are, so a flight's length is known and a new page carries on from there.
   private position: { x: number; y: number } | null = null;
   private quietUntil = 0;
+  private lastTouched = 0;
+  // A job has stopped to ask, so it's facing the user, not working anything out.
+  private waiting = false;
+  // Answered, and the tool hasn't started: `describe` runs again to check nothing changed, and that isn't a new question.
+  private justAnswered = false;
   private idleTimer: NodeJS.Timeout | null = null;
   // Waits to end early, because the bird has gone. What happens next is the tools' to decide.
   private readonly waits = new Set<() => void>();
@@ -166,8 +174,18 @@ export class PageActor {
     return Promise.race([contents.executeJavaScriptInIsolatedWorld(1000, [{ code }], true).catch(() => null), late]).finally(() => clearTimeout(timer));
   }
 
-  private async draw(name: string, args: object = {}): Promise<boolean> {
+  // Whether the user clicked or typed in this tab since then. The tools ask this whether or not any bird is showing.
+  touchedSince(time: number): boolean {
+    return this.lastTouched >= time;
+  }
+
+  get touchedLately(): boolean {
+    return Date.now() < this.lastTouched + QUIET_AFTER_USER_MS;
+  }
+
+  private async draw(name: string, args: { words?: string; [other: string]: unknown } = {}): Promise<boolean> {
     if (!this.showing) return false;
+    if (args.words) this.justAnswered = false;
     this.clearIdle();
     const command = actorCommand(this.key, name, args);
     let answer = await this.ask(command);
@@ -202,7 +220,7 @@ export class PageActor {
   // Between steps. Called once a step's drawing is done.
   private idleSoon(): void {
     this.clearIdle();
-    if (!this.showing) return;
+    if (!this.showing || this.waiting) return;
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
       void this.draw("pose", { name: "thinking", words: "" });
@@ -212,19 +230,29 @@ export class PageActor {
   // Flies to where it can do this. Resolves once it has landed, or at once if nobody can see it.
   async goTo(spot: Spot, words: string, kind: Landing, ref?: string): Promise<void> {
     if (!this.showing) return;
+    const asking = kind === "ask";
+    // Asking never scrolls anything, so what isn't in view leaves it where it is.
+    if (asking && (this.justAnswered || spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return;
     const { still, plain } = this.options();
     const unit = 1 / this.zoom();
     const size = (still ? 28 : BIRD_SIZE) * unit;
     // A pointer's tip is the thing that's meant to be on the point.
     const place: Place = plain && kind !== "perch" ? { x: spot.x, y: spot.y, turn: 1 } : landingFor(spot, kind, size);
+    const then = kind === "perch" ? "sitting" : kind === "look" ? "looking" : asking ? "asking" : "rest";
+    const far = this.position ? Math.hypot(place.x - this.position.x, place.y - this.position.y) : Infinity;
+    // Already there, as after an approval, so there's nothing to fly.
+    if (far < 2) {
+      await this.draw("pose", { name: then, words });
+      if (!asking) this.idleSoon();
+      return;
+    }
     const ms = still ? MARKER_MS : flightMs(this.position, place);
-    const then = kind === "perch" ? "sitting" : kind === "look" ? "looking" : "rest";
     const arc = Math.min(size, Math.hypot(place.x - (this.position?.x ?? place.x), place.y - (this.position?.y ?? place.y)) * 0.18);
     const drawn = await this.draw("go", { x: place.x, y: place.y, ms, arc, turn: place.turn, ref, words, then });
     if (!drawn) return;
     this.position = place;
     await this.wait(ms);
-    this.idleSoon();
+    if (!asking) this.idleSoon();
   }
 
   // Starts the jab, and resolves as the beak is coming down, so the press and the beak arrive together.
@@ -256,10 +284,13 @@ export class PageActor {
 
   // A job has stopped to ask the user something. It faces them, as it does anywhere it needs a decision.
   waitingForUser(): void {
-    void this.draw("pose", { name: "asking", words: "Waiting for you" });
+    this.waiting = true;
+    void this.draw("pose", { name: "asking", words: WAITING_WORDS });
   }
 
   answered(): void {
+    this.waiting = false;
+    this.justAnswered = true;
     this.idleSoon();
   }
 
@@ -305,6 +336,7 @@ export class PageActor {
 
   // Gone at once, and the next look starts fresh.
   private vanish(): void {
+    this.waiting = false;
     this.clearIdle();
     this.endWaits();
     this.position = null;
@@ -318,6 +350,7 @@ export class PageActor {
 
   // A job has let go of the tab: it finished, was stopped, or moved on.
   leave(): void {
+    this.waiting = false;
     this.clearIdle();
     this.endWaits();
     this.position = null;
@@ -327,8 +360,9 @@ export class PageActor {
 
   // The user clicked or typed here. Whatever happens to the job, it goes and stays away a while.
   userTouched(): void {
+    this.lastTouched = Date.now();
     if (!this.options().on) return;
-    this.quietUntil = Date.now() + QUIET_AFTER_USER_MS;
+    this.quietUntil = this.lastTouched + QUIET_AFTER_USER_MS;
     this.vanish();
   }
 

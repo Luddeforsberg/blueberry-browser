@@ -32,6 +32,11 @@ const PAGES: Record<string, { body: string; csp?: string }> = {
   },
   "/form": { body: `<title>Form</title><body style="margin:0;height:3000px"><input id="field" aria-label="Your name" style="position:absolute;left:100px;top:300px;width:300px"><input id="pass" type="password" aria-label="Password" style="position:absolute;left:100px;top:400px;width:300px">` },
   "/inner": { body: `<title>Inner</title><body><button onclick="parent.postMessage('pressed','*');document.title='Pressed'">In the frame</button>` },
+  // A button with words right up against it, and clear space below.
+  "/crowded": {
+    body: `<title>Crowded</title><body style="margin:0;font:16px/22px sans-serif"><p id="words" style="position:absolute;left:150px;top:190px;width:460px;margin:0">Words someone might be reading, a good few of them, set out over several lines so they fill all of the space directly above the button and around where the bird will stand. They carry on for a while yet, so that nothing above it is clear.</p><button id="go" style="position:absolute;left:300px;top:300px;width:160px;height:44px" onclick="document.title='Pressed'">Press me now</button>`,
+  },
+  "/two": { body: `<title>Two</title><body style="margin:0"><button id="a" style="position:absolute;left:60px;top:80px;width:120px;height:40px">First</button><button id="b" style="position:absolute;left:500px;top:420px;width:160px;height:44px" onclick="document.title='Placed'">Place order</button>` },
   "/next": { body: `<title>Next</title><body>The next page` },
 };
 
@@ -40,6 +45,7 @@ interface ActorState {
   spot: { x: number; y: number } | null;
   covered: boolean;
   words: string;
+  line: { left: number; top: number; right: number; bottom: number };
   attached: boolean;
   hidden: boolean;
   flying: boolean;
@@ -200,6 +206,104 @@ test("it faces the user while a job waits for an answer, and the click waits for
     const approval = await chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.approval?.id), chatId);
     await chrome.evaluate(([id, asked]) => window.chromeAPI.chat.decide(id!, asked!, true), [chatId, approval]);
     await expect(page).toHaveTitle("Pressed by true");
+    await finished();
+  } finally {
+    await close();
+  }
+});
+
+test("while a card waits it stands on what the card is about, and stays put if it can't find that", async () => {
+  const { app, chrome, open, job, close } = await setup({ actionApproval: "always" });
+  try {
+    const page = await open("/two");
+    const { chatId, finished } = await job([
+      { name: "list_elements", args: {} },
+      { name: "hover", args: { ref: "e1" } },
+      { name: "click", args: { ref: "e2" } },
+      { name: "click", args: { ref: "e99" } },
+    ]);
+    const approval = () => chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.approval?.id), chatId);
+    const answer = (asked: string | undefined, allow: boolean) => chrome.evaluate(([id, one, yes]) => window.chromeAPI.chat.decide(id as string, one as string, yes as boolean), [chatId, asked, allow] as const);
+    await expect.poll(approval).toBeTruthy();
+    await expect.poll(() => stateIn(app, "/two")).toMatchObject({ pose: "asking", words: "Waiting for you", flying: false });
+    const { x, y } = (await stateIn(app, "/two"))!.spot!;
+    expect(x).toBeGreaterThan(500);
+    expect(x).toBeLessThan(660);
+    expect(y).toBeGreaterThanOrEqual(420);
+    expect(y).toBeLessThan(464);
+    await expect(page).toHaveTitle("Two");
+    const first = await approval();
+    await answer(first, true);
+    await expect(page).toHaveTitle("Placed");
+
+    // Nothing there to stand on: asked about all the same, from where it was.
+    await expect.poll(async () => { const next = await approval(); return next && next !== first; }).toBeTruthy();
+    await expect.poll(async () => (await stateIn(app, "/two"))?.pose).toBe("asking");
+    const stayed = (await stateIn(app, "/two"))!.spot!;
+    expect(stayed.x).toBe(x);
+    expect(stayed.y).toBe(y);
+    await answer(await approval(), false);
+    await finished();
+  } finally {
+    await close();
+  }
+});
+
+test("its words stay off the target and the text beside it, and on screen", async () => {
+  const { app, open, job, close } = await setup();
+  try {
+    const page = await open("/crowded");
+    const { finished } = await job([
+      { name: "list_elements", args: {} },
+      { name: "hover", args: { ref: "e1" } },
+    ]);
+    // Once landed, and before it goes back to thinking.
+    let line: ActorState["line"] | undefined;
+    await expect.poll(async () => {
+      const state = await stateIn(app, "/crowded");
+      if (state?.words.includes("Pointing at") && !state.flying) line = state.line;
+      return !!line;
+    }, { intervals: [15] }).toBe(true);
+    line = line!;
+    const boxes = await page.evaluate(() => ["words", "go"].map((id) => document.getElementById(id)!.getBoundingClientRect().toJSON()));
+    for (const box of boxes) {
+      expect(line.left < box.right && line.right > box.left && line.top < box.bottom && line.bottom > box.top).toBe(false);
+    }
+    expect(line.left).toBeGreaterThanOrEqual(0);
+    expect(line.top).toBeGreaterThanOrEqual(0);
+    await finished();
+  } finally {
+    await close();
+  }
+});
+
+test("the user stepping into a field stops the typing, and what's in it stays theirs", async () => {
+  const { app, open, job, close, model } = await setup();
+  try {
+    const form = await open("/form");
+    const text = "Ada Lovelace wrote the first program for a machine that was never built";
+    const { allAsked, finished, toolResults } = await job([
+      { name: "list_elements", args: {} },
+      { name: "type_text", args: { ref: "e1", text, submit: true } },
+      { name: "type_text", args: { ref: "e1", text: "Typed over it" } },
+    ]);
+    await expect.poll(() => form.locator("#field").inputValue(), { intervals: [20] }).toMatch(/^Ada/);
+    const field = (await form.locator("#field").boundingBox())!;
+    await form.mouse.click(field.x + 20, field.y + field.height / 2);
+    await form.keyboard.type(" and me");
+    await expect.poll(() => hostInPage(form)).toBe(false);
+    await allAsked();
+
+    const value = await form.locator("#field").inputValue();
+    expect(value).toContain(" and me".trim());
+    expect(value).not.toContain("Typed over it");
+    expect(value).not.toBe(text);
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    expect(await form.locator("#field").inputValue()).toBe(value);
+    // The job hears why, twice, and goes on: the second try at that field does nothing.
+    expect(toolResults().match(/typing stopped/g)).toHaveLength(2);
+    expect(model.requests.length).toBeGreaterThan(3);
+    expect((await stateIn(app, "/form"))).toBeNull();
     await finished();
   } finally {
     await close();

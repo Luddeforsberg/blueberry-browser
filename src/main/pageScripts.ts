@@ -488,7 +488,8 @@ export const beginTyping = (ref: string): string =>
 export const typeChunk = (ref: string, chunk: string): string =>
   withElement(
     ref,
-    `if (el.getRootNode().activeElement !== el) el.focus();
+    // Never takes the focus back, because it may be the user who moved it.
+    `if (el.getRootNode().activeElement !== el) return false;
      return el.ownerDocument.execCommand("insertText", false, ${JSON.stringify(chunk)});`
   );
 

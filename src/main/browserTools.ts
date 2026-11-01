@@ -27,7 +27,7 @@ import {
   type FocusInfo,
 } from "./pageScripts";
 import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
-import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
+import { typingChunks, typingPauseMs, WAITING_WORDS, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { Tab } from "./Tab";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { siteAllowed } from "../shared/mascots";
@@ -199,6 +199,10 @@ const isSearchPage = ({ hostname, pathname }: URL): boolean => {
   if (hostname.endsWith(".wikipedia.org")) return pathname === "/w/index.php";
   return (SEARCH_PAGES.get(hostname) ?? SEARCH_PAGES.get(`www.${hostname}`)) === pathname;
 };
+
+// Their words stay. Said to a job with the page open, which the user touching the page doesn't end.
+const USER_IN_FIELD =
+  "The user clicked or typed in this page while that was being typed, so typing stopped and nothing was submitted. The field keeps whatever is in it now, which may be part of your text and some of theirs. Don't type in it again unless they ask.";
 
 const NOT_WEB = "Only http and https addresses can be opened.";
 const STALE_ELEMENT = "That element is no longer on the page. Call list_elements and try again.";
@@ -420,13 +424,34 @@ export const createPageTools = ({
     if (spot) await actor.goTo(spot, entry ? words(`a frame from ${siteOf(entry.origin)}`) : words(spot.name), kind, entry ? undefined : ref);
     return carryOn(tab);
   };
+  // While the card waits, it stands on what the card is about. Nothing waits for this, so the card goes out as it always did.
+  const standOnRef = (id: string | undefined, ref: string) => {
+    const tab = canSee() ? find(id) : null;
+    if (tab) void flyToRef(tab, ref, () => WAITING_WORDS, "ask");
+  };
   const carryOn = (tab: Tab) => !stopped() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
   const leftOff = (tab: Tab) => tookOver(tab.id) ?? STOPPED;
 
+  // Fields the user has stepped in on in this reply, which it doesn't type in again.
+  const usersFields = new Set<string>();
+  // A click before the message was sent is how a user points at a field to have filled in, so only later ones count.
+  const jobStarted = Date.now();
+
   // At a pace, one piece at a time, with the same result as all at once. Only where someone is watching, and never in a
-  // secret field, where it's over as quickly as it can be.
+  // secret field, where it's over as quickly as it can be. The user clicking or typing in the page ends it there, and
+  // what's in the field is then theirs: nothing here goes back to fill it in.
   const typeInField = async (tab: Tab, ref: string, text: string): Promise<string | null> => {
+    const started = Date.now();
+    const field = `${tab.id}/${ref}`;
+    const stepAside = () => {
+      usersFields.add(field);
+      return "user-in-field";
+    };
+    if (usersFields.has(field)) return "user-in-field";
+    // Whether or not a bird is drawn, a field the user is in the middle of isn't typed over.
+    if (tab.actor?.touchedLately && tab.actor.touchedSince(jobStarted) && (await onRef<boolean>(tab, ref, hasFocus).catch(() => false))) return stepAside();
+    const touched = () => !!tab.actor?.touchedSince(started);
     const actor = actorOn(tab);
     const whole = () => onRef<string>(tab, ref, (inner) => typeIntoElement(inner, text));
     if (!actor?.moving || frameOf(tab, ref) || !text) return whole();
@@ -436,14 +461,16 @@ export const createPageTools = ({
     if (begun !== "ready") return begun;
     actor.typing();
     for (const chunk of typingChunks(text)) {
-      if (!carryOn(tab) || !actor.moving) break;
+      if (!carryOn(tab) || touched() || !actor.moving) break;
       if (!(await tab.runInPage<boolean | null>(typeChunk(ref, chunk)))) break;
       await pause(typingPauseMs(chunk));
     }
     actor.doneTyping();
     if (!carryOn(tab)) return "stopped";
+    if (touched()) return stepAside();
     const finished = await tab.runInPage<string | null>(finishTyping(ref, text));
-    return finished === "again" ? whole() : finished;
+    if (finished !== "again") return finished;
+    return touched() ? stepAside() : whole();
   };
 
   const whereNow = async (tab: Tab) => {
@@ -533,6 +560,7 @@ export const createPageTools = ({
   };
 
   const describeOn = async (id: string | undefined, ref: string, say: (info: ElementInfo) => string) => {
+    standOnRef(id, ref);
     const info = await element(id, ref);
     const tab = find(id);
     if (!info || !tab) return `Act on element ${ref}, which is no longer on the page`;
@@ -694,6 +722,7 @@ export const createPageTools = ({
       label: ({ tabId: id }) => `Dragged something on ${site(id)}`,
       // No `isRisky`, so it always asks in the default mode: dropping something can mean anything on a page.
       describe: async ({ tabId: id, ref, toRef }) => {
+        standOnRef(id, ref);
         const [from, to] = await Promise.all([element(id, ref), element(id, toRef)]);
         const tab = find(id);
         if (!from || !to || !tab) return `Drag element ${ref} onto ${toRef}, which are no longer on the page`;
@@ -826,6 +855,7 @@ export const createPageTools = ({
           if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch"))) return leftOff(tab);
           const result = await typeInField(tab, ref, text);
           if (result === "stopped") return leftOff(tab);
+          if (result === "user-in-field") return USER_IN_FIELD;
           if (result === null) return STALE_ELEMENT;
           if (result === "dropdown") return "That's a dropdown, so nothing was typed. Use choose_option.";
           if (result === "not-kept") {
@@ -847,6 +877,7 @@ export const createPageTools = ({
       label: ({ tabId: id }) => `Chose an option on ${site(id)}`,
       // No `isRisky`, so it always asks in the default mode: changing a dropdown can run anything the page likes.
       describe: async ({ tabId: id, ref, option }) => {
+        standOnRef(id, ref);
         const tab = canSee() ? find(id) : null;
         const info = tab && (await onRef<ElementInfo & { option: string | null; optionValue: string | null }>(tab, ref, (inner) => describeOption(inner, option)).catch(() => null));
         if (!tab || !info) return `Act on element ${ref}, which is no longer on the page`;

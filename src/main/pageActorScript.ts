@@ -141,6 +141,11 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   let nod = null;
   let leaving = null;
   let covered = false;
+  // What a flight from \`go\` lands as, which a job stopping to ask can still change on the way.
+  let landingPose = null;
+  // What the bird is here to do, which the line keeps clear of, and the line's place from the feet.
+  let target = null;
+  let lineAt = null;
 
   const setPose = (name) => {
     const next = poseFor(name);
@@ -164,23 +169,83 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     return { x: matrix.e, y: matrix.f };
   };
 
-  // Above the bird if there's room and below its feet if not, and always wholly on screen.
-  const fitLine = () => {
-    if (!spot) return;
+  // How much of what's under this box someone might be reading. Only ever a rough count, as the line is only there a moment.
+  const crowded = (left, top, width, height) => {
+    let count = 0;
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 5; col++) {
+        const x = left + (width * (col + 0.5)) / 5;
+        const y = top + (height * (row + 0.5)) / 2;
+        const el = document.elementFromPoint(x, y);
+        if (!el) continue;
+        if (el.matches("input,textarea,select,button,a,[role=button]")) {
+          count++;
+          continue;
+        }
+        // The nearest place in some text, which only counts if the point really is on that line.
+        const at = document.caretRangeFromPoint?.(x, y);
+        if (at?.startContainer.nodeType !== 3 || !at.startContainer.textContent.trim()) continue;
+        const box = at.getBoundingClientRect();
+        if (y >= box.top && y <= box.bottom && Math.abs(box.left - x) < 24) count++;
+      }
+    }
+    return count;
+  };
+  const overlaps = (left, top, width, height, box) => left < box.right && left + width > box.left && top < box.bottom && top + height > box.top;
+
+  // Tries the places around the bird and takes the first with the least under it, always wholly on screen. Over the bird
+  // or what it's about to do is worse than over any text.
+  const placeLine = () => {
+    if (!spot || !line.classList.contains("shown")) return;
     const unit = 1 / LOOK.zoom;
     const { width, height } = line.getBoundingClientRect();
     const margin = 6 * unit;
     const gap = 8 * unit;
+    const onScreenX = (left) => Math.max(margin, Math.min(left, innerWidth - width - margin));
+    const onScreenY = (top) => Math.max(margin, Math.min(top, innerHeight - height - margin));
+    const reach = size() * 0.6;
+    const rect = target?.isConnected ? rectOf(target) : null;
+    const box = rect && { left: rect.left, top: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height };
+    const bird = { left: spot.x - reach, top: spot.y - size(), right: spot.x + reach, bottom: spot.y };
     const above = spot.y - size() - height - gap;
-    const top = above >= margin ? above : Math.min(spot.y + gap, innerHeight - height - margin);
-    const left = Math.max(margin, Math.min(spot.x - width / 2, innerWidth - width - margin));
+    const beside = spot.y - size() * 0.75;
+    const places = [
+      [spot.x - width / 2, above],
+      [spot.x - reach, above],
+      [spot.x + reach - width, above],
+      [spot.x + reach + gap, beside],
+      [spot.x - reach - gap - width, beside],
+      [spot.x - width / 2, Math.max(spot.y, box?.bottom ?? spot.y) + gap],
+    ].map(([left, top]) => [onScreenX(left), onScreenY(top)]);
+    let best = null;
+    let bestScore = Infinity;
+    places.forEach(([left, top], order) => {
+      const inTheWay = (box && overlaps(left, top, width, height, box) ? 100 : 0) + (overlaps(left, top, width, height, bird) ? 100 : 0);
+      const score = inTheWay + crowded(left, top, width, height) * 10 + order;
+      if (score < bestScore) {
+        best = [left, top];
+        bestScore = score;
+      }
+    });
+    lineAt = { x: best[0] - spot.x, y: best[1] - spot.y, width, height };
+    line.style.transform = "translate(" + lineAt.x + "px, " + lineAt.y + "px)";
+  };
+  // The same place from the feet as they move, unless that would take it off screen.
+  const keepLine = () => {
+    if (!spot || !lineAt) return;
+    const left = Math.max(0, Math.min(spot.x + lineAt.x, innerWidth - lineAt.width));
+    const top = Math.max(0, Math.min(spot.y + lineAt.y, innerHeight - lineAt.height));
     line.style.transform = "translate(" + (left - spot.x) + "px, " + (top - spot.y) + "px)";
   };
-  const say = (words) => {
+  const setWords = (words) => {
     if (words === undefined) return;
     if (words) line.dataset.words = words;
     line.classList.toggle("shown", !!words);
-    fitLine();
+  };
+  const say = (words) => {
+    if (words === undefined) return;
+    setWords(words);
+    placeLine();
   };
 
   const landed = () => body.animate(
@@ -211,6 +276,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
       frames.push({ transform: "translate(" + x + "px, " + y + "px)" });
     }
     place(to);
+    landingPose = null;
     const run = bird.animate(frames, { duration: ms, easing: "linear" });
     flight = run;
     run.onfinish = () => {
@@ -245,7 +311,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     const x = Math.max(4, Math.min(rect.left + anchor.dx, innerWidth - 4));
     const y = Math.max(size() * 0.7, Math.min(rect.top + anchor.dy, innerHeight - 4));
     place({ x, y });
-    fitLine();
+    keepLine();
   };
   let followQueued = false;
   const queueFollow = () => {
@@ -341,20 +407,25 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   const api = {
     key: ${JSON.stringify(key)},
 
-    state: () => ({ pose, spot, facing, covered, words: line.classList.contains("shown") ? line.dataset.words : "", attached: host.isConnected, hidden: sky.style.visibility === "hidden", flying: !!flight }),
+    state: () => {
+      const { left, top, right, bottom } = line.getBoundingClientRect();
+      return { pose, spot, facing, covered, words: line.classList.contains("shown") ? line.dataset.words : "", line: { left, top, right, bottom }, attached: host.isConnected, hidden: sky.style.visibility === "hidden", flying: !!flight };
+    },
 
     // Goes to a spot and lands there. ms is how long main will wait.
     go: ({ x, y, ms, arc, turn, ref, words, then }) => {
       if (!begin()) return false;
       anchor = null;
       const to = { x, y };
-      say(words);
+      const el = ref ? state.byRef.get(ref) : null;
+      target = el?.isConnected ? el : null;
+      setWords(words);
       if (quietMotion()) {
         setPose(then);
         place(to);
         setFacing(turn);
         anchorTo(ref);
-        fitLine();
+        placeLine();
         fade();
         return true;
       }
@@ -362,13 +433,15 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
       setPose("flying");
       setFacing(x >= (spot?.x ?? x) ? 1 : -1);
       flyTo(to, ms, arc, () => {
-        setPose(then);
+        setPose(landingPose ?? then);
+        landingPose = null;
         setFacing(turn);
         anchorTo(ref);
-        fitLine();
+        keepLine();
         landed();
       });
-      fitLine();
+      landingPose = then;
+      placeLine();
       return true;
     },
 
@@ -403,6 +476,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     // Across to where a dragged thing goes.
     carry: ({ x, y, ms, words }) => {
       if (!begin()) return false;
+      target = null;
       say(words);
       anchor = null;
       if (quietMotion()) {
@@ -427,7 +501,9 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
       }
       // In the air, it stays where it is while the page moves under it.
       if (name === "flying") anchor = null;
-      setPose(name);
+      // On its way somewhere, this is how it lands.
+      if (flight && landingPose) landingPose = name;
+      else setPose(name);
       if (words !== undefined) say(words);
       return true;
     },
@@ -465,6 +541,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
     read: ({ words }) => {
       if (!begin()) return false;
       anchor = null;
+      target = null;
       say(words);
       const margin = size();
       const blocks = [...document.querySelectorAll("h1,h2,h3,p,li,td,dt,dd,blockquote,figcaption,label")]
@@ -481,7 +558,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
         setPose("looking");
         place(onLeft(stops[0]));
         setFacing(1);
-        fitLine();
+        placeLine();
         fade();
         return true;
       }
@@ -498,11 +575,10 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
           if (job !== reading) return;
           setPose("looking");
           setFacing(1);
-          fitLine();
           landed();
           setTimeout(next, 420);
         });
-        fitLine();
+        placeLine();
       };
       next();
       return true;
