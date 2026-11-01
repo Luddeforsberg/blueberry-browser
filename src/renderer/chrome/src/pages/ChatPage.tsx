@@ -93,7 +93,6 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             </div>
                         )}
                         {thread.error && <ChatError message={thread.error} />}
-                        {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                         {!running && thread.messages.at(-1)?.role === 'assistant' && (
                             <div>
                                 <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>
@@ -101,6 +100,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 </Button>
                             </div>
                         )}
+                        {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                     </div>
                 </div>
 

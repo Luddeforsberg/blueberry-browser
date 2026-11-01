@@ -615,9 +615,8 @@ export class Chats {
   private offerToRemember(sourceId: string, run: Run, failed: boolean, job: Pick<MemoryToOffer, "said" | "routine" | "stillWanted">): void {
     const handedOver = run.handedOver || [...run.used].some((tab) => this.handedBack.has(tab) || this.handedOver.has(tab.id) || tab.heldForUser || tab.mayShowCode);
     const sites = [...run.sites].filter((site) => site.includes("."));
-    if (!this.memory || !worthRemembering({ stopped: run.controller.signal.aborted, failed, replied: !!run.partial, steps: run.steps.length, sites: sites.length, handedOver })) return;
     // A routine's words were written earlier, so what's new is only what the user said during this run.
-    if (job.routine !== null && run.answers.length === 0) return;
+    if (!this.memory || !worthRemembering({ stopped: run.controller.signal.aborted, failed, replied: !!run.partial, handedOver, said: job.said.at(-1), answers: run.answers })) return;
     void this.memory.propose({
       ...job,
       sourceId,

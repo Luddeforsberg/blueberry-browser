@@ -19,7 +19,7 @@ import { ChatRow } from '../components/Sidebar'
 import { MascotPerch } from '../components/MascotPerch'
 import { MascotCard, Preview } from './FlockPage'
 import { MascotMemoryView } from './MascotMemory'
-import { MemoryOfferRow, RememberedFacts } from '../components/MemoryInChat'
+import { MemoryOffersLine, RememberedFacts } from '../components/MemoryInChat'
 import { GalleryCard } from './MascotGalleryPage'
 import { mascotForm } from '../flockView'
 import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
@@ -40,8 +40,8 @@ import { useShell } from '../contexts/ShellContext'
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 
 const SAMPLE_FACTS: MemoryFact[] = [
-    { id: 'gallery-fact-1', mascotId: 'gallery', text: 'You keep prices in Swedish kronor.', site: null, savedAt: 1 },
-    { id: 'gallery-fact-2', mascotId: 'gallery', text: 'You want the cheapest one that’s in stock.', site: 'webhallen.com', savedAt: 2 }
+    { id: 'gallery-fact-1', mascotId: 'gallery', text: 'You want prices in kronor.', site: null, savedAt: 1 },
+    { id: 'gallery-fact-2', mascotId: 'gallery', text: 'You always choose the cheapest option that’s in stock.', site: null, savedAt: 2 }
 ]
 
 const SAMPLE_MASCOT: MascotProfile = {
@@ -342,11 +342,12 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Memory">
                     <div className="max-w-xl flex flex-col gap-6">
-                        <MemoryOfferRow offer={{ text: 'You want the cheapest one that’s in stock.', site: 'webhallen.com' }} question="Should I remember this for next time?" onAnswer={() => undefined} />
-                        <MemoryOfferRow offer={{ text: 'You keep prices in Swedish kronor.', site: null }} question="Should I remember this for next time?" error="This bird already remembers 30 things. Forget one in Flock first." onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} startOpen errors={{ 'gallery-fact-1': 'This bird already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
                         <RememberedFacts mascot={SAMPLE_MASCOT} used={SAMPLE_FACTS.slice(0, 1)} />
                         <RememberedFacts mascot={SAMPLE_MASCOT} used={SAMPLE_FACTS} />
-                        <RememberedFacts mascot={SAMPLE_MASCOT} used={[...SAMPLE_FACTS, { ...SAMPLE_FACTS[0], id: 'gallery-fact-3', text: 'You skip anything refurbished.' }]} />
+                        <RememberedFacts mascot={SAMPLE_MASCOT} used={[...SAMPLE_FACTS, { ...SAMPLE_FACTS[0], id: 'gallery-fact-3', text: 'You never buy refurbished.' }]} />
                         <MascotMemoryView mascot={SAMPLE_MASCOT} facts={[]} onBack={() => undefined} />
                         <MascotMemoryView
                             mascot={SAMPLE_MASCOT}

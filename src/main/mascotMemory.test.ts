@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseProposals, proposalData, relevantFacts, sameFact, worthRemembering } from "./mascotMemory";
+import { parseProposals, proposalData, relevantFacts, sameFact, statesAHabit, worthRemembering } from "./mascotMemory";
 import { MemoryStore } from "./MemoryStore";
 import { memoryNote } from "./mascotNote";
 import { factProblem, MAX_FACT_LENGTH, MAX_FACTS_PER_MASCOT } from "../shared/memory";
@@ -112,17 +112,35 @@ describe("parseProposals", () => {
 });
 
 describe("worthRemembering", () => {
-  const good = { stopped: false, failed: false, replied: true, steps: 2, sites: 1, handedOver: false };
+  const good = { stopped: false, failed: false, replied: true, handedOver: false, said: "I always want the cheapest", answers: [] };
   it.each([
     [{ ...good }, true],
     [{ ...good, stopped: true }, false],
     [{ ...good, failed: true }, false],
     [{ ...good, replied: false }, false],
-    [{ ...good, steps: 1 }, false],
-    [{ ...good, sites: 0 }, false],
     [{ ...good, handedOver: true }, false],
+    [{ ...good, said: undefined }, false],
+    [{ ...good, said: "Find me a black USB-C cable, 2 metres" }, false],
+    [{ ...good, said: undefined, answers: [{ answer: "2 metres" }] }, false],
+    [{ ...good, said: undefined, answers: [{ answer: "2 metres, that's always what I want" }] }, true],
   ])("%j is %s", (job, expected) => {
     expect(worthRemembering(job)).toBe(expected);
+  });
+});
+
+describe("statesAHabit", () => {
+  it.each(["I always go for the cheapest", "I USUALLY take the train", "I never buy hardcovers", "From now on in kronor", "Remember that I want kronor", "Jag brukar välja svart", "alltid svart", "Kom ihåg att jag vill ha kronor", "Aldrig begagnat", "varje gång"])("hears it in: %s", (said) => {
+    expect(statesAHabit(said, [])).toBe(true);
+  });
+
+  it.each(["Find me a black USB-C cable, 2 metres", "Hitta en svart kabel, 2 meter", "Find a USB-C cable under 200 kr", "Book a hotel in Berlin with free cancellation", "I only stay at places rated above 8.5", "hallways and walways", "", "alltidigt"])("doesn't in: %s", (said) => {
+    expect(statesAHabit(said, [])).toBe(false);
+  });
+
+  it("goes by the words just typed, so an earlier message isn't offered again", () => {
+    const data = JSON.parse(proposalData({ said: ["I always want the cheapest", "Now an HDMI one"], routine: null, answers: [], sites: [] }, [], []));
+    expect(data.said).toBe("Now an HDMI one");
+    expect(data.earlier).toEqual(["I always want the cheapest"]);
   });
 });
 
@@ -136,7 +154,7 @@ describe("proposalData", () => {
 
   it("has room for nothing but what the user typed and the sites", () => {
     const data = JSON.parse(proposalData({ said: ["Find a cable"], routine: null, answers: [], sites: ["a.se"] }, [], []));
-    expect(Object.keys(data).sort()).toEqual(["answers", "declined", "kept", "said", "sites"]);
+    expect(Object.keys(data).sort()).toEqual(["answers", "declined", "earlier", "kept", "said", "sites"]);
   });
 });
 
@@ -268,7 +286,7 @@ describe("memory and everything that copies a mascot", () => {
 
 describe("forgetting while a proposal is on its way", () => {
   it("offers nothing for a bird that was cleared in the meantime", async () => {
-    let answer = (_: string) => {};
+    let answer: (reply: string) => void = () => {};
     const store = new MemoryStore(join(mkdtempSync(join(tmpdir(), "memory-")), "memory.json"), {
       enabled: () => true,
       hasModel: () => true,

@@ -126,6 +126,17 @@ describe("Chats", () => {
       expect(propose).not.toHaveBeenCalled();
     });
 
+    it("makes no call for what this job asked for, and does for a plain ask with no job", async () => {
+      const search = remembering(job());
+      search.chats.send(null, "Find me a black USB-C cable, 2 metres", { seePage: false });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(search.propose).not.toHaveBeenCalled();
+
+      const asked = remembering(replying("Noted."));
+      asked.chats.send(null, "Remember that I want prices in kronor", { seePage: false });
+      await vi.waitFor(() => expect(asked.propose).toHaveBeenCalled());
+    });
+
     it("offers nothing after a stopped task", async () => {
       const stop = async () => chats.stop("run-1");
       const { chats, propose } = remembering(job(stop));
@@ -135,9 +146,9 @@ describe("Chats", () => {
 
     it("gives a chat's proposer the user's words and sites, and never a page or the reply", async () => {
       const { chats, propose, dropOffers } = remembering(job());
-      const thread = chats.send(null, "Find it, the cheapest", { seePage: false })!;
+      const thread = chats.send(null, "Find it, I always want the cheapest", { seePage: false })!;
       await vi.waitFor(() => expect(propose).toHaveBeenCalled());
-      expect(propose.mock.calls[0]).toMatchObject([{ sourceId: thread.id, mascotId: "berry", said: ["Find it, the cheapest"], routine: null, sites: ["example.com"] }]);
+      expect(propose.mock.calls[0]).toMatchObject([{ sourceId: thread.id, mascotId: "berry", said: ["Find it, I always want the cheapest"], routine: null, sites: ["example.com"] }]);
       expect(JSON.stringify(propose.mock.calls[0])).not.toContain("report");
 
       // Asks once: a new message takes the last offer away.

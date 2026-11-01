@@ -6,7 +6,7 @@ import { cn } from '@common/lib/utils'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { setFlockView } from '../flockView'
-import { Berry, useAssistantName } from './Berry'
+import { useAssistantName } from './Berry'
 
 const MAX_SHOWN = 2
 
@@ -66,58 +66,60 @@ export const RememberedLine: React.FC<{ ids?: string[]; mascot: MascotProfile }>
     return used.length > 0 ? <RememberedFacts used={used} mascot={mascot} /> : null
 }
 
-// The sentence is exactly what would be kept. The bird is already beside the reply, so nothing here needs a box or a face.
-export const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; question: string; error?: string | null; onAnswer: (keep: boolean) => void }> = ({ offer, question, error, onAnswer }) => (
-    <section aria-label="Offer to remember" className="border-t pt-3 [overflow-wrap:anywhere] animate-fade-in">
-        <p className="text-13 text-muted-foreground">{question}</p>
-        <p className="mt-1 text-16">{offer.text}</p>
-        <p className="mt-0.5 text-12 text-muted-foreground">{offer.site ? `Only on ${offer.site}` : 'On any site'}</p>
-        <div className="mt-2 flex items-center gap-1 -ml-0.5">
-            <Button size="sm" variant="outline" onClick={() => onAnswer(true)}>Remember</Button>
-            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => onAnswer(false)}>No thanks</Button>
+// A fact a bird could keep, word for word, opened from the quiet line. As quiet as the line itself.
+const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; error?: string; onAnswer: (keep: boolean) => void }> = ({ offer, error, onAnswer }) => (
+    <li aria-label="Offer to remember">
+        <p>{offer.text}{offer.site && <span className="text-12"> Only on {offer.site}</span>}</p>
+        <div className="-ml-2.5 flex items-center">
+            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => onAnswer(true)}>Remember</Button>
+            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => onAnswer(false)}>No thanks</Button>
         </div>
-        {error && <p role="alert" className="mt-2 text-13 text-destructive">{error}</p>}
-    </section>
+        {error && <p role="alert" className="text-destructive">{error}</p>}
+    </li>
 )
 
-// After a finished job, what its bird would like to remember. Nothing is kept until Remember is pressed, and it only ever
-// waits here, on the reply or the run it came after, so a job nobody was watching says nothing about it until they look.
+// One line, folded however many there are. Nothing about it waits, counts or asks, so leaving it alone is as good as No thanks.
+export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text' | 'site'>[]; mascot: MascotProfile; kept: boolean; errors?: Record<string, string>; startOpen?: boolean; onAnswer: (id: string, keep: boolean) => void }> = ({ offers, mascot, kept, errors = {}, startOpen = false, onAnswer }) => {
+    const { showBerry } = useShell().settings
+    const name = useAssistantName(mascot)
+    const [open, setOpen] = useState(startOpen)
+    return (
+        <div className="flex flex-col items-start gap-1.5 text-13 text-muted-foreground [overflow-wrap:anywhere] animate-fade-in">
+            {offers.length > 0 && (
+                <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpen(!open)}
+                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
+                    {showBerry ? 'Something I could remember for next time' : `Something ${name} could remember for next time`}
+                </button>
+            )}
+            {open && offers.length > 0 && (
+                <ul className="pl-5 flex flex-col gap-1.5">
+                    {offers.map((offer) => <MemoryOfferRow key={offer.id} offer={offer} error={errors[offer.id]} onAnswer={(keep) => onAnswer(offer.id, keep)} />)}
+                </ul>
+            )}
+            {kept && <p role="status">Noted. <ChangeIt mascot={mascot}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
+        </div>
+    )
+}
+
+// What a finished job's bird could keep, under its reply or run. Nothing is kept until Remember is pressed, and it only ever
+// sits here, so a job nobody was watching says nothing about it until they look, and then only this.
 export const MemoryOffers: React.FC<{ sourceId: string | null; mascot: MascotProfile }> = ({ sourceId, mascot }) => {
     const { memory: { offers } } = useLibrary()
-    const { showBerry, keepBerryStill } = useShell().settings
-    const name = useAssistantName(mascot)
-    const [keptOne, setKeptOne] = useState(false)
+    const [kept, setKept] = useState(false)
     const [errors, setErrors] = useState<Record<string, string>>({})
     const waiting = offers.filter((offer) => offer.sourceId === sourceId)
 
     const answer = async (id: string, keep: boolean) => {
         const result = await window.chromeAPI.memory.decide(id, keep)
         if (!result.ok) setErrors({ ...errors, [id]: result.error })
-        else if (keep) setKeptOne(true)
+        else if (keep) setKept(true)
     }
 
-    if (waiting.length === 0 && !keptOne) return null
-    return (
-        <div className="flex flex-col gap-3">
-            {waiting.map((offer) => (
-                <MemoryOfferRow
-                    key={offer.id}
-                    offer={offer}
-                    question={showBerry ? 'Should I remember this for next time?' : `Should ${name} remember this for next time?`}
-                    error={errors[offer.id]}
-                    onAnswer={(keep) => void answer(offer.id, keep)}
-                />
-            ))}
-            {keptOne && (
-                <p role="status" className="flex items-center gap-2 text-13 text-muted-foreground animate-fade-in">
-                    {showBerry && (
-                        <span className={cn(!keepBerryStill && "motion-safe:animate-berry-hop")}>
-                            <Berry mood="delivered" size={24} mascot={mascot} />
-                        </span>
-                    )}
-                    <span>Noted. No other bird has this. <ChangeIt mascot={mascot}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></span>
-                </p>
-            )}
-        </div>
-    )
+    if (waiting.length === 0 && !kept) return null
+    return <MemoryOffersLine offers={waiting} mascot={mascot} kept={kept} errors={errors} onAnswer={(id, keep) => void answer(id, keep)} />
 }
