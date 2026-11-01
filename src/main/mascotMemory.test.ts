@@ -24,6 +24,9 @@ describe("factProblem", () => {
     "Your CVV is on the back",
     "You live at Storgatan 12",
     "Your home is at 221 Baker Street",
+    "You prefer delivery to 221B Baker Street",
+    "Your kod is ABCDEF.",
+    "Your code is ABCDEF.",
     "Your delivery address is the office",
     "Your email is someone@example.com",
     "Your phone is 070-123 45 67",
@@ -61,8 +64,11 @@ describe("factProblem", () => {
   });
 });
 
+type Known = { text: string; site: string | null };
+const general = (known: string | Known): Known => (typeof known === "string" ? { text: known, site: null } : known);
+
 describe("parseProposals", () => {
-  const parse = (facts: unknown, sites = ["webhallen.com"], kept: string[] = [], declined: string[] = []) => parseProposals(JSON.stringify({ facts }), { sites, kept, declined });
+  const parse = (facts: unknown, sites = ["webhallen.com"], kept: (string | Known)[] = [], declined: (string | Known)[] = []) => parseProposals(JSON.stringify({ facts }), { sites, kept: kept.map(general), declined: declined.map(general) });
 
   it("takes at most two, and nothing is fine", () => {
     expect(parse([])).toEqual([]);
@@ -92,6 +98,17 @@ describe("parseProposals", () => {
     expect(parse([{ text, site: null }], [], [], [text])).toEqual([]);
     expect(sameFact(text, "You keep prices in kronor.")).toBe(false);
   });
+
+  it("only counts as known where the known one applies", () => {
+    const text = "You want the cheapest one.";
+    const onA = { text, site: "a.se" };
+    // Kept for one site, it says nothing about another, or about everywhere.
+    expect(parse([{ text, site: "b.se" }], ["a.se", "b.se"], [onA])).toEqual([{ text, site: "b.se" }]);
+    expect(parse([{ text, site: null }], ["a.se"], [onA])).toEqual([{ text, site: null }]);
+    expect(parse([{ text, site: "a.se" }], ["a.se"], [onA])).toEqual([]);
+    // Kept for everywhere, it already goes for every site.
+    expect(parse([{ text, site: "a.se" }], ["a.se"], [{ text, site: null }])).toEqual([]);
+  });
 });
 
 describe("worthRemembering", () => {
@@ -110,6 +127,13 @@ describe("worthRemembering", () => {
 });
 
 describe("proposalData", () => {
+  it("says which site what's known is about", () => {
+    const known = { text: "You want the cheapest.", site: "a.se" };
+    const data = JSON.parse(proposalData({ said: ["Find a cable"], routine: null, answers: [], sites: ["b.se"] }, [known], [known]));
+    expect(data.kept).toEqual([known]);
+    expect(data.declined).toEqual([known]);
+  });
+
   it("has room for nothing but what the user typed and the sites", () => {
     const data = JSON.parse(proposalData({ said: ["Find a cable"], routine: null, answers: [], sites: ["a.se"] }, [], []));
     expect(Object.keys(data).sort()).toEqual(["answers", "declined", "kept", "said", "sites"]);
@@ -239,5 +263,24 @@ describe("memory and everything that copies a mascot", () => {
     store.delete(first.ok ? first.id : "");
     const second = store.addFromGallery("entry", mascot);
     expect(second.ok && first.ok && second.id !== first.id).toBe(true);
+  });
+});
+
+describe("forgetting while a proposal is on its way", () => {
+  it("offers nothing for a bird that was cleared in the meantime", async () => {
+    let answer = (_: string) => {};
+    const store = new MemoryStore(join(mkdtempSync(join(tmpdir(), "memory-")), "memory.json"), {
+      enabled: () => true,
+      hasModel: () => true,
+      isClean: () => true,
+      onChanged: () => {},
+      write: () => new Promise<string>((resolve) => (answer = resolve)),
+    } as never);
+    const job = { sourceId: "chat", mascotId: "scout", stillWanted: () => true, said: ["I like the cheapest"], routine: null, answers: [], sites: [] } as never;
+    const asking = store.propose(job);
+    store.clear("scout");
+    answer(JSON.stringify({ facts: [{ text: "You want the cheapest.", site: null }] }));
+    await asking;
+    expect(store.state.offers).toEqual([]);
   });
 });

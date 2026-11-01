@@ -10,13 +10,13 @@ export const MAX_FACTS_PER_MASCOT = 30;
 const word = (words: string) => new RegExp(`(?<![\\p{L}\\p{N}])(?:${words})(?![\\p{L}\\p{N}])`, "iu");
 
 const SECRET_WORDS = word(
-  "pass ?words?|passwd|pwd|pass ?phrases?|pass ?codes?|lösenord|lösen|pin|pin ?(?:code|kod)|one[- ]time|otp|2fa|two[- ]factor|mfa|" +
+  "codes?|kod|koden|koder|pass ?words?|passwd|pwd|pass ?phrases?|pass ?codes?|lösenord|lösen|pin|pin ?(?:code|kod)|one[- ]time|otp|2fa|two[- ]factor|mfa|" +
     "(?:verification|security|login|sign[- ]in|access|auth) ?codes?|verifieringskod|engångskod|säkerhetskod|bank ?id|" +
     "cvv|cvc|(?:credit|debit|bank) ?cards?|card ?(?:number|details)|kortnummer|kortuppgifter|personnummer|social security|ssn|iban|" +
     "log[- ]?ins?|sign[- ]?ins?|logga in|api ?keys?|access tokens?|tokens?|secrets?|username|användarnamn"
 );
 const ADDRESS_WORDS = word("addresse?s?|adress|adressen|hemadress|leveransadress|faktureringsadress|post ?codes?|postal codes?|zip ?codes?|postnummer|phone number|telefonnummer|mobilnummer");
-const STREET = /[\p{L}-]+(?:gatan|vägen|gränd|gränden|torget|stigen|allén|backen)\s+\d|\b[\p{L}-]+\s+(?:street|avenue|road|boulevard|lane|drive)\s+\d|\b\d+\s+[\p{L}-]+(?:\s[\p{L}-]+)?\s+(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr)\b/iu;
+const STREET = /[\p{L}-]+(?:gatan|vägen|gränd|gränden|torget|stigen|allén|backen)\s+\d|\b[\p{L}-]+\s+(?:street|avenue|road|boulevard|lane|drive)\s+\d|\b\d+\p{L}?\s+[\p{L}-]+(?:\s[\p{L}-]+)?\s+(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr)\b/iu;
 // A price or a share is a fair thing to prefer. Any other run of four digits may be a code, a PIN or part of a phone number.
 const AMOUNT = /\d[\d\s.,]*\s*(?:kr|kronor|sek|eur|euros?|usd|dollars?|gbp|pounds?|:-|%)(?![\p{L}])|[$€£]\s*\d[\d\s.,]*/giu;
 const LONG_NUMBER = /\d(?:[\s-]?\d){3,}/;

@@ -5,7 +5,7 @@ import type { MemoryFact, MemoryOffer, MemoryResult, MemoryState } from "../shar
 import { normaliseSite } from "../shared/mascots";
 import { factProblem, MAX_FACTS_PER_MASCOT } from "../shared/memory";
 import { cleanLine } from "../shared/publishing";
-import { MEMORY_PROMPT, parseProposals, proposalData, sameFact, type JobToRemember } from "./mascotMemory";
+import { MEMORY_PROMPT, parseProposals, proposalData, covers, type KnownFact, type JobToRemember } from "./mascotMemory";
 
 // Waiting offers are only worth so much, and a new one matters more than an old one nobody answered.
 const MAX_OFFERS = 20;
@@ -42,7 +42,9 @@ const parseStored = (item: unknown): MemoryFact | null => {
 export class MemoryStore {
   private facts: MemoryFact[] = [];
   private offers: MemoryOffer[] = [];
-  private readonly declined = new Map<string, string[]>();
+  private readonly declined = new Map<string, KnownFact[]>();
+  // Counts each bird's clearing, so an answer that was on its way when it happened isn't offered afterwards.
+  private readonly cleared = new Map<string, number>();
 
   constructor(private readonly file: string, private readonly sources: MemorySources) {
     try {
@@ -71,11 +73,12 @@ export class MemoryStore {
     if (!this.sources.enabled() || !this.sources.hasModel()) return;
     const held = this.factsOf(mascotId);
     if (held.length >= MAX_FACTS_PER_MASCOT) return;
-    const kept = held.map(({ text }) => text);
+    const kept = held.map(({ text, site }) => ({ text, site }));
     const declined = this.declined.get(mascotId) ?? [];
+    const clearedBefore = this.cleared.get(mascotId) ?? 0;
     try {
       const reply = await this.sources.write(MEMORY_PROMPT, proposalData(job, kept, declined));
-      if (!stillWanted()) return;
+      if (!stillWanted() || (this.cleared.get(mascotId) ?? 0) !== clearedBefore) return;
       const proposals = parseProposals(reply, { sites: job.sites, kept, declined }).filter(({ text }) => this.sources.isClean(text));
       if (proposals.length === 0) return;
       const offers = proposals.map((proposal) => ({ ...proposal, id: randomUUID(), mascotId, sourceId }));
@@ -91,7 +94,7 @@ export class MemoryStore {
     const offer = this.offers.find(({ id }) => id === offerId);
     if (!offer) return { ok: false, error: "This offer has gone." };
     if (!keep) {
-      this.declined.set(offer.mascotId, [...(this.declined.get(offer.mascotId) ?? []), offer.text]);
+      this.declined.set(offer.mascotId, [...(this.declined.get(offer.mascotId) ?? []), { text: offer.text, site: offer.site }]);
       this.dropOffer(offerId);
       return { ok: true };
     }
@@ -99,7 +102,7 @@ export class MemoryStore {
       return { ok: false, error: `This bird already remembers ${MAX_FACTS_PER_MASCOT} things. Forget one in Flock first.` };
     }
     const { text, site, mascotId } = offer;
-    if (!this.factsOf(mascotId).some((fact) => sameFact(fact.text, text))) {
+    if (!this.factsOf(mascotId).some((fact) => covers(fact, text, site))) {
       this.write([...this.facts, { id: randomUUID(), mascotId, text, site, savedAt: Date.now() }]);
     }
     this.dropOffer(offerId);
@@ -137,6 +140,7 @@ export class MemoryStore {
 
   // Everything about one bird, waiting offers too. Also what deleting that bird does.
   clear(mascotId: string): void {
+    this.cleared.set(mascotId, (this.cleared.get(mascotId) ?? 0) + 1);
     this.offers = this.offers.filter((offer) => offer.mascotId !== mascotId);
     this.declined.delete(mascotId);
     this.write(this.facts.filter((fact) => fact.mascotId !== mascotId));

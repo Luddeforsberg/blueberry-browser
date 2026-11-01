@@ -20,9 +20,9 @@ const MIN_NAME_LENGTH = 4;
 
 export const MEMORY_PROMPT = `A web browser's assistant has just finished a job for someone. You decide whether it should offer to remember something about how this person likes things done, so later jobs go better. The person sees your sentence and says yes or no.
 
-You get JSON. "said" is what the person typed. "routine", if there is one, is a standing job they set up earlier, already in place. "answers" are questions the assistant asked during the job and what the person typed back. The assistant may have read web pages when it wrote a question, so only what the person typed counts. "sites" are the sites the job used. "kept" is what's already remembered, and "declined" is what they've said no to.
+You get JSON. "said" is what the person typed. "routine", if there is one, is a standing job they set up earlier, already in place. "answers" are questions the assistant asked during the job and what the person typed back. The assistant may have read web pages when it wrote a question, so only what the person typed counts. "sites" are the sites the job used. "kept" is what's already remembered, and "declined" is what they've said no to, each with the site it's about or null for every site.
 
-Only offer something that is true of this person beyond this job, and that comes from their own words: a way they choose between things, a format, a unit or currency, a size or brand they keep to, what they want left out. One job's details are not that: today's product, a date, a place, a one-off search or the task itself. A routine's own instructions aren't either, so for a routine go by the answers. Most jobs have nothing worth remembering, and then you offer nothing. An empty list is the usual answer and a good one. Don't offer anything close to what's in "kept" or "declined".
+Only offer something that is true of this person beyond this job, and that comes from their own words: a way they choose between things, a format, a unit or currency, a size or brand they keep to, what they want left out. One job's details are not that: today's product, a date, a place, a one-off search or the task itself. A routine's own instructions aren't either, so for a routine go by the answers. Most jobs have nothing worth remembering, and then you offer nothing. An empty list is the usual answer and a good one. Don't offer anything close to what's in "kept" or "declined" for the same site, or for every site. One about another site doesn't count.
 
 How to write:
 - One short sentence to the person, under 90 characters, starting with "You" or "Your", in the language they typed, such as "You want the shortest flight, even if it costs more." Don't copy this example.
@@ -46,7 +46,7 @@ export interface JobToRemember {
   sites: string[];
 }
 
-export const proposalData = ({ said, routine, answers, sites }: JobToRemember, kept: string[], declined: string[]): string =>
+export const proposalData = ({ said, routine, answers, sites }: JobToRemember, kept: KnownFact[], declined: KnownFact[]): string =>
   JSON.stringify({
     said: said.slice(-MAX_SAID).map((text) => text.slice(0, MAX_SAID_LENGTH)),
     ...(routine ? { routine: routine.slice(0, MAX_SAID_LENGTH * 2) } : {}),
@@ -72,9 +72,18 @@ export const sameFact = (a: string, b: string): boolean => {
   return either > 0 && both / either >= SAME_FACT;
 };
 
+export interface KnownFact {
+  text: string;
+  site: string | null;
+}
+
+// Whether this already says it, where it would apply: one about a site says nothing about another, or about everywhere.
+export const covers = (known: KnownFact, text: string, site: string | null): boolean =>
+  (known.site === null || known.site === site) && sameFact(known.text, text);
+
 // What's kept of what the model wrote. It isn't trusted for any of it: a site has to be one the job really used, and each
 // sentence goes through the same check as anything else that could be stored.
-export const parseProposals = (raw: string, { sites, kept, declined }: { sites: string[]; kept: string[]; declined: string[] }): { text: string; site: string | null }[] => {
+export const parseProposals = (raw: string, { sites, kept, declined }: { sites: string[]; kept: KnownFact[]; declined: KnownFact[] }): KnownFact[] => {
   let facts: unknown;
   try {
     ({ facts } = JSON.parse(raw.replace(/^[^{]*/, "").replace(/[^}]*$/, "")) as { facts?: unknown });
@@ -82,14 +91,14 @@ export const parseProposals = (raw: string, { sites, kept, declined }: { sites: 
     return [];
   }
   if (!Array.isArray(facts)) return [];
-  const chosen: { text: string; site: string | null }[] = [];
+  const chosen: KnownFact[] = [];
   for (const fact of facts) {
     const { text: rawText, site: rawSite } = (fact ?? {}) as Record<string, unknown>;
     const text = cleanLine(rawText);
     const site = typeof rawSite === "string" ? normaliseSite(rawSite) : null;
     if (typeof rawSite === "string" && (!site || !sites.includes(site))) continue;
     if (!STARTS_AS_YOU.test(text) || text.length > MAX_PROPOSAL_LENGTH || factProblem(text, site)) continue;
-    if ([...kept, ...declined, ...chosen.map((one) => one.text)].some((other) => sameFact(text, other))) continue;
+    if ([...kept, ...declined, ...chosen].some((other) => covers(other, text, site))) continue;
     chosen.push({ text, site });
   }
   return chosen.slice(0, MAX_PROPOSALS);
