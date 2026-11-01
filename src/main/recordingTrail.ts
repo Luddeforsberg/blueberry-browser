@@ -204,7 +204,8 @@ export class Trail {
       return;
     }
     this.lastWentAt = now;
-    if (last?.kind === "clicked" && now - this.lastClickAt < CLICK_LEADS_MS) {
+    // Only on the same site: a new one has to be a step of its own, or the routine isn't allowed to go there.
+    if (last?.kind === "clicked" && last.site === site && now - this.lastClickAt < CLICK_LEADS_MS) {
       last.path = place;
       return;
     }

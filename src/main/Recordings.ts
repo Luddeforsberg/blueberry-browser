@@ -84,7 +84,7 @@ export class Recordings {
   // Any change of tabs comes through here. A tab first seen now gets watched, and going to one that's already there is a
   // step. Going to one of our own pages and back isn't anything.
   sync(): void {
-    if (!this.isRecording) return;
+    if (!this.isRecording || this.stopping) return;
     const tab = this.deps.activeTab();
     if (!tab || tab === this.current) return;
     this.current = tab;

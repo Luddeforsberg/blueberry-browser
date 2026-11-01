@@ -50,6 +50,13 @@ describe("the trail", () => {
     expect(JSON.stringify(made.steps)).not.toContain("sid=secret");
   });
 
+  it("keeps the site a click led to, as the routine will need it", () => {
+    const { note, made } = trail("first.example");
+    note({ type: "click", label: "Partner shop", role: "link" });
+    made.went("https://second.example/offer", { now: 100_000 + 11_000 });
+    expect(sitesOf(made.steps)).toEqual(["first.example", "second.example"]);
+  });
+
   it("files where a click led under that click", () => {
     const { note, went, made } = trail();
     note({ type: "click", label: "Cheap cable", role: "link" });

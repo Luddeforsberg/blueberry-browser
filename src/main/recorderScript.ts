@@ -63,7 +63,8 @@ const SCRIPT = `
 
   const dirty = new Set();
   const sent = new WeakMap();
-  // The only place a field's value is read, and only after it's been ruled out as a secret.
+  const SAW_CARD = Symbol();
+  // The only place a text field's value is read, and only after it's been ruled out as a secret.
   const finishField = (el) => {
     const wasDirty = dirty.delete(el);
     const secret = secretKind(el);
@@ -73,9 +74,14 @@ const SCRIPT = `
     }
     const value = (el.isContentEditable ? el.innerText : el.value) ?? "";
     if (!value.trim() || sent.get(el) === value) return;
+    // A field that doesn't say it's for a card can only be told by reading it. The number goes no further than this line.
+    if (looksLikeCard(value)) {
+      if (sent.get(el) !== SAW_CARD) push({ type: "secret", secret: "card" });
+      sent.set(el, SAW_CARD);
+      return;
+    }
     sent.set(el, value);
-    if (looksLikeCard(value)) push({ type: "secret", secret: "card" });
-    else push({ type: "typed", label: fieldName(el), value: value.replace(/\\s+/g, " ").trim().slice(0, ${MAX_VALUE_LENGTH}) });
+    push({ type: "typed", label: fieldName(el), value: value.replace(/\\s+/g, " ").trim().slice(0, ${MAX_VALUE_LENGTH}) });
   };
   const finishAll = () => [...dirty].forEach(finishField);
 
@@ -109,7 +115,10 @@ const SCRIPT = `
     on(where, "change", trusted((event) => {
       const el = realTarget(event);
       if (!el) return;
-      if (holdsText(el)) finishField(el);
+      if (holdsText(el)) return finishField(el);
+      // A choice can be as private as anything typed, such as a card's expiry month.
+      const secret = (el.tagName === "SELECT" || el.type === "radio") && secretKind(el);
+      if (secret) push({ type: "secret", secret });
       else if (el.tagName === "SELECT") push({ type: "chose", label: fieldName(el), value: clip([...el.selectedOptions].map((option) => option.text).join(", ")) });
       else if (el.type === "checkbox") push({ type: "ticked", label: nameOf(el), checked: el.checked });
       else if (el.type === "radio") push({ type: "chose", label: fieldName(el.closest("fieldset") ?? el), value: nameOf(el) });

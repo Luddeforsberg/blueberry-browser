@@ -20,6 +20,7 @@ const PAGES: Record<string, string> = {
     <form><input type="password" aria-label="Password"></form>
     <input name="cardnumber" aria-label="Card number">
     <input aria-label="Plain box">
+    <select autocomplete="cc-exp-month" aria-label="Expiry month"><option>Month-01</option><option>Month-12</option></select>
     <iframe id="same" src="/pay" width="300" height="80"></iframe>
     <iframe id="other" src="http://localhost:PORT/pay" width="300" height="80"></iframe>`,
   "/pay": `<!doctype html><title>Pay</title><input aria-label="In the frame">`,
@@ -71,6 +72,11 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await page.keyboard.type(PASSWORD);
     await page.getByRole("textbox", { name: "Card number" }).click();
     await page.keyboard.type(CARD);
+    await page.getByRole("combobox", { name: "Expiry month" }).focus();
+    // Typing to choose, as a click or an arrow key opens the Mac's own menu.
+    await page.keyboard.type("Month-12");
+    await expect(page.getByRole("combobox", { name: "Expiry month" })).toHaveValue("Month-12");
+    await page.getByRole("button", { name: "Add to cart" }).focus();
     // A frame from the same origin is watched like the page, and only once.
     await page.frameLocator("#same").getByRole("textbox", { name: "In the frame" }).click();
     await page.keyboard.type("in the same origin");
@@ -115,6 +121,7 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     const said = JSON.stringify(state);
     expect(said).not.toContain(PASSWORD);
     expect(said).not.toContain(CARD);
+    expect(said).not.toContain("Month-12");
     expect(said).not.toContain("said in the frame");
     expect(said).not.toContain("private");
 
