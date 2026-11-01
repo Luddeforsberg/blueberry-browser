@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useId } from "react";
+import React, { createContext, useContext, useId, useRef } from "react";
 import { MessageCircle } from "lucide-react";
 import type { MascotAccessory, MascotLook } from "@shared/library";
 import { cn } from "../lib/utils";
+import { useMascotReaction, type Reaction } from "./useMascotReaction";
 
 export type Mood =
   | "rest"
@@ -38,6 +39,8 @@ interface MascotProps {
   hidden?: boolean;
   // Keep Berry still: the pose stays, the motion stops. Reduced motion does the same through CSS.
   still?: boolean;
+  // Reacts when clicked. Decoration only: any control it's inside still takes the click as well.
+  lively?: boolean;
   className?: string;
   onContextMenu?: (event: React.MouseEvent) => void;
 }
@@ -264,6 +267,8 @@ const Torso: React.FC = () => (
   </>
 );
 
+const FEATHER = "M16 30 C10 38 10 46 14 54 C20 46 21 38 16 30 Z";
+
 // Short legs with three-toed feet. The hind toe points back along the bird.
 const LEGS = "M52 97 L51 112 M45 114 L51 112 L58 114 M63 95 L63 110 M57 112 L63 110 L70 112";
 const LEG_PROPS = { strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round", fill: "none", className: "stroke-berry-ink" } as const;
@@ -390,7 +395,7 @@ const Pose: React.FC<{ mood: Mood; animate: boolean }> = ({ mood, animate }) => 
           </g>
           <Fruit x={104} y={106} r={9} />
           <path
-            d="M16 30 C10 38 10 46 14 54 C20 46 21 38 16 30 Z"
+            d={FEATHER}
             className={cn("fill-berry-wing", animate && "motion-safe:animate-berry-feather")}
             style={ownBox("center")}
           />
@@ -412,6 +417,9 @@ const Pose: React.FC<{ mood: Mood; animate: boolean }> = ({ mood, animate }) => 
       );
   }
 };
+
+// The two reactions that are poses, and only from at rest, so a mood that means something is never covered up.
+const POSE_FOR: Partial<Record<Reaction, Mood>> = { look: "curious", toss: "thinking" };
 
 // Just the head and the berry, so Berry is still Berry at icon sizes. Pose and eye carry the mood.
 const SimplifiedPose: React.FC<{ mood: Mood }> = ({ mood }) => {
@@ -461,10 +469,14 @@ export const Mascot: React.FC<MascotProps> = ({
   name = "Berry",
   hidden = false,
   still = false,
+  lively = false,
   className,
   onContextMenu,
 }) => {
   const label = `${name}, ${MOOD_LABELS[mood]}`;
+  const drawing = useRef<SVGSVGElement>(null);
+  const { reaction, react } = useMascotReaction(drawing, mood, lively && !still);
+  const drawn = (mood === "rest" && reaction && POSE_FOR[reaction]) || mood;
 
   if (hidden) {
     return (
@@ -480,20 +492,26 @@ export const Mascot: React.FC<MascotProps> = ({
 
   return (
     <svg
+      ref={drawing}
       role="img"
       aria-label={label}
       viewBox="0 0 120 120"
       width={size}
       height={size}
+      onClick={lively ? react : undefined}
       onContextMenu={onContextMenu}
+      data-reaction={reaction ?? undefined}
       data-mascot={look?.palette}
       className={cn("shrink-0 overflow-visible", className)}
     >
       <GearContext.Provider value={look?.accessory ?? "none"}>
         {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
-        <g key={mood} className={cn(!still && "animate-berry-pose")}>
-          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={mood} /> : <Pose mood={mood} animate={!still} />}
+        <g key={drawn} className={cn(!still && "animate-berry-pose")}>
+          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={drawn} /> : <Pose mood={drawn} animate={!still} />}
         </g>
+        {reaction === "ruffle" && size >= SIMPLIFIED_BELOW && (
+          <path d={FEATHER} className="fill-berry-wing motion-safe:animate-berry-feather" style={ownBox("center")} />
+        )}
       </GearContext.Provider>
     </svg>
   );

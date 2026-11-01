@@ -307,6 +307,10 @@ Every mood has a text label for assistive technology.
 | Oops | Something went wrong | Slumped, berry rolled away, a feather falls |
 | Off duty | Nothing to do for a long time | Fluffed up asleep, berry beside it |
 
+### When you click it
+
+Clicking a bird anywhere in the chrome gets a small reaction: a hop, a curious look, tossing the berry or a ruffle that loses a feather, in turn. Five clicks in a couple of seconds and it turns its back on you for a moment and ignores you. Only a bird at rest changes pose. One sitting on a tab or already curious hops and ruffles, and one with a status mood gives a small squash, so a mood that means something stays on screen and its label never changes. It's decoration: it says nothing, changes nothing, and any button it's on still takes the click. Reduced motion only gets the curious look, and Keep Berry still gets nothing. The bird working on a web page doesn't react, because nothing there can be clicked.
+
 ### Where Berry appears
 
 | Place | What it does |
