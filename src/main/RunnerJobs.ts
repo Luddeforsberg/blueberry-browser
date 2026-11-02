@@ -20,8 +20,11 @@ const NOT_TAKEN = "The runner's queue didn't take the job. Try again in a moment
 const TOO_MANY = "Five jobs are already waiting or going on the runner. Try again when one is done.";
 const FAILED = "The job failed on the runner.";
 const GONE = "This job isn't on your account any more.";
+const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 
 interface Entry {
+  // The account that sent it, by email. Only that account, signed in, sees anything of it.
+  account: string;
   // Null while it's being sent.
   jobId: string | null;
   active: boolean;
@@ -40,7 +43,7 @@ export interface RunnerJobsHooks {
   contextId: () => string | null;
 }
 
-const fresh = (jobId: string | null, active: boolean): Entry => ({ jobId, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
+const fresh = (account: string, jobId: string | null, active: boolean): Entry => ({ account, jobId, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
 
 export class RunnerJobs implements ChatRunner {
   private readonly entries = new Map<string, Entry>();
@@ -48,6 +51,8 @@ export class RunnerJobs implements ChatRunner {
   private readonly answered = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
+  // Who was signed in when the account last changed, so a change clears what the last one saw.
+  private seenAccount: string | null;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -56,8 +61,19 @@ export class RunnerJobs implements ChatRunner {
     private readonly hooks: RunnerJobsHooks,
     private readonly pollMs = POLL_MS
   ) {
+    this.seenAccount = this.signedIn;
     this.load();
     this.schedule();
+  }
+
+  private get signedIn(): string | null {
+    const { status, email } = this.account.state;
+    return status === "signed-in" ? email : null;
+  }
+
+  // An entry only counts while the account that sent it is signed in. Anyone else's waits, untouched, until it is again.
+  private mine(entry: Entry | undefined): entry is Entry {
+    return !!entry && entry.account === this.signedIn;
   }
 
   available(): boolean {
@@ -69,24 +85,28 @@ export class RunnerJobs implements ChatRunner {
   }
 
   active(): string[] {
-    return [...this.entries].filter(([, entry]) => entry.active).map(([chatId]) => chatId);
+    return [...this.entries].filter(([, entry]) => entry.active && this.mine(entry)).map(([chatId]) => chatId);
   }
 
   progress(chatId: string): RunnerProgress | null {
     const entry = this.entries.get(chatId);
-    return entry?.active ? { reply: entry.reply, steps: entry.steps, approval: entry.approval } : null;
+    return this.mine(entry) && entry.active ? { reply: entry.reply, steps: entry.steps, approval: entry.approval } : null;
   }
 
   // For the chrome only.
   liveView(chatId: string): string | null {
     const entry = this.entries.get(chatId);
-    return entry?.active && entry.liveView && isLiveView(entry.liveView) ? entry.liveView : null;
+    return this.mine(entry) && entry.active && entry.liveView && isLiveView(entry.liveView) ? entry.liveView : null;
   }
 
   async start(chatId: string, { prompt, earlier, mascot, actionApproval }: RunnerJobInput): Promise<string | null> {
     if (!this.server) return NOT_SET_UP;
+    const account = this.signedIn;
+    if (!account) return SIGN_IN;
+    const earlierEntry = this.entries.get(chatId);
+    if (earlierEntry && earlierEntry.account !== account) return OTHER_ACCOUNT(earlierEntry.account);
     // It shows as going at once, while it's sent.
-    const entry = fresh(null, true);
+    const entry = fresh(account, null, true);
     this.entries.set(chatId, entry);
     const fail = (problem: string) => {
       entry.active = false;
@@ -115,7 +135,7 @@ export class RunnerJobs implements ChatRunner {
 
   decide(chatId: string, approvalId: string, allow: boolean, answer?: string): boolean {
     const entry = this.entries.get(chatId);
-    if (!entry?.active || entry.approval?.id !== approvalId) return false;
+    if (!this.mine(entry) || !entry.active || entry.approval?.id !== approvalId) return false;
     entry.approval = null;
     this.answered.add(approvalId);
     this.hooks.changed(chatId);
@@ -127,19 +147,31 @@ export class RunnerJobs implements ChatRunner {
   }
 
   stop(chatId: string): void {
-    const jobId = this.entries.get(chatId)?.jobId;
+    const entry = this.entries.get(chatId);
+    const jobId = this.mine(entry) ? entry.jobId : null;
     if (jobId) void this.withToken((token) => this.server!.stopCloudJob(token, jobId));
   }
 
   forget(chatId: string): void {
-    const jobId = this.entries.get(chatId)?.jobId;
+    const entry = this.entries.get(chatId);
+    const jobId = this.mine(entry) ? entry.jobId : null;
     this.entries.delete(chatId);
     this.save();
     if (jobId) void this.withToken((token) => this.server!.forgetCloudJob(token, jobId));
   }
 
-  // Signed in or out. Jobs carry on there either way, and come back here once someone's signed in.
+  // Signed in or out. Jobs carry on there either way. Nothing the last account saw stays here, not a card, a step or a
+  // live view, and each comes back once its own account is signed in again.
   accountChanged(): void {
+    const now = this.signedIn;
+    if (now !== this.seenAccount) {
+      this.seenAccount = now;
+      this.answered.clear();
+      this.entries.forEach((entry, chatId) => {
+        Object.assign(entry, { steps: [], reply: "", error: null, liveView: null, approval: null });
+        if (entry.active) this.hooks.changed(chatId);
+      });
+    }
     this.schedule();
   }
 
@@ -161,7 +193,7 @@ export class RunnerJobs implements ChatRunner {
 
   private schedule(): void {
     if (this.timer || !this.server) return;
-    if (![...this.entries.values()].some(({ active, jobId }) => active && jobId)) return;
+    if (![...this.entries.values()].some((entry) => entry.active && entry.jobId && this.mine(entry))) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       void this.poll().finally(() => this.schedule());
@@ -169,24 +201,26 @@ export class RunnerJobs implements ChatRunner {
   }
 
   private async poll(): Promise<void> {
-    if (this.polling || this.account.state.status !== "signed-in") return;
-    const going = [...this.entries].filter(([, entry]) => entry.active && entry.jobId);
+    const account = this.signedIn;
+    if (this.polling || !account) return;
+    const going = [...this.entries].filter(([, entry]) => entry.active && entry.jobId && entry.account === account);
     if (going.length === 0) return;
     this.polling = true;
     try {
       const rows = await this.withToken((token) => this.server!.cloudJobs(token, going.map(([, entry]) => entry.jobId!)));
-      if (rows) going.forEach(([chatId, entry]) => this.read(chatId, entry, rows.find((row) => row.id === entry.jobId)));
+      // Someone else signed in while it was asking, so none of this is theirs.
+      if (rows && this.signedIn === account) going.forEach(([chatId, entry]) => this.read(chatId, entry, rows.find((row) => row.id === entry.jobId)));
     } finally {
       this.polling = false;
     }
   }
 
   private read(chatId: string, entry: Entry, row: Record<string, unknown> | undefined): void {
-    // Deleted, or another account is signed in now.
+    // Asked as the account that sent it, so it was deleted.
     if (!row) return this.finish(chatId, entry, GONE);
     const status = typeof row.status === "string" ? (row.status as CloudJobStatus) : entry.status;
     const approval = approvalFromRow(row);
-    const next: Omit<Entry, "jobId" | "active"> = {
+    const next: Omit<Entry, "account" | "jobId" | "active"> = {
       status,
       steps: stepsFromRow(row.steps),
       reply: typeof row.reply === "string" ? row.reply : "",
@@ -194,10 +228,10 @@ export class RunnerJobs implements ChatRunner {
       liveView: typeof row.live_view_url === "string" ? row.live_view_url : null,
       approval: approval && !this.answered.has(approval.id) ? approval : null,
     };
-    const before = JSON.stringify({ ...entry, jobId: undefined, active: undefined });
+    const same = JSON.stringify(next) === JSON.stringify({ status: entry.status, steps: entry.steps, reply: entry.reply, error: entry.error, liveView: entry.liveView, approval: entry.approval });
     Object.assign(entry, next);
     if (FINISHED.includes(status)) return this.finish(chatId, entry, status === "failed" ? (entry.error ?? FAILED) : status === "stopped" ? entry.error : null);
-    if (JSON.stringify({ ...entry, jobId: undefined, active: undefined }) !== before) this.hooks.changed(chatId);
+    if (!same) this.hooks.changed(chatId);
   }
 
   private finish(chatId: string, entry: Entry, error: string | null): void {
@@ -212,8 +246,8 @@ export class RunnerJobs implements ChatRunner {
     try {
       const saved = JSON.parse(readFileSync(this.file, "utf8"));
       Object.entries(saved?.chats ?? {}).forEach(([chatId, value]) => {
-        const { jobId, active } = (value ?? {}) as Record<string, unknown>;
-        if (typeof jobId === "string" && jobId.length <= 100) this.entries.set(chatId, fresh(jobId, active === true));
+        const { account, jobId, active } = (value ?? {}) as Record<string, unknown>;
+        if (typeof account === "string" && typeof jobId === "string" && jobId.length <= 100) this.entries.set(chatId, fresh(account, jobId, active === true));
       });
     } catch {
       // Nothing sent there yet.
@@ -223,7 +257,7 @@ export class RunnerJobs implements ChatRunner {
   private save(): void {
     try {
       mkdirSync(dirname(this.file), { recursive: true });
-      const chats = Object.fromEntries([...this.entries].filter(([, entry]) => entry.jobId).map(([chatId, { jobId, active }]) => [chatId, { jobId, active }]));
+      const chats = Object.fromEntries([...this.entries].filter(([, entry]) => entry.jobId).map(([chatId, { account, jobId, active }]) => [chatId, { account, jobId, active }]));
       const temp = `${this.file}.tmp`;
       writeFileSync(temp, JSON.stringify({ chats }));
       renameSync(temp, this.file);

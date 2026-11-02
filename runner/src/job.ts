@@ -24,8 +24,8 @@ const BAD_MASCOT = "The bird this job was sent as couldn't be read, so it didn't
 // The cloud browser for one job, which ends with it, so nothing is left running or costing.
 export interface JobBrowser {
   cloud: ChatCloud;
-  // The live view of the page it's on now, or null where there's none.
-  liveView(): Promise<string | null>;
+  // The live view of that page, or null where there's none.
+  liveView(pageId: string): Promise<string | null>;
   end(): Promise<void>;
 }
 
@@ -45,10 +45,7 @@ export const sessionBrowser = (sessions: CloudSessions): JobBrowser => ({
     // Nobody takes a page over in a window here: the user signs in through the live view, and I'm done answers the handoff.
     giveBack: () => {},
   },
-  liveView: async () => {
-    const latest = sessions.pageIds.filter((id) => sessions.page(id) && !sessions.page(id)!.isClosed).at(-1);
-    return latest ? sessions.liveView(latest) : null;
-  },
+  liveView: (pageId) => sessions.liveView(pageId),
   end: () => sessions.end(),
 });
 
@@ -134,9 +131,11 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
     return writing;
   };
 
+  // The page handed to the user while they're asked to do something there, and otherwise the one the job used last.
   let liveView: string | null = null;
-  const showLiveView = async () => {
-    const url = await browser.liveView().catch(() => null);
+  const showLiveView = async (approval: ChatApproval | null) => {
+    const pageId = approval?.handoff?.tabId || chats.work(job.id)?.currentId;
+    const url = pageId ? await browser.liveView(pageId).catch(() => null) : null;
     const next = url && isLiveView(url) ? url : null;
     if (next === liveView) return;
     liveView = next;
@@ -173,7 +172,7 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   const asked = new Set<string>();
   const onProgress = ({ steps, approval }: TaskProgress) => {
     void write({ steps });
-    void showLiveView();
+    void showLiveView(approval);
     if (approval && !asked.has(approval.id)) {
       asked.add(approval.id);
       void relay(approval);

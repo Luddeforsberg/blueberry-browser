@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { StreamReply } from "../../src/main/agent";
 import type { ChatCloud } from "../../src/main/Chats";
+import { mascotSnapshot } from "../../src/main/cloudJobs";
+import { BERRY } from "../../src/shared/mascots";
 import { dbConfig, type ClaimedJob, type Decision, type JobUpdate, type RunnerDb } from "./db";
 import { NO_ANSWER, runJob, SHUT_DOWN, type JobBrowser } from "./job";
 
@@ -12,7 +14,7 @@ const askingReply: StreamReply = async function* (_messages, _signal, { approve 
   yield allowed ? "Ordered it" : "Left it";
 };
 
-const JOB: ClaimedJob = { id: "job-1", prompt: "Order the thing", history: [], mascot: { id: "berry" }, actionApproval: "risky", contextId: "ctx-1" };
+const JOB: ClaimedJob = { id: "job-1", prompt: "Order the thing", history: [], mascot: mascotSnapshot(BERRY), actionApproval: "risky", contextId: "ctx-1" };
 
 // The runner's side of the database, recording everything it's asked to do. It has nothing that could decide.
 const fakeDb = (answers: (Decision | "stop")[] = []) => {

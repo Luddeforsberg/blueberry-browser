@@ -34,11 +34,17 @@ export const mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId
   fromGallery: !!galleryId,
 });
 
-// Berry is Berry whatever the row says. Anyone else must pass the same checks as a mascot made in the app, or the job
-// doesn't run at all, so nothing in a row can lift a limit.
+// A row is written with the user's session, so it can only say what the user could have sent: a stolen session could
+// already make any bird and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only
+// one with no limits, and only with none in the row, which is how the app always sends Berry. Anyone else must pass
+// the same checks as a mascot made in the app, or the job doesn't run at all.
 export const mascotFromSnapshot = (input: unknown): MascotProfile | null => {
   const snapshot = (input ?? {}) as Record<string, unknown>;
-  if (snapshot.id === BERRY_ID) return BERRY;
+  if (snapshot.id === BERRY_ID) {
+    const { sites, tools } = snapshot;
+    const unlimited = Array.isArray(sites) && sites.length === 0 && Array.isArray(tools) && BERRY.tools.every((tool) => tools.includes(tool));
+    return unlimited ? BERRY : null;
+  }
   if (typeof snapshot.id !== "string" || !/^[\w-]{1,100}$/.test(snapshot.id)) return null;
   const parsed = parseMascotDraft({ ...snapshot, look: BERRY.look });
   if ("error" in parsed) return null;
@@ -58,7 +64,8 @@ export const stepsFromRow = (input: unknown): ChatStep[] =>
     .slice(-MAX_STEPS)
     .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true }));
 
-export const actionApprovalFromRow = (input: unknown): ActionApproval => (input === "always" || input === "never" ? input : "risky");
+// Nobody is at the computer to see what a job does, so it never asks less than the default: "Never ask" becomes "risky".
+export const actionApprovalFromRow = (input: unknown): ActionApproval => (input === "always" ? "always" : "risky");
 
 export type ApprovalKind = "approval" | "question" | "handoff";
 

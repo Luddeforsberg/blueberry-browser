@@ -4,6 +4,9 @@ import { CloudSessions, type CloudBrowser } from "../../src/main/cloudBrowser";
 import { isLocalEndpoint, localChrome } from "../../src/main/localChrome";
 import { dbConfig, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser } from "./job";
+import { quietConsole } from "./quietConsole";
+
+quietConsole();
 
 // The cloud runner: takes the user's queued jobs from Supabase one at a time and runs each in a Browserbase session on
 // their own Context, so the sites they brought along are signed in. Every key comes from the environment, and nothing

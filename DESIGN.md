@@ -668,6 +668,8 @@ A chat sent to the cloud runner is an ordinary chat in the list, with "Sent to t
 
 - **Beside the chat,** while it runs and there's room, the same column as the working view: the crossed-out screen and **On the runner**, one line in `muted-foreground` saying it keeps going with this computer off, the live view in a `tray` box with `border` and the `card` radius, locked like a cloud tab's, and what it's doing now. With no live view, as from a test browser, the box says so.
 - **Handed to the user:** a sign-in or captcha unlocks the live view, the line says to do it there and press I'm done, and I'm done on the card gives the page back. There's no tab to go to.
+- **Another account:** signed out, or signed in as someone else, a runner chat shows only what's saved, and a new message there says which account it's on. Nothing of it is answered or shown meanwhile, and it comes back when that account signs in.
+- **Ask before acting** is never less than the default there, because nobody is watching: Never ask still asks before anything risky.
 - **No answer** in 30 minutes stops the job, and the chat says so as its error. Stop in the composer stops it on the runner.
 
 ### Cloud tab

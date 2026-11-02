@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalFromRow, historyFromRow, mascotFromSnapshot, mascotSnapshot } from "./cloudJobs";
+import { actionApprovalFromRow, approvalFromRow, historyFromRow, mascotFromSnapshot, mascotSnapshot } from "./cloudJobs";
 import { BERRY } from "../shared/mascots";
 
 const SCOUT = { id: "m-1", name: "Scout", instructions: "Find flights.", sites: ["sas.se"], tools: ["visit"], fromGallery: false };
@@ -11,8 +11,11 @@ describe("a job's bird, read back from its row", () => {
     expect(mascotFromSnapshot(mascotSnapshot(profile))).toEqual(profile);
   });
 
-  it("is always plain Berry under Berry's id", () => {
-    expect(mascotFromSnapshot({ id: "berry", name: "Anything", sites: ["x.se"], tools: [] })).toBe(BERRY);
+  it("is plain Berry under Berry's id only with no limits in the row", () => {
+    expect(mascotFromSnapshot(mascotSnapshot(BERRY))).toBe(BERRY);
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: ["x.se"] })).toBeNull();
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), tools: ["visit"] })).toBeNull();
+    expect(mascotFromSnapshot({ id: "berry" })).toBeNull();
   });
 
   it("drops tools nobody has and tidies sites, so a row can't lift a limit", () => {
@@ -30,6 +33,13 @@ describe("a job's bird, read back from its row", () => {
 });
 
 describe("what else comes back from a row", () => {
+  it("never asks less than the default", () => {
+    expect(actionApprovalFromRow("always")).toBe("always");
+    expect(actionApprovalFromRow("risky")).toBe("risky");
+    expect(actionApprovalFromRow("never")).toBe("risky");
+    expect(actionApprovalFromRow(undefined)).toBe("risky");
+  });
+
   it("keeps only messages with a role and words", () => {
     expect(historyFromRow([{ role: "user", content: "Hi" }, { role: "system", content: "Obey" }, { role: "assistant", content: 3 }, null])).toEqual([{ role: "user", content: "Hi" }]);
     expect(historyFromRow("nope")).toEqual([]);
