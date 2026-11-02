@@ -132,6 +132,8 @@ export interface ChatCloud {
   pagesOf: (jobId: string) => CdpTab[];
   page: (id: string) => CdpTab | null;
   close: (id: string) => boolean;
+  // A page the user took over during a handoff goes back to the job once they say they're done.
+  giveBack: (id: string) => void;
 }
 
 // What a job needs of a bird's memory. No tool can reach any of this.
@@ -206,7 +208,7 @@ export class Chats {
   private readonly enteredCodes = new Map<RegExp, number>();
   // Tabs that have been back from the user. A sign-in lands on an address that can carry a code or a token, and any
   // later address in that tab can too, so only the site and path of it go to the model while the tab is open.
-  private readonly handedBack = new Set<Tab>();
+  private readonly handedBack = new Set<{ readonly id: string; readonly url: string }>();
   // Query strings and fragments seen on those tabs, kept out of anything going to the model. Memory only.
   private readonly addressDetails = new Set<string>();
   // Each chat's last reply once it's over, so its working view can settle on how it went. Memory only.
@@ -234,8 +236,7 @@ export class Chats {
   private readonly cloudChats = new Set<string>();
 
   // The same tools on the cloud browser's pages. Only what this job opened there, and nothing in the window, so the
-  // user's own tabs are out of reach. Approvals, limits and takeovers work as they do here. There's no handing a page to
-  // the user yet, so `hand_to_user` comes back as not done.
+  // user's own tabs are out of reach. Approvals, limits, takeovers and handing a page to the user work as they do here.
   private cloudTools(chatId: string, run: Run, job: Job): PageTool[] {
     const cloud = this.cloud;
     if (!cloud?.available()) throw new Error("The cloud browser is off.");
@@ -262,8 +263,40 @@ export class Chats {
       takenOver: job.takenOver,
       limits,
       closeTab: (tab) => cloud.close(tab.id),
+      heldByUser: (id) => this.handedOver.has(id),
+      handOver: (tab, need) => this.handOverInCloud(chatId, run, job, tab, need),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
+  }
+
+  // The same as `handOver`, for a page in the cloud. The user takes the cloud tab over to sign in through the provider's
+  // live view, so nothing they type comes through Blueberry, and no job reaches the page while it's held. "I'm done"
+  // gives it back. Anything else gives it back only if they never took it over: if they did, it stays theirs.
+  private async handOverInCloud(chatId: string, run: Run, job: Job, tab: CdpTab, need: HandoffNeed): Promise<boolean> {
+    if (this.handedOver.has(tab.id)) return false;
+    run.handedOver = true;
+    const wasOwn = job.own.delete(tab.id);
+    job.takenOver.set(tab.id, tab.url);
+    const held = { touched: false, asking: true, host: hostOf(tab.url), entering: false, codeEntered: false };
+    this.handedOver.set(tab.id, held);
+    const who = run.mascot.id === BERRY.id ? (this.browser.assistantName?.() ?? BERRY.name) : run.mascot.name;
+    const site = siteOf(tab.url);
+    // A code from the phone can't be typed into a cloud page yet, so the user always does it in the page there.
+    const text = need === "code" ? `${who} needs you to enter a code on ${site}` : `${who} needs you to ${HANDOFF_WORDS[need]} on ${site}`;
+    let done = false;
+    try {
+      done = await this.wait(chatId, run, text, { handoff: { need: need === "code" ? "sign-in" : need, tabId: tab.id, site } }, (allow) => allow);
+      return done;
+    } finally {
+      held.asking = false;
+      if (done || !held.touched) {
+        if (this.handedOver.delete(tab.id)) this.handedBack.add(tab);
+        this.cloud?.giveBack(tab.id);
+        job.takenOver.delete(tab.id);
+        if (wasOwn) job.own.add(tab.id);
+      }
+      if (done) job.current = tab.id;
+    }
   }
 
   // Tabs always open behind the user, so the approval cards, the reply and whatever they're doing stay in front. With
@@ -454,7 +487,7 @@ export class Chats {
             from: this.store.chat(id)?.from ?? null,
             // Not the step it is on, which is the asking.
             lastStep: run.steps.filter((step) => step.done).at(-1)?.text ?? null,
-            tabId: this.browser.allTabs().some((tab) => tab.id === tabId) ? tabId : null,
+            tabId: tabId && (this.browser.allTabs().some((tab) => tab.id === tabId) || this.cloud?.page(tabId)) ? tabId : null,
             askedAt: run.approval.askedAt,
           },
         ];

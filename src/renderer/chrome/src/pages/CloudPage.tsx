@@ -3,7 +3,8 @@ import type { CloudView, TabInfo } from '@shared/ipc'
 import { Cloud } from 'lucide-react'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
-import { Berry } from '../components/Berry'
+import { Berry, useAssistantName } from '../components/Berry'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { liveFrameLock } from '../cloudView'
 
 const api = () => window.chromeAPI.cloud
@@ -14,6 +15,10 @@ const api = () => window.chromeAPI.cloud
 export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [view, setView] = useState<CloudView | null>(null)
     const [frame, setFrame] = useState<string | null>(null)
+    const [answered, setAnswered] = useState(false)
+    // A job handed this page to the user, who signs in through the live view and presses I'm done in the toolbar.
+    const handoff = useLibrary().needsYou.find(({ approval }) => approval.handoff?.tabId === tab.id)
+    const asker = useAssistantName(useFlock().find(handoff?.mascotId ?? null))
 
     const refresh = useCallback(() => void api().view(tab.id).then(setView), [tab.id])
     useEffect(() => {
@@ -49,6 +54,19 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const takenOver = view?.takenOver ?? false
     const lock = liveFrameLock(takenOver)
     const takeOver = () => void api().takeOver(tab.id).then(refresh)
+    const checking = view?.checking ?? null
+    const mark = (signedIn: boolean) => {
+        if (!checking) return
+        setAnswered(true)
+        void api().markLogin(checking, signedIn)
+    }
+    const line = checking
+        ? answered ? 'Saved in Settings > Cloud.' : `Are you signed in to ${checking} here? Look at the page, then say.`
+        : handoff
+          ? takenOver ? `Yours now. When you’ve finished, press I’m done and ${asker} carries on.` : `${asker} needs you here. Take over to do it in the page. ${asker} can’t see it meanwhile.`
+          : takenOver
+            ? pictures ? 'Yours now. The local test browser only shows pictures here.' : 'Yours now.'
+            : 'Take over to use it yourself. That stops the job here.'
 
     return (
         <div className="h-full flex flex-col">
@@ -58,11 +76,15 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     <span className="font-semibold">In the cloud</span>
                     <span className="text-muted-foreground">
                         {' · '}
-                        {takenOver
-                            ? pictures ? 'Yours now. The local test browser only shows pictures here.' : 'Yours now.'
-                            : 'Take over to use it yourself. That stops the job here.'}
+                        {line}
                     </span>
                 </p>
+                {checking && !answered && (
+                    <>
+                        <Button size="sm" onClick={() => mark(true)}>Yes, I’m signed in</Button>
+                        <Button variant="outline" size="sm" onClick={() => mark(false)}>No, I’m signed out</Button>
+                    </>
+                )}
                 {!takenOver && view && (
                     <Button variant="outline" size="sm" onClick={takeOver}>Take over</Button>
                 )}
