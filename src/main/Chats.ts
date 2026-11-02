@@ -119,6 +119,8 @@ interface Run {
   handedOver: boolean;
   // It works in the cloud browser's pages, and never in the window's tabs.
   cloud?: boolean;
+  // The cloud pages it has used in this reply, latest last, like `used`.
+  usedInCloud?: Set<CdpTab>;
 }
 
 // What a job in the cloud needs of the browser there. Its pages are `CdpTab`s, which the user sees as cloud tabs.
@@ -254,6 +256,9 @@ export class Chats {
       },
       canSee: () => true,
       onUse: (tab) => {
+        run.usedInCloud ??= new Set();
+        run.usedInCloud.delete(tab);
+        run.usedInCloud.add(tab);
         run.sites.delete(siteOf(tab.url));
         run.sites.add(siteOf(tab.url));
       },
@@ -540,10 +545,23 @@ export class Chats {
     const run = this.runs.get(chatId) ?? ended?.run;
     if (!run) return null;
     const job = this.jobs.get(chatId);
-    const open = this.browser.allTabs();
-    const used = [...run.used].filter((tab) => open.includes(tab));
     const running = this.runs.get(chatId) === run;
-    if (running) used.forEach((tab) => run.sites.add(siteOf(tab.url)));
+    const tabs = run.cloud ? this.cloudTabsOf(run, job) : this.tabsOf(run, job);
+    if (running) tabs.forEach(({ tab }) => run.sites.add(siteOf(tab.url)));
+    return {
+      mascotId: run.mascot.id,
+      startedAt: run.startedAt,
+      endedAt: ended && !running ? ended.endedAt : null,
+      outcome: running ? null : run.controller.signal.aborted ? "stopped" : this.errors.has(chatId) ? "failed" : "done",
+      tabs,
+      currentId: tabs.at(-1)?.tab.id ?? null,
+      sites: [...run.sites].reverse(),
+      step: run.steps.filter((step) => !step.done).at(-1)?.text ?? null,
+    };
+  }
+
+  private tabsOf(run: Run, job: Job | undefined): JobWork["tabs"] {
+    const open = this.browser.allTabs();
     const state = (tab: Tab): WorkTabState => {
       if (this.handedOver.has(tab.id) || tab.heldForUser) return "held";
       if (job?.takenOver.has(tab.id) || !(run.withPage || job?.own.has(tab.id))) return "yours";
@@ -551,16 +569,19 @@ export class Chats {
       if (run.withPage && !this.pageAccess) return "no-access";
       return tab.mayShowCode || tab.trouble || tab.loadError ? "none" : "picture";
     };
-    return {
-      mascotId: run.mascot.id,
-      startedAt: run.startedAt,
-      endedAt: ended && !running ? ended.endedAt : null,
-      outcome: running ? null : run.controller.signal.aborted ? "stopped" : this.errors.has(chatId) ? "failed" : "done",
-      tabs: used.map((tab) => ({ tab, state: state(tab), site: siteOf(tab.url) })),
-      currentId: used.at(-1)?.id ?? null,
-      sites: [...run.sites].reverse(),
-      step: run.steps.filter((step) => !step.done).at(-1)?.text ?? null,
+    return [...run.used].filter((tab) => open.includes(tab)).map((tab) => ({ tab, state: state(tab), site: siteOf(tab.url) }));
+  }
+
+  // A job in the cloud's pages are only ever its own. The chrome shows them from the cloud tab's own live view or
+  // pictures, so nothing of them is captured here.
+  private cloudTabsOf(run: Run, job: Job | undefined): JobWork["tabs"] {
+    const state = (tab: CdpTab): WorkTabState => {
+      if (this.handedOver.has(tab.id)) return "held";
+      if (job?.takenOver.has(tab.id) || !job?.own.has(tab.id)) return "yours";
+      if (!siteAllowed(tab.url, run.mascot.sites)) return "off-limits";
+      return tab.trouble || tab.loadError ? "none" : "picture";
     };
+    return [...(run.usedInCloud ?? [])].filter((tab) => this.cloud?.page(tab.id) === tab).map((tab) => ({ tab, cloud: true, state: state(tab), site: siteOf(tab.url) }));
   }
 
   thread(id: string): ChatThread | null {

@@ -112,6 +112,8 @@ export interface WorkTab {
   state: WorkTabState;
   // Where it's working now. The rest are the job's other tabs.
   current: boolean;
+  // A page in the cloud browser, which the chrome shows from the cloud tab's own live view or pictures.
+  cloud?: boolean;
 }
 
 export type WorkOutcome = "done" | "stopped" | "failed";

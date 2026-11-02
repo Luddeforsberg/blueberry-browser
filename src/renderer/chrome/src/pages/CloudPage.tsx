@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import type { CloudView, TabInfo } from '@shared/ipc'
+import React, { useState } from 'react'
+import type { TabInfo } from '@shared/ipc'
 import { Cloud } from 'lucide-react'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from '../components/Berry'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { liveFrameLock } from '../cloudView'
+import { liveFrameLock, useCloudView } from '../cloudView'
 
 const api = () => window.chromeAPI.cloud
 
@@ -13,31 +13,13 @@ const api = () => window.chromeAPI.cloud
 // once the user has taken the tab over, so nothing they do lands in the middle of a job. A local test browser sends pictures instead.
 // None of what's shown here goes anywhere but this screen.
 export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
-    const [view, setView] = useState<CloudView | null>(null)
-    const [frame, setFrame] = useState<string | null>(null)
+    const { view, frame, refresh } = useCloudView(tab.id)
     const [answered, setAnswered] = useState(false)
     // A job handed this page to the user, who signs in through the live view and presses I'm done in the toolbar.
     const handoff = useLibrary().needsYou.find(({ approval }) => approval.handoff?.tabId === tab.id)
     const asker = useAssistantName(useFlock().find(handoff?.mascotId ?? null))
 
-    const refresh = useCallback(() => void api().view(tab.id).then(setView), [tab.id])
-    useEffect(() => {
-        refresh()
-        return api().onUpdated(refresh)
-    }, [refresh])
-
     const pictures = view?.kind === 'frames'
-    useEffect(() => {
-        if (!pictures) return
-        const off = api().onFrame((next) => {
-            if (next.tabId === tab.id) setFrame(next.data)
-        })
-        void api().watch(tab.id)
-        return () => {
-            off()
-            void api().watch(null)
-        }
-    }, [pictures, tab.id])
 
     if (view?.kind === 'gone') {
         return (

@@ -7,6 +7,7 @@ import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
 import { Favicon } from './Favicon'
 import { SHIMMER_TEXT } from './ChatMessage'
+import { liveFrameLock, useCloudView } from '../cloudView'
 
 const PERCH_SIZE = 48
 // The drawing's feet are this far up from the bottom of its box.
@@ -96,12 +97,27 @@ const sitesInWords = (sites: string[]): string => {
     return named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named.at(-1)}` : named[0]
 }
 
-// What a tab looks like just now. There's no element to hold a picture at all unless this tab may have one.
-const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string }> = ({ tab, frames, name }) => {
+// A page in the cloud, from its cloud tab's own live view, locked as it is before taking over, or the local test
+// browser's pictures. Nothing of it is captured or kept here.
+const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
+    const { view, frame } = useCloudView(tab.id)
+    if (view?.kind === 'live') {
+        const lock = liveFrameLock(false)
+        return <iframe title={`Live view of ${tab.title}`} src={view.url} sandbox="allow-same-origin allow-scripts" inert={lock.inert} tabIndex={lock.tabIndex} className={cn('absolute inset-0 size-full border-0', lock.className)} />
+    }
+    return view?.kind === 'frames' && frame
+        ? <img src={`data:image/jpeg;base64,${frame}`} alt="" draggable={false} className="absolute inset-0 size-full object-cover object-left-top" />
+        : <div className="absolute inset-0 bg-tray" />
+}
+
+// What a tab looks like just now. There's no element to hold a picture at all unless this tab may have one. Only the
+// big window shows a cloud page, as one cloud tab is watched at a time.
+const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: boolean }> = ({ tab, frames, name, big = false }) => {
     const picture = useSyncExternalStore(frames.subscribe, () => frames.get(tab.id))
     if (tab.state !== 'picture') {
         return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-13 text-muted-foreground">{WITHOUT_PICTURE[tab.state](name)}</div>
     }
+    if (tab.cloud) return big ? <CloudPicture tab={tab} /> : <div className="absolute inset-0 bg-tray" />
     return picture ? <img src={picture} alt="" decoding="sync" draggable={false} className="absolute inset-0 size-full object-cover object-top" /> : <div className="absolute inset-0 bg-tray" />
 }
 
@@ -135,7 +151,7 @@ const WorkWindow: React.FC<{
                 <span className="truncate">{tab.site}</span>
             </span>
             <span className="relative block bg-tray" style={{ aspectRatio: aspect }}>
-                <Picture tab={tab} frames={frames} name={name} />
+                <Picture tab={tab} frames={frames} name={name} big />
             </span>
         </button>
     </div>
@@ -169,8 +185,9 @@ export const WorkingView: React.FC<{
     const current = view.tabs.find((tab) => tab.current) ?? view.tabs[0]
     const others = view.tabs.filter((tab) => tab !== current)
     const ended = view.outcome !== null
-    // The bird is in the picture while it's working there, and only comes out to the edge when it isn't.
-    const inPicture = !ended && current.state === 'picture' && birdOnPages && !keepBerryStill
+    // The bird is in the picture while it's working there, and only comes out to the edge when it isn't. There's none
+    // drawn in a cloud page.
+    const inPicture = !ended && current.state === 'picture' && !current.cloud && birdOnPages && !keepBerryStill
     const perched = showBerry && !inPicture
         ? <Berry mood={ended ? (view.outcome === 'done' ? 'delivered' : 'rest') : approval ? 'asking' : 'rest'} size={PERCH_SIZE} mascot={mascot} />
         : null

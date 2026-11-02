@@ -1,4 +1,5 @@
 import { sendToRenderer } from "./ipc";
+import type { CdpTab } from "./CdpTab";
 import type { Tab } from "./Tab";
 import type { WorkOutcome, WorkTab, WorkTabState, WorkView } from "../shared/library";
 import type { WebContents } from "electron";
@@ -21,7 +22,8 @@ export interface JobWork {
   startedAt: number;
   endedAt: number | null;
   outcome: WorkOutcome | null;
-  tabs: Array<{ tab: Tab; state: WorkTabState; site: string }>;
+  // A cloud page is never captured here: the chrome shows the cloud tab's own live view or pictures.
+  tabs: Array<{ tab: Tab; cloud?: false; state: WorkTabState; site: string } | { tab: CdpTab; cloud: true; state: WorkTabState; site: string }>;
   // The tab it used last, which is where it's working now.
   currentId: string | null;
   sites: string[];
@@ -37,6 +39,9 @@ interface WorkViewsDeps {
   onScreen: (chatId: string) => boolean;
   pageWidth: () => number;
 }
+
+type LocalEntry = Extract<JobWork["tabs"][number], { tab: Tab }>;
+const localTabs = (job: JobWork): LocalEntry[] => job.tabs.filter((entry): entry is LocalEntry => !entry.cloud);
 
 interface Seen {
   at: number;
@@ -117,8 +122,10 @@ export class WorkViews {
     job?.tabs.forEach(({ tab, state }) => {
       if (state !== "picture") this.seen.delete(tab.id);
     });
-    // A job that ended with no picture taken of it has nothing to settle on, so it isn't brought up again.
-    const view = watching && job && (job.outcome === null || this.seen.size > 0) ? this.viewOf(watching.chatId, job) : null;
+    // A job that ended with no picture taken of it has nothing to settle on, so it isn't brought up again. A cloud page
+    // still shows in its cloud tab, so it's something to settle on.
+    const settled = this.seen.size > 0 || !!job?.tabs.some((entry) => entry.cloud && entry.state === "picture");
+    const view = watching && job && (job.outcome === null || settled) ? this.viewOf(watching.chatId, job) : null;
     const said = JSON.stringify(view);
     if (said !== this.lastView) {
       this.lastView = said;
@@ -128,16 +135,17 @@ export class WorkViews {
   }
 
   private viewOf(chatId: string, job: JobWork): WorkView | null {
-    const tabs: WorkTab[] = job.tabs.map(({ tab, state, site }) => ({
-      id: tab.id,
-      site,
-      title: tab.title,
-      favicon: tab.favicon,
-      state,
-      current: tab.id === job.currentId,
+    const tabs: WorkTab[] = job.tabs.map((entry) => ({
+      id: entry.tab.id,
+      site: entry.site,
+      title: entry.tab.title,
+      favicon: entry.cloud ? null : entry.tab.favicon,
+      state: entry.state,
+      current: entry.tab.id === job.currentId,
+      ...(entry.cloud ? { cloud: true } : {}),
     }));
     if (tabs.length === 0) return null;
-    const current = job.tabs.find(({ tab }) => tab.id === job.currentId);
+    const current = localTabs(job).find(({ tab }) => tab.id === job.currentId);
     const saying = current?.state === "picture" ? current.tab.actor.saying : "";
     return {
       chatId,
@@ -158,7 +166,7 @@ export class WorkViews {
     const pageWidth = this.deps.pageWidth();
     const scale = width > 0 && pageWidth > 0 ? width / pageWidth : null;
     const live = new Set(
-      job && scale !== null ? job.tabs.filter(({ state, tab }) => state === "picture" && (job.outcome === null ? tab.id === job.currentId : tab.isLeaving)).map(({ tab }) => tab) : []
+      job && scale !== null ? localTabs(job).filter(({ state, tab }) => state === "picture" && (job.outcome === null ? tab.id === job.currentId : tab.isLeaving)).map(({ tab }) => tab) : []
     );
     this.pictured.forEach((tab) => {
       if (!live.has(tab)) {
@@ -177,7 +185,7 @@ export class WorkViews {
     this.timer = null;
     const job = this.job;
     // Words with no pictures still need to keep up with what the job is doing.
-    if (job && (job.outcome === null || job.tabs.some(({ tab }) => tab.isLeaving))) this.timer = setTimeout(() => void this.tick(), this.nextDelay(job));
+    if (job && (job.outcome === null || localTabs(job).some(({ tab }) => tab.isLeaving))) this.timer = setTimeout(() => void this.tick(), this.nextDelay(job));
   }
 
   private widthFor(current: boolean): number {
@@ -194,7 +202,7 @@ export class WorkViews {
 
   private due(job: JobWork): Array<{ tab: Tab; current: boolean; wait: number }> {
     const now = Date.now();
-    return job.tabs
+    return localTabs(job)
       .filter(({ state, tab }) => state === "picture" && tab.isParked)
       .map(({ tab }) => {
         const current = tab.id === job.currentId;
