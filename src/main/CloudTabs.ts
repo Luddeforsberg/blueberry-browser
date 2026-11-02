@@ -141,7 +141,7 @@ export class CloudTabs implements ChatCloud {
     this.sessions?.release(jobId);
   }
 
-  async open(jobId: string, url: string): Promise<CdpTab> {
+  async open(jobId: string, url: string, allows?: (url: string) => boolean): Promise<CdpTab> {
     const sessions = this.sessions;
     if (!sessions) throw new Error("The cloud browser is off.");
     const id = this.hooks.openTab(hostOf(url));
@@ -151,7 +151,7 @@ export class CloudTabs implements ChatCloud {
           const page = sessions.page(id);
           if (page) this.hooks.updateTab(id, page.title || hostOf(page.url));
         },
-      });
+      }, allows);
     } catch (error) {
       this.hooks.closeTab(id);
       throw error;

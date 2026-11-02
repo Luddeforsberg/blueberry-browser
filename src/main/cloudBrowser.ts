@@ -104,8 +104,9 @@ export class CloudSessions {
     this.onChange();
   }
 
-  // A new page for the job that has claimed the session. `id` is what the tools and the window call it.
-  async open(jobId: string, id: string, url: string, events: CdpTabEvents): Promise<CdpTab> {
+  // A new page for the job that has claimed the session. `id` is what the tools and the window call it. `allows` is a
+  // limited mascot's sites, which hold from the blank page's first load, so a redirect can't send anything elsewhere.
+  async open(jobId: string, id: string, url: string, events: CdpTabEvents, allows?: (url: string) => boolean): Promise<CdpTab> {
     if (this.owner !== jobId) throw new Error("The cloud browser is working on another job.");
     const session = await this.ensure();
     const page = await session.context.newPage();
@@ -115,7 +116,9 @@ export class CloudSessions {
       this.pages.delete(id);
       this.onChange();
     });
-    await tab.loadURL(url).catch(() => {});
+    const load = () => tab.loadURL(url).then(() => tab.settled(), () => {});
+    if (allows) await tab.withNavigationLimit(allows, load);
+    else await load();
     this.onChange();
     return tab;
   }

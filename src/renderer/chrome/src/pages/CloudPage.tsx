@@ -4,11 +4,12 @@ import { Cloud } from 'lucide-react'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry } from '../components/Berry'
+import { liveFrameLock } from '../cloudView'
 
 const api = () => window.chromeAPI.cloud
 
-// A page in the cloud browser. Browserbase's live view sits in a frame, which only takes the pointer once the user has
-// taken the tab over, so nothing they do lands in the middle of a job. A local test browser sends pictures instead.
+// A page in the cloud browser. Browserbase's live view sits in a frame, which only takes the pointer or the keyboard
+// once the user has taken the tab over, so nothing they do lands in the middle of a job. A local test browser sends pictures instead.
 // None of what's shown here goes anywhere but this screen.
 export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [view, setView] = useState<CloudView | null>(null)
@@ -46,6 +47,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
 
     const takenOver = view?.takenOver ?? false
+    const lock = liveFrameLock(takenOver)
     const takeOver = () => void api().takeOver(tab.id).then(refresh)
 
     return (
@@ -72,7 +74,9 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         src={view.url}
                         sandbox="allow-same-origin allow-scripts"
                         allow="clipboard-read; clipboard-write"
-                        className={cn('absolute inset-0 size-full border-0', !takenOver && 'pointer-events-none')}
+                        inert={lock.inert}
+                        tabIndex={lock.tabIndex}
+                        className={cn('absolute inset-0 size-full border-0', lock.className)}
                     />
                 )}
                 {pictures && (frame

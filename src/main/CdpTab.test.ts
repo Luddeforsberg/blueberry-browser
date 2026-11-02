@@ -25,6 +25,8 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
   let cloud: CloudSessions;
   let tab: CdpTab;
   let tools: PageTool[];
+  // Requests that reached the site a mascot isn't allowed on.
+  const forbidden: string[] = [];
   const tool = (name: string) => tools.find((one) => one.name === name)!;
   const refOf = async (name: string) => {
     const listed = JSON.parse(await tool("list_elements").run({})) as { elements: { ref: string; name: string }[] };
@@ -33,6 +35,12 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
 
   beforeAll(async () => {
     server = createServer((request, response) => {
+      if (request.headers.host?.startsWith("localhost")) forbidden.push(request.url ?? "");
+      if (request.url === "/redirect") {
+        response.writeHead(302, { location: `${origin.replace("127.0.0.1", "localhost")}/forbidden` });
+        response.end();
+        return;
+      }
       response.setHeader("content-type", "text/html");
       response.end(request.url === "/" ? PAGE : `<title>${request.url}</title><p>${request.url}</p>`);
     });
@@ -117,6 +125,15 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
 
   it("refuses a site the mascot isn't allowed on before anything happens", async () => {
     expect(await tool("go_to").refuses!({ url: "https://example.com/" })).toMatchObject({ label: "Stayed off example.com" });
+  });
+
+  it("holds a limited mascot to its sites from a new page's first load, so a redirect sends nothing elsewhere", async () => {
+    const allowed = (url: string) => new URL(url).hostname === "127.0.0.1";
+    const redirected = await cloud.open("job", "cloud-2", `${origin}/redirect`, { onChange: () => {} }, allowed);
+    await redirected.settled();
+    expect(forbidden).toEqual([]);
+    expect(redirected.url).not.toContain("localhost");
+    await cloud.close("cloud-2");
   });
 
   it("lets one job at a time use the session", () => {

@@ -127,7 +127,8 @@ export interface ChatCloud {
   // One job at a time. False if another has it.
   claim: (jobId: string) => boolean;
   release: (jobId: string) => void;
-  open: (jobId: string, url: string) => Promise<CdpTab>;
+  // `allows` holds from the page's first load, before anything is sent.
+  open: (jobId: string, url: string, allows?: (url: string) => boolean) => Promise<CdpTab>;
   pagesOf: (jobId: string) => CdpTab[];
   page: (id: string) => CdpTab | null;
   close: (id: string) => boolean;
@@ -240,11 +241,12 @@ export class Chats {
     if (!cloud?.available()) throw new Error("The cloud browser is off.");
     if (!cloud.claim(chatId)) throw new CloudBusyError();
     const mine = () => cloud.pagesOf(chatId).filter((tab) => job.own.has(tab.id));
+    const limits = run.mascot.id === BERRY.id && run.mascot.sites.length === 0 ? undefined : run.mascot;
     return createPageTools<CdpTab>({
       allTabs: mine,
       activeTab: () => mine().find((tab) => tab.id === job.current) ?? null,
       openTab: async (url) => {
-        const tab = await cloud.open(chatId, url);
+        const tab = await cloud.open(chatId, url, limits && ((address) => siteAllowed(address, limits.sites)));
         job.own.add(tab.id);
         job.current = tab.id;
         return tab;
@@ -258,7 +260,7 @@ export class Chats {
       ownsEveryTab: true,
       ownsTab: (id) => job.own.has(id),
       takenOver: job.takenOver,
-      limits: run.mascot.id === BERRY.id && run.mascot.sites.length === 0 ? undefined : run.mascot,
+      limits,
       closeTab: (tab) => cloud.close(tab.id),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
