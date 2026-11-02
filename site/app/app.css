@@ -150,7 +150,8 @@ form .button.wide { margin-top: 8px; }
   animation: shimmer 1300ms linear infinite;
 }
 @keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
-.reply { margin-top: 16px; white-space: pre-wrap; }
+.reply { margin-top: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.reply a { color: rgb(var(--accent-ink)); text-decoration: underline; text-underline-offset: 2px; }
 /* A conversation: each job's exchange in turn, and the box to go on under the last once it's over. */
 .exchange + .exchange { margin-top: 32px; }
 .follow { margin-top: 32px; gap: 8px; }

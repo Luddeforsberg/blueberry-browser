@@ -221,8 +221,12 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
 
     // The runner takes it, and the conversation reads as one chat.
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(second.id);
-    await rpc(runner, "runner_update_job", { p_job: second.id, p_status: "done", p_steps: [{ text: "Compared 2 m cables", done: true }], p_reply: "Yes, one for 69 kr." });
-    await expect(page.getByText("Yes, one for 69 kr.")).toBeVisible();
+    await rpc(runner, "runner_update_job", { p_job: second.id, p_status: "done", p_steps: [{ text: "Compared 2 m cables", done: true }], p_reply: "Yes, one for **69 kr** on [the shop](https://shop.example/cable), see https://shop.example/2m. Not [this](javascript:alert(1))." });
+    await expect(page.getByText("69 kr", { exact: true })).toBeVisible();
+    // Sources are links that open outside the page, a full stop isn't part of a bare address, and nothing but the web is.
+    await expect(page.getByRole("link", { name: "the shop" })).toHaveAttribute("href", "https://shop.example/cable");
+    await expect(page.getByRole("link", { name: "https://shop.example/2m" })).toHaveAttribute("target", "_blank");
+    await expect(page.locator(".reply a[href^='javascript']")).toHaveCount(0);
     await expect(page.getByLabel("Follow up")).toBeVisible();
     await shoot(page, "conversation");
 
