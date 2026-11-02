@@ -74,8 +74,9 @@ create index cloud_push_subscriptions_owner on public.cloud_push_subscriptions (
 alter table public.cloud_push_subscriptions enable row level security;
 revoke all on table public.cloud_push_subscriptions from public, anon, authenticated;
 
--- The signed-in owner turns notifications on for this browser. The same browser signed in as someone else moves to
--- them. A handful per account at most, and a runner can't have any.
+-- The signed-in owner turns notifications on for this browser, or again with new keys. An address someone else already
+-- has stays theirs, so nobody who learns it can take another's device: false until its owner turns it off, as signing
+-- out on the phone does. A handful per account at most, and a runner can't have any.
 create function public.save_push_subscription(p_endpoint text, p_p256dh text, p_auth text) returns boolean
 language plpgsql security definer set search_path = ''
 as $$
@@ -89,8 +90,9 @@ begin
     raise exception 'Too many devices with notifications on' using errcode = 'P0001';
   end if;
   insert into public.cloud_push_subscriptions (endpoint, owner, p256dh, auth) values (p_endpoint, me, p_p256dh, p_auth)
-    on conflict (endpoint) do update set owner = excluded.owner, p256dh = excluded.p256dh, auth = excluded.auth, created_at = now();
-  return true;
+    on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth, created_at = now()
+      where public.cloud_push_subscriptions.owner = me;
+  return found;
 end;
 $$;
 

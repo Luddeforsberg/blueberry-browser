@@ -101,6 +101,17 @@ describe("the phone page's database rules", () => {
     expect(await as(RUNNER, "select endpoint from public.runner_push_subscriptions()")).toEqual([]);
   });
 
+  it("never lets someone else take over a device's address, though its owner can subscribe it again", async () => {
+    const alices = "https://fcm.googleapis.com/fcm/send/alices-phone";
+    expect(await subscribe(ALICE, alices)).toEqual([{ ok: true }]);
+    expect(await subscribe(BOB, alices)).toEqual([{ ok: false }]);
+    expect((await db.query("select owner from public.cloud_push_subscriptions where endpoint = $1", [alices])).rows).toEqual([{ owner: ALICE }]);
+    expect(await subscribe(ALICE, alices)).toEqual([{ ok: true }]);
+    // Nor take it away.
+    expect(await as(BOB, `select public.forget_push_subscription('${alices}') as ok`)).toEqual([{ ok: false }]);
+    expect(await as(RUNNER, "select endpoint from public.runner_push_subscriptions()")).toContainEqual({ endpoint: alices });
+  });
+
   it("only keeps an https address, and lets the owner turn it off", async () => {
     await expect(subscribe(ALICE, "http://10.0.0.1/push")).rejects.toThrow(/endpoint_shape/);
     await expect(subscribe(null)).rejects.toThrow(/permission denied/);
