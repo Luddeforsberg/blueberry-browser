@@ -9,15 +9,18 @@ export const FAKE_KEY = "sb_publishable_fake_for_tests_only";
 
 type Row = Record<string, unknown> & { id: string; owner: string; hidden: boolean; add_count: number };
 
-// The cloud runner's functions, which run in real Postgres here with the real migration, as the role and user each
-// token stands for, so the app and the runner meet the real rules.
-const CLOUD_FUNCTIONS = new Set(["start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job", "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision"]);
+// The cloud runner's functions, which run in real Postgres here with the real migration, as the user each token stands
+// for, so the app and the runner, which signs in as a user of its own, meet the real rules.
+const CLOUD_FUNCTIONS = new Set([
+  "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job",
+  "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
+  "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
+]);
 const CLOUD_STANDINS = `
   create role anon nologin;
   create role authenticated nologin;
-  create role authenticator nologin;
   create schema auth;
-  create table auth.users (id uuid primary key);
+  create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
   grant usage on schema public, auth to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
@@ -53,8 +56,6 @@ const cloudDatabase = async () => {
 // from the cloud runner's jobs, which with `cloudJobs` are the real rules in real Postgres.
 export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boolean } = {}) => {
   const cloud = cloudJobs ? await cloudDatabase() : null;
-  // The runner's tokens, each for one user, as the role it may take.
-  const runnerTokens = new Map<string, string>();
   const accounts = new Map<string, { password: string; id: string }>();
   const tokens = new Map<string, string>();
   const rows: Row[] = [];
@@ -90,7 +91,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       if (accounts.has(body.email)) return answer(422, { error_code: "user_already_exists", msg: "Exists" });
       const account = { password: body.password, id: randomUUID() };
       accounts.set(body.email, account);
-      await cloud?.db.query("insert into auth.users values ($1)", [account.id]);
+      await cloud?.db.query("insert into auth.users values ($1, $2)", [account.id, body.email]);
       return answer(200, sessionFor(body.email, account.id));
     }
     if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "password") {
@@ -102,11 +103,8 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
 
     const cloudCall = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname)?.[1];
     if (cloud && request.method === "POST" && cloudCall && CLOUD_FUNCTIONS.has(cloudCall)) {
-      const bearer = String(request.headers.authorization).replace("Bearer ", "");
-      const runnerFor = runnerTokens.get(bearer);
-      const [role, user] = runnerFor ? ["blueberry_runner", runnerFor] : uid ? ["authenticated", uid] : ["anon", null];
       try {
-        return answer(200, await cloud.call(role, user, cloudCall, body));
+        return answer(200, await cloud.call(uid ? "authenticated" : "anon", uid ?? null, cloudCall, body));
       } catch (error) {
         const { code, message } = error as { code?: string; message?: string };
         return answer(code === "42501" ? 403 : 400, { code, message });
@@ -156,14 +154,11 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       rows.push(seeded);
       return seeded;
     },
-    // A token for the runner's role and that account's user, shaped like the one `runner/mintToken.mjs` makes.
-    runnerToken: (email: string) => {
-      const id = accounts.get(email)?.id;
-      if (!id) throw new Error(`No account for ${email}`);
-      const part = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
-      const token = `${part({ alg: "none" })}.${part({ role: "blueberry_runner", sub: id })}.${randomUUID()}`;
-      runnerTokens.set(token, id);
-      return token;
+    // An account made the way the dashboard does, such as the runner's own.
+    addAccount: async (email: string, password: string) => {
+      const id = randomUUID();
+      accounts.set(email, { password, id });
+      await cloud?.db.query("insert into auth.users values ($1, $2)", [id, email]);
     },
     // What's in the cloud jobs' tables, as the database sees it.
     cloudRows: async (sql: string) => (await cloud!.db.query<Record<string, unknown>>(sql)).rows,

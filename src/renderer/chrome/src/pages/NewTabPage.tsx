@@ -9,7 +9,7 @@ import { Favicon } from '../components/Favicon'
 import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
 import { useCloud } from '../useCloud'
-import { useAccount } from '../useAccount'
+import { useRunner } from '../useRunner'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
 import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
@@ -41,10 +41,10 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { chosen, choose, find } = useFlock()
     const [cloudState] = useCloud()
     const [inCloud, setInCloud] = useState(false)
-    // The runner needs the user's account, since its jobs are kept there.
-    const [account] = useAccount()
+    // Only with a runner linked in Settings > Cloud, which has accepted, so nothing waits in a queue nobody takes from.
+    const [runnerState] = useRunner()
     const [inRunner, setInRunner] = useState(false)
-    const canUseRunner = account.status === 'signed-in'
+    const canUseRunner = runnerState.status === 'linked'
 
     useEffect(() => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))

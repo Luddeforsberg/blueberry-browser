@@ -339,6 +339,14 @@ export interface ChatSendOptions {
   runner?: boolean;
 }
 
+// Settings > Cloud > Runner: the account the cloud runner signs in as, linked to this user's, and whether the runner has
+// accepted. Only its email, never its password, which only the runner has.
+export interface RunnerState {
+  status: "not-set-up" | "signed-out" | "none" | "waiting" | "linked";
+  email: string | null;
+  problem: string | null;
+}
+
 // Settings > Cloud. The key and project id never come back here once saved: only whether there are any.
 export interface CloudState {
   // "local" is the test browser on this computer, only in an unpackaged app.
@@ -534,6 +542,10 @@ export interface InvokeChannels {
   "cloud:view": { region: "chrome"; args: [tabId: string]; result: CloudView };
   // The live view of a chat's job on the cloud runner, only ever Browserbase's page, or null while there's none.
   "cloud:runner-view": { region: "chrome"; args: [chatId: string]; result: string | null };
+  // The runner's link, looked up again. Link names the runner's account by email.
+  "cloud:runner-state": { region: "chrome"; args: []; result: RunnerState };
+  "cloud:runner-link": { region: "chrome"; args: [email: string]; result: RunnerState };
+  "cloud:runner-unlink": { region: "chrome"; args: []; result: RunnerState };
   // Which cloud tab is on screen, or null. Pictures of it come as `cloud:frame`, to the chrome and nowhere else.
   "cloud:watch": { region: "chrome"; args: [tabId: string | null]; result: void };
   // The user takes the tab from the job, as clicking in a tab of the window's own does.
@@ -566,6 +578,7 @@ export interface EventChannels {
   "phone:answered": PhoneAnswered;
   "mcp:updated": McpState;
   "cloud:updated": CloudState;
+  "cloud:runner-updated": RunnerState;
   "cloud:frame": CloudFrame;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
@@ -780,6 +793,10 @@ export interface CloudAPI {
   end: () => Promise<CloudState>;
   view: (tabId: string) => Promise<CloudView>;
   runnerView: (chatId: string) => Promise<string | null>;
+  runnerState: () => Promise<RunnerState>;
+  linkRunner: (email: string) => Promise<RunnerState>;
+  unlinkRunner: () => Promise<RunnerState>;
+  onRunnerUpdated: (callback: (state: RunnerState) => void) => Unsubscribe;
   watch: (tabId: string | null) => Promise<void>;
   takeOver: (tabId: string) => Promise<boolean>;
   loginSuggestions: () => Promise<string[]>;

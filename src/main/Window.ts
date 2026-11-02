@@ -265,6 +265,7 @@ export class Window {
       changed: (chatId) => this.chats.runnerChanged(chatId),
       finished: (chatId, result) => this.chats.runnerFinished(chatId, result),
       contextId: () => this.cloud.contextId,
+      runnerUpdated: (state) => sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state),
     });
 
     this.chats = new Chats(chatStore, streamReply, generateTitle, {

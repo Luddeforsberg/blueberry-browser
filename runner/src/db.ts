@@ -1,12 +1,15 @@
 import type { ReplyMessage } from "../../src/main/agent";
 import { actionApprovalFromRow, historyFromRow, type ApprovalToAsk, type CloudJobStatus } from "../../src/main/cloudJobs";
 import type { ActionApproval } from "../../src/shared/ipc";
+import { GalleryServer, type ServerSession } from "../../src/main/galleryServer";
 import type { ChatStep } from "../../src/shared/library";
 
-// The runner's only way to Supabase: the `runner_*` functions, as the role `blueberry_runner` for one user. Nothing here
-// can decide an approval, and the database refuses it too. No error passes on anything from a reply but its status.
+// The runner's only way to Supabase: signed in as its own user, with the publishable key, through the `runner_*`
+// functions, which only reach the jobs of the owner it's linked to. Nothing here can decide an approval, and the database
+// refuses it too. No error passes on anything from a reply but its status.
 
 const CALL_ABORT_MS = 15_000;
+const REFRESH_BEFORE_MS = 60_000;
 
 export interface ClaimedJob {
   id: string;
@@ -49,25 +52,22 @@ export class DbError extends Error {
 export interface DbConfig {
   url: string;
   key: string;
-  token: string;
+  email: string;
+  password: string;
+  // The account whose jobs it runs, which has to have linked this runner in Blueberry.
+  owner: string;
 }
-
-// The token's own claims, read without checking the signature, which is the server's job. It's only to refuse the wrong
-// kind of key before anything is sent: a service key, a user's session or anything else that isn't the runner's role.
-const claimsOf = (token: string): Record<string, unknown> | null => {
-  try {
-    return JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-};
 
 // Says what's wrong in words for the deploy log, or gives the config. Values are never in the words.
 export const dbConfig = (env: Record<string, string | undefined>): DbConfig | string => {
   const url = env.SUPABASE_URL?.replace(/\/$/, "");
   const key = env.SUPABASE_PUBLISHABLE_KEY;
-  const token = env.BLUEBERRY_RUNNER_TOKEN;
-  if (!url || !key || !token) return "Set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY and BLUEBERRY_RUNNER_TOKEN.";
+  const email = env.BLUEBERRY_RUNNER_EMAIL?.trim();
+  const password = env.BLUEBERRY_RUNNER_PASSWORD;
+  const owner = env.BLUEBERRY_RUNNER_OWNER?.trim();
+  if (!url || !key || !email || !password || !owner) {
+    return "Set SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, BLUEBERRY_RUNNER_EMAIL, BLUEBERRY_RUNNER_PASSWORD and BLUEBERRY_RUNNER_OWNER.";
+  }
   try {
     const { protocol, hostname } = new URL(url);
     if (protocol !== "https:" && !(protocol === "http:" && hostname === "127.0.0.1")) return "SUPABASE_URL has to be https.";
@@ -75,32 +75,68 @@ export const dbConfig = (env: Record<string, string | undefined>): DbConfig | st
     return "SUPABASE_URL isn't an address.";
   }
   if (!key.startsWith("sb_publishable_")) return "SUPABASE_PUBLISHABLE_KEY has to be the publishable key, never a secret one.";
-  const claims = claimsOf(token);
-  if (claims?.role !== "blueberry_runner") return "BLUEBERRY_RUNNER_TOKEN has to be a token for the blueberry_runner role. See runner/README.md.";
-  if (typeof claims.sub !== "string") return "BLUEBERRY_RUNNER_TOKEN has to name the user it works for.";
-  return { url, key, token };
+  if (email.toLowerCase() === owner.toLowerCase()) return "BLUEBERRY_RUNNER_EMAIL has to be an account of its own, not the owner's.";
+  return { url, key, email, password, owner };
 };
 
-export const supabaseDb = ({ url, key, token }: DbConfig, send: typeof fetch = fetch): RunnerDb => {
-  const rpc = async <T>(name: string, body: object): Promise<T> => {
-    let response: Response;
-    let text: string;
+// The runner's own sign-in, as an ordinary user, kept in memory and refreshed as the app's is. If a refresh is refused
+// it signs in again. Nothing of it is logged.
+export const runnerSession = ({ url, key, email, password }: DbConfig, server = new GalleryServer({ url, key })) => {
+  let session: ServerSession | null = null;
+  let pending: Promise<string> | null = null;
+  const fresh = async (): Promise<string> => {
+    const refreshed = session && (await server.refresh(session.refreshToken, email).catch(() => null));
+    session = refreshed ?? (await server.signIn(email, password).catch(() => null));
+    if (!session) throw new DbError(401);
+    return session.accessToken;
+  };
+  return {
+    token: (): Promise<string> => {
+      if (session && session.expiresAt - Date.now() > REFRESH_BEFORE_MS) return Promise.resolve(session.accessToken);
+      // A refresh token works once, so callers at the same time share one.
+      pending ??= fresh().finally(() => {
+        pending = null;
+      });
+      return pending;
+    },
+    // The server refused the token, so the next call gets a new one.
+    reset: () => {
+      if (session) session = { ...session, expiresAt: 0 };
+    },
+  };
+};
+
+export type RunnerSession = ReturnType<typeof runnerSession>;
+
+export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & { accept(): Promise<boolean> } => {
+  const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
+    const authorization = `Bearer ${await auth.token()}`;
     try {
-      response = await send(`${url}/rest/v1/rpc/${name}`, {
+      const response = await send(`${url}/rest/v1/rpc/${name}`, {
         method: "POST",
-        headers: { apikey: key, authorization: `Bearer ${token}`, "content-type": "application/json" },
+        headers: { apikey: key, authorization, "content-type": "application/json" },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(CALL_ABORT_MS),
       });
-      text = await response.text();
+      return { status: response.status, text: await response.text() };
     } catch {
       throw new DbError(0);
     }
-    if (!response.ok) throw new DbError(response.status);
+  };
+  const rpc = async <T>(name: string, body: object): Promise<T> => {
+    let { status, text } = await call(name, body);
+    // An expired session: once more, with a new one.
+    if (status === 401) {
+      auth.reset();
+      ({ status, text } = await call(name, body));
+    }
+    if (status < 200 || status >= 300) throw new DbError(status);
     return (text ? JSON.parse(text) : null) as T;
   };
 
   return {
+    // Takes up the link the owner made in Blueberry. False until they have.
+    accept: async () => (await rpc<unknown>("accept_cloud_runner_link", { p_owner_email: owner })) === true,
     claim: async () => {
       const rows = await rpc<Record<string, unknown>[]>("runner_claim_job", {});
       const row = rows?.[0];

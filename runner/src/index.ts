@@ -2,7 +2,7 @@ import { modelConfig } from "../../src/main/agent";
 import { browserbase } from "../../src/main/browserbase";
 import { CloudSessions, type CloudBrowser } from "../../src/main/cloudBrowser";
 import { isLocalEndpoint, localChrome } from "../../src/main/localChrome";
-import { dbConfig, supabaseDb, type ClaimedJob } from "./db";
+import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { quietConsole } from "./quietConsole";
 
@@ -52,7 +52,8 @@ const cloudBrowser = (contextId: string | null): CloudBrowser =>
         },
       });
 
-const db = supabaseDb(config as Exclude<typeof config, string>);
+const settings = config as Exclude<typeof config, string>;
+const db = supabaseDb(settings, runnerSession(settings));
 const unreleased = new UnreleasedBrowsers();
 const shutdown = new AbortController();
 let working: Promise<unknown> | null = null;
@@ -68,20 +69,47 @@ process.on("SIGINT", quit);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Until the owner has linked this runner in Blueberry, there's nothing it may do.
+const LINK_RETRY_MS = 30_000;
+const NOT_LINKED = "Not linked yet: its owner has to link this runner's account in Blueberry, in Settings > Cloud. Trying again in 30 seconds.";
+let linked = false;
+const link = async (): Promise<void> => {
+  try {
+    linked = await db.accept();
+  } catch (error) {
+    linked = false;
+    console.error(error instanceof DbError && error.status === 401 ? "Couldn't sign in as the runner. Check BLUEBERRY_RUNNER_EMAIL and BLUEBERRY_RUNNER_PASSWORD." : error instanceof Error ? error.message : "Couldn't reach Supabase.");
+    return;
+  }
+  console.log(linked ? "Linked to its owner." : NOT_LINKED);
+};
+
 const loop = async () => {
   console.log(`Runner started, using ${local ? "a local Chrome" : "Browserbase"}.`);
   let unreachable = false;
   while (!shutdown.signal.aborted) {
     await unreleased.retry();
+    if (!linked) {
+      await link();
+      if (!linked) {
+        await sleep(LINK_RETRY_MS);
+        continue;
+      }
+    }
     let job: ClaimedJob | null = null;
     try {
       job = await db.claim();
       if (unreachable) console.log("Reached Supabase again.");
       unreachable = false;
     } catch (error) {
-      // Said once, not every few seconds.
-      if (!unreachable) console.error(error instanceof Error ? error.message : "Couldn't reach Supabase.");
-      unreachable = true;
+      if (error instanceof DbError && error.status === 403) {
+        // Unlinked by its owner, so it asks again rather than working on anything.
+        linked = false;
+      } else {
+        // Said once, not every few seconds.
+        if (!unreachable) console.error(error instanceof Error ? error.message : "Couldn't reach Supabase.");
+        unreachable = true;
+      }
     }
     if (!job) {
       await sleep(POLL_MS);

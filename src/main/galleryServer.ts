@@ -187,4 +187,19 @@ export class GalleryServer {
   async forgetCloudJob(token: string, id: string): Promise<void> {
     await this.request("/rest/v1/rpc/forget_cloud_job", { method: "POST", token, body: { p_job: id } });
   }
+
+  // The user's runner: an account of its own, named by email, which counts once the runner has accepted.
+
+  async linkCloudRunner(token: string, email: string): Promise<boolean> {
+    return (await this.request<unknown>("/rest/v1/rpc/link_cloud_runner", { method: "POST", token, body: { p_email: email } })) === true;
+  }
+
+  async unlinkCloudRunner(token: string): Promise<void> {
+    await this.request("/rest/v1/rpc/unlink_cloud_runner", { method: "POST", token, body: {} });
+  }
+
+  async myCloudRunner(token: string): Promise<{ email: string; accepted: boolean } | null> {
+    const [row] = (await this.request<{ email?: unknown; accepted?: unknown }[]>("/rest/v1/rpc/my_cloud_runner", { method: "POST", token, body: {} })) ?? [];
+    return row && typeof row.email === "string" ? { email: row.email, accepted: row.accepted === true } : null;
+  }
 }

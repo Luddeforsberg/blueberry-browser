@@ -18,6 +18,8 @@ import { startFakeSupabase } from "./fakeSupabase";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const SHOTS = process.env.BLUEBERRY_SHOTS ?? join(homedir(), "blueberry-audit", "shots-runner");
 const EMAIL = "ana@example.com";
+const RUNNER_EMAIL = "runner@example.com";
+const RUNNER_PASSWORD = "a long random runner password";
 const PROMPT = "Order the thing from my shop";
 
 const SHOP = `<!doctype html><title>Shop</title>
@@ -55,6 +57,16 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     const signedIn = await chrome.evaluate((email) => window.chromeAPI.account.signUp(email, "correct horse battery"), EMAIL);
     expect(signedIn.status).toBe("signed-in");
 
+    // The runner's own account, made in the dashboard, and linked from Settings > Cloud.
+    await supabase.addAccount(RUNNER_EMAIL, RUNNER_PASSWORD);
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
+    const runnerField = chrome.getByLabel("Runner's email");
+    await runnerField.scrollIntoViewIfNeeded();
+    await runnerField.fill(RUNNER_EMAIL);
+    await chrome.getByRole("button", { name: "Link", exact: true }).click();
+    await expect(chrome.getByText(`Linked to ${RUNNER_EMAIL}. Waiting for the runner`)).toBeVisible();
+    await shoot(chrome, "settings-runner-waiting");
+
     runner = spawn(process.execPath, ["runner/dist/index.cjs"], {
       cwd: root,
       env: {
@@ -63,7 +75,9 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
         LLM_PROVIDER: "openai",
         SUPABASE_URL: supabase.env.SUPABASE_URL,
         SUPABASE_PUBLISHABLE_KEY: supabase.env.SUPABASE_PUBLISHABLE_KEY,
-        BLUEBERRY_RUNNER_TOKEN: supabase.runnerToken(EMAIL),
+        BLUEBERRY_RUNNER_EMAIL: RUNNER_EMAIL,
+        BLUEBERRY_RUNNER_PASSWORD: RUNNER_PASSWORD,
+        BLUEBERRY_RUNNER_OWNER: EMAIL,
         BLUEBERRY_RUNNER_CHROME: CHROME,
         BLUEBERRY_RUNNER_POLL_MS: "300",
       },
@@ -71,6 +85,12 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     });
     runner.stdout?.on("data", (part: Buffer) => (runnerLog += part));
     runner.stderr?.on("data", (part: Buffer) => (runnerLog += part));
+
+    // The runner accepts on start, and Settings says so.
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.cloud.runnerState())).status, { timeout: 20_000 }).toBe("linked");
+    await expect(chrome.getByText(`${RUNNER_EMAIL} is your runner.`)).toBeVisible();
+    await shoot(chrome, "settings-runner-linked");
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
 
     model.callTools({ name: "open_tab", args: { url: shop } });
     model.callTools({ name: "list_elements", args: {} });
@@ -136,6 +156,8 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     expect(runnerLog).not.toContain(PROMPT);
     expect(runnerLog).not.toContain("Order placed");
     expect(runnerLog).not.toContain("Place order");
+    expect(runnerLog).not.toContain(RUNNER_PASSWORD);
+    expect(runnerLog).toContain("Linked to its owner.");
   } finally {
     runner?.kill("SIGTERM");
     await app.close();

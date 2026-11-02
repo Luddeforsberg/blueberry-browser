@@ -29,6 +29,7 @@ const setUp = () => {
     }),
     cloudJobs: async (token: string, ids: string[]) => ids.flatMap((id) => (jobs.get(id)?.owner === token ? [jobs.get(id)!.row] : [])),
     decideCloudApproval: vi.fn(async () => true),
+    myCloudRunner: async () => ({ email: "runner@example.com", accepted: true }),
     stopCloudJob: vi.fn(async () => {}),
     forgetCloudJob: vi.fn(async () => {}),
   } as unknown as GalleryServer;

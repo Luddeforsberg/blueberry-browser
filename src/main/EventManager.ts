@@ -165,6 +165,9 @@ export class EventManager {
     this.handle("cloud:end", () => this.mainWindow.cloud.end());
     this.handle("cloud:view", (tabId) => this.mainWindow.cloud.view(tabId));
     this.handle("cloud:runner-view", (chatId) => (typeof chatId === "string" ? this.mainWindow.runnerJobs.liveView(chatId) : null));
+    this.handle("cloud:runner-state", () => this.mainWindow.runnerJobs.refreshLink());
+    this.handle("cloud:runner-link", (email) => this.mainWindow.runnerJobs.linkRunner(email));
+    this.handle("cloud:runner-unlink", () => this.mainWindow.runnerJobs.unlinkRunner());
     this.handle("cloud:watch", (tabId) => this.mainWindow.cloud.watch(tabId));
     this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
     this.handle("cloud:login-suggestions", () => this.mainWindow.cloudLoginSuggestions());

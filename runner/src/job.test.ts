@@ -157,18 +157,24 @@ describe("a job on the runner", () => {
 });
 
 describe("the runner's keys", () => {
-  const token = (claims: object) => `x.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.y`;
-  const env = { SUPABASE_URL: "https://abc.supabase.co", SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x", BLUEBERRY_RUNNER_TOKEN: token({ role: "blueberry_runner", sub: "u1" }) };
+  const env = {
+    SUPABASE_URL: "https://abc.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x",
+    BLUEBERRY_RUNNER_EMAIL: "runner@example.com",
+    BLUEBERRY_RUNNER_PASSWORD: "long and random",
+    BLUEBERRY_RUNNER_OWNER: "ana@example.com",
+  };
 
-  it("takes the runner's own role and the publishable key", () => {
-    expect(dbConfig(env)).toEqual({ url: "https://abc.supabase.co", key: "sb_publishable_x", token: env.BLUEBERRY_RUNNER_TOKEN });
+  it("takes its own account and the publishable key", () => {
+    expect(dbConfig(env)).toEqual({ url: "https://abc.supabase.co", key: "sb_publishable_x", email: "runner@example.com", password: "long and random", owner: "ana@example.com" });
   });
 
   it.each([
     ["a secret key", { SUPABASE_PUBLISHABLE_KEY: "sb_secret_x" }],
-    ["a service role token", { BLUEBERRY_RUNNER_TOKEN: token({ role: "service_role" }) }],
-    ["a user's session", { BLUEBERRY_RUNNER_TOKEN: token({ role: "authenticated", sub: "u1" }) }],
-    ["a token for no one", { BLUEBERRY_RUNNER_TOKEN: token({ role: "blueberry_runner" }) }],
+    ["a legacy service role key", { SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.x" }],
+    ["no password", { BLUEBERRY_RUNNER_PASSWORD: "" }],
+    ["no owner", { BLUEBERRY_RUNNER_OWNER: undefined }],
+    ["the owner's own account", { BLUEBERRY_RUNNER_EMAIL: "Ana@example.com" }],
     ["plain http", { SUPABASE_URL: "http://abc.supabase.co" }],
   ])("refuses %s", (_, change) => {
     expect(typeof dbConfig({ ...env, ...change })).toBe("string");

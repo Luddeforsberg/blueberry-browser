@@ -1,21 +1,36 @@
 -- Jobs for the cloud runner, and the approvals they wait on. A job is the user's: they start it, read it, stop it and
--- answer it. The runner only works on it, as the role `blueberry_runner`, with a token that also names the user, so it
--- reaches that one user's jobs and nothing else. It can ask, but no grant or function lets it answer: a decision is only
--- ever written by `decide_cloud_approval`, which only a signed-in user can call. No cookie, code or picture is kept here.
--- Run it once in the SQL editor, after the Gallery's migration.
+-- answer it. The runner is an ordinary Supabase user of its own, such as runner@…, signed in with email and password
+-- and the publishable key, and linked to one owner. It only works on that owner's jobs, and only through the `runner_*`
+-- functions below: it can ask, but nothing lets it answer. A decision is only ever written by `decide_cloud_approval`,
+-- which refuses any runner. No cookie, code or picture is kept here. Run it once in the SQL editor, after the Gallery's.
 
-create role blueberry_runner nologin noinherit;
--- So the API can take on the role for a token that names it.
-grant blueberry_runner to authenticator;
-grant usage on schema public to blueberry_runner;
-
--- Who is asking, for the user and the runner alike. `auth.uid()` reads the token's `sub`, and this calls it as its owner
--- so the runner's role needs nothing in the `auth` schema.
+-- Who is asking. `auth.uid()` reads the token's `sub`.
 create function public.cloud_user() returns uuid
 language sql stable security definer set search_path = ''
 as $$ select auth.uid() $$;
 revoke all on function public.cloud_user() from public, anon, authenticated;
-grant execute on function public.cloud_user() to authenticated, blueberry_runner;
+grant execute on function public.cloud_user() to authenticated;
+
+-- Which user is whose runner. The owner offers it, naming the runner's account, and it counts only once the runner has
+-- accepted, naming the owner back. So nobody can send their jobs to someone else's runner, or turn someone's own account
+-- into a runner, by knowing an email. One runner per owner and one owner per runner.
+create table public.cloud_runner_links (
+  owner uuid primary key references auth.users (id) on delete cascade,
+  runner uuid not null references auth.users (id) on delete cascade,
+  accepted boolean not null default false,
+  created_at timestamptz not null default now(),
+  constraint not_yourself check (owner <> runner)
+);
+create unique index cloud_runner_links_one_owner on public.cloud_runner_links (runner) where accepted;
+alter table public.cloud_runner_links enable row level security;
+revoke all on table public.cloud_runner_links from public, anon, authenticated;
+
+-- The owner the caller is runner for, or null for anyone who isn't one.
+create function public.cloud_runner_for() returns uuid
+language sql stable security definer set search_path = ''
+as $$ select l.owner from public.cloud_runner_links l where l.runner = auth.uid() and l.accepted $$;
+revoke all on function public.cloud_runner_for() from public, anon, authenticated;
+grant execute on function public.cloud_runner_for() to authenticated;
 
 create table public.cloud_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -94,29 +109,68 @@ create policy "Users read their own jobs" on public.cloud_jobs
   for select to authenticated using (owner = public.cloud_user());
 create policy "Users remove their own jobs" on public.cloud_jobs
   for delete to authenticated using (owner = public.cloud_user());
-create policy "The runner reads its user's jobs" on public.cloud_jobs
-  for select to blueberry_runner using (owner = public.cloud_user());
-create policy "The runner works on its user's jobs" on public.cloud_jobs
-  for update to blueberry_runner using (owner = public.cloud_user()) with check (owner = public.cloud_user());
+-- Only what's still to do, so a runner never sees how the owner's earlier jobs went.
+create policy "A runner reads its owner's unfinished jobs" on public.cloud_jobs
+  for select to authenticated using (owner = public.cloud_runner_for() and status in ('queued', 'running', 'waiting'));
 
-create policy "Users and the runner read their own approvals" on public.cloud_approvals
-  for select to authenticated, blueberry_runner using (owner = public.cloud_user());
--- Only on a job it's running for that same user.
-create policy "The runner asks on its user's running jobs" on public.cloud_approvals
-  for insert to blueberry_runner with check (
-    owner = public.cloud_user()
-    and exists (select 1 from public.cloud_jobs j where j.id = job_id and j.owner = public.cloud_user() and j.status = 'running')
-  );
+create policy "Users read their own approvals" on public.cloud_approvals
+  for select to authenticated using (owner = public.cloud_user());
+create policy "A runner reads its owner's approvals" on public.cloud_approvals
+  for select to authenticated using (owner = public.cloud_runner_for());
 
--- Rows say whose. These say which columns. The user writes what they asked for, only through `start_cloud_job`, the
--- runner what happened, and nobody writes a decision: that's only the function below. Nobody but the database changes `owner` or the dates it stamps.
-revoke all on table public.cloud_jobs from public, anon, authenticated, blueberry_runner;
-revoke all on table public.cloud_approvals from public, anon, authenticated, blueberry_runner;
+-- The user and the runner are both `authenticated`, so no column grant can tell them apart. So nobody writes these
+-- tables directly: every write is one of the functions below, and each checks who's calling. Reading and deleting
+-- one's own jobs is all a grant allows.
+revoke all on table public.cloud_jobs from public, anon, authenticated;
+revoke all on table public.cloud_approvals from public, anon, authenticated;
 grant select, delete on table public.cloud_jobs to authenticated;
-grant select on table public.cloud_jobs to blueberry_runner;
-grant update (status, steps, reply, error, live_view_url, claimed_at, heartbeat_at, updated_at, finished_at) on table public.cloud_jobs to blueberry_runner;
-grant select on table public.cloud_approvals to authenticated, blueberry_runner;
-grant insert (job_id, owner, kind, text, need, site) on table public.cloud_approvals to blueberry_runner;
+grant select on table public.cloud_approvals to authenticated;
+
+-- Linking, by the owner and then the runner.
+
+-- The owner names the runner's account by email. It replaces any earlier link, and waits for the runner to accept.
+create function public.link_cloud_runner(p_email text) returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  me uuid := auth.uid();
+  found_runner uuid;
+begin
+  if me is null or public.cloud_runner_for() is not null then return false; end if;
+  select u.id into found_runner from auth.users u where lower(u.email) = lower(btrim(p_email));
+  if found_runner is null or found_runner = me then return false; end if;
+  insert into public.cloud_runner_links (owner, runner) values (me, found_runner)
+    on conflict (owner) do update set runner = excluded.runner, accepted = false, created_at = now();
+  return true;
+end;
+$$;
+
+create function public.unlink_cloud_runner() returns void
+language sql security definer set search_path = ''
+as $$ delete from public.cloud_runner_links where owner = auth.uid() $$;
+
+-- The owner's link: the runner's email and whether it has accepted. Nothing if there's none.
+create function public.my_cloud_runner() returns table (email text, accepted boolean)
+language sql stable security definer set search_path = ''
+as $$
+  select u.email::text, l.accepted from public.cloud_runner_links l join auth.users u on u.id = l.runner where l.owner = auth.uid();
+$$;
+
+-- The runner takes up the link from the owner it was set up for, by their email. False if that owner hasn't offered one.
+-- An account that has jobs of its own can't become anyone's runner.
+create function public.accept_cloud_runner_link(p_owner_email text) returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null or exists (select 1 from public.cloud_jobs j where j.owner = me) then return false; end if;
+  update public.cloud_runner_links l set accepted = true
+    where l.runner = me and l.owner = (select u.id from auth.users u where lower(u.email) = lower(btrim(p_owner_email)))
+      and not exists (select 1 from public.cloud_runner_links o where o.runner = me and o.accepted and o.owner <> l.owner);
+  return found;
+end;
+$$;
 
 -- For the user, as themselves, so the rules above apply.
 
@@ -131,6 +185,8 @@ declare
   made uuid;
 begin
   if me is null then raise exception 'Not signed in' using errcode = '42501'; end if;
+  -- A runner works on its owner's jobs and has none of its own.
+  if public.cloud_runner_for() is not null then raise exception 'A runner can''t start jobs' using errcode = '42501'; end if;
   perform pg_advisory_xact_lock(hashtextextended('cloud_jobs:' || me::text, 0));
   if (select count(*) from public.cloud_jobs j where j.owner = public.cloud_user() and j.status in ('queued', 'running', 'waiting')) >= 5 then
     raise exception 'Too many cloud jobs at once' using errcode = 'P0001';
@@ -175,14 +231,16 @@ begin
 end;
 $$;
 
--- The one way anything is allowed: the signed-in user, on their own approval, once, while its job is waiting on it. Only
--- `authenticated` may call it, so the runner's role can't, and neither can anyone signed out.
+-- The one way anything is allowed: the signed-in owner, on their own approval, once, while its job is waiting on it.
+-- Nobody signed out can call it, and a linked runner is refused outright.
 create function public.decide_cloud_approval(p_approval uuid, p_allow boolean, p_answer text default null) returns boolean
 language plpgsql security definer set search_path = ''
 as $$
 declare
   me uuid := public.cloud_user();
 begin
+  -- Whatever it's asked, a runner never answers.
+  if public.cloud_runner_for() is not null then raise exception 'A runner can''t decide' using errcode = '42501'; end if;
   if me is null or p_approval is null or p_allow is null then return false; end if;
   update public.cloud_approvals a
     set decision = case when p_allow then 'allow' else 'deny' end,
@@ -200,39 +258,45 @@ as $$
   with gone as (delete from public.cloud_jobs where id = p_job returning id) select exists (select 1 from gone);
 $$;
 
--- For the runner, as `blueberry_runner`, so it only ever touches its user's jobs, and only the columns it may.
+-- For the runner, signed in as its own user. Each checks that the caller is a linked runner, and only ever touches its
+-- owner's jobs, and only what the runner may write.
 
--- Takes the oldest queued job, so two runners never get the same one. A job whose runner went quiet ends as failed
--- rather than starting again, because it may have done half of something.
+-- Takes the owner's oldest queued job, so two runners never get the same one. A job whose runner went quiet ends as
+-- failed rather than starting again, because it may have done half of something.
 create function public.runner_claim_job() returns setof public.cloud_jobs
-language plpgsql security invoker set search_path = ''
+language plpgsql security definer set search_path = ''
 as $$
+declare
+  owner_of uuid := public.cloud_runner_for();
 begin
+  if owner_of is null then raise exception 'Not a linked runner' using errcode = '42501'; end if;
   update public.cloud_jobs
     set status = 'failed', error = 'The runner stopped while this job was going, so it ended there.',
       live_view_url = null, finished_at = now(), updated_at = now()
-    where status in ('running', 'waiting') and heartbeat_at < now() - interval '2 minutes';
+    where owner = owner_of and status in ('running', 'waiting') and heartbeat_at < now() - interval '2 minutes';
   return query
     update public.cloud_jobs j
       set status = 'running', claimed_at = now(), heartbeat_at = now(), updated_at = now()
       where j.id = (
-        select q.id from public.cloud_jobs q where q.status = 'queued' order by q.created_at limit 1 for update skip locked
+        select q.id from public.cloud_jobs q where q.owner = owner_of and q.status = 'queued' order by q.created_at limit 1 for update skip locked
       )
       returning j.*;
 end;
 $$;
 
 -- What happened so far. Null leaves a field as it is, and an empty live view clears it. Answers whether to stop, which
--- is also the answer for a job that's gone or over.
+-- is also the answer for a job that's gone, over or not this runner's.
 create function public.runner_update_job(
   p_job uuid, p_status text default null, p_steps jsonb default null, p_reply text default null, p_error text default null, p_live_view text default null
 ) returns boolean
-language plpgsql security invoker set search_path = ''
+language plpgsql security definer set search_path = ''
 as $$
 declare
+  owner_of uuid := public.cloud_runner_for();
   ending boolean := p_status in ('done', 'failed', 'stopped');
   stopping boolean;
 begin
+  if owner_of is null then raise exception 'Not a linked runner' using errcode = '42501'; end if;
   if p_status = 'queued' then raise exception 'A job goes back to the queue only by being sent again' using errcode = 'P0001'; end if;
   update public.cloud_jobs
     set status = coalesce(p_status, status),
@@ -243,21 +307,26 @@ begin
       heartbeat_at = now(),
       updated_at = now(),
       finished_at = case when ending then now() else finished_at end
-    where id = p_job and status in ('running', 'waiting')
+    where id = p_job and owner = owner_of and status in ('running', 'waiting')
     returning stop_requested into stopping;
   return coalesce(stopping, true);
 end;
 $$;
 
--- Asks the user, and the job waits. Says the approval's id, which is all the runner can then do anything with: read it.
+-- Asks the owner, on a job it's running, and the job waits. Says the approval's id, which the runner can then only read.
 create function public.runner_ask(p_job uuid, p_kind text, p_text text, p_need text default null, p_site text default null) returns uuid
-language plpgsql security invoker set search_path = ''
+language plpgsql security definer set search_path = ''
 as $$
 declare
+  owner_of uuid := public.cloud_runner_for();
   made uuid;
 begin
+  if owner_of is null then raise exception 'Not a linked runner' using errcode = '42501'; end if;
+  if not exists (select 1 from public.cloud_jobs j where j.id = p_job and j.owner = owner_of and j.status = 'running') then
+    raise exception 'Not a job it''s running' using errcode = '42501';
+  end if;
   insert into public.cloud_approvals (job_id, owner, kind, text, need, site)
-    values (p_job, public.cloud_user(), p_kind, p_text, p_need, p_site)
+    values (p_job, owner_of, p_kind, p_text, p_need, p_site)
     returning id into made;
   update public.cloud_jobs set status = 'waiting', heartbeat_at = now(), updated_at = now() where id = p_job;
   return made;
@@ -267,24 +336,21 @@ $$;
 create function public.runner_decision(p_approval uuid) returns table (decision text, answer text)
 language sql stable security invoker set search_path = ''
 as $$
-  select a.decision, a.answer from public.cloud_approvals a where a.id = p_approval;
+  select a.decision, a.answer from public.cloud_approvals a where a.id = p_approval and a.owner = public.cloud_runner_for();
 $$;
 
-revoke all on function public.start_cloud_job(text, jsonb, jsonb, text, text) from public, anon, authenticated;
-revoke all on function public.my_cloud_jobs(uuid[]) from public, anon, authenticated;
-revoke all on function public.stop_cloud_job(uuid) from public, anon, authenticated;
-revoke all on function public.decide_cloud_approval(uuid, boolean, text) from public, anon, authenticated;
-revoke all on function public.forget_cloud_job(uuid) from public, anon, authenticated;
-revoke all on function public.runner_claim_job() from public, anon, authenticated;
-revoke all on function public.runner_update_job(uuid, text, jsonb, text, text, text) from public, anon, authenticated;
-revoke all on function public.runner_ask(uuid, text, text, text, text) from public, anon, authenticated;
-revoke all on function public.runner_decision(uuid) from public, anon, authenticated;
-grant execute on function public.start_cloud_job(text, jsonb, jsonb, text, text) to authenticated;
-grant execute on function public.my_cloud_jobs(uuid[]) to authenticated;
-grant execute on function public.stop_cloud_job(uuid) to authenticated;
-grant execute on function public.decide_cloud_approval(uuid, boolean, text) to authenticated;
-grant execute on function public.forget_cloud_job(uuid) to authenticated;
-grant execute on function public.runner_claim_job() to blueberry_runner;
-grant execute on function public.runner_update_job(uuid, text, jsonb, text, text, text) to blueberry_runner;
-grant execute on function public.runner_ask(uuid, text, text, text, text) to blueberry_runner;
-grant execute on function public.runner_decision(uuid) to blueberry_runner;
+do $$
+declare
+  fn text;
+begin
+  foreach fn in array array[
+    'start_cloud_job(text, jsonb, jsonb, text, text)', 'my_cloud_jobs(uuid[])', 'stop_cloud_job(uuid)',
+    'decide_cloud_approval(uuid, boolean, text)', 'forget_cloud_job(uuid)', 'link_cloud_runner(text)', 'unlink_cloud_runner()',
+    'my_cloud_runner()', 'accept_cloud_runner_link(text)', 'runner_claim_job()',
+    'runner_update_job(uuid, text, jsonb, text, text, text)', 'runner_ask(uuid, text, text, text, text)', 'runner_decision(uuid)'
+  ] loop
+    execute format('revoke all on function public.%s from public, anon, authenticated', fn);
+    execute format('grant execute on function public.%s to authenticated', fn);
+  end loop;
+end;
+$$;

@@ -5,6 +5,7 @@ import { isLiveView } from "./browserbase";
 import type { ChatRunner, RunnerJobInput, RunnerProgress } from "./Chats";
 import { approvalFromRow, FINISHED, historyFromRow, mascotSnapshot, stepsFromRow, type CloudJobStatus } from "./cloudJobs";
 import { ServerError, type GalleryServer } from "./galleryServer";
+import type { RunnerState } from "../shared/ipc";
 import type { ChatStep } from "../shared/library";
 
 // Chats whose jobs went to the cloud runner, which keeps going with this computer off. The jobs, their steps and their
@@ -20,6 +21,10 @@ const NOT_TAKEN = "The runner's queue didn't take the job. Try again in a moment
 const TOO_MANY = "Five jobs are already waiting or going on the runner. Try again when one is done.";
 const FAILED = "The job failed on the runner.";
 const GONE = "This job isn't on your account any more.";
+const NO_SUCH_RUNNER = "There's no Blueberry account with that email that can be your runner. Create it in Supabase first, and don't use your own.";
+const LINK_FAILED = "The runner couldn't be linked. Try again in a moment.";
+// While the runner hasn't accepted yet, it's looked up again this often.
+const LINK_POLL_MS = 10_000;
 const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
 const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 
@@ -44,6 +49,7 @@ export interface RunnerJobsHooks {
   finished: (chatId: string, result: { reply: string; steps: ChatStep[]; error: string | null }) => void;
   // The user's Browserbase Context, so the sites they brought along are signed in there too.
   contextId: () => string | null;
+  runnerUpdated?: (state: RunnerState) => void;
 }
 
 const fresh = (account: string, jobId: string | null, active: boolean): Entry => ({ account, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
@@ -56,6 +62,10 @@ export class RunnerJobs implements ChatRunner {
   private polling = false;
   // Who was signed in when the account last changed, so a change clears what the last one saw.
   private seenAccount: string | null;
+  // The runner linked to the signed-in account, as the server last said, and why linking last failed.
+  private link: { email: string; accepted: boolean } | null = null;
+  private linkProblem: string | null = null;
+  private linkTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -67,6 +77,7 @@ export class RunnerJobs implements ChatRunner {
     this.seenAccount = this.signedIn;
     this.load();
     this.schedule();
+    void this.refreshLink();
   }
 
   private get signedIn(): string | null {
@@ -79,8 +90,51 @@ export class RunnerJobs implements ChatRunner {
     return !!entry && entry.account === this.signedIn;
   }
 
+  // Only with a runner that has accepted the link, so a job never waits in a queue nobody takes from.
   available(): boolean {
-    return this.server !== null && this.account.state.status === "signed-in";
+    return this.server !== null && this.signedIn !== null && this.link?.accepted === true;
+  }
+
+  get runnerState(): RunnerState {
+    if (!this.server) return { status: "not-set-up", email: null, problem: null };
+    if (!this.signedIn) return { status: "signed-out", email: null, problem: null };
+    if (!this.link) return { status: "none", email: null, problem: this.linkProblem };
+    return { status: this.link.accepted ? "linked" : "waiting", email: this.link.email, problem: this.linkProblem };
+  }
+
+  // Asks the server who the runner is. While it hasn't accepted, it keeps asking now and then.
+  async refreshLink(): Promise<RunnerState> {
+    if (this.linkTimer) clearTimeout(this.linkTimer);
+    this.linkTimer = null;
+    const account = this.signedIn;
+    if (!account) this.link = null;
+    else {
+      const link = await this.withToken(account, (token) => this.server!.myCloudRunner(token).then((found) => ({ found })));
+      if (link && this.signedIn === account) this.link = link.found;
+    }
+    if (this.link && !this.link.accepted) this.linkTimer = setTimeout(() => void this.refreshLink(), LINK_POLL_MS);
+    this.hooks.runnerUpdated?.(this.runnerState);
+    return this.runnerState;
+  }
+
+  async linkRunner(email: unknown): Promise<RunnerState> {
+    const account = this.signedIn;
+    const address = typeof email === "string" ? email.trim() : "";
+    this.linkProblem = null;
+    if (!account || !address || address.length > 320 || !address.includes("@")) {
+      this.linkProblem = NO_SUCH_RUNNER;
+      return this.refreshLink();
+    }
+    const linked = await this.withToken(account, (token) => this.server!.linkCloudRunner(token, address));
+    if (linked !== true) this.linkProblem = linked === false ? NO_SUCH_RUNNER : LINK_FAILED;
+    return this.refreshLink();
+  }
+
+  async unlinkRunner(): Promise<RunnerState> {
+    const account = this.signedIn;
+    this.linkProblem = null;
+    if (account) await this.withToken(account, (token) => this.server!.unlinkCloudRunner(token));
+    return this.refreshLink();
   }
 
   has(chatId: string): boolean {
@@ -183,13 +237,18 @@ export class RunnerJobs implements ChatRunner {
         Object.assign(entry, { steps: [], reply: "", error: null, liveView: null, approval: null });
         if (entry.active) this.hooks.changed(chatId);
       });
+      this.link = null;
+      this.linkProblem = null;
+      void this.refreshLink();
     }
     this.schedule();
   }
 
   destroy(): void {
     if (this.timer) clearTimeout(this.timer);
+    if (this.linkTimer) clearTimeout(this.linkTimer);
     this.timer = null;
+    this.linkTimer = null;
   }
 
   // A token for that account only. A refresh can end after someone else signs in and hand back their token, so who is
