@@ -102,7 +102,7 @@ export const Onboarding: React.FC = () => {
                         <ul className="mt-4 flex flex-col gap-2 text-15 text-muted-foreground text-left">
                             <li>I only read a page when you ask, and the chat always shows which one.</li>
                             <li>I only speak up about work you started.</li>
-                            <li>Your history stays on this computer, apart from the few details it takes to word a suggestion. You can turn that off in Settings.</li>
+                            <li>Your history stays on this computer, apart from the summary it takes to suggest something. You can turn that off in Settings.</li>
                         </ul>
                         <Button className="mt-8" onClick={finish}>Start browsing</Button>
                     </>

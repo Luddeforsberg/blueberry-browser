@@ -242,6 +242,7 @@ export class EventManager {
     this.handle("account:sign-out", () => this.mainWindow.account.signOut());
     this.handle("suggestions:list", () => this.mainWindow.suggestions.list());
     this.handle("suggestions:dismiss", (id) => this.mainWindow.suggestions.dismiss(id));
+    this.handle("suggestions:used", (id) => this.mainWindow.suggestions.used(id));
   }
 
   private handleDownloadEvents(): void {

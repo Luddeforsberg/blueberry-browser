@@ -2,27 +2,19 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 /// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoVisits, seedChats } from "../evals/seedHistory";
 import { HistoryStore } from "../src/main/HistoryStore";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
+import { DEMO_LINES, REFUSED_LINES, demoProposals } from "./suggestionReplies";
 
-const CARDS = JSON.stringify({
-  cards: [
-    { id: "p1", title: "Meet Linus", name: "Linus", instructions: "Keep an eye on my checkout pull requests.", palette: "kingfisher", accessory: "glasses" },
-    { id: "p2", title: "Top stories at 8:15", name: "Morning stories", instructions: "Read the front page and list five stories." },
-    { id: "p3", title: "Newest flats on Södermalm", prompt: "What's newly listed on Södermalm?" },
-    { id: "p4", title: "Lisbon flights this week", prompt: "Find the cheapest flights to Lisbon this week." },
-  ],
-});
-
-test("a card fills things in, and one dismissed stays gone", async () => {
+test("only cards whose evidence checks out show, a card fills things in, and one dismissed stays gone", async () => {
   test.setTimeout(60_000);
   const model = await startFakeModel();
-  model.titleWith(CARDS);
+  model.suggestFrom(demoProposals);
   const profile = mkdtempSync(join(tmpdir(), "blueberry-suggestions-"));
   new HistoryStore(join(profile, "history.db")).importVisits(demoVisits());
   seedChats(profile);
@@ -33,11 +25,18 @@ test("a card fills things in, and one dismissed stays gone", async () => {
     const composer = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
     const cards = chrome.getByRole("region", { name: "Things you repeat" }).getByRole("listitem");
 
-    // The page doesn't wait for the model, and the reason comes from the history, not from it.
-    await expect(cards).toHaveCount(3, { timeout: 20_000 });
-    await expect(chrome.getByText(/You’ve opened Hacker News around 8:\d\d/)).toBeVisible();
+    // The page doesn't wait for the model, and only what checks out comes from it.
+    await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible({ timeout: 20_000 });
+    await expect(cards).toHaveCount(3);
+    for (const line of Object.values(DEMO_LINES)) await expect(chrome.getByText(line)).toBeVisible();
+    for (const line of REFUSED_LINES) await expect(chrome.getByText(line)).toHaveCount(0);
+    // Not just left off the page: only these got past the checks.
+    const saved = JSON.parse(readFileSync(join(profile, "suggestions.json"), "utf8")) as { proposals: Array<{ card: { title: string } }> };
+    expect(saved.proposals.map(({ card }) => card.title).sort()).toEqual(Object.values(DEMO_LINES).sort());
 
-    const sent = JSON.stringify(model.titleRequests[0].messages);
+    const sent = JSON.stringify(model.suggestionRequests[0].messages);
+    expect(sent).toContain("news.ycombinator.com");
+    expect(sent).toContain("Cheap flights to Lisbon");
     expect(sent).not.toContain("sore throat");
     expect(sent).not.toContain("Swedbank");
     expect(sent).not.toContain("Inbox");
@@ -57,7 +56,7 @@ test("a card fills things in, and one dismissed stays gone", async () => {
     await chrome.getByRole("button", { name: "Set it up" }).click();
     await expect(chrome.getByRole("heading", { name: "New routine" })).toBeVisible();
     await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Morning stories");
-    await expect(chrome.getByLabel("Time")).toHaveValue(/^0[78]:\d\d$/);
+    await expect(chrome.getByRole("textbox", { name: "Time", exact: true })).toHaveValue("08:15");
     const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
     expect(library.routines).toHaveLength(0);
 
@@ -72,14 +71,14 @@ test("a card fills things in, and one dismissed stays gone", async () => {
     await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
 
     await app.close();
-    const asked = model.titleRequests.length;
+    const asked = model.suggestionRequests.length;
     app = await launchApp(profile, { modelEnv: model.env });
     chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
 
     await expect(chrome.getByRole("button", { name: "Meet Linus", exact: true })).toBeVisible();
     await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
-    expect(model.titleRequests).toHaveLength(asked);
+    expect(model.suggestionRequests).toHaveLength(asked);
   } finally {
     await app.close();
     model.close();

@@ -94,13 +94,13 @@ export const plainText = (text: string): string =>
   // eslint-disable-next-line no-control-regex
   text.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
 
-const titleToShare = (title: string): string | null => {
+export const titleToShare = (title: string): string | null => {
   const clean = plainText(title);
   return !clean || clean.includes("://") || PRIVATE_TITLE.test(clean) ? null : clean.slice(0, MAX_TITLE_LENGTH);
 };
 
 // A title may repeat a search or an order number when the address has a query, so those titles stay here.
-const shareableTitle = ({ url, title }: PatternVisit): string | null => {
+export const shareableTitle = ({ url, title }: PatternVisit): string | null => {
   try {
     return new URL(url).search ? null : titleToShare(title);
   } catch {
@@ -311,14 +311,14 @@ const NOT_WORTH_COMPARING = new Set(
 );
 
 // Cut short so "flights" and "flight", or "cheap" and "cheapest", count as the same word in any language.
-const wordsOf = (text: string): Set<string> =>
+export const wordsOf = (text: string): Set<string> =>
   new Set(
     (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
       .filter((word) => word.length > 2 && !NOT_WORTH_COMPARING.has(word))
       .map((word) => word.slice(0, WORD_STEM))
   );
 
-const areSimilar = (a: Set<string>, b: Set<string>): boolean => {
+export const areSimilar = (a: Set<string>, b: Set<string>): boolean => {
   const shared = [...a].filter((word) => b.has(word)).length;
   return shared >= MIN_SHARED_WORDS && shared / Math.min(a.size, b.size) >= MIN_WORD_OVERLAP;
 };
@@ -353,15 +353,12 @@ const chatPatterns = (chats: PatternChat[], now: number): Pattern[] => {
   });
 };
 
-// Every site in the history by the name people would write, such as "reddit" for old.reddit.com.
+// A site by the name people would write, such as "reddit" for old.reddit.com.
 const COUNTRY_SECOND_LEVEL = /^(co|com|org|net|ac|gov|edu)$/;
-const nameOfSite = (host: string): string | undefined => {
+export const nameOfSite = (host: string): string | undefined => {
   const parts = host.split(".");
   return parts.at(-1)?.length === 2 && COUNTRY_SECOND_LEVEL.test(parts.at(-2) ?? "") ? parts.at(-3) : parts.at(-2);
 };
-export const siteNamesIn = (visits: PatternVisit[]): string[] => [
-  ...new Set(visits.flatMap(({ url }) => nameOfSite(normaliseSite(url) ?? "") ?? []).filter((name) => name.length > 2)),
-];
 
 // Everything the history and chats show, best first. Costs a few milliseconds and no money.
 export const findPatterns = (visits: PatternVisit[], chats: PatternChat[], now = Date.now()): Pattern[] => {

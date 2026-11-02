@@ -68,7 +68,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const dismiss = (id: string) => void window.chromeAPI.suggestions.dismiss(id).then(setSuggestions)
 
     const askBerry = async (message: string) => {
-        if (filled) void window.chromeAPI.suggestions.dismiss(filled.id)
+        if (filled) void window.chromeAPI.suggestions.used(filled.id)
         const chat = await window.chromeAPI.chat.send(null, message, { seePage: false, mascotId: chosen.id, cloud: inCloud && cloudState.status !== 'off' })
         if (!chat) return
         await browser.openPage('chat', { param: chat.id, title: chat.title })

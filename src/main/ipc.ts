@@ -95,6 +95,7 @@ export const CHANNEL_REGIONS: {
   "account:sign-out": ["chrome"],
   "suggestions:list": ["chrome"],
   "suggestions:dismiss": ["chrome"],
+  "suggestions:used": ["chrome"],
   "downloads:list": ["chrome"],
   "downloads:act": ["chrome"],
   "downloads:choose-folder": ["chrome"],

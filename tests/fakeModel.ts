@@ -30,6 +30,8 @@ export const startFakeModel = async () => {
   const titleRequests: FakeModelRequest[] = [];
   let memory = '{"facts":[]}';
   const memoryRequests: FakeModelRequest[] = [];
+  let suggest: ((digest: string) => string) | null = null;
+  const suggestionRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -43,7 +45,9 @@ export const startFakeModel = async () => {
 
     if (parsed.model === TITLE_MODEL) {
       const asksWhatToRemember = JSON.stringify(parsed.messages[0]).includes("offer to remember");
-      (asksWhatToRemember ? memoryRequests : titleRequests).push(parsed);
+      const human = parsed.messages.at(-1)?.content;
+      const asksForSuggestions = typeof human === "string" && human.startsWith("<browsing_digest>");
+      (asksWhatToRemember ? memoryRequests : asksForSuggestions ? suggestionRequests : titleRequests).push(parsed);
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -51,7 +55,7 @@ export const startFakeModel = async () => {
           object: "chat.completion",
           created: 0,
           model: TITLE_MODEL,
-          choices: [{ index: 0, message: { role: "assistant", content: asksWhatToRemember ? memory : title }, finish_reason: "stop" }],
+          choices: [{ index: 0, message: { role: "assistant", content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title }, finish_reason: "stop" }],
         })
       );
       return;
@@ -98,6 +102,7 @@ export const startFakeModel = async () => {
     requests,
     titleRequests,
     memoryRequests,
+    suggestionRequests,
     reset() {
       memory = '{"facts":[]}';
       memoryRequests.length = 0;
@@ -109,10 +114,16 @@ export const startFakeModel = async () => {
       thinkMs = 0;
       requests.length = 0;
       titleRequests.length = 0;
+      suggest = null;
+      suggestionRequests.length = 0;
     },
     // What the title model answers. NONE means the chat has no topic yet.
     titleWith(next: string) {
       title = next;
+    },
+    // What the cheap model proposes for the new tab, worked out from the digest it was sent.
+    suggestFrom(next: (digest: string) => string) {
+      suggest = next;
     },
     // What the cheap model proposes for a bird to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {
