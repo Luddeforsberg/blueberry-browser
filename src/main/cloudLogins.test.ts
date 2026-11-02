@@ -109,13 +109,19 @@ const fakeContext = (): CookieJar & { cookies: CloudCookie[] } => {
   return context;
 };
 
+// The same jar every time, as `CloudSessions` is.
+const stable = (withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T>) => {
+  const jar = { withContext };
+  return () => jar;
+};
+
 const setup = ({ confirmed = true, cookies = [] as StoredCookie[] } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), "cloud-logins-"));
   const file = join(dir, "cloud-logins.json");
   const context = fakeContext();
   const readCookies = vi.fn(async (site: string) => cookies.filter((one) => cookieDomainPattern(site).test(one.domain!)));
   const confirm = vi.fn(async () => confirmed);
-  const logins = new CloudLogins(file, { jar: () => ({ withContext: (act) => act(context) }), confirm, readCookies, onChange: () => {} });
+  const logins = new CloudLogins(file, { jar: stable((act) => act(context)), confirm, readCookies, onChange: () => {} });
   return { file, context, readCookies, confirm, logins };
 };
 
@@ -191,13 +197,40 @@ describe("CloudLogins", () => {
     writeFileSync(file, JSON.stringify(Array.from({ length: MAX_SITES }, (_, index) => ({ site: `site${index}.com`, addedAt: 5, checkedAt: null, status: "brought" }))));
     const readCookies = vi.fn(async () => [cookie(".site0.com"), cookie(".example.com")]);
     const confirm = vi.fn(async () => true);
-    const logins = new CloudLogins(file, { jar: () => ({ withContext: (act) => act(fakeContext()) }), confirm, readCookies, onChange: () => {} });
+    const logins = new CloudLogins(file, { jar: stable((act) => act(fakeContext())), confirm, readCookies, onChange: () => {} });
     expect(await logins.bring("example.com")).toMatch(/already 50 sites.*Remove one first/);
     expect(confirm).not.toHaveBeenCalled();
     expect(readCookies).not.toHaveBeenCalled();
     expect(logins.logins).toHaveLength(MAX_SITES);
     expect(await logins.bring("site0.com")).toBeNull();
     expect(logins.logins.map(({ site }) => site)).toContain("site49.com");
+  });
+
+  it("copies nothing when the cloud browser ends, or its key changes, while the user is still confirming", async () => {
+    for (const change of ["replaced", "ended"] as const) {
+      const file = join(mkdtempSync(join(tmpdir(), "cloud-logins-")), "cloud-logins.json");
+      const old = vi.fn(async () => {});
+      let current: { withContext: <T>(act: (jar: CookieJar) => Promise<T>) => Promise<T> } | null = { withContext: (act) => act({ addCookies: old, clearCookies: async () => {} }) };
+      let answer: (yes: boolean) => void = () => {};
+      const logins = new CloudLogins(file, { jar: () => current, confirm: () => new Promise((resolve) => (answer = resolve)), readCookies: async () => signedIn, onChange: () => {} });
+      const pending = logins.bring("example.com");
+      await Promise.resolve();
+      if (change === "ended") logins.cancelPending();
+      else current = { withContext: (act) => act(fakeContext()) };
+      answer(true);
+      expect(await pending).toMatch(/ended or its key changed/);
+      expect(old).not.toHaveBeenCalled();
+      expect(logins.logins).toEqual([]);
+    }
+  });
+
+  it("says the sign-in went in when the list couldn't be saved", async () => {
+    // A folder where the file should be, so writing it fails.
+    const dir = mkdtempSync(join(tmpdir(), "cloud-logins-"));
+    const context = fakeContext();
+    const logins = new CloudLogins(dir, { jar: stable((act) => act(context)), confirm: async () => true, readCookies: async () => signedIn, onChange: () => {} });
+    expect(await logins.bring("example.com")).toMatch(/is in the cloud browser, but the list here couldn't be saved.*Forget all cloud logins/);
+    expect(context.cookies).toHaveLength(1);
   });
 
   it("does nothing with the cloud off", async () => {

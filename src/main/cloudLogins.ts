@@ -172,6 +172,8 @@ const NOT_TAKEN = "The cloud browser didn't take that. Try again.";
 export class CloudLogins {
   private list: CloudLogin[] = [];
   private busy = false;
+  // Goes up whenever the cloud browser ends or is replaced, so a copy still waiting on the user never lands in it.
+  private generation = 0;
 
   constructor(
     private readonly file: string,
@@ -188,24 +190,32 @@ export class CloudLogins {
     return this.list;
   }
 
+  // The cloud browser ended, or its key was forgotten or changed. Anything still waiting copies nothing.
+  cancelPending(): void {
+    this.generation++;
+  }
+
   // Says what went wrong, or null once it's in.
   async bring(site: string): Promise<string | null> {
     const jar = this.hooks.jar();
     if (!jar) return "The cloud browser is off.";
     // Every site on the list needs its Remove, so a full list takes no more until one comes off.
     if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site)) return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
+    const generation = this.generation;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
       if (!stored) return "Blueberry couldn't read its own sign-in to that site. Try again.";
       const cookies = cookiesForSite(stored, site);
       if (cookies.length === 0) return `Blueberry isn't signed in to ${site}, so there's nothing to bring along. Sign in there in a tab first.`;
+      // The user took a while to confirm, and the browser it was for may have gone meanwhile.
+      if (generation !== this.generation || this.hooks.jar() !== jar) return "Nothing was brought along, because the cloud browser ended or its key changed meanwhile.";
       try {
         await jar.withContext((context) => context.addCookies(cookies));
       } catch {
         return NOT_TAKEN;
       }
-      this.save(withLogin(this.list, site));
+      if (!this.save(withLogin(this.list, site))) return `The sign-in to ${site} is in the cloud browser, but the list here couldn't be saved, so it may not show after a restart. Try again, or use Forget all cloud logins.`;
       return null;
     });
   }
@@ -253,16 +263,20 @@ export class CloudLogins {
     }
   }
 
-  private save(next: CloudLogin[]): void {
+  // False if it couldn't be written, though the list in memory has changed.
+  private save(next: CloudLogin[]): boolean {
     this.list = parseLogins(next);
+    let saved = true;
     try {
       mkdirSync(dirname(this.file), { recursive: true });
       const temp = `${this.file}.tmp`;
       writeFileSync(temp, JSON.stringify(this.list), { mode: 0o600 });
       renameSync(temp, this.file);
     } catch {
+      saved = false;
       console.error("Couldn't save the list of cloud logins.");
     }
     this.hooks.onChange();
+    return saved;
   }
 }

@@ -138,6 +138,7 @@ export class CloudTabs implements ChatCloud {
 
   // Ends the session at the provider and closes every cloud tab, whatever was working there.
   async end(): Promise<CloudState> {
+    this.logins.cancelPending();
     await this.watch(null);
     // The tabs go first, so nothing is left showing a page that's on its way out.
     (this.sessions?.pageIds ?? []).forEach((id) => this.hooks.closeTab(id));
@@ -202,8 +203,10 @@ export class CloudTabs implements ChatCloud {
 
   // The window closed the tab, so the page goes too.
   tabClosed(id: string): void {
-    this.taken.delete(id);
-    if (this.checking.delete(id)) this.sessions?.endWhenIdle();
+    const wasUsers = this.taken.delete(id);
+    this.checking.delete(id);
+    // The user may still have another tab there, which keeps it open.
+    if (wasUsers && this.taken.size === 0) this.sessions?.endWhenIdle();
     if (this.watching?.id === id) void this.watch(null);
     void this.sessions?.close(id);
   }
