@@ -48,6 +48,8 @@ export interface NeedsYouItem {
   job: string;
   // Set when it's a routine's run.
   routineId: string | null;
+  // The app that started it from outside Blueberry, such as "Claude Code".
+  from: string | null;
   // What it did last, in its own words. Null if it hasn't done anything yet.
   lastStep: string | null;
   // The tab it's working in, for going there.
@@ -69,6 +71,8 @@ export interface ChatThreadSummary {
   updatedAt: number;
   // Who the chat runs as. Null is Berry, which every chat from before the flock stays.
   mascotId: string | null;
+  // The app that started it from outside Blueberry, such as "Claude Code". Null for one the user started here.
+  from: string | null;
   // A reply is being written right now.
   running?: boolean;
 }

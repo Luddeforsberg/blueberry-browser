@@ -28,6 +28,8 @@ const MIGRATIONS = [
   // Chats from before the flock have none, which means Berry.
   `ALTER TABLE chats ADD COLUMN mascot_id TEXT;`,
   `ALTER TABLE messages ADD COLUMN memory TEXT;`,
+  // The app outside Blueberry that started the chat, such as "Claude Code". Null for the user's own.
+  `ALTER TABLE chats ADD COLUMN source TEXT;`,
 ];
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
@@ -44,17 +46,19 @@ export class ChatStore {
 
   summaries(): ChatThreadSummary[] {
     return this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId FROM chats ORDER BY updated_at DESC, rowid DESC")
+      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\" FROM chats ORDER BY updated_at DESC, rowid DESC")
       .all() as unknown as ChatThreadSummary[];
   }
 
-  // What each of the newest chats began with, for noticing what the user keeps asking.
+  // What each of the newest chats began with, for noticing what the user keeps asking. A chat another app started
+  // isn't something the user asked.
   firstMessages(limit: number): Array<ChatThreadSummary & { firstMessage: string }> {
     return this.db
       .prepare(
         `SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId,
+           source AS "from",
            (SELECT content FROM messages WHERE chat_id = chats.id AND role = 'user' ORDER BY id LIMIT 1) AS firstMessage
-         FROM chats ORDER BY updated_at DESC, rowid DESC LIMIT ?`
+         FROM chats WHERE source IS NULL ORDER BY updated_at DESC, rowid DESC LIMIT ?`
       )
       .all(limit)
       .flatMap((row) => ((row as { firstMessage: string | null }).firstMessage ? [row as unknown as ChatThreadSummary & { firstMessage: string }] : []));
@@ -62,7 +66,7 @@ export class ChatStore {
 
   chat(id: string): StoredChat | null {
     const summary = this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId FROM chats WHERE id = ?")
+      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\" FROM chats WHERE id = ?")
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
@@ -76,11 +80,11 @@ export class ChatStore {
     return { ...summary, messages };
   }
 
-  createChat(title: string, mascotId: string | null = null): string {
+  createChat(title: string, mascotId: string | null = null, from: string | null = null): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO chats (id, title, updated_at, title_settled, mascot_id) VALUES (?, ?, ?, 0, ?)")
-      .run(id, title, Date.now(), mascotId);
+      .prepare("INSERT INTO chats (id, title, updated_at, title_settled, mascot_id, source) VALUES (?, ?, ?, 0, ?, ?)")
+      .run(id, title, Date.now(), mascotId, from);
     return id;
   }
 

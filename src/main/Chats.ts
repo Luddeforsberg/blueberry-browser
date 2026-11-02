@@ -105,8 +105,8 @@ interface Run {
   memoryNote: string;
   // Questions it asked and what the user typed back.
   answers: { question: string; answer: string }[];
-  // This answer came from the phone, so it stays out of what's offered for remembering.
-  answeredByPhone?: boolean;
+  // This answer came from the phone or another app, not typed here, so it stays out of what's offered for remembering.
+  answeredElsewhere?: boolean;
   // A tab went to the user during this reply, so nothing about this job is offered for remembering.
   handedOver: boolean;
 }
@@ -135,6 +135,8 @@ export interface WaitingRun {
   mascotId: string;
   // Null for a task, which has no saved chat.
   chatTitle: string | null;
+  // The app that started its chat, such as "Claude Code".
+  from: string | null;
   lastStep: string | null;
   tabId: string | null;
   askedAt: number;
@@ -389,6 +391,7 @@ export class Chats {
             approval: publicApproval(run.approval),
             mascotId: run.mascot.id,
             chatTitle: this.store.chat(id)?.title ?? null,
+            from: this.store.chat(id)?.from ?? null,
             // Not the step it is on, which is the asking.
             lastStep: run.steps.filter((step) => step.done).at(-1)?.text ?? null,
             tabId: this.browser.allTabs().some((tab) => tab.id === tabId) ? tabId : null,
@@ -488,8 +491,13 @@ export class Chats {
   }
 
   // Starts a chat when `chatId` is null, as `mascotId` if it's given. An existing chat stays with its own mascot.
-  // The reply follows through the events.
-  send(chatId: string | null, text: string, { seePage, mascotId }: { seePage: boolean; mascotId?: string | null }): ChatThread | null {
+  // The reply follows through the events. `from` names the app outside Blueberry that started a new chat, and `sites`
+  // can only narrow where this reply may go, on top of the mascot's own.
+  send(
+    chatId: string | null,
+    text: string,
+    { seePage, mascotId, from = null, sites = [] }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[] }
+  ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
     if (chatId && (!this.store.chat(chatId) || this.runs.has(chatId))) return null;
@@ -497,8 +505,9 @@ export class Chats {
     // The renderer's choice is checked here, so nothing but a mascot in the flock can start a chat.
     const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
     if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
-    const id = chatId ?? this.store.createChat(titleFrom(message), chosen);
-    const mascot = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
+    const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
+    const profile = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
+    const mascot = sites.length > 0 ? { ...profile, sites: narrowSites(profile.sites, sites) } : profile;
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
     const earlier = this.finished.get(id)?.run;
@@ -586,6 +595,8 @@ export class Chats {
     }
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
+    // Another app wrote what this chat started with, so none of it is what the user said about themselves.
+    if (this.store.chat(chatId)?.from) return;
     this.offerToRemember(chatId, run, this.errors.has(chatId), {
       said: this.userWords(chatId),
       routine: null,
@@ -768,16 +779,16 @@ export class Chats {
   private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
     return this.wait(chatId, run, question, { question: true }, (allow, answer) => {
       if (!allow || !answer) return null;
-      if (!run.answeredByPhone) run.answers.push({ question, answer });
+      if (!run.answeredElsewhere) run.answers.push({ question, answer });
       return answer;
     });
   }
 
   // False if that request has already been answered or its reply has ended. `answer` is for a question.
-  decide(chatId: string, approvalId: string, allow: boolean, answer?: string, { fromPhone = false }: { fromPhone?: boolean } = {}): boolean {
+  decide(chatId: string, approvalId: string, allow: boolean, answer?: string, { fromPhone = false, fromApp = false }: { fromPhone?: boolean; fromApp?: boolean } = {}): boolean {
     const run = this.runs.get(chatId);
     if (run?.approval?.id !== approvalId) return false;
-    run.answeredByPhone = fromPhone;
+    run.answeredElsewhere = fromPhone || fromApp;
     const { answer: finish } = run.approval;
     run.approval = null;
     this.events.onDecided?.(approvalId, allow === true);

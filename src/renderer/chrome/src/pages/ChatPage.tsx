@@ -72,7 +72,11 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     <div className={cn("max-w-[800px] mx-auto pr-6 pt-8 pb-4 flex flex-col gap-6", gutter)}>
                         {messages.map((message, index) =>
                             message.role === 'user' ? (
-                                <UserMessage key={index} content={message.content} />
+                                <div key={index} className="flex flex-col">
+                                    {/* Another app wrote the first message, so it says whose words they are. */}
+                                    {index === 0 && thread.from && <p className="mb-1.5 text-12 text-muted-foreground text-right">From {thread.from}</p>}
+                                    <UserMessage content={message.content} />
+                                </div>
                             ) : (
                                 <AssistantMessage
                                     key={index}

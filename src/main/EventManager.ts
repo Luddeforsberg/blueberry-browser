@@ -155,6 +155,10 @@ export class EventManager {
     this.handle("phone:new-link", () => this.mainWindow.telegram.newLink());
     this.handle("phone:open-link", () => this.mainWindow.telegram.openLink());
     this.handle("phone:disconnect", () => this.mainWindow.telegram.disconnect());
+    this.handle("mcp:state", () => this.mainWindow.mcp.state);
+    this.handle("mcp:set-on", (on) => this.mainWindow.mcp.setOn(on === true));
+    this.handle("mcp:revoke", () => this.mainWindow.mcp.revoke());
+    this.handle("mcp:copy", async (app) => typeof app === "string" && (await this.mainWindow.mcp.copy(app)));
   }
 
   private handleChatEvents(): void {

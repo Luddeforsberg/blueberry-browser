@@ -162,6 +162,13 @@ const chromeAPI: ChromeAPI = {
     onUpdated: (callback) => subscribe("phone:updated", callback),
     onAnswered: (callback) => subscribe("phone:answered", callback),
   },
+  mcp: {
+    state: () => invoke("mcp:state"),
+    setOn: (on) => invoke("mcp:set-on", on),
+    revoke: () => invoke("mcp:revoke"),
+    copy: (app) => invoke("mcp:copy", app),
+    onUpdated: (callback) => subscribe("mcp:updated", callback),
+  },
   suggestions: {
     list: () => invoke("suggestions:list"),
     dismiss: (id) => invoke("suggestions:dismiss", id),

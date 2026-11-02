@@ -136,7 +136,7 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
                     {question && <QuestionBox name={name} onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)} />}
                     <div className="mt-1 min-h-7 flex flex-wrap items-center gap-x-1.5 text-12 text-muted-foreground">
                         <Berry mood="asking" size={24} mascot={mascot} className="shrink-0" />
-                        <span className="min-w-0 truncate">{name} · {item.job} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
+                        <span className="min-w-0 truncate">{name} · {item.job}{item.from && ` · from ${item.from}`} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
                         <span className={cn("ml-auto flex items-center", QUIETLY)}>
                             {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={goToTab}>Go to the tab</Button>}
                             <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
