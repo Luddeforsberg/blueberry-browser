@@ -82,6 +82,23 @@ export const browserbase = ({ apiKey, projectId, saved, onSaved, fetch: send = f
 
   return {
     name: "browserbase",
+    get hasSession() {
+      return saved.sessionId !== null;
+    },
+    // Needs only the saved id, so a session whose connection was lost, or never made, still ends and stops costing.
+    release: async () => {
+      const id = saved.sessionId;
+      if (!id) return;
+      try {
+        await call("POST", `/sessions/${encodeURIComponent(id)}`, { status: "REQUEST_RELEASE" });
+      } catch (error) {
+        // One that has already ended can't be released, and doesn't need to be.
+        const known = await call<Session>("GET", `/sessions/${encodeURIComponent(id)}`).catch(() => null);
+        if (!known || known.status === "RUNNING" || known.status === "PENDING") throw error;
+      }
+      saved = { ...saved, sessionId: null };
+      onSaved(saved);
+    },
     start: async (): Promise<CloudSession> => {
       const { id, connectUrl } = await session();
       const browser = await connect(connectUrl);
@@ -95,11 +112,8 @@ export const browserbase = ({ apiKey, projectId, saved, onSaved, fetch: send = f
           const url = match?.debuggerFullscreenUrl ?? live.debuggerFullscreenUrl;
           return url ? withoutNavbar(url) : null;
         },
-        end: async () => {
+        close: async () => {
           await browser.close().catch(() => {});
-          await call("POST", `/sessions/${encodeURIComponent(id)}`, { status: "REQUEST_RELEASE" });
-          saved = { ...saved, sessionId: null };
-          onSaved(saved);
         },
       };
     },

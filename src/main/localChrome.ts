@@ -59,6 +59,9 @@ const launch = (executable: string): Promise<{ endpoint: string; process: ChildP
 // `endpoint` connects to a browser already running here. Otherwise one is launched from `executable` or the usual place.
 export const localChrome = ({ endpoint, executable }: { endpoint?: string; executable?: string } = {}): CloudBrowser => ({
   name: "local",
+  // Closing the session ends this browser, so there's nothing left at a provider to release.
+  hasSession: false,
+  release: async () => {},
   start: async (): Promise<CloudSession> => {
     if (endpoint && !isLocalEndpoint(endpoint)) throw new Error("A local browser has to be on 127.0.0.1.");
     const path = executable ?? findChrome();
@@ -66,13 +69,14 @@ export const localChrome = ({ endpoint, executable }: { endpoint?: string; execu
     const launched = endpoint ? null : await launch(path!);
     const browser = await connectOverCdp(endpoint ?? launched!.endpoint).catch((error) => {
       launched?.process.kill();
+      if (launched) rmSync(launched.profile, { recursive: true, force: true });
       throw error;
     });
     const context = browser.contexts()[0] ?? (await browser.newContext());
     return {
       context,
       liveView: async () => null,
-      end: async () => {
+      close: async () => {
         await browser.close().catch(() => {});
         if (!launched) return;
         launched.process.kill();

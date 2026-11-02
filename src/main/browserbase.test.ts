@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Browser } from "playwright-core";
 import { browserbase, BROWSERBASE_REGION, type BrowserbaseSaved } from "./browserbase";
 import type { CdpTab } from "./CdpTab";
+import { CloudSessions } from "./cloudBrowser";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
 
@@ -97,18 +98,68 @@ describe("Browserbase", () => {
     expect(await session.liveView({ targetId: "NEW", url: "https://c.test/" } as CdpTab)).toBe("https://www.browserbase.com/devtools-fullscreen/inspector.html?wss=all&navbar=false");
   });
 
-  it("releases the session when it ends, so it stops costing", async () => {
+  it("ends the session at Browserbase before letting go of the connection, so it stops costing", async () => {
     const { calls, send } = stub({
       "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
       "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
     });
     const fake = fakeBrowser();
     const kept: BrowserbaseSaved[] = [];
-    const session = await browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: null }, onSaved: (saved) => kept.push(saved), fetch: send, connect: async () => fake.browser }).start();
-    await session.end();
+    const provider = browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: null }, onSaved: (saved) => kept.push(saved), fetch: send, connect: async () => fake.browser });
+    const session = await provider.start();
+    expect(provider.hasSession).toBe(true);
+    await provider.release();
+    await session.close();
     expect(fake.closed()).toBe(true);
     expect(calls.at(-1)).toMatchObject({ method: "POST", url: "https://api.browserbase.com/v1/sessions/sess-1", body: { status: "REQUEST_RELEASE" } });
     expect(kept.at(-1)).toEqual({ contextId: "ctx", sessionId: null });
+    expect(provider.hasSession).toBe(false);
+  });
+
+  it("releases a session it made even when connecting to it failed", async () => {
+    const { calls, send } = stub({
+      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
+      "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
+    });
+    const provider = browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: null }, onSaved: () => {}, fetch: send, connect: async () => Promise.reject(new Error("no connection")) });
+    const sessions = new CloudSessions(provider);
+    sessions.claim("job");
+    await expect(sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} })).rejects.toThrow("no connection");
+    expect(calls.at(-1)).toMatchObject({ method: "POST", url: "https://api.browserbase.com/v1/sessions/sess-1", body: { status: "REQUEST_RELEASE" } });
+    expect(sessions.canEnd).toBe(false);
+  });
+
+  it("ends a session from last time with no connection to it, and says so until Browserbase confirms", async () => {
+    const answers: Record<string, { status?: number; body: unknown }> = {
+      "POST /sessions/sess-1": { status: 500, body: {} },
+      "GET /sessions/sess-1": { body: { id: "sess-1", status: "RUNNING" } },
+    };
+    const { calls, send } = stub(answers);
+    const provider = browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: "sess-1" }, onSaved: () => {}, fetch: send, connect: async () => fakeBrowser().browser });
+    const sessions = new CloudSessions(provider);
+    expect(sessions.canEnd).toBe(true);
+
+    await sessions.end();
+    expect(sessions.unreleased).toBe(true);
+    expect(sessions.problem).toMatch(/may still be running, and costing/);
+    expect(sessions.canEnd).toBe(true);
+
+    answers["POST /sessions/sess-1"] = { body: { id: "sess-1", status: "COMPLETED" } };
+    await sessions.end();
+    expect(calls.filter(({ method, url }) => method === "POST" && url.endsWith("/sessions/sess-1"))).toHaveLength(2);
+    expect(sessions.unreleased).toBe(false);
+    expect(sessions.problem).toBeNull();
+    expect(sessions.canEnd).toBe(false);
+  });
+
+  it("counts a session that has already ended as released", async () => {
+    const { send } = stub({
+      "POST /sessions/sess-1": { status: 400, body: {} },
+      "GET /sessions/sess-1": { body: { id: "sess-1", status: "TIMED_OUT" } },
+    });
+    const provider = browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: "sess-1" }, onSaved: () => {}, fetch: send, connect: async () => fakeBrowser().browser });
+    await provider.release();
+    expect(provider.hasSession).toBe(false);
   });
 
   it("says plainly when the key is refused", async () => {

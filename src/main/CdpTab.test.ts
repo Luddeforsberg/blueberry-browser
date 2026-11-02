@@ -169,6 +169,19 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     await cloud.close("cloud-3");
   });
 
+  it("loads a popup from an earlier chat's page only into that page, never into the job working now", async () => {
+    const earlier = await cloud.open("job", "cloud-6", `${origin}/links`, { onChange: () => {} });
+    cloud.release("job");
+    cloud.claim("now");
+    const current = await cloud.open("now", "cloud-7", `${origin}/`, { onChange: () => {} });
+    await earlier.runInPage(`void window.open("${origin}/next")`);
+    await vi.waitFor(() => expect(earlier.url).toBe(`${origin}/next`), { timeout: 5000 });
+    expect(current.url).toBe(`${origin}/`);
+    await Promise.all([cloud.close("cloud-6"), cloud.close("cloud-7")]);
+    cloud.release("now");
+    cloud.claim("job");
+  });
+
   it("lets one job at a time use the session", () => {
     expect(cloud.claim("another")).toBe(false);
     cloud.release("job");

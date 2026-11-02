@@ -78,6 +78,8 @@ export class CloudTabs implements ChatCloud {
       configured: !!this.saved.apiKey && !!this.saved.projectId,
       status: sessions ? sessions.status : "off",
       busy: !!sessions?.busyWith,
+      canEnd: !!sessions?.canEnd,
+      unreleased: !!sessions?.unreleased,
       problem: this.problem ?? sessions?.problem ?? null,
     };
   }
@@ -208,6 +210,7 @@ export class CloudTabs implements ChatCloud {
     if (typeof id !== "string" || !this.page(id)) return false;
     this.taken.add(id);
     this.hooks.takenOver(id);
+    this.changed();
     return true;
   }
 

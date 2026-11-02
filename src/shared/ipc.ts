@@ -345,6 +345,10 @@ export interface CloudState {
   status: "off" | "idle" | "starting" | "running" | "ended";
   // The chat or run using it now, if any.
   busy: boolean;
+  // Whether End has anything to end, here or at the provider.
+  canEnd: boolean;
+  // The provider didn't confirm the last end, so a paid session may still be running.
+  unreleased: boolean;
   problem: string | null;
 }
 

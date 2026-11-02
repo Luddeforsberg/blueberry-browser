@@ -36,8 +36,6 @@ export const CloudSettings: React.FC = () => {
         }
     }
 
-    const running = cloud.status === 'starting' || cloud.status === 'running'
-
     return (
         <>
             <SettingsRow
@@ -46,7 +44,7 @@ export const CloudSettings: React.FC = () => {
                 description="A bird can do a job in a browser on Browserbase instead of in your tabs here. You watch it live in a cloud tab and can take over there, and it asks you before anything risky, the same as here. That browser isn’t signed in to anything yet."
             />
             <SettingsRow id="setting-cloud-status" title="Status" description={statusLine(cloud)}>
-                <Button variant="outline" disabled={!running} onClick={() => void api.end().then(setCloud)}>End cloud session</Button>
+                <Button variant="outline" disabled={!cloud.canEnd} onClick={() => void api.end().then(setCloud)}>End cloud session</Button>
             </SettingsRow>
 
             {cloud.provider !== 'local' && !cloud.configured && (
@@ -74,8 +72,9 @@ export const CloudSettings: React.FC = () => {
             )}
 
             {cloud.problem && (
-                <div className="py-4">
-                    <p role="alert" className="text-13 text-warning">{cloud.problem}</p>
+                <div className="py-4 flex items-center gap-6">
+                    <p role="alert" className="flex-1 min-w-0 text-13 text-warning">{cloud.problem}</p>
+                    {cloud.unreleased && <Button variant="outline" onClick={() => void api.end().then(setCloud)}>Try again</Button>}
                 </div>
             )}
         </>

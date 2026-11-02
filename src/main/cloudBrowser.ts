@@ -10,13 +10,17 @@ export interface CloudSession {
   // An address for an iframe showing this page live, which the user can work in. Null where there's none, as for a
   // local browser, which shows pictures instead.
   liveView(page: CdpTab): Promise<string | null>;
-  // Ends it at the provider too, so nothing keeps running or costing.
-  end(): Promise<void>;
+  // Lets go of the connection, and ends a browser this computer started.
+  close(): Promise<void>;
 }
 
 export interface CloudBrowser {
   readonly name: "browserbase" | "local";
   start(): Promise<CloudSession>;
+  // Whether a session may still be running at the provider, connected or not.
+  readonly hasSession: boolean;
+  // Ends it there, with or without a connection, so nothing keeps running or costing. Rejects if that wasn't confirmed.
+  release(): Promise<void>;
 }
 
 // Playwright loads only when a cloud browser is first used, so startup never waits for it.
@@ -38,6 +42,8 @@ export class CloudSessions {
   private readonly pages = new Map<string, { tab: CdpTab; jobId: string }>();
   private _status: CloudStatus = "idle";
   private _problem: string | null = null;
+  // The last release wasn't confirmed, so a paid session may still be running.
+  private _unreleased = false;
   // Every page made here. Anything else in the context is a popup a page opened.
   private readonly ours = new WeakSet<Page>();
   private opening: Promise<unknown> = Promise.resolve();
@@ -53,6 +59,15 @@ export class CloudSessions {
 
   get problem(): string | null {
     return this._problem;
+  }
+
+  get unreleased(): boolean {
+    return this._unreleased;
+  }
+
+  // Whether End has anything to end, here or at the provider.
+  get canEnd(): boolean {
+    return this.session !== null || this.starting !== null || this.browser.hasSession || this._unreleased;
   }
 
   get provider(): CloudBrowser["name"] {
@@ -93,8 +108,11 @@ export class CloudSessions {
         return session;
       } catch (error) {
         this._status = "idle";
-        this._problem = error instanceof Error ? error.message : "The cloud browser couldn't start.";
-        throw new Error(this._problem);
+        const problem = error instanceof Error ? error.message : "The cloud browser couldn't start.";
+        // A session may have been made before the connection failed, and nothing else would end it.
+        await this.releaseAtProvider();
+        this._problem ??= problem;
+        throw new Error(problem);
       } finally {
         this.starting = null;
         this.onChange();
@@ -140,16 +158,17 @@ export class CloudSessions {
     const url = page.url();
     await page.close().catch(() => {});
     if (!/^https?:/.test(url)) return;
-    // A link with `noopener` has no opener to find, so it goes where the job last acted.
-    const tabs = this.jobTabs();
-    const tab = tabs.find((one) => one.page === opener) ?? tabs.sort((a, b) => b.actedAt - a.actedAt)[0];
+    // Only into the tab that opened it, whichever chat that is. A popup with no opener to find, as from a `noopener`
+    // link, loads nowhere, so it can't land in another chat's page.
+    const tab = [...this.pages.values()].find(({ tab: one }) => one.page === opener)?.tab;
     await tab?.loadURL(url).catch(() => {});
   }
 
+  // The connection went. A kept-alive session can still be running at the provider, which End can release.
   private lost(): void {
     if (!this.session) return;
     this.session = null;
-    this._status = "ended";
+    this._status = "idle";
     this.pages.clear();
     this.onChange();
   }
@@ -200,14 +219,30 @@ export class CloudSessions {
     return page && this.session ? this.session.liveView(page).catch(() => null) : null;
   }
 
-  // Everything goes: the pages, the job's claim and the session at the provider.
+  // True once the provider has confirmed. Otherwise it says so, and End stays there to try again.
+  private async releaseAtProvider(): Promise<boolean> {
+    try {
+      await this.browser.release();
+      this._unreleased = false;
+      this._problem = null;
+      return true;
+    } catch (error) {
+      console.error("Couldn't release the cloud session:", error);
+      this._unreleased = true;
+      this._problem = "The cloud session may still be running, and costing, because the provider didn't confirm it ended. Try again.";
+      return false;
+    }
+  }
+
+  // Everything goes: the session at the provider first, then the connection, the pages and the job's claim.
   async end(): Promise<void> {
     const session = this.session ?? (await this.starting?.catch(() => null)) ?? null;
+    await this.releaseAtProvider();
+    await session?.close().catch(() => {});
     this.session = null;
     this.pages.clear();
     this.owner = null;
     this._status = "ended";
     this.onChange();
-    await session?.end().catch((error) => console.error("Couldn't end the cloud session:", error));
   }
 }

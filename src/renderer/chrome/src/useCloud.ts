@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CloudState } from '@shared/ipc'
 
-const OFF: CloudState = { provider: null, configured: false, status: 'off', busy: false, problem: null }
+const OFF: CloudState = { provider: null, configured: false, status: 'off', busy: false, canEnd: false, unreleased: false, problem: null }
 
 // Whether there's a cloud browser, and what it's doing. Never the key.
 export const useCloud = () => {

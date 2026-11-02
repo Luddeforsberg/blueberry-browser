@@ -91,7 +91,6 @@ export class CdpTab implements PageTarget {
   private readonly refusalListeners = new Set<Set<string>>();
   private fetching: Promise<unknown> = Promise.resolve();
   private pressed = false;
-  private lastInput = 0;
   private closed = false;
   private screencast: ((jpeg: string) => void) | null = null;
 
@@ -311,14 +310,8 @@ export class CdpTab implements PageTarget {
     });
   }
 
-  // When Berry last clicked or typed here, which says where a popup with no opener came from.
-  get actedAt(): number {
-    return this.lastInput;
-  }
-
   async sendAgentInput(event: AgentInput): Promise<void> {
     if (this.closed) throw new Error("The page is closed");
-    this.lastInput = Date.now();
     if (!("keyCode" in event)) {
       if (event.type === "mouseDown") this.pressed = true;
       const held = this.pressed;
