@@ -1,5 +1,5 @@
 import { app, dialog, session, systemPreferences, type BaseWindow } from "electron";
-import type { StoredCookie } from "./cloudLogins";
+import { cookieDomainPattern, parentDomains, type StoredCookie } from "./cloudLogins";
 
 // The two Electron parts of bringing a sign-in into the cloud: asking the user, and reading that one site's cookies.
 
@@ -28,14 +28,18 @@ export const confirmCloudLogin = async (window: BaseWindow, site: string): Promi
   return response === 0;
 };
 
-// Cookies for the site and its subdomains, and those its parent domains set for it, which it gets anyway. Two lookups
-// that each name the site, never one for everything. `cookiesForSite` filters again before anything is sent.
+// Cookies for the site and its subdomains, and those its parent domains set for all of theirs, whatever their path,
+// which the site gets anyway. Each lookup names the site or one of its parents, never everything. A parent's lookup also
+// finds its other subdomains' cookies, which are dropped here, before anything else sees them. `cookiesForSite` filters
+// again before anything is sent.
 export const readSiteCookies = async (site: string): Promise<StoredCookie[]> => {
   const { cookies } = session.defaultSession;
-  const [own, sent] = await Promise.all([
-    cookies.get({ domain: site }),
-    cookies.get({ url: `https://${site}/` }),
-  ]);
+  const found = (await Promise.all([site, ...parentDomains(site)].map((domain) => cookies.get({ domain })))).flat();
+  const pattern = cookieDomainPattern(site);
+  const ours = found.filter(({ domain = "", hostOnly }) => {
+    const host = domain.replace(/^\./, "");
+    return pattern.test(domain) && (!hostOnly || host === site || host.endsWith(`.${site}`));
+  });
   const key = (cookie: Electron.Cookie) => `${cookie.name}\u0000${cookie.domain}\u0000${cookie.path}`;
-  return [...new Map([...own, ...sent].map((cookie) => [key(cookie), cookie])).values()];
+  return [...new Map(ours.map((cookie) => [key(cookie), cookie])).values()];
 };

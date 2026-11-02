@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CloudLogins, cookieDomainPattern, cookiesForSite, loginSite, parseLogins, suggestLoginSites, type CloudCookie, type CookieJar, type StoredCookie } from "./cloudLogins";
+import { CloudLogins, cookieDomainPattern, cookiesForSite, loginSite, MAX_SITES, parseLogins, suggestLoginSites, type CloudCookie, type CookieJar, type StoredCookie } from "./cloudLogins";
 
 const cookie = (domain: string, name = "sid", more: Partial<StoredCookie> = {}): StoredCookie => ({ name, value: `value-of-${name}-at-${domain}`, domain, path: "/", ...more });
 
@@ -41,15 +41,19 @@ describe("cookiesForSite", () => {
     expect(names).toEqual(["domain", "sub", "deep"]);
   });
 
-  it("sets a host-only cookie by address and a domain cookie by domain", () => {
+  it("sets a host-only cookie by an undotted domain and a domain cookie by a dotted one, never by address", () => {
     const [host, domain] = cookiesForSite(jar, "example.com");
-    expect(host).toMatchObject({ url: "https://example.com/", httpOnly: false, secure: true });
-    expect(host.domain).toBeUndefined();
+    expect(host).toMatchObject({ domain: "example.com", path: "/", httpOnly: false, secure: true });
     expect(domain).toMatchObject({ domain: ".example.com", path: "/" });
+    expect(cookiesForSite(jar, "example.com").some((one) => one.url !== undefined)).toBe(false);
+  });
+
+  it("keeps a host-only cookie's exact path, which an address would widen to its folder", () => {
+    expect(cookiesForSite([cookie("example.com", "sid", { hostOnly: true, path: "/account" })], "example.com")[0]).toMatchObject({ domain: "example.com", path: "/account" });
   });
 
   it("keeps a host-only cookie host-only when Electron gives its domain a dot", () => {
-    expect(cookiesForSite([cookie(".127.0.0.1", "sid", { hostOnly: true })], "127.0.0.1")[0]).toMatchObject({ url: "http://127.0.0.1/" });
+    expect(cookiesForSite([cookie(".127.0.0.1", "sid", { hostOnly: true })], "127.0.0.1")[0]).toMatchObject({ domain: "127.0.0.1" });
   });
 
   it("carries HttpOnly, expiry and SameSite, and leaves out what has expired", () => {
@@ -99,8 +103,7 @@ const fakeContext = (): CookieJar & { cookies: CloudCookie[] } => {
       context.cookies.push(...cookies);
     },
     clearCookies: async (options?: { domain?: RegExp }) => {
-      const domainOf = (one: CloudCookie) => one.domain ?? new URL(one.url!).hostname;
-      context.cookies = context.cookies.filter((one) => options?.domain && !options.domain.test(domainOf(one)));
+      context.cookies = context.cookies.filter((one) => options?.domain && !options.domain.test(one.domain ?? ""));
     },
   };
   return context;
@@ -181,6 +184,20 @@ describe("CloudLogins", () => {
     const first = logins.bring("example.com");
     expect(await logins.bring("github.com")).toMatch(/Try again in a moment/);
     expect(await first).toBeNull();
+  });
+
+  it("takes no more sites once the list is full, before asking or reading anything, but can bring a listed one again", async () => {
+    const { file } = setup();
+    writeFileSync(file, JSON.stringify(Array.from({ length: MAX_SITES }, (_, index) => ({ site: `site${index}.com`, addedAt: 5, checkedAt: null, status: "brought" }))));
+    const readCookies = vi.fn(async () => [cookie(".site0.com"), cookie(".example.com")]);
+    const confirm = vi.fn(async () => true);
+    const logins = new CloudLogins(file, { jar: () => ({ withContext: (act) => act(fakeContext()) }), confirm, readCookies, onChange: () => {} });
+    expect(await logins.bring("example.com")).toMatch(/already 50 sites.*Remove one first/);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(readCookies).not.toHaveBeenCalled();
+    expect(logins.logins).toHaveLength(MAX_SITES);
+    expect(await logins.bring("site0.com")).toBeNull();
+    expect(logins.logins.map(({ site }) => site)).toContain("site49.com");
   });
 
   it("does nothing with the cloud off", async () => {

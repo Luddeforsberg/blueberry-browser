@@ -6,7 +6,7 @@ import type { CloudLogin, CloudLoginStatus } from "../shared/ipc";
 // Cookie values pass through here on their way into the cloud browser and are never kept: the list on disk has each
 // site's name and dates and nothing else.
 
-const MAX_SITES = 50;
+export const MAX_SITES = 50;
 const MAX_SITE_LENGTH = 253;
 const STATUSES: CloudLoginStatus[] = ["brought", "checked", "signed-out"];
 
@@ -34,9 +34,14 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // or for it and below (".example.com"), and cookies a parent domain set for all its subdomains (".example.com" for
 // "mail.example.com"), which the site gets anyway. A parent never reaches a public suffix, because browsers refuse
 // cookies there. Nothing else, so another site's cookies can't match.
-export const cookieDomainPattern = (site: string): RegExp => {
+// The domains above a site that can set cookies for it, nearest first: "example.com" for "shop.example.com".
+export const parentDomains = (site: string): string[] => {
   const labels = site.split(".");
-  const parents = isIp(site) ? [] : labels.slice(1, -1).map((_, index) => labels.slice(index + 1).join("."));
+  return isIp(site) ? [] : labels.slice(1, -1).map((_, index) => labels.slice(index + 1).join("."));
+};
+
+export const cookieDomainPattern = (site: string): RegExp => {
+  const parents = parentDomains(site);
   const own = `\\.?(?:[^.]+\\.)*${escape(site)}`;
   return new RegExp(`^(?:${[own, ...parents.map((parent) => `\\.${escape(parent)}`)].join("|")})$`, "i");
 };
@@ -87,8 +92,10 @@ export const cookiesForSite = (cookies: StoredCookie[], site: string, now = Date
       {
         name: cookie.name,
         value: cookie.value,
-        // A host-only cookie is set by its address, which keeps it to that host. A domain cookie by its domain.
-        ...(hostOnly ? { url: `${cookie.secure ? "https" : "http"}://${host}${path}` } : { domain: `.${host}`, path }),
+        // An undotted domain keeps a cookie to that host, and a dotted one takes in its subdomains. Never an address,
+        // from which Playwright would take a wider path.
+        domain: hostOnly ? host : `.${host}`,
+        path,
         ...(cookie.expirationDate !== undefined ? { expires: Math.floor(cookie.expirationDate) } : {}),
         httpOnly: !!cookie.httpOnly,
         secure: !!cookie.secure,
@@ -133,7 +140,7 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
 // Bringing a site along again starts its check over.
 export const withLogin = (logins: CloudLogin[], site: string, now = Date.now()): CloudLogin[] => {
   const added: CloudLogin = { site, addedAt: now, checkedAt: null, status: "brought" };
-  return [added, ...logins.filter((login) => login.site !== site)].slice(0, MAX_SITES);
+  return [added, ...logins.filter((login) => login.site !== site)];
 };
 
 export const withoutLogin = (logins: CloudLogin[], site: string): CloudLogin[] => logins.filter((login) => login.site !== site);
@@ -185,6 +192,8 @@ export class CloudLogins {
   async bring(site: string): Promise<string | null> {
     const jar = this.hooks.jar();
     if (!jar) return "The cloud browser is off.";
+    // Every site on the list needs its Remove, so a full list takes no more until one comes off.
+    if (this.list.length >= MAX_SITES && !this.list.some((login) => login.site === site)) return `There are already ${MAX_SITES} sites in the cloud browser. Remove one first.`;
     return this.oneAtATime(async () => {
       if (!(await this.hooks.confirm(site))) return "Nothing was brought along, because it wasn't confirmed.";
       const stored = await this.hooks.readCookies(site).catch(() => null);
