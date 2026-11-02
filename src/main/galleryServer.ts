@@ -2,6 +2,8 @@
 // ever here, and row-level security is what limits it. The email and password go to the sign-in calls and nowhere else,
 // and no error passes on anything from a request or a reply but a status and a code.
 
+import type { CloudRoutineRow } from "./cloudJobs";
+
 const CALL_ABORT_MS = 10_000;
 // Enough for a young gallery. The page sorts and searches what comes back, so past this it would miss the rest.
 const LIST_LIMIT = 300;
@@ -228,6 +230,18 @@ export class GalleryServer {
   // The flock as the phone page sees it, replaced whole. Mascot fields only, never memory.
   async syncCloudFlock(token: string, birds: object[]): Promise<void> {
     await this.request("/rest/v1/rpc/sync_cloud_flock", { method: "POST", token, body: { p_birds: birds } });
+  }
+
+  async syncCloudRoutine(token: string, row: CloudRoutineRow): Promise<void> {
+    await this.request("/rest/v1/rpc/sync_cloud_routine", {
+      method: "POST",
+      token,
+      body: { p_key: row.key, p_prompt: row.prompt, p_mascot: row.mascot, p_action_approval: row.actionApproval, p_context_id: row.contextId, p_schedule: row.schedule, p_time_zone: row.timeZone, p_next_run_at: row.nextRunAt },
+    });
+  }
+
+  async forgetCloudRoutine(token: string, key: string): Promise<void> {
+    await this.request("/rest/v1/rpc/forget_cloud_routine", { method: "POST", token, body: { p_key: key } });
   }
 
   async myCloudRunner(token: string): Promise<{ email: string; accepted: boolean } | null> {

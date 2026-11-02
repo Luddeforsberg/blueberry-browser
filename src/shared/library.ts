@@ -168,6 +168,8 @@ export interface RoutineDraft {
   mascotId?: string | null;
   // The only sites a run may use, on top of its mascot's limits. Left out or empty adds no limit.
   sites?: string[];
+  // It runs on the cloud runner on its schedule, even with the Mac off, and never here on a schedule.
+  inCloud?: boolean;
 }
 
 // How one run went, or is going.
@@ -203,6 +205,7 @@ export interface Routine {
   scheduleSpec: RoutineSchedule;
   mascotId: string | null;
   sites: string[];
+  inCloud: boolean;
   // The schedule in words.
   schedule: string;
   paused: boolean;

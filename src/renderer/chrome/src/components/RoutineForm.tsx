@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { Button } from '@common/components/Button'
-import { Choice } from '@common/components/Controls'
+import { Choice, Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { applyRecordedValue, askForRecordedValue, changeRecordedValue, toDraft, type RoutineFormValues } from '../routinesView'
 import { ChatError } from './ChatMessage'
 import { MascotPerch } from './MascotPerch'
 import { BERRY_ID } from '@shared/mascots'
+import { useRunner } from '../useRunner'
 
 const INPUT = "w-full h-9 px-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
@@ -41,6 +42,9 @@ export const RoutineForm: React.FC<{
     // Only a routine that has sites gets asked about them, and clearing the box doesn't make the box go away.
     const [hasSites] = useState(values.sites !== '')
     const scheduled = values.kind !== 'manual'
+    const [runner] = useRunner()
+    // Only with a runner that has accepted, which is what runs it. One already on stays visible, so it can be turned off.
+    const canRunInCloud = scheduled && (runner.status === 'linked' || values.inCloud === true)
 
     const save = async (event: React.FormEvent, runNow = false) => {
         event.preventDefault()
@@ -205,10 +209,18 @@ export const RoutineForm: React.FC<{
                     <p className="mt-2 text-13 text-muted-foreground">In shorter months, it runs on the last day.</p>
                 )}
                 <p className="mt-2 text-13 text-muted-foreground">
-                    {scheduled
-                        ? 'If the app is closed at this time, it runs once when you next open it and says it was late.'
-                        : 'It only runs when you press Run now.'}
+                    {!scheduled
+                        ? 'It only runs when you press Run now.'
+                        : values.inCloud
+                          ? 'It runs in the cloud at this time, even with your Mac off, and its run shows as a chat.'
+                          : 'If the app is closed at this time, it runs once when you next open it and says it was late.'}
                 </p>
+                {canRunInCloud && (
+                    <div className="mt-3 flex items-center gap-3">
+                        <span id="routine-in-cloud" className="flex-1 text-14">Runs even when your Mac is off</span>
+                        <Switch labelledBy="routine-in-cloud" checked={values.inCloud === true} onChange={(on) => set({ inCloud: on })} />
+                    </div>
+                )}
             </div>
 
             {error && <ChatError message={error} />}

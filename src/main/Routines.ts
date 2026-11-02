@@ -1,7 +1,10 @@
 import { nextRun, parseDraft, scheduleLabel } from "./routineSchedule";
 import type { TaskProgress, TaskResult } from "./Chats";
 import type { RoutineStore, StoredRoutine } from "./RoutineStore";
-import type { ChatApproval, ChatStep, Routine, RoutineRun, RoutineStatus } from "../shared/library";
+import type { ChatApproval, ChatStep, MascotProfile, Routine, RoutineRun, RoutineStatus } from "../shared/library";
+import type { ActionApproval } from "../shared/ipc";
+import { mascotSnapshot, type CloudRoutineRow } from "./cloudJobs";
+import { narrowSites } from "../shared/mascots";
 
 // Runs that may start while this many are working. A run waiting for the user's OK uses nothing, so it doesn't count,
 // and once allowed it goes straight on even past this, because the user is waiting on it.
@@ -33,8 +36,11 @@ interface ActiveRun {
   approval: ChatApproval | null;
 }
 
-const prompt = ({ name, instructions, sites }: StoredRoutine, now: number): string =>
-  `This is a routine the user set up earlier, running by itself at ${new Date(now).toString()}. ` +
+const prompt = (routine: StoredRoutine, now: number): string => routinePrompt(routine, `at ${new Date(now).toString()}`);
+
+// What a run is told. A run in the cloud is written before it's due, so it says where rather than when.
+export const routinePrompt = ({ name, instructions, sites }: Pick<StoredRoutine, "name" | "instructions" | "sites">, when: string): string =>
+  `This is a routine the user set up earlier, running by itself ${when}. ` +
   "Nobody is watching right now, so don't ask questions in words: anything you need from the user goes through ask_user or hand_to_user, which wait for them. Do what it says in your own tabs, " +
   "then end with a short report of what you found and did, and anything you couldn't do.\n\n" +
   (sites.length > 0 ? `It may only use ${sites.join(", ")}, and anything else will be refused.\n\n` : "") +
@@ -127,8 +133,9 @@ export class Routines {
 
     this.store.due(now).forEach((routine) => {
       const next = nextRun(routine.schedule, now);
-      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up.
-      if (this.active.has(routine.id)) {
+      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up. One in the cloud
+      // runs there, so here it only moves on to its next time.
+      if (this.active.has(routine.id) || routine.inCloud) {
         this.store.setNextRun(routine.id, next);
         this.events.onChanged();
       } else if (this.hasFreePlace) {
@@ -194,7 +201,7 @@ export class Routines {
     const now = Date.now();
     return this.store.routines().map((routine) => {
       const latestRun = this.store.latestRun(routine.id);
-      const { id, name, instructions, schedule, mascotId, sites, paused, nextRunAt } = routine;
+      const { id, name, instructions, schedule, mascotId, sites, inCloud, paused, nextRunAt } = routine;
       return {
         id,
         name,
@@ -202,6 +209,7 @@ export class Routines {
         scheduleSpec: schedule,
         mascotId,
         sites,
+        inCloud,
         schedule: scheduleLabel(schedule),
         paused,
         nextRunAt,
@@ -219,6 +227,24 @@ export class Routines {
     if (routine.paused) return "paused";
     if (routine.nextRunAt !== null && routine.nextRunAt <= now) return "queued";
     return latest?.status ?? "idle";
+  }
+
+  // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites, and
+  // a paused one has no next time, so it waits there.
+  cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] {
+    return this.store.routines().filter(({ inCloud }) => inCloud).map((routine) => {
+      const mascot = mascotOf(routine.mascotId);
+      return {
+        key: routine.id,
+        prompt: routinePrompt(routine, "in the cloud, maybe with the user's computer off"),
+        mascot: mascotSnapshot({ ...mascot, sites: narrowSites(mascot.sites, routine.sites) }),
+        actionApproval,
+        contextId,
+        schedule: routine.schedule,
+        timeZone,
+        nextRunAt: routine.paused || routine.nextRunAt === null ? null : new Date(routine.nextRunAt).toISOString(),
+      };
+    });
   }
 
   runs(routineId: string): RoutineRun[] {

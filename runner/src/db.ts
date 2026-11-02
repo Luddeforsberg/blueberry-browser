@@ -4,6 +4,7 @@ import type { ActionApproval } from "../../src/shared/ipc";
 import { GalleryServer, type ServerSession } from "../../src/main/galleryServer";
 import type { ChatStep } from "../../src/shared/library";
 import type { PushDb, PushSubscriptionRow } from "./push";
+import type { DueRoutine, RoutineDb } from "./routines";
 
 // The runner's only way to Supabase: signed in as its own user, with the publishable key, through the `runner_*`
 // functions, which only reach the jobs of the owner it's linked to. Nothing here can decide an approval, and the database
@@ -109,7 +110,7 @@ export const runnerSession = ({ url, key, email, password }: DbConfig, server = 
 
 export type RunnerSession = ReturnType<typeof runnerSession>;
 
-export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & { accept(): Promise<boolean> } => {
+export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & RoutineDb & { accept(): Promise<boolean> } => {
   const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
     const authorization = `Bearer ${await auth.token()}`;
     try {
@@ -172,6 +173,16 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
       ),
     forgetPushSubscription: async (endpoint) => {
       await rpc("runner_forget_push_subscription", { p_endpoint: endpoint });
+    },
+    dueRoutines: async () =>
+      ((await rpc<Record<string, unknown>[]>("runner_due_routines", {})) ?? []).flatMap((row): DueRoutine[] =>
+        typeof row.id === "string" && typeof row.time_zone === "string" && typeof row.next_run_at === "string"
+          ? [{ id: row.id, schedule: row.schedule, timeZone: row.time_zone, dueAt: row.next_run_at }]
+          : []
+      ),
+    startRoutine: async (routineId, dueAt, next) => {
+      const id = await rpc<unknown>("runner_start_routine", { p_routine: routineId, p_due: dueAt, p_next: next });
+      return typeof id === "string" ? id : null;
     },
     decision: async (approvalId) => {
       const [row] = (await rpc<Record<string, unknown>[]>("runner_decision", { p_approval: approvalId })) ?? [];

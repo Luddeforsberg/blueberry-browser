@@ -6,6 +6,7 @@ import type { AccountState } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { ServerError, type GalleryServer } from "./galleryServer";
 import { RunnerJobs } from "./RunnerJobs";
+import { mascotSnapshot, type CloudRoutineRow } from "./cloudJobs";
 
 const LIVE = "https://www.browserbase.com/devtools-fullscreen/inspector.html";
 const ANA = "ana@example.com";
@@ -373,6 +374,49 @@ describe("the flock shared with the phone", () => {
     await settle();
     await runner.flockChanged();
     expect(syncCloudFlock).not.toHaveBeenCalled();
+    runner.destroy();
+  });
+});
+
+describe("routines kept in the cloud", () => {
+  const row = (key: string, nextRunAt: string | null = "2026-11-03T07:00:00.000Z"): CloudRoutineRow => ({
+    key,
+    prompt: "Check the prices",
+    mascot: mascotSnapshot(BERRY),
+    actionApproval: "risky",
+    contextId: null,
+    schedule: { kind: "daily", time: "08:00" },
+    timeZone: "Europe/Stockholm",
+    nextRunAt,
+  });
+
+  it("sends each routine once, again when it changes or is paused but not as its time moves on, and forgets one that went", async () => {
+    const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
+    const syncCloudRoutine = vi.fn(async () => {});
+    const forgetCloudRoutine = vi.fn(async () => {});
+    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted: true }), syncCloudFlock: async () => {}, syncCloudRoutine, forgetCloudRoutine, cloudConversationJobs: async () => [] } as unknown as GalleryServer;
+    let rows = [row("r1")];
+    const runner = new RunnerJobs(
+      server,
+      { get state() { return account.state; }, accessToken: async () => "token" },
+      join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
+      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: () => rows },
+      5
+    );
+    await settle();
+    expect(syncCloudRoutine).toHaveBeenCalledTimes(1);
+    expect(syncCloudRoutine).toHaveBeenLastCalledWith("token", rows[0]);
+    rows = [row("r1", "2026-11-04T07:00:00.000Z")];
+    await runner.routinesChanged();
+    expect(syncCloudRoutine).toHaveBeenCalledTimes(1);
+    rows = [row("r1", null)];
+    await runner.routinesChanged();
+    expect(syncCloudRoutine).toHaveBeenCalledTimes(2);
+    rows = [];
+    await runner.routinesChanged();
+    expect(forgetCloudRoutine).toHaveBeenCalledWith("token", "r1");
+    await runner.routinesChanged();
+    expect(forgetCloudRoutine).toHaveBeenCalledTimes(1);
     runner.destroy();
   });
 });

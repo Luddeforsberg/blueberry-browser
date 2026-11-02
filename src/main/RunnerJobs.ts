@@ -4,7 +4,7 @@ import { dirname } from "path";
 import type { Account } from "./Account";
 import { isLiveView } from "./browserbase";
 import type { ChatRunner, RunnerJobInput, RunnerProgress } from "./Chats";
-import { approvalFromRow, FINISHED, historyFromRow, mascotSnapshot, stepsFromRow, type CloudJobStatus } from "./cloudJobs";
+import { approvalFromRow, FINISHED, historyFromRow, mascotSnapshot, stepsFromRow, type CloudJobStatus, type CloudRoutineRow } from "./cloudJobs";
 import { ServerError, type GalleryServer } from "./galleryServer";
 import type { RunnerState } from "../shared/ipc";
 import type { ChatStep, MascotProfile } from "../shared/library";
@@ -72,6 +72,8 @@ export interface RunnerJobsHooks {
   adopt?: (first: { prompt: string; mascotId: string | null }) => string | null;
   // A message sent in that chat from elsewhere, saved as the user's.
   followedUp?: (chatId: string, prompt: string) => void;
+  // The routines that run in the cloud, as rows for it, kept there while a linked runner has accepted.
+  routines?: () => CloudRoutineRow[];
 }
 
 const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({ account, conversationId, jobIds, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
@@ -102,6 +104,11 @@ export class RunnerJobs implements ChatRunner {
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
   // What was last shared, and by whom, so an unchanged flock isn't sent again.
   private sharedFlock: string | null = null;
+  // What was last sent of each routine, by key, and for which account. The next time it's due isn't part of it, as that
+  // moves on by itself there.
+  private sharedRoutines: { account: string; rows: Map<string, string> } | null = null;
+  private routinesSending: Promise<void> | null = null;
+  private routinesAgain = false;
   private flockSending: Promise<void> | null = null;
   private flockAgain = false;
 
@@ -155,6 +162,7 @@ export class RunnerJobs implements ChatRunner {
     if (this.link) this.linkTimer = setTimeout(() => void this.refreshLink(), this.link.accepted ? LINKED_POLL_MS : LINK_POLL_MS);
     this.hooks.runnerUpdated?.(this.runnerState);
     void this.flockChanged();
+    void this.routinesChanged();
     void this.discover();
     return this.runnerState;
   }
@@ -182,6 +190,40 @@ export class RunnerJobs implements ChatRunner {
   // Shares the flock with the phone page, only while signed in with a runner that has accepted, and only if it changed.
   // A bird's name, look, instructions and limits go, and nothing it remembers. One send at a time, and a change that
   // comes in meanwhile is sent after it, so an older flock never lands after a newer one.
+  // Keeps the routines that run in the cloud there, one call per routine that changed or went, one round at a time.
+  async routinesChanged(): Promise<void> {
+    if (this.routinesSending) {
+      this.routinesAgain = true;
+      return this.routinesSending;
+    }
+    this.routinesSending = (async () => {
+      do {
+        this.routinesAgain = false;
+        await this.shareRoutines();
+      } while (this.routinesAgain);
+    })().finally(() => {
+      this.routinesSending = null;
+    });
+    return this.routinesSending;
+  }
+
+  private async shareRoutines(): Promise<void> {
+    const account = this.signedIn;
+    if (!account || !this.link?.accepted || !this.hooks.routines) return;
+    if (this.sharedRoutines?.account !== account) this.sharedRoutines = { account, rows: new Map() };
+    const sent = this.sharedRoutines.rows;
+    const rows = this.hooks.routines();
+    for (const row of rows) {
+      const shape = JSON.stringify({ ...row, nextRunAt: row.nextRunAt === null });
+      if (sent.get(row.key) === shape) continue;
+      // Tried again on the next change or the next look at the link.
+      if (await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true))) sent.set(row.key, shape);
+    }
+    for (const key of [...sent.keys()].filter((key) => !rows.some((row) => row.key === key))) {
+      if (await this.withToken(account, (token) => this.server!.forgetCloudRoutine(token, key).then(() => true))) sent.delete(key);
+    }
+  }
+
   async flockChanged(): Promise<void> {
     if (this.flockSending) {
       this.flockAgain = true;

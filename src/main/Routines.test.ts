@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LATE_AFTER_MS, MAX_ACTIVE_RUNS, Routines, type RoutineEvents } from "./Routines";
 import { RoutineStore } from "./RoutineStore";
 import type { TaskProgress, TaskResult } from "./Chats";
+import type { MascotProfile } from "../shared/library";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -92,6 +93,26 @@ describe("the scheduler", () => {
     await flush();
     expect(store.latestRun(id)).toMatchObject({ status: "finished", result: "done", lateFor: null, tokens: 10, seen: false });
     expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+  });
+
+  it("leaves a routine that runs in the cloud to the cloud, and only moves it on to its next time here", async () => {
+    const { routines, store, started: runs } = setup();
+    const id = save(routines, { ...daily("13:00"), inCloud: true, sites: ["shop.example"] });
+    started(routines);
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(runs).toHaveLength(0);
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+
+    // What goes to the cloud: its bird narrowed to the routine's sites, and no next time once it's paused.
+    const scout = (): MascotProfile => ({ id: "m-1", name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find.", sites: [], tools: ["visit"], deletedAt: null });
+    const options = { actionApproval: "risky", contextId: "ctx-1", timeZone: "Europe/Stockholm" } as const;
+    const [row] = routines.cloudRows(scout, options);
+    expect(row).toMatchObject({ key: id, mascot: { id: "m-1", sites: ["shop.example"] }, schedule: { kind: "daily", time: "13:00" }, timeZone: "Europe/Stockholm", nextRunAt: new Date(NOW + 60 * MINUTE + DAY).toISOString() });
+    expect(row.prompt).toContain("Look");
+    routines.setPaused(id, true);
+    expect(routines.cloudRows(scout, options)[0].nextRunAt).toBeNull();
+    save(routines, daily("13:00", "Here"));
+    expect(routines.cloudRows(scout, options)).toHaveLength(1);
   });
 
   it("runs a missed routine once when the app opens and says it was late, however many it missed", async () => {

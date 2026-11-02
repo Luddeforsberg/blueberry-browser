@@ -35,6 +35,7 @@ const cloudDatabase = async () => {
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261102000000_cloud_jobs.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261103000000_phone.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261104000000_cloud_conversations.sql"), "utf8"));
+  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261105000000_cloud_routines.sql"), "utf8"));
   // One connection, so one call at a time, each with its own role.
   let queue: Promise<unknown> = Promise.resolve();
   const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {
