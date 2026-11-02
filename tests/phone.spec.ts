@@ -207,6 +207,19 @@ test("the phone page signs in, shows a job, allows it, starts one, and never sen
     await page.getByRole("button", { name: "Stop" }).click();
     await expect.poll(async () => (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0].status).toBe("stopped");
 
+    // Signed out and in as someone else, nothing of Ana's comes back, and notifications are this account's to turn on.
+    await supabase.addAccount("bo@example.com", OWNER_PASSWORD);
+    await page.getByRole("link", { name: "Jobs" }).click();
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByLabel("Email").fill("bo@example.com");
+    await page.getByLabel("Password").fill(OWNER_PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("Signed in as bo@example.com")).toBeVisible();
+    await expect(page.getByText("Nothing in the cloud yet.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    await page.waitForTimeout(3_500);
+    await expect(page.getByText(/Scout|Penny|shop\.example/)).toHaveCount(0);
+
     // Nothing the user typed into the live view, or the code-shaped answer, ever reached the server.
     expect(supabase.received.filter(({ body, path }) => body.includes(CODE) || path.includes(CODE))).toEqual([]);
     expect(problems).toEqual([]);

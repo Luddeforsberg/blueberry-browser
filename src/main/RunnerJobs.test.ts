@@ -185,6 +185,33 @@ describe("the flock shared with the phone", () => {
     runner.destroy();
   });
 
+  it("sends one flock at a time, and the newest last", async () => {
+    const { runner, syncCloudFlock, flock } = make(true);
+    let open = 0;
+    let most = 0;
+    const releases: (() => void)[] = [];
+    syncCloudFlock.mockImplementation(async () => {
+      most = Math.max(most, ++open);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      open--;
+    });
+    await settle();
+    // The first send is still out when two edits come in.
+    flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
+    void runner.flockChanged();
+    flock.push({ ...SCOUT, id: "m-3", name: "Pip" });
+    const last = runner.flockChanged();
+    while (releases.length) {
+      releases.shift()!();
+      await settle();
+    }
+    await last;
+    expect(most).toBe(1);
+    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    expect((syncCloudFlock.mock.calls.at(-1) as unknown[])[1]).toHaveLength(3);
+    runner.destroy();
+  });
+
   it("isn't shared before a runner has accepted", async () => {
     const { runner, syncCloudFlock } = make(false);
     await settle();

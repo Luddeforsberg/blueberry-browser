@@ -158,8 +158,11 @@ const saying = (words) => {
 // --- Loading ---
 
 const load = async () => {
+  const asked = api.sessionVersion();
   try {
     const [jobs, flock, linked] = await Promise.all([api.jobs(), api.flock(), state.linked === null ? api.runner() : Promise.resolve(undefined)]);
+    // Someone signed out or in while it was asking, so none of this is theirs.
+    if (api.sessionVersion() !== asked) return;
     // A new question takes the place of whatever was said about the last one.
     const asking = jobs.flatMap((job) => (job.ask ? [job.ask.approval_id] : []));
     if (asking.some((id) => !(state.jobs ?? []).some((known) => known.ask?.approval_id === id))) state.said = null;
@@ -169,7 +172,7 @@ const load = async () => {
     if (linked !== undefined) state.linked = linked?.accepted === true;
     state.problem = null;
   } catch (error) {
-    state.problem = problemWords(error);
+    if (api.sessionVersion() === asked) state.problem = problemWords(error);
   }
 };
 
@@ -202,6 +205,7 @@ const signInScreen = () => {
       try {
         await api.signIn(email.value.trim(), password.value);
         state.linked = null;
+        state.push = await pushState();
         location.hash = "";
         show(true);
         void poll();
@@ -268,7 +272,7 @@ const notifications = () => {
 const signOut = async () => {
   await turnOff().catch(() => {});
   await api.signOut();
-  Object.assign(state, { jobs: null, flock: flockFromRows([]), flockShared: null, linked: null, problem: null, said: null });
+  Object.assign(state, { jobs: null, flock: flockFromRows([]), flockShared: null, linked: null, problem: null, said: null, push: await pushState() });
   state.taken.clear();
   state.answered.clear();
   location.hash = "";

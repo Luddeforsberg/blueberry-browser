@@ -26,7 +26,12 @@ const read = () => {
 };
 
 let session = read();
-const keep = (next) => {
+// Changes whenever someone signs in or out, so an answer to a call made before can be dropped rather than bring the
+// last account back.
+let version = 0;
+export const sessionVersion = () => version;
+const keep = (next, { same = false } = {}) => {
+  if (!same) version++;
   session = next;
   try {
     if (next) localStorage.setItem(KEPT, JSON.stringify(next));
@@ -87,14 +92,17 @@ let refreshing = null;
 const token = async () => {
   if (!session) throw new ApiError(401);
   if (session.expiresAt - Date.now() > REFRESH_BEFORE_MS) return session.accessToken;
+  const asked = version;
   refreshing ??= send("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: { refresh_token: session.refreshToken } })
     .then((body) => {
+      // Signed out, or in as someone else, while it was out: this one isn't theirs.
+      if (version !== asked) throw new ApiError(401);
       const next = toSession(body);
       if (!next) throw new ApiError(401);
-      keep(next);
+      keep(next, { same: true });
     })
     .catch((error) => {
-      if (error.status === 400 || error.status === 401) keep(null);
+      if (version === asked && (error.status === 400 || error.status === 401)) keep(null);
       throw error;
     })
     .finally(() => {
@@ -105,11 +113,12 @@ const token = async () => {
 };
 
 const asUser = async (path, options = {}) => {
+  const asked = version;
   try {
     return await send(path, { ...options, token: await token() });
   } catch (error) {
-    // A session the server no longer takes.
-    if (error.status === 401) keep(null);
+    // A session the server no longer takes, unless it's already been replaced.
+    if (error.status === 401 && version === asked) keep(null);
     throw error;
   }
 };

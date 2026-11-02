@@ -74,6 +74,8 @@ export class RunnerJobs implements ChatRunner {
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
   // What was last shared, and by whom, so an unchanged flock isn't sent again.
   private sharedFlock: string | null = null;
+  private flockSending: Promise<void> | null = null;
+  private flockAgain = false;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -147,8 +149,25 @@ export class RunnerJobs implements ChatRunner {
   }
 
   // Shares the flock with the phone page, only while signed in with a runner that has accepted, and only if it changed.
-  // A bird's name, look, instructions and limits go, and nothing it remembers.
+  // A bird's name, look, instructions and limits go, and nothing it remembers. One send at a time, and a change that
+  // comes in meanwhile is sent after it, so an older flock never lands after a newer one.
   async flockChanged(): Promise<void> {
+    if (this.flockSending) {
+      this.flockAgain = true;
+      return this.flockSending;
+    }
+    this.flockSending = (async () => {
+      do {
+        this.flockAgain = false;
+        await this.shareFlock();
+      } while (this.flockAgain);
+    })().finally(() => {
+      this.flockSending = null;
+    });
+    return this.flockSending;
+  }
+
+  private async shareFlock(): Promise<void> {
     const account = this.signedIn;
     if (!account || !this.link?.accepted || !this.hooks.flock) return;
     const birds = flockRows(this.hooks.flock());
