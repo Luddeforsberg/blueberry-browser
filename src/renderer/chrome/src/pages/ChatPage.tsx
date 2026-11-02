@@ -91,6 +91,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     mascot={mascot}
                                     failed={!!thread.error && index === messages.length - 1}
                                     memoryIds={message.memoryIds}
+                                    pages={message.pages}
                                 />
                             )
                         )}

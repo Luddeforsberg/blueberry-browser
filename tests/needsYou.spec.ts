@@ -44,7 +44,8 @@ test("an approval answered from Needs you lets the job carry on", async () => {
 
     await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content).toBe("All done");
     await expect(chrome.getByText("Nothing needs you right now.")).toBeVisible();
-    expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.url === address)).toBe(true);
+    // Its tab closed once it was done.
+    expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.url === address)).toBe(false);
   } finally {
     await app.close();
     model.close();
@@ -185,10 +186,13 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     expect(boxes.message_id).not.toBe(code.message_id);
     model.callTools({ name: "read_page", args: {} });
     model.replyWith("All done");
+    // Held, since its tabs close once it's done.
+    const finish = model.holdBeforeFirstToken();
     telegram.userSends(`${BOX_CODE.slice(0, 3)} ${BOX_CODE.slice(3)}`, boxes.message_id);
-    await expect.poll(async () => (await reply(sent!.id))?.messages.at(-1)?.content).toBe("All done");
     const boxPage = await findView(app, `${site.origin}/boxes`);
     await expect(boxPage.getByText(`Verified with code ${BOX_CODE}`)).toBeVisible();
+    finish();
+    await expect.poll(async () => (await reply(sent!.id))?.messages.at(-1)?.content).toBe("All done");
 
     // The job really read those pages again, and neither code went anywhere it shouldn't.
     const seen = JSON.stringify(model.requests) + JSON.stringify(model.titleRequests);

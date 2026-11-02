@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { ChatApproval, ChatStep, MascotProfile } from '@shared/library'
+import type { ChatApproval, ChatStep, MascotProfile, UsedPage } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
 import { ChevronRight } from 'lucide-react'
 import { ApprovalCard, MascotSays } from '@common/components/ApprovalCard'
@@ -109,7 +109,9 @@ export const AssistantMessage: React.FC<{
     failed?: boolean
     // What its bird went into this reply remembering.
     memoryIds?: string[]
-}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot, failed = false, memoryIds }) => (
+    // The pages its job opened, which closed when it ended.
+    pages?: UsedPage[]
+}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot, failed = false, memoryIds, pages = [] }) => (
     // With nothing written yet, the mascot is already speaking in what it's waiting on.
     waiting && !content && steps.length === 0 ? null : <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
@@ -134,8 +136,52 @@ export const AssistantMessage: React.FC<{
                 </div>
             )
         )}
+        {!isStreaming && pages.length > 0 && <PagesItUsed pages={pages} />}
     </div>
 )
+
+const siteOf = (url: string) => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, '')
+    } catch {
+        return url
+    }
+}
+
+// The pages a job opened close when it's done, and any of them opens again here, as the user's own tab.
+const PagesItUsed: React.FC<{ pages: UsedPage[] }> = ({ pages }) => {
+    const [open, setOpen] = useState(false)
+    return (
+        <div className="flex flex-col items-start gap-1.5 text-13 text-muted-foreground">
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+                className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
+                Pages it used ({pages.length})
+            </button>
+            {open && (
+                <ul aria-label="Pages it used" className="flex flex-col gap-1 min-w-0 max-w-full">
+                    {pages.map((page) => (
+                        <li key={page.url} className="min-w-0 max-w-full">
+                            <button
+                                type="button"
+                                title={page.url}
+                                onClick={() => void window.chromeAPI.browser.createTab(page.url)}
+                                className="max-w-full flex items-baseline gap-2 rounded-control text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <span className="truncate text-foreground">{page.title}</span>
+                                <span className="shrink-0">{siteOf(page.url)}</span>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    )
+}
 
 // Left foot, right foot.
 export const StepFootprint: React.FC<{ index: number }> = ({ index }) => (

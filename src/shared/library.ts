@@ -63,6 +63,13 @@ export interface ChatThreadMessage {
   steps?: ChatStep[];
   // What its bird remembered going into this reply, by id, so forgetting one takes it off here too.
   memoryIds?: string[];
+  // The pages its job opened, which close when it ends, so the user can open any of them again.
+  pages?: UsedPage[];
+}
+
+export interface UsedPage {
+  url: string;
+  title: string;
 }
 
 export interface ChatThreadSummary {

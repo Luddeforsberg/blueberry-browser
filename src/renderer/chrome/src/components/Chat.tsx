@@ -34,6 +34,7 @@ const ConversationTurnComponent: React.FC<{
                 mascot={mascot}
                 failed={failed}
                 memoryIds={turn.assistant.memoryIds}
+                pages={turn.assistant.pages}
             />
         )}
         {isLoading && <ThinkingMessage mascot={mascot} />}

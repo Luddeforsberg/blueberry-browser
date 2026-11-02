@@ -297,6 +297,8 @@ export interface TabInfo {
   berryWorking: boolean;
   // Who is working in it, if a mascot other than Berry is.
   workingMascotId: string | null;
+  // The chat whose running job opened it, which the sidebar shows it under instead of with the user's tabs.
+  jobChatId: string | null;
   canGoBack: boolean;
   canGoForward: boolean;
   zoomPercent: number;

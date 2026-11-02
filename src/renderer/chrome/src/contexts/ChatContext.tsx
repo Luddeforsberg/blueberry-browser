@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ChatApproval, ChatStep, ChatThread } from '@shared/library'
+import type { ChatApproval, ChatStep, ChatThread, UsedPage } from '@shared/library'
 
 export interface Message {
     id: string
@@ -7,6 +7,7 @@ export interface Message {
     content: string
     steps?: ChatStep[]
     memoryIds?: string[]
+    pages?: UsedPage[]
     isStreaming?: boolean
 }
 

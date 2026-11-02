@@ -6,7 +6,7 @@ import { useFlock } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { TabIcon } from './TabIcon'
 import { SHIMMER_TEXT } from './ChatMessage'
-import { useTabDrag } from './useTabDrag'
+import { nudgeTarget, useTabDrag } from './useTabDrag'
 import { cn } from '@common/lib/utils'
 
 const TabItem: React.FC<{
@@ -84,9 +84,14 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     label,
     showNew = true
 }) => {
-    const { tabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
+    const { tabs: allTabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
     const vertical = mode === 'vertical'
-    const { start, itemProps } = useTabDrag(tabs.map(tab => tab.id), vertical ? 'y' : 'x', moveTab)
+    // In the sidebar, a running job's tabs show under its chat. The tab row has no chats, so it shows them all.
+    const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId) : allTabs
+    // A drag counts places in this list, and the window in all of them.
+    const moveShown = (tabId: string, toIndex: number) =>
+        moveTab(tabId, toIndex < tabs.length ? allTabs.indexOf(tabs[toIndex]) : allTabs.length - 1)
+    const { start, itemProps } = useTabDrag(tabs.map(tab => tab.id), vertical ? 'y' : 'x', moveShown)
     const order = tabs.map(tab => tab.id).join()
     const nudged = useRef<HTMLElement | null>(null)
 
@@ -119,7 +124,10 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                         }}
                         onNudge={(delta, button) => {
                             nudged.current = button
-                            void moveTabBy(tab.id, delta)
+                            // With a job's tabs hidden, a step counts only the ones shown.
+                            if (tabs.length === allTabs.length) return void moveTabBy(tab.id, delta)
+                            const to = nudgeTarget(allTabs.map(({ id }) => id), tabs.map(({ id }) => id), tab.id, delta)
+                            if (to !== null) void moveTab(tab.id, to)
                         }}
                         {...itemProps(tab.id, index)}
                     />

@@ -507,7 +507,8 @@ describe("Chats", () => {
           allTabs.push(opened);
           return opened;
         },
-        closeTab: () => true,
+        // Refused, as for the tab the user is looking at, so it's still the chat's once the reply is over.
+        closeTab: () => false,
         actionApproval: () => "always",
       }, {
         onChunk: () => {},
@@ -533,6 +534,92 @@ describe("Chats", () => {
       expect(await readPage.run({})).toMatch(/user took over tab tab-own/);
     });
 
+    it("close the tabs a reply opened when it ends, except the one it points to, and keep their addresses", async () => {
+      const open: Tab[] = [];
+      const closed: string[] = [];
+      const make = (id: string, url: string) => ({ ...tab(), id, url, title: id, settled: async () => {} }) as unknown as Tab;
+      const urls = ["https://shop.example/item?q=1", "https://other.example/", "https://kept.example/cart"];
+      const given: string[] = [];
+      let duringJob: (string | null)[] = [];
+      let chats: Chats | null = null;
+      const reply: StreamReply = async function* (_, __, { tools }) {
+        for (const url of urls) await tools.find((tool) => tool.name === "open_tab")!.run({ url });
+        duringJob = open.map((one) => chats!.jobChatOf(one.id));
+        yield "It's in your cart on kept.example.";
+      };
+      const store = new ChatStore(":memory:");
+      let finished = false;
+      chats = new Chats(store, reply, async () => null, {
+        activeTab: () => null,
+        allTabs: () => open,
+        openBackgroundTab: (url) => {
+          const opened = make(`tab-${open.length}`, url);
+          open.push(opened);
+          return opened;
+        },
+        closeTab: (id) => {
+          closed.push(id);
+          open.splice(open.findIndex((one) => one.id === id), 1);
+          return true;
+        },
+        giveToUser: (id) => given.push(id),
+        actionApproval: () => "always",
+      }, { onChunk: () => {}, onThread: (thread) => (finished ||= thread.partial === null), onListChanged: () => {}, onWorkingTabs: () => {} });
+      const thread = send(chats, null, "Add it to my cart", false)!;
+      await vi.waitFor(() => expect(finished).toBe(true));
+
+      expect(duringJob).toEqual([thread.id, thread.id, thread.id]);
+      expect(closed).toEqual(["tab-0", "tab-1"]);
+      expect(open.map((one) => one.id)).toEqual(["tab-2"]);
+      // The one left is the user's now, so it's under no chat and no job reaches it.
+      expect(chats.jobChatOf("tab-2")).toBeNull();
+      expect(chats.isOwnTab("tab-2")).toBe(false);
+      // So the window saves it with the session, rather than as a job's tab that's gone on a restart.
+      expect(given).toEqual(["tab-2"]);
+      expect(store.chat(thread.id)!.messages.at(-1)!.pages).toEqual(urls.map((url, index) => ({ url, title: `tab-${index}` })));
+    });
+
+    it("leave a tab another chat is still reading for its message, even when the job that opened it ends", async () => {
+      let capture: (image: unknown) => void = () => {};
+      const own = { ...tab({ screenshot: () => new Promise((resolve) => (capture = resolve)) }), id: "tab-own", title: "Own", settled: async () => {} } as unknown as Tab;
+      const open: Tab[] = [];
+      const closed: string[] = [];
+      let release = () => {};
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const stream: StreamReply = async function* (messages, _, { tools }) {
+        if (JSON.stringify(messages).includes("Open it")) {
+          await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
+          await held;
+        }
+        yield "ok";
+      };
+      const store = new ChatStore(":memory:");
+      const ended: string[] = [];
+      const chats = new Chats(store, stream, async () => null, {
+        activeTab: () => open[0] ?? null,
+        allTabs: () => open,
+        openBackgroundTab: () => {
+          open.push(own);
+          return own;
+        },
+        closeTab: (id) => {
+          closed.push(id);
+          return true;
+        },
+        actionApproval: () => "always",
+      }, { onChunk: () => {}, onThread: (thread) => thread.partial === null && ended.push(thread.id), onListChanged: () => {}, onWorkingTabs: () => {} });
+      const opener = send(chats, null, "Open it", false)!;
+      await vi.waitFor(() => expect(open).toHaveLength(1));
+      // Another chat is sent with that page, and is still taking its picture when the first job ends.
+      const reader = send(chats, null, "What's on this page?", true)!;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      release();
+      await vi.waitFor(() => expect(ended).toContain(opener.id));
+      expect(closed).toEqual([]);
+      capture({ toDataURL: () => SCREENSHOT });
+      await vi.waitFor(() => expect(ended).toContain(reader.id));
+    });
+
     describe("a code from the phone", () => {
       const handedOver = async (need: "code" | "sign-in") => {
         const typed = vi.fn();
@@ -548,18 +635,28 @@ describe("Chats", () => {
           heard.push(String(await tools.find((tool) => tool.name === "list_tabs")!.run({})));
           yield "ok";
         };
-        const chats = new Chats(new ChatStore(":memory:"), stream, async () => null, {
+        const store = new ChatStore(":memory:");
+        const chats = new Chats(store, stream, async () => null, {
           activeTab: () => null,
           allTabs: () => open,
           openBackgroundTab: () => own,
-          closeTab: () => true,
+          // Refused, so the tab outlasts the reply and what's said about it later can be checked.
+          closeTab: () => false,
           actionApproval: () => "always",
         }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} });
         send(chats, null, "Check my orders", false);
         await vi.waitFor(() => expect(chats.waiting()).toHaveLength(1));
         const [{ id, approval }] = chats.waiting();
-        return { chats, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id, heard, tools: () => reached };
+        return { chats, store, own, open, typed, looked, enter: () => chats.enterCode(id, approval.id, "123456"), id, approvalId: approval.id, heard, tools: () => reached };
       };
+
+      it("keeps only the site and path of a page it handed over, even once that tab has closed", async () => {
+        const { chats, store, own, id } = await handedOver("sign-in");
+        (own as unknown as { url: string }).url = "https://example.com/callback?code=s3cret#token=t0ken";
+        chats.tabClosed(own.id);
+        await vi.waitFor(() => expect(store.chat(id)!.messages.at(-1)!.role).toBe("assistant"));
+        expect(store.chat(id)!.messages.at(-1)!.pages).toEqual([{ url: "https://example.com/callback", title: "example.com" }]);
+      });
 
       it("keeps the query and fragment of where the user landed from the model, but only for that tab", async () => {
         const { chats, own, id, approvalId, heard, tools } = await handedOver("sign-in");

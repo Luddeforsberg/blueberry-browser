@@ -103,20 +103,14 @@ test.describe("the working view", () => {
 
     finish();
     await expect(chrome.getByText("All done")).toBeVisible();
-    // It settles on the last picture, and nothing about it was kept.
-    await expect(view().getByText("Done")).toBeVisible();
-    await expect(picture()).toBeVisible();
+    // Its tab closes once it's done, so the view goes with it, and nothing about the picture was kept.
+    await expect(view()).toHaveCount(0);
+    await expect(chrome.getByRole("button", { name: "Pages it used (1)" })).toBeVisible();
     const saved = await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), chatId);
     const said = JSON.stringify(saved);
     expect(said).not.toContain("data:image");
     expect(said).not.toContain("base64");
     expect(JSON.stringify(model.requests)).not.toContain("data:image");
-
-    // A new window size doesn't lose the finished view, once the bird has left and nothing is being captured.
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    await app.evaluate(({ BaseWindow }, { width, height }) => BaseWindow.getAllWindows()[0].setSize(width + 240, height), WIDE);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    await expect(view().getByText("Done")).toBeVisible();
 
     // The next message starts over, with no old picture.
     model.replyWith("Just words");
