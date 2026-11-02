@@ -14,6 +14,8 @@ export interface RoutineFormValues {
     mascotId: string | null
     // The sites a run may use, as typed, split by commas. Empty adds no limit.
     sites: string
+    // Runs on its schedule in the cloud, even with the Mac off. Only offered with a runner linked.
+    inCloud?: boolean
     // The suggestion that filled this in, which goes away once it's saved.
     suggestionId?: string
     // Filled in from what the user showed Berry: what looks like it changes, and whether to ask for it on each run.
@@ -64,8 +66,8 @@ const withSchedule = (blank: RoutineFormValues, schedule: RoutineSchedule): Rout
     return { ...values, time: schedule.time }
 }
 
-export const formFor = ({ id, name, instructions, mascotId, sites, scheduleSpec }: Routine): RoutineFormValues =>
-    withSchedule({ ...blankForm(name, instructions, mascotId), id, sites: sites.join(', ') }, scheduleSpec)
+export const formFor = ({ id, name, instructions, mascotId, sites, inCloud, scheduleSpec }: Routine): RoutineFormValues =>
+    withSchedule({ ...blankForm(name, instructions, mascotId), id, sites: sites.join(', '), inCloud }, scheduleSpec)
 
 // It does nothing by itself until the user gives it a time, and the sites are the ones they used.
 export const recordedForm = ({ name, instructions, sites, changes }: RecordedDraft): RoutineFormValues => ({
@@ -127,7 +129,7 @@ export const suggestedForm = ({ name, instructions, mascotId, schedule }: Routin
 
 export const toDraft = (form: RoutineFormValues): RoutineDraft => {
     // Saving with Enter leaves a field that hasn't been finished with.
-    const { name, instructions, kind, time, date, days, day, mascotId, sites } = (form.recorded ?? []).reduce((values, _, at) => applyRecordedValue(values, at), form)
+    const { name, instructions, kind, time, date, days, day, mascotId, sites, inCloud } = (form.recorded ?? []).reduce((values, _, at) => applyRecordedValue(values, at), form)
     const schedule = (): RoutineSchedule => {
         switch (kind) {
             case 'manual':
@@ -142,7 +144,7 @@ export const toDraft = (form: RoutineFormValues): RoutineDraft => {
                 return { kind, day, time }
         }
     }
-    return { name, instructions, schedule: schedule(), mascotId, sites: sites.split(/[\s,]+/).filter(Boolean) }
+    return { name, instructions, schedule: schedule(), mascotId, sites: sites.split(/[\s,]+/).filter(Boolean), ...(inCloud && kind !== 'manual' ? { inCloud } : {}) }
 }
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.

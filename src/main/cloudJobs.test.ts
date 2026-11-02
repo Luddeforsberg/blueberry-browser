@@ -11,9 +11,12 @@ describe("a job's bird, read back from its row", () => {
     expect(mascotFromSnapshot(mascotSnapshot(profile))).toEqual(profile);
   });
 
-  it("is plain Berry under Berry's id only with no limits in the row", () => {
+  it("is plain Berry under Berry's id only with no limits in the row, and Berry on fewer sites with some", () => {
     expect(mascotFromSnapshot(mascotSnapshot(BERRY))).toBe(BERRY);
-    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: ["x.se"] })).toBeNull();
+    // A routine of Berry's that may only use some sites.
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: ["https://www.X.se/a", "x.se"] })).toEqual({ ...BERRY, sites: ["x.se"] });
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: ["not a site"] })).toBeNull();
+    expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), sites: [42] })).toBeNull();
     expect(mascotFromSnapshot({ ...mascotSnapshot(BERRY), tools: ["visit"] })).toBeNull();
     expect(mascotFromSnapshot({ id: "berry" })).toBeNull();
   });

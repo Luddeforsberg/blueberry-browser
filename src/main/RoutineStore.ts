@@ -20,15 +20,18 @@ export interface StoredRoutine {
   mascotId: string | null;
   // The only sites a run may use. Empty adds no limit.
   sites: string[];
+  // Runs on the cloud runner on its schedule, not here.
+  inCloud: boolean;
   paused: boolean;
   // When it's next due. Null when paused, or for a one-off that's been used.
   nextRunAt: number | null;
 }
 
-interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused" | "sites"> {
+interface RoutineRow extends Omit<StoredRoutine, "schedule" | "paused" | "sites" | "inCloud"> {
   schedule: string;
   sites: string;
   paused: number;
+  inCloud: number;
 }
 
 interface RunRow extends Omit<RoutineRun, "steps" | "approval" | "seen" | "memoryIds"> {
@@ -69,16 +72,18 @@ const MIGRATIONS = [
   `ALTER TABLE routines ADD COLUMN mascot_id TEXT;`,
   `ALTER TABLE routines ADD COLUMN sites TEXT NOT NULL DEFAULT '[]';`,
   `ALTER TABLE runs ADD COLUMN memory TEXT NOT NULL DEFAULT '[]';`,
+  `ALTER TABLE routines ADD COLUMN in_cloud INTEGER NOT NULL DEFAULT 0;`,
 ];
 
-const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, sites, paused, next_run_at AS nextRunAt";
+const ROUTINE_COLUMNS = "id, name, instructions, schedule, mascot_id AS mascotId, sites, in_cloud AS inCloud, paused, next_run_at AS nextRunAt";
 const RUN_COLUMNS =
   "id, routine_id AS routineId, status, started_at AS startedAt, ended_at AS endedAt, late_for AS lateFor, steps, result, error, approval, tokens, seen, memory";
 
-const toRoutine = ({ schedule, sites, paused, ...row }: RoutineRow): StoredRoutine => ({
+const toRoutine = ({ schedule, sites, paused, inCloud, ...row }: RoutineRow): StoredRoutine => ({
   ...row,
   schedule: JSON.parse(schedule),
   sites: JSON.parse(sites),
+  inCloud: inCloud === 1,
   paused: paused === 1,
 });
 
@@ -114,31 +119,31 @@ export class RoutineStore {
     return row ? toRoutine(row as unknown as RoutineRow) : null;
   }
 
-  // Oldest first, so whatever has waited longest gets the next free place.
+  // Oldest first, so whatever has waited longest gets the next free place. One in the cloud is the cloud's to run.
   due(now: number): StoredRoutine[] {
     const rows = this.db
-      .prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE paused = 0 AND next_run_at <= ? ORDER BY next_run_at, rowid`)
+      .prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE paused = 0 AND in_cloud = 0 AND next_run_at <= ? ORDER BY next_run_at, rowid`)
       .all(now);
     return (rows as unknown as RoutineRow[]).map(toRoutine);
   }
 
   soonest(): number | null {
-    const row = this.db.prepare("SELECT MIN(next_run_at) AS at FROM routines WHERE paused = 0").get() as { at: number | null };
+    const row = this.db.prepare("SELECT MIN(next_run_at) AS at FROM routines WHERE paused = 0 AND in_cloud = 0").get() as { at: number | null };
     return row.at;
   }
 
-  create({ name, instructions, schedule, mascotId = null, sites = [] }: RoutineDraft, nextRunAt: number | null): string {
+  create({ name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null): string {
     const id = randomUUID();
     this.db
-      .prepare("INSERT INTO routines (id, name, instructions, schedule, mascot_id, sites, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .run(id, name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), nextRunAt, Date.now());
+      .prepare("INSERT INTO routines (id, name, instructions, schedule, mascot_id, sites, in_cloud, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(id, name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, Date.now());
     return id;
   }
 
-  update(id: string, { name, instructions, schedule, mascotId = null, sites = [] }: RoutineDraft, nextRunAt: number | null): boolean {
+  update(id: string, { name, instructions, schedule, mascotId = null, sites = [], inCloud = false }: RoutineDraft, nextRunAt: number | null): boolean {
     const { changes } = this.db
-      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, next_run_at = ? WHERE id = ?")
-      .run(name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), nextRunAt, id);
+      .prepare("UPDATE routines SET name = ?, instructions = ?, schedule = ?, mascot_id = ?, sites = ?, in_cloud = ?, next_run_at = ? WHERE id = ?")
+      .run(name, instructions, JSON.stringify(schedule), mascotId, JSON.stringify(sites), inCloud ? 1 : 0, nextRunAt, id);
     return changes > 0;
   }
 

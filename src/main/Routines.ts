@@ -1,7 +1,10 @@
 import { nextRun, parseDraft, scheduleLabel } from "./routineSchedule";
 import type { TaskProgress, TaskResult } from "./Chats";
 import type { RoutineStore, StoredRoutine } from "./RoutineStore";
-import type { ChatApproval, ChatStep, Routine, RoutineRun, RoutineStatus } from "../shared/library";
+import type { ChatApproval, ChatStep, MascotProfile, Routine, RoutineRun, RoutineStatus } from "../shared/library";
+import type { ActionApproval } from "../shared/ipc";
+import { mascotSnapshot, type CloudRoutineRow } from "./cloudJobs";
+import { narrowSites } from "../shared/mascots";
 
 // Runs that may start while this many are working. A run waiting for the user's OK uses nothing, so it doesn't count,
 // and once allowed it goes straight on even past this, because the user is waiting on it.
@@ -22,6 +25,10 @@ export interface RoutineRunner {
 
 export interface RoutineEvents {
   onChanged: () => void;
+  // Whether this routine may still be in the cloud, where it could run, and whether sending it there last failed.
+  // Without these, nothing is ever there.
+  stillInCloud?: (id: string) => boolean;
+  cloudFailed?: (id: string) => boolean;
   // Only for what the user started and hasn't seen: a result, or a decision only they can make.
   onAttention: (routine: StoredRoutine, kind: "finished" | "failed" | "needs-approval") => void;
   closeTab: (tabId: string) => void;
@@ -33,8 +40,11 @@ interface ActiveRun {
   approval: ChatApproval | null;
 }
 
-const prompt = ({ name, instructions, sites }: StoredRoutine, now: number): string =>
-  `This is a routine the user set up earlier, running by itself at ${new Date(now).toString()}. ` +
+const prompt = (routine: StoredRoutine, now: number): string => routinePrompt(routine, `at ${new Date(now).toString()}`);
+
+// What a run is told. A run in the cloud is written before it's due, so it says where rather than when.
+export const routinePrompt = ({ name, instructions, sites }: Pick<StoredRoutine, "name" | "instructions" | "sites">, when: string): string =>
+  `This is a routine the user set up earlier, running by itself ${when}. ` +
   "Nobody is watching right now, so don't ask questions in words: anything you need from the user goes through ask_user or hand_to_user, which wait for them. Do what it says in your own tabs, " +
   "then end with a short report of what you found and did, and anything you couldn't do.\n\n" +
   (sites.length > 0 ? `It may only use ${sites.join(", ")}, and anything else will be refused.\n\n` : "") +
@@ -127,8 +137,9 @@ export class Routines {
 
     this.store.due(now).forEach((routine) => {
       const next = nextRun(routine.schedule, now);
-      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up.
-      if (this.active.has(routine.id)) {
+      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up. So is one that
+      // was just moved back from the cloud while it may still be there, so the two never both run it.
+      if (this.active.has(routine.id) || this.events.stillInCloud?.(routine.id)) {
         this.store.setNextRun(routine.id, next);
         this.events.onChanged();
       } else if (this.hasFreePlace) {
@@ -194,7 +205,7 @@ export class Routines {
     const now = Date.now();
     return this.store.routines().map((routine) => {
       const latestRun = this.store.latestRun(routine.id);
-      const { id, name, instructions, schedule, mascotId, sites, paused, nextRunAt } = routine;
+      const { id, name, instructions, schedule, mascotId, sites, inCloud, paused, nextRunAt } = routine;
       return {
         id,
         name,
@@ -202,9 +213,12 @@ export class Routines {
         scheduleSpec: schedule,
         mascotId,
         sites,
+        inCloud,
+        cloudNote: this.cloudNote(routine),
         schedule: scheduleLabel(schedule),
         paused,
-        nextRunAt,
+        // One in the cloud is never moved on here, so its time is worked out from its schedule.
+        nextRunAt: inCloud ? (paused ? null : nextRun(schedule, now)) : nextRunAt,
         status: this.statusOf(routine, latestRun, now),
         lastResult: lastResult(latestRun, now),
         latestRun,
@@ -217,8 +231,44 @@ export class Routines {
     if (this.active.has(routine.id) && latest) return latest.status;
     if (this.requested.has(routine.id)) return "queued";
     if (routine.paused) return "paused";
-    if (routine.nextRunAt !== null && routine.nextRunAt <= now) return "queued";
+    if (!routine.inCloud && routine.nextRunAt !== null && routine.nextRunAt <= now) return "queued";
     return latest?.status ?? "idle";
+  }
+
+  // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites. The
+  // first time is only when this would run it next, which the server takes for a new or changed one.
+  cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] {
+    return this.store.routines().filter(({ inCloud }) => inCloud).map((routine) => {
+      const mascot = mascotOf(routine.mascotId);
+      return {
+        key: routine.id,
+        prompt: routinePrompt(routine, "in the cloud, maybe with the user's computer off"),
+        mascot: mascotSnapshot({ ...mascot, sites: narrowSites(mascot.sites, routine.sites) }),
+        actionApproval,
+        contextId,
+        schedule: routine.schedule,
+        timeZone,
+        paused: routine.paused,
+        firstRunAt: this.cloudNext(routine, Date.now()),
+      };
+    });
+  }
+
+  private cloudNote({ id, inCloud }: StoredRoutine): string | null {
+    if (!inCloud) return this.events.stillInCloud?.(id) ? "Moving back to this Mac…" : null;
+    return this.events.cloudFailed?.(id) ? "Couldn’t reach the cloud, will retry" : null;
+  }
+
+  // The cloud's side changed: one may have come back here, or reached it.
+  cloudChanged(): void {
+    this.events.onChanged();
+    this.tick();
+  }
+
+  // When one in the cloud is next due, as far as this can tell. The server has the real time.
+  private cloudNext(routine: StoredRoutine, now: number): string | null {
+    const next = routine.paused ? null : nextRun(routine.schedule, now);
+    return next === null ? null : new Date(next).toISOString();
   }
 
   runs(routineId: string): RoutineRun[] {
@@ -233,8 +283,9 @@ export class Routines {
     const existing = id ? this.store.routine(id) : null;
     if (id && !existing) return { ok: false, error: "This routine no longer exists." };
 
-    // A changed time counts from now. Anything else leaves a time that's already set alone.
-    const sameSchedule = JSON.stringify(existing?.schedule) === JSON.stringify(draft.schedule);
+    // A changed time counts from now. Anything else leaves a time that's already set alone. One coming back from the
+    // cloud counts from now too, since its time here was never moved on.
+    const sameSchedule = JSON.stringify(existing?.schedule) === JSON.stringify(draft.schedule) && existing?.inCloud === (draft.inCloud === true);
     const next = nextRun(draft.schedule, now);
     if (draft.schedule.kind === "once" && next === null && !sameSchedule) {
       return { ok: false, error: "Choose a time that hasn’t passed." };

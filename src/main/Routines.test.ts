@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LATE_AFTER_MS, MAX_ACTIVE_RUNS, Routines, type RoutineEvents } from "./Routines";
 import { RoutineStore } from "./RoutineStore";
 import type { TaskProgress, TaskResult } from "./Chats";
+import type { MascotProfile } from "../shared/library";
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
@@ -14,7 +15,7 @@ interface FakeRun {
   end: (result?: Partial<TaskResult>) => void;
 }
 
-const setup = (store = new RoutineStore(":memory:")) => {
+const setup = (store = new RoutineStore(":memory:"), cloud: Pick<RoutineEvents, "stillInCloud" | "cloudFailed"> = {}) => {
   const started: FakeRun[] = [];
   const stoppedIds: string[] = [];
   const runner = {
@@ -36,6 +37,7 @@ const setup = (store = new RoutineStore(":memory:")) => {
     onChanged: vi.fn(),
     onAttention: vi.fn(),
     closeTab: vi.fn(),
+    ...cloud,
   } satisfies RoutineEvents;
   const routines = new Routines(store, runner, events);
   return { store, routines, started, stoppedIds, events };
@@ -92,6 +94,61 @@ describe("the scheduler", () => {
     await flush();
     expect(store.latestRun(id)).toMatchObject({ status: "finished", result: "done", lateFor: null, tokens: 10, seen: false });
     expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+  });
+
+  it("leaves a routine that runs in the cloud to the cloud, and only moves it on to its next time here", async () => {
+    const { routines, store, started: runs } = setup();
+    const id = save(routines, { ...daily("13:00"), inCloud: true, sites: ["shop.example"] });
+    started(routines);
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(runs).toHaveLength(0);
+    // Never moved on here, since the cloud has its real time. The page works it out from the schedule.
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE);
+    expect(routines.list()[0]).toMatchObject({ nextRunAt: NOW + 60 * MINUTE + DAY, status: "idle" });
+
+    // What goes to the cloud: its bird narrowed to the routine's sites, and no next time once it's paused.
+    const scout = (): MascotProfile => ({ id: "m-1", name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find.", sites: [], tools: ["visit"], deletedAt: null });
+    const options = { actionApproval: "risky", contextId: "ctx-1", timeZone: "Europe/Stockholm" } as const;
+    const [row] = routines.cloudRows(scout, options);
+    expect(row).toMatchObject({ key: id, mascot: { id: "m-1", sites: ["shop.example"] }, schedule: { kind: "daily", time: "13:00" }, timeZone: "Europe/Stockholm", paused: false, firstRunAt: new Date(NOW + 60 * MINUTE + DAY).toISOString() });
+    expect(row.prompt).toContain("Look");
+    routines.setPaused(id, true);
+    expect(routines.cloudRows(scout, options)[0]).toMatchObject({ paused: true, firstRunAt: null });
+    save(routines, daily("13:00", "Here"));
+    expect(routines.cloudRows(scout, options)).toHaveLength(1);
+  });
+
+  it("doesn't run a routine moved back from the cloud until it's gone from there, so the two never both run it", async () => {
+    let there = true;
+    const { routines, store, started: runs } = setup(undefined, { stillInCloud: () => there });
+    const id = save(routines, { ...daily("13:00"), inCloud: true });
+    save(routines, daily("13:00"), id);
+    started(routines);
+    expect(routines.list()[0].cloudNote).toBe("Moving back to this Mac…");
+
+    // Its time comes while the cloud may still run it: skipped here, and on to the next.
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(runs).toHaveLength(0);
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+
+    there = false;
+    routines.cloudChanged();
+    expect(routines.list()[0].cloudNote).toBeNull();
+    await jump(DAY);
+    expect(runs).toHaveLength(1);
+  });
+
+  it("keeps a routine that only runs when asked out of the cloud", () => {
+    const { routines } = setup();
+    save(routines, { name: "Ask me", instructions: "Look", schedule: { kind: "manual" }, inCloud: true });
+    expect(routines.list()[0].inCloud).toBe(false);
+    expect(routines.cloudRows(() => { throw new Error("not asked"); }, { actionApproval: "risky", contextId: null, timeZone: "UTC" })).toEqual([]);
+  });
+
+  it("says when a routine couldn't be sent to the cloud", () => {
+    const { routines } = setup(undefined, { cloudFailed: () => true });
+    save(routines, { ...daily("13:00"), inCloud: true });
+    expect(routines.list()[0].cloudNote).toBe("Couldn’t reach the cloud, will retry");
   });
 
   it("runs a missed routine once when the app opens and says it was late, however many it missed", async () => {

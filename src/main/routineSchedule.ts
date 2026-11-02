@@ -74,7 +74,7 @@ const isTime = (value: unknown): value is string =>
 const isWhole = (value: unknown, min: number, max: number): value is number =>
   Number.isInteger(value) && (value as number) >= min && (value as number) <= max;
 
-const parseSchedule = (input: unknown): RoutineSchedule | null => {
+export const parseSchedule = (input: unknown): RoutineSchedule | null => {
   const value = (input ?? {}) as Record<string, unknown>;
   if (value.kind === "once") {
     return Number.isFinite(value.at) && (value.at as number) > 0 ? { kind: "once", at: value.at as number } : null;
@@ -113,5 +113,7 @@ export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: s
     if (!cleanSites.includes(clean)) cleanSites.push(clean);
   }
   if (cleanSites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
-  return { draft: { name: cleanName, instructions: cleanInstructions, schedule, sites: cleanSites, ...(typeof mascotId === "string" ? { mascotId } : {}) } };
+  // Only a scheduled routine has anything for the cloud to run.
+  const inCloud = (input as { inCloud?: unknown } | null)?.inCloud === true && schedule.kind !== "manual";
+  return { draft: { name: cleanName, instructions: cleanInstructions, schedule, sites: cleanSites, ...(typeof mascotId === "string" ? { mascotId } : {}), ...(inCloud ? { inCloud } : {}) } };
 };

@@ -272,6 +272,13 @@ export class Window {
       flock: () => this.mascotStore.all(),
       adopt: ({ prompt, mascotId }) => this.chats.adoptRunnerChat(prompt, mascotId),
       followedUp: (chatId, prompt) => this.chats.runnerFollowedUp(chatId, prompt),
+      routinesSettled: () => this.routines.cloudChanged(),
+      routines: () =>
+        this.routines.cloudRows((id) => this.mascotStore.resolve(id), {
+          actionApproval: this.settings.actionApproval,
+          contextId: this.cloud.contextId,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
     });
 
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
@@ -328,7 +335,12 @@ export class Window {
     this._baseWindow.on("show", syncWork);
 
     this.routines = new Routines(routineStore, this.chats, {
-      onChanged: () => this.publishLibrary(),
+      onChanged: () => {
+        this.publishLibrary();
+        void this.runnerJobs.routinesChanged();
+      },
+      stillInCloud: (id) => this.runnerJobs.stillInCloud(id),
+      cloudFailed: (id) => this.runnerJobs.cloudFailed(id),
       onAttention: (routine, kind) => {
         // The Routines row and the toolbar say so anyway, and that holds until the user is free. Anything asking
         // is notified from Needs you, along with every chat's.
@@ -1186,6 +1198,8 @@ export class Window {
   private mascotsChanged(): void {
     this.broadcast("library:updated", this.librarySnapshot);
     void this.runnerJobs.flockChanged();
+    // A bird's limits go with its routines in the cloud.
+    void this.runnerJobs.routinesChanged();
   }
 
   async confirmClearMemory(mascotId: string): Promise<boolean> {

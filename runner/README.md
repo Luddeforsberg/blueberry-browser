@@ -12,7 +12,7 @@ You link it to your account in Blueberry, and it accepts the link when it starts
 
 ## Deploy
 
-1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, then `supabase/migrations/20261103000000_phone.sql`, for the phone page, and then `supabase/migrations/20261104000000_cloud_conversations.sql`, for follow-ups.
+1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, then `supabase/migrations/20261103000000_phone.sql`, for the phone page, then `supabase/migrations/20261104000000_cloud_conversations.sql`, for follow-ups, and then `supabase/migrations/20261105000000_cloud_routines.sql`, for routines that run with the Mac off.
 2. **Create the runner's user.** In the Supabase dashboard, Authentication > Users > Add user > Create new user, with an email of its own and a long random password. Tick Auto Confirm User. Don't use your own account.
 3. **Link it in Blueberry.** Signed in to your Blueberry account, open Settings > Cloud > With your Mac off, type the runner's email and press **Link**. It says it's waiting for the runner.
 4. **Create the service.** From the repo root, with `railway login` done:

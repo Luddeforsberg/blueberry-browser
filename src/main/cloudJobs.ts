@@ -1,7 +1,7 @@
 import type { ReplyMessage } from "./agent";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatApproval, ChatStep, MascotProfile } from "../shared/library";
-import { BERRY, BERRY_ID, parseMascotDraft } from "../shared/mascots";
+import { BERRY, BERRY_ID, normaliseSite, parseMascotDraft } from "../shared/mascots";
 import { fitHistory } from "../shared/phone";
 
 // What goes into a cloud job's row and what comes back out, for the app and the runner alike. Plain data, no Electron.
@@ -35,14 +35,17 @@ export const mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId
 
 // A row is written with the user's session, so it can only say what the user could have sent: a stolen session could
 // already make any bird and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only
-// one with no limits, and only with none in the row, which is how the app always sends Berry. Anyone else must pass
-// the same checks as a mascot made in the app, or the job doesn't run at all.
+// one with no limits, and only with none in the row, which is how the app always sends Berry. A routine of Berry's
+// limited to some sites comes as Berry with those sites, which can only narrow it. Anyone else must pass the same checks
+// as a mascot made in the app, or the job doesn't run at all.
 export const mascotFromSnapshot = (input: unknown): MascotProfile | null => {
   const snapshot = (input ?? {}) as Record<string, unknown>;
   if (snapshot.id === BERRY_ID) {
     const { sites, tools } = snapshot;
-    const unlimited = Array.isArray(sites) && sites.length === 0 && Array.isArray(tools) && BERRY.tools.every((tool) => tools.includes(tool));
-    return unlimited ? BERRY : null;
+    if (!Array.isArray(sites) || !Array.isArray(tools) || !BERRY.tools.every((tool) => tools.includes(tool))) return null;
+    if (sites.length === 0) return BERRY;
+    const clean = sites.map((site) => (typeof site === "string" ? normaliseSite(site) : null));
+    return sites.length <= 20 && clean.every((site) => site !== null) ? { ...BERRY, sites: [...new Set(clean as string[])] } : null;
   }
   if (typeof snapshot.id !== "string" || !/^[\w-]{1,100}$/.test(snapshot.id)) return null;
   const parsed = parseMascotDraft({ ...snapshot, look: BERRY.look });
@@ -90,3 +93,18 @@ export const approvalFromRow = (row: Record<string, unknown>): (ChatApproval & {
     ...(kind === "handoff" ? { handoff: { need: need === "captcha" ? ("captcha" as const) : ("sign-in" as const), tabId: "", site: typeof site === "string" ? site : "" } } : {}),
   };
 };
+
+// A routine that runs in the cloud, as the app keeps it there for the runner. Its bird's limits are narrowed by the
+// routine's own sites before it goes. When it's due is the server's from then on: `firstRunAt` only counts for a new
+// routine, a changed schedule or a resume.
+export interface CloudRoutineRow {
+  key: string;
+  prompt: string;
+  mascot: MascotSnapshot;
+  actionApproval: ActionApproval;
+  contextId: string | null;
+  schedule: object;
+  timeZone: string;
+  paused: boolean;
+  firstRunAt: string | null;
+}

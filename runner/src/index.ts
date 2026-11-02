@@ -6,6 +6,7 @@ import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from ".
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { pushConfig, pusher } from "./push";
 import { quietConsole } from "./quietConsole";
+import { startDueRoutines } from "./routines";
 
 quietConsole();
 
@@ -94,6 +95,7 @@ const link = async (): Promise<void> => {
 const loop = async () => {
   console.log(`Runner started, using ${local ? "a local Chrome" : "Browserbase"}.`);
   let unreachable = false;
+  let routinesFailing = false;
   while (!shutdown.signal.aborted) {
     await unreleased.retry();
     if (!linked) {
@@ -105,6 +107,15 @@ const loop = async () => {
     }
     let job: ClaimedJob | null = null;
     try {
+      // A routine that's due becomes a queued job first, so it's taken in turn like any other. Routines failing, as before
+      // their migration has run, never stops jobs from being taken.
+      const routineJobs = await startDueRoutines(db).catch((error: unknown) => {
+        if (!routinesFailing) console.error(`Couldn't start routines: ${error instanceof Error ? error.message : "no answer"}`);
+        routinesFailing = true;
+        return null;
+      });
+      if (routineJobs) routinesFailing = false;
+      routineJobs?.forEach((id) => console.log(`Job ${id}: started from a routine.`));
       job = await db.claim();
       if (unreachable) console.log("Reached Supabase again.");
       unreachable = false;
