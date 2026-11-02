@@ -34,6 +34,8 @@ const POPUP_URL_MS = 2_000;
 
 export type CloudStatus = "idle" | "starting" | "running" | "ended";
 
+const IDLE_MS = 3 * 60_000;
+
 // The session, the job using it and its pages. Whoever owns this decides who may claim it.
 export class CloudSessions {
   private session: CloudSession | null = null;
@@ -47,10 +49,13 @@ export class CloudSessions {
   // Every page made here. Anything else in the context is a popup a page opened.
   private readonly ours = new WeakSet<Page>();
   private opening: Promise<unknown> = Promise.resolve();
+  // A session nobody is using still costs, so it ends a while after the last job lets go.
+  private idle: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly browser: CloudBrowser,
-    private readonly onChange: () => void = () => {}
+    private readonly onChange: () => void = () => {},
+    private readonly idleMs = IDLE_MS
   ) {}
 
   get status(): CloudStatus {
@@ -83,6 +88,7 @@ export class CloudSessions {
   claim(jobId: string): boolean {
     if (this.owner && this.owner !== jobId) return false;
     this.owner = jobId;
+    this.keepOpen();
     this.onChange();
     return true;
   }
@@ -90,7 +96,15 @@ export class CloudSessions {
   release(jobId: string): void {
     if (this.owner !== jobId) return;
     this.owner = null;
+    this.keepOpen();
+    if (this.canEnd) this.idle = setTimeout(() => void this.end(), this.idleMs);
     this.onChange();
+  }
+
+  // Someone is using it: a job, or the user after taking over, who ends it themselves or at the provider's timeout.
+  keepOpen(): void {
+    if (this.idle) clearTimeout(this.idle);
+    this.idle = null;
   }
 
   private async ensure(): Promise<CloudSession> {
@@ -236,6 +250,7 @@ export class CloudSessions {
 
   // Everything goes: the session at the provider first, then the connection, the pages and the job's claim.
   async end(): Promise<void> {
+    this.keepOpen();
     const session = this.session ?? (await this.starting?.catch(() => null)) ?? null;
     await this.releaseAtProvider();
     await session?.close().catch(() => {});

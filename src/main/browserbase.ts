@@ -2,7 +2,7 @@ import type { CdpTab } from "./CdpTab";
 import { connectOverCdp, type CloudBrowser, type CloudSession } from "./cloudBrowser";
 
 // Browserbase, from its REST API (docs.browserbase.com/reference/api) and connected to over CDP. One persistent Context
-// keeps the profile between sessions, and a session is kept alive between jobs, ended by the user or after an hour.
+// keeps the profile between sessions, and a session is kept alive between jobs, ended a few minutes after the last one, by the user, or after an hour.
 // Written against the docs and tested with a stubbed fetch only: it hasn't run against the real service yet.
 
 const API = "https://api.browserbase.com/v1";

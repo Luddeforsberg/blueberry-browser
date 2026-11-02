@@ -209,6 +209,7 @@ export class CloudTabs implements ChatCloud {
   takeOver(id: unknown): boolean {
     if (typeof id !== "string" || !this.page(id)) return false;
     this.taken.add(id);
+    this.sessions?.keepOpen();
     this.hooks.takenOver(id);
     this.changed();
     return true;
