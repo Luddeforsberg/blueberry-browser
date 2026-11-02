@@ -19,6 +19,8 @@ const SHOTS = process.env.BLUEBERRY_SHOTS ?? join(homedir(), "blueberry-audit", 
 const FIRST_PROMPT = "Find the cheapest USB-C cable on shop.example and put it in my cart";
 const FIRST_REPLY = "The cheapest is a 1 m cable for 49 kr. It's in your cart.";
 const FOLLOW_UP = "Is there a 2 m one under 80 kr?";
+const FROM_MAC = "Is it in stock?";
+const THIRD = "Then order the 2 m one";
 const SITE = join(__dirname, "..", "site");
 const OWNER = "ana@example.com";
 const OWNER_PASSWORD = "correct horse battery";
@@ -215,7 +217,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     ]);
     expect(mascotFromSnapshot(second.mascot)).toMatchObject({ id: "m-scout", sites: ["shop.example", "prices.example"] });
     // One at a time in a conversation.
-    await expect(fetch(`${base}/rest/v1/rpc/start_cloud_job`, { method: "POST", headers: { apikey: FAKE_KEY, authorization: `Bearer ${owner}`, "content-type": "application/json" }, body: JSON.stringify({ p_prompt: "Again", p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: null, p_conversation: first }) }).then((response) => response.status)).resolves.toBe(409);
+    await expect(fetch(`${base}/rest/v1/rpc/start_cloud_job`, { method: "POST", headers: { apikey: FAKE_KEY, authorization: `Bearer ${owner}`, "content-type": "application/json" }, body: JSON.stringify({ p_prompt: "Again", p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: null, p_conversation: first, p_after_job: second.id }) }).then((response) => response.status)).resolves.toBe(409);
 
     // The runner takes it, and the conversation reads as one chat.
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(second.id);
@@ -223,6 +225,48 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await expect(page.getByText("Yes, one for 69 kr.")).toBeVisible();
     await expect(page.getByLabel("Follow up")).toBeVisible();
     await shoot(page, "conversation");
+
+    // Sent from the Mac and over while a follow-up is typed here, with the page still showing the conversation as it
+    // was. The server refuses that follow-up as built on an older job, and the page reads the conversation again and
+    // sends it once more, carrying the Mac's exchange.
+    let frozen: { body: string; headers: Record<string, string> } | null = null;
+    let freeze = true;
+    await page.route(/\/rest\/v1\/cloud_jobs\?select=id,conversation_id,prompt/, async (route) => {
+      if (!freeze) return route.continue();
+      if (!frozen) {
+        const response = await route.fetch();
+        frozen = { body: await response.text(), headers: response.headers() };
+      }
+      await route.fulfill({ status: 200, body: frozen.body, headers: frozen.headers });
+    });
+    const refused: number[] = [];
+    await page.route(/\/rest\/v1\/rpc\/start_cloud_job/, async (route) => {
+      const response = await route.fetch();
+      if (response.status() === 409) {
+        refused.push(409);
+        freeze = false;
+      }
+      await route.fulfill({ response });
+    });
+    await page.waitForResponse(/cloud_jobs\?select=id,conversation_id,prompt/);
+    const fromMac = await rpc(owner, "start_cloud_job", { p_prompt: FROM_MAC, p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: null, p_conversation: first, p_after_job: second.id });
+    expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(fromMac);
+    await rpc(runner, "runner_update_job", { p_job: fromMac, p_status: "done", p_reply: "Yes, 12 left." });
+    await page.waitForResponse(/cloud_jobs\?select=id,conversation_id,prompt/);
+    await expect(page.getByText(FROM_MAC)).toHaveCount(0);
+    await page.getByLabel("Follow up").fill(THIRD);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.locator(".bubble")).toHaveText([FIRST_PROMPT, FOLLOW_UP, FROM_MAC, THIRD]);
+    expect(refused).toEqual([409]);
+    // That refusal is the one other error the console may show.
+    expect(problems.splice(0)).toEqual(["Failed to load resource: the server responded with a status of 409 (Conflict)"]);
+    const [third] = await supabase.cloudRows(`select conversation_id, history from public.cloud_jobs where prompt = '${THIRD}'`);
+    expect(third.conversation_id).toBe(first);
+    expect((third.history as unknown[]).slice(-2)).toEqual([{ role: "user", content: FROM_MAC }, { role: "assistant", content: "Yes, 12 left." }]);
+    await page.unrouteAll();
+    expect((await rpc(runner, "runner_claim_job"))[0].prompt).toBe(THIRD);
+    await rpc(runner, "runner_update_job", { p_job: (await supabase.cloudRows(`select id from public.cloud_jobs where prompt = '${THIRD}'`))[0].id, p_status: "done", p_reply: "Ordered." });
+    await expect(page.getByText("Ordered.", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Jobs" }).click();
     await expect(page.locator(".rows li")).toHaveCount(1);
     await expect(page.getByRole("link", { name: new RegExp(`${FIRST_PROMPT}.*Scout · Done`) })).toBeVisible();

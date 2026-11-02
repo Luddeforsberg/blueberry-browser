@@ -39,8 +39,12 @@ describe("conversations of cloud jobs", () => {
     await as(owner, `select public.link_cloud_runner('user${Number(runner.slice(-12))}@example.com')`);
     await as(runner, `select public.accept_cloud_runner_link('user${Number(owner.slice(-12))}@example.com')`);
   };
-  const start = async (uid: string, conversation: string | null = null, history = "[]") =>
-    (await as<{ id: string }>(uid, `select public.start_cloud_job('Go on', '${history}', ${MASCOT}, 'risky', null, ${conversation ? `'${conversation}'` : "null"}) as id`))[0].id;
+  const quoted = (id: string | null) => (id ? `'${id}'` : "null");
+  // A follow-up names the job its history was built on, the conversation's newest unless said otherwise.
+  const newestOf = async (conversation: string) =>
+    ((await db.query<{ id: string }>("select id from public.cloud_jobs where conversation_id = $1 or id = $1 order by created_at desc, id desc limit 1", [conversation])).rows[0]?.id ?? null);
+  const start = async (uid: string, conversation: string | null = null, history = "[]", after?: string | null) =>
+    (await as<{ id: string }>(uid, `select public.start_cloud_job('Go on', '${history}', ${MASCOT}, 'risky', null, ${quoted(conversation)}, ${quoted(after === undefined && conversation ? await newestOf(conversation) : (after ?? null))}) as id`))[0].id;
   const conversationOf = async (id: string) => (await db.query<{ conversation_id: string | null }>("select conversation_id from public.cloud_jobs where id = $1", [id])).rows[0].conversation_id;
   const finish = (id: string, status = "done") => db.query("update public.cloud_jobs set status = $2 where id = $1", [id, status]);
 
@@ -101,6 +105,29 @@ describe("conversations of cloud jobs", () => {
     await expect(start(RUNNER, alices)).rejects.toThrow(/runner can't start jobs/);
     await expect(as(null, `select public.start_cloud_job('Go on', '[]', ${MASCOT}, 'risky', null, '${alices}')`)).rejects.toThrow(/permission denied/);
     expect((await db.query("select count(*)::int as jobs from public.cloud_jobs where conversation_id = $1", [alices])).rows[0]).toEqual({ jobs: 1 });
+  });
+
+  it("refuses a follow-up built on a job that's no longer the newest, or on none", async () => {
+    const first = await start(ALICE);
+    await finish(first);
+    // Sent elsewhere meanwhile, and over.
+    const second = await start(ALICE, first, "[]", first);
+    await finish(second);
+    await expect(start(ALICE, first, "[]", first)).rejects.toThrow(/went on since that job/);
+    await expect(start(ALICE, first, "[]", null)).rejects.toThrow(/went on since that job/);
+    // Someone else's job, or one from another conversation, is no better.
+    const other = await start(ALICE);
+    await expect(start(ALICE, first, "[]", other)).rejects.toThrow(/went on since that job/);
+    expect((await db.query("select count(*)::int as jobs from public.cloud_jobs where conversation_id = $1", [first])).rows[0]).toEqual({ jobs: 2 });
+    // Built on the newest, it's taken.
+    expect(await conversationOf(await start(ALICE, first, "[]", second))).toBe(first);
+  });
+
+  it("can be run again over itself", async () => {
+    const first = await start(ALICE);
+    await db.exec(readFileSync(join(__dirname, "migrations", "20261104000000_cloud_conversations.sql"), "utf8"));
+    await finish(first);
+    expect(await conversationOf(await start(ALICE, first))).toBe(first);
   });
 
   it("brings a job from before conversations into the first one that follows it up", async () => {

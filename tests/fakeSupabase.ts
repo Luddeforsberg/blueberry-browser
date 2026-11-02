@@ -53,8 +53,8 @@ const cloudDatabase = async () => {
     queue = run.catch(() => {});
     return run;
   };
-  // A select in PostgREST's shape, for the few it's asked: columns, `eq.` or `not.is.null` on a few columns, an order
-  // and a limit.
+  // A select in PostgREST's shape, for the few it's asked: columns, `eq.` or `not.is.null` on a few columns, an order,
+  // a limit and an offset.
   const select = (uid: string | null, table: string, params: URLSearchParams) => {
     const run = queue.then(async () => {
       const columns = params.get("select") ?? "*";
@@ -70,12 +70,13 @@ const cloudDatabase = async () => {
       });
       const [orderBy, direction] = (params.get("order") ?? "").split(".");
       const limit = Number(params.get("limit")) || 100;
+      const offset = Number(params.get("offset")) || 0;
       await db.query("select set_config('test.uid', $1, false)", [uid ?? ""]);
       await db.exec(`set role ${uid ? "authenticated" : "anon"}`);
       try {
         const where = filters.length ? `where ${filters.join(" and ")}` : "";
         const order = /^[a-z_]+$/.test(orderBy ?? "") ? `order by ${orderBy} ${direction === "desc" ? "desc" : "asc"}` : "";
-        const sql = `select ${columns} from public.${table} ${where} ${order} limit ${limit}`;
+        const sql = `select ${columns} from public.${table} ${where} ${order} limit ${limit} offset ${offset}`;
         return (await db.query<Record<string, unknown>>(sql, values)).rows;
       } finally {
         await db.exec("reset role");

@@ -24,10 +24,13 @@ const setUp = () => {
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
-    startCloudJob: vi.fn(async (token: string, job: { prompt: string; conversationId: string }) => {
+    startCloudJob: vi.fn(async (token: string, job: { prompt: string; history: unknown[]; conversationId: string; afterJobId: string | null }) => {
       await answering;
       if (!link.accepted) throw new ServerError(400, "");
-      if ([...jobs.values()].some(({ row }) => row.conversation_id === job.conversationId && !["done", "failed", "stopped"].includes(String(row.status)))) throw new ServerError(409, "");
+      const conversation = [...jobs.values()].filter(({ row }) => row.conversation_id === job.conversationId).map(({ row }) => row);
+      if (conversation.some((row) => !["done", "failed", "stopped"].includes(String(row.status)))) throw new ServerError(409, "");
+      // Refused unless it was built on the conversation's newest job, as the server does.
+      if ((conversation.at(-1)?.id ?? null) !== job.afterJobId) throw new ServerError(409, "");
       const id = `job-${++made}`;
       jobs.set(id, { owner: token, row: { id, conversation_id: job.conversationId, prompt: job.prompt, mascot: { id: "berry" }, created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
       return id;
@@ -54,6 +57,8 @@ const setUp = () => {
     return id;
   });
   const followedUp = vi.fn((chatId: string, prompt: string) => chats.get(chatId)?.said.push(prompt));
+  // The Mac's own chat, as `Chats` keeps it: what's saved there, which a message sent from here builds its history on.
+  const transcript: { role: "user" | "assistant"; content: string }[] = [];
   const runner = new RunnerJobs(
     server,
     { get state() { return account.state; }, accessToken: async () => {
@@ -61,14 +66,31 @@ const setUp = () => {
       return account.state.status === "signed-in" ? tokenOf() : null;
     } },
     join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
-    { changed, finished, contextId: () => null, adopt, followedUp },
+    {
+      changed,
+      finished: (chatId: string, result: { reply: string; steps: unknown[]; error: string | null }) => {
+        finished(chatId, result);
+        if (chatId === "chat-1" && result.reply) transcript.push({ role: "assistant", content: result.reply });
+      },
+      contextId: () => null,
+      adopt,
+      followedUp: (chatId: string, prompt: string) => {
+        followedUp(chatId, prompt);
+        if (chatId === "chat-1") transcript.push({ role: "user", content: prompt });
+      },
+    },
     5
   );
   const signIn = (email: string | null) => {
     account.state = email ? { status: "signed-in", email, problem: null } : { status: "signed-out", email: null, problem: null };
     runner.accountChanged();
   };
-  const send = (chatId = "chat-1", prompt = "Order it") => runner.start(chatId, { prompt, earlier: [], mascot: BERRY, actionApproval: "risky" });
+  // As `Chats` sends: the history read from the chat when it goes, and the message saved once the runner has it.
+  const send = async (chatId = "chat-1", prompt = "Order it") => {
+    const problem = await runner.start(chatId, { prompt, earlier: () => (chatId === "chat-1" ? [...transcript] : []), mascot: BERRY, actionApproval: "risky" });
+    if (chatId === "chat-1") transcript.push({ role: "user", content: prompt });
+    return problem;
+  };
   // A job sent from the phone, as Ana, in a conversation of its own or one it follows up.
   const fromPhone = (prompt: string, conversationId = `phone-${made + 1}`, status = "running") => {
     const id = `job-${++made}`;
@@ -85,7 +107,7 @@ const setUp = () => {
   };
   const holdTokens = () => hold((gate) => (refreshing = gate));
   const holdAnswers = () => hold((gate) => (answering = gate));
-  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers, link, fromPhone, adopt, followedUp, chats };
+  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers, link, fromPhone, adopt, followedUp, chats, transcript };
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
@@ -213,6 +235,31 @@ describe("conversations from elsewhere", () => {
     // This computer's own job isn't taken for one from elsewhere.
     await runner.discover();
     expect(followedUp).toHaveBeenCalledTimes(1);
+    runner.destroy();
+  });
+
+  it("brings in an exchange sent from the phone since, before a message from here, and carries it", async () => {
+    const { runner, jobs, send, fromPhone, server, transcript } = setUp();
+    await send();
+    await settle();
+    const conversation = String(jobs.get("job-1")!.row.conversation_id);
+    jobs.get("job-1")!.row = { ...jobs.get("job-1")!.row, status: "done", reply: "Ordered" };
+    await settle();
+    // Sent and finished on the phone before this computer looked.
+    fromPhone("And the charger?", conversation, "done");
+    expect(await send("chat-1", "Thanks")).toBeNull();
+    const calls = (server.startCloudJob as unknown as { mock: { calls: [string, { prompt: string; history: unknown[]; afterJobId: string | null }][] } }).mock.calls;
+    // Refused once as built on job-1, then sent after job-2 with its exchange.
+    expect(calls.slice(-2).map(([, job]) => [job.prompt, job.afterJobId])).toEqual([["Thanks", "job-1"], ["Thanks", "job-2"]]);
+    expect(calls.at(-1)?.[1].history).toEqual([
+      { role: "user", content: "Order it" },
+      { role: "assistant", content: "Ordered" },
+      { role: "user", content: "And the charger?" },
+      { role: "assistant", content: "Done there" },
+    ]);
+    // And saved in that order.
+    expect(transcript.map(({ content }) => content)).toEqual(["Order it", "Ordered", "And the charger?", "Done there", "Thanks"]);
+    expect(runner.active()).toEqual(["chat-1"]);
     runner.destroy();
   });
 

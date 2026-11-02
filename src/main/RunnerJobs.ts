@@ -76,6 +76,12 @@ export interface RunnerJobsHooks {
 
 const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({ account, conversationId, jobIds, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
 
+type NewJob = Record<string, unknown> & { id: string; prompt: string };
+
+// A conversation's jobs, oldest first, that this chat doesn't have yet.
+const newJobs = (rows: Record<string, unknown>[], known: string[]): NewJob[] =>
+  rows.filter((row): row is NewJob => typeof row.id === "string" && typeof row.prompt === "string" && !known.includes(row.id));
+
 // How a job that's over ended, as the chat says it.
 const endError = (status: CloudJobStatus, error: string | null): string | null => (status === "failed" ? (error ?? FAILED) : status === "stopped" ? error : null);
 
@@ -241,14 +247,27 @@ export class RunnerJobs implements ChatRunner {
       const token = await this.tokenFor(account);
       if (token === "switched") return fail(SWITCHED);
       if (!token) return fail(SIGN_IN);
-      const jobId = await this.server.startCloudJob(token, {
-        prompt,
-        history: historyFromRow(earlier),
-        mascot: mascotSnapshot(mascot),
-        actionApproval,
-        contextId: this.hooks.contextId(),
-        conversationId: entry.conversationId,
-      });
+      // Built on the newest job this chat has, which the server checks is the conversation's newest.
+      const server = this.server;
+      const send = () =>
+        server.startCloudJob(token, {
+          prompt,
+          history: historyFromRow(earlier()),
+          mascot: mascotSnapshot(mascot),
+          actionApproval,
+          contextId: this.hooks.contextId(),
+          conversationId: entry.conversationId,
+          afterJobId: entry.jobIds.at(-1) ?? null,
+        });
+      let jobId: string | null;
+      try {
+        jobId = await send();
+      } catch (error) {
+        // The conversation went on elsewhere since this chat last looked. That's brought in first, so this message comes
+        // after it and carries it, and it's sent once more.
+        if (!(error instanceof ServerError && error.status === 409) || !(await this.catchUp(account, chatId, entry))) throw error;
+        jobId = await send();
+      }
       if (!jobId) return fail(NOT_TAKEN);
       entry.jobId = jobId;
       entry.jobIds.push(jobId);
@@ -435,7 +454,7 @@ export class RunnerJobs implements ChatRunner {
     let found = this.chatOf(account, conversationId);
     // Checked again, since a message may have been sent from here while it asked.
     if (this.forgotten.includes(conversationId) || found?.[1].active) return;
-    const fresher = rows.filter((row): row is Record<string, unknown> & { id: string; prompt: string } => typeof row.id === "string" && typeof row.prompt === "string" && !found?.[1].jobIds.includes(row.id));
+    const fresher = newJobs(rows, found?.[1].jobIds ?? []);
     if (fresher.length === 0) return;
     if (!found) {
       const mascotId = (fresher[0].mascot as { id?: unknown } | null)?.id;
@@ -444,7 +463,22 @@ export class RunnerJobs implements ChatRunner {
       found = [chatId, fresh(account, conversationId, [], null, false)];
       this.entries.set(...found);
     }
-    const [chatId, entry] = found;
+    this.apply(...found, fresher);
+  }
+
+  // While a message from here is being sent: brings in what was sent in the chat's conversation elsewhere since its newest
+  // job here. False if a job there is still going, so this one can't go yet, or it couldn't be read.
+  private async catchUp(account: string, chatId: string, entry: Entry): Promise<boolean> {
+    const rows = await this.withToken(account, (token) => this.server!.cloudConversation(token, entry.conversationId));
+    if (!rows || this.signedIn !== account || this.entries.get(chatId) !== entry) return false;
+    const fresher = newJobs(rows, entry.jobIds);
+    if (fresher.length === 0 || fresher.some((row) => !FINISHED.includes(row.status as CloudJobStatus))) return false;
+    this.apply(chatId, entry, fresher);
+    return true;
+  }
+
+  // Saves jobs new to this chat in order: each one's message, then how it ended, or follows the one still going.
+  private apply(chatId: string, entry: Entry, fresher: NewJob[]): void {
     for (const row of fresher) {
       entry.jobIds.push(row.id);
       this.hooks.followedUp?.(chatId, row.prompt);

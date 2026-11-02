@@ -1,26 +1,33 @@
 -- Conversations: a follow-up to a cloud job is a new job in the same conversation, carrying the messages before it as its
 -- history, as a runner chat in the app always has. Each job keeps its own row, so the runner, its checks and its
--- approvals are unchanged. Only one job in a conversation may be going at once. The app and the phone both read a
--- conversation from the owner's own rows, so either can go on with one the other started. Run it once in the SQL editor,
--- after the phone page's.
+-- approvals are unchanged. Only one job in a conversation may be going at once, and a follow-up must say which job it
+-- built its history on, so one sent without an exchange made elsewhere meanwhile is refused rather than carrying a
+-- conversation with a gap. The app and the phone both read a conversation from the owner's own rows, so either can go on
+-- with one the other started. Run it in the SQL editor, after the phone page's. Running it again is safe.
 
 -- Null for a job from before conversations, which is one on its own until something follows it up.
-alter table public.cloud_jobs add column conversation_id uuid;
-create index cloud_jobs_conversation on public.cloud_jobs (owner, conversation_id, created_at);
+alter table public.cloud_jobs add column if not exists conversation_id uuid;
+create index if not exists cloud_jobs_conversation on public.cloud_jobs (owner, conversation_id, created_at);
 -- The real rule behind "one at a time": two going in one conversation can't both be written.
-create unique index cloud_jobs_one_going on public.cloud_jobs (conversation_id) where status in ('queued', 'running', 'waiting');
+create unique index if not exists cloud_jobs_one_going on public.cloud_jobs (conversation_id) where status in ('queued', 'running', 'waiting');
 
 -- As before, with the conversation it belongs to. Null starts a new one under the job's own id. An id nobody uses yet
 -- starts one under that id, which is how the app knows its chat's before the job is made. One with jobs must be the
--- caller's own, and must have none going.
-drop function public.start_cloud_job(text, jsonb, jsonb, text, text);
-create function public.start_cloud_job(p_prompt text, p_history jsonb, p_mascot jsonb, p_action_approval text, p_context_id text, p_conversation uuid default null)
+-- caller's own, must have none going, and `p_after_job` must be its newest job, the one the history was built on.
+-- Refused with 409 otherwise, after which the sender reads the conversation again and builds the history anew.
+drop function if exists public.start_cloud_job(text, jsonb, jsonb, text, text);
+drop function if exists public.start_cloud_job(text, jsonb, jsonb, text, text, uuid);
+drop function if exists public.start_cloud_job(text, jsonb, jsonb, text, text, uuid, uuid);
+create function public.start_cloud_job(
+  p_prompt text, p_history jsonb, p_mascot jsonb, p_action_approval text, p_context_id text, p_conversation uuid default null, p_after_job uuid default null
+)
 returns uuid
 language plpgsql security definer set search_path = ''
 as $$
 declare
   me uuid := public.cloud_user();
   made uuid := gen_random_uuid();
+  newest uuid;
 begin
   if me is null then raise exception 'Not signed in' using errcode = '42501'; end if;
   perform public.lock_cloud_account(me);
@@ -41,6 +48,10 @@ begin
     if exists (select 1 from public.cloud_jobs j where j.conversation_id = p_conversation and j.status in ('queued', 'running', 'waiting')) then
       raise exception 'This conversation already has a job going' using errcode = '23505';
     end if;
+    select j.id into newest from public.cloud_jobs j where j.conversation_id = p_conversation order by j.created_at desc, j.id desc limit 1;
+    if newest is distinct from p_after_job then
+      raise exception 'This conversation went on since that job' using errcode = '23505';
+    end if;
   end if;
   insert into public.cloud_jobs (id, owner, prompt, history, mascot, action_approval, context_id, conversation_id)
     values (made, me, p_prompt, coalesce(p_history, '[]'), p_mascot, coalesce(p_action_approval, 'risky'), nullif(p_context_id, ''), coalesce(p_conversation, made))
@@ -51,7 +62,7 @@ $$;
 
 -- Deleting a chat in the app deletes every job of its conversation, so it can't come back as a chat started elsewhere.
 -- As the caller, so row-level security keeps it to their own.
-create function public.forget_cloud_conversation(p_conversation uuid) returns integer
+create or replace function public.forget_cloud_conversation(p_conversation uuid) returns integer
 language sql security invoker set search_path = ''
 as $$
   with gone as (delete from public.cloud_jobs where conversation_id = p_conversation or id = p_conversation returning id) select count(*)::integer from gone;
@@ -61,7 +72,7 @@ do $$
 declare
   fn text;
 begin
-  foreach fn in array array['start_cloud_job(text, jsonb, jsonb, text, text, uuid)', 'forget_cloud_conversation(uuid)'] loop
+  foreach fn in array array['start_cloud_job(text, jsonb, jsonb, text, text, uuid, uuid)', 'forget_cloud_conversation(uuid)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', fn);
     execute format('grant execute on function public.%s to authenticated', fn);
   end loop;

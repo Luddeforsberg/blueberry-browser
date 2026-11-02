@@ -154,7 +154,8 @@ export interface ChatRunner {
 
 export interface RunnerJobInput {
   prompt: string;
-  earlier: ReplyMessage[];
+  // The chat before this message, read when it's sent, and again if what was sent elsewhere had to be brought in first.
+  earlier: () => ReplyMessage[];
   mascot: MascotProfile;
   actionApproval: ActionApproval;
 }
@@ -267,6 +268,9 @@ export class Chats {
 
   // Chats started in the cloud, whose later messages go there too. Memory only, so after a restart a chat works here.
   private readonly cloudChats = new Set<string>();
+  // A message on its way to the runner, shown last and saved once the runner has it, so anything sent in that chat
+  // elsewhere meanwhile is saved before it.
+  private readonly runnerPending = new Map<string, string>();
 
   // The same tools on the cloud browser's pages. Only what this job opened there, and nothing in the window, so the
   // user's own tabs are out of reach. Approvals, limits, takeovers and handing a page to the user work as they do here.
@@ -648,8 +652,10 @@ export class Chats {
     const run = this.runs.get(chat.id);
     if (this.runner?.has(chat.id)) {
       const progress = this.runner.progress(chat.id);
+      const pending = this.runnerPending.get(chat.id);
       return {
         ...chat,
+        messages: pending === undefined ? chat.messages : [...chat.messages, { role: "user", content: pending }],
         partial: progress?.reply ?? null,
         steps: progress?.steps ?? [],
         approval: progress?.approval ? publicApproval(progress.approval) : null,
@@ -719,13 +725,17 @@ export class Chats {
     if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
     const id = chatId ?? this.store.createChat(titleFrom(message), chosen, null);
     const mascot = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
-    const earlier = (this.store.chat(id)?.messages ?? []).map(toReplyMessage);
-    this.store.addMessage(id, { role: "user", content: message });
+    const earlier = () => (this.store.chat(id)?.messages ?? []).map(toReplyMessage);
+    this.runnerPending.set(id, message);
     this.errors.delete(id);
     this.finished.delete(id);
     void runner.start(id, { prompt: message, earlier, mascot, actionApproval: this.browser.actionApproval() }).then((problem) => {
-      if (!problem) return;
-      this.errors.set(id, problem);
+      this.runnerPending.delete(id);
+      if (!this.store.chat(id)) return;
+      this.store.addMessage(id, { role: "user", content: message });
+      // What was brought in first may have ended in an error of its own, which isn't this message's.
+      if (problem) this.errors.set(id, problem);
+      else this.errors.delete(id);
       this.notify(id);
     });
     this.notify(id);
@@ -782,6 +792,7 @@ export class Chats {
     this.finished.delete(chatId);
     this.jobs.delete(chatId);
     this.cloudChats.delete(chatId);
+    this.runnerPending.delete(chatId);
     this.runner?.forget(chatId);
     this.memory?.dropOffers(chatId);
     if (!this.store.deleteChat(chatId)) return false;

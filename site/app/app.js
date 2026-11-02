@@ -467,9 +467,10 @@ const liveView = (job, mascot, ask) => {
 };
 
 // The box under a conversation once its newest job is over. What's sent goes as the same bird, with the conversation so
-// far as its history: the earlier job's own history, then its prompt and reply.
+// far as its history: the newest job's own history, then its prompt and reply. The server takes it only if that job is
+// still the newest, so one sent from the Mac meanwhile is read in first and the history built again, once.
 const followUp = (conversation, mascot) => {
-  const { id, latest } = conversation;
+  const { id } = conversation;
   const problem = el("div");
   const box = el("textarea", { ariaLabel: "Follow up", rows: 2, maxLength: 8000, placeholder: `Ask ${mascot.name} to go on`, value: state.drafts.get(id) ?? "" });
   box.oninput = () => state.drafts.set(id, box.value);
@@ -481,15 +482,33 @@ const followUp = (conversation, mascot) => {
       const prompt = box.value.trim();
       if (!prompt) return box.focus();
       problem.replaceChildren();
-      // Only as a bird that's still in the flock, with its limits as they are now.
-      const snapshot = latest.mascot ?? {};
-      const sender = snapshot.id === BERRY_ID ? state.flock[0] : state.flock.find((bird) => bird.id === snapshot.id);
-      if (!sender) return problem.replaceChildren(say(`${mascot.name} isn’t in your flock any more, so this can’t go on.`, "small warning"));
       send.disabled = true;
-      try {
+      // As the conversation is now, not as it was when this was drawn: a poll doesn't redraw while it's typed in.
+      const attempt = async () => {
+        const latest = conversations().find((candidate) => candidate.id === id)?.latest;
+        if (!latest || going(latest)) throw new api.ApiError(409);
+        // Only as a bird that's still in the flock, with its limits as they are now.
+        const snapshot = latest.mascot ?? {};
+        const sender = snapshot.id === BERRY_ID ? state.flock[0] : state.flock.find((bird) => bird.id === snapshot.id);
+        if (!sender) return "gone";
         const last = await api.jobWithHistory(latest.id);
         if (!last) throw new api.ApiError(404);
-        await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: followUpHistory(last), p_mascot: snapshotOf(sender), p_action_approval: "risky", p_context_id: contextOf(), p_conversation: id });
+        await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: followUpHistory(last), p_mascot: snapshotOf(sender), p_action_approval: "risky", p_context_id: contextOf(), p_conversation: id, p_after_job: latest.id });
+      };
+      try {
+        let gone;
+        try {
+          gone = await attempt();
+        } catch (error) {
+          if (error?.status !== 409) throw error;
+          await load();
+          gone = await attempt();
+        }
+        if (gone) {
+          problem.replaceChildren(say(`${mascot.name} isn’t in your flock any more, so this can’t go on.`, "small warning"));
+          send.disabled = false;
+          return;
+        }
         state.drafts.delete(id);
         await load();
         show(true);
