@@ -92,6 +92,53 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
   }
 });
 
+test("a cloud job shows in the working view beside its chat, and pressing the picture opens its cloud tab", async () => {
+  test.setTimeout(60_000);
+  const server = createServer((_, response) => {
+    response.setHeader("content-type", "text/html");
+    response.end(SHOP);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const shop = `http://127.0.0.1:${(server.address() as AddressInfo).port}/shop`;
+  const model = await startFakeModel();
+  const app = await launchApp(undefined, { modelEnv: { ...model.env, BLUEBERRY_CLOUD_LOCAL: "1", BLUEBERRY_CLOUD_CHROME: CHROME } });
+  try {
+    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1500, 900));
+    const chrome = await findView(app, "view=chrome");
+    model.callTools({ name: "open_tab", args: { url: shop } });
+    model.replyWith("Had a look");
+    const finish = model.holdBeforeFirstToken();
+    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Have a look at the shop", { seePage: false, cloud: true }));
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+
+    const view = chrome.getByRole("complementary", { name: /working on/ });
+    const goThere = view.getByRole("button", { name: "Go to the tab on 127.0.0.1" });
+    await expect(goThere).toBeVisible({ timeout: 20_000 });
+    // The local test browser's own pictures, and the bird on the window's edge, as there's none in a cloud page.
+    await expect(view.locator("img[src^='data:image/jpeg']")).toBeVisible({ timeout: 10_000 });
+    await expect(view.getByRole("status")).toHaveText("Thinking");
+    await expect(chrome.getByText(/Opened/).first()).toBeVisible();
+    await shoot(chrome, "cloud-working-view");
+
+    await goThere.click();
+    const active = await chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive));
+    expect(active?.page).toBe("cloud");
+    await expect(chrome.getByText("In the cloud")).toBeVisible();
+    // Looking isn't taking over.
+    await expect(chrome.getByRole("button", { name: "Take over" })).toBeVisible();
+
+    finish();
+    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Had a look");
+    const saved = JSON.stringify(await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id));
+    expect(saved).not.toContain("data:image");
+    expect(JSON.stringify(model.requests)).not.toContain("data:image");
+  } finally {
+    await app.close();
+    model.close();
+    server.close();
+  }
+});
+
 test("with no key the cloud is off, and a saved key never comes back to the page", async () => {
   const app = await launchApp();
   try {
