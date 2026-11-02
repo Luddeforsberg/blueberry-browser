@@ -277,6 +277,10 @@ export class Window {
       openBackgroundTab: (url) => this.createBackgroundTab(url),
       // The window closes with its last tab, so Berry never takes that one, or the one the user is looking at.
       closeTab: (tabId) => this.tabCount > 1 && tabId !== this.activeTabId && this.closeTab(tabId, false),
+      // Saved with the session from now on, like any other tab of theirs.
+      giveToUser: (tabId) => {
+        if (this.backgroundTabs.delete(tabId)) this.saveSessionSoon();
+      },
       actionApproval: () => this.settings.actionApproval,
       assistantName: () => (this.settings.showBerry ? BERRY.name : "Assistant"),
     }, {

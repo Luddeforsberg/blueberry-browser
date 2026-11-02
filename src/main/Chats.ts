@@ -102,6 +102,8 @@ interface Run {
   startedAt: number;
   // Whether what it sees depends on the "Can see" toggle, because it was sent with a page.
   withPage: boolean;
+  // The page sent with the message, from before it's read, so no other job's end closes it meanwhile.
+  sentPage?: Tab;
   mascot: MascotProfile;
   // Set for a task, which belongs to its caller rather than to a saved chat.
   onChange?: () => void;
@@ -243,6 +245,8 @@ export class Chats {
   // Tabs that have been back from the user. A sign-in lands on an address that can carry a code or a token, and any
   // later address in that tab can too, so only the site and path of it go to the model while the tab is open.
   private readonly handedBack = new Set<{ readonly id: string; readonly url: string }>();
+  // Every tab ever handed to the user, by id, which outlasts the tab, so an address it reached is never kept whole.
+  private readonly everHandedOver = new Set<string>();
   // Query strings and fragments seen on those tabs, kept out of anything going to the model. Memory only.
   private readonly addressDetails = new Set<string>();
   // Each chat's last reply once it's over, so its working view can settle on how it went. Memory only.
@@ -255,6 +259,8 @@ export class Chats {
     private readonly browser: Pick<PageToolAccess<Tab>, "activeTab" | "allTabs"> & {
       openBackgroundTab: (url: string) => Tab;
       closeTab: (tabId: string) => boolean;
+      // A tab a job opened is the user's now, so it's saved with their session like any other.
+      giveToUser?: (tabId: string) => void;
       actionApproval: () => ActionApproval;
       // What Berry goes by right now, since Hide Berry changes it.
       assistantName?: () => string;
@@ -316,6 +322,7 @@ export class Chats {
   private async handOverInCloud(chatId: string, run: Run, job: Job, tab: CdpTab, need: HandoffNeed): Promise<boolean> {
     if (this.handedOver.has(tab.id)) return false;
     run.handedOver = true;
+    this.everHandedOver.add(tab.id);
     const wasOwn = job.own.delete(tab.id);
     job.takenOver.set(tab.id, tab.url);
     const held = { touched: false, asking: true, host: hostOf(tab.url), entering: false, codeEntered: false };
@@ -433,6 +440,7 @@ export class Chats {
     // Another job got there first and only its answer may let the tab go, or the user left it half typed and it stays theirs.
     if (this.handedOver.has(tab.id)) return false;
     run.handedOver = true;
+    this.everHandedOver.add(tab.id);
     const wasOwn = job.own.delete(tab.id);
     job.takenOver.set(tab.id, tab.url);
     const held = { touched: false, asking: true, host: hostOf(tab.url), entering: false, codeEntered: false };
@@ -592,13 +600,13 @@ export class Chats {
       ? [...(run.usedInCloud ?? [])].filter((tab) => this.cloud?.page(tab.id) === tab)
       : this.browser.allTabs();
     const tabOf = (id: string) => open.find((tab) => tab.id === id) ?? null;
-    const usedNow = new Set([...this.runs.values()].flatMap((other) => [...other.tabs].map((tab) => tab.id)));
+    const usedNow = new Set([...this.runs.values()].flatMap((other) => [...other.tabs, ...(other.sentPage ? [other.sentPage] : [])].map((tab) => tab.id)));
     const used = run.cloud ? [...(run.usedInCloud ?? [])] : [...run.used];
     const pages = new Map<string, UsedPage>();
     used.forEach((tab) => {
       if (!job.own.has(tab.id)) return;
       const url = addressToKeep(tab.url, {
-        handedBack: [...this.handedBack].some((back) => back.id === tab.id),
+        handedBack: this.everHandedOver.has(tab.id),
         codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
       });
       if (url) pages.set(url, { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) });
@@ -611,6 +619,7 @@ export class Chats {
       if (id === pointed) {
         job.own.delete(id);
         job.takenOver.set(id, this.withoutCodes(tab.url));
+        this.browser.giveToUser?.(id);
         // A cloud page's tab in the window closes it too.
       } else if (this.browser.closeTab(id)) job.own.delete(id);
     });
@@ -867,6 +876,7 @@ export class Chats {
     try {
       // Read before anything waits, so it's the page the message was sent from wherever the user has gone since.
       const page = seePage && this.pageAccess ? this.activeTab : null;
+      if (page) run.sentPage = page;
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
       run.withPage = page !== null;
