@@ -96,9 +96,15 @@ export class CloudSessions {
   release(jobId: string): void {
     if (this.owner !== jobId) return;
     this.owner = null;
-    this.keepOpen();
-    if (this.canEnd) this.idle = setTimeout(() => void this.end(), this.idleMs);
+    this.endWhenIdle();
     this.onChange();
+  }
+
+  // Nobody needs it now, unless a job claims it before the time is up.
+  endWhenIdle(): void {
+    this.keepOpen();
+    if (this.owner || !this.canEnd) return;
+    this.idle = setTimeout(() => void this.end(), this.idleMs);
   }
 
   // Someone is using it: a job, or the user after taking over, who ends it themselves or at the provider's timeout.
@@ -191,6 +197,36 @@ export class CloudSessions {
   // limited mascot's sites, which hold from the blank page's first load, so a redirect can't send anything elsewhere.
   async open(jobId: string, id: string, url: string, events: CdpTabEvents, allows?: (url: string) => boolean): Promise<CdpTab> {
     if (this.owner !== jobId) throw new Error("The cloud browser is working on another job.");
+    const tab = await this.newTab(id, jobId, events);
+    const load = () => tab.loadURL(url).then(() => tab.settled(), () => {});
+    if (allows) await tab.withNavigationLimit(allows, load);
+    else await load();
+    this.onChange();
+    return tab;
+  }
+
+  // For main only, never a tool: whatever is done to the browser's cookies, such as bringing a login along. Starts the
+  // session if it isn't running, and lets it end as usual afterwards if no job is using it.
+  async withContext<T>(act: (context: BrowserContext) => Promise<T>): Promise<T> {
+    // Running with no timer means someone is using it, such as the user in a tab they took over, so it stays that way.
+    const wasIdle = this.idle !== null || this.session === null;
+    this.keepOpen();
+    try {
+      return await act((await this.ensure()).context);
+    } finally {
+      if (wasIdle) this.endWhenIdle();
+    }
+  }
+
+  // A page the user opened themselves, such as a site to see whether they're signed in. It belongs to no job.
+  async openForUser(id: string, url: string, events: CdpTabEvents): Promise<CdpTab> {
+    const tab = await this.newTab(id, "", events);
+    await tab.loadURL(url).then(() => tab.settled(), () => {});
+    this.onChange();
+    return tab;
+  }
+
+  private async newTab(id: string, jobId: string, events: CdpTabEvents): Promise<CdpTab> {
     const session = await this.ensure();
     const made = session.context.newPage();
     this.opening = made.catch(() => null);
@@ -202,10 +238,6 @@ export class CloudSessions {
       this.pages.delete(id);
       this.onChange();
     });
-    const load = () => tab.loadURL(url).then(() => tab.settled(), () => {});
-    if (allows) await tab.withNavigationLimit(allows, load);
-    else await load();
-    this.onChange();
     return tab;
   }
 

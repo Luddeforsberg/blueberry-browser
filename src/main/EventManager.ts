@@ -166,6 +166,12 @@ export class EventManager {
     this.handle("cloud:view", (tabId) => this.mainWindow.cloud.view(tabId));
     this.handle("cloud:watch", (tabId) => this.mainWindow.cloud.watch(tabId));
     this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
+    this.handle("cloud:login-suggestions", () => this.mainWindow.cloudLoginSuggestions());
+    this.handle("cloud:bring-login", (site) => this.mainWindow.cloud.bringLogin(site));
+    this.handle("cloud:check-login", (site) => this.mainWindow.cloud.checkLogin(site));
+    this.handle("cloud:mark-login", (site, signedIn) => this.mainWindow.cloud.markLogin(site, signedIn));
+    this.handle("cloud:revoke-login", (site) => this.mainWindow.cloud.revokeLogin(site));
+    this.handle("cloud:forget-logins", () => this.mainWindow.cloud.forgetLogins());
   }
 
   private handleChatEvents(): void {

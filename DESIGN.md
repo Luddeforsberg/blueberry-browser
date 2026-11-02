@@ -651,9 +651,10 @@ Settings > Claude lets Claude Code and Claude Desktop on this computer hand jobs
 
 Settings > Cloud lets a bird work in a browser on Browserbase. It's off until a key is saved, and the same plain rows as Phone.
 
-- **What it does** in one sentence, including that the cloud browser isn't signed in to anything yet.
+- **What it does** in one sentence, including that the cloud browser is only signed in to the sites brought along.
 - **Status:** one line in words (off, starting, running with or without a job, ended) and **End cloud session**, disabled while nothing runs.
 - **The key:** API key and project id, both as password fields, and **Save**. Once saved they never come back to the page: the row says the key is saved and offers **Forget key**.
+- **Signed in to:** what's copied and that it asks for Touch ID, then the sites brought along in a plain list split by `border`, each with its name, its status in words ("Brought over", "Checked by you" or, in `warning`, "Signed out when you checked") and the date, with **Check** and **Remove**. Under it a field for a site and **Bring along**, and up to eight sites from history and bookmarks as small outline buttons after "From your history:". **Forget all cloud logins** once there's anything to forget. Bringing a site along asks for Touch ID, or a plain confirm without it, and then opens the site in a cloud tab in front.
 - **A local test browser:** an unpackaged app started with `BLUEBERRY_CLOUD_LOCAL` says so here instead of asking for a key.
 - **Choosing it:** on the new tab page, while the cloud is on, a small cloud button sits in the composer beside the mascot. Pressed, it reads "Cloud" in `accent-ink` on `muted`, and that chat works in the cloud from then on.
 
@@ -663,6 +664,8 @@ A page in the cloud browser opens as a tab behind the user, with a cloud icon an
 
 - **A strip on top:** the cloud icon, **In the cloud** and one line in `muted-foreground` saying what taking over does, with **Take over** on the right. Once taken, the line says it's yours and the button goes.
 - **The page:** Browserbase's live view in a frame that takes no pointer until the user takes over, so nothing they do lands in the middle of a job. A local test browser shows pictures instead, and says it's pictures only once taken.
+- **Checking a sign-in:** a site opened from Signed in to is the user's from the start. The strip asks whether they're signed in to it there, with **Yes, I'm signed in** and **No, I'm signed out**, which only set its status. Nothing guesses for them.
+- **Handed to the user:** when a job in the cloud asks for a sign-in, the strip says who needs them and that taking over is how to do it, and the toolbar's **I'm done** gives the page back, the same as a tab of the window's own.
 - **Taking over** is the same as clicking in a tab of the window's own: the job can't reach it any more and is told why. Typing an address there counts too, and goes there in the cloud.
 - **Ended:** when the session ends its tabs close. A tab left without a page shows Berry in its Oops mood and says so.
 

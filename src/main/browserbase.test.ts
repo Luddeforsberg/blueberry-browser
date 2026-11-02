@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Browser } from "playwright-core";
+import type { Browser, BrowserContext } from "playwright-core";
 import { browserbase, BROWSERBASE_REGION, type BrowserbaseSaved } from "./browserbase";
 import type { CdpTab } from "./CdpTab";
-import { CloudSessions } from "./cloudBrowser";
+import { CloudSessions, type CloudBrowser } from "./cloudBrowser";
 
 // Against a stubbed fetch, shaped from Browserbase's API reference. Nothing here has talked to the real service.
 
@@ -138,6 +138,29 @@ describe("Browserbase", () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
     expect(released()).toBe(1);
     expect(sessions.canEnd).toBe(false);
+  });
+
+  it("starts a session for a change to its cookies, ends it after a while if nobody else is in it, and never under the user", async () => {
+    let released = 0;
+    const context = { route: async () => {}, on: () => {}, browser: () => null };
+    const provider: CloudBrowser = {
+      name: "local",
+      hasSession: true,
+      release: async () => void released++,
+      start: async () => ({ context: context as unknown as BrowserContext, liveView: async () => null, close: async () => {} }),
+    };
+    const sessions = new CloudSessions(provider, () => {}, 20);
+
+    expect(await sessions.withContext(async (got) => got === (context as unknown))).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(released).toBe(1);
+
+    // Running with no timer, as with the user in a tab they took over.
+    await sessions.withContext(async () => {});
+    sessions.keepOpen();
+    await sessions.withContext(async () => {});
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(released).toBe(1);
   });
 
   it("releases a session it made even when connecting to it failed", async () => {

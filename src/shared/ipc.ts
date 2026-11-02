@@ -350,10 +350,23 @@ export interface CloudState {
   // The provider didn't confirm the last end, so a paid session may still be running.
   unreleased: boolean;
   problem: string | null;
+  // Sites brought into the cloud browser signed in, newest first. Names and dates only, never a cookie.
+  logins: CloudLogin[];
+}
+
+// "brought": its cookies went in. "checked": the user saw it signed in there. "signed-out": they saw it wasn't.
+export type CloudLoginStatus = "brought" | "checked" | "signed-out";
+
+export interface CloudLogin {
+  site: string;
+  addedAt: number;
+  checkedAt: number | null;
+  status: CloudLoginStatus;
 }
 
 // What a cloud tab shows: the provider's live view in a frame, or pictures sent as `cloud:frame`.
-export type CloudView = { kind: "live"; url: string; takenOver: boolean } | { kind: "frames"; takenOver: boolean } | { kind: "gone" };
+// `checking` names the site when the user opened it to see whether they're signed in there.
+export type CloudView = { kind: "live"; url: string; takenOver: boolean; checking: string | null } | { kind: "frames"; takenOver: boolean; checking: string | null } | { kind: "gone" };
 
 export interface CloudFrame {
   tabId: string;
@@ -520,6 +533,19 @@ export interface InvokeChannels {
   "cloud:watch": { region: "chrome"; args: [tabId: string | null]; result: void };
   // The user takes the tab from the job, as clicking in a tab of the window's own does.
   "cloud:take-over": { region: "chrome"; args: [tabId: string]; result: boolean };
+  // Sites from history and bookmarks to offer for bringing along. Names only.
+  "cloud:login-suggestions": { region: "chrome"; args: []; result: string[] };
+  // Asks for Touch ID, then copies that one site's cookies from this browser into the cloud browser and opens it there.
+  // Says what went wrong, or null. Only the user can start this, from Settings: no tool or mascot reaches it.
+  "cloud:bring-login": { region: "chrome"; args: [site: string]; result: string | null };
+  // Opens the site in a cloud tab, for the user to see whether they're signed in.
+  "cloud:check-login": { region: "chrome"; args: [site: string]; result: string | null };
+  // What the user saw there.
+  "cloud:mark-login": { region: "chrome"; args: [site: string, signedIn: boolean]; result: void };
+  // Takes that site's cookies out of the cloud browser, and the site off the list.
+  "cloud:revoke-login": { region: "chrome"; args: [site: string]; result: string | null };
+  // Every cookie in the cloud browser, and the whole list.
+  "cloud:forget-logins": { region: "chrome"; args: []; result: string | null };
   "permissions:current": { region: "prompt"; args: []; result: PermissionPrompt | null };
   "permissions:decide": { region: "prompt"; args: [promptId: string, allow: boolean]; result: boolean };
   "permissions:resize": { region: "prompt"; args: [height: number]; result: void };
@@ -748,6 +774,12 @@ export interface CloudAPI {
   view: (tabId: string) => Promise<CloudView>;
   watch: (tabId: string | null) => Promise<void>;
   takeOver: (tabId: string) => Promise<boolean>;
+  loginSuggestions: () => Promise<string[]>;
+  bringLogin: (site: string) => Promise<string | null>;
+  checkLogin: (site: string) => Promise<string | null>;
+  markLogin: (site: string, signedIn: boolean) => Promise<void>;
+  revokeLogin: (site: string) => Promise<string | null>;
+  forgetLogins: () => Promise<string | null>;
   onUpdated: (callback: (state: CloudState) => void) => Unsubscribe;
   onFrame: (callback: (frame: CloudFrame) => void) => Unsubscribe;
 }

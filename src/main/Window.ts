@@ -37,6 +37,8 @@ import { McpConnector } from "./McpConnector";
 import { createMcpTools, type McpTool } from "./mcpTools";
 import { readTabText } from "./mcpPages";
 import { CloudTabs } from "./CloudTabs";
+import { confirmCloudLogin, readSiteCookies } from "./cloudLoginAccess";
+import { suggestLoginSites } from "./cloudLogins";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -247,6 +249,9 @@ export class Window {
           else this.cloud.tabClosed(id);
         },
         takenOver: (id) => this.chats.releaseTab(id),
+        showTab: (id) => this.switchActiveTab(id),
+        confirmLogin: (site) => confirmCloudLogin(this._baseWindow, site),
+        readCookies: (site) => readSiteCookies(site),
       },
       localCloud ? (localCloud === "1" ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined } : { endpoint: localCloud }) : null
     );
@@ -706,6 +711,12 @@ export class Window {
     this.tabsMap.set(tab.id, tab);
     this.notifyTabs();
     return tab;
+  }
+
+  // Sites to offer in Settings > Cloud > Signed in to, from history and bookmarks. Names only.
+  cloudLoginSuggestions(): string[] {
+    const urls = [...this.history.recent(500), ...this.bookmarkStore.get(), ...this.pinnedStore.get()].map(({ url }) => url);
+    return suggestLoginSites(urls, this.cloud.state.logins.map(({ site }) => site));
   }
 
   // A page in the cloud browser, shown by the chrome. Opened behind the user, like any tab a job opens.

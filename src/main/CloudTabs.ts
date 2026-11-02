@@ -1,11 +1,12 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../shared/ipc";
 import { browserbase, type BrowserbaseSaved } from "./browserbase";
 import type { CdpTab } from "./CdpTab";
 import type { ChatCloud } from "./Chats";
 import { CloudSessions, type CloudBrowser } from "./cloudBrowser";
+import { CloudLogins, loginSite, type StoredCookie } from "./cloudLogins";
 import { sendToRenderer } from "./ipc";
 import { localChrome } from "./localChrome";
 
@@ -33,6 +34,12 @@ export interface CloudTabsHooks {
   closeTab: (id: string) => void;
   // The user has taken this tab from the job that opened it.
   takenOver: (id: string) => void;
+  // Puts a tab in front, for a site the user opened to check.
+  showTab: (id: string) => void;
+  // Touch ID, or a plain confirm where there's none, before a site's cookies are read.
+  confirmLogin: (site: string) => Promise<boolean>;
+  // That one site's cookies from this browser's own session. Nothing else.
+  readCookies: (site: string) => Promise<StoredCookie[]>;
 }
 
 export class CloudTabs implements ChatCloud {
@@ -41,13 +48,23 @@ export class CloudTabs implements ChatCloud {
   private problem: string | null = null;
   private readonly taken = new Set<string>();
   private watching: CdpTab | null = null;
+  // Tabs the user opened to see whether they're signed in, and the site each is for. No job can reach them.
+  private readonly checking = new Map<string, string>();
+  private readonly logins: CloudLogins;
 
   constructor(
     private readonly file: string,
     private readonly hooks: CloudTabsHooks,
     // Only an unpackaged app gets these, like the other test hooks: a Chrome on this computer instead of Browserbase.
     private readonly local: { endpoint?: string; executable?: string } | null
-  ) {}
+  ) {
+    this.logins = new CloudLogins(join(dirname(file), "cloud-logins.json"), {
+      jar: () => this.sessions,
+      confirm: (site) => this.hooks.confirmLogin(site),
+      readCookies: (site) => this.hooks.readCookies(site),
+      onChange: () => this.changed(),
+    });
+  }
 
   start(): void {
     this.saved = this.load();
@@ -81,6 +98,7 @@ export class CloudTabs implements ChatCloud {
       canEnd: !!sessions?.canEnd,
       unreleased: !!sessions?.unreleased,
       problem: this.problem ?? sessions?.problem ?? null,
+      logins: this.logins.logins,
     };
   }
 
@@ -124,6 +142,7 @@ export class CloudTabs implements ChatCloud {
     // The tabs go first, so nothing is left showing a page that's on its way out.
     (this.sessions?.pageIds ?? []).forEach((id) => this.hooks.closeTab(id));
     this.taken.clear();
+    this.checking.clear();
     await this.sessions?.end();
     this.changed();
     return this.state;
@@ -160,6 +179,12 @@ export class CloudTabs implements ChatCloud {
     }
   }
 
+  // After a handoff the user said they were done with, the job may use the page again.
+  giveBack(id: string): void {
+    if (!this.taken.delete(id)) return;
+    this.changed();
+  }
+
   pagesOf(jobId: string): CdpTab[] {
     return this.sessions?.pagesOf(jobId).filter((tab) => !this.taken.has(tab.id)) ?? [];
   }
@@ -178,6 +203,7 @@ export class CloudTabs implements ChatCloud {
   // The window closed the tab, so the page goes too.
   tabClosed(id: string): void {
     this.taken.delete(id);
+    if (this.checking.delete(id)) this.sessions?.endWhenIdle();
     if (this.watching?.id === id) void this.watch(null);
     void this.sessions?.close(id);
   }
@@ -189,9 +215,10 @@ export class CloudTabs implements ChatCloud {
     if (!page || !this.sessions) return { kind: "gone" };
     const takenOver = this.taken.has(page.id);
     const live = await this.sessions.liveView(page.id);
-    if (live === null) return { kind: "frames", takenOver };
+    const checking = this.checking.get(page.id) ?? null;
+    if (live === null) return { kind: "frames", takenOver, checking };
     // The chrome puts this in a frame, so it's only ever Browserbase's own page.
-    return isLiveView(live) ? { kind: "live", url: live, takenOver } : { kind: "gone" };
+    return isLiveView(live) ? { kind: "live", url: live, takenOver, checking } : { kind: "gone" };
   }
 
   async watch(id: unknown): Promise<void> {
@@ -213,6 +240,71 @@ export class CloudTabs implements ChatCloud {
     this.hooks.takenOver(id);
     this.changed();
     return true;
+  }
+
+  // Signed in to: only from Settings, so only the user starts any of it. `input` is what they picked or typed, which
+  // may be a whole address to open for the check.
+
+  async bringLogin(input: unknown): Promise<string | null> {
+    const site = loginSite(input);
+    if (!site) return "That isn't a site's address.";
+    const problem = await this.logins.bring(site);
+    return problem ?? (await this.checkLogin(input));
+  }
+
+  // Opens the site in a cloud tab in front, for the user to see whether they're signed in there.
+  async checkLogin(input: unknown): Promise<string | null> {
+    const site = loginSite(input);
+    const sessions = this.sessions;
+    if (!site) return "That isn't a site's address.";
+    if (!sessions) return "The cloud browser is off.";
+    const url = typeof input === "string" && /^https?:\/\//i.test(input.trim()) ? input.trim() : `https://${site}/`;
+    const id = this.hooks.openTab(site);
+    try {
+      await sessions.openForUser(id, url, {
+        onChange: () => {
+          const page = sessions.page(id);
+          if (page) this.hooks.updateTab(id, page.title || hostOf(page.url));
+        },
+      });
+    } catch {
+      this.hooks.closeTab(id);
+      return "The cloud browser couldn't open it.";
+    }
+    this.checking.set(id, site);
+    // It's the user's from the start, and they're using it.
+    this.taken.add(id);
+    sessions.keepOpen();
+    this.hooks.showTab(id);
+    this.changed();
+    return null;
+  }
+
+  markLogin(input: unknown, signedIn: unknown): void {
+    const site = loginSite(input);
+    if (site) this.logins.mark(site, signedIn === true);
+  }
+
+  // A tab open to check that site loads again, so the user sees it signed out.
+  async revokeLogin(input: unknown): Promise<string | null> {
+    const site = loginSite(input);
+    if (!site) return "That isn't a site's address.";
+    const problem = await this.logins.revoke(site);
+    if (!problem) this.reloadChecks((checked) => checked === site);
+    return problem;
+  }
+
+  async forgetLogins(): Promise<string | null> {
+    const problem = await this.logins.forgetAll();
+    if (!problem) this.reloadChecks(() => true);
+    return problem;
+  }
+
+  private reloadChecks(which: (site: string) => boolean): void {
+    this.checking.forEach((site, id) => {
+      const page = this.page(id);
+      if (page && which(site)) void page.loadURL(page.url).catch(() => {});
+    });
   }
 
   private load(): Saved {
