@@ -98,11 +98,12 @@ const words = (value: unknown, max: number): string | null => {
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // It names no site but its own, and no address at all.
-const namesOnly = (text: string, hosts: string[], evidenceText: string, otherNames: string[]): boolean => {
+// A site comes only from the evidence's hosts: a title can say anything, so it can't vouch for one.
+const namesOnly = (text: string, hosts: string[], otherNames: string[]): boolean => {
   const lower = text.toLowerCase();
   if (lower.includes("://") || lower.includes("www.")) return false;
   const named = (lower.match(SITE_NAME) ?? []).filter((name) => !NOT_A_SITE.test(name));
-  const allowed = (name: string) => evidenceText.includes(name) || hosts.some((host) => host === name || host.endsWith(`.${name}`) || name.endsWith(`.${host}`));
+  const allowed = (name: string) => hosts.some((host) => host === name || host.endsWith(`.${name}`) || name.endsWith(`.${host}`));
   if (!named.every(allowed)) return false;
   return !otherNames.some((name) => new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}($|[^\\p{L}\\p{N}])`, "iu").test(text));
 };
@@ -132,9 +133,15 @@ export const scheduleFits = (schedule: RoutineSchedule, times: number[]): boolea
   const days = (list: number[]) => new Set(list.map((time) => new Date(time).toDateString())).size;
   const matching = times.filter((time) => near(time) && onDay(time));
   const relevant = schedule.kind === "daily" ? times : times.filter(onDay);
+  if (schedule.kind === "weekly") {
+    // Each day it runs needs a habit of its own: two of those weekdays, a week or more apart.
+    const everyDayRecurs = schedule.days.every((day) => {
+      const onThatDay = matching.filter((time) => new Date(time).getDay() === day);
+      return days(onThatDay) >= 2 && Math.max(...onThatDay) - Math.min(...onThatDay) >= WEEK_SPAN_MS;
+    });
+    if (!everyDayRecurs) return false;
+  }
   const needed = schedule.kind === "daily" ? 3 : 2;
-  const span = matching.length > 0 ? Math.max(...matching) - Math.min(...matching) : 0;
-  if (schedule.kind === "weekly" && span < WEEK_SPAN_MS) return false;
   return days(matching) >= needed && days(matching) >= days(relevant) / 2;
 };
 
@@ -216,11 +223,10 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
   const why = words(raw.why, MAX_WHY)?.replace(/[\s.!?…]+$/, "") || null;
   if (!line || !why) return null;
 
-  const evidenceText = evidence.map((item) => item.text).join(" \n ").toLowerCase();
   const otherNames = [...WELL_KNOWN_SITES, ...digest.allHosts.flatMap((host) => (hosts.includes(host) ? [] : [host, nameOfSite(host) ?? ""]))].filter(
-    (name) => name.length > 2 && !evidenceText.includes(name.toLowerCase()) && !hosts.some((host) => host.includes(name.toLowerCase()))
+    (name) => name.length > 2 && !hosts.some((host) => host.includes(name.toLowerCase()))
   );
-  const fits = (...texts: string[]) => texts.every((text) => !DIGEST_ID.test(text) && namesOnly(text, hosts, evidenceText, otherNames));
+  const fits = (...texts: string[]) => texts.every((text) => !DIGEST_ID.test(text) && namesOnly(text, hosts, otherNames));
 
   const times = evidence.flatMap((item) => item.times);
   const numbers = new Set([

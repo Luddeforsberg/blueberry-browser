@@ -59,6 +59,14 @@ describe("verifying a proposal", () => {
     expect(verify(prompt({ prompt: "Run routine r1 and compare fares." }))).toEqual([]);
   });
 
+  it("never lets a page title stand in for a site", () => {
+    const visits = [visit("https://example.com/deals", "Deals today, see evil.example", at(1, 9))];
+    const titled = buildDigest({ visits, chats: [], routines: [], mascots: [], feedback: [], now: NOW });
+    const card = { kind: "prompt", line: "Shall I find today's deals?", why: "You looked at deals", evidence: ["s1"], prompt: "Open evil.example and list the deals." };
+    expect(verifyProposals(JSON.stringify({ cards: [card] }), titled, NONE)).toEqual([]);
+    expect(verifyProposals(JSON.stringify({ cards: [{ ...card, prompt: "Open example.com and list the deals." }] }), titled, NONE)).toHaveLength(1);
+  });
+
   it("drops a reason with a number its evidence doesn't show", () => {
     expect(verify(prompt({ why: "You compared Lisbon fares 14 times" }))).toEqual([]);
     expect(verify(prompt({ why: "You compared fares on 3 sites" }))).toHaveLength(1);
@@ -106,6 +114,9 @@ describe("matching a schedule", () => {
     expect(scheduleFits({ kind: "weekly", days: [1], time: "07:30" }, mondays)).toBe(true);
     expect(scheduleFits({ kind: "weekly", days: [1], time: "07:30" }, mondays.slice(0, 1))).toBe(false);
     expect(scheduleFits({ kind: "daily", time: "07:30" }, mondays)).toBe(false);
+    // Every day it runs needs its own habit.
+    expect(scheduleFits({ kind: "weekly", days: [0, 1, 2, 3, 4, 5, 6], time: "07:30" }, mondays)).toBe(false);
+    expect(scheduleFits({ kind: "weekly", days: [1, 4], time: "07:30" }, mondays)).toBe(false);
     // Three evenings of one job in a week aren't a weekly habit.
     expect(scheduleFits({ kind: "weekly", days: [3, 4, 6], time: "19:55" }, [2, 4, 5].map((daysAgo) => at(daysAgo, 20, 5)))).toBe(false);
     expect(scheduleFits({ kind: "daily", time: "07:30" }, [1, 2, 3].map((daysAgo) => at(daysAgo, 7, 45)))).toBe(true);

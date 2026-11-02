@@ -102,6 +102,38 @@ describe("search queries", () => {
 });
 
 describe("chats, routines, the flock and feedback", () => {
+  it("sends feedback as the line and kind only, and leaves out a private line", () => {
+    const sent = JSON.stringify(
+      data({
+        feedback: [
+          { verdict: "used", kind: "prompt", line: "Want me to take this one again?", body: "My password is hunter2, log in and pay", sites: [], at: at(1, 9) },
+          { verdict: "dismissed", kind: "prompt", line: "Shall I check your bank balance?", body: "Check it", sites: [], at: at(1, 9) },
+        ],
+      }).feedback
+    );
+    expect(sent).toContain("Want me to take this one again?");
+    expect(sent).not.toContain("hunter2");
+    expect(sent).not.toContain("bank");
+  });
+
+  it("puts a routine's and a bird's names and sites through the same filters", () => {
+    const digest = digestOf({
+      routines: [
+        { id: "a", name: "Move money at the bank", schedule: "Daily at 07:00", sites: ["prisjakt.nu"], runs: [] },
+        { id: "b", name: "Price check", schedule: "Daily at 07:00", sites: ["mail.google.com", "localhost", "prisjakt.nu"], runs: [] },
+      ],
+      mascots: [
+        { name: "Password keeper", sites: ["github.com"] },
+        { name: "Ada", sites: ["internbank.swedbank.se", "localhost", "github.com"] },
+      ],
+    });
+    const sent = JSON.stringify(digest.data);
+    ["bank", "Password", "mail.google.com", "localhost", "swedbank"].forEach((word) => expect(sent).not.toContain(word));
+    expect(sent).toContain("prisjakt.nu");
+    expect(sent).toContain("github.com");
+    expect([...digest.evidence.values()].flatMap(({ hosts }) => hosts)).toEqual(["prisjakt.nu"]);
+  });
+
   it("say how each went, with ids", () => {
     const { chats, routines, flock, feedback } = data({
       chats: [

@@ -1,6 +1,6 @@
 import type { RoutineRunStatus } from "../shared/library";
 import { normaliseSite } from "../shared/mascots";
-import { isShareable, plainText, shareableTitle, titleToShare, type PatternVisit } from "./suggestionPatterns";
+import { isShareable, shareableTitle, titleToShare, type PatternVisit } from "./suggestionPatterns";
 
 // What the model reads to decide what to suggest. Built here, in code, from summaries only: site names, page titles in
 // order, search queries, chat and routine titles, and when. Never a page's text or a full address. Every item has a
@@ -207,9 +207,14 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       return { id, title, when: when(updatedAt), ...(outcome === "done" ? {} : { outcome }) };
     });
 
-  const routineData = routines.slice(0, MAX_ROUTINES).map((routine, index) => {
+  // What the user named and limited things to goes through the same filters as their history.
+  const shareableSites = (sites: string[]) => sites.filter((site) => isShareable(`https://${site}/`));
+  const routineData = routines.flatMap((routine) => {
+    const name = titleToShare(routine.name);
+    return name ? [{ ...routine, name: name.slice(0, 60), sites: shareableSites(routine.sites) }] : [];
+  }).slice(0, MAX_ROUTINES).map((routine, index) => {
     const id = `r${index + 1}`;
-    const name = plainText(routine.name).slice(0, 60);
+    const { name } = routine;
     const runs = routine.runs.slice(0, MAX_RUNS);
     const failed = runs.filter(({ status }) => status === "failed" || status === "interrupted").length;
     add({
@@ -223,8 +228,21 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
     return { id, name, schedule: routine.schedule, ...(routine.sites.length ? { sites: routine.sites } : {}), lastRuns: runs.map(({ status, startedAt }) => ({ when: when(startedAt), result: status })) };
   });
 
-  const flockData = mascots.slice(0, MAX_FLOCK).map(({ name, sites }, index) => ({ id: `m${index + 1}`, name: plainText(name), sites }));
-  const feedbackData = feedback.slice(-MAX_FEEDBACK).map(({ verdict, kind, line, body }, index) => ({ id: `f${index + 1}`, [verdict]: true, kind, line, body }));
+  const flockData = mascots
+    .flatMap(({ name, sites }) => {
+      const shared = titleToShare(name);
+      return shared ? [{ name: shared, sites: shareableSites(sites) }] : [];
+    })
+    .slice(0, MAX_FLOCK)
+    .map((mascot, index) => ({ id: `m${index + 1}`, ...mascot }));
+  // Only what the bird said, never the prompt or instructions under it, which can hold what the user typed.
+  const feedbackData = feedback
+    .slice(-MAX_FEEDBACK)
+    .flatMap(({ verdict, kind, line }) => {
+      const shared = titleToShare(line);
+      return shared ? [{ [verdict]: true, kind, line: shared }] : [];
+    })
+    .map((entry, index) => ({ id: `f${index + 1}`, ...entry }));
 
   const allHosts = [...new Set(visits.flatMap(({ url }) => (isShareable(url) ? (normaliseSite(url) ?? []) : [])))];
   const newest = Math.max(
