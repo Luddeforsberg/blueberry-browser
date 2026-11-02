@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { plausibleCode } from "./phoneReplies";
 import type { WaitingRun } from "./Chats";
@@ -14,6 +15,7 @@ const MAX_ANSWER_LENGTH = 2000;
 const MAX_LIST = 100;
 const DEFAULT_LIST = 20;
 const MAX_LISTED_TASKS = 20;
+const MAX_REMEMBERED_TASKS = 200;
 const MAX_SUMMARY = 80;
 
 export const UNTRUSTED_NOTE =
@@ -54,7 +56,8 @@ export interface McpHost {
   waiting: () => WaitingRun[];
   answer: (id: string, approvalId: string, answer: string) => boolean;
   routines: () => Routine[];
-  runRoutine: (id: string) => boolean;
+  // `onStart` hears the id of the run this becomes, so the task is that run and no other.
+  runRoutine: (id: string, onStart: (runId: string) => void) => boolean;
   routineRuns: (routineId: string) => RoutineRun[];
   stopRoutineRun: (runId: string) => boolean;
   tabs: () => McpTab[];
@@ -103,7 +106,6 @@ const at = (time: number | null) => (time === null ? null : new Date(time).toISO
 export const pageContent = (url: string, text: string): string =>
   `${UNTRUSTED_NOTE}\n\n<untrusted-page-content url="${url.replace(/"/g, "%22")}">\n${text.replace(/<\/?untrusted-page-content/gi, "[tag removed]")}\n</untrusted-page-content>`;
 
-const ROUTINE_TASK = /^routine:([^:]+):(\d+)$/;
 
 type TaskStatus = "working" | "has_question" | "waiting_for_approval" | "waiting_for_user" | "queued" | "done" | "failed" | "stopped" | "interrupted" | "ended";
 
@@ -137,8 +139,9 @@ const FEATURES = [
 ];
 
 export const createMcpTools = (host: McpHost): McpTool[] => {
-  // Routine runs started from here, so list_tasks can name them. Memory only.
-  const routineTasks: string[] = [];
+  // Routine runs started from here, by the task id handed out, with the run each became once it started. Only these can
+  // be reached: a routine's own id names runs the user or the schedule started. Memory only, newest last.
+  const routineTasks = new Map<string, { routineId: string; runId: string | null }>();
 
   const flock = () => host.mascots().filter((mascot) => mascot.deletedAt === null);
   const findAgent = (name: string) => {
@@ -147,11 +150,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
   };
   const nameOf = (mascotId: string | null) => host.mascots().find((mascot) => mascot.id === (mascotId ?? BERRY.id))?.name ?? "A mascot that was deleted";
 
-  const routineRun = (routineId: string, since: number) =>
-    host
-      .routineRuns(routineId)
-      .filter((run) => run.startedAt >= since)
-      .sort((a, b) => a.startedAt - b.startedAt)[0] ?? null;
+  const routineRun = (routineId: string, runId: string | null) => (runId === null ? null : (host.routineRuns(routineId).find(({ id }) => id === runId) ?? null));
 
   const chatTask = (chat: ChatThread) => {
     const waiting = host.waiting().find(({ id }) => id === chat.id);
@@ -175,10 +174,11 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
     };
   };
 
-  const routineTask = (taskId: string, routineId: string, since: number) => {
-    const routine = host.routines().find(({ id }) => id === routineId);
-    if (!routine) return null;
-    const run = routineRun(routineId, since);
+  const routineTask = (taskId: string) => {
+    const started = routineTasks.get(taskId);
+    const routine = started && host.routines().find(({ id }) => id === started.routineId);
+    if (!started || !routine) return null;
+    const run = routineRun(started.routineId, started.runId);
     const waiting = run ? host.waiting().find(({ id }) => id === run.id) : undefined;
     const ended: TaskStatus = !run ? "queued" : run.status === "finished" ? "done" : run.status === "needs-approval" || run.status === "running" ? "working" : run.status;
     return {
@@ -197,17 +197,16 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
   };
 
   const task = (id: string) => {
-    const routine = ROUTINE_TASK.exec(id);
-    if (routine) return routineTask(id, routine[1], Number(routine[2]));
+    if (routineTasks.has(id)) return routineTask(id);
     const chat = host.chat(id);
     return chat?.from ? chatTask(chat) : null;
   };
 
   // The id `chat:decide` takes: the chat's, or the routine run's once it has started.
   const runIdOf = (taskId: string): string | null => {
-    const routine = ROUTINE_TASK.exec(taskId);
-    if (!routine) return host.chat(taskId)?.from ? taskId : null;
-    return routineRun(routine[1], Number(routine[2]))?.id ?? null;
+    const started = routineTasks.get(taskId);
+    if (!started) return host.chat(taskId)?.from ? taskId : null;
+    return routineRun(started.routineId, started.runId)?.id ?? null;
   };
 
   const NO_TASK = (id: string) => failed(`There's no task ${id} from an app. list_tasks names the ones there are.`, `No task ${clip(id, 40)}`);
@@ -319,11 +318,11 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
         const name = String(wanted).trim();
         const routine = host.routines().find(({ id, name: own }) => id === name || own.toLowerCase() === name.toLowerCase());
         if (!routine) return failed(`There's no routine called ${name}. list_routines names them.`, `No routine ${clip(name, 30)}`);
-        const since = Date.now();
-        if (!host.runRoutine(routine.id)) return failed(`${routine.name} is running already.`, `${routine.name} already running`);
-        const taskId = `routine:${routine.id}:${since}`;
-        routineTasks.unshift(taskId);
-        routineTasks.splice(MAX_LISTED_TASKS);
+        const taskId = `routine:${randomUUID()}`;
+        const started = { routineId: routine.id, runId: null as string | null };
+        if (!host.runRoutine(routine.id, (runId) => (started.runId = runId))) return failed(`${routine.name} is running already.`, `${routine.name} already running`);
+        routineTasks.set(taskId, started);
+        if (routineTasks.size > MAX_REMEMBERED_TASKS) routineTasks.delete(routineTasks.keys().next().value as string);
         return { text: json({ taskId, routine: routine.name, status: "queued", note: "Check on it with get_task. It may wait for a free place first." }), summary: `Ran ${routine.name}` };
       },
     },
@@ -356,11 +355,13 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
             const { id, agent, status, from } = chatTask(chat);
             return [{ id, title: chat.title, agent, status, from, updatedAt: at(chat.updatedAt) }];
           });
-        const routines = routineTasks.flatMap((id) => {
-          const match = ROUTINE_TASK.exec(id);
-          const found = match && routineTask(id, match[1], Number(match[2]));
-          return found ? [{ id, title: found.routine, agent: found.agent, status: found.status, startedAt: found.startedAt }] : [];
-        });
+        const routines = [...routineTasks.keys()]
+          .reverse()
+          .slice(0, MAX_LISTED_TASKS)
+          .flatMap((id) => {
+            const found = routineTask(id);
+            return found ? [{ id, title: found.routine, agent: found.agent, status: found.status, startedAt: found.startedAt }] : [];
+          });
         return { text: fromWeb([...routines, ...chats]), summary: count(chats.length + routines.length, "task") };
       },
     },
@@ -374,7 +375,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
         const id = String(taskId);
         const runId = runIdOf(id);
         if (!task(id)) return NO_TASK(id);
-        if (ROUTINE_TASK.test(id)) {
+        if (routineTasks.has(id)) {
           if (!runId || !host.stopRoutineRun(runId)) return failed("That routine run isn't going.", "Not running");
         } else {
           if (!host.isRunning(id)) return failed("That task has already ended.", "Already ended");

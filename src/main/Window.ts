@@ -477,7 +477,7 @@ export class Window {
       waiting: () => this.chats.waiting(),
       answer: (id, approvalId, answer) => this.chats.decide(id, approvalId, true, answer, { fromApp: true }),
       routines: () => this.routines.list(),
-      runRoutine: (id) => this.routines.runNow(id),
+      runRoutine: (id, onStart) => this.routines.runNow(id, onStart),
       routineRuns: (id) => this.routines.runs(id),
       stopRoutineRun: (runId) => this.routines.stop(runId),
       tabs: () =>

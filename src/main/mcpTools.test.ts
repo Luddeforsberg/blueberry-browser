@@ -3,7 +3,7 @@ import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
 import type { StreamReply } from "./agent";
 import { createMcpTools, UNTRUSTED_NOTE, type McpHost, type McpTab } from "./mcpTools";
-import type { MascotProfile, MemoryFact } from "../shared/library";
+import type { MascotProfile, MemoryFact, Routine, RoutineRun } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 vi.mock("./agent", async (importOriginal) => {
@@ -194,6 +194,47 @@ describe("MCP tools", () => {
     expect(open.text).not.toContain("secret");
     expect(open.text).toContain("bank.example");
     expect((await call("read_page", { url: "file:///etc/passwd" })).isError).toBe(true);
+  });
+
+  it("only reaches the routine run it started, never one the user or the schedule started", async () => {
+    const routine = { id: "r1", name: "Morning prices", instructions: "Check prices", mascotId: null, sites: [], schedule: "Daily", paused: false, status: "running", lastResult: "" } as unknown as Routine;
+    const run = (id: string, startedAt: number): RoutineRun => ({ id, routineId: "r1", status: "running", startedAt, endedAt: null, lateFor: null, steps: [], result: null, error: null, approval: { id: `ask-${id}`, text: "Which shop?", question: true }, tokens: null, seen: false });
+    const runs: RoutineRun[] = [run("scheduled", Date.now())];
+    const stopped: string[] = [];
+    const answered: string[] = [];
+    let start: (runId: string) => void = () => {};
+    const { call } = setup(scripted(async () => ""), {
+      routines: () => [routine],
+      routineRuns: () => runs,
+      runRoutine: (_, onStart) => {
+        start = onStart;
+        return true;
+      },
+      stopRoutineRun: (runId) => (stopped.push(runId), true),
+      waiting: () => runs.map(({ id, approval }) => ({ id, approval: approval!, mascotId: BERRY.id, chatTitle: null, from: null, lastStep: null, tabId: null, askedAt: 0 })),
+      answer: (id) => (answered.push(id), true),
+    });
+
+    // A forged id names the user's own run, which is going right now.
+    for (const forged of ["routine:r1:0", `routine:r1:${Date.now() - 1000}`]) {
+      expect((await call("get_task", { taskId: forged })).isError).toBe(true);
+      expect((await call("cancel_task", { taskId: forged })).isError).toBe(true);
+      expect((await call("respond_to_task", { taskId: forged, answer: "The cheap one" })).isError).toBe(true);
+    }
+    expect(stopped).toEqual([]);
+    expect(answered).toEqual([]);
+
+    // Its own run is queued until it starts, and then it's exactly that run, whatever else started in between.
+    const { taskId } = JSON.parse((await call("run_routine", { routine: "Morning prices" })).text);
+    expect((await taskOf(call, taskId)).status).toBe("queued");
+    runs.push(run("another-scheduled", Date.now()), run("ours", Date.now()));
+    start("ours");
+    expect((await call("respond_to_task", { taskId, answer: "The cheap one" })).isError).toBeUndefined();
+    expect((await call("cancel_task", { taskId })).isError).toBeUndefined();
+    expect(answered).toEqual(["ours"]);
+    expect(stopped).toEqual(["ours"]);
+    const listed = JSON.parse((await call("list_tasks")).text.slice(UNTRUSTED_NOTE.length));
+    expect(listed.map(({ id }: { id: string }) => id)).toEqual([taskId]);
   });
 
   it("reads what the flock remembers, leaving out birds that were deleted", async () => {
