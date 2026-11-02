@@ -1,0 +1,172 @@
+/* The phone page. Only tokens from tokens.css: the frame behind, one canvas card for the page, as in the window, and
+   plain lines split by `border` rather than cards. */
+* { box-sizing: border-box; }
+html { background: rgb(var(--background)); color: rgb(var(--foreground)); }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--frame);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+#app { max-width: 560px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+p, h1, h2, h3, ol, ul { margin: 0; }
+ol, ul { padding: 0; list-style: none; }
+button, input, textarea { font: inherit; color: inherit; }
+svg { display: block; overflow: visible; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* On the frame, above the card. */
+.top { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 8px 16px; }
+.top .title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+.top .runner { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--muted-foreground)); }
+.icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The one card, floating on the frame like the page card. */
+.card {
+  flex: 1;
+  margin: 0 8px 8px;
+  padding: 24px 16px 32px;
+  border-radius: 22px;
+  background: rgb(var(--canvas));
+  box-shadow: var(--shadow-page);
+}
+
+h1 { font-size: 20px; font-weight: 600; line-height: 28px; }
+h2 { font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); padding: 24px 0 8px; }
+h2:first-child { padding-top: 0; }
+.muted { font-size: 14px; color: rgb(var(--muted-foreground)); }
+.small { font-size: 12px; color: rgb(var(--muted-foreground)); }
+.warning { color: rgb(var(--warning)); }
+
+/* Buttons: full radius, filled only for a decision or the main action. */
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 36px; padding: 0 16px; border-radius: 999px; border: 1px solid transparent;
+  background: rgb(var(--primary)); color: rgb(var(--primary-foreground));
+  font-size: 14px; cursor: pointer; text-decoration: none;
+  transition: background-color 100ms cubic-bezier(.32, .72, 0, 1), filter 100ms;
+}
+.button:active { filter: brightness(0.9); }
+.button.outline { background: transparent; color: rgb(var(--foreground)); border-color: rgb(var(--border)); }
+.button.outline:hover { background: rgb(var(--muted)); }
+.button.quiet { background: transparent; color: rgb(var(--muted-foreground)); padding: 0 8px; }
+.button.quiet.small { min-height: 28px; font-size: 12px; }
+.button.quiet:hover { background: rgb(var(--muted)); color: rgb(var(--foreground)); }
+.button.wide { width: 100%; min-height: 44px; font-size: 16px; }
+.button:focus-visible, a:focus-visible, .row:focus-visible, .perch button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+
+/* Birds. The drawing comes from poses.js with its palette set on it. */
+.bird svg { width: 100%; height: 100%; }
+.bird { flex-shrink: 0; }
+.bird.s24 { width: 24px; height: 24px; }
+.bird.s28 { width: 28px; height: 28px; }
+
+/* Signing in: Berry standing on the card's top edge, as it stands on the composer. */
+.signin { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 8px 8px; }
+.signin .card { flex: none; margin: 0; padding-top: 28px; position: relative; }
+.signin .perched { position: absolute; top: -78px; left: 20px; width: 92px; height: 92px; }
+.signin .lead { margin-top: 4px; }
+form { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.field {
+  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); font-size: 16px; outline: none;
+}
+.field:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 0; }
+form .button.wide { margin-top: 8px; }
+.signin .foot { margin-top: 16px; }
+
+/* The composer on the list: the bird you'd send stands on its top edge. Pressing it starts a job. */
+.composer-wrap { position: relative; padding-top: 44px; }
+.composer-wrap .perched { position: absolute; top: 0; right: 24px; width: 56px; height: 56px; }
+.composer {
+  display: flex; align-items: flex-end; gap: 4px; width: 100%; padding: 8px 8px 8px 16px;
+  border-radius: 26px; border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); box-shadow: var(--shadow-raised);
+  text-align: left; cursor: text; color: inherit; text-decoration: none;
+}
+.composer .placeholder { flex: 1; padding: 6px 0; color: rgb(var(--muted-foreground)); }
+.composer textarea { flex: 1; min-height: 96px; padding: 6px 0; border: 0; background: transparent; resize: none; outline: none; font-size: 16px; }
+.composer textarea::placeholder { color: rgb(var(--muted-foreground)); }
+.send {
+  width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; border: 0; background: rgb(var(--primary)); color: rgb(var(--primary-foreground));
+}
+.send.off { background: rgb(var(--muted)); color: rgb(var(--muted-foreground)); }
+
+/* Lists: plain rows split by lines, like Needs you. */
+.rows > li { border-top: 1px solid rgb(var(--border)); }
+.rows > li:last-child { border-bottom: 1px solid rgb(var(--border)); }
+.row { display: flex; gap: 12px; padding: 14px 0; color: inherit; text-decoration: none; border-radius: 8px; }
+.row .body { flex: 1; min-width: 0; }
+.row .ask { font-size: 16px; }
+.row .prompt { font-size: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: rgb(var(--muted-foreground)); }
+.row .meta.warning { color: rgb(var(--warning)); }
+.row .chev { align-self: center; color: rgb(var(--muted-foreground)); }
+
+/* Exactly what will happen, in full, never cut. */
+.exactly { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--tray)); font-size: 13px; color: rgb(var(--muted-foreground)); white-space: pre-wrap; }
+
+/* A job. */
+.bubble { max-width: 85%; margin-left: auto; padding: 10px 16px; border-radius: 22px; background: rgb(var(--muted)); white-space: pre-wrap; }
+.who { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
+.who b { font-weight: 600; }
+.says { display: flex; gap: 12px; margin-top: 16px; padding: 16px 0; border-top: 1px solid rgb(var(--border)); border-bottom: 1px solid rgb(var(--border)); }
+.says .body { flex: 1; min-width: 0; }
+.says h3 { font-size: 16px; font-weight: 400; }
+.says .note { margin-top: 4px; font-size: 13px; color: rgb(var(--muted-foreground)); }
+
+.runner-head { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
+.runner-head b { font-weight: 600; }
+.runner-head .muted { font-size: 13px; }
+.live { position: relative; margin-top: 8px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 22px; border: 1px solid rgb(var(--border)); background: rgb(var(--tray)); }
+.live.yours { aspect-ratio: 3 / 4; box-shadow: var(--shadow-reading); border-color: transparent; }
+.live .lock { position: absolute; inset: 0; }
+.lockline { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.lockline p { flex: 1; min-width: 0; font-size: 13px; color: rgb(var(--muted-foreground)); }
+.lockline .icon { color: rgb(var(--muted-foreground)); }
+
+/* Steps: a footprint for each done, the berry on the one it's on now. */
+.steps { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; font-size: 14px; color: rgb(var(--muted-foreground)); }
+.steps li { display: flex; align-items: center; gap: 12px; }
+.steps .foot { width: 16px; height: 16px; color: rgb(var(--primary)); fill: currentColor; }
+.steps .now { color: rgb(var(--foreground)); }
+.dot { width: 10px; height: 10px; margin: 3px; border-radius: 50%; background: radial-gradient(circle at 36% 30%, rgb(var(--berry-fruit-bloom)), rgb(var(--berry-fruit-mid)) 42%, rgb(var(--berry-fruit-dark))); }
+.shimmer {
+  background: linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--accent-ink)) 38%, rgb(var(--foreground)) 50%, rgb(var(--accent-ink)) 62%, rgb(var(--muted-foreground) / 0.55) 80%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: shimmer 1300ms linear infinite;
+}
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+.reply { margin-top: 16px; white-space: pre-wrap; }
+
+/* Starting a job: the flock stands on a wire, and the one going stands up. */
+.perch { position: relative; display: flex; gap: 4px; overflow-x: auto; padding: 8px 0 0; margin: 0 -16px; padding-inline: 16px; scrollbar-width: none; }
+.perch::after { content: ""; position: absolute; left: 0; right: 0; top: 72px; height: 2px; background: rgb(var(--border)); }
+.perch button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; flex-shrink: 0; padding: 0 0 6px; border: 0; border-radius: 12px; background: none; cursor: pointer; }
+.perch .bird { width: 64px; height: 64px; }
+.perch .name { font-size: 13px; color: rgb(var(--muted-foreground)); padding-bottom: 2px; border-bottom: 2px solid transparent; }
+.perch [aria-pressed="true"] .name { color: rgb(var(--foreground)); font-weight: 600; border-bottom-color: rgb(var(--accent-ink)); }
+.can { margin-top: 12px; }
+.can li { font-size: 14px; padding: 1px 0; }
+.can li.open { color: rgb(var(--warning)); }
+.start .composer { margin-top: 24px; }
+.start .foot { margin-top: 12px; }
+.start .button.wide { margin-top: 16px; }
+
+/* Empty. */
+.empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 0; text-align: center; }
+.empty .bird { width: 72px; height: 72px; }
+
+@media (min-width: 600px) {
+  .card { padding: 32px 32px 40px; }
+  .signin .card { padding: 32px 32px 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer { animation: none; color: rgb(var(--foreground)); background: none; }
+}
