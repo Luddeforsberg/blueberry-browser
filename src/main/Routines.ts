@@ -25,6 +25,10 @@ export interface RoutineRunner {
 
 export interface RoutineEvents {
   onChanged: () => void;
+  // Whether this routine may still be in the cloud, where it could run, and whether sending it there last failed.
+  // Without these, nothing is ever there.
+  stillInCloud?: (id: string) => boolean;
+  cloudFailed?: (id: string) => boolean;
   // Only for what the user started and hasn't seen: a result, or a decision only they can make.
   onAttention: (routine: StoredRoutine, kind: "finished" | "failed" | "needs-approval") => void;
   closeTab: (tabId: string) => void;
@@ -133,8 +137,9 @@ export class Routines {
 
     this.store.due(now).forEach((routine) => {
       const next = nextRun(routine.schedule, now);
-      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up.
-      if (this.active.has(routine.id)) {
+      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up. So is one that
+      // was just moved back from the cloud while it may still be there, so the two never both run it.
+      if (this.active.has(routine.id) || this.events.stillInCloud?.(routine.id)) {
         this.store.setNextRun(routine.id, next);
         this.events.onChanged();
       } else if (this.hasFreePlace) {
@@ -209,6 +214,7 @@ export class Routines {
         mascotId,
         sites,
         inCloud,
+        cloudNote: this.cloudNote(routine),
         schedule: scheduleLabel(schedule),
         paused,
         // One in the cloud is never moved on here, so its time is worked out from its schedule.
@@ -246,6 +252,17 @@ export class Routines {
         firstRunAt: this.cloudNext(routine, Date.now()),
       };
     });
+  }
+
+  private cloudNote({ id, inCloud }: StoredRoutine): string | null {
+    if (!inCloud) return this.events.stillInCloud?.(id) ? "Moving back to this Mac…" : null;
+    return this.events.cloudFailed?.(id) ? "Couldn’t reach the cloud, will retry" : null;
+  }
+
+  // The cloud's side changed: one may have come back here, or reached it.
+  cloudChanged(): void {
+    this.events.onChanged();
+    this.tick();
   }
 
   // When one in the cloud is next due, as far as this can tell. The server has the real time.

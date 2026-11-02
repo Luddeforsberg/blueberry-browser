@@ -72,7 +72,7 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                                     <span className={cn("truncate", routine.status === 'running' && "font-semibold")}>{routine.name}</span>
                                 </span>
                                 <span className="min-w-0 text-muted-foreground">{routine.schedule}</span>
-                                <span className="min-w-0 text-muted-foreground line-clamp-2">{routine.lastResult}</span>
+                                <span className="min-w-0 text-muted-foreground line-clamp-2">{routine.cloudNote ?? routine.lastResult}</span>
                                 <span className="flex justify-end">
                                     <RoutineStatusLabel status={routine.status} />
                                 </span>

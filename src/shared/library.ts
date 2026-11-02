@@ -206,6 +206,9 @@ export interface Routine {
   mascotId: string | null;
   sites: string[];
   inCloud: boolean;
+  // How keeping it in the cloud is going, in words, when it isn't simply there: still on its way back to this Mac, or
+  // not sent yet. Null otherwise.
+  cloudNote?: string | null;
   // The schedule in words.
   schedule: string;
   paused: boolean;

@@ -272,6 +272,7 @@ export class Window {
       flock: () => this.mascotStore.all(),
       adopt: ({ prompt, mascotId }) => this.chats.adoptRunnerChat(prompt, mascotId),
       followedUp: (chatId, prompt) => this.chats.runnerFollowedUp(chatId, prompt),
+      routinesSettled: () => this.routines.cloudChanged(),
       routines: () =>
         this.routines.cloudRows((id) => this.mascotStore.resolve(id), {
           actionApproval: this.settings.actionApproval,
@@ -338,6 +339,8 @@ export class Window {
         this.publishLibrary();
         void this.runnerJobs.routinesChanged();
       },
+      stillInCloud: (id) => this.runnerJobs.stillInCloud(id),
+      cloudFailed: (id) => this.runnerJobs.cloudFailed(id),
       onAttention: (routine, kind) => {
         // The Routines row and the toolbar say so anyway, and that holds until the user is free. Anything asking
         // is notified from Needs you, along with every chat's.

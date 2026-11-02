@@ -439,15 +439,32 @@ describe("routines kept in the cloud", () => {
     runner.destroy();
   });
 
-  it("takes away what the server still has after a restart, and tries a failed forget again", async () => {
-    // Deleted on the Mac before it quit, while the forget couldn't get through.
+  it("takes away what the server still has after a restart, tries a failed forget again, and holds it back here till then", async () => {
+    // Deleted or moved back on the Mac before it quit, while the forget couldn't get through.
     const { runner, keys, forgetCloudRoutine } = make(["kept", "deleted-before-restart"], () => [row("kept")], 1);
     await settle();
     expect(forgetCloudRoutine).toHaveBeenCalledTimes(1);
     expect([...keys].sort()).toEqual(["deleted-before-restart", "kept"]);
+    expect(runner.stillInCloud("deleted-before-restart")).toBe(true);
     await runner.routinesChanged();
     expect(forgetCloudRoutine).toHaveBeenCalledTimes(2);
     expect([...keys]).toEqual(["kept"]);
+    expect(runner.stillInCloud("deleted-before-restart")).toBe(false);
+    expect(runner.stillInCloud("kept")).toBe(true);
+    runner.destroy();
+  });
+
+  it("says a routine couldn't be sent, and stops saying so once it is", async () => {
+    let rows = [row("r1")];
+    const { runner, syncCloudRoutine } = make([], () => rows);
+    syncCloudRoutine.mockRejectedValueOnce(new ServerError(500, ""));
+    await settle();
+    expect(runner.cloudFailed("r1")).toBe(true);
+    expect(runner.stillInCloud("r1")).toBe(false);
+    rows = [row("r1", null, true)];
+    await runner.routinesChanged();
+    expect(runner.cloudFailed("r1")).toBe(false);
+    expect(runner.stillInCloud("r1")).toBe(true);
     runner.destroy();
   });
 });

@@ -15,7 +15,7 @@ interface FakeRun {
   end: (result?: Partial<TaskResult>) => void;
 }
 
-const setup = (store = new RoutineStore(":memory:")) => {
+const setup = (store = new RoutineStore(":memory:"), cloud: Pick<RoutineEvents, "stillInCloud" | "cloudFailed"> = {}) => {
   const started: FakeRun[] = [];
   const stoppedIds: string[] = [];
   const runner = {
@@ -37,6 +37,7 @@ const setup = (store = new RoutineStore(":memory:")) => {
     onChanged: vi.fn(),
     onAttention: vi.fn(),
     closeTab: vi.fn(),
+    ...cloud,
   } satisfies RoutineEvents;
   const routines = new Routines(store, runner, events);
   return { store, routines, started, stoppedIds, events };
@@ -115,6 +116,32 @@ describe("the scheduler", () => {
     expect(routines.cloudRows(scout, options)[0]).toMatchObject({ paused: true, firstRunAt: null });
     save(routines, daily("13:00", "Here"));
     expect(routines.cloudRows(scout, options)).toHaveLength(1);
+  });
+
+  it("doesn't run a routine moved back from the cloud until it's gone from there, so the two never both run it", async () => {
+    let there = true;
+    const { routines, store, started: runs } = setup(undefined, { stillInCloud: () => there });
+    const id = save(routines, { ...daily("13:00"), inCloud: true });
+    save(routines, daily("13:00"), id);
+    started(routines);
+    expect(routines.list()[0].cloudNote).toBe("Moving back to this Mac…");
+
+    // Its time comes while the cloud may still run it: skipped here, and on to the next.
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    expect(runs).toHaveLength(0);
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+
+    there = false;
+    routines.cloudChanged();
+    expect(routines.list()[0].cloudNote).toBeNull();
+    await jump(DAY);
+    expect(runs).toHaveLength(1);
+  });
+
+  it("says when a routine couldn't be sent to the cloud", () => {
+    const { routines } = setup(undefined, { cloudFailed: () => true });
+    save(routines, { ...daily("13:00"), inCloud: true });
+    expect(routines.list()[0].cloudNote).toBe("Couldn’t reach the cloud, will retry");
   });
 
   it("runs a missed routine once when the app opens and says it was late, however many it missed", async () => {

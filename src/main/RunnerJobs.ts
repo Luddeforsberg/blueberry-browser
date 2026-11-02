@@ -74,6 +74,8 @@ export interface RunnerJobsHooks {
   followedUp?: (chatId: string, prompt: string) => void;
   // The routines that run in the cloud, as rows for it, kept there while a linked runner has accepted.
   routines?: () => CloudRoutineRow[];
+  // What `stillInCloud` or `cloudFailed` says about a routine changed.
+  routinesSettled?: () => void;
 }
 
 const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({ account, conversationId, jobIds, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
@@ -108,6 +110,11 @@ export class RunnerJobs implements ChatRunner {
   // owns when it's due. `reconciled` is the set of keys last checked against the server's, null until that's worked.
   private sharedRoutines: { account: string; rows: Map<string, string>; reconciled: string | null } | null = null;
   private routinesSending: Promise<void> | null = null;
+  // Routines that may be in the cloud, by key: sent there, and not yet known to be gone. Saved, so one turned off before
+  // a restart stays held back here until the server confirms it's gone.
+  private readonly routinesThere = new Set<string>();
+  // Routines whose last send failed.
+  private readonly routinesFailed = new Set<string>();
   private routinesAgain = false;
   private flockSending: Promise<void> | null = null;
   private flockAgain = false;
@@ -158,6 +165,12 @@ export class RunnerJobs implements ChatRunner {
     else {
       const link = await this.withToken(account, (token) => this.server!.myCloudRunner(token).then((found) => ({ found })));
       if (link && this.signedIn === account) this.link = link.found;
+      // No runner has accepted, so nothing in the cloud can run a routine, and none needs holding back here.
+      if (link && this.signedIn === account && !link.found?.accepted && this.routinesThere.size > 0) {
+        this.routinesThere.clear();
+        this.save();
+        this.hooks.routinesSettled?.();
+      }
     }
     if (this.link) this.linkTimer = setTimeout(() => void this.refreshLink(), this.link.accepted ? LINKED_POLL_MS : LINK_POLL_MS);
     this.hooks.runnerUpdated?.(this.runnerState);
@@ -213,12 +226,26 @@ export class RunnerJobs implements ChatRunner {
     if (this.sharedRoutines?.account !== account) this.sharedRoutines = { account, rows: new Map(), reconciled: null };
     const shared = this.sharedRoutines;
     const rows = this.hooks.routines();
+    const before = JSON.stringify([[...this.routinesThere].sort(), [...this.routinesFailed].sort()]);
     for (const row of rows) {
       const shape = JSON.stringify({ ...row, firstRunAt: null });
       if (shared.rows.get(row.key) === shape) continue;
       // Tried again on the next change or the next look at the link.
-      if (await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true))) shared.rows.set(row.key, shape);
+      if (await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true))) {
+        shared.rows.set(row.key, shape);
+        this.routinesThere.add(row.key);
+        this.routinesFailed.delete(row.key);
+      } else this.routinesFailed.add(row.key);
     }
+    await this.reconcileRoutines(account, shared, rows);
+    [...this.routinesFailed].filter((key) => !rows.some((row) => row.key === key)).forEach((key) => this.routinesFailed.delete(key));
+    if (JSON.stringify([[...this.routinesThere].sort(), [...this.routinesFailed].sort()]) !== before) {
+      this.save();
+      this.hooks.routinesSettled?.();
+    }
+  }
+
+  private async reconcileRoutines(account: string, shared: NonNullable<RunnerJobs["sharedRoutines"]>, rows: CloudRoutineRow[]): Promise<void> {
     // Anything there that this no longer has goes, checked against the server's own keys, so one deleted or turned off
     // while it couldn't be reached, or before a restart, still goes. Only when the keys here change, or until it's worked.
     const keys = rows.map(({ key }) => key);
@@ -226,13 +253,27 @@ export class RunnerJobs implements ChatRunner {
     if (shared.reconciled === local) return;
     const there = await this.withToken(account, (token) => this.server!.myCloudRoutineKeys(token));
     if (!there) return;
+    // Whatever the server doesn't have is known to be gone.
+    [...this.routinesThere].filter((key) => !there.includes(key)).forEach((key) => this.routinesThere.delete(key));
+    there.forEach((key) => this.routinesThere.add(key));
     let gone = true;
     for (const key of there.filter((key) => !keys.includes(key))) {
       const forgotten = await this.withToken(account, (token) => this.server!.forgetCloudRoutine(token, key).then(() => true));
-      if (forgotten) shared.rows.delete(key);
-      else gone = false;
+      if (forgotten) {
+        shared.rows.delete(key);
+        this.routinesThere.delete(key);
+      } else gone = false;
     }
     if (gone) shared.reconciled = local;
+  }
+
+  // A routine that may still be in the cloud, where it could run. One turned off stays so until the server says it's gone.
+  stillInCloud(key: string): boolean {
+    return this.routinesThere.has(key);
+  }
+
+  cloudFailed(key: string): boolean {
+    return this.routinesFailed.has(key);
   }
 
   async flockChanged(): Promise<void> {
@@ -562,6 +603,7 @@ export class RunnerJobs implements ChatRunner {
         if (conversation) this.entries.set(chatId, fresh(account, conversation, known, id(jobId) ? jobId : null, id(jobId) && active === true));
       });
       if (Array.isArray(saved?.forgotten)) this.forgotten.push(...saved.forgotten.filter(id).slice(-MAX_FORGOTTEN));
+      if (Array.isArray(saved?.routinesInCloud)) saved.routinesInCloud.filter(id).slice(0, 100).forEach((key: string) => this.routinesThere.add(key));
     } catch {
       // Nothing sent there yet.
     }
@@ -574,7 +616,7 @@ export class RunnerJobs implements ChatRunner {
         [...this.entries].filter(([, entry]) => entry.jobIds.length > 0).map(([chatId, { account, conversationId, jobIds, jobId, active }]) => [chatId, { account, conversationId, jobIds, jobId, active: active && !!jobId }])
       );
       const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify({ chats, forgotten: this.forgotten }));
+      writeFileSync(temp, JSON.stringify({ chats, forgotten: this.forgotten, routinesInCloud: [...this.routinesThere] }));
       renameSync(temp, this.file);
     } catch {
       console.error("Couldn't save which chats are on the runner.");
