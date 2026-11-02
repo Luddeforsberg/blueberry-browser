@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Cloud, MonitorOff, Plus, Square } from 'lucide-react'
+import { ArrowUp, Check, Cloud, Plus, Square } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { MascotChip, MascotPerch } from './MascotPerch'
@@ -32,13 +32,34 @@ export const Composer: React.FC<{
     // Who this goes to. With `onChooseMascot`, pressing it opens the flock. Without, it just says who.
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-    // Whether this job runs in the cloud browser, where there is one.
+    // Whether this job is done in the cloud, where that's set up. It's an item in the + menu, and a mark on Send while on.
     cloud?: { on: boolean; onToggle: () => void }
-    // Whether a job in the cloud goes to the runner, which keeps going with this computer off. Only beside Cloud, once it's on.
-    runner?: { on: boolean; onToggle: () => void }
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, runner }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
+    const [menuOpen, setMenuOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
+    const addRef = useRef<HTMLButtonElement>(null)
+    // The + menu only holds the cloud option, so it's there only where the + has nothing else to do.
+    const menu = !onAdd && cloud ? cloud : null
+
+    useEffect(() => {
+        if (!menuOpen) return
+        const close = (event: Event) => {
+            if (event instanceof KeyboardEvent) {
+                if (event.key !== 'Escape') return
+                setMenuOpen(false)
+                // The item that had focus goes with the menu, so it comes back to the button that opened it.
+                addRef.current?.focus()
+            } else if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
+        }
+        window.addEventListener('pointerdown', close)
+        window.addEventListener('keydown', close)
+        return () => {
+            window.removeEventListener('pointerdown', close)
+            window.removeEventListener('keydown', close)
+        }
+    }, [menuOpen])
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current
@@ -91,73 +112,71 @@ export const Composer: React.FC<{
                     onKeyDown={onKeyDown}
                     className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
                 />
-                {cloud && (
-                    <button
-                        type="button"
-                        aria-label="Run in the cloud"
-                        aria-pressed={cloud.on}
-                        title={cloud.on ? 'Runs in the cloud browser' : 'Run in the cloud browser'}
-                        onClick={cloud.onToggle}
-                        className={cn(
-                            "h-9 px-2.5 flex items-center gap-1.5 rounded-full text-13 outline-none transition-colors",
-                            "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                            cloud.on ? "bg-muted text-accent-ink" : "text-muted-foreground"
-                        )}
-                    >
-                        <Cloud className="size-4" />
-                        {cloud.on && <span>Cloud</span>}
-                    </button>
-                )}
-                {cloud?.on && runner && (
-                    <button
-                        type="button"
-                        aria-label="Keep going with this computer off"
-                        aria-pressed={runner.on}
-                        title={runner.on ? 'Goes to the runner, which keeps going with this computer off' : 'Keep going with this computer off'}
-                        onClick={runner.onToggle}
-                        className={cn(
-                            "h-9 px-2.5 flex items-center gap-1.5 rounded-full text-13 outline-none transition-colors",
-                            "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                            runner.on ? "bg-muted text-accent-ink" : "text-muted-foreground"
-                        )}
-                    >
-                        <MonitorOff className="size-4" />
-                        {runner.on && <span>Keeps going</span>}
-                    </button>
-                )}
                 {mascot && (
                     <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
                 )}
                 {!noAdd && (
-                    <button
-                        type="button"
-                        aria-label={addLabel ?? 'Add to chat'}
-                        title={addLabel ?? 'Adding files arrives with the backend'}
-                        onClick={onAdd}
-                        disabled={!onAdd}
-                        className={cn(
-                            "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
-                            "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                            "disabled:hover:bg-transparent disabled:text-muted-foreground"
+                    <div ref={menuRef} className="relative">
+                        <button
+                            ref={addRef}
+                            type="button"
+                            aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
+                            title={menu ? undefined : (addLabel ?? 'Adding files arrives with the backend')}
+                            aria-haspopup={menu ? 'menu' : undefined}
+                            aria-expanded={menu ? menuOpen : undefined}
+                            onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
+                            disabled={!onAdd && !menu}
+                            className={cn(
+                                "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
+                                "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                                "disabled:hover:bg-transparent disabled:text-muted-foreground",
+                                menuOpen && "bg-muted"
+                            )}
+                        >
+                            <Plus className="size-5" />
+                        </button>
+                        {menu && menuOpen && (
+                            <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default">
+                                <button
+                                    type="button"
+                                    role="menuitemcheckbox"
+                                    aria-checked={menu.on}
+                                    autoFocus
+                                    onClick={() => {
+                                        menu.onToggle()
+                                        setMenuOpen(false)
+                                        textareaRef.current?.focus()
+                                    }}
+                                    className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+                                >
+                                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                                    <span className="flex-1">Do this in the cloud</span>
+                                    {menu.on && <Check className="size-4 shrink-0 text-accent-ink" />}
+                                </button>
+                            </div>
                         )}
-                    >
-                        <Plus className="size-5" />
-                    </button>
+                    </div>
                 )}
                 <button
                     type="button"
-                    aria-label={onStop ? 'Stop' : 'Send'}
+                    aria-label={onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'}
+                    title={!onStop && cloud?.on ? 'Done in the cloud' : undefined}
                     onClick={onStop ?? onSend}
                     disabled={!onStop && !canSend}
                     className={cn(
                         bare ? "size-8 mb-0.5 disabled:opacity-40" : "size-9",
-                        "shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
+                        "relative shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
                         "bg-primary text-primary-foreground hover:brightness-110",
                         "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
                         "disabled:hover:brightness-100"
                     )}
                 >
                     {onStop ? <Square className="size-3.5" fill="currentColor" /> : <ArrowUp className="size-[18px]" />}
+                    {!onStop && cloud?.on && (
+                        <span aria-hidden className="absolute -top-1 -right-1 size-[18px] rounded-full bg-surface border flex items-center justify-center text-accent-ink">
+                            <Cloud className="size-3" strokeWidth={2.5} />
+                        </span>
+                    )}
                 </button>
             </div>
         </div>

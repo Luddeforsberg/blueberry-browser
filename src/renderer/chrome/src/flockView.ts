@@ -11,6 +11,7 @@ export interface MascotFormValues {
     onlySomeSites: boolean
     sitesText: string
     tools: MascotTool[]
+    worksInCloud: boolean
     // The suggestion that filled this in, which goes away once it's saved.
     suggestionId?: string
 }
@@ -62,7 +63,8 @@ export const blankMascot = (): MascotFormValues => ({
     instructions: '',
     onlySomeSites: false,
     sitesText: '',
-    tools: MASCOT_TOOLS.map(({ id }) => id)
+    tools: MASCOT_TOOLS.map(({ id }) => id),
+    worksInCloud: false
 })
 
 // A new look and name, never one someone else in the flock already has.
@@ -72,14 +74,15 @@ export const surprise = (values: MascotFormValues, taken: string[]): MascotFormV
     name: oneOf(NAMES.filter((name) => name !== values.name && !taken.includes(name))) ?? values.name
 })
 
-export const mascotForm = ({ id, name, look, instructions, sites, tools }: MascotProfile): MascotFormValues => ({
+export const mascotForm = ({ id, name, look, instructions, sites, tools, worksInCloud = false }: MascotProfile): MascotFormValues => ({
     id,
     name,
     ...look,
     instructions,
     onlySomeSites: sites.length > 0,
     sitesText: sites.join(', '),
-    tools
+    tools,
+    worksInCloud
 })
 
 export const suggestedMascot = (draft: MascotDraft, suggestionId: string): MascotFormValues => ({

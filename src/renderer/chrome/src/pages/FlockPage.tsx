@@ -11,6 +11,8 @@ import { useShell } from '../contexts/ShellContext'
 import { Berry } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
 import { useAccount } from '../useAccount'
+import { useCloud } from '../useCloud'
+import { useRunner } from '../useRunner'
 import { PublishMascot } from './PublishMascot'
 import { MascotMemory } from './MascotMemory'
 import { blankMascot, blankPublish, FLOCK_VIEW_EVENT, flockView, mascotForm, setFlockView, sitesFrom, surprise, toMascotDraft, type FlockView, type MascotFormValues } from '../flockView'
@@ -235,6 +237,9 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
     const others = flock.filter((mascot) => mascot.id !== values.id).map((mascot) => mascot.name)
     const own = routines.filter((routine) => values.id && routine.mascotId === values.id)
     const badSite = sitesFrom(values).find((site) => !normaliseSite(site))
+    const [cloud] = useCloud()
+    const [runner] = useRunner()
+    const canWorkInCloud = cloud.status !== 'off' || runner.status === 'linked'
 
     // Choosing a mood holds it until you get on with something else.
     const reactWith = (mood: Mood | null) => {
@@ -248,7 +253,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
             setError('Name at least one site, or choose Any site.')
             return
         }
-        const result = await api().save(values.id, toMascotDraft(values))
+        const result = await api().save(values.id, { ...toMascotDraft(values), worksInCloud: values.worksInCloud })
         if (!result.ok) {
             setError(result.error)
             return
@@ -391,6 +396,16 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                         ))}
                     </ul>
                 </section>
+
+                {canWorkInCloud && (
+                    <section className="flex items-center gap-3">
+                        <div className="flex-1">
+                            <h2 id="mascot-works-in-cloud" className="text-14 font-semibold">Works in the cloud</h2>
+                            <p className="mt-1 text-12 text-muted-foreground">Choosing it turns on Do this in the cloud. You can still turn that off for one message.</p>
+                        </div>
+                        <Switch labelledBy="mascot-works-in-cloud" checked={values.worksInCloud} onChange={(on) => set({ worksInCloud: on })} />
+                    </section>
+                )}
 
                 {values.id && (
                     <section>

@@ -63,11 +63,11 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     // The runner's own account, made in the dashboard, and linked from Settings > Cloud.
     await supabase.addAccount(RUNNER_EMAIL, RUNNER_PASSWORD);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
-    const runnerField = chrome.getByLabel("Runner's email");
+    const runnerField = chrome.getByLabel("Its account’s email");
     await runnerField.scrollIntoViewIfNeeded();
     await runnerField.fill(RUNNER_EMAIL);
     await chrome.getByRole("button", { name: "Link", exact: true }).click();
-    await expect(chrome.getByText(`Linked to ${RUNNER_EMAIL}. Waiting for the runner`)).toBeVisible();
+    await expect(chrome.getByText(`Linked to ${RUNNER_EMAIL}. Waiting for it to start`)).toBeVisible();
     await shoot(chrome, "settings-runner-waiting");
 
     runner = spawn(process.execPath, ["runner/dist/index.cjs"], {
@@ -91,7 +91,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
 
     // The runner accepts on start, and Settings says so.
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.cloud.runnerState())).status, { timeout: 20_000 }).toBe("linked");
-    await expect(chrome.getByText(`${RUNNER_EMAIL} is your runner.`)).toBeVisible();
+    await expect(chrome.getByText(`Jobs in the cloud run on ${RUNNER_EMAIL}`)).toBeVisible();
     await shoot(chrome, "settings-runner-linked");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
 
@@ -101,18 +101,17 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     model.callTools({ name: "read_page", args: {} });
     model.replyWith("Ordered it");
 
-    // Cloud, then Keeps going, from the new tab page.
+    // Do this in the cloud, from the new tab page. With a runner linked, that's where it goes.
     const composer = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
     await composer.fill(PROMPT);
-    await chrome.getByRole("button", { name: "Run in the cloud" }).click();
-    const keepGoing = chrome.getByRole("button", { name: "Keep going with this computer off" });
-    await keepGoing.click();
-    await expect(keepGoing).toHaveAttribute("aria-pressed", "true");
-    await shoot(chrome, "new-tab-keeps-going");
+    await chrome.getByRole("button", { name: "More options" }).click();
+    await chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" }).click();
+    await expect(chrome.getByRole("button", { name: "Send to the cloud" })).toBeVisible();
+    await shoot(chrome, "new-tab-in-the-cloud");
     await composer.press("Meta+Enter");
 
-    await expect(chrome.getByText("Sent to the runner")).toBeVisible();
-    await expect(chrome.getByRole("region", { name: "On the runner" })).toBeVisible();
+    await expect(chrome.locator("p.text-right", { hasText: "In the cloud" })).toBeVisible();
+    await expect(chrome.getByRole("region", { name: "In the cloud" })).toBeVisible();
 
     // The runner asks, and the app shows it in Needs you like any other.
     await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible({ timeout: 30_000 });
@@ -179,7 +178,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     expect(adopted.runner).toBe(true);
     expect(adopted.messages.map(({ role }) => role)).toEqual(["user", "assistant"]);
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), adopted.id);
-    await expect(chrome.getByText("Sent to the runner")).toBeVisible();
+    await expect(chrome.locator("p.text-right", { hasText: "In the cloud" })).toBeVisible();
     await expect(chrome.getByText("Found it from the phone")).toBeVisible();
     await shoot(chrome, "chat-from-phone");
 

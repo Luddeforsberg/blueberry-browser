@@ -488,7 +488,7 @@ export interface InvokeChannels {
   "routines:stop": { region: "chrome"; args: [runId: string]; result: boolean };
   "routines:runs": { region: "chrome"; args: [id: string]; result: RoutineRun[] };
   "routines:mark-seen": { region: "chrome"; args: []; result: void };
-  "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft]; result: MascotSaveResult };
+  "mascots:save": { region: "chrome"; args: [id: string | null, draft: MascotDraft & { worksInCloud?: boolean }]; result: MascotSaveResult };
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
   "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
@@ -719,7 +719,7 @@ export interface RoutinesAPI {
 }
 
 export interface MascotsAPI {
-  save: (id: string | null, draft: MascotDraft) => Promise<MascotSaveResult>;
+  save: (id: string | null, draft: MascotDraft & { worksInCloud?: boolean }) => Promise<MascotSaveResult>;
   delete: (id: string) => Promise<boolean>;
   gallery: () => Promise<GalleryListing>;
   addFromGallery: (galleryId: string, name: string | null) => Promise<MascotSaveResult>;

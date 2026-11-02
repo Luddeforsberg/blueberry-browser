@@ -1,6 +1,6 @@
 # The cloud runner
 
-A small Node service that runs a bird's job in the cloud browser while your Mac is closed. Blueberry puts the job in Supabase when you press **Cloud** and then **Keeps going** in the composer. The runner takes it from there, works on a Browserbase session in your own Context, so the sites you brought along are signed in, and writes each step back. If the job needs your approval it waits, and you answer in Blueberry's Needs you. A job with no answer for 30 minutes stops.
+A small Node service that runs a bird's job in the cloud browser while your Mac is closed. Blueberry puts the job in Supabase when you choose **Do this in the cloud** from the composer's **+**. The runner takes it from there, works on a Browserbase session in your own Context, so the sites you brought along are signed in, and writes each step back. If the job needs your approval it waits, and you answer in Blueberry's Needs you. A job with no answer for 30 minutes stops.
 
 It runs the app's own code, `Chats.runTask` with the same agent, tools, mascot limits, approvals and step limit as a chat. It never answers an approval.
 
@@ -14,7 +14,7 @@ You link it to your account in Blueberry, and it accepts the link when it starts
 
 1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, then `supabase/migrations/20261103000000_phone.sql`, for the phone page, and then `supabase/migrations/20261104000000_cloud_conversations.sql`, for follow-ups.
 2. **Create the runner's user.** In the Supabase dashboard, Authentication > Users > Add user > Create new user, with an email of its own and a long random password. Tick Auto Confirm User. Don't use your own account.
-3. **Link it in Blueberry.** Signed in to your Blueberry account, open Settings > Cloud > Runner, type the runner's email and press **Link**. It says it's waiting for the runner.
+3. **Link it in Blueberry.** Signed in to your Blueberry account, open Settings > Cloud > With your Mac off, type the runner's email and press **Link**. It says it's waiting for the runner.
 4. **Create the service.** From the repo root, with `railway login` done:
 
    ```sh
@@ -38,7 +38,7 @@ You link it to your account in Blueberry, and it accepts the link when it starts
    | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Optional, for notifications on the phone page. `pnpm run push:keys` prints a pair. The subject is `mailto:` and your own address. Without them nothing goes to the phone, and the log says so once |
 
    `BROWSERBASE_CONTEXT_ID` is optional. Each job carries the Context id from the app, which is where the sites you brought along are.
-6. **Check.** The log says `Runner started, using Browserbase.` and `Linked to its owner.`, and Settings > Cloud > Runner says it's your runner within about ten seconds. After that the log has one line per job: its id and how it went. Nothing else: no prompt, page, cookie, code, password or key.
+6. **Check.** The log says `Runner started, using Browserbase.` and `Linked to its owner.`, and Settings > Cloud > With your Mac off says jobs run on it within about ten seconds. After that the log has one line per job: its id and how it went. Nothing else: no prompt, page, cookie, code, password or key.
 
 ## The phone page
 

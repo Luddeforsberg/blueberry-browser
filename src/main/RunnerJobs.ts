@@ -23,20 +23,20 @@ const DISCOVER_MS = 10_000;
 // Conversations deleted here, kept so a slow delete on the server can't bring one back as a chat started elsewhere.
 const MAX_FORGOTTEN = 500;
 
-const NOT_SET_UP = "This copy of Blueberry has no account server, so it can't send jobs to the runner.";
-const SIGN_IN = "Sign in to your Blueberry account in Settings to send jobs to the runner.";
-const NOT_TAKEN = "The runner's queue didn't take the job. Try again in a moment.";
-const TOO_MANY = "Five jobs are already waiting or going on the runner. Try again when one is done.";
-const FAILED = "The job failed on the runner.";
+const NOT_SET_UP = "This copy of Blueberry has no account server, so it can't send jobs to the cloud.";
+const SIGN_IN = "Sign in to your Blueberry account in Settings to send jobs to the cloud.";
+const NOT_TAKEN = "The cloud didn't take the job. Try again in a moment.";
+const TOO_MANY = "Five jobs are already waiting or going in the cloud. Try again when one is done.";
+const FAILED = "The job failed in the cloud.";
 const BUSY = "This chat already has a job going in the cloud, maybe sent from your phone. Send this again once it's done.";
 const GONE = "This job isn't on your account any more.";
-const NO_SUCH_RUNNER = "There's no Blueberry account with that email that can be your runner. Create it in Supabase first, and don't use your own.";
-const LINK_FAILED = "The runner couldn't be linked. Try again in a moment.";
+const NO_SUCH_RUNNER = "There's no Blueberry account with that email that can run your jobs. Create it in Supabase first, and don't use your own.";
+const LINK_FAILED = "That account couldn't be linked. Try again in a moment.";
 // The link is looked up again this often while the runner hasn't accepted, and less often once it has, in case it's
 // been unlinked elsewhere. Opening the composer looks too.
 const LINK_POLL_MS = 10_000;
 const LINKED_POLL_MS = 5 * 60_000;
-const NO_RUNNER = "Your runner isn't linked any more, so this wasn't sent. Link it again in Settings > Cloud.";
+const NO_RUNNER = "Jobs with your Mac off aren't linked any more, so this wasn't sent. Link them again in Settings > Cloud.";
 const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
 const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 

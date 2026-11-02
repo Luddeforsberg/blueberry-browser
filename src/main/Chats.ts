@@ -728,6 +728,11 @@ export class Chats {
     };
   }
 
+  // Whether its jobs go to the cloud, on the runner or in a cloud tab.
+  inCloud(chatId: string): boolean {
+    return this.cloudChats.has(chatId) || !!this.runner?.has(chatId);
+  }
+
   isRunning(chatId: string): boolean {
     return this.runs.has(chatId) || !!this.runner?.progress(chatId);
   }

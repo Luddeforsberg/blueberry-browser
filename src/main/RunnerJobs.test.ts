@@ -148,7 +148,7 @@ describe("runner jobs in the app", () => {
     await settle();
     expect(runner.available()).toBe(true);
     link.accepted = false;
-    expect(await send()).toContain("isn't linked any more");
+    expect(await send()).toContain("aren't linked any more");
     expect(runner.available()).toBe(false);
     expect(runner.runnerState.status).toBe("none");
     runner.destroy();

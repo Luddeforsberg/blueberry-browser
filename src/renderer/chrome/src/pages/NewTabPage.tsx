@@ -40,11 +40,15 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { layout, theme } = useShell()
     const { chosen, choose, find } = useFlock()
     const [cloudState] = useCloud()
-    const [inCloud, setInCloud] = useState(false)
     // Only with a runner linked in Settings > Cloud, which has accepted, so nothing waits in a queue nobody takes from.
     const [runnerState] = useRunner()
-    const [inRunner, setInRunner] = useState(false)
     const canUseRunner = runnerState.status === 'linked'
+    const canUseCloud = cloudState.status !== 'off'
+    // Null follows the bird, which may work in the cloud. Another bird, chosen here or in the chat panel, goes back to
+    // following it.
+    const [cloudChoice, setCloudChoice] = useState<boolean | null>(null)
+    useEffect(() => setCloudChoice(null), [chosen.id])
+    const inCloud = (canUseRunner || canUseCloud) && (cloudChoice ?? chosen.worksInCloud === true)
 
     useEffect(() => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))
@@ -74,7 +78,13 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     const askBerry = async (message: string) => {
         if (filled) void window.chromeAPI.suggestions.used(filled.id)
-        const chat = await window.chromeAPI.chat.send(null, message, { seePage: false, mascotId: chosen.id, cloud: inCloud && cloudState.status !== 'off', runner: inCloud && inRunner && canUseRunner })
+        const chat = await window.chromeAPI.chat.send(null, message, {
+            seePage: false,
+            mascotId: chosen.id,
+            // The runner keeps going with this computer off, so it's used whenever there is one. The user never picks.
+            runner: inCloud && canUseRunner,
+            cloud: inCloud && !canUseRunner && canUseCloud
+        })
         if (!chat) return
         await browser.openPage('chat', { param: chat.id, title: chat.title })
         await browser.closeTab(tab.id)
@@ -185,8 +195,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             onSend={() => submit(false)}
                             mascot={chosen}
                             onChooseMascot={choose}
-                            cloud={cloudState.status !== 'off' ? { on: inCloud, onToggle: () => setInCloud(!inCloud) } : undefined}
-                            runner={canUseRunner ? { on: inRunner, onToggle: () => setInRunner(!inRunner) } : undefined}
+                            cloud={canUseRunner || canUseCloud ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
                         />
                     </div>
                     {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
