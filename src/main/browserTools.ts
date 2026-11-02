@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { WebFrameMain } from "electron";
 import {
   aimClick,
   aimHover,
@@ -28,7 +27,7 @@ import {
 } from "./pageScripts";
 import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import { typingChunks, typingPauseMs, WAITING_WORDS, type Landing, type PageActor, type Spot } from "./PageActor";
-import type { Tab } from "./Tab";
+import type { PageFrame, PageTarget } from "./pageTarget";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { siteAllowed } from "../shared/mascots";
 
@@ -123,7 +122,7 @@ export const siteOf = (url: string): string => {
   }
 };
 
-const readText = async (tab: Tab, allowsFrame: (origin: string) => boolean): Promise<string | null> => {
+const readText = async (tab: PageTarget, allowsFrame: (origin: string) => boolean): Promise<string | null> => {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<null>((resolve) => {
     timer = setTimeout(() => resolve(null), READ_TIMEOUT_MS);
@@ -244,7 +243,7 @@ const heldMessage = (id: string) =>
 const NOT_ON_A_TAB = ["list_tabs", "wait", "ask_user", "open_tab"];
 
 // Said instead of a vaguer failure, so the model tells the user what to do rather than trying again.
-const inTrouble = (tab: Tab): string | null => {
+const inTrouble = (tab: PageTarget): string | null => {
   if (tab.trouble === "crashed") {
     return `The page in tab ${tab.id} has crashed, so nothing happened there. It stays that way until the user reloads it, so tell them.`;
   }
@@ -254,12 +253,13 @@ const inTrouble = (tab: Tab): string | null => {
   return null;
 };
 
-export interface PageToolAccess {
-  activeTab: () => Tab | null;
-  allTabs: () => Tab[];
-  openTab: (url: string) => Tab;
+// `T` is whatever kind of tab this job works in: the window's own, or pages in a browser in the cloud.
+export interface PageToolAccess<T extends PageTarget = PageTarget> {
+  activeTab: () => T | null;
+  allTabs: () => T[];
+  openTab: (url: string) => T | Promise<T>;
   // False if it couldn't be closed, which it can't if it's the window's last.
-  closeTab: (tab: Tab) => boolean;
+  closeTab: (tab: T) => boolean;
   // Whether anything `allTabs` gives is Berry's own to close. Otherwise only what these tools opened.
   ownsEveryTab?: boolean;
   // Whether this job opened the tab, in this reply or an earlier one, and the user hasn't taken it from it.
@@ -270,20 +270,20 @@ export interface PageToolAccess {
   heldByUser?: (id: string) => boolean;
   // Waits until the user says they're done with this tab, which gives it back: true. "code" if that's because a code
   // they sent from their phone went in, which never comes here itself. False if they won't, or closed it.
-  handOver?: (tab: Tab, need: HandoffNeed) => Promise<boolean | "code">;
+  handOver?: (tab: T, need: HandoffNeed) => Promise<boolean | "code">;
   // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped.
   ask: (question: string) => Promise<string | null>;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
   canSee: () => boolean;
   // Told about each tab a tool is about to use, so the user can see where Berry is working.
-  onUse: (tab: Tab) => void;
+  onUse: (tab: T) => void;
   // A mascot other than Berry. It only ever takes tools and sites away. Approvals work the same either way.
   limits?: Pick<MascotProfile, "name" | "sites" | "tools">;
   // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
   stopped?: () => boolean;
 }
 
-export const createPageTools = ({
+export const createPageTools = <T extends PageTarget>({
   activeTab,
   allTabs,
   openTab,
@@ -298,7 +298,7 @@ export const createPageTools = ({
   onUse,
   limits,
   stopped = () => false,
-}: PageToolAccess): PageTool[] => {
+}: PageToolAccess<T>): PageTool[] => {
   const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
   const offLimits = (url: string) => {
     const name = siteOf(url);
@@ -320,9 +320,9 @@ export const createPageTools = ({
   };
   // A ref into a frame from another origin is `f<number>.<its ref>`. Which frame and site that means is only kept
   // here, so the frame's page can't point it anywhere else, and it dies with the frame or a change of site.
-  const frameRefs = new Map<string, { frame: WebFrameMain; origin: string; tabId: string }>();
-  const frameNames = new Map<WebFrameMain, string>();
-  const frameName = (frame: WebFrameMain, tab: Tab) => {
+  const frameRefs = new Map<string, { frame: PageFrame; origin: string; tabId: string }>();
+  const frameNames = new Map<PageFrame, string>();
+  const frameName = (frame: PageFrame, tab: T) => {
     const known = frameNames.get(frame);
     if (known && frameRefs.get(known)?.origin === frame.origin) return known;
     const name = `f${frameRefs.size + 1}`;
@@ -330,7 +330,7 @@ export const createPageTools = ({
     frameRefs.set(name, { frame, origin: frame.origin, tabId: tab.id });
     return name;
   };
-  const frameOf = (tab: Tab, ref: string) => {
+  const frameOf = (tab: T, ref: string) => {
     const [, name] = /^(f\d+)\./.exec(ref) ?? [];
     if (!name) return null;
     const entry = frameRefs.get(name);
@@ -338,11 +338,11 @@ export const createPageTools = ({
     return live ? entry : "gone";
   };
   // Runs a script for this ref wherever its element lives. Null means the element has gone.
-  const onRef = async <T>(tab: Tab, ref: string, script: (ref: string) => string): Promise<T | null> => {
+  const onRef = async <R>(tab: T, ref: string, script: (ref: string) => string): Promise<R | null> => {
     const entry = frameOf(tab, ref);
     if (entry === "gone") return null;
-    if (!entry) return tab.runInPage<T | null>(script(ref));
-    return tab.runInFrame<T | null>(entry.frame, script(ref.slice(ref.indexOf(".") + 1)));
+    if (!entry) return tab.runInPage<R | null>(script(ref));
+    return tab.runInFrame<R | null>(entry.frame, script(ref.slice(ref.indexOf(".") + 1)));
   };
 
   const tookOver = (id: string | undefined) => {
@@ -367,7 +367,7 @@ export const createPageTools = ({
   };
 
   // Everything these tools return is the page's words, so the system prompt tells the model not to obey them.
-  const withText = async (id: string | undefined, doing: string, format: (tab: Tab, text: string) => string) => {
+  const withText = async (id: string | undefined, doing: string, format: (tab: T, text: string) => string) => {
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return noTab(id);
@@ -379,7 +379,7 @@ export const createPageTools = ({
     return text === null ? (inTrouble(tab) ?? `The page at ${tab.url} could not be read.`) : format(tab, text);
   };
 
-  const withTab = async (id: string | undefined, act: (tab: Tab) => Promise<string>) => {
+  const withTab = async (id: string | undefined, act: (tab: T) => Promise<string>) => {
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return noTab(id);
@@ -395,7 +395,7 @@ export const createPageTools = ({
 
   // A real Enter where it can reach, which also submits a form the way a person's does. Only into the field the card
   // named: if the focus has moved, this goes to that field by script instead.
-  const pressEnter = async (tab: Tab, ref: string) => {
+  const pressEnter = async (tab: T, ref: string) => {
     if (!frameOf(tab, ref) && (await tab.runInPage<boolean | null>(hasFocus(ref)))) {
       const focus = await tab.runInPage<FocusInfo>(aimKey);
       if (!focus.foreignFrame) {
@@ -407,12 +407,12 @@ export const createPageTools = ({
   };
 
   // The bird, if anyone's there to see it. With none, every tool does just what it would do anyway, at the same speed.
-  const actorOn = (tab: Tab): PageActor | null => (tab.actor?.showing ? tab.actor : null);
+  const actorOn = (tab: T): PageActor | null => (tab.actor?.showing ? tab.actor : null);
   const unnamed = (name: string | undefined, fallback: string) => clipWords(name) || fallback;
 
   // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
   // or the tab taken over while it flew, and an action must not follow that.
-  const flyToRef = async (tab: Tab, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
+  const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
     const actor = actorOn(tab);
     if (!actor) return true;
     const entry = frameOf(tab, ref);
@@ -429,9 +429,9 @@ export const createPageTools = ({
     const tab = canSee() ? find(id) : null;
     if (tab) void flyToRef(tab, ref, () => WAITING_WORDS, "ask");
   };
-  const carryOn = (tab: Tab) => !stopped() && canSee() && !tookOver(tab.id);
+  const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
-  const leftOff = (tab: Tab) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
+  const leftOff = (tab: T) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
   const usersFields = new Set<string>();
@@ -441,7 +441,7 @@ export const createPageTools = ({
   // At a pace, one piece at a time, with the same result as all at once. Only where someone is watching, and never in a
   // secret field, where it's over as quickly as it can be. The user clicking or typing in the page ends it there, and
   // what's in the field is then theirs: nothing here goes back to fill it in.
-  const typeInField = async (tab: Tab, ref: string, text: string, started: number): Promise<string | null> => {
+  const typeInField = async (tab: T, ref: string, text: string, started: number): Promise<string | null> => {
     const field = `${tab.id}/${ref}`;
     const stepAside = () => {
       usersFields.add(field);
@@ -472,7 +472,7 @@ export const createPageTools = ({
     return touched() ? stepAside() : whole();
   };
 
-  const whereNow = async (tab: Tab) => {
+  const whereNow = async (tab: T) => {
     await tab.settled();
     if (!canSee()) return NO_ACCESS;
     const trouble = inTrouble(tab);
@@ -491,7 +491,7 @@ export const createPageTools = ({
   };
 
   // A frame from another origin can answer anything here, so it's never trusted to say something is safe.
-  const describeRef = async (tab: Tab, ref: string): Promise<ElementInfo | null> => {
+  const describeRef = async (tab: T, ref: string): Promise<ElementInfo | null> => {
     const entry = frameOf(tab, ref);
     if (!entry || entry === "gone") return onRef<ElementInfo>(tab, ref, describeElement);
     // Saying nothing or failing can't make it safe either, because the action would still reach that frame.
@@ -507,7 +507,7 @@ export const createPageTools = ({
 
   // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
   // something covering it gets the scripted click sent straight to the element, not the real one.
-  const clickRef = async (tab: Tab, ref: string, clicks: 1 | 2) => {
+  const clickRef = async (tab: T, ref: string, clicks: 1 | 2) => {
     const doing = clicks === 2 ? "Double-clicking" : "Clicking";
     const scripted = () => onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks));
     const finish = (result: string | null, note = "") => {
@@ -552,7 +552,7 @@ export const createPageTools = ({
   };
 
   // A page can't take the tab off-limits while this runs. If it got there anyway, what came back is the other site's.
-  const limitedRun = async (tab: Tab, act: () => Promise<string>): Promise<string> => {
+  const limitedRun = async (tab: T, act: () => Promise<string>): Promise<string> => {
     const { result, refused } = await tab.withNavigationLimit(allowed, act);
     if (!allowed(tab.url)) return `${offLimits(tab.url).message} The tab went there by itself. Don't use it again.`;
     // A picture can't carry words, and it shows where the tab stayed anyway.
@@ -930,11 +930,10 @@ export const createPageTools = ({
           if (tab.mayShowCode) return `Screenshots of tab ${tab.id} aren't available for now, because a code from the user's phone went in there and the page might show it. Read its text instead.`;
           await actorOn(tab)?.say(`Looking at ${siteOf(tab.url)}`, "looking");
           await tab.settled();
-          const image = await tab.screenshot();
+          const image = await tab.screenshotJpeg(MAX_SCREENSHOT_WIDTH, SCREENSHOT_QUALITY);
           if (!canSee()) return NO_ACCESS;
-          if (image.isEmpty()) return `The page in tab ${tab.id} hasn't drawn anything to look at yet.`;
-          const scaled = image.getSize().width > MAX_SCREENSHOT_WIDTH ? image.resize({ width: MAX_SCREENSHOT_WIDTH }) : image;
-          return `data:image/jpeg;base64,${scaled.toJPEG(SCREENSHOT_QUALITY).toString("base64")}`;
+          if (!image) return `The page in tab ${tab.id} hasn't drawn anything to look at yet.`;
+          return `data:image/jpeg;base64,${image.toString("base64")}`;
         }),
     }),
     pageTool({
@@ -1005,7 +1004,14 @@ export const createPageTools = ({
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
-        const tab = openTab(url);
+        let tab: T;
+        try {
+          tab = await openTab(url);
+        } catch (error) {
+          // Only a browser in the cloud fails here, and what it says is ours, not a page's.
+          console.error("Couldn't open a tab:", error);
+          return `No tab was opened. ${error instanceof Error ? error.message : ""}`.trim();
+        }
         opened.add(tab.id);
         onUse(tab);
         return limits ? (await limitedRun(tab, () => whereNow(tab))) : whereNow(tab);

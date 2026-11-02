@@ -1,4 +1,4 @@
-import type { Tab } from "./Tab";
+import type { PageTarget } from "./pageTarget";
 
 // Real mouse and keyboard, which a page can't tell from a person's. They go to the tab's own view, so they don't
 // move the user's pointer or take their focus, and a tab behind the chat gets them too. Electron's input doesn't
@@ -20,55 +20,55 @@ export interface Point {
 export const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The page measures in its own pixels, and a zoomed page draws them bigger.
-const inView = (tab: Tab, { x, y }: Point) => {
-  const zoom = tab.webContents.getZoomFactor();
+const inView = (tab: PageTarget, { x, y }: Point) => {
+  const zoom = tab.zoomFactor;
   return { x: Math.round(x * zoom), y: Math.round(y * zoom) };
 };
 
-export const moveTo = async (tab: Tab, point: Point): Promise<void> => {
+export const moveTo = async (tab: PageTarget, point: Point): Promise<void> => {
   const at = inView(tab, point);
   // The second move, a pixel on, is what makes some pages notice the pointer has arrived.
-  tab.sendAgentInput({ type: "mouseMove", x: at.x - 1, y: at.y });
+  await tab.sendAgentInput({ type: "mouseMove", x: at.x - 1, y: at.y });
   await pause(STEP_MS);
-  tab.sendAgentInput({ type: "mouseMove", x: at.x, y: at.y });
+  await tab.sendAgentInput({ type: "mouseMove", x: at.x, y: at.y });
   await pause(STEP_MS);
 };
 
-const press = (tab: Tab, at: Point, clickCount: number) => {
-  tab.sendAgentInput({ type: "mouseDown", button: "left", clickCount, ...at });
+const press = async (tab: PageTarget, at: Point, clickCount: number) => {
+  await tab.sendAgentInput({ type: "mouseDown", button: "left", clickCount, ...at });
 };
 
-const release = (tab: Tab, at: Point, clickCount: number) => {
-  tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
+const release = async (tab: PageTarget, at: Point, clickCount: number) => {
+  await tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
 };
 
 // False if `goOn` said no just before a press, so nothing was clicked.
-export const clickAt = async (tab: Tab, point: Point, clicks: 1 | 2, goOn: () => boolean = () => true): Promise<boolean> => {
+export const clickAt = async (tab: PageTarget, point: Point, clicks: 1 | 2, goOn: () => boolean = () => true): Promise<boolean> => {
   await moveTo(tab, point);
   const at = inView(tab, point);
   for (let count = 1; count <= clicks; count++) {
     if (!goOn()) return false;
-    press(tab, at, count);
+    await press(tab, at, count);
     await pause(STEP_MS);
-    release(tab, at, count);
+    await release(tab, at, count);
     await pause(STEP_MS);
   }
   return true;
 };
 
-export const dragBetween = async (tab: Tab, from: Point, to: Point): Promise<void> => {
+export const dragBetween = async (tab: PageTarget, from: Point, to: Point): Promise<void> => {
   await moveTo(tab, from);
   const start = inView(tab, from);
   const end = inView(tab, to);
-  press(tab, start, 1);
+  await press(tab, start, 1);
   await pause(STEP_MS);
   for (let step = 1; step <= DRAG_STEPS; step++) {
     const x = Math.round(start.x + ((end.x - start.x) * step) / DRAG_STEPS);
     const y = Math.round(start.y + ((end.y - start.y) * step) / DRAG_STEPS);
-    tab.sendAgentInput({ type: "mouseMove", x, y });
+    await tab.sendAgentInput({ type: "mouseMove", x, y });
     await pause(STEP_MS);
   }
-  release(tab, end, 1);
+  await release(tab, end, 1);
   await pause(STEP_MS);
 };
 
@@ -101,16 +101,16 @@ export const isHarmlessKey = (key: string): boolean => HARMLESS_KEYS.has(key);
 // when a page doesn't, and that includes closing the window and quitting.
 export const isKnownKey = (key: string): boolean => key in NAMED_KEYS || [...key].length === 1;
 
-export const pressKey = async (tab: Pick<Tab, "sendAgentInput">, key: string, shift: boolean): Promise<void> => {
+export const pressKey = async (tab: Pick<PageTarget, "sendAgentInput">, key: string, shift: boolean): Promise<void> => {
   const keyCode = NAMED_KEYS[key] ?? key;
   const modifiers: "shift"[] = shift ? ["shift"] : [];
-  tab.sendAgentInput({ type: "keyDown", keyCode, modifiers });
+  await tab.sendAgentInput({ type: "keyDown", keyCode, modifiers });
   // Without this a character isn't typed and Enter doesn't submit.
   if (keyCode === "Enter" || keyCode === "Space" || !(key in NAMED_KEYS)) {
-    tab.sendAgentInput({ type: "char", keyCode: keyCode === "Space" ? " " : keyCode, modifiers });
+    await tab.sendAgentInput({ type: "char", keyCode: keyCode === "Space" ? " " : keyCode, modifiers });
   }
   await pause(STEP_MS);
-  tab.sendAgentInput({ type: "keyUp", keyCode, modifiers });
+  await tab.sendAgentInput({ type: "keyUp", keyCode, modifiers });
   await pause(STEP_MS);
 };
 

@@ -199,6 +199,9 @@ importers:
       lucide-react:
         specifier: ^0.544.0
         version: 0.544.0(react@19.1.1)
+      playwright-core:
+        specifier: 1.64.1
+        version: 1.64.1
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4

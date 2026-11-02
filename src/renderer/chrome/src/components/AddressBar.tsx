@@ -30,7 +30,8 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     flock: 'Your flock',
     'mascot-gallery': 'Mascot gallery',
     'needs-you': 'Needs you',
-    recording: 'What I watched'
+    recording: 'What I watched',
+    cloud: 'Cloud tab'
 }
 
 // Internal pages have no address worth editing, so the field starts empty there.

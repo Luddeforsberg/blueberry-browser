@@ -636,7 +636,7 @@ A chats or history database that can't be read doesn't stop the app. The file is
 
 ### Settings
 
-Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide, On your desktop, Show the bird on pages and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Claude (see below), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions and Offers to remember switches with what each sends. Appearance follows the system by default, with a manual light or dark override.
+Plain sections, including Account (only for publishing: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), layout, appearance, Berry (Still, Hide, On your desktop, Show the bird on pages and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Claude (see below), Cloud (see below), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions and Offers to remember switches with what each sends. Appearance follows the system by default, with a manual light or dark override.
 
 ### Claude
 
@@ -646,6 +646,25 @@ Settings > Claude lets Claude Code and Claude Desktop on this computer hand jobs
 - **Once on:** one row for each app, with where its snippet goes and **Copy**, over the snippet in a `tray` block with the key shown as dots. Copy puts the real key on the clipboard from main, so the page never has it. **Revoke** makes a new key.
 - **Recent calls:** a plain list split by `border`, newest first: the time in tabular figures, the app, the tool in words, and a short summary, in `warning` when a call was refused. It's memory only, and says so.
 - **A job from an app** is an ordinary chat. Over its first message, "From Claude Code" in 12px `muted-foreground`, and the same on its Needs you row. An app can't allow anything: approvals wait for the user as always.
+
+### Cloud
+
+Settings > Cloud lets a bird work in a browser on Browserbase. It's off until a key is saved, and the same plain rows as Phone.
+
+- **What it does** in one sentence, including that the cloud browser isn't signed in to anything yet.
+- **Status:** one line in words (off, starting, running with or without a job, ended) and **End cloud session**, disabled while nothing runs.
+- **The key:** API key and project id, both as password fields, and **Save**. Once saved they never come back to the page: the row says the key is saved and offers **Forget key**.
+- **A local test browser:** an unpackaged app started with `BLUEBERRY_CLOUD_LOCAL` says so here instead of asking for a key.
+- **Choosing it:** on the new tab page, while the cloud is on, a small cloud button sits in the composer beside the mascot. Pressed, it reads "Cloud" in `accent-ink` on `muted`, and that chat works in the cloud from then on.
+
+### Cloud tab
+
+A page in the cloud browser opens as a tab behind the user, with a cloud icon and the page's title. The chrome draws it.
+
+- **A strip on top:** the cloud icon, **In the cloud** and one line in `muted-foreground` saying what taking over does, with **Take over** on the right. Once taken, the line says it's yours and the button goes.
+- **The page:** Browserbase's live view in a frame that takes no pointer until the user takes over, so nothing they do lands in the middle of a job. A local test browser shows pictures instead, and says it's pictures only once taken.
+- **Taking over** is the same as clicking in a tab of the window's own: the job can't reach it any more and is told why. Typing an address there counts too, and goes there in the cloud.
+- **Ended:** when the session ends its tabs close. A tab left without a page shows Berry in its Oops mood and says so.
 
 ### Downloads
 

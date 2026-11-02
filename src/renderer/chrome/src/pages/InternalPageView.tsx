@@ -11,6 +11,7 @@ import { FlockPage } from './FlockPage'
 import { MascotGalleryPage } from './MascotGalleryPage'
 import { NeedsYouPage } from './NeedsYouPage'
 import { RecordingPage } from './RecordingPage'
+import { CloudPage } from './CloudPage'
 
 export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     switch (tab.page) {
@@ -36,6 +37,8 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             return <NeedsYouPage tab={tab} />
         case 'recording':
             return <RecordingPage tab={tab} />
+        case 'cloud':
+            return <CloudPage key={tab.id} tab={tab} />
         default:
             return null
     }

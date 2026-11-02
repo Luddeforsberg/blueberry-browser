@@ -14,7 +14,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you" | "recording";
+export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you" | "recording" | "cloud";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -333,6 +333,32 @@ export type MascotSaveResult = { ok: true; id: string } | { ok: false; error: st
 export interface ChatSendOptions {
   seePage: boolean;
   mascotId?: string | null;
+  // Work in a browser in the cloud rather than in this window's tabs. Ignored while the cloud is off.
+  cloud?: boolean;
+}
+
+// Settings > Cloud. The key and project id never come back here once saved: only whether there are any.
+export interface CloudState {
+  // "local" is the test browser on this computer, only in an unpackaged app.
+  provider: "browserbase" | "local" | null;
+  configured: boolean;
+  status: "off" | "idle" | "starting" | "running" | "ended";
+  // The chat or run using it now, if any.
+  busy: boolean;
+  // Whether End has anything to end, here or at the provider.
+  canEnd: boolean;
+  // The provider didn't confirm the last end, so a paid session may still be running.
+  unreleased: boolean;
+  problem: string | null;
+}
+
+// What a cloud tab shows: the provider's live view in a frame, or pictures sent as `cloud:frame`.
+export type CloudView = { kind: "live"; url: string; takenOver: boolean } | { kind: "frames"; takenOver: boolean } | { kind: "gone" };
+
+export interface CloudFrame {
+  tabId: string;
+  // A JPEG, base64.
+  data: string;
 }
 
 // Renderer asks, main answers. `region` names the views main accepts the call from.
@@ -484,6 +510,16 @@ export interface InvokeChannels {
   "mcp:revoke": { region: "chrome"; args: []; result: McpState };
   // Puts that app's snippet, with the real token, on the clipboard.
   "mcp:copy": { region: "chrome"; args: [app: string]; result: boolean };
+  "cloud:state": { region: "chrome"; args: []; result: CloudState };
+  // The key and project id go this way only.
+  "cloud:save": { region: "chrome"; args: [apiKey: string, projectId: string]; result: CloudState };
+  "cloud:forget": { region: "chrome"; args: []; result: CloudState };
+  "cloud:end": { region: "chrome"; args: []; result: CloudState };
+  "cloud:view": { region: "chrome"; args: [tabId: string]; result: CloudView };
+  // Which cloud tab is on screen, or null. Pictures of it come as `cloud:frame`, to the chrome and nowhere else.
+  "cloud:watch": { region: "chrome"; args: [tabId: string | null]; result: void };
+  // The user takes the tab from the job, as clicking in a tab of the window's own does.
+  "cloud:take-over": { region: "chrome"; args: [tabId: string]; result: boolean };
   "permissions:current": { region: "prompt"; args: []; result: PermissionPrompt | null };
   "permissions:decide": { region: "prompt"; args: [promptId: string, allow: boolean]; result: boolean };
   "permissions:resize": { region: "prompt"; args: [height: number]; result: void };
@@ -498,6 +534,8 @@ export interface EventChannels {
   "phone:updated": PhoneState;
   "phone:answered": PhoneAnswered;
   "mcp:updated": McpState;
+  "cloud:updated": CloudState;
+  "cloud:frame": CloudFrame;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
   "desktop:state": DesktopBerryState;
@@ -702,6 +740,18 @@ export interface McpAPI {
   onUpdated: (callback: (state: McpState) => void) => Unsubscribe;
 }
 
+export interface CloudAPI {
+  state: () => Promise<CloudState>;
+  save: (apiKey: string, projectId: string) => Promise<CloudState>;
+  forget: () => Promise<CloudState>;
+  end: () => Promise<CloudState>;
+  view: (tabId: string) => Promise<CloudView>;
+  watch: (tabId: string | null) => Promise<void>;
+  takeOver: (tabId: string) => Promise<boolean>;
+  onUpdated: (callback: (state: CloudState) => void) => Unsubscribe;
+  onFrame: (callback: (frame: CloudFrame) => void) => Unsubscribe;
+}
+
 export interface DesktopAPI {
   // For Settings and the chrome's own bird. The chrome can't call the rest.
   shortcutTaken: () => Promise<boolean>;
@@ -740,4 +790,5 @@ export interface ChromeAPI {
   permissions: PermissionsAPI;
   phone: PhoneAPI;
   mcp: McpAPI;
+  cloud: CloudAPI;
 }

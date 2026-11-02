@@ -12,6 +12,7 @@ const TITLES: Record<InternalPage, string> = {
   "mascot-gallery": "Mascot gallery",
   "needs-you": "Needs you",
   recording: "What I watched",
+  cloud: "Cloud tab",
 };
 
 // A tab whose page the chrome renderer draws, so it has no web view and no navigation history.

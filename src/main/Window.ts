@@ -36,6 +36,7 @@ import { DesktopBerry } from "./DesktopBerry";
 import { McpConnector } from "./McpConnector";
 import { createMcpTools, type McpTool } from "./mcpTools";
 import { readTabText } from "./mcpPages";
+import { CloudTabs } from "./CloudTabs";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -129,6 +130,7 @@ export class Window {
   readonly desktopBerry: DesktopBerry;
   readonly memory: MemoryStore;
   readonly mcp: McpConnector;
+  readonly cloud: CloudTabs;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -227,6 +229,29 @@ export class Window {
       isClean: (text) => this.chats.withoutCodes(text) === text,
     });
 
+    // Only an unpackaged app can be pointed at a Chrome on this computer instead of Browserbase, like the other test hooks.
+    const localCloud = app.isPackaged ? undefined : process.env.BLUEBERRY_CLOUD_LOCAL;
+    this.cloud = new CloudTabs(
+      join(app.getPath("userData"), "cloud.json"),
+      {
+        chrome: () => this.chrome.view.webContents,
+        openTab: (title) => this.openCloudTab(title),
+        updateTab: (id, title) => {
+          const tab = this.tabsMap.get(id);
+          if (!(tab instanceof InternalTab) || tab.title === title) return;
+          tab.title = title;
+          this.notifyTabs();
+        },
+        closeTab: (id) => {
+          if (this.tabsMap.has(id) && this.tabCount > 1) this.closeTab(id, false);
+          else this.cloud.tabClosed(id);
+        },
+        takenOver: (id) => this.chats.releaseTab(id),
+      },
+      localCloud ? (localCloud === "1" ? { executable: process.env.BLUEBERRY_CLOUD_CHROME || undefined } : { endpoint: localCloud }) : null
+    );
+    this.cloud.start();
+
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
@@ -257,7 +282,7 @@ export class Window {
         this.notifyTabs();
         this.workViews.sync();
       },
-    }, (id) => this.mascotStore.resolve(id), this.memory);
+    }, (id) => this.mascotStore.resolve(id), this.memory, this.cloud);
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -386,6 +411,7 @@ export class Window {
       this.phone.stop();
       this.telegram.close();
       this.mcp.close();
+      this.cloud.destroy();
       this.permissionPrompt.destroy();
       session.defaultSession.off("will-download", onDownload);
       offDownloads();
@@ -641,6 +667,8 @@ export class Window {
       this.tabsMap.set(id, this.createWebTab(id, saved.url, saved));
       return id;
     }
+    // A cloud tab's page went with the session.
+    if (saved.page === "cloud") return null;
     const chat = saved.page === "chat" && saved.param ? this.chatStore.summaries().find(({ id: chatId }) => chatId === saved.param) : null;
     if (saved.page === "chat" && saved.param && !chat) return null;
     this.tabsMap.set(id, new InternalTab(id, saved.page, saved.param, chat?.title ?? saved.title));
@@ -651,7 +679,7 @@ export class Window {
     if (this.settings.onStartup !== "restore") return null;
     const { width, height } = this.windowSize;
     // A chat's or routine's own tabs last as long as its work, so they aren't the user's to get back.
-    const entries = this.entries.filter((tab) => !this.backgroundTabs.has(tab.id));
+    const entries = this.entries.filter((tab) => !this.backgroundTabs.has(tab.id) && !(tab instanceof InternalTab && tab.page === "cloud"));
     return {
       tabs: entries.map(
         (tab): SavedTab =>
@@ -680,7 +708,17 @@ export class Window {
     return tab;
   }
 
+  // A page in the cloud browser, shown by the chrome. Opened behind the user, like any tab a job opens.
+  private openCloudTab(title: string): string {
+    const id = `tab-${++this.tabCounter}`;
+    this.tabsMap.set(id, new InternalTab(id, "cloud", id, title));
+    this.notifyTabs();
+    return id;
+  }
+
   openPage(page: InternalPage, options: { param?: string; title?: string } = {}): BrowserTab {
+    // Only a job opens one, with a page behind it.
+    if (page === "cloud") return this.openPage("new-tab");
     const param = options.param ?? null;
     // A chat only starts from the new tab page, so a chat tab always has a chat.
     if (page === "chat" && param === null) return this.openPage("new-tab");
@@ -718,6 +756,14 @@ export class Window {
     }
 
     this.recordings.addressBarUsed(tabId);
+    // A cloud tab goes there in the cloud, and the user typing an address has taken it from the job.
+    if (entry instanceof InternalTab && entry.page === "cloud") {
+      const page = this.cloud.page(tabId);
+      if (!page) return false;
+      this.cloud.takeOver(tabId);
+      await page.loadURL(url).catch(() => {});
+      return true;
+    }
 
     const tab = this.createWebTab(tabId, url);
     this.tabsMap = new Map(
@@ -871,7 +917,9 @@ export class Window {
 
     // Leaving the review is the same as throwing it away, so a trail never outlasts the page showing it.
     if (tab instanceof InternalTab && tab.page === "recording") this.recordings.discard();
-    if (remember && !(tab instanceof InternalTab && tab.page === "recording")) this.closedTabs.push(this.tabInfo(tab));
+    const isCloud = tab instanceof InternalTab && tab.page === "cloud";
+    if (isCloud) this.cloud.tabClosed(tabId);
+    if (remember && !isCloud && !(tab instanceof InternalTab && tab.page === "recording")) this.closedTabs.push(this.tabInfo(tab));
     if (tab instanceof Tab && tab.existingView) this._baseWindow.contentView.removeChildView(tab.existingView);
     tab.destroy();
     this.tabsMap.delete(tabId);
