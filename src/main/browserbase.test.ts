@@ -116,6 +116,30 @@ describe("Browserbase", () => {
     expect(provider.hasSession).toBe(false);
   });
 
+  it("ends a session nobody has used for a while, and not one a job or the user picked up again", async () => {
+    const { calls, send } = stub({ "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } } });
+    const provider = browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: "sess-1" }, onSaved: () => {}, fetch: send, connect: async () => fakeBrowser().browser });
+    const sessions = new CloudSessions(provider, () => {}, 20);
+    const released = () => calls.filter(({ url, body }) => url.endsWith("/sessions/sess-1") && body?.status === "REQUEST_RELEASE").length;
+
+    sessions.claim("job-1");
+    sessions.release("job-1");
+    sessions.claim("job-2");
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(released()).toBe(0);
+
+    sessions.release("job-2");
+    sessions.keepOpen();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(released()).toBe(0);
+
+    sessions.claim("job-3");
+    sessions.release("job-3");
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(released()).toBe(1);
+    expect(sessions.canEnd).toBe(false);
+  });
+
   it("releases a session it made even when connecting to it failed", async () => {
     const { calls, send } = stub({
       "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
