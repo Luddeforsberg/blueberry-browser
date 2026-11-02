@@ -44,8 +44,10 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [runnerState] = useRunner()
     const canUseRunner = runnerState.status === 'linked'
     const canUseCloud = cloudState.status !== 'off'
-    // Null follows the bird, which may work in the cloud. Choosing another bird goes back to following it.
+    // Null follows the bird, which may work in the cloud. Another bird, chosen here or in the chat panel, goes back to
+    // following it.
     const [cloudChoice, setCloudChoice] = useState<boolean | null>(null)
+    useEffect(() => setCloudChoice(null), [chosen.id])
     const inCloud = (canUseRunner || canUseCloud) && (cloudChoice ?? chosen.worksInCloud === true)
 
     useEffect(() => {
@@ -192,10 +194,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             canSend={text.trim().length > 0}
                             onSend={() => submit(false)}
                             mascot={chosen}
-                            onChooseMascot={(id) => {
-                                choose(id)
-                                setCloudChoice(null)
-                            }}
+                            onChooseMascot={choose}
                             cloud={canUseRunner || canUseCloud ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
                         />
                     </div>

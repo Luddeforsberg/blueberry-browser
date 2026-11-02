@@ -38,6 +38,8 @@ test("a bird that works in the cloud turns Do this in the cloud on, and it can s
     await chrome.screenshot({ path: join(SHOTS, "1-menu.png") });
     await chrome.keyboard.press("Escape");
     await expect(item).toHaveCount(0);
+    // Back on the button that opened it, so the keyboard isn't lost.
+    await expect(more).toBeFocused();
 
     // Scout does, so choosing it turns it on.
     await choose("Scout");
@@ -49,7 +51,9 @@ test("a bird that works in the cloud turns Do this in the cloud on, and it can s
     await expect(item).toHaveAttribute("aria-checked", "true");
     await item.click();
     await expect(send("Send")).toBeVisible();
+    // Any change of bird goes back to following it, wherever it was chosen, as the chat panel shares the choice.
     await choose("Berry");
+    await expect(send("Send")).toBeVisible();
     await choose("Scout");
     await expect(send("Send to the cloud")).toBeVisible();
 

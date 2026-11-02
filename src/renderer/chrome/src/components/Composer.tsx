@@ -39,13 +39,19 @@ export const Composer: React.FC<{
     const [choosing, setChoosing] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
+    const addRef = useRef<HTMLButtonElement>(null)
     // The + menu only holds the cloud option, so it's there only where the + has nothing else to do.
     const menu = !onAdd && cloud ? cloud : null
 
     useEffect(() => {
         if (!menuOpen) return
         const close = (event: Event) => {
-            if (event instanceof KeyboardEvent ? event.key === 'Escape' : !menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
+            if (event instanceof KeyboardEvent) {
+                if (event.key !== 'Escape') return
+                setMenuOpen(false)
+                // The item that had focus goes with the menu, so it comes back to the button that opened it.
+                addRef.current?.focus()
+            } else if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
         }
         window.addEventListener('pointerdown', close)
         window.addEventListener('keydown', close)
@@ -112,6 +118,7 @@ export const Composer: React.FC<{
                 {!noAdd && (
                     <div ref={menuRef} className="relative">
                         <button
+                            ref={addRef}
                             type="button"
                             aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
                             title={menu ? undefined : (addLabel ?? 'Adding files arrives with the backend')}
