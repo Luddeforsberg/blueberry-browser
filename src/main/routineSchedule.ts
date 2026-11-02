@@ -113,6 +113,7 @@ export const parseDraft = (input: unknown): { draft: RoutineDraft } | { error: s
     if (!cleanSites.includes(clean)) cleanSites.push(clean);
   }
   if (cleanSites.length > MAX_SITES) return { error: `Keep it to ${MAX_SITES} sites.` };
-  const inCloud = (input as { inCloud?: unknown } | null)?.inCloud === true;
+  // Only a scheduled routine has anything for the cloud to run.
+  const inCloud = (input as { inCloud?: unknown } | null)?.inCloud === true && schedule.kind !== "manual";
   return { draft: { name: cleanName, instructions: cleanInstructions, schedule, sites: cleanSites, ...(typeof mascotId === "string" ? { mascotId } : {}), ...(inCloud ? { inCloud } : {}) } };
 };

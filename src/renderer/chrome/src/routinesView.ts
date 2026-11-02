@@ -144,7 +144,7 @@ export const toDraft = (form: RoutineFormValues): RoutineDraft => {
                 return { kind, day, time }
         }
     }
-    return { name, instructions, schedule: schedule(), mascotId, sites: sites.split(/[\s,]+/).filter(Boolean), ...(inCloud ? { inCloud } : {}) }
+    return { name, instructions, schedule: schedule(), mascotId, sites: sites.split(/[\s,]+/).filter(Boolean), ...(inCloud && kind !== 'manual' ? { inCloud } : {}) }
 }
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.

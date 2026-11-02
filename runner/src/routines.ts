@@ -39,7 +39,8 @@ const knownZone = (timeZone: string): boolean => {
   }
 };
 
-// The next time after now, so times missed while the runner was down are skipped rather than saved up, as in the app.
+// The next time after now. A time missed while the runner was down runs once when it's back, and any others it missed
+// are skipped rather than saved up, as in the app.
 // Null for a routine that won't run again, or whose schedule or zone it can't read.
 export const nextRunAfter = (routine: Pick<DueRoutine, "schedule" | "timeZone">, now: number): string | null => {
   const schedule = parseSchedule(routine.schedule);

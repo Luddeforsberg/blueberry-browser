@@ -138,6 +138,13 @@ describe("the scheduler", () => {
     expect(runs).toHaveLength(1);
   });
 
+  it("keeps a routine that only runs when asked out of the cloud", () => {
+    const { routines } = setup();
+    save(routines, { name: "Ask me", instructions: "Look", schedule: { kind: "manual" }, inCloud: true });
+    expect(routines.list()[0].inCloud).toBe(false);
+    expect(routines.cloudRows(() => { throw new Error("not asked"); }, { actionApproval: "risky", contextId: null, timeZone: "UTC" })).toEqual([]);
+  });
+
   it("says when a routine couldn't be sent to the cloud", () => {
     const { routines } = setup(undefined, { cloudFailed: () => true });
     save(routines, { ...daily("13:00"), inCloud: true });
