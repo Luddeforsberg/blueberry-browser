@@ -230,7 +230,13 @@ export class McpConnector {
     };
     const { token } = this.saved;
     if (!this.port || !hostAllowed(request.headers.host, this.port)) return refuse(403, "Only apps on this computer may use this.");
-    if (new URL(request.url ?? "/", "http://localhost").pathname !== "/mcp") return refuse(404, "Not found.");
+    let path: string;
+    try {
+      path = new URL(request.url ?? "/", "http://localhost").pathname;
+    } catch {
+      return refuse(400, "Bad request.");
+    }
+    if (path !== "/mcp") return refuse(404, "Not found.");
     if (!token || !tokenMatches(request.headers.authorization, token)) return refuse(401, "Blueberry didn't recognise this app. Copy the snippet again from Settings > Claude.");
     // Stateless, so there's no stream to open and no session to end.
     if (request.method !== "POST") return refuse(405, "Only POST is supported.");
