@@ -98,6 +98,8 @@ export interface Evidence {
   hosts: string[];
   // When the user did it, for checking a schedule. A routine's own runs aren't the user's habit, so they have none.
   times: number[];
+  // When each of its sites was first opened in it.
+  siteTimes: Record<string, number[]>;
   // Every number that may be said about it.
   numbers: number[];
   // Everything it says, for checking what a suggestion names.
@@ -171,6 +173,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       id,
       hosts,
       times: [start],
+      siteTimes: Object.fromEntries(hosts.map((host) => [host, steps.flatMap((step) => ("host" in step && step.host === host ? [step.at] : [])).slice(0, 1)])),
       numbers: [minutes, pages.length, steps.length, ...hosts.map((host) => steps.filter((step) => "host" in step && step.host === host).length), ...numbersIn(when(start))],
       text,
       sources: hosts.map((host) => `site:${host}`),
@@ -190,7 +193,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       const id = `q${index + 1}`;
       const sorted = [...times].sort((a, b) => b - a);
       const days = new Set(times.map(dayOf)).size;
-      add({ id, hosts: [], times, numbers: [times.length, days, ...sorted.flatMap((at) => numbersIn(when(at)))], text: query, sources: [`search:${query}`] });
+      add({ id, hosts: [], times, siteTimes: {}, numbers: [times.length, days, ...sorted.flatMap((at) => numbersIn(when(at)))], text: query, sources: [`search:${query}`] });
       return { id, query, times: times.length, days, when: sorted.slice(0, MAX_SEARCH_TIMES).map(when) };
     });
 
@@ -203,7 +206,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
     .slice(0, MAX_CHATS)
     .map(({ id: chatId, title, updatedAt, outcome }, index) => {
       const id = `c${index + 1}`;
-      add({ id, hosts: [], times: [updatedAt], numbers: numbersIn(`${title} ${when(updatedAt)}`), text: title, sources: [`chat:${chatId}`] });
+      add({ id, hosts: [], times: [updatedAt], siteTimes: {}, numbers: numbersIn(`${title} ${when(updatedAt)}`), text: title, sources: [`chat:${chatId}`] });
       return { id, title, when: when(updatedAt), ...(outcome === "done" ? {} : { outcome }) };
     });
 
@@ -221,6 +224,7 @@ export const buildDigest = ({ visits, chats, routines, mascots, feedback, now }:
       id,
       hosts: routine.sites,
       times: [],
+      siteTimes: {},
       numbers: [runs.length, failed, ...numbersIn(`${name} ${routine.schedule}`), ...runs.flatMap(({ startedAt }) => numbersIn(when(startedAt)))],
       text: `${name} ${routine.sites.join(" ")}`,
       sources: [`routine:${routine.id}`],

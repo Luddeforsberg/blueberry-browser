@@ -67,6 +67,11 @@ describe("verifying a proposal", () => {
     expect(verifyProposals(JSON.stringify({ cards: [{ ...card, prompt: "Open example.com and list the deals." }] }), titled, NONE)).toHaveLength(1);
   });
 
+  it("treats anything shaped like a site as one, even a file name", () => {
+    expect(verify(prompt({ prompt: "Open evil.md and compare the fares." }))).toEqual([]);
+    expect(verify(prompt({ prompt: "Compare the fares in fares.json." }))).toEqual([]);
+  });
+
   it("drops a reason with a number its evidence doesn't show", () => {
     expect(verify(prompt({ why: "You compared Lisbon fares 14 times" }))).toEqual([]);
     expect(verify(prompt({ why: "You compared fares on 3 sites" }))).toHaveLength(1);
@@ -76,6 +81,17 @@ describe("verifying a proposal", () => {
     const [kept] = verify({ kind: "routine", line: "Want the Arsenal score by 7:30 on Mondays?", why: "You checked Arsenal on Flashscore on 2 Monday mornings", evidence: scores, sites: ["flashscore.com"], name: "Monday scores", instructions: "Open Flashscore and tell me Arsenal's last result.", schedule: { kind: "weekly", days: [1], time: "07:30" } });
     expect(kept.card.kind === "routine" && kept.card.draft.schedule).toEqual({ kind: "weekly", days: [1], time: "07:30" });
     expect(kept.card.kind === "routine" && kept.card.draft.sites).toEqual(["flashscore.com"]);
+  });
+
+  it("only counts visits to the routine's own sites as its habit", () => {
+    const visits = [
+      visit("https://shop.example/deals", "Deals", at(1, 15)),
+      ...[1, 2, 3].map((daysAgo) => visit("https://news.example/", "News", at(daysAgo, 8, 10))),
+    ].sort((a, b) => b.visitedAt - a.visitedAt);
+    const mixed = buildDigest({ visits, chats: [], routines: [], mascots: [], feedback: [], now: NOW });
+    const card = { kind: "routine", line: "Want the shop's deals each morning?", why: "You look at deals", evidence: [...mixed.evidence.keys()], sites: ["shop.example"], name: "Shop deals", instructions: "Open shop.example and list the deals.", schedule: { kind: "daily", time: "08:00" } };
+    const [kept] = verifyProposals(JSON.stringify({ cards: [card] }), mixed, NONE);
+    expect(kept.card.kind).toBe("prompt");
   });
 
   it("turns a routine whose schedule doesn't match into a prompt", () => {

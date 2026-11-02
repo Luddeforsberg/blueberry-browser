@@ -21,8 +21,6 @@ const EARLY_MINUTES = 180;
 const LATE_MINUTES = 30;
 const DAY_MINUTES = 24 * 60;
 const WEEK_SPAN_MS = 6 * 86_400_000;
-// A file name such as next.js isn't a site.
-const NOT_A_SITE = /\.(js|ts|py|md|txt|pdf|csv|html|json)$/;
 const SITE_NAME = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 // Written without an address these pass for ordinary words, so the big ones are listed.
 const WELL_KNOWN_SITES = "reddit youtube twitter facebook instagram tiktok linkedin amazon ebay wikipedia netflix spotify google bing gmail whatsapp telegram discord".split(" ");
@@ -102,7 +100,8 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const namesOnly = (text: string, hosts: string[], otherNames: string[]): boolean => {
   const lower = text.toLowerCase();
   if (lower.includes("://") || lower.includes("www.")) return false;
-  const named = (lower.match(SITE_NAME) ?? []).filter((name) => !NOT_A_SITE.test(name));
+  // Even a file name: evil.md is a real domain, so anything shaped like one is treated as one.
+  const named = lower.match(SITE_NAME) ?? [];
   const allowed = (name: string) => hosts.some((host) => host === name || host.endsWith(`.${name}`) || name.endsWith(`.${host}`));
   if (!named.every(allowed)) return false;
   return !otherNames.some((name) => new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}($|[^\\p{L}\\p{N}])`, "iu").test(text));
@@ -253,7 +252,9 @@ const verifyOne = (raw: Record<string, unknown>, digest: Digest): Proposal | nul
   if (kind === "routine") {
     const parsed = parseDraft({ name, instructions, schedule: raw.schedule, sites });
     // A schedule that isn't when they really do it is dropped, and what's left is a job for now.
-    if ("error" in parsed || !scheduleFits(parsed.draft.schedule, times)) return asPrompt(instructions);
+    // Its habit is only the visits to its own sites, or for a job with none, its searches and chats.
+    const ownTimes = sites.length > 0 ? evidence.flatMap((item) => sites.flatMap((site) => item.siteTimes[site] ?? [])) : evidence.filter((item) => item.hosts.length === 0).flatMap((item) => item.times);
+    if ("error" in parsed || !scheduleFits(parsed.draft.schedule, ownTimes)) return asPrompt(instructions);
     const schedule = parsed.draft.schedule;
     const scheduleNumbers = "time" in schedule ? schedule.time.split(":").map(Number) : [];
     scheduleNumbers.forEach((number) => numbers.add(number));

@@ -58,6 +58,22 @@ describe("exclusions", () => {
     ["Inbox", "Swedbank", "localhost", "token", "Shared doc"].forEach((word) => expect(sent).not.toContain(word));
   });
 
+  it("leaves out an address with a token in its fragment, and any fragment's title", () => {
+    const sent = JSON.stringify(
+      data({
+        visits: [
+          visit("https://example.com/app#token=abc123", "abc123", at(1, 8)),
+          visit("https://example.com/cb#state=x&session=s3cr3t", "Signed in s3cr3t", at(1, 8, 1)),
+          visit("https://docs.example.org/guide#install", "Guide to secret thing", at(1, 8, 2)),
+        ],
+      })
+    );
+    expect(sent).not.toContain("abc123");
+    expect(sent).not.toContain("s3cr3t");
+    expect(sent).not.toContain("secret thing");
+    expect(sent).toContain("docs.example.org");
+  });
+
   it("keeps the site but not the title of an address with a query", () => {
     const { sessions } = data({ visits: [visit("https://shop.example/order?id=55", "Order 55 for Mira", at(1, 8))] });
     expect(sessions[0].pages).toEqual([{ site: "shop.example" }]);

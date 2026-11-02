@@ -82,8 +82,10 @@ export const isShareable = (url: string): boolean => {
     if (!host.includes(".") || IP_ADDRESS.test(host) || PRIVATE_SUFFIX.test(host)) return false;
     if (PRIVATE_LABEL.test(host) || PRIVATE_WORD.test(host) || JUST_A_WAY_THERE.test(host)) return false;
     if (PRIVATE_PATH.test(pathname) || [...searchParams.keys()].some((key) => SECRET_PARAMETER.test(key))) return false;
-    if (/access_token|id_token/.test(hash)) return false;
-    return ![...pathname.split("/"), ...searchParams.values()].some((part) => LONG_RANDOM.test(part));
+    // A fragment can carry parameters as a query does, and sign-in flows put tokens there.
+    const fragment = new URLSearchParams(hash.slice(1));
+    if (/access_token|id_token/.test(hash) || [...fragment.keys()].some((key) => key !== hash.slice(1) && SECRET_PARAMETER.test(key))) return false;
+    return ![...pathname.split("/"), ...searchParams.values(), ...fragment.values()].some((part) => LONG_RANDOM.test(part));
   } catch {
     return false;
   }
@@ -99,10 +101,12 @@ export const titleToShare = (title: string): string | null => {
   return !clean || clean.includes("://") || PRIVATE_TITLE.test(clean) ? null : clean.slice(0, MAX_TITLE_LENGTH);
 };
 
-// A title may repeat a search or an order number when the address has a query, so those titles stay here.
+// A title may repeat a search, an order number or a token when the address has a query or a fragment, so those
+// titles stay here.
 export const shareableTitle = ({ url, title }: PatternVisit): string | null => {
   try {
-    return new URL(url).search ? null : titleToShare(title);
+    const { search, hash } = new URL(url);
+    return search || hash ? null : titleToShare(title);
   } catch {
     return null;
   }
