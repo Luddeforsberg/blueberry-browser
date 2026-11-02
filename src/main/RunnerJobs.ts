@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { Account } from "./Account";
@@ -12,15 +13,22 @@ import { flockRows } from "../shared/phone";
 // Chats whose jobs went to the cloud runner, which keeps going with this computer off. The jobs, their steps and their
 // approvals are rows in Supabase, read as the signed-in user, so nobody else's can come back. Only the user's own answer
 // from this window is written back, through `decide_cloud_approval`: the runner can't write one, and neither can the phone
-// or an app here. Which chat is which job is kept in a file of ids. The live view address goes to the chrome and nowhere else.
+// or an app here. Which chat is which conversation, and which of its jobs it has, is kept in a file of ids. A conversation
+// started or followed up on the phone shows here as a runner chat too, found by looking now and then. The live view
+// address goes to the chrome and nowhere else.
 
 const POLL_MS = 2_000;
+// How often to look for conversations started or followed up elsewhere, while a linked runner has accepted.
+const DISCOVER_MS = 10_000;
+// Conversations deleted here, kept so a slow delete on the server can't bring one back as a chat started elsewhere.
+const MAX_FORGOTTEN = 500;
 
 const NOT_SET_UP = "This copy of Blueberry has no account server, so it can't send jobs to the runner.";
 const SIGN_IN = "Sign in to your Blueberry account in Settings to send jobs to the runner.";
 const NOT_TAKEN = "The runner's queue didn't take the job. Try again in a moment.";
 const TOO_MANY = "Five jobs are already waiting or going on the runner. Try again when one is done.";
 const FAILED = "The job failed on the runner.";
+const BUSY = "This chat already has a job going in the cloud, maybe sent from your phone. Send this again once it's done.";
 const GONE = "This job isn't on your account any more.";
 const NO_SUCH_RUNNER = "There's no Blueberry account with that email that can be your runner. Create it in Supabase first, and don't use your own.";
 const LINK_FAILED = "The runner couldn't be linked. Try again in a moment.";
@@ -35,7 +43,11 @@ const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign
 interface Entry {
   // The account that sent it, by email. Only that account, signed in, sees anything of it.
   account: string;
-  // Null while it's being sent.
+  // The conversation its jobs are in, which the phone shows as one too.
+  conversationId: string;
+  // Every job of it this chat already has, so one sent from elsewhere can be told apart.
+  jobIds: string[];
+  // The newest job. Null while it's being sent.
   jobId: string | null;
   // Stopped or deleted while it was being sent, which is done as soon as its id comes back.
   cancel: "stop" | "forget" | null;
@@ -56,9 +68,16 @@ export interface RunnerJobsHooks {
   runnerUpdated?: (state: RunnerState) => void;
   // The flock, shared with the phone page while a linked runner has accepted, so a job can be sent from there as any bird.
   flock?: () => MascotProfile[];
+  // A conversation started elsewhere becomes a chat here, as the bird its first job ran as. Says the chat's id.
+  adopt?: (first: { prompt: string; mascotId: string | null }) => string | null;
+  // A message sent in that chat from elsewhere, saved as the user's.
+  followedUp?: (chatId: string, prompt: string) => void;
 }
 
-const fresh = (account: string, jobId: string | null, active: boolean): Entry => ({ account, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
+const fresh = (account: string, conversationId: string, jobIds: string[], jobId: string | null, active: boolean): Entry => ({ account, conversationId, jobIds, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
+
+// How a job that's over ended, as the chat says it.
+const endError = (status: CloudJobStatus, error: string | null): string | null => (status === "failed" ? (error ?? FAILED) : status === "stopped" ? error : null);
 
 export class RunnerJobs implements ChatRunner {
   private readonly entries = new Map<string, Entry>();
@@ -66,6 +85,9 @@ export class RunnerJobs implements ChatRunner {
   private readonly answered = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
+  private readonly discoverTimer: ReturnType<typeof setInterval>;
+  private discovering = false;
+  private readonly forgotten: string[] = [];
   // Who was signed in when the account last changed, so a change clears what the last one saw.
   private seenAccount: string | null;
   // The runner linked to the signed-in account, as the server last said, and why linking last failed.
@@ -87,6 +109,8 @@ export class RunnerJobs implements ChatRunner {
     this.seenAccount = this.signedIn;
     this.load();
     this.schedule();
+    this.discoverTimer = setInterval(() => void this.discover(), DISCOVER_MS);
+    this.discoverTimer.unref?.();
     void this.refreshLink();
   }
 
@@ -125,6 +149,7 @@ export class RunnerJobs implements ChatRunner {
     if (this.link) this.linkTimer = setTimeout(() => void this.refreshLink(), this.link.accepted ? LINKED_POLL_MS : LINK_POLL_MS);
     this.hooks.runnerUpdated?.(this.runnerState);
     void this.flockChanged();
+    void this.discover();
     return this.runnerState;
   }
 
@@ -204,8 +229,8 @@ export class RunnerJobs implements ChatRunner {
     if (!account) return SIGN_IN;
     const earlierEntry = this.entries.get(chatId);
     if (earlierEntry && earlierEntry.account !== account) return OTHER_ACCOUNT(earlierEntry.account);
-    // It shows as going at once, while it's sent.
-    const entry = fresh(account, null, true);
+    // It shows as going at once, while it's sent, in the same conversation as the chat's earlier jobs.
+    const entry = fresh(account, earlierEntry?.conversationId ?? randomUUID(), earlierEntry?.jobIds ?? [], null, true);
     this.entries.set(chatId, entry);
     const fail = (problem: string) => {
       entry.active = false;
@@ -222,15 +247,22 @@ export class RunnerJobs implements ChatRunner {
         mascot: mascotSnapshot(mascot),
         actionApproval,
         contextId: this.hooks.contextId(),
+        conversationId: entry.conversationId,
       });
       if (!jobId) return fail(NOT_TAKEN);
       entry.jobId = jobId;
+      entry.jobIds.push(jobId);
       if (entry.cancel === "forget") {
-        void this.server.forgetCloudJob(token, jobId).catch(() => console.error("Couldn't remove a job from the runner."));
+        void this.server.forgetCloudConversation(token, entry.conversationId).catch(() => console.error("Couldn't remove a job from the runner."));
         return null;
       }
       if (entry.cancel === "stop") void this.server.stopCloudJob(token, jobId).catch(() => console.error("Couldn't stop a job on the runner."));
     } catch (error) {
+      // Another job of this conversation is going, sent from elsewhere, which the next look brings here.
+      if (error instanceof ServerError && error.status === 409) {
+        void this.discover();
+        return fail(BUSY);
+      }
       if (!(error instanceof ServerError && error.status === 400)) return fail(NOT_TAKEN);
       // Refused as too many, or because the runner was unlinked elsewhere. The link says which.
       await this.refreshLink();
@@ -261,14 +293,17 @@ export class RunnerJobs implements ChatRunner {
     if (this.mine(entry) && jobId) void this.withToken(entry.account, (token) => this.server!.stopCloudJob(token, jobId));
   }
 
+  // Deletes every job of the chat's conversation, wherever it was sent from.
   forget(chatId: string): void {
     const entry = this.entries.get(chatId);
-    const jobId = entry?.jobId;
+    if (!entry) return;
     const ours = this.mine(entry);
-    if (ours && entry.active && !jobId) entry.cancel = "forget";
+    if (ours && entry.active && !entry.jobId) entry.cancel = "forget";
     this.entries.delete(chatId);
+    this.forgotten.push(entry.conversationId);
+    this.forgotten.splice(0, Math.max(0, this.forgotten.length - MAX_FORGOTTEN));
     this.save();
-    if (ours && jobId) void this.withToken(entry.account, (token) => this.server!.forgetCloudJob(token, jobId));
+    if (ours && entry.jobIds.length > 0) void this.withToken(entry.account, (token) => this.server!.forgetCloudConversation(token, entry.conversationId));
   }
 
   // Signed in or out. Jobs carry on there either way. Nothing the last account saw stays here, not a card, a step or a
@@ -290,6 +325,7 @@ export class RunnerJobs implements ChatRunner {
   }
 
   destroy(): void {
+    clearInterval(this.discoverTimer);
     if (this.timer) clearTimeout(this.timer);
     if (this.linkTimer) clearTimeout(this.linkTimer);
     this.timer = null;
@@ -343,7 +379,7 @@ export class RunnerJobs implements ChatRunner {
     if (!row) return this.finish(chatId, entry, GONE);
     const status = typeof row.status === "string" ? (row.status as CloudJobStatus) : entry.status;
     const approval = approvalFromRow(row);
-    const next: Omit<Entry, "account" | "jobId" | "cancel" | "active"> = {
+    const next: Omit<Entry, "account" | "conversationId" | "jobIds" | "jobId" | "cancel" | "active"> = {
       status,
       steps: stepsFromRow(row.steps),
       reply: typeof row.reply === "string" ? row.reply : "",
@@ -353,7 +389,7 @@ export class RunnerJobs implements ChatRunner {
     };
     const same = JSON.stringify(next) === JSON.stringify({ status: entry.status, steps: entry.steps, reply: entry.reply, error: entry.error, liveView: entry.liveView, approval: entry.approval });
     Object.assign(entry, next);
-    if (FINISHED.includes(status)) return this.finish(chatId, entry, status === "failed" ? (entry.error ?? FAILED) : status === "stopped" ? entry.error : null);
+    if (FINISHED.includes(status)) return this.finish(chatId, entry, endError(status, entry.error));
     if (!same) this.hooks.changed(chatId);
   }
 
@@ -365,13 +401,80 @@ export class RunnerJobs implements ChatRunner {
     this.hooks.finished(chatId, { reply: entry.reply, steps: entry.steps, error });
   }
 
+  // Looks for conversations on the account that this computer didn't send, or that went on elsewhere: a job from the phone
+  // becomes a runner chat here, and a follow-up from there joins the chat it follows. Only while a linked runner has
+  // accepted, as the signed-in account, and never for a chat with a job going or being sent from here.
+  async discover(): Promise<void> {
+    const account = this.signedIn;
+    if (this.discovering || !account || !this.available()) return;
+    this.discovering = true;
+    try {
+      const listed = await this.withToken(account, (token) => this.server!.cloudConversationJobs(token));
+      if (!listed) return;
+      const conversations = new Map<string, string[]>();
+      listed.forEach(({ id, conversation_id: conversationId }) => conversations.set(conversationId, [...(conversations.get(conversationId) ?? []), id]));
+      for (const [conversationId, jobIds] of conversations) {
+        if (this.signedIn !== account) return;
+        const known = this.chatOf(account, conversationId)?.[1];
+        if (this.forgotten.includes(conversationId) || known?.active || (known && jobIds.every((id) => known.jobIds.includes(id)))) continue;
+        const rows = await this.withToken(account, (token) => this.server!.cloudConversation(token, conversationId));
+        if (rows && this.signedIn === account) this.take(account, conversationId, rows);
+      }
+    } finally {
+      this.discovering = false;
+    }
+  }
+
+  private chatOf(account: string, conversationId: string): [string, Entry] | undefined {
+    return [...this.entries].find(([, entry]) => entry.account === account && entry.conversationId === conversationId);
+  }
+
+  // A conversation's jobs, oldest first, as the server has them now. What's new to this computer is saved as the chat
+  // would have saved it, and a job still going is followed like one sent from here.
+  private take(account: string, conversationId: string, rows: Record<string, unknown>[]): void {
+    let found = this.chatOf(account, conversationId);
+    // Checked again, since a message may have been sent from here while it asked.
+    if (this.forgotten.includes(conversationId) || found?.[1].active) return;
+    const fresher = rows.filter((row): row is Record<string, unknown> & { id: string; prompt: string } => typeof row.id === "string" && typeof row.prompt === "string" && !found?.[1].jobIds.includes(row.id));
+    if (fresher.length === 0) return;
+    if (!found) {
+      const mascotId = (fresher[0].mascot as { id?: unknown } | null)?.id;
+      const chatId = this.hooks.adopt?.({ prompt: fresher[0].prompt, mascotId: typeof mascotId === "string" ? mascotId : null });
+      if (!chatId) return;
+      found = [chatId, fresh(account, conversationId, [], null, false)];
+      this.entries.set(...found);
+    }
+    const [chatId, entry] = found;
+    for (const row of fresher) {
+      entry.jobIds.push(row.id);
+      this.hooks.followedUp?.(chatId, row.prompt);
+      const status = (typeof row.status === "string" ? row.status : "failed") as CloudJobStatus;
+      if (FINISHED.includes(status)) {
+        this.hooks.finished(chatId, { reply: typeof row.reply === "string" ? row.reply : "", steps: stepsFromRow(row.steps), error: endError(status, typeof row.error === "string" ? row.error : null) });
+        continue;
+      }
+      // Only one in a conversation goes at a time, and it's the newest.
+      Object.assign(entry, { jobId: row.id, active: true, status, steps: [], reply: "", error: null, liveView: null, approval: null });
+      this.hooks.changed(chatId);
+      break;
+    }
+    this.save();
+    this.schedule();
+  }
+
   private load(): void {
     try {
       const saved = JSON.parse(readFileSync(this.file, "utf8"));
+      const id = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 100;
       Object.entries(saved?.chats ?? {}).forEach(([chatId, value]) => {
-        const { account, jobId, active } = (value ?? {}) as Record<string, unknown>;
-        if (typeof account === "string" && typeof jobId === "string" && jobId.length <= 100) this.entries.set(chatId, fresh(account, jobId, active === true));
+        const { account, jobId, active, conversationId, jobIds } = (value ?? {}) as Record<string, unknown>;
+        if (typeof account !== "string" || (jobId !== null && !id(jobId))) return;
+        const known = Array.isArray(jobIds) ? jobIds.filter(id) : id(jobId) ? [jobId] : [];
+        // A chat saved before conversations is one under its job's id, which is what the server makes of it too.
+        const conversation = id(conversationId) ? conversationId : id(jobId) ? jobId : null;
+        if (conversation) this.entries.set(chatId, fresh(account, conversation, known, id(jobId) ? jobId : null, id(jobId) && active === true));
       });
+      if (Array.isArray(saved?.forgotten)) this.forgotten.push(...saved.forgotten.filter(id).slice(-MAX_FORGOTTEN));
     } catch {
       // Nothing sent there yet.
     }
@@ -380,9 +483,11 @@ export class RunnerJobs implements ChatRunner {
   private save(): void {
     try {
       mkdirSync(dirname(this.file), { recursive: true });
-      const chats = Object.fromEntries([...this.entries].filter(([, entry]) => entry.jobId).map(([chatId, { account, jobId, active }]) => [chatId, { account, jobId, active }]));
+      const chats = Object.fromEntries(
+        [...this.entries].filter(([, entry]) => entry.jobIds.length > 0).map(([chatId, { account, conversationId, jobIds, jobId, active }]) => [chatId, { account, conversationId, jobIds, jobId, active: active && !!jobId }])
+      );
       const temp = `${this.file}.tmp`;
-      writeFileSync(temp, JSON.stringify({ chats }));
+      writeFileSync(temp, JSON.stringify({ chats, forgotten: this.forgotten }));
       renameSync(temp, this.file);
     } catch {
       console.error("Couldn't save which chats are on the runner.");

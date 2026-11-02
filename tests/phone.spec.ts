@@ -8,7 +8,7 @@ import { extname, join, normalize } from "node:path";
 import webpush from "web-push";
 import { mascotFromSnapshot, mascotSnapshot } from "../src/main/cloudJobs";
 import type { MascotProfile } from "../src/shared/library";
-import { flockRows } from "../src/shared/phone";
+import { flockRows, followUpHistory, type ConversationJob } from "../src/shared/phone";
 import { FAKE_KEY, startFakeSupabase } from "./fakeSupabase";
 
 // The phone page, served from site/ as Netlify would, in Chrome at a phone's size, against the real migrations in
@@ -16,6 +16,9 @@ import { FAKE_KEY, startFakeSupabase } from "./fakeSupabase";
 // on the way is the real one. Only the live view's page is a stand-in, since it's Browserbase's.
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const SHOTS = process.env.BLUEBERRY_SHOTS ?? join(homedir(), "blueberry-audit", "shots-phone");
+const FIRST_PROMPT = "Find the cheapest USB-C cable on shop.example and put it in my cart";
+const FIRST_REPLY = "The cheapest is a 1 m cable for 49 kr. It's in your cart.";
+const FOLLOW_UP = "Is there a 2 m one under 80 kr?";
 const SITE = join(__dirname, "..", "site");
 const OWNER = "ana@example.com";
 const OWNER_PASSWORD = "correct horse battery";
@@ -42,7 +45,7 @@ const SHOP = `<!doctype html><title>Shop</title><style>body{font:16px system-ui;
 
 test.skip(process.platform !== "darwin" || !existsSync(CHROME), "Needs Google Chrome");
 
-test("the phone page signs in, shows a job, allows it, starts one, and never sends a code", async () => {
+test("the phone page signs in, shows a job, allows it, follows it up, starts one, and never sends a code", async () => {
   test.setTimeout(120_000);
   const supabase = await startFakeSupabase({ cloudJobs: true });
   const base = supabase.env.SUPABASE_URL;
@@ -117,7 +120,7 @@ test("the phone page signs in, shows a job, allows it, starts one, and never sen
     await rpc(owner, "sync_cloud_flock", { p_birds: flockRows([SCOUT, PENNY]) });
 
     // A job sent from the Mac, which the runner has started and is now asking about.
-    const first = await rpc(owner, "start_cloud_job", { p_prompt: "Find the cheapest USB-C cable on shop.example and put it in my cart", p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: "ctx-ana" });
+    const first = await rpc(owner, "start_cloud_job", { p_prompt: FIRST_PROMPT, p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: "ctx-ana" });
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(first);
     const steps = [{ text: "Opened shop.example", done: true }, { text: "Compared 14 cables by price", done: true }];
     await rpc(runner, "runner_update_job", { p_job: first, p_steps: steps, p_live_view: LIVE });
@@ -140,7 +143,9 @@ test("the phone page signs in, shows a job, allows it, starts one, and never sen
     const row = page.getByRole("link", { name: /Scout wants to click the button “Place order” on shop\.example/ });
     await expect(row).toBeVisible();
     await expect(page.getByText("Ready")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    // Only the composer and the conversations: notifications and the account are in Settings.
+    await expect(page.getByRole("button", { name: "Turn on" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
     await shoot(page, "list");
 
     // 3. Allow, with the exact words in full, and the decision is written as the user.
@@ -190,8 +195,40 @@ test("the phone page signs in, shows a job, allows it, starts one, and never sen
     await expect(page.getByText("Answered. Scout carries on.")).toBeVisible();
     expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([{ decision: "allow", answer: "Black, please" }]);
 
-    // 4. Start a job as a shared bird, with the snapshot the runner accepts.
+    // Done, and then followed up from here: a new job in the same conversation, as the same bird, carrying the first
+    // exchange as its history.
+    const doneSteps = [...steps, { text: "Added it to the cart", done: true }];
+    await rpc(runner, "runner_update_job", { p_job: first, p_status: "done", p_steps: doneSteps, p_reply: FIRST_REPLY });
+    await expect(page.getByText(FIRST_REPLY)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop" })).toHaveCount(0);
+    await page.getByLabel("Follow up").fill(FOLLOW_UP);
+    await shoot(page, "follow-up");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.locator(".bubble")).toHaveText([FIRST_PROMPT, FOLLOW_UP]);
+    const [before] = await supabase.cloudRows(`select id, conversation_id, created_at::text, history, prompt, reply, steps from public.cloud_jobs where id = '${first}'`);
+    const [second] = await supabase.cloudRows(`select id, conversation_id, history, mascot, status from public.cloud_jobs where prompt = '${FOLLOW_UP}'`);
+    expect(second).toMatchObject({ conversation_id: first, status: "queued" });
+    expect(second.history).toEqual(followUpHistory(before as unknown as ConversationJob));
+    expect(second.history).toEqual([
+      { role: "user", content: FIRST_PROMPT },
+      { role: "assistant", content: `<steps>\n${doneSteps.map((step) => `- ${step.text}`).join("\n")}\n</steps>\n\n${FIRST_REPLY}` },
+    ]);
+    expect(mascotFromSnapshot(second.mascot)).toMatchObject({ id: "m-scout", sites: ["shop.example", "prices.example"] });
+    // One at a time in a conversation.
+    await expect(fetch(`${base}/rest/v1/rpc/start_cloud_job`, { method: "POST", headers: { apikey: FAKE_KEY, authorization: `Bearer ${owner}`, "content-type": "application/json" }, body: JSON.stringify({ p_prompt: "Again", p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: null, p_conversation: first }) }).then((response) => response.status)).resolves.toBe(409);
+
+    // The runner takes it, and the conversation reads as one chat.
+    expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(second.id);
+    await rpc(runner, "runner_update_job", { p_job: second.id, p_status: "done", p_steps: [{ text: "Compared 2 m cables", done: true }], p_reply: "Yes, one for 69 kr." });
+    await expect(page.getByText("Yes, one for 69 kr.")).toBeVisible();
+    await expect(page.getByLabel("Follow up")).toBeVisible();
+    await shoot(page, "conversation");
     await page.getByRole("link", { name: "Jobs" }).click();
+    await expect(page.locator(".rows li")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: new RegExp(`${FIRST_PROMPT}.*Scout · Done`) })).toBeVisible();
+    await shoot(page, "list-conversation");
+
+    // 4. Start a job as a shared bird, with the snapshot the runner accepts.
     await page.getByRole("link", { name: "Give a bird a job" }).click();
     await page.getByRole("button", { name: /Penny/ }).click();
     await expect(page.getByText("Only visits news.example")).toBeVisible();
@@ -207,16 +244,37 @@ test("the phone page signs in, shows a job, allows it, starts one, and never sen
     await page.getByRole("button", { name: "Stop" }).click();
     await expect.poll(async () => (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0].status).toBe("stopped");
 
+    // Settings: appearance, notifications and the account. A choice of Dark holds over the system's light, after a reload.
+    await page.getByRole("link", { name: "Jobs" }).click();
+    await expect(page.locator(".rows li")).toHaveCount(2);
+    await page.getByRole("link", { name: "Settings" }).click();
+    await expect(page.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    await expect(page.getByText(`Signed in as ${OWNER}`)).toBeVisible();
+    await page.getByRole("radio", { name: "Light" }).click();
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: join(SHOTS, "settings-light.png"), fullPage: true });
+    await page.getByRole("radio", { name: "Dark" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: join(SHOTS, "settings-dark.png"), fullPage: true });
+    await page.reload();
+    await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await page.getByRole("radio", { name: "System" }).click();
+    await expect(page.locator("html")).not.toHaveClass(/dark/);
+
     // Signed out and in as someone else, nothing of Ana's comes back, and notifications are this account's to turn on.
     await supabase.addAccount("bo@example.com", OWNER_PASSWORD);
-    await page.getByRole("link", { name: "Jobs" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.getByLabel("Email").fill("bo@example.com");
     await page.getByLabel("Password").fill(OWNER_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText("Signed in as bo@example.com")).toBeVisible();
     await expect(page.getByText("Nothing in the cloud yet.", { exact: false })).toBeVisible();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await expect(page.getByText("Signed in as bo@example.com")).toBeVisible();
     await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    await page.getByRole("link", { name: "Jobs" }).click();
     await page.waitForTimeout(3_500);
     await expect(page.getByText(/Scout|Penny|shop\.example/)).toHaveCount(0);
 

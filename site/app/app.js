@@ -1,11 +1,12 @@
-import "../theme.js";
-import { asContinuation, BERRY_ID, flockFromRows, permissionsInWords, plausibleCode, snapshotOf, withSiteNames } from "../shared.js";
+import { appearance, setAppearance } from "../theme.js";
+import { asContinuation, BERRY_ID, conversationsOf, flockFromRows, followUpHistory, permissionsInWords, plausibleCode, snapshotOf, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
 import { POSES } from "./poses.js";
 import { pushState, register, turnOff, turnOn } from "./push.js";
 
-// Blueberry on the phone: the jobs your birds are doing in the cloud, what they're asking, and the live view of the page
-// each is on, read and answered as the signed-in user only. Everything from the server goes in as text. The one piece of
+// Blueberry on the phone: the conversations your birds are having in the cloud, what they're asking, and the live view of
+// the page each is on, read and answered as the signed-in user only. A follow-up is a new job in the same conversation,
+// carrying the messages before it, as a runner chat on the Mac does. Everything from the server goes in as text. The one piece of
 // markup is our own drawing, chosen by keys checked against the poses we have. A code is never typed here: a sign-in
 // or a code goes into the live view itself, straight to the site.
 
@@ -38,6 +39,7 @@ const ICONS = {
   lock: ["M7 11V7a5 5 0 0 1 10 0v4", "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"],
   unlocked: ["M7 11V7a5 5 0 0 1 9.9-1", "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"],
   up: ["m5 12 7-7 7 7", "M12 19V5"],
+  settings: ["M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z", "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"],
 };
 const icon = (name) => svg("svg", { viewBox: "0 0 24 24", class: "icon", "aria-hidden": "true" }, ...ICONS[name].map((d) => svg("path", { d })));
 
@@ -84,6 +86,8 @@ const state = {
   taken: new Set(),
   // Answered here and on their way, so a poll that crosses them doesn't bring them back.
   answered: new Set(),
+  // What's being typed as a follow-up, by conversation, so a redraw doesn't lose it.
+  drafts: new Map(),
   said: null,
 };
 
@@ -93,6 +97,11 @@ const mascotOf = (job) => {
   const known = state.flock.find((bird) => bird.id === snapshot.id) ?? (snapshot.id === BERRY_ID ? state.flock[0] : null);
   return { id: String(snapshot.id ?? ""), name: typeof snapshot.name === "string" && snapshot.name ? snapshot.name : "Berry", look: known?.look ?? state.flock[0].look };
 };
+
+const conversations = () => conversationsOf(state.jobs ?? []);
+
+// The sites the user brought along live in their Browserbase Context, which only the Mac knows. Its last job says.
+const contextOf = () => (state.jobs ?? []).find((job) => typeof job.context_id === "string")?.context_id ?? null;
 
 const stepsOf = (job) => (Array.isArray(job.steps) ? job.steps : []).filter((step) => typeof step?.text === "string").slice(-200);
 const going = (job) => job.status === "queued" || job.status === "running" || job.status === "waiting";
@@ -141,6 +150,7 @@ const problemWords = (error) => {
   if (error?.status === 401) return "You were signed out. Sign in again.";
   if (/Too many/.test(error?.message ?? "")) return "Five jobs are already going in the cloud. Try again when one is done.";
   if (/No runner/.test(error?.message ?? "")) return NOT_SET_UP;
+  if (error?.status === 409) return "This conversation already has a job going. Send this once it’s done.";
   return "Something went wrong. Try again in a moment.";
 };
 
@@ -230,15 +240,16 @@ const signInScreen = () => {
 
 // --- The list ---
 
-const jobRow = (job) => {
-  const mascot = mascotOf(job);
-  const ask = askOf(job);
+// One row per conversation: what it was started with, or what it's asking now, and how its newest job is going.
+const conversationRow = ({ id, jobs, latest }) => {
+  const mascot = mascotOf(latest);
+  const ask = askOf(latest);
   return el("li", {},
-    el("a", { className: "row", href: `#job/${job.id}` },
-      bird(mascot, ask ? "asking" : MOOD_FOR[job.status] ?? "rest", "s24"),
+    el("a", { className: "row", href: `#chat/${id}` },
+      bird(mascot, ask ? "asking" : MOOD_FOR[latest.status] ?? "rest", "s24"),
       el("div", { className: "body" },
-        el("p", { className: ask ? "ask" : "prompt", textContent: ask ? asked(mascot.name, ask) : job.prompt }),
-        el("p", { className: `meta ${job.status === "failed" ? "warning" : ""}`, textContent: ask ? `${mascot.name} · ${when(ask.approval_asked_at)}` : `${mascot.name} · ${statusWords(job)}` })),
+        el("p", { className: ask ? "ask" : "prompt", textContent: ask ? asked(mascot.name, ask) : jobs[0].prompt }),
+        el("p", { className: `meta ${latest.status === "failed" ? "warning" : ""}`, textContent: ask ? `${mascot.name} · ${when(ask.approval_asked_at)}` : `${mascot.name} · ${statusWords(latest)}` })),
       el("span", { className: "chev" }, icon("next"))));
 };
 
@@ -247,6 +258,7 @@ const NOTIFY_WORDS = {
   blocked: "Notifications are blocked for this site in your browser’s settings.",
   on: "Notifications are on. They only ever say that Berry needs you or has finished.",
   off: "Get a notification when Berry needs you or has finished. It says nothing more.",
+  unavailable: "This browser can’t show notifications from this page.",
 };
 const notifications = () => {
   const words = NOTIFY_WORDS[state.push];
@@ -266,7 +278,7 @@ const notifications = () => {
         },
       })
     : null;
-  return el("div", { className: "lockline notify" }, el("p", { textContent: words }), toggle);
+  return el("div", { className: "lockline" }, el("p", { textContent: words }), toggle);
 };
 
 const signOut = async () => {
@@ -280,14 +292,15 @@ const signOut = async () => {
 };
 
 const listScreen = () => {
-  const jobs = state.jobs ?? [];
-  const waiting = jobs.filter(askOf);
-  const rest = jobs.filter((job) => !askOf(job));
+  const all = conversations();
+  const waiting = all.filter(({ latest }) => askOf(latest));
+  const rest = all.filter(({ latest }) => !askOf(latest));
   const sender = state.flock[0];
   const ready = state.linked === true;
   return [
     top(el("span", { className: "title", textContent: "Blueberry" }),
-      state.linked === null ? null : el("span", { className: "status" }, el("span", { className: `status-dot ${ready ? "" : "off"}`, ariaHidden: "true" }), ready ? "Ready" : "Not set up")),
+      state.linked === null ? null : el("span", { className: "status" }, el("span", { className: `status-dot ${ready ? "" : "off"}`, ariaHidden: "true" }), ready ? "Ready" : "Not set up"),
+      el("a", { className: "button quiet icon-only", href: "#settings", ariaLabel: "Settings" }, icon("settings"))),
     card(
       el("div", { className: "composer-wrap" },
         el("div", { className: "perched" }, bird(sender, "rest")),
@@ -298,19 +311,47 @@ const listScreen = () => {
       state.problem ? say(state.problem, "small warning gap") : null,
       state.said ? el("p", { className: "small gap", role: "status", textContent: state.said }) : null,
       waiting.length ? el("h2", { textContent: "Needs you" }) : null,
-      waiting.length ? el("ul", { className: "rows" }, ...waiting.map(jobRow)) : null,
+      waiting.length ? el("ul", { className: "rows" }, ...waiting.map(conversationRow)) : null,
       el("h2", { textContent: "In the cloud" }),
       state.jobs === null
         ? say("Loading…")
         : rest.length
-          ? el("ul", { className: "rows" }, ...rest.map(jobRow))
-          : say(jobs.length ? "Nothing else right now." : "Nothing in the cloud yet. Give Berry a job and it keeps going with your computer off."),
-      notifications(),
-      el("div", { className: "actions" },
-        el("span", { className: "small", textContent: `Signed in as ${api.signedIn()?.email ?? ""}` }),
-        button("Sign out", { kind: "quiet small", onClick: signOut }))),
+          ? el("ul", { className: "rows" }, ...rest.map(conversationRow))
+          : say(all.length ? "Nothing else right now." : "Nothing in the cloud yet. Give Berry a job and it keeps going with your computer off.")),
   ];
 };
+
+// --- Settings ---
+
+const APPEARANCES = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
+
+const settingsScreen = () => [
+  top(link("Jobs", "#", "quiet"), el("span", { className: "title", textContent: "Settings" })),
+  card(
+    el("section", { className: "setting", ariaLabelledby: "appearance" },
+      el("h2", { id: "appearance", textContent: "Appearance" }),
+      el("div", { className: "segmented", role: "radiogroup", ariaLabelledby: "appearance" },
+        ...APPEARANCES.map(([choice, words]) =>
+          el("button", {
+            type: "button",
+            role: "radio",
+            ariaChecked: String(appearance() === choice),
+            textContent: words,
+            onclick: () => {
+              setAppearance(choice);
+              show(true);
+            },
+          })))),
+    el("section", { className: "setting", ariaLabelledby: "notifications" },
+      el("h2", { id: "notifications", textContent: "Notifications" }),
+      notifications()),
+    el("section", { className: "setting", ariaLabelledby: "account" },
+      el("h2", { id: "account", textContent: "Account" }),
+      el("div", { className: "lockline" },
+        el("p", { textContent: `Signed in as ${api.signedIn()?.email ?? ""}` }),
+        button("Sign out", { kind: "outline", onClick: signOut }))),
+    state.problem ? say(state.problem, "small warning gap") : null),
+];
 
 // --- A job ---
 
@@ -425,8 +466,60 @@ const liveView = (job, mascot, ask) => {
   ];
 };
 
-const jobScreen = (job) => {
-  if (!job) return [top(link("Jobs", "#", "quiet")), card(say(state.jobs === null ? "Loading…" : "This job isn’t on your account any more."))];
+// The box under a conversation once its newest job is over. What's sent goes as the same bird, with the conversation so
+// far as its history: the earlier job's own history, then its prompt and reply.
+const followUp = (conversation, mascot) => {
+  const { id, latest } = conversation;
+  const problem = el("div");
+  const box = el("textarea", { ariaLabel: "Follow up", rows: 2, maxLength: 8000, placeholder: `Ask ${mascot.name} to go on`, value: state.drafts.get(id) ?? "" });
+  box.oninput = () => state.drafts.set(id, box.value);
+  const send = el("button", { type: "submit", className: "send", ariaLabel: "Send" }, icon("up"));
+  return el("form", {
+    className: "follow",
+    onsubmit: async (event) => {
+      event.preventDefault();
+      const prompt = box.value.trim();
+      if (!prompt) return box.focus();
+      problem.replaceChildren();
+      // Only as a bird that's still in the flock, with its limits as they are now.
+      const snapshot = latest.mascot ?? {};
+      const sender = snapshot.id === BERRY_ID ? state.flock[0] : state.flock.find((bird) => bird.id === snapshot.id);
+      if (!sender) return problem.replaceChildren(say(`${mascot.name} isn’t in your flock any more, so this can’t go on.`, "small warning"));
+      send.disabled = true;
+      try {
+        const last = await api.jobWithHistory(latest.id);
+        if (!last) throw new api.ApiError(404);
+        await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: followUpHistory(last), p_mascot: snapshotOf(sender), p_action_approval: "risky", p_context_id: contextOf(), p_conversation: id });
+        state.drafts.delete(id);
+        await load();
+        show(true);
+      } catch (error) {
+        problem.replaceChildren(say(problemWords(error), "small warning"));
+        send.disabled = false;
+      }
+    },
+  }, el("div", { className: "composer" }, box, send), problem);
+};
+
+// What one job in a conversation asked and how it went. Only the newest can be asking, and only it says what just happened.
+const exchange = (job, newest) => {
+  const mascot = mascotOf(job);
+  const ask = newest ? askOf(job) : null;
+  return [
+    el("p", { className: "bubble", textContent: job.prompt }),
+    el("p", { className: "who" }, ask ? null : bird(mascot, MOOD_FOR[job.status] ?? "rest", "s28"), el("b", { textContent: mascot.name }), el("span", { className: "muted", textContent: `Sent ${when(job.created_at)}` })),
+    newest && state.problem ? say(state.problem, "small warning gap") : null,
+    newest && state.said ? el("p", { className: "small gap", role: "status", textContent: state.said }) : null,
+    ask ? says(mascot, ask) : null,
+    steps(job),
+    job.reply ? el("p", { className: "reply", textContent: job.reply }) : null,
+    job.status === "failed" || job.status === "stopped" ? say(statusWords(job), job.status === "failed" ? "small warning gap" : "small gap") : null,
+  ];
+};
+
+const chatScreen = (conversation) => {
+  if (!conversation) return [top(link("Jobs", "#", "quiet")), card(say(state.jobs === null ? "Loading…" : "This conversation isn’t on your account any more."))];
+  const job = conversation.latest;
   const mascot = mascotOf(job);
   const ask = askOf(job);
   const stop = async () => {
@@ -442,15 +535,8 @@ const jobScreen = (job) => {
   return [
     top(link("Jobs", "#", "quiet"), el("span", { className: "title" }), going(job) ? button("Stop", { kind: "outline", onClick: stop }) : null),
     card(
-      el("p", { className: "bubble", textContent: job.prompt }),
-      el("p", { className: "who" }, ask ? null : bird(mascot, MOOD_FOR[job.status] ?? "rest", "s28"), el("b", { textContent: mascot.name }), el("span", { className: "muted", textContent: `Sent ${when(job.created_at)}` })),
-      state.problem ? say(state.problem, "small warning gap") : null,
-      state.said ? el("p", { className: "small gap", role: "status", textContent: state.said }) : null,
-      ask ? says(mascot, ask) : null,
-      steps(job),
-      job.reply ? el("p", { className: "reply", textContent: job.reply }) : null,
-      job.status === "failed" || job.status === "stopped" ? say(statusWords(job), job.status === "failed" ? "small warning gap" : "small gap") : null,
-      ...(going(job) ? liveView(job, mascot, ask) : [])),
+      ...conversation.jobs.flatMap((one) => el("div", { className: "exchange" }, ...exchange(one, one === job))),
+      ...(going(job) ? liveView(job, mascot, ask) : [followUp(conversation, mascot)])),
   ];
 };
 
@@ -481,12 +567,11 @@ const startScreen = () => {
       if (!prompt) return box.focus();
       send.disabled = true;
       problem.replaceChildren();
-      // The sites the user brought along live in their Browserbase Context, which only the Mac knows. Its last job says.
-      const context = (state.jobs ?? []).find((job) => typeof job.context_id === "string")?.context_id ?? null;
       try {
-        const id = await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: [], p_mascot: snapshotOf(chosen), p_action_approval: "risky", p_context_id: context });
+        // A new conversation, under the job's own id.
+        const id = await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: [], p_mascot: snapshotOf(chosen), p_action_approval: "risky", p_context_id: contextOf() });
         await load();
-        location.hash = UUID.test(String(id)) ? `#job/${id}` : "";
+        location.hash = UUID.test(String(id)) ? `#chat/${id}` : "";
       } catch (error) {
         problem.replaceChildren(say(problemWords(error), "small warning"));
         send.disabled = false;
@@ -516,17 +601,17 @@ const startScreen = () => {
 let shown = "";
 const show = (force = false) => {
   const route = location.hash.replace(/^#/, "");
-  const jobId = /^job\/(.+)$/.exec(route)?.[1];
-  const job = jobId ? (state.jobs ?? []).find((candidate) => candidate.id === jobId) : null;
-  const screen = !api.signedIn() ? "signin" : route === "start" ? "start" : jobId ? "job" : "list";
+  const chatId = /^chat\/(.+)$/.exec(route)?.[1];
+  const conversation = chatId ? conversations().find((candidate) => candidate.id === chatId) : null;
+  const screen = !api.signedIn() ? "signin" : route === "start" ? "start" : route === "settings" ? "settings" : chatId ? "chat" : "list";
   // Signing in and starting a job are drawn once, so what's typed there stays.
   if (!force && (screen === "start" || screen === "signin") && shown.startsWith(`["${screen}"`)) return;
-  const signature = JSON.stringify([screen, screen === "job" ? job : screen === "list" ? state.jobs : null, state.linked, state.problem, state.said, state.push, [...state.taken], [...state.answered]]);
+  const signature = JSON.stringify([screen, screen === "chat" ? conversation : screen === "list" ? state.jobs : null, state.linked, state.problem, state.said, state.push, appearance(), [...state.taken], [...state.answered]]);
   if (!force && signature === shown) return;
-  // A question being typed into isn't drawn over by a poll.
-  if (!force && screen === "job" && document.activeElement?.closest(".answer")) return;
+  // An answer or a follow-up being typed isn't drawn over by a poll.
+  if (!force && screen === "chat" && document.activeElement?.closest(".answer, .follow")) return;
   shown = signature;
-  const draw = { signin: signInScreen, list: listScreen, start: startScreen, job: () => jobScreen(job) }[screen];
+  const draw = { signin: signInScreen, list: listScreen, start: startScreen, settings: settingsScreen, chat: () => chatScreen(conversation) }[screen];
   const nodes = draw();
   const app = document.getElementById("app");
   const slot = nodes.find((node) => node.matches("main"))?.querySelector(".live-slot");

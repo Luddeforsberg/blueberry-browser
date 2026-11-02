@@ -19,6 +19,7 @@ import type { CdpTab } from "./CdpTab";
 import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
+import { asHistoryMessage } from "../shared/phone";
 import type { MemoryToOffer } from "./MemoryStore";
 
 const MAX_TITLE_LENGTH = 40;
@@ -83,11 +84,8 @@ const withPage = (message: string, page: Page): ReplyContent => {
   ];
 };
 
-// The model sees what it did earlier by these notes, not by the pages themselves, which aren't saved.
-const toReplyMessage = ({ role, content, steps }: ChatThreadMessage): ReplyMessage => ({
-  role,
-  content: steps ? `<steps>\n${steps.map((step) => `- ${step.text}`).join("\n")}\n</steps>\n\n${content}` : content,
-});
+// The model sees what it did earlier by notes of its steps, not by the pages themselves, which aren't saved.
+const toReplyMessage = (message: ChatThreadMessage): ReplyMessage => asHistoryMessage(message);
 
 interface Run {
   controller: AbortController;
@@ -732,6 +730,21 @@ export class Chats {
     });
     this.notify(id);
     return this.thread(id);
+  }
+
+  // A conversation in the cloud that was started elsewhere, such as on the phone, becomes a runner chat here, as the bird
+  // its first job ran as. Its messages follow through `runnerFollowedUp` and `runnerFinished`.
+  adoptRunnerChat(prompt: string, mascotId: string | null): string {
+    return this.store.createChat(titleFrom(prompt), mascotId && mascotId !== BERRY.id ? mascotId : null, null);
+  }
+
+  // A message sent in a runner chat from elsewhere.
+  runnerFollowedUp(chatId: string, prompt: string): void {
+    if (!this.store.chat(chatId)) return;
+    this.store.addMessage(chatId, { role: "user", content: prompt });
+    this.errors.delete(chatId);
+    this.finished.delete(chatId);
+    this.notify(chatId);
   }
 
   // The runner's rows changed.

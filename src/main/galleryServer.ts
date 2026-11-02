@@ -162,11 +162,12 @@ export class GalleryServer {
 
   // The cloud runner's jobs, always as the signed-in user, so row-level security keeps each to their own.
 
-  async startCloudJob(token: string, job: { prompt: string; history: unknown[]; mascot: object; actionApproval: string; contextId: string | null }): Promise<string | null> {
+  // Answers 409 while another job in the same conversation is going.
+  async startCloudJob(token: string, job: { prompt: string; history: unknown[]; mascot: object; actionApproval: string; contextId: string | null; conversationId: string }): Promise<string | null> {
     const id = await this.request<unknown>("/rest/v1/rpc/start_cloud_job", {
       method: "POST",
       token,
-      body: { p_prompt: job.prompt, p_history: job.history, p_mascot: job.mascot, p_action_approval: job.actionApproval, p_context_id: job.contextId },
+      body: { p_prompt: job.prompt, p_history: job.history, p_mascot: job.mascot, p_action_approval: job.actionApproval, p_context_id: job.contextId, p_conversation: job.conversationId },
     });
     return typeof id === "string" ? id : null;
   }
@@ -184,8 +185,20 @@ export class GalleryServer {
     return (await this.request<unknown>("/rest/v1/rpc/decide_cloud_approval", { method: "POST", token, body: { p_approval: id, p_allow: allow, p_answer: answer } })) === true;
   }
 
-  async forgetCloudJob(token: string, id: string): Promise<void> {
-    await this.request("/rest/v1/rpc/forget_cloud_job", { method: "POST", token, body: { p_job: id } });
+  // Every job of a conversation, so a chat deleted here doesn't come back as one started elsewhere.
+  async forgetCloudConversation(token: string, id: string): Promise<void> {
+    await this.request("/rest/v1/rpc/forget_cloud_conversation", { method: "POST", token, body: { p_conversation: id } });
+  }
+
+  // The newest jobs that belong to a conversation, so one started or followed up elsewhere shows here. Ids only.
+  async cloudConversationJobs(token: string): Promise<{ id: string; conversation_id: string; created_at: string }[]> {
+    const rows = (await this.request<Record<string, unknown>[]>("/rest/v1/cloud_jobs?select=id,conversation_id,created_at&conversation_id=not.is.null&order=created_at.desc&limit=50", { token })) ?? [];
+    return rows.filter((row): row is { id: string; conversation_id: string; created_at: string } => typeof row.id === "string" && typeof row.conversation_id === "string" && typeof row.created_at === "string");
+  }
+
+  // Every job of one conversation, oldest first, with what each asked and how it went.
+  async cloudConversation(token: string, id: string): Promise<Record<string, unknown>[]> {
+    return (await this.request<Record<string, unknown>[]>(`/rest/v1/cloud_jobs?select=id,prompt,mascot,status,steps,reply,error,created_at&conversation_id=eq.${encodeURIComponent(id)}&order=created_at.asc&limit=100`, { token })) ?? [];
   }
 
   // The user's runner: an account of its own, named by email, which counts once the runner has accepted.

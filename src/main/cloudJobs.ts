@@ -2,13 +2,12 @@ import type { ReplyMessage } from "./agent";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatApproval, ChatStep, MascotProfile } from "../shared/library";
 import { BERRY, BERRY_ID, parseMascotDraft } from "../shared/mascots";
+import { fitHistory } from "../shared/phone";
 
 // What goes into a cloud job's row and what comes back out, for the app and the runner alike. Plain data, no Electron.
 // Everything read from a row is checked again here, whoever wrote it, and a mascot's limits can only come out the same
 // or narrower.
 
-const MAX_HISTORY = 40;
-const MAX_HISTORY_TEXT = 8000;
 const MAX_STEPS = 500;
 const MAX_STEP_TEXT = 300;
 
@@ -51,12 +50,8 @@ export const mascotFromSnapshot = (input: unknown): MascotProfile | null => {
   return { ...parsed.draft, id: snapshot.id, deletedAt: null, ...(snapshot.fromGallery === true ? { galleryId: "gallery" } : {}) };
 };
 
-// The chat before the newest message, in the words the model got it. Anything else in the row is dropped.
-export const historyFromRow = (input: unknown): ReplyMessage[] =>
-  (Array.isArray(input) ? input : [])
-    .filter((message): message is ReplyMessage => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string")
-    .slice(-MAX_HISTORY)
-    .map(({ role, content }) => ({ role, content: (content as string).slice(0, MAX_HISTORY_TEXT) }));
+// The chat before the newest message, in the words the model got it, trimmed to fit the row. Anything else is dropped.
+export const historyFromRow = (input: unknown): ReplyMessage[] => fitHistory(input);
 
 export const stepsFromRow = (input: unknown): ChatStep[] =>
   (Array.isArray(input) ? input : [])

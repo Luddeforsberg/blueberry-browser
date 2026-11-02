@@ -18,8 +18,9 @@ await build({
     contents: [
       `export { isUuid, parsePublishedRow } from "./src/shared/publishing";`,
       `export { BERRY_ID, permissionsInWords } from "./src/shared/mascots";`,
-      // The phone page: the flock as the app shares it, the words for an approval, and what counts as a code.
-      `export { flockFromRows, snapshotOf } from "./src/shared/phone";`,
+      // The phone page: the flock as the app shares it, conversations and their history, the words for an approval, and what
+      // counts as a code.
+      `export { conversationIdOf, conversationsOf, flockFromRows, followUpHistory, snapshotOf } from "./src/shared/phone";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
       `export { plausibleCode } from "./src/main/phoneReplies";`,
     ].join("\n"),

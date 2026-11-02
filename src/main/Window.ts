@@ -267,6 +267,8 @@ export class Window {
       contextId: () => this.cloud.contextId,
       runnerUpdated: (state) => sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state),
       flock: () => this.mascotStore.all(),
+      adopt: ({ prompt, mascotId }) => this.chats.adoptRunnerChat(prompt, mascotId),
+      followedUp: (chatId, prompt) => this.chats.runnerFollowedUp(chatId, prompt),
     });
 
     this.chats = new Chats(chatStore, streamReply, generateTitle, {

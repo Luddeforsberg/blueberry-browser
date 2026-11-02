@@ -125,15 +125,22 @@ const asUser = async (path, options = {}) => {
 
 export const rpc = (name, body = {}) => asUser(`/rest/v1/rpc/${name}`, { method: "POST", body });
 
-const JOB_COLUMNS = "id,prompt,mascot,status,steps,reply,error,live_view_url,context_id,created_at,updated_at";
+const JOB_COLUMNS = "id,conversation_id,prompt,mascot,status,steps,reply,error,live_view_url,context_id,created_at,updated_at";
 
-// The user's newest jobs, then what each waiting one is asking.
+// The user's newest jobs, then what each waiting one is asking. The page puts them together into conversations.
 export const jobs = async () => {
   const me = encodeURIComponent(session?.userId ?? "");
-  const rows = (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&order=created_at.desc&limit=30`)) ?? [];
+  const rows = (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&order=created_at.desc&limit=100`)) ?? [];
   const waiting = rows.filter((row) => row.status === "waiting").map((row) => row.id);
   const asks = waiting.length ? ((await rpc("my_cloud_jobs", { p_ids: waiting })) ?? []) : [];
   return rows.map((row) => ({ ...row, ask: asks.find((ask) => ask.id === row.id && typeof ask.approval_id === "string") ?? null }));
+};
+
+// One job with the history it carried, which only a follow-up needs, so the list doesn't fetch it for every job.
+export const jobWithHistory = async (id) => {
+  const me = encodeURIComponent(session?.userId ?? "");
+  const [row] = (await asUser(`/rest/v1/cloud_jobs?select=id,conversation_id,prompt,history,steps,reply,created_at&owner=eq.${me}&id=eq.${encodeURIComponent(id)}&limit=1`)) ?? [];
+  return row ?? null;
 };
 
 export const flock = async () => (await asUser("/rest/v1/cloud_flock?select=id,name,palette,accessory,instructions,sites,tools,from_gallery,updated_at&order=position")) ?? [];
