@@ -35,7 +35,7 @@ import { PermissionPromptView } from "./PermissionPromptView";
 import { DesktopBerry } from "./DesktopBerry";
 import { McpConnector } from "./McpConnector";
 import { createMcpTools, type McpTool } from "./mcpTools";
-import { readAddress, readTabText } from "./mcpPages";
+import { readTabText } from "./mcpPages";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -480,13 +480,13 @@ export class Window {
       runRoutine: (id, onStart) => this.routines.runNow(id, onStart),
       routineRuns: (id) => this.routines.runs(id),
       stopRoutineRun: (runId) => this.routines.stop(runId),
+      cancelRoutineRequest: (id) => this.routines.cancelRequest(id),
       tabs: () =>
         this.allTabs.map((tab) => ({ id: tab.id, title: tab.title, url: tab.url, active: tab.id === this.activeTabId, working: tab.berryWorking, heldForUser: tab.heldForUser })),
       readTab: (tabId, offset) => {
         const tab = this.allTabs.find(({ id }) => id === tabId);
         return tab ? readTabText(tab, offset) : Promise.resolve(`There is no web page in tab ${tabId}.`);
       },
-      readUrl: (url, offset) => readAddress(url, offset, (address) => this.createBackgroundTab(address), (tab) => this.tabCount > 1 && this.closeTab(tab.id, false)),
       searchHistory: (query, limit) => this.history.search({ query, limit }).entries,
       recentHistory: (limit) => this.history.recent(limit),
       bookmarks: () => ({ bookmarks: this.bookmarkStore.get(), pinned: this.pinnedStore.get() }),

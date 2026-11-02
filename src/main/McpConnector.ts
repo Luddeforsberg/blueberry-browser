@@ -119,6 +119,8 @@ export const snippets = (url: string, token: string, bridge: string, binary: str
 export class McpConnector {
   private saved: Saved = { on: false, token: null, port: DEFAULT_PORT };
   private server: Server | null = null;
+  // Still finding a port, so switching off can close it before it's ever used.
+  private starting: Server | null = null;
   private port: number | null = null;
   private problem: string | null = null;
   private activity: McpActivity[] = [];
@@ -192,22 +194,38 @@ export class McpConnector {
   }
 
   close(): void {
-    this.server?.closeAllConnections();
-    this.server?.close();
+    [this.server, this.starting].forEach((server) => {
+      server?.closeAllConnections();
+      server?.close();
+    });
     this.server = null;
+    this.starting = null;
     this.port = null;
   }
 
   private async listen(): Promise<void> {
-    if (this.server) return;
+    if (this.server || this.starting) return;
     this.writeBridge();
     const server = createServer((request, response) => void this.handle(request, response));
+    this.starting = server;
     const tryPort = (port: number) =>
       new Promise<number | null>((resolve) => {
         server.once("error", () => resolve(null));
+        // Closed by switching off before it could bind, which says neither.
+        server.once("close", () => resolve(null));
         server.listen(port, "127.0.0.1", () => resolve((server.address() as AddressInfo).port));
       });
-    const port = (await tryPort(this.anyPort ? 0 : this.saved.port)) ?? (await tryPort(0));
+    // Switched off while it was starting. A bind already on its way can still finish, so it's closed here too.
+    const stale = () => {
+      if (this.starting === server) return false;
+      server.close();
+      return true;
+    };
+    let port = await tryPort(this.anyPort ? 0 : this.saved.port);
+    if (stale()) return;
+    port ??= await tryPort(0);
+    if (stale()) return;
+    this.starting = null;
     if (port === null) {
       this.problem = "Couldn't start the server on this computer.";
       return;
@@ -229,6 +247,7 @@ export class McpConnector {
       response.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message } }));
     };
     const { token } = this.saved;
+    if (!this.saved.on) return refuse(503, "Blueberry's MCP server is off. Turn it on in Blueberry, under Settings > Claude.");
     if (!this.port || !hostAllowed(request.headers.host, this.port)) return refuse(403, "Only apps on this computer may use this.");
     let path: string;
     try {

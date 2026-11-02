@@ -285,6 +285,13 @@ export class Routines {
     return true;
   }
 
+  // Takes back a Run now that's still waiting for a place.
+  cancelRequest(id: string): boolean {
+    if (!this.requested.delete(id)) return false;
+    this.events.onChanged();
+    return true;
+  }
+
   stop(runId: string): boolean {
     if (![...this.active.values()].some((run) => run.runId === runId)) return false;
     this.runner.stop(runId);

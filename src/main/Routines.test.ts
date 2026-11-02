@@ -222,6 +222,20 @@ describe("the scheduler", () => {
     expect(runs).toHaveLength(MAX_ACTIVE_RUNS + 1);
   });
 
+  it("drops a queued Run now that's cancelled, so it never starts", async () => {
+    const { routines, started: runs } = setup();
+    const ids = [save(routines, daily("23:00", "A")), save(routines, daily("23:00", "B")), save(routines, daily("23:00", "C"))];
+    started(routines);
+    ids.forEach((id) => routines.runNow(id));
+    expect(routines.cancelRequest(ids[2])).toBe(true);
+    expect(routines.cancelRequest(ids[2])).toBe(false);
+    expect(routines.list()[2].status).not.toBe("queued");
+
+    runs[1].end();
+    await flush();
+    expect(runs).toHaveLength(MAX_ACTIVE_RUNS);
+  });
+
   it("leaves a paused routine alone, and resuming doesn't catch up", async () => {
     const { routines, store, started: runs } = setup();
     const id = save(routines, daily("13:00"));

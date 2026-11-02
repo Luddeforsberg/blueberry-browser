@@ -60,9 +60,10 @@ export interface McpHost {
   runRoutine: (id: string, onStart: (runId: string) => void) => boolean;
   routineRuns: (routineId: string) => RoutineRun[];
   stopRoutineRun: (runId: string) => boolean;
+  // A Run now that hasn't started yet. False if it has, or there's none.
+  cancelRoutineRequest: (routineId: string) => boolean;
   tabs: () => McpTab[];
   readTab: (tabId: string, offset: number) => Promise<string>;
-  readUrl: (url: string, offset: number) => Promise<string>;
   searchHistory: (query: string, limit: number) => HistoryEntry[];
   recentHistory: (limit: number) => Visit[];
   bookmarks: () => { bookmarks: Bookmark[]; pinned: Bookmark[] };
@@ -100,6 +101,15 @@ const siteOf = (url: string) => {
   }
 };
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+// The same page however it's written, such as with a capital in the host. Only http and https are pages here.
+const sameAddress = (a: string, b: string) => {
+  try {
+    const [first, second] = [new URL(a), new URL(b)];
+    return /^https?:$/.test(first.protocol) && first.href === second.href;
+  } catch {
+    return false;
+  }
+};
 const at = (time: number | null) => (time === null ? null : new Date(time).toISOString());
 
 // Page text goes in a tag a page can't close early, so where it ends is never up to the page.
@@ -141,7 +151,7 @@ const FEATURES = [
 export const createMcpTools = (host: McpHost): McpTool[] => {
   // Routine runs started from here, by the task id handed out, with the run each became once it started. Only these can
   // be reached: a routine's own id names runs the user or the schedule started. Memory only, newest last.
-  const routineTasks = new Map<string, { routineId: string; runId: string | null }>();
+  const routineTasks = new Map<string, { routineId: string; runId: string | null; cancelled: boolean }>();
 
   const flock = () => host.mascots().filter((mascot) => mascot.deletedAt === null);
   const findAgent = (name: string) => {
@@ -180,7 +190,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
     if (!started || !routine) return null;
     const run = routineRun(started.routineId, started.runId);
     const waiting = run ? host.waiting().find(({ id }) => id === run.id) : undefined;
-    const ended: TaskStatus = !run ? "queued" : run.status === "finished" ? "done" : run.status === "needs-approval" || run.status === "running" ? "working" : run.status;
+    const ended: TaskStatus = !run ? (started.cancelled ? "stopped" : "queued") : run.status === "finished" ? "done" : run.status === "needs-approval" || run.status === "running" ? "working" : run.status;
     return {
       id: taskId,
       kind: "routine",
@@ -319,7 +329,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
         const routine = host.routines().find(({ id, name: own }) => id === name || own.toLowerCase() === name.toLowerCase());
         if (!routine) return failed(`There's no routine called ${name}. list_routines names them.`, `No routine ${clip(name, 30)}`);
         const taskId = `routine:${randomUUID()}`;
-        const started = { routineId: routine.id, runId: null as string | null };
+        const started = { routineId: routine.id, runId: null as string | null, cancelled: false };
         if (!host.runRoutine(routine.id, (runId) => (started.runId = runId))) return failed(`${routine.name} is running already.`, `${routine.name} already running`);
         routineTasks.set(taskId, started);
         if (routineTasks.size > MAX_REMEMBERED_TASKS) routineTasks.delete(routineTasks.keys().next().value as string);
@@ -375,8 +385,12 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
         const id = String(taskId);
         const runId = runIdOf(id);
         if (!task(id)) return NO_TASK(id);
-        if (routineTasks.has(id)) {
-          if (!runId || !host.stopRoutineRun(runId)) return failed("That routine run isn't going.", "Not running");
+        const started = routineTasks.get(id);
+        if (started) {
+          // Still waiting for a place, so it's taken out of the queue and never starts.
+          const queued = started.runId === null && !started.cancelled && host.cancelRoutineRequest(started.routineId);
+          if (queued) started.cancelled = true;
+          else if (!runId || !host.stopRoutineRun(runId)) return failed("That routine run isn't going.", "Not running");
         } else {
           if (!host.isRunning(id)) return failed("That task has already ended.", "Already ended");
           host.stop(id);
@@ -430,7 +444,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
       name: "read_page",
       title: "Read a page",
       description:
-        "Read a page's text in the user's browser, with their logins. Give `tabId` from get_open_tabs, or `url` to open it in a tab behind the user's, read it and close it. Long pages come in parts: call again with the offset it gives.",
+        "Read the text of a page open in the user's browser, with their logins. Give `tabId` from get_open_tabs, or the `url` of a tab that's open. To go somewhere new, use run_browser_task, which asks the user before anything that could send data. Long pages come in parts: call again with the offset it gives.",
       shape: {
         tabId: z.string().optional(),
         url: z.string().optional(),
@@ -439,14 +453,18 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
       readOnly: true,
       run: async ({ tabId, url, offset }) => {
         const from = typeof offset === "number" ? offset : 0;
-        if (typeof tabId === "string" && tabId) {
-          const tab = host.tabs().find(({ id }) => id === tabId);
-          if (!tab) return failed(`There's no tab ${tabId}. get_open_tabs names them.`, "No such tab");
+        // Only a page that's open already. Opening an address is going there, which may send whatever is in it, so that
+        // goes through a job and its approvals instead.
+        const tab = typeof tabId === "string" && tabId ? host.tabs().find(({ id }) => id === tabId) : typeof url === "string" ? host.tabs().find((open) => sameAddress(open.url, url)) : undefined;
+        if (typeof tabId === "string" && tabId && !tab) return failed(`There's no tab ${tabId}. get_open_tabs names them.`, "No such tab");
+        if (typeof url === "string" && url && !tab) {
+          return failed(`No open tab is at ${url}. read_page only reads pages that are open already. To open it, use run_browser_task, which asks the user before anything that could send data.`, `Refused: ${siteOf(url)} not open`);
+        }
+        if (tab) {
           if (tab.heldForUser) return failed("The user is signing in or entering a code in that tab, so it can't be read.", `Refused: ${siteOf(tab.url)} held`);
           return { text: pageContent(host.clean(tab.url), host.clean(await host.readTab(tab.id, from))), summary: `Read ${siteOf(tab.url)}` };
         }
-        if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return failed("Give a tabId, or a url starting with http:// or https://.", "Nothing to read");
-        return { text: pageContent(host.clean(url), host.clean(await host.readUrl(url, from))), summary: `Read ${siteOf(url)}` };
+        return failed("Give a tabId, or the url of an open tab.", "Nothing to read");
       },
     },
     {

