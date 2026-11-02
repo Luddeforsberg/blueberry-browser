@@ -140,3 +140,6 @@ playwright-report
 
 # Eval screenshots stay local, since they add megabytes to every run.
 evals/results/*/
+
+# Netlify's local state, from `netlify link` or `netlify dev`.
+.netlify

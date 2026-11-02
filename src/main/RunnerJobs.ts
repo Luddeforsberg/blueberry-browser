@@ -6,7 +6,8 @@ import type { ChatRunner, RunnerJobInput, RunnerProgress } from "./Chats";
 import { approvalFromRow, FINISHED, historyFromRow, mascotSnapshot, stepsFromRow, type CloudJobStatus } from "./cloudJobs";
 import { ServerError, type GalleryServer } from "./galleryServer";
 import type { RunnerState } from "../shared/ipc";
-import type { ChatStep } from "../shared/library";
+import type { ChatStep, MascotProfile } from "../shared/library";
+import { flockRows } from "../shared/phone";
 
 // Chats whose jobs went to the cloud runner, which keeps going with this computer off. The jobs, their steps and their
 // approvals are rows in Supabase, read as the signed-in user, so nobody else's can come back. Only the user's own answer
@@ -53,6 +54,8 @@ export interface RunnerJobsHooks {
   // The user's Browserbase Context, so the sites they brought along are signed in there too.
   contextId: () => string | null;
   runnerUpdated?: (state: RunnerState) => void;
+  // The flock, shared with the phone page while a linked runner has accepted, so a job can be sent from there as any bird.
+  flock?: () => MascotProfile[];
 }
 
 const fresh = (account: string, jobId: string | null, active: boolean): Entry => ({ account, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
@@ -69,6 +72,10 @@ export class RunnerJobs implements ChatRunner {
   private link: { email: string; accepted: boolean } | null = null;
   private linkProblem: string | null = null;
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
+  // What was last shared, and by whom, so an unchanged flock isn't sent again.
+  private sharedFlock: string | null = null;
+  private flockSending: Promise<void> | null = null;
+  private flockAgain = false;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -117,6 +124,7 @@ export class RunnerJobs implements ChatRunner {
     }
     if (this.link) this.linkTimer = setTimeout(() => void this.refreshLink(), this.link.accepted ? LINKED_POLL_MS : LINK_POLL_MS);
     this.hooks.runnerUpdated?.(this.runnerState);
+    void this.flockChanged();
     return this.runnerState;
   }
 
@@ -138,6 +146,37 @@ export class RunnerJobs implements ChatRunner {
     this.linkProblem = null;
     if (account) await this.withToken(account, (token) => this.server!.unlinkCloudRunner(token));
     return this.refreshLink();
+  }
+
+  // Shares the flock with the phone page, only while signed in with a runner that has accepted, and only if it changed.
+  // A bird's name, look, instructions and limits go, and nothing it remembers. One send at a time, and a change that
+  // comes in meanwhile is sent after it, so an older flock never lands after a newer one.
+  async flockChanged(): Promise<void> {
+    if (this.flockSending) {
+      this.flockAgain = true;
+      return this.flockSending;
+    }
+    this.flockSending = (async () => {
+      do {
+        this.flockAgain = false;
+        await this.shareFlock();
+      } while (this.flockAgain);
+    })().finally(() => {
+      this.flockSending = null;
+    });
+    return this.flockSending;
+  }
+
+  private async shareFlock(): Promise<void> {
+    const account = this.signedIn;
+    if (!account || !this.link?.accepted || !this.hooks.flock) return;
+    const birds = flockRows(this.hooks.flock());
+    const shared = JSON.stringify([account, birds]);
+    if (shared === this.sharedFlock) return;
+    this.sharedFlock = shared;
+    const sent = await this.withToken(account, (token) => this.server!.syncCloudFlock(token, birds).then(() => true));
+    // Tried again on the next change or the next look at the link.
+    if (!sent && this.sharedFlock === shared) this.sharedFlock = null;
   }
 
   has(chatId: string): boolean {

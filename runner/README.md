@@ -12,7 +12,7 @@ You link it to your account in Blueberry, and it accepts the link when it starts
 
 ## Deploy
 
-1. **Run the migration.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's.
+1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, and then `supabase/migrations/20261103000000_phone.sql`, for the phone page.
 2. **Create the runner's user.** In the Supabase dashboard, Authentication > Users > Add user > Create new user, with an email of its own and a long random password. Tick Auto Confirm User. Don't use your own account.
 3. **Link it in Blueberry.** Signed in to your Blueberry account, open Settings > Cloud > Runner, type the runner's email and press **Link**. It says it's waiting for the runner.
 4. **Create the service.** From the repo root, with `railway login` done:
@@ -35,8 +35,21 @@ You link it to your account in Blueberry, and it accepts the link when it starts
    | `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | The model key. `LLM_MODEL` chooses a model, as in the app |
    | `BROWSERBASE_API_KEY`, `BROWSERBASE_PROJECT_ID` | The same Browserbase account as Settings > Cloud |
 
+   | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Optional, for notifications on the phone page. `pnpm run push:keys` prints a pair. The subject is `mailto:` and your own address. Without them nothing goes to the phone, and the log says so once |
+
    `BROWSERBASE_CONTEXT_ID` is optional. Each job carries the Context id from the app, which is where the sites you brought along are.
 6. **Check.** The log says `Runner started, using Browserbase.` and `Linked to its owner.`, and Settings > Cloud > Runner says it's your runner within about ten seconds. After that the log has one line per job: its id and how it went. Nothing else: no prompt, page, cookie, code, password or key.
+
+## The phone page
+
+`site/app/` lets you follow and answer these jobs from your phone, and start new ones, with the computer off. It's static and goes up with the rest of `site/`:
+
+1. In `site/config.js`, set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `VAPID_PUBLIC_KEY` to the public key from `pnpm run push:keys`. Never the private key.
+2. `npx netlify login`, then `npx netlify link` for a site you have or `npx netlify init` for a new one.
+3. `pnpm run site:deploy`, which runs `npx netlify deploy --prod --dir site`. `netlify.toml` sets the headers.
+4. Open `https://<your site>/app/` on the phone, sign in with your Blueberry account, and on an iPhone add it to the Home Screen and open it from there before pressing **Turn on**.
+
+When the runner asks, it sends a push that says only "Berry needs you", and when a job ends, "Berry finished". Nothing of the job is in it. Your birds show there once Blueberry on the Mac is signed in with this runner linked: it shares their names, looks and limits, never what they remember.
 
 To revoke it, press **Unlink** in Settings, or change the runner user's password or delete it in Supabase.
 
@@ -53,4 +66,4 @@ SUPABASE_URL=… SUPABASE_PUBLISHABLE_KEY=… BLUEBERRY_RUNNER_EMAIL=… BLUEBER
 
 ## Not tried yet
 
-None of this has run on Railway, real Supabase or real Browserbase. In particular, whether Browserbase lets the runner's session use the Context while the app's own session is still open on it.
+None of this has run on Railway, real Supabase or real Browserbase, and no real push has been sent to a phone. In particular, whether Browserbase lets the runner's session use the Context while the app's own session is still open on it.

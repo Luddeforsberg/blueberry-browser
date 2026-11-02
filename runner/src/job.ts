@@ -6,6 +6,7 @@ import { approvalToAsk, mascotFromSnapshot } from "../../src/main/cloudJobs";
 import type { CloudSessions } from "../../src/main/cloudBrowser";
 import type { ChatApproval } from "../../src/shared/library";
 import type { ClaimedJob, JobUpdate, RunnerDb } from "./db";
+import type { PushKind } from "./push";
 
 // One job, run the way a chat with no page runs in the app: the same `Chats.runTask`, agent, tools, mascot limits,
 // approvals and step limit, in the cloud browser's pages. What it does is written to the job's row as it happens. An
@@ -104,12 +105,15 @@ export interface RunJobOptions {
   heartbeatMs?: number;
   answerTimeoutMs?: number;
   log?: (line: string) => void;
+  // Tells the owner's phone, with no content: when the job asks them, and when it ends other than by their own Stop.
+  notify?: (kind: PushKind) => Promise<void>;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"done" | "failed" | "stopped"> => {
   const { db, streamReply = agentReply, signal, pollMs = POLL_MS, heartbeatMs = HEARTBEAT_MS, answerTimeoutMs = ANSWER_TIMEOUT_MS, log = console.log } = options;
+  const notify = (kind: PushKind) => void options.notify?.(kind).catch(() => {});
   const mascot = mascotFromSnapshot(job.mascot);
   if (!mascot) {
     await db.update(job.id, { status: "failed", error: BAD_MASCOT }).catch(() => {});
@@ -185,6 +189,7 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
       log(`Job ${job.id}: couldn't ask the user.`);
       return stop("The runner couldn't ask you about the next step, so it stopped there.");
     }
+    notify("needs-you");
     const until = Date.now() + answerTimeoutMs;
     while (waitingOn(approval)) {
       await sleep(pollMs);
@@ -232,6 +237,7 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
       }
     }
     log(`Job ${job.id}: ${status}.`);
+    if (status !== "stopped" || stopWords) notify("finished");
     return status;
   } finally {
     clearInterval(heartbeat);

@@ -266,6 +266,7 @@ export class Window {
       finished: (chatId, result) => this.chats.runnerFinished(chatId, result),
       contextId: () => this.cloud.contextId,
       runnerUpdated: (state) => sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state),
+      flock: () => this.mascotStore.all(),
     });
 
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
@@ -1128,7 +1129,7 @@ export class Window {
 
   saveMascot(id: string | null, draft: unknown): MascotSaveResult {
     const result = this.mascotStore.save(id, draft);
-    if (result.ok) this.broadcast("library:updated", this.librarySnapshot);
+    if (result.ok) this.mascotsChanged();
     return result;
   }
 
@@ -1138,7 +1139,7 @@ export class Window {
     const result = this.mascotStore.addFromGallery(galleryId, name === null ? entry.draft : { ...entry.draft, name });
     if (result.ok) {
       this.gallery.countAdd(galleryId);
-      this.broadcast("library:updated", this.librarySnapshot);
+      this.mascotsChanged();
     }
     return result;
   }
@@ -1164,8 +1165,13 @@ export class Window {
     if (!this.mascotStore.delete(id)) return false;
     this.memory.clear(id);
     runs.forEach((routine) => this.routines.setPaused(routine.id, true));
-    this.broadcast("library:updated", this.librarySnapshot);
+    this.mascotsChanged();
     return true;
+  }
+
+  private mascotsChanged(): void {
+    this.broadcast("library:updated", this.librarySnapshot);
+    void this.runnerJobs.flockChanged();
   }
 
   async confirmClearMemory(mascotId: string): Promise<boolean> {

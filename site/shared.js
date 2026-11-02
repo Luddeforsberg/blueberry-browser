@@ -152,8 +152,68 @@ var parsePublishedRow = (input) => {
     publishedAt: Number.isNaN(publishedAt) ? 0 : publishedAt
   };
 };
+
+// src/shared/phone.ts
+var flockFromRows = (rows) => {
+  const birds = [BERRY];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const { id, name, palette, accessory, instructions, sites, tools, from_gallery: fromGallery } = row ?? {};
+    if (typeof id !== "string" || !/^[\w-]{1,100}$/.test(id) || id === BERRY_ID || birds.some((bird) => bird.id === id)) continue;
+    const parsed = parseMascotDraft({ name, look: { palette, accessory }, instructions, sites, tools });
+    if ("error" in parsed) continue;
+    birds.push({ ...parsed.draft, id, deletedAt: null, ...fromGallery === true ? { galleryId: "gallery" } : {} });
+  }
+  return birds;
+};
+var snapshotOf = ({ id, name, instructions, sites, tools, galleryId }) => ({
+  id,
+  name,
+  instructions,
+  sites: [...sites],
+  tools: [...tools],
+  fromGallery: !!galleryId
+});
+
+// src/renderer/chrome/src/siteNames.ts
+var siteParts = (text) => {
+  const parts = [];
+  let at = 0;
+  for (const match of text.matchAll(/https?:\/\/[^\s,”"<>]+/g)) {
+    const found = match[0];
+    const trailing = /[.)]+$/.exec(found)?.[0] ?? "";
+    let hostname;
+    try {
+      hostname = new URL(found.slice(0, found.length - trailing.length)).hostname;
+    } catch {
+      continue;
+    }
+    parts.push({ text: text.slice(at, match.index), site: false }, { text: hostname.replace(/^www\./, ""), site: true });
+    at = match.index + found.length - trailing.length;
+  }
+  parts.push({ text: text.slice(at), site: false });
+  return parts.filter((part) => part.text);
+};
+var withSiteNames = (text) => siteParts(text).map((part) => part.text).join("");
+var asContinuation = (text) => /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+
+// src/main/phoneReplies.ts
+var MIN_CODE_LENGTH = 4;
+var MAX_CODE_LENGTH = 12;
+var plausibleCode = (text) => {
+  const trimmed = text.trim();
+  if (!/^[A-Za-z0-9]+(?:[ -][A-Za-z0-9]+)?$/.test(trimmed)) return null;
+  const code = trimmed.replace(/[ -]/g, "");
+  if (code.length < MIN_CODE_LENGTH || code.length > MAX_CODE_LENGTH) return null;
+  return /\d/.test(code) || code === code.toUpperCase() ? code : null;
+};
 export {
+  BERRY_ID,
+  asContinuation,
+  flockFromRows,
   isUuid,
   parsePublishedRow,
-  permissionsInWords
+  permissionsInWords,
+  plausibleCode,
+  snapshotOf,
+  withSiteNames
 };

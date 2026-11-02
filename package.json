@@ -16,6 +16,8 @@
     "test:e2e": "playwright test",
     "eval": "electron-vite build && playwright test -c evals/playwright.config.ts",
     "site:build": "node scripts/buildSite.mjs",
+    "site:deploy": "npx netlify deploy --prod --dir site",
+    "push:keys": "node scripts/pushKeys.mjs",
     "runner:build": "esbuild runner/src/index.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=runner/dist/index.cjs",
     "runner:start": "node runner/dist/index.cjs",
     "verify": "npm run typecheck && npm run lint && npm run test && electron-vite build && npm run test:e2e",
@@ -45,6 +47,7 @@
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "web-push": "3.6.7",
     "zod": "^4.1.8"
   },
   "devDependencies": {
@@ -58,6 +61,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/web-push": "3.6.4",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",

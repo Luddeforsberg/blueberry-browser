@@ -146,6 +146,21 @@ describe("a job on the runner", () => {
     expect(final()).toMatchObject({ status: "stopped", error: SHUT_DOWN });
   });
 
+  it("tells the phone when it asks and when it finishes, and nothing more", async () => {
+    const { db } = fakeDb([{ decision: "allow", answer: null }]);
+    const sent: string[] = [];
+    const notify = async (kind: string) => void sent.push(kind);
+    expect(await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: askingReply, notify })).toBe("done");
+    expect(sent).toEqual(["needs-you", "finished"]);
+  });
+
+  it("doesn't tell the phone about a stop the user asked for", async () => {
+    const { db } = fakeDb(["stop"]);
+    const sent: string[] = [];
+    await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: askingReply, notify: async (kind) => void sent.push(kind) });
+    expect(sent).toEqual(["needs-you"]);
+  });
+
   it("doesn't run as a bird it can't read", async () => {
     const { db, final } = fakeDb();
     const { seen, browser } = fakeBrowser();

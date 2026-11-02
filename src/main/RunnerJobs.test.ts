@@ -149,3 +149,74 @@ describe("runner jobs in the app", () => {
     runner.destroy();
   });
 });
+
+describe("the flock shared with the phone", () => {
+  const SCOUT = { ...BERRY, id: "m-1", name: "Scout", instructions: "Find cables.", sites: ["webhallen.com"] };
+  const make = (accepted: boolean) => {
+    const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
+    const syncCloudFlock = vi.fn(async () => {});
+    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted }), syncCloudFlock } as unknown as GalleryServer;
+    const flock = [BERRY, SCOUT];
+    const runner = new RunnerJobs(
+      server,
+      { get state() { return account.state; }, accessToken: async () => (account.state.status === "signed-in" ? "token" : null) },
+      join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
+      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, flock: () => flock },
+      5
+    );
+    return { runner, account, syncCloudFlock, flock };
+  };
+
+  it("goes once a runner has accepted, again only when it changes, and never while signed out", async () => {
+    const { runner, account, syncCloudFlock, flock } = make(true);
+    await settle();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(1);
+    expect(syncCloudFlock).toHaveBeenLastCalledWith("token", [expect.objectContaining({ id: "m-1", name: "Scout", sites: ["webhallen.com"] })]);
+    await runner.flockChanged();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(1);
+    flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
+    await runner.flockChanged();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    account.state = { status: "signed-out", email: null, problem: null };
+    runner.accountChanged();
+    flock.pop();
+    await runner.flockChanged();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    runner.destroy();
+  });
+
+  it("sends one flock at a time, and the newest last", async () => {
+    const { runner, syncCloudFlock, flock } = make(true);
+    let open = 0;
+    let most = 0;
+    const releases: (() => void)[] = [];
+    syncCloudFlock.mockImplementation(async () => {
+      most = Math.max(most, ++open);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      open--;
+    });
+    await settle();
+    // The first send is still out when two edits come in.
+    flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
+    void runner.flockChanged();
+    flock.push({ ...SCOUT, id: "m-3", name: "Pip" });
+    const last = runner.flockChanged();
+    while (releases.length) {
+      releases.shift()!();
+      await settle();
+    }
+    await last;
+    expect(most).toBe(1);
+    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    expect((syncCloudFlock.mock.calls.at(-1) as unknown[])[1]).toHaveLength(3);
+    runner.destroy();
+  });
+
+  it("isn't shared before a runner has accepted", async () => {
+    const { runner, syncCloudFlock } = make(false);
+    await settle();
+    await runner.flockChanged();
+    expect(syncCloudFlock).not.toHaveBeenCalled();
+    runner.destroy();
+  });
+});
