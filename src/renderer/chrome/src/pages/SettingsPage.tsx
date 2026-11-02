@@ -191,7 +191,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <SettingsRow
                                     id="setting-suggestions"
                                     title="Suggestions"
-                                    description="The new tab page offers to take over what you repeat. Finding it happens on this computer. To word the cards, site names, page titles, chat titles, and how often and when you visit go to the AI service, never page text or full addresses. Local addresses, addresses with tokens, and sites it recognises as banks or mail are left out. Off means nothing is sent."
+                                    description="The new tab page offers to take over what you keep doing. To decide what to offer, the AI service gets a summary of the last two weeks: site names and page titles in the order you visited them, what you searched for, the titles of your chats and routines and how they went, and which cards you dismissed or used. Never page text or full addresses. Local addresses, addresses with tokens, sites it recognises as banks or mail, and searches about health, money or logins are left out, though it can miss one. Off means nothing is sent."
                                 >
                                     <Switch
                                         labelledBy="setting-suggestions"

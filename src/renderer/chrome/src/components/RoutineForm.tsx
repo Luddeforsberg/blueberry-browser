@@ -51,7 +51,7 @@ export const RoutineForm: React.FC<{
             return
         }
         if (runNow) void window.chromeAPI.routines.runNow(result.id)
-        if (values.suggestionId) void window.chromeAPI.suggestions.dismiss(values.suggestionId)
+        if (values.suggestionId) void window.chromeAPI.suggestions.used(values.suggestionId)
         onSaved(result.id)
     }
 

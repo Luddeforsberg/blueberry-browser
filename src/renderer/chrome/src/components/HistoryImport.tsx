@@ -3,11 +3,11 @@ import type { HistoryImportResult, ImportSource } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
 
-// What happens, in the one place both screens say it. The last line has to match `forTheModel` in Suggestions.ts.
+// What happens, in the one place both screens say it. The last line has to match `buildDigest` in suggestionDigest.ts.
 export const IMPORT_NOTES = [
     'Only history comes across: addresses, page titles and visit times from the last 90 days, from every profile. Not passwords or cookies.',
     'It stays on this computer.',
-    'To word a suggestion, site names, page titles, chat titles, and how often and when you visit go to the AI service, never page text or full addresses. Local addresses, and sites it recognises as banks, mail or search engines, are left out. You can turn Suggestions off in Settings.'
+    'To decide what to suggest, a summary of the last two weeks goes to the AI service: site names and page titles in the order you visited them, what you searched for, and your chat and routine titles. Never page text or full addresses. Local addresses, and sites it recognises as banks or mail, are left out. You can turn Suggestions off in Settings.'
 ]
 
 export const useHistoryImport = () => {

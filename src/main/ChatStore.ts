@@ -52,16 +52,20 @@ export class ChatStore {
 
   // What each of the newest chats began with, for noticing what the user keeps asking. A chat another app started
   // isn't something the user asked.
-  firstMessages(limit: number): Array<ChatThreadSummary & { firstMessage: string }> {
+  firstMessages(limit: number): Array<ChatThreadSummary & { firstMessage: string; replied: boolean }> {
     return this.db
       .prepare(
         `SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId,
            source AS "from",
-           (SELECT content FROM messages WHERE chat_id = chats.id AND role = 'user' ORDER BY id LIMIT 1) AS firstMessage
+           (SELECT content FROM messages WHERE chat_id = chats.id AND role = 'user' ORDER BY id LIMIT 1) AS firstMessage,
+           EXISTS (SELECT 1 FROM messages WHERE chat_id = chats.id AND role = 'assistant' AND content <> '') AS replied
          FROM chats WHERE source IS NULL ORDER BY updated_at DESC, rowid DESC LIMIT ?`
       )
       .all(limit)
-      .flatMap((row) => ((row as { firstMessage: string | null }).firstMessage ? [row as unknown as ChatThreadSummary & { firstMessage: string }] : []));
+      .flatMap((row) => {
+        const { firstMessage, replied, ...summary } = row as unknown as ChatThreadSummary & { firstMessage: string | null; replied: number };
+        return firstMessage ? [{ ...summary, firstMessage, replied: replied === 1 }] : [];
+      });
   }
 
   chat(id: string): StoredChat | null {

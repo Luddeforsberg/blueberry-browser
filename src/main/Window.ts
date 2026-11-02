@@ -340,8 +340,14 @@ export class Window {
       enabled: () => this.settings.suggestions,
       // Both newest first.
       visits: () => this.history.since(Date.now() - PATTERN_WINDOW_MS, MAX_SUGGESTION_VISITS),
-      chats: () => chatStore.firstMessages(MAX_SUGGESTION_CHATS),
+      chats: () =>
+        chatStore.firstMessages(MAX_SUGGESTION_CHATS).map((chat) => {
+          // Failed and stopped are only known for replies since launch.
+          const outcome = this.chats.work(chat.id)?.outcome;
+          return { ...chat, outcome: outcome === "failed" || outcome === "stopped" ? outcome : chat.replied ? "done" : "no reply" };
+        }),
       routines: () => this.routines.list(),
+      runs: (routineId) => this.routines.runs(routineId),
       mascots: () => this.mascotStore.all(),
       hasModel,
       // Page titles go in this, and a careless page may have put a code from the phone in its title.

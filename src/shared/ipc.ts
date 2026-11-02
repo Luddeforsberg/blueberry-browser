@@ -502,6 +502,7 @@ export interface InvokeChannels {
   "account:sign-out": { region: "chrome"; args: []; result: AccountState };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
+  "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
   "downloads:act": { region: "chrome"; args: [id: string, action: DownloadAction]; result: boolean };
   "downloads:choose-folder": { region: "chrome"; args: []; result: void };
@@ -727,6 +728,8 @@ export interface AccountAPI {
 export interface SuggestionsAPI {
   list: () => Promise<Suggestion[]>;
   dismiss: (id: string) => Promise<Suggestion[]>;
+  // Its prompt was sent or its form saved.
+  used: (id: string) => Promise<Suggestion[]>;
   onUpdated: (callback: (suggestions: Suggestion[]) => void) => Unsubscribe;
 }
 

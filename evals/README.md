@@ -30,3 +30,14 @@ env -u ELECTRON_RUN_AS_NODE pnpm exec electron . --user-data-dir=/tmp/blueberry-
 ```
 
 The cards take a few seconds to appear the first time, while the cheap model writes them, which was about 2,300 tokens in the runs so far. After that they show at once. To start again, delete the folder and seed it again.
+
+## Checking suggestions with the real model
+
+`evals/suggestionsCheck.ts` fills a new folder with two weeks of made-up history, chats and a routine that failed twice, then asks the real cheap model for suggestions once, through the app's own `Suggestions` class. It prints what the old rules would show, what the model proposed, what got past the checks and what the new tab would show, and leaves the digest it sent and the reply in the folder. It refuses a folder that isn't empty. Link `.env` first.
+
+```
+pnpm dlx tsx evals/suggestionsCheck.ts /tmp/blueberry-suggestions-check
+env -u ELECTRON_RUN_AS_NODE pnpm exec electron . --user-data-dir=/tmp/blueberry-suggestions-check
+```
+
+The app then shows the checked cards without asking again within the hour.

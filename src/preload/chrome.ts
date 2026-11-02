@@ -189,6 +189,7 @@ const chromeAPI: ChromeAPI = {
   suggestions: {
     list: () => invoke("suggestions:list"),
     dismiss: (id) => invoke("suggestions:dismiss", id),
+    used: (id) => invoke("suggestions:used", id),
     onUpdated: (callback) => subscribe("suggestions:updated", callback),
   },
   downloads: {
