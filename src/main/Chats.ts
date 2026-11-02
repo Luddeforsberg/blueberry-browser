@@ -897,14 +897,14 @@ export class Chats {
   // Runs one message as a chat with no page would, with the same tools and the same approvals, under an id of the
   // caller's. Nothing is saved here. `stop` and `decide` take that id. Never rejects.
   // With `cloud`, it works in the cloud browser's pages instead, as the cloud runner's jobs do, and `earlier` is the chat
-  // that came before the message.
+  // that came before the message. `onText` is told the reply so far as it's written.
   async runTask(
     id: string,
     message: string,
     onProgress: (progress: TaskProgress) => void,
     mascotId: string | null = null,
     sites: string[] = [],
-    { cloud = false, earlier = [] }: { cloud?: boolean; earlier?: ReplyMessage[] } = {}
+    { cloud = false, earlier = [], onText }: { cloud?: boolean; earlier?: ReplyMessage[]; onText?: (text: string) => void } = {}
   ): Promise<TaskResult> {
     let tokens = 0;
     const mascot = this.mascotOf(mascotId);
@@ -941,7 +941,7 @@ export class Chats {
     try {
       const tools = this.jobTools(id, run, null);
       this.recall(id, run, message);
-      await this.consume(id, run, [...earlier, { role: "user", content: message }], tools, () => {}, (used) => (tokens += used));
+      await this.consume(id, run, [...earlier, { role: "user", content: message }], tools, () => onText?.(run.partial), (used) => (tokens += used));
     } catch (caught) {
       if (!run.controller.signal.aborted) {
         console.error("Error in a task:", caught);

@@ -28,6 +28,8 @@ interface Entry {
   account: string;
   // Null while it's being sent.
   jobId: string | null;
+  // Stopped or deleted while it was being sent, which is done as soon as its id comes back.
+  cancel: "stop" | "forget" | null;
   active: boolean;
   status: CloudJobStatus;
   steps: ChatStep[];
@@ -44,7 +46,7 @@ export interface RunnerJobsHooks {
   contextId: () => string | null;
 }
 
-const fresh = (account: string, jobId: string | null, active: boolean): Entry => ({ account, jobId, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
+const fresh = (account: string, jobId: string | null, active: boolean): Entry => ({ account, jobId, cancel: null, active, status: "queued", steps: [], reply: "", error: null, liveView: null, approval: null });
 
 export class RunnerJobs implements ChatRunner {
   private readonly entries = new Map<string, Entry>();
@@ -127,6 +129,11 @@ export class RunnerJobs implements ChatRunner {
       });
       if (!jobId) return fail(NOT_TAKEN);
       entry.jobId = jobId;
+      if (entry.cancel === "forget") {
+        void this.server.forgetCloudJob(token, jobId).catch(() => console.error("Couldn't remove a job from the runner."));
+        return null;
+      }
+      if (entry.cancel === "stop") void this.server.stopCloudJob(token, jobId).catch(() => console.error("Couldn't stop a job on the runner."));
     } catch (error) {
       return fail(error instanceof ServerError && error.status === 400 ? TOO_MANY : NOT_TAKEN);
     }
@@ -151,6 +158,7 @@ export class RunnerJobs implements ChatRunner {
   stop(chatId: string): void {
     const entry = this.entries.get(chatId);
     const jobId = entry?.jobId;
+    if (this.mine(entry) && entry.active && !jobId) entry.cancel = "stop";
     if (this.mine(entry) && jobId) void this.withToken(entry.account, (token) => this.server!.stopCloudJob(token, jobId));
   }
 
@@ -158,6 +166,7 @@ export class RunnerJobs implements ChatRunner {
     const entry = this.entries.get(chatId);
     const jobId = entry?.jobId;
     const ours = this.mine(entry);
+    if (ours && entry.active && !jobId) entry.cancel = "forget";
     this.entries.delete(chatId);
     this.save();
     if (ours && jobId) void this.withToken(entry.account, (token) => this.server!.forgetCloudJob(token, jobId));
@@ -230,7 +239,7 @@ export class RunnerJobs implements ChatRunner {
     if (!row) return this.finish(chatId, entry, GONE);
     const status = typeof row.status === "string" ? (row.status as CloudJobStatus) : entry.status;
     const approval = approvalFromRow(row);
-    const next: Omit<Entry, "account" | "jobId" | "active"> = {
+    const next: Omit<Entry, "account" | "jobId" | "cancel" | "active"> = {
       status,
       steps: stepsFromRow(row.steps),
       reply: typeof row.reply === "string" ? row.reply : "",

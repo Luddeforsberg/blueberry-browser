@@ -92,8 +92,6 @@ alter table public.cloud_approvals enable row level security;
 
 create policy "Users read their own jobs" on public.cloud_jobs
   for select to authenticated using (owner = public.cloud_user());
-create policy "Users start their own jobs" on public.cloud_jobs
-  for insert to authenticated with check (owner = public.cloud_user());
 create policy "Users remove their own jobs" on public.cloud_jobs
   for delete to authenticated using (owner = public.cloud_user());
 create policy "The runner reads its user's jobs" on public.cloud_jobs
@@ -110,12 +108,11 @@ create policy "The runner asks on its user's running jobs" on public.cloud_appro
     and exists (select 1 from public.cloud_jobs j where j.id = job_id and j.owner = public.cloud_user() and j.status = 'running')
   );
 
--- Rows say whose. These say which columns. The user writes what they asked for, the runner what happened, and nobody
--- writes a decision: that's only the function below. Nobody but the database changes `owner` or the dates it stamps.
+-- Rows say whose. These say which columns. The user writes what they asked for, only through `start_cloud_job`, the
+-- runner what happened, and nobody writes a decision: that's only the function below. Nobody but the database changes `owner` or the dates it stamps.
 revoke all on table public.cloud_jobs from public, anon, authenticated, blueberry_runner;
 revoke all on table public.cloud_approvals from public, anon, authenticated, blueberry_runner;
 grant select, delete on table public.cloud_jobs to authenticated;
-grant insert (prompt, history, mascot, action_approval, context_id) on table public.cloud_jobs to authenticated;
 grant select on table public.cloud_jobs to blueberry_runner;
 grant update (status, steps, reply, error, live_view_url, claimed_at, heartbeat_at, updated_at, finished_at) on table public.cloud_jobs to blueberry_runner;
 grant select on table public.cloud_approvals to authenticated, blueberry_runner;
@@ -123,19 +120,23 @@ grant insert (job_id, owner, kind, text, need, site) on table public.cloud_appro
 
 -- For the user, as themselves, so the rules above apply.
 
--- At most a few at a time, so one account can't fill the queue.
+-- The only way a job is made, and at most a few at a time, so one account can't fill the queue. Its owner is whoever
+-- calls it, and one call per user at a time holds the lock, so two at once can't both get under the limit.
 create function public.start_cloud_job(p_prompt text, p_history jsonb, p_mascot jsonb, p_action_approval text, p_context_id text)
 returns uuid
-language plpgsql security invoker set search_path = ''
+language plpgsql security definer set search_path = ''
 as $$
 declare
+  me uuid := public.cloud_user();
   made uuid;
 begin
+  if me is null then raise exception 'Not signed in' using errcode = '42501'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('cloud_jobs:' || me::text, 0));
   if (select count(*) from public.cloud_jobs j where j.owner = public.cloud_user() and j.status in ('queued', 'running', 'waiting')) >= 5 then
     raise exception 'Too many cloud jobs at once' using errcode = 'P0001';
   end if;
-  insert into public.cloud_jobs (prompt, history, mascot, action_approval, context_id)
-    values (p_prompt, coalesce(p_history, '[]'), p_mascot, coalesce(p_action_approval, 'risky'), nullif(p_context_id, ''))
+  insert into public.cloud_jobs (owner, prompt, history, mascot, action_approval, context_id)
+    values (me, p_prompt, coalesce(p_history, '[]'), p_mascot, coalesce(p_action_approval, 'risky'), nullif(p_context_id, ''))
     returning id into made;
   return made;
 end;

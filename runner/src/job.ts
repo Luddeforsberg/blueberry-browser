@@ -26,7 +26,8 @@ export interface JobBrowser {
   cloud: ChatCloud;
   // The live view of that page, or null where there's none.
   liveView(pageId: string): Promise<string | null>;
-  end(): Promise<void>;
+  // True once the provider has confirmed it ended. Until then it may still be running, and costing.
+  end(): Promise<boolean>;
 }
 
 export const sessionBrowser = (sessions: CloudSessions): JobBrowser => ({
@@ -46,8 +47,36 @@ export const sessionBrowser = (sessions: CloudSessions): JobBrowser => ({
     giveBack: () => {},
   },
   liveView: (pageId) => sessions.liveView(pageId),
-  end: () => sessions.end(),
+  end: async () => {
+    await sessions.end();
+    return !sessions.unreleased;
+  },
 });
+
+// Browsers whose end the provider didn't confirm, tried again until it does, so a passing failure doesn't leave a paid
+// session running until it times out.
+export class UnreleasedBrowsers {
+  private readonly waiting = new Set<JobBrowser>();
+
+  constructor(private readonly log: (line: string) => void = console.log) {}
+
+  keep(browser: JobBrowser): void {
+    this.waiting.add(browser);
+  }
+
+  get count(): number {
+    return this.waiting.size;
+  }
+
+  async retry(): Promise<void> {
+    for (const browser of this.waiting) {
+      if (await browser.end().catch(() => false)) {
+        this.waiting.delete(browser);
+        this.log("A cloud browser that hadn't ended has now.");
+      }
+    }
+  }
+}
 
 // A runner has no saved chats. A task never reads or writes one, so this only has to say there are none.
 const NO_CHATS: ChatStoreLike = {
@@ -69,6 +98,8 @@ export interface RunJobOptions {
   streamReply?: StreamReply;
   // Aborted when the runner shuts down.
   signal?: AbortSignal;
+  // Told about a browser whose end wasn't confirmed, to try again later.
+  unreleased?: UnreleasedBrowsers;
   pollMs?: number;
   heartbeatMs?: number;
   answerTimeoutMs?: number;
@@ -183,7 +214,9 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   log(`Job ${job.id}: started.`);
   try {
     if (signal?.aborted) stop(SHUT_DOWN);
-    const result = await chats.runTask(job.id, job.prompt, onProgress, mascot.id, [], { cloud: true, earlier: job.history });
+    // The reply so far goes with the steps, so words written before a long wait show while it waits.
+    const onText = (reply: string) => void write({ reply });
+    const result = await chats.runTask(job.id, job.prompt, onProgress, mascot.id, [], { cloud: true, earlier: job.history, onText });
     clearInterval(heartbeat);
     await writing;
     const status = result.stopped ? "stopped" : result.error ? "failed" : "done";
@@ -203,6 +236,9 @@ export const runJob = async (job: ClaimedJob, options: RunJobOptions): Promise<"
   } finally {
     clearInterval(heartbeat);
     signal?.removeEventListener("abort", onShutDown);
-    await browser.end().catch(() => log(`Job ${job.id}: couldn't end its cloud browser.`));
+    if (!(await browser.end().catch(() => false))) {
+      log(`Job ${job.id}: its cloud browser didn't confirm it ended, so the runner will try again.`);
+      options.unreleased?.keep(browser);
+    }
   }
 };

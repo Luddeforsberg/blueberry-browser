@@ -3,7 +3,7 @@ import { browserbase } from "../../src/main/browserbase";
 import { CloudSessions, type CloudBrowser } from "../../src/main/cloudBrowser";
 import { isLocalEndpoint, localChrome } from "../../src/main/localChrome";
 import { dbConfig, supabaseDb, type ClaimedJob } from "./db";
-import { runJob, sessionBrowser } from "./job";
+import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { quietConsole } from "./quietConsole";
 
 quietConsole();
@@ -53,13 +53,15 @@ const cloudBrowser = (contextId: string | null): CloudBrowser =>
       });
 
 const db = supabaseDb(config as Exclude<typeof config, string>);
+const unreleased = new UnreleasedBrowsers();
 const shutdown = new AbortController();
 let working: Promise<unknown> | null = null;
 const quit = () => {
   if (shutdown.signal.aborted) return;
   console.log("Shutting down.");
   shutdown.abort();
-  void (working ?? Promise.resolve()).finally(() => process.exit(0));
+  // One last try at anything left running at the provider.
+  void (working ?? Promise.resolve()).then(() => unreleased.retry()).finally(() => process.exit(0));
 };
 process.on("SIGTERM", quit);
 process.on("SIGINT", quit);
@@ -70,6 +72,7 @@ const loop = async () => {
   console.log(`Runner started, using ${local ? "a local Chrome" : "Browserbase"}.`);
   let unreachable = false;
   while (!shutdown.signal.aborted) {
+    await unreleased.retry();
     let job: ClaimedJob | null = null;
     try {
       job = await db.claim();
@@ -89,6 +92,7 @@ const loop = async () => {
       db,
       browser: (contextId) => sessionBrowser(new CloudSessions(cloudBrowser(contextId))),
       signal: shutdown.signal,
+      unreleased,
     }).catch(() => console.error(`Job ${id}: the runner couldn't finish it.`));
     await working;
     working = null;

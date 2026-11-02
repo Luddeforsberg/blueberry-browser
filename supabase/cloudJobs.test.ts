@@ -157,12 +157,16 @@ describe("the cloud jobs' database rules", () => {
     expect(await job(id)).toBeUndefined();
   });
 
-  it("stops a queued job at once, and lets an account have five going at a time", async () => {
+  it("stops a queued job at once, and lets an account have five going at a time, made only through the function", async () => {
     const CAROL = await newUser();
     const first = await start(CAROL);
     expect(await user(CAROL, `select public.stop_cloud_job('${first}') as stopped`)).toEqual([{ stopped: true }]);
     expect((await job(first)).status).toBe("stopped");
     for (let at = 0; at < 5; at++) await start(CAROL);
     await expect(start(CAROL)).rejects.toThrow(/Too many/);
+    // Not by writing the row straight in either, and not signed out.
+    await expect(user(CAROL, `insert into public.cloud_jobs (prompt, mascot) values ('More', ${MASCOT})`)).rejects.toThrow(/permission denied/);
+    await expect(as("anon", null, `select public.start_cloud_job('More', '[]', ${MASCOT}, 'risky', null)`)).rejects.toThrow(/permission denied/);
+    expect(await user(CAROL, "select count(*)::int as n from public.cloud_jobs where status = 'queued'")).toEqual([{ n: 5 }]);
   });
 });

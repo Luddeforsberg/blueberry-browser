@@ -4,7 +4,7 @@ import type { ChatCloud } from "../../src/main/Chats";
 import { mascotSnapshot } from "../../src/main/cloudJobs";
 import { BERRY } from "../../src/shared/mascots";
 import { dbConfig, type ClaimedJob, type Decision, type JobUpdate, type RunnerDb } from "./db";
-import { NO_ANSWER, runJob, SHUT_DOWN, type JobBrowser } from "./job";
+import { NO_ANSWER, runJob, SHUT_DOWN, UnreleasedBrowsers, type JobBrowser } from "./job";
 
 const ASKED = "Click the button “Place order” on shop.example";
 
@@ -45,8 +45,9 @@ const fakeDb = (answers: (Decision | "stop")[] = []) => {
   return { db, calls, updates, final: () => updates.at(-1) };
 };
 
-const fakeBrowser = () => {
-  const seen = { contextId: undefined as string | null | undefined, ended: false };
+// `releases` says how each end goes at the provider, in order. Every end after them is confirmed.
+const fakeBrowser = (releases: boolean[] = []) => {
+  const seen = { contextId: undefined as string | null | undefined, ended: false, ends: 0 };
   const cloud: ChatCloud = {
     available: () => true,
     claim: () => true,
@@ -63,7 +64,15 @@ const fakeBrowser = () => {
     seen,
     browser: (contextId: string | null): JobBrowser => {
       seen.contextId = contextId;
-      return { cloud, liveView: async () => null, end: async () => void (seen.ended = true) };
+      return {
+        cloud,
+        liveView: async () => null,
+        end: async () => {
+          seen.ends++;
+          seen.ended = releases.shift() ?? true;
+          return seen.ended;
+        },
+      };
     },
   };
 };
@@ -78,7 +87,33 @@ describe("a job on the runner", () => {
     expect(calls.find(({ name }) => name === "ask")?.args).toEqual(["job-1", { kind: "approval", text: ASKED, need: null, site: null }]);
     expect(calls.filter(({ name }) => name === "decision")).toHaveLength(3);
     expect(final()).toMatchObject({ status: "done", reply: "Ordered it" });
-    expect(seen).toEqual({ contextId: "ctx-1", ended: true });
+    expect(seen).toEqual({ contextId: "ctx-1", ended: true, ends: 1 });
+  });
+
+  it("saves the reply so far with the steps, before it waits", async () => {
+    const { db, calls } = fakeDb([{ decision: "allow", answer: null }]);
+    const talkative: StreamReply = async function* (_messages, _signal, { approve }) {
+      yield "Found it. ";
+      await approve(ASKED);
+      yield "Ordered it";
+    };
+    expect(await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: talkative })).toBe("done");
+    const asked = calls.findIndex(({ name }) => name === "ask");
+    const before = calls.slice(0, asked).map(({ args }) => (args[1] as JobUpdate | undefined)?.reply);
+    expect(before).toContain("Found it. ");
+  });
+
+  it("keeps a browser whose end wasn't confirmed, and tries again until it is", async () => {
+    const { db } = fakeDb([{ decision: "allow", answer: null }]);
+    const { seen, browser } = fakeBrowser([false, false]);
+    const unreleased = new UnreleasedBrowsers(() => {});
+    expect(await runJob(JOB, { ...options, db, browser, streamReply: askingReply, unreleased })).toBe("done");
+    expect(unreleased.count).toBe(1);
+    await unreleased.retry();
+    expect(unreleased.count).toBe(1);
+    await unreleased.retry();
+    expect(unreleased.count).toBe(0);
+    expect(seen.ends).toBe(3);
   });
 
   it("passes on a no", async () => {

@@ -15,19 +15,22 @@ const BO = "bo@example.com";
 const setUp = () => {
   // While set, every token waits for it, as a refresh does.
   let refreshing: Promise<void> | null = null;
+  // While set, the server's answer to a new job waits for it.
+  let answering: Promise<void> | null = null;
   const jobs = new Map<string, { owner: string; row: Record<string, unknown> }>();
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
     startCloudJob: vi.fn(async (token: string) => {
+      await answering;
       const id = `job-${jobs.size + 1}`;
       jobs.set(id, { owner: token, row: { id, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
       return id;
     }),
     cloudJobs: async (token: string, ids: string[]) => ids.flatMap((id) => (jobs.get(id)?.owner === token ? [jobs.get(id)!.row] : [])),
     decideCloudApproval: vi.fn(async () => true),
-    stopCloudJob: async () => {},
-    forgetCloudJob: async () => {},
+    stopCloudJob: vi.fn(async () => {}),
+    forgetCloudJob: vi.fn(async () => {}),
   } as unknown as GalleryServer;
   const changed = vi.fn();
   const finished = vi.fn();
@@ -46,15 +49,17 @@ const setUp = () => {
     runner.accountChanged();
   };
   const send = () => runner.start("chat-1", { prompt: "Order it", earlier: [], mascot: BERRY, actionApproval: "risky" });
-  const holdTokens = () => {
+  const hold = (set: (gate: Promise<void> | null) => void) => {
     let release = () => {};
-    refreshing = new Promise((resolve) => (release = resolve));
+    set(new Promise((resolve) => (release = resolve)));
     return () => {
-      refreshing = null;
+      set(null);
       release();
     };
   };
-  return { runner, jobs, signIn, send, changed, finished, server, holdTokens };
+  const holdTokens = () => hold((gate) => (refreshing = gate));
+  const holdAnswers = () => hold((gate) => (answering = gate));
+  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers };
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
@@ -70,6 +75,23 @@ describe("runner jobs in the app", () => {
     expect(await sending).toContain("another account");
     expect(server.startCloudJob).not.toHaveBeenCalled();
     expect(runner.progress("chat-1")).toBeNull();
+  });
+
+  it.each([
+    ["Stop", "stopCloudJob" as const],
+    ["deleting the chat", "forgetCloudJob" as const],
+  ])("does %s on a job still being sent as soon as its id comes back", async (_, call) => {
+    const { runner, send, server, holdAnswers } = setUp();
+    const release = holdAnswers();
+    const sending = send();
+    await settle();
+    if (call === "stopCloudJob") runner.stop("chat-1");
+    else runner.forget("chat-1");
+    release();
+    await sending;
+    await settle();
+    expect(server[call]).toHaveBeenCalledWith(ANA, "job-1");
+    runner.destroy();
   });
 
   it("shows nothing of a job once its account signs out, and can't answer it", async () => {
