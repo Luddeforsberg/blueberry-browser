@@ -123,6 +123,7 @@ const waitingSample = (id: string, approval: Omit<NeedsYouItem['approval'], 'id'
     mascotId: BERRY_ID,
     job,
     routineId: null,
+    from: null,
     lastStep: 'Opened example.com',
     tabId: null,
     askedAt: 0
@@ -335,8 +336,8 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Chat in the sidebar">
                     <ul className="max-w-xs">
-                        <ChatRow chat={{ id: 'gallery-1', title: 'Long weekend in Lisbon', updatedAt: Date.now(), mascotId: null }} selected={false} onOpen={() => undefined} />
-                        <ChatRow chat={{ id: 'gallery-2', title: 'The open chat', updatedAt: Date.now(), mascotId: null }} selected onOpen={() => undefined} />
+                        <ChatRow chat={{ id: 'gallery-1', title: 'Long weekend in Lisbon', updatedAt: Date.now(), mascotId: null, from: null }} selected={false} onOpen={() => undefined} />
+                        <ChatRow chat={{ id: 'gallery-2', title: 'The open chat', updatedAt: Date.now(), mascotId: null, from: null }} selected onOpen={() => undefined} />
                     </ul>
                 </Section>
 

@@ -33,6 +33,9 @@ import type { Downloads } from "./Downloads";
 import type { SitePermissions } from "./SitePermissions";
 import { PermissionPromptView } from "./PermissionPromptView";
 import { DesktopBerry } from "./DesktopBerry";
+import { McpConnector } from "./McpConnector";
+import { createMcpTools, type McpTool } from "./mcpTools";
+import { readTabText } from "./mcpPages";
 import {
   computeLayout,
   MIN_WINDOW,
@@ -125,6 +128,7 @@ export class Window {
   readonly permissionPrompt: PermissionPromptView;
   readonly desktopBerry: DesktopBerry;
   readonly memory: MemoryStore;
+  readonly mcp: McpConnector;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -345,6 +349,8 @@ export class Window {
       showBlueberry: () => this.bringForward(),
     });
 
+    this.mcp = new McpConnector(join(app.getPath("userData"), "mcp.json"), () => this.mcpTools, () => sendToRenderer(this.chrome.view.webContents, "mcp:updated", this.mcp.state));
+
     if (restored) this.restoreSession(restored);
     else this.createTab();
     this.updateAllBounds();
@@ -352,6 +358,7 @@ export class Window {
     this.routines.start();
     this.telegram.start();
     this.phone.start();
+    this.mcp.start();
 
     this.windowSize = this._baseWindow.getBounds();
     this._baseWindow.on("resize", () => {
@@ -378,6 +385,7 @@ export class Window {
       this.routines.shutdown();
       this.phone.stop();
       this.telegram.close();
+      this.mcp.close();
       this.permissionPrompt.destroy();
       session.defaultSession.off("will-download", onDownload);
       offDownloads();
@@ -452,6 +460,39 @@ export class Window {
 
   private publishSuggestions(): void {
     sendToRenderer(this.chrome.view.webContents, "suggestions:updated", this.suggestions.list());
+  }
+
+  // What Claude and other apps can do over MCP, each through the path the user's own action takes. Made once, since it
+  // remembers the routine runs it started.
+  private mcpToolList: McpTool[] | null = null;
+  private get mcpTools(): McpTool[] {
+    return (this.mcpToolList ??= createMcpTools({
+      mascots: () => this.mascotStore.all(),
+      startChat: (task, { mascotId, sites, from }) => this.chats.send(null, task, { seePage: false, mascotId, sites, from }),
+      chat: (id) => this.chats.thread(id),
+      chatsFromApps: () => this.chatStore.summaries().filter((chat) => chat.from),
+      isRunning: (id) => this.chats.isRunning(id),
+      outcome: (id) => this.chats.work(id)?.outcome ?? null,
+      stop: (id) => this.chats.stop(id),
+      waiting: () => this.chats.waiting(),
+      answer: (id, approvalId, answer) => this.chats.decide(id, approvalId, true, answer, { fromApp: true }),
+      routines: () => this.routines.list(),
+      runRoutine: (id, onStart) => this.routines.runNow(id, onStart),
+      routineRuns: (id) => this.routines.runs(id),
+      stopRoutineRun: (runId) => this.routines.stop(runId),
+      cancelRoutineRequest: (id) => this.routines.cancelRequest(id),
+      tabs: () =>
+        this.allTabs.map((tab) => ({ id: tab.id, title: tab.title, url: tab.url, active: tab.id === this.activeTabId, working: tab.berryWorking, heldForUser: tab.heldForUser })),
+      readTab: (tabId, offset) => {
+        const tab = this.allTabs.find(({ id }) => id === tabId);
+        return tab ? readTabText(tab, offset) : Promise.resolve(`There is no web page in tab ${tabId}.`);
+      },
+      searchHistory: (query, limit) => this.history.search({ query, limit }).entries,
+      recentHistory: (limit) => this.history.recent(limit),
+      bookmarks: () => ({ bookmarks: this.bookmarkStore.get(), pinned: this.pinnedStore.get() }),
+      facts: () => this.mascotStore.all().flatMap(({ id }) => this.memory.factsOf(id)),
+      clean: (text) => this.chats.withoutCodes(text),
+    }));
   }
 
   private get needsYou(): NeedsYouItem[] {

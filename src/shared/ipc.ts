@@ -126,6 +126,33 @@ export interface PhoneState {
   problem: string | null;
 }
 
+// Claude and other apps on this computer using Blueberry over MCP. The token never comes back from main: snippets
+// here show it hidden, and copying one puts the real one straight on the clipboard.
+export interface McpSnippet {
+  app: string;
+  where: string;
+  text: string;
+}
+
+export interface McpActivity {
+  id: string;
+  client: string;
+  tool: string;
+  at: number;
+  summary: string;
+  failed: boolean;
+}
+
+export interface McpState {
+  on: boolean;
+  // Null while it's off, or couldn't start.
+  url: string | null;
+  problem: string | null;
+  snippets: McpSnippet[];
+  // Newest first. Memory only, so it starts empty on each launch.
+  activity: McpActivity[];
+}
+
 export interface PhoneAnswered {
   approvalId: string;
   said: string;
@@ -451,6 +478,12 @@ export interface InvokeChannels {
   "phone:new-link": { region: "chrome"; args: []; result: PhoneState };
   "phone:open-link": { region: "chrome"; args: []; result: void };
   "phone:disconnect": { region: "chrome"; args: []; result: PhoneState };
+  "mcp:state": { region: "chrome"; args: []; result: McpState };
+  "mcp:set-on": { region: "chrome"; args: [on: boolean]; result: McpState };
+  // A new token, so every app set up with the old one is refused.
+  "mcp:revoke": { region: "chrome"; args: []; result: McpState };
+  // Puts that app's snippet, with the real token, on the clipboard.
+  "mcp:copy": { region: "chrome"; args: [app: string]; result: boolean };
   "permissions:current": { region: "prompt"; args: []; result: PermissionPrompt | null };
   "permissions:decide": { region: "prompt"; args: [promptId: string, allow: boolean]; result: boolean };
   "permissions:resize": { region: "prompt"; args: [height: number]; result: void };
@@ -464,6 +497,7 @@ export interface EventChannels {
   "account:updated": AccountState;
   "phone:updated": PhoneState;
   "phone:answered": PhoneAnswered;
+  "mcp:updated": McpState;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
   "desktop:state": DesktopBerryState;
@@ -660,6 +694,14 @@ export interface PhoneAPI {
   onAnswered: (callback: (answered: PhoneAnswered) => void) => Unsubscribe;
 }
 
+export interface McpAPI {
+  state: () => Promise<McpState>;
+  setOn: (on: boolean) => Promise<McpState>;
+  revoke: () => Promise<McpState>;
+  copy: (app: string) => Promise<boolean>;
+  onUpdated: (callback: (state: McpState) => void) => Unsubscribe;
+}
+
 export interface DesktopAPI {
   // For Settings and the chrome's own bird. The chrome can't call the rest.
   shortcutTaken: () => Promise<boolean>;
@@ -697,4 +739,5 @@ export interface ChromeAPI {
   downloads: DownloadsAPI;
   permissions: PermissionsAPI;
   phone: PhoneAPI;
+  mcp: McpAPI;
 }

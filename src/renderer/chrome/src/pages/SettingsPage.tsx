@@ -7,6 +7,7 @@ import { SettingsRow } from '../components/SettingsRow'
 import { DownloadSettings, SitePermissionsSettings } from './SiteSettings'
 import { HistoryImportSettings } from '../components/HistoryImport'
 import { PhoneSettings } from './PhoneSettings'
+import { McpSettings } from './McpSettings'
 import { AccountSettings } from './AccountSettings'
 import { Button } from '@common/components/Button'
 
@@ -23,7 +24,7 @@ const STARTUP_DESCRIPTIONS: Record<StartupChoice, string> = {
 
 const DESKTOP_SHORTCUT = /Mac/.test(navigator.platform) ? '⌥Space' : 'Alt+Space'
 
-const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Phone', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
+const SECTIONS = ['Layout', 'Appearance', 'Berry', 'Phone', 'Claude', 'Downloads', 'Site permissions', 'Data and privacy', 'Account'] as const
 type Section = typeof SECTIONS[number]
 
 export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
@@ -159,6 +160,8 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
 
                         {section === 'Phone' && <PhoneSettings />}
+
+                        {section === 'Claude' && <McpSettings />}
 
                         {section === 'Downloads' && <DownloadSettings />}
 

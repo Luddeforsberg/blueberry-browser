@@ -79,8 +79,8 @@ const lastResult = (run: RoutineRun | null, now: number): string => {
 // so even a crash leaves a record of how far it got.
 export class Routines {
   private readonly active = new Map<string, ActiveRun>();
-  // Run now, when every place was taken.
-  private readonly requested = new Set<string>();
+  // Run now, when every place was taken, each with whoever asked to hear which run it became.
+  private readonly requested = new Map<string, ((runId: string) => void) | undefined>();
   private timer: NodeJS.Timeout | null = null;
   private stopped = false;
 
@@ -115,12 +115,13 @@ export class Routines {
     if (this.timer) clearTimeout(this.timer);
     const now = Date.now();
 
-    this.requested.forEach((id) => {
+    this.requested.forEach((onStart, id) => {
       const routine = this.store.routine(id);
       if (!routine || this.active.has(id)) this.requested.delete(id);
       else if (this.hasFreePlace) {
         this.requested.delete(id);
-        this.begin(routine, null);
+        const runId = this.begin(routine, null);
+        onStart?.(runId);
       }
     });
 
@@ -144,7 +145,7 @@ export class Routines {
     this.timer = setTimeout(() => this.tick(), wait);
   }
 
-  private begin(routine: StoredRoutine, lateFor: number | null): void {
+  private begin(routine: StoredRoutine, lateFor: number | null): string {
     const now = Date.now();
     const runId = this.store.startRun(routine.id, now, lateFor);
     const run: ActiveRun = { runId, steps: [], approval: null };
@@ -154,6 +155,7 @@ export class Routines {
     void this.runner
       .runTask(runId, prompt(routine, now), (progress) => this.onProgress(routine, run, progress), routine.mascotId, routine.sites)
       .then((result) => this.finish(routine.id, run, result));
+    return runId;
   }
 
   private onProgress(routine: StoredRoutine, run: ActiveRun, { steps, approval, tokens, memoryIds }: TaskProgress): void {
@@ -271,12 +273,22 @@ export class Routines {
     return true;
   }
 
-  // False if it's running already, since a routine never runs twice at once.
-  runNow(id: string): boolean {
+  // False if it's running already, since a routine never runs twice at once. `onStart` hears the id of the run this
+  // becomes, which may be later, once a place is free.
+  runNow(id: string, onStart?: (runId: string) => void): boolean {
     if (!this.store.routine(id) || this.active.has(id)) return false;
-    this.requested.add(id);
+    // Asked again while it waits: it's still one run, and everyone who asked hears which.
+    const before = this.requested.get(id);
+    this.requested.set(id, before && onStart ? (runId) => (before(runId), onStart(runId)) : (onStart ?? before));
     this.events.onChanged();
     this.tick();
+    return true;
+  }
+
+  // Takes back a Run now that's still waiting for a place.
+  cancelRequest(id: string): boolean {
+    if (!this.requested.delete(id)) return false;
+    this.events.onChanged();
     return true;
   }
 
