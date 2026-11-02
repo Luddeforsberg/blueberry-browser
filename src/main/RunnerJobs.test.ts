@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { AccountState } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
-import type { GalleryServer } from "./galleryServer";
+import { ServerError, type GalleryServer } from "./galleryServer";
 import { RunnerJobs } from "./RunnerJobs";
 
 const LIVE = "https://www.browserbase.com/devtools-fullscreen/inspector.html";
@@ -17,19 +17,22 @@ const setUp = () => {
   let refreshing: Promise<void> | null = null;
   // While set, the server's answer to a new job waits for it.
   let answering: Promise<void> | null = null;
+  // Whether the runner is still linked, as the server would say.
+  const link = { accepted: true };
   const jobs = new Map<string, { owner: string; row: Record<string, unknown> }>();
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
     startCloudJob: vi.fn(async (token: string) => {
       await answering;
+      if (!link.accepted) throw new ServerError(400, "");
       const id = `job-${jobs.size + 1}`;
       jobs.set(id, { owner: token, row: { id, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
       return id;
     }),
     cloudJobs: async (token: string, ids: string[]) => ids.flatMap((id) => (jobs.get(id)?.owner === token ? [jobs.get(id)!.row] : [])),
     decideCloudApproval: vi.fn(async () => true),
-    myCloudRunner: async () => ({ email: "runner@example.com", accepted: true }),
+    myCloudRunner: async () => (link.accepted ? { email: "runner@example.com", accepted: true } : null),
     stopCloudJob: vi.fn(async () => {}),
     forgetCloudJob: vi.fn(async () => {}),
   } as unknown as GalleryServer;
@@ -60,7 +63,7 @@ const setUp = () => {
   };
   const holdTokens = () => hold((gate) => (refreshing = gate));
   const holdAnswers = () => hold((gate) => (answering = gate));
-  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers };
+  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers, link };
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
@@ -92,6 +95,17 @@ describe("runner jobs in the app", () => {
     await sending;
     await settle();
     expect(server[call]).toHaveBeenCalledWith(ANA, "job-1");
+    runner.destroy();
+  });
+
+  it("says a runner unlinked elsewhere is why a job wasn't taken, and stops offering it", async () => {
+    const { runner, send, link } = setUp();
+    await settle();
+    expect(runner.available()).toBe(true);
+    link.accepted = false;
+    expect(await send()).toContain("isn't linked any more");
+    expect(runner.available()).toBe(false);
+    expect(runner.runnerState.status).toBe("none");
     runner.destroy();
   });
 

@@ -8,7 +8,7 @@ It runs the app's own code, `Chats.runTask` with the same agent, tools, mascot l
 
 The runner is a Supabase user of its own, such as `runner@yourdomain`, signed in with its email and password and the publishable key, and its session refreshes like the app's. It only uses Supabase's new keys: no service key, no secret key and no JWT secret.
 
-You link it to your account in Blueberry, and it accepts the link when it starts, naming your account back. Until both sides have, it can't see anything. Once linked it can read your unfinished jobs, claim them, write their steps, reply, error and live view, ask for approvals and read your answers, all through the `runner_*` functions. It can't start jobs, stop or delete them, or decide an approval by any route: `decide_cloud_approval` refuses a runner outright, and nobody can write those tables directly. One runner per owner, and one owner per runner.
+You link it to your account in Blueberry, and it accepts the link when it starts, naming your account back. Until both sides have, it can't see anything. Once linked it can read your unfinished jobs, claim them, write their steps, reply, error and live view, ask for approvals and read your answers, all through the `runner_*` functions. Nobody can send a job until a runner has accepted, so nothing waits in a queue no runner takes from. It can't start jobs, stop or delete them, or decide an approval by any route: `decide_cloud_approval` refuses a runner outright, and nobody can write those tables directly. One runner per owner, and one owner per runner.
 
 ## Deploy
 

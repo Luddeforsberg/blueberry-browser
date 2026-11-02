@@ -23,8 +23,11 @@ const FAILED = "The job failed on the runner.";
 const GONE = "This job isn't on your account any more.";
 const NO_SUCH_RUNNER = "There's no Blueberry account with that email that can be your runner. Create it in Supabase first, and don't use your own.";
 const LINK_FAILED = "The runner couldn't be linked. Try again in a moment.";
-// While the runner hasn't accepted yet, it's looked up again this often.
+// The link is looked up again this often while the runner hasn't accepted, and less often once it has, in case it's
+// been unlinked elsewhere. Opening the composer looks too.
 const LINK_POLL_MS = 10_000;
+const LINKED_POLL_MS = 5 * 60_000;
+const NO_RUNNER = "Your runner isn't linked any more, so this wasn't sent. Link it again in Settings > Cloud.";
 const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
 const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 
@@ -102,7 +105,7 @@ export class RunnerJobs implements ChatRunner {
     return { status: this.link.accepted ? "linked" : "waiting", email: this.link.email, problem: this.linkProblem };
   }
 
-  // Asks the server who the runner is. While it hasn't accepted, it keeps asking now and then.
+  // Asks the server who the runner is, and again now and then while someone's signed in.
   async refreshLink(): Promise<RunnerState> {
     if (this.linkTimer) clearTimeout(this.linkTimer);
     this.linkTimer = null;
@@ -112,7 +115,7 @@ export class RunnerJobs implements ChatRunner {
       const link = await this.withToken(account, (token) => this.server!.myCloudRunner(token).then((found) => ({ found })));
       if (link && this.signedIn === account) this.link = link.found;
     }
-    if (this.link && !this.link.accepted) this.linkTimer = setTimeout(() => void this.refreshLink(), LINK_POLL_MS);
+    if (this.link) this.linkTimer = setTimeout(() => void this.refreshLink(), this.link.accepted ? LINKED_POLL_MS : LINK_POLL_MS);
     this.hooks.runnerUpdated?.(this.runnerState);
     return this.runnerState;
   }
@@ -189,7 +192,10 @@ export class RunnerJobs implements ChatRunner {
       }
       if (entry.cancel === "stop") void this.server.stopCloudJob(token, jobId).catch(() => console.error("Couldn't stop a job on the runner."));
     } catch (error) {
-      return fail(error instanceof ServerError && error.status === 400 ? TOO_MANY : NOT_TAKEN);
+      if (!(error instanceof ServerError && error.status === 400)) return fail(NOT_TAKEN);
+      // Refused as too many, or because the runner was unlinked elsewhere. The link says which.
+      await this.refreshLink();
+      return fail(this.link?.accepted ? TOO_MANY : NO_RUNNER);
     }
     this.save();
     this.schedule();

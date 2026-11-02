@@ -156,6 +156,13 @@ as $$
   select u.email::text, l.accepted from public.cloud_runner_links l join auth.users u on u.id = l.runner where l.owner = auth.uid();
 $$;
 
+-- One lock per account, around both "has it jobs" and "is it a runner". Accepting takes the runner's, and starting a
+-- job takes the owner's, before either looks, so the two can't both pass for the same account at once.
+create function public.lock_cloud_account(p_account uuid) returns void
+language sql security definer set search_path = ''
+as $$ select pg_advisory_xact_lock(hashtextextended('cloud_jobs:' || p_account::text, 0)) $$;
+revoke all on function public.lock_cloud_account(uuid) from public, anon, authenticated;
+
 -- The runner takes up the link from the owner it was set up for, by their email. False if that owner hasn't offered one.
 -- An account that has jobs of its own can't become anyone's runner.
 create function public.accept_cloud_runner_link(p_owner_email text) returns boolean
@@ -164,7 +171,9 @@ as $$
 declare
   me uuid := auth.uid();
 begin
-  if me is null or exists (select 1 from public.cloud_jobs j where j.owner = me) then return false; end if;
+  if me is null then return false; end if;
+  perform public.lock_cloud_account(me);
+  if exists (select 1 from public.cloud_jobs j where j.owner = me) then return false; end if;
   update public.cloud_runner_links l set accepted = true
     where l.runner = me and l.owner = (select u.id from auth.users u where lower(u.email) = lower(btrim(p_owner_email)))
       and not exists (select 1 from public.cloud_runner_links o where o.runner = me and o.accepted and o.owner <> l.owner);
@@ -175,7 +184,8 @@ $$;
 -- For the user, as themselves, so the rules above apply.
 
 -- The only way a job is made, and at most a few at a time, so one account can't fill the queue. Its owner is whoever
--- calls it, and one call per user at a time holds the lock, so two at once can't both get under the limit.
+-- calls it, who needs a runner that has accepted, so nothing waits where no runner will take it. One call per account
+-- at a time holds the lock, so two at once can't both get under the limit, or slip past a runner accepting this account.
 create function public.start_cloud_job(p_prompt text, p_history jsonb, p_mascot jsonb, p_action_approval text, p_context_id text)
 returns uuid
 language plpgsql security definer set search_path = ''
@@ -185,9 +195,12 @@ declare
   made uuid;
 begin
   if me is null then raise exception 'Not signed in' using errcode = '42501'; end if;
+  perform public.lock_cloud_account(me);
   -- A runner works on its owner's jobs and has none of its own.
   if public.cloud_runner_for() is not null then raise exception 'A runner can''t start jobs' using errcode = '42501'; end if;
-  perform pg_advisory_xact_lock(hashtextextended('cloud_jobs:' || me::text, 0));
+  if not exists (select 1 from public.cloud_runner_links l where l.owner = me and l.accepted) then
+    raise exception 'No runner has accepted a link to this account' using errcode = 'P0001';
+  end if;
   if (select count(*) from public.cloud_jobs j where j.owner = public.cloud_user() and j.status in ('queued', 'running', 'waiting')) >= 5 then
     raise exception 'Too many cloud jobs at once' using errcode = 'P0001';
   end if;

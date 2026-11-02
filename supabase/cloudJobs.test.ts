@@ -41,7 +41,7 @@ describe("the cloud jobs' database rules", () => {
   const offer = async (owner: string, runner: string) => (await as<{ ok: boolean }>(owner, `select public.link_cloud_runner('${await emailOf(runner)}') as ok`))[0].ok;
   const accept = async (runner: string, owner: string) => (await as<{ ok: boolean }>(runner, `select public.accept_cloud_runner_link('${await emailOf(owner)}') as ok`))[0].ok;
 
-  // Each test has its own owner, that owner's runner, and another owner.
+  // Each test has its own owner and that owner's runner, and another owner with a runner of his own.
   let ALICE = "";
   let RUNNER = "";
   let BOB = "";
@@ -49,8 +49,11 @@ describe("the cloud jobs' database rules", () => {
     ALICE = await newUser();
     RUNNER = await newUser();
     BOB = await newUser();
+    const bobsRunner = await newUser();
     expect(await offer(ALICE, RUNNER)).toBe(true);
     expect(await accept(RUNNER, ALICE)).toBe(true);
+    expect(await offer(BOB, bobsRunner)).toBe(true);
+    expect(await accept(bobsRunner, BOB)).toBe(true);
   });
 
   const start = async (uid: string, prompt = "Order the thing") =>
@@ -196,9 +199,9 @@ describe("the cloud jobs' database rules", () => {
 
   it("only counts a link both sides made, one owner per runner", async () => {
     // Bob offers Alice's runner his jobs. It's already Alice's, so it can't take his too, and sees nothing of them.
+    const bobs = await start(BOB);
     expect(await offer(BOB, RUNNER)).toBe(true);
     expect(await accept(RUNNER, BOB)).toBe(false);
-    const bobs = await start(BOB);
     expect(await as(RUNNER, `select id from public.cloud_jobs where id = '${bobs}'`)).toEqual([]);
     // Naming someone's own account doesn't make it a runner: they'd have to accept, and one with jobs can't.
     const stranger = await newUser();
@@ -208,6 +211,19 @@ describe("the cloud jobs' database rules", () => {
     // Nobody links themselves, and the owner sees who their runner is.
     expect(await offer(ALICE, ALICE)).toBe(false);
     expect(await as(ALICE, "select * from public.my_cloud_runner()")).toEqual([{ email: await emailOf(RUNNER), accepted: true }]);
+  });
+
+  it("only takes a job from an owner whose runner has accepted, so none waits where nobody takes it", async () => {
+    const carol = await newUser();
+    await expect(start(carol)).rejects.toThrow(/No runner has accepted/);
+    const carolsRunner = await newUser();
+    expect(await offer(carol, carolsRunner)).toBe(true);
+    await expect(start(carol)).rejects.toThrow(/No runner has accepted/);
+    expect(await accept(carolsRunner, carol)).toBe(true);
+    expect(typeof (await start(carol))).toBe("string");
+    // Unlinked from anywhere, the next one is refused too.
+    await as(carol, "select public.unlink_cloud_runner()");
+    await expect(start(carol)).rejects.toThrow(/No runner has accepted/);
   });
 
   it("takes everything from a runner once it's unlinked", async () => {
