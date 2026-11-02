@@ -159,11 +159,18 @@ export class EventManager {
     this.handle("mcp:set-on", (on) => this.mainWindow.mcp.setOn(on === true));
     this.handle("mcp:revoke", () => this.mainWindow.mcp.revoke());
     this.handle("mcp:copy", async (app) => typeof app === "string" && (await this.mainWindow.mcp.copy(app)));
+    this.handle("cloud:state", () => this.mainWindow.cloud.state);
+    this.handle("cloud:save", (apiKey, projectId) => this.mainWindow.cloud.saveKey(apiKey, projectId));
+    this.handle("cloud:forget", () => this.mainWindow.cloud.forget());
+    this.handle("cloud:end", () => this.mainWindow.cloud.end());
+    this.handle("cloud:view", (tabId) => this.mainWindow.cloud.view(tabId));
+    this.handle("cloud:watch", (tabId) => this.mainWindow.cloud.watch(tabId));
+    this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
   }
 
   private handleChatEvents(): void {
     this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, options) : null
+      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...options, cloud: options?.cloud === true }) : null
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));

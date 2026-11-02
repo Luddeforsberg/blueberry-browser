@@ -169,6 +169,17 @@ const chromeAPI: ChromeAPI = {
     copy: (app) => invoke("mcp:copy", app),
     onUpdated: (callback) => subscribe("mcp:updated", callback),
   },
+  cloud: {
+    state: () => invoke("cloud:state"),
+    save: (apiKey, projectId) => invoke("cloud:save", apiKey, projectId),
+    forget: () => invoke("cloud:forget"),
+    end: () => invoke("cloud:end"),
+    view: (tabId) => invoke("cloud:view", tabId),
+    watch: (tabId) => invoke("cloud:watch", tabId),
+    takeOver: (tabId) => invoke("cloud:take-over", tabId),
+    onUpdated: (callback) => subscribe("cloud:updated", callback),
+    onFrame: (callback) => subscribe("cloud:frame", callback),
+  },
   suggestions: {
     list: () => invoke("suggestions:list"),
     dismiss: (id) => invoke("suggestions:dismiss", id),

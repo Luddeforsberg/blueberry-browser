@@ -3,11 +3,7 @@ import { createPageTools } from "./browserTools";
 import type { Tab } from "./Tab";
 import type { MascotTool } from "../shared/library";
 
-const IMAGE = {
-  isEmpty: () => false,
-  getSize: () => ({ width: 100, height: 100 }),
-  toJPEG: () => Buffer.from("picture"),
-};
+const IMAGE = Buffer.from("picture");
 
 const screenshotTool = (tab: Tab, canSee: () => boolean) =>
   createPageTools({
@@ -64,7 +60,7 @@ describe("the screenshot tool", () => {
   const settled = async () => {};
 
   it("returns the page as a picture", async () => {
-    const tab = { settled, screenshot: async () => IMAGE } as unknown as Tab;
+    const tab = { settled, screenshotJpeg: async () => IMAGE } as unknown as Tab;
     expect(await screenshotTool(tab, () => true).run({})).toBe(`data:image/jpeg;base64,${Buffer.from("picture").toString("base64")}`);
   });
 
@@ -72,7 +68,7 @@ describe("the screenshot tool", () => {
     let taken = false;
     const tab = {
       settled,
-      screenshot: async () => {
+      screenshotJpeg: async () => {
         taken = true;
         return IMAGE;
       },
@@ -85,7 +81,7 @@ describe("the screenshot tool", () => {
     let canSee = true;
     const tab = {
       settled,
-      screenshot: async () => {
+      screenshotJpeg: async () => {
         canSee = false;
         return IMAGE;
       },
@@ -94,7 +90,7 @@ describe("the screenshot tool", () => {
   });
 
   it("says so when there's nothing to see", async () => {
-    const tab = { id: "tab-1", settled, screenshot: async () => ({ ...IMAGE, isEmpty: () => true }) } as unknown as Tab;
+    const tab = { id: "tab-1", settled, screenshotJpeg: async () => null } as unknown as Tab;
     expect(await screenshotTool(tab, () => true).run({})).toMatch(/hasn't drawn/);
   });
 });

@@ -8,6 +8,7 @@ import { useShell } from '../contexts/ShellContext'
 import { Favicon } from '../components/Favicon'
 import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
+import { useCloud } from '../useCloud'
 import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Backdrop } from '../components/Backdrop'
 import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
@@ -37,6 +38,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const library = useLibrary()
     const { layout, theme } = useShell()
     const { chosen, choose, find } = useFlock()
+    const [cloudState] = useCloud()
+    const [inCloud, setInCloud] = useState(false)
 
     useEffect(() => {
         browser.getRecent().then(setRecent).catch(() => setRecent([]))
@@ -66,7 +69,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     const askBerry = async (message: string) => {
         if (filled) void window.chromeAPI.suggestions.dismiss(filled.id)
-        const chat = await window.chromeAPI.chat.send(null, message, { seePage: false, mascotId: chosen.id })
+        const chat = await window.chromeAPI.chat.send(null, message, { seePage: false, mascotId: chosen.id, cloud: inCloud && cloudState.status !== 'off' })
         if (!chat) return
         await browser.openPage('chat', { param: chat.id, title: chat.title })
         await browser.closeTab(tab.id)
@@ -177,6 +180,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             onSend={() => submit(false)}
                             mascot={chosen}
                             onChooseMascot={choose}
+                            cloud={cloudState.status !== 'off' ? { on: inCloud, onToggle: () => setInCloud(!inCloud) } : undefined}
                         />
                     </div>
                     {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}

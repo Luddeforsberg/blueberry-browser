@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Plus, Square } from 'lucide-react'
+import { ArrowUp, Cloud, Plus, Square } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { MascotChip, MascotPerch } from './MascotPerch'
@@ -32,7 +32,9 @@ export const Composer: React.FC<{
     // Who this goes to. With `onChooseMascot`, pressing it opens the flock. Without, it just says who.
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot }) => {
+    // Whether this job runs in the cloud browser, where there is one.
+    cloud?: { on: boolean; onToggle: () => void }
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
 
@@ -87,6 +89,23 @@ export const Composer: React.FC<{
                     onKeyDown={onKeyDown}
                     className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
                 />
+                {cloud && (
+                    <button
+                        type="button"
+                        aria-label="Run in the cloud"
+                        aria-pressed={cloud.on}
+                        title={cloud.on ? 'Runs in the cloud browser' : 'Run in the cloud browser'}
+                        onClick={cloud.onToggle}
+                        className={cn(
+                            "h-9 px-2.5 flex items-center gap-1.5 rounded-full text-13 outline-none transition-colors",
+                            "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                            cloud.on ? "bg-muted text-accent-ink" : "text-muted-foreground"
+                        )}
+                    >
+                        <Cloud className="size-4" />
+                        {cloud.on && <span>Cloud</span>}
+                    </button>
+                )}
                 {mascot && (
                     <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
                 )}

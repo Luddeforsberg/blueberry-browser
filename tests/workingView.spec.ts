@@ -209,7 +209,9 @@ test.describe("the working view", () => {
     const { finish } = await startJob(chrome, model, `${site.origin}/job`, saved.id);
     await expect(picture()).toBeVisible();
 
-    // The page sends itself somewhere the mascot may not go, between the job's calls, when no limit is on the tab.
+    // The page sends itself somewhere the mascot may not go, between the job's calls, when no limit is on the tab. The
+    // second request to the model is the job asking what's next, so open_tab and its limit are over.
+    await expect.poll(() => model.requests.length).toBe(2);
     const page = await findView(app, `${site.origin}/job`);
     const away = site.origin.replace("127.0.0.1", "localhost");
     await page.evaluate((url) => void (location.href = url), `${away}/away`);

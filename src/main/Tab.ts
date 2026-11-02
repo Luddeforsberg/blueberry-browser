@@ -2,6 +2,7 @@ import { NativeImage, WebContentsView, type WebContents, type WebFrameMain } fro
 import type { Layout, TabLoadError, TabTrouble } from "../shared/ipc";
 import { PageActor, type ActorOptions } from "./PageActor";
 import { savedEntries, type SavedWebTab } from "./Session";
+import type { PageTarget } from "./pageTarget";
 
 // The page card radius from DESIGN.md.
 // Matches the card the page sits in, `rounded-panel` in the chrome.
@@ -72,7 +73,7 @@ export interface TabEvents {
   actorOptions: () => ActorOptions;
 }
 
-export class Tab {
+export class Tab implements PageTarget {
   readonly kind = "web";
   // Made when first needed, so a restored tab costs nothing until then.
   private webContentsView: WebContentsView | null = null;
@@ -583,6 +584,18 @@ export class Tab {
     this.refuseWhileHeld();
     if (this.mayShowCode) throw new Error("This page may show a code");
     return await this.fromPage(() => this.actor.whileHidden(() => this.view.webContents.capturePage()));
+  }
+
+  // For the model: no wider than it needs, and null for a page that hasn't drawn anything yet.
+  async screenshotJpeg(maxWidth: number, quality: number): Promise<Buffer | null> {
+    const image = await this.screenshot();
+    if (image.isEmpty()) return null;
+    const scaled = image.getSize().width > maxWidth ? image.resize({ width: maxWidth }) : image;
+    return scaled.toJPEG(quality);
+  }
+
+  get zoomFactor(): number {
+    return this.webContents.getZoomFactor();
   }
 
   async runJs<T = unknown>(code: string): Promise<T> {

@@ -15,6 +15,7 @@ import { relevantFacts, worthRemembering } from "./mascotMemory";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
+import type { CdpTab } from "./CdpTab";
 import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
@@ -44,8 +45,15 @@ const publicApproval = ({ id, text, question, handoff }: ChatApproval): ChatAppr
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
 
+// The cloud browser does one job at a time, and this reply came while it was on another.
+class CloudBusyError extends Error {
+  constructor() {
+    super("The cloud browser is working on another job. Try again when that's done, or end it in Settings > Cloud.");
+  }
+}
+
 const errorMessage = (error: unknown): string => {
-  if (error instanceof ModelConfigError) return error.message;
+  if (error instanceof ModelConfigError || error instanceof CloudBusyError) return error.message;
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("401") || message.includes("unauthorized")) {
     return "The API key was rejected. Check it in the .env file and restart.";
@@ -109,6 +117,20 @@ interface Run {
   answeredElsewhere?: boolean;
   // A tab went to the user during this reply, so nothing about this job is offered for remembering.
   handedOver: boolean;
+  // It works in the cloud browser's pages, and never in the window's tabs.
+  cloud?: boolean;
+}
+
+// What a job in the cloud needs of the browser there. Its pages are `CdpTab`s, which the user sees as cloud tabs.
+export interface ChatCloud {
+  available: () => boolean;
+  // One job at a time. False if another has it.
+  claim: (jobId: string) => boolean;
+  release: (jobId: string) => void;
+  open: (jobId: string, url: string) => Promise<CdpTab>;
+  pagesOf: (jobId: string) => CdpTab[];
+  page: (id: string) => CdpTab | null;
+  close: (id: string) => boolean;
 }
 
 // What a job needs of a bird's memory. No tool can reach any of this.
@@ -193,7 +215,7 @@ export class Chats {
     private readonly store: ChatStore,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
-    private readonly browser: Pick<PageToolAccess, "activeTab" | "allTabs"> & {
+    private readonly browser: Pick<PageToolAccess<Tab>, "activeTab" | "allTabs"> & {
       openBackgroundTab: (url: string) => Tab;
       closeTab: (tabId: string) => boolean;
       actionApproval: () => ActionApproval;
@@ -203,8 +225,44 @@ export class Chats {
     private readonly events: ChatEvents,
     // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
     private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY,
-    private readonly memory: ChatMemory | null = null
+    private readonly memory: ChatMemory | null = null,
+    private readonly cloud: ChatCloud | null = null
   ) {}
+
+  // Chats started in the cloud, whose later messages go there too. Memory only, so after a restart a chat works here.
+  private readonly cloudChats = new Set<string>();
+
+  // The same tools on the cloud browser's pages. Only what this job opened there, and nothing in the window, so the
+  // user's own tabs are out of reach. Approvals, limits and takeovers work as they do here. There's no handing a page to
+  // the user yet, so `hand_to_user` comes back as not done.
+  private cloudTools(chatId: string, run: Run, job: Job): PageTool[] {
+    const cloud = this.cloud;
+    if (!cloud?.available()) throw new Error("The cloud browser is off.");
+    if (!cloud.claim(chatId)) throw new CloudBusyError();
+    const mine = () => cloud.pagesOf(chatId).filter((tab) => job.own.has(tab.id));
+    return createPageTools<CdpTab>({
+      allTabs: mine,
+      activeTab: () => mine().find((tab) => tab.id === job.current) ?? null,
+      openTab: async (url) => {
+        const tab = await cloud.open(chatId, url);
+        job.own.add(tab.id);
+        job.current = tab.id;
+        return tab;
+      },
+      canSee: () => true,
+      onUse: (tab) => {
+        run.sites.delete(siteOf(tab.url));
+        run.sites.add(siteOf(tab.url));
+      },
+      stopped: () => run.controller.signal.aborted,
+      ownsEveryTab: true,
+      ownsTab: (id) => job.own.has(id),
+      takenOver: job.takenOver,
+      limits: run.mascot.id === BERRY.id && run.mascot.sites.length === 0 ? undefined : run.mascot,
+      closeTab: (tab) => cloud.close(tab.id),
+      ask: (question) => this.askQuestion(chatId, run, question),
+    });
+  }
 
   // Tabs always open behind the user, so the approval cards, the reply and whatever they're doing stay in front. With
   // `page`, the page sent with this message, the tools also reach every open tab. Without it, only the job's own.
@@ -219,7 +277,7 @@ export class Chats {
       // That was the page from an earlier message. This one came without it, so it's out of reach.
       job.current = [...job.own].at(-1) ?? null;
     }
-    const tools = createPageTools({
+    const tools = run.cloud ? this.cloudTools(chatId, run, job) : createPageTools<Tab>({
       allTabs: () => this.browser.allTabs().filter((tab) => page || job.own.has(tab.id)),
       activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current) ?? null,
       openTab: (url) => {
@@ -427,7 +485,8 @@ export class Chats {
     this.jobs.forEach((job, id) => {
       if (!job.own.delete(tabId)) return;
       // Said to the model later, when the tab may be somewhere else, so it's cleaned now.
-      job.takenOver.set(tabId, tab ? this.withoutCodes(tab.url) : "an earlier page");
+      const url = tab?.url ?? this.cloud?.page(tabId)?.url;
+      job.takenOver.set(tabId, url ? this.withoutCodes(url) : "an earlier page");
       if (tab) this.runs.get(id)?.tabs.delete(tab);
     });
     this.publishWorkingTabs();
@@ -496,11 +555,14 @@ export class Chats {
   send(
     chatId: string | null,
     text: string,
-    { seePage, mascotId, from = null, sites = [] }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[] }
+    { seePage, mascotId, from = null, sites = [], cloud = false }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; cloud?: boolean }
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
     if (chatId && (!this.store.chat(chatId) || this.runs.has(chatId))) return null;
+    const inCloud = cloud === true || (chatId !== null && this.cloudChats.has(chatId));
+    // Asked for the cloud with it off, the job doesn't quietly run in the user's own tabs instead.
+    if (inCloud && !this.cloud?.available()) return null;
 
     // The renderer's choice is checked here, so nothing but a mascot in the flock can start a chat.
     const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
@@ -514,9 +576,11 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud };
+    if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
-    void this.reply(id, run, seePage);
+    // A page in this window never goes with a job in the cloud.
+    void this.reply(id, run, seePage && !inCloud);
 
     this.notify(id);
     return this.thread(id);
@@ -542,6 +606,7 @@ export class Chats {
     this.errors.delete(chatId);
     this.finished.delete(chatId);
     this.jobs.delete(chatId);
+    this.cloudChats.delete(chatId);
     this.memory?.dropOffers(chatId);
     if (!this.store.deleteChat(chatId)) return false;
     this.events.onListChanged();
@@ -583,6 +648,7 @@ export class Chats {
       }
     }
 
+    if (run.cloud) this.cloud?.release(chatId);
     // Deleted while replying, so there's nowhere to save it.
     if (this.runs.get(chatId) !== run) return;
     this.finished.set(chatId, { run, endedAt: Date.now() });
