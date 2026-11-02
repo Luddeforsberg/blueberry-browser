@@ -1,5 +1,7 @@
 -- Routines that run even when the Mac is off. The app keeps a copy of each such routine here, written only by its owner
--- through `sync_cloud_routine`, and the runner starts a job from it when it's due, through `runner_start_routine`. That
+-- through `sync_cloud_routine`, and the runner starts a job from it when it's due, through `runner_start_routine`. Once
+-- it's here, this table owns when it's next due: the app sends its schedule and whether it's paused, and its first time
+-- counts only for a new routine, a changed schedule or a resume, so a resend after a restart never puts it back. That
 -- job is an ordinary cloud job of the owner's, with the bird, limits and Ask before acting the owner wrote, so the
 -- runner checks it as it checks any other, and its approvals are answered only by the owner. The runner reads only when
 -- each is due and how its schedule goes: never the instructions until a job is made from them. Run it in the SQL
@@ -18,6 +20,7 @@ create table if not exists public.cloud_routines (
   -- The app's schedule, which the runner reads with the app's own rules, in the owner's time zone.
   schedule jsonb not null,
   time_zone text not null,
+  paused boolean not null default false,
   next_run_at timestamptz,
   updated_at timestamptz not null default now(),
 
@@ -32,9 +35,12 @@ create table if not exists public.cloud_routines (
 );
 create index if not exists cloud_routines_due on public.cloud_routines (owner, next_run_at);
 
--- Which routine a job was started from, so one can't be started twice while the last is going.
+-- Which routine a job was started from, and for which of its times. One time starts at most one job, whatever happens
+-- to the routine's due time, and one routine has at most one job going.
 alter table public.cloud_jobs add column if not exists routine_id uuid references public.cloud_routines (id) on delete set null;
+alter table public.cloud_jobs add column if not exists occurrence_at timestamptz;
 create unique index if not exists cloud_jobs_one_per_routine on public.cloud_jobs (routine_id) where status in ('queued', 'running', 'waiting');
+create unique index if not exists cloud_jobs_one_per_occurrence on public.cloud_jobs (routine_id, occurrence_at);
 
 alter table public.cloud_routines enable row level security;
 drop policy if exists "Users read their own cloud routines" on public.cloud_routines;
@@ -45,9 +51,12 @@ revoke all on table public.cloud_routines from public, anon, authenticated;
 grant select on table public.cloud_routines to authenticated;
 
 -- The owner's copy of one routine, made or replaced. Like starting a job, it needs a runner that has accepted, and a
--- runner can't call it. A null `p_next_run_at` keeps it here without running, as for a paused routine.
+-- runner can't call it. `p_first_run_at` is when the app would first run it: used for a new routine, a changed schedule
+-- or zone, or one that's resumed, and otherwise ignored, since the runner has moved it on since. Paused, it waits here
+-- with no due time.
+drop function if exists public.sync_cloud_routine(text, text, jsonb, text, text, jsonb, text, timestamptz);
 create or replace function public.sync_cloud_routine(
-  p_key text, p_prompt text, p_mascot jsonb, p_action_approval text, p_context_id text, p_schedule jsonb, p_time_zone text, p_next_run_at timestamptz
+  p_key text, p_prompt text, p_mascot jsonb, p_action_approval text, p_context_id text, p_schedule jsonb, p_time_zone text, p_paused boolean, p_first_run_at timestamptz
 ) returns uuid
 language plpgsql security definer set search_path = ''
 as $$
@@ -65,11 +74,18 @@ begin
     and (select count(*) from public.cloud_routines r where r.owner = me) >= 20 then
     raise exception 'Too many routines in the cloud' using errcode = 'P0001';
   end if;
-  insert into public.cloud_routines (owner, routine_key, prompt, mascot, action_approval, context_id, schedule, time_zone, next_run_at)
-    values (me, p_key, p_prompt, p_mascot, coalesce(p_action_approval, 'risky'), nullif(p_context_id, ''), p_schedule, p_time_zone, p_next_run_at)
+  insert into public.cloud_routines (owner, routine_key, prompt, mascot, action_approval, context_id, schedule, time_zone, paused, next_run_at)
+    values (me, p_key, p_prompt, p_mascot, coalesce(p_action_approval, 'risky'), nullif(p_context_id, ''), p_schedule, p_time_zone,
+      coalesce(p_paused, false), case when coalesce(p_paused, false) then null else p_first_run_at end)
     on conflict (owner, routine_key) do update set
       prompt = excluded.prompt, mascot = excluded.mascot, action_approval = excluded.action_approval, context_id = excluded.context_id,
-      schedule = excluded.schedule, time_zone = excluded.time_zone, next_run_at = excluded.next_run_at, updated_at = now()
+      next_run_at = case
+        when excluded.paused then null
+        when cloud_routines.paused or cloud_routines.schedule is distinct from excluded.schedule or cloud_routines.time_zone is distinct from excluded.time_zone
+          then excluded.next_run_at
+        else cloud_routines.next_run_at
+      end,
+      schedule = excluded.schedule, time_zone = excluded.time_zone, paused = excluded.paused, updated_at = now()
     returning id into made;
   return made;
 end;
@@ -84,6 +100,11 @@ begin
   return found;
 end;
 $$;
+
+-- The owner's routines here, by the app's key, so the app can take away any it no longer has, even after a restart.
+create or replace function public.my_cloud_routine_keys() returns setof text
+language sql stable security invoker set search_path = ''
+as $$ select r.routine_key from public.cloud_routines r where r.owner = public.cloud_user() $$;
 
 -- The runner's owner's routines that are due now: only enough to work out the next time. Nothing for anyone else.
 create or replace function public.runner_due_routines()
@@ -125,9 +146,10 @@ begin
     or (select count(*) from public.cloud_jobs j where j.owner = owner_of and j.status in ('queued', 'running', 'waiting')) >= 5 then
     return null;
   end if;
-  insert into public.cloud_jobs (id, owner, prompt, history, mascot, action_approval, context_id, conversation_id, routine_id)
-    values (made, owner_of, routine.prompt, '[]', routine.mascot, routine.action_approval, routine.context_id, made, routine.id);
-  return made;
+  insert into public.cloud_jobs (id, owner, prompt, history, mascot, action_approval, context_id, conversation_id, routine_id, occurrence_at)
+    values (made, owner_of, routine.prompt, '[]', routine.mascot, routine.action_approval, routine.context_id, made, routine.id, p_due)
+    on conflict (routine_id, occurrence_at) do nothing;
+  return case when found then made end;
 end;
 $$;
 
@@ -136,7 +158,7 @@ declare
   fn text;
 begin
   foreach fn in array array[
-    'sync_cloud_routine(text, text, jsonb, text, text, jsonb, text, timestamptz)', 'forget_cloud_routine(text)',
+    'sync_cloud_routine(text, text, jsonb, text, text, jsonb, text, boolean, timestamptz)', 'forget_cloud_routine(text)', 'my_cloud_routine_keys()',
     'runner_due_routines()', 'runner_start_routine(uuid, timestamptz, timestamptz)'
   ] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', fn);

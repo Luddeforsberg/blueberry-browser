@@ -119,16 +119,16 @@ export class RoutineStore {
     return row ? toRoutine(row as unknown as RoutineRow) : null;
   }
 
-  // Oldest first, so whatever has waited longest gets the next free place.
+  // Oldest first, so whatever has waited longest gets the next free place. One in the cloud is the cloud's to run.
   due(now: number): StoredRoutine[] {
     const rows = this.db
-      .prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE paused = 0 AND next_run_at <= ? ORDER BY next_run_at, rowid`)
+      .prepare(`SELECT ${ROUTINE_COLUMNS} FROM routines WHERE paused = 0 AND in_cloud = 0 AND next_run_at <= ? ORDER BY next_run_at, rowid`)
       .all(now);
     return (rows as unknown as RoutineRow[]).map(toRoutine);
   }
 
   soonest(): number | null {
-    const row = this.db.prepare("SELECT MIN(next_run_at) AS at FROM routines WHERE paused = 0").get() as { at: number | null };
+    const row = this.db.prepare("SELECT MIN(next_run_at) AS at FROM routines WHERE paused = 0 AND in_cloud = 0").get() as { at: number | null };
     return row.at;
   }
 

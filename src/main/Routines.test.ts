@@ -101,16 +101,18 @@ describe("the scheduler", () => {
     started(routines);
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
     expect(runs).toHaveLength(0);
-    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE + DAY);
+    // Never moved on here, since the cloud has its real time. The page works it out from the schedule.
+    expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE);
+    expect(routines.list()[0]).toMatchObject({ nextRunAt: NOW + 60 * MINUTE + DAY, status: "idle" });
 
     // What goes to the cloud: its bird narrowed to the routine's sites, and no next time once it's paused.
     const scout = (): MascotProfile => ({ id: "m-1", name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find.", sites: [], tools: ["visit"], deletedAt: null });
     const options = { actionApproval: "risky", contextId: "ctx-1", timeZone: "Europe/Stockholm" } as const;
     const [row] = routines.cloudRows(scout, options);
-    expect(row).toMatchObject({ key: id, mascot: { id: "m-1", sites: ["shop.example"] }, schedule: { kind: "daily", time: "13:00" }, timeZone: "Europe/Stockholm", nextRunAt: new Date(NOW + 60 * MINUTE + DAY).toISOString() });
+    expect(row).toMatchObject({ key: id, mascot: { id: "m-1", sites: ["shop.example"] }, schedule: { kind: "daily", time: "13:00" }, timeZone: "Europe/Stockholm", paused: false, firstRunAt: new Date(NOW + 60 * MINUTE + DAY).toISOString() });
     expect(row.prompt).toContain("Look");
     routines.setPaused(id, true);
-    expect(routines.cloudRows(scout, options)[0].nextRunAt).toBeNull();
+    expect(routines.cloudRows(scout, options)[0]).toMatchObject({ paused: true, firstRunAt: null });
     save(routines, daily("13:00", "Here"));
     expect(routines.cloudRows(scout, options)).toHaveLength(1);
   });

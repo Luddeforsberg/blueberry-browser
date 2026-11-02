@@ -379,7 +379,7 @@ describe("the flock shared with the phone", () => {
 });
 
 describe("routines kept in the cloud", () => {
-  const row = (key: string, nextRunAt: string | null = "2026-11-03T07:00:00.000Z"): CloudRoutineRow => ({
+  const row = (key: string, firstRunAt: string | null = "2026-11-03T07:00:00.000Z", paused = false): CloudRoutineRow => ({
     key,
     prompt: "Check the prices",
     mascot: mascotSnapshot(BERRY),
@@ -387,36 +387,67 @@ describe("routines kept in the cloud", () => {
     contextId: null,
     schedule: { kind: "daily", time: "08:00" },
     timeZone: "Europe/Stockholm",
-    nextRunAt,
+    paused,
+    firstRunAt,
   });
 
-  it("sends each routine once, again when it changes or is paused but not as its time moves on, and forgets one that went", async () => {
-    const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
-    const syncCloudRoutine = vi.fn(async () => {});
-    const forgetCloudRoutine = vi.fn(async () => {});
-    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted: true }), syncCloudFlock: async () => {}, syncCloudRoutine, forgetCloudRoutine, cloudConversationJobs: async () => [] } as unknown as GalleryServer;
-    let rows = [row("r1")];
+  // A server holding the routines' keys, as `my_cloud_routine_keys` gives them. `failForgets` makes that many forgets fail.
+  const make = (onServer: string[], rows: () => CloudRoutineRow[], failForgets = 0) => {
+    const keys = new Set(onServer);
+    let failing = failForgets;
+    const syncCloudRoutine = vi.fn(async (_token: string, sent: CloudRoutineRow) => void keys.add(sent.key));
+    const forgetCloudRoutine = vi.fn(async (_token: string, key: string) => {
+      if (failing-- > 0) throw new ServerError(500, "");
+      keys.delete(key);
+    });
+    const server = {
+      myCloudRunner: async () => ({ email: "runner@example.com", accepted: true }),
+      syncCloudFlock: async () => {},
+      syncCloudRoutine,
+      forgetCloudRoutine,
+      myCloudRoutineKeys: async () => [...keys],
+      cloudConversationJobs: async () => [],
+    } as unknown as GalleryServer;
     const runner = new RunnerJobs(
       server,
-      { get state() { return account.state; }, accessToken: async () => "token" },
+      { state: { status: "signed-in", email: ANA, problem: null } as AccountState, accessToken: async () => "token" },
       join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
-      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: () => rows },
+      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, routines: rows },
       5
     );
+    return { runner, keys, syncCloudRoutine, forgetCloudRoutine };
+  };
+
+  it("sends each routine once, again when it changes or is paused but not as its first time moves on, and forgets one that went", async () => {
+    let rows = [row("r1")];
+    const { runner, keys, syncCloudRoutine, forgetCloudRoutine } = make([], () => rows);
     await settle();
     expect(syncCloudRoutine).toHaveBeenCalledTimes(1);
     expect(syncCloudRoutine).toHaveBeenLastCalledWith("token", rows[0]);
     rows = [row("r1", "2026-11-04T07:00:00.000Z")];
     await runner.routinesChanged();
     expect(syncCloudRoutine).toHaveBeenCalledTimes(1);
-    rows = [row("r1", null)];
+    rows = [row("r1", null, true)];
     await runner.routinesChanged();
     expect(syncCloudRoutine).toHaveBeenCalledTimes(2);
     rows = [];
     await runner.routinesChanged();
     expect(forgetCloudRoutine).toHaveBeenCalledWith("token", "r1");
+    expect([...keys]).toEqual([]);
     await runner.routinesChanged();
     expect(forgetCloudRoutine).toHaveBeenCalledTimes(1);
+    runner.destroy();
+  });
+
+  it("takes away what the server still has after a restart, and tries a failed forget again", async () => {
+    // Deleted on the Mac before it quit, while the forget couldn't get through.
+    const { runner, keys, forgetCloudRoutine } = make(["kept", "deleted-before-restart"], () => [row("kept")], 1);
+    await settle();
+    expect(forgetCloudRoutine).toHaveBeenCalledTimes(1);
+    expect([...keys].sort()).toEqual(["deleted-before-restart", "kept"]);
+    await runner.routinesChanged();
+    expect(forgetCloudRoutine).toHaveBeenCalledTimes(2);
+    expect([...keys]).toEqual(["kept"]);
     runner.destroy();
   });
 });

@@ -40,8 +40,9 @@ describe("routines in the cloud", () => {
     await as(owner, `select public.link_cloud_runner('user${Number(runner.slice(-12))}@example.com')`);
     await as(runner, `select public.accept_cloud_runner_link('user${Number(owner.slice(-12))}@example.com')`);
   };
-  const sync = (uid: string, key = "routine-1", next = "now() - interval '1 minute'") =>
-    as<{ id: string }>(uid, `select public.sync_cloud_routine('${key}', 'Check the prices', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'Europe/Stockholm', ${next}) as id`).then(([row]) => row.id);
+  // As the app sends it: the schedule, whether it's paused, and when it would first run it.
+  const sync = (uid: string, key = "routine-1", first = "now() - interval '1 minute'", { paused = false, schedule = SCHEDULE } = {}) =>
+    as<{ id: string }>(uid, `select public.sync_cloud_routine('${key}', 'Check the prices', ${MASCOT}, 'risky', null, ${schedule}, 'Europe/Stockholm', ${paused}, ${first}) as id`).then(([row]) => row.id);
   const due = (runner: string) => as<{ id: string; next_run_at: string }>(runner, "select id, next_run_at from public.runner_due_routines()");
   const startRun = async (runner: string, routine: string, dueAt: string, next = "now() + interval '1 day'") =>
     (await as<{ id: string | null }>(runner, `select public.runner_start_routine('${routine}', '${dueAt}', ${next}) as id`))[0].id;
@@ -77,12 +78,12 @@ describe("routines in the cloud", () => {
     expect(await as(RUNNER, "select id from public.cloud_routines")).toEqual([]);
     expect(await refused(ALICE, `insert into public.cloud_routines (routine_key, prompt, mascot, schedule, time_zone) values ('x', 'y', ${MASCOT}, ${SCHEDULE}, 'UTC')`)).toMatch(/permission denied/);
     expect(await refused(ALICE, `update public.cloud_routines set prompt = 'Something else'`)).toMatch(/permission denied/);
-    expect(await refused(RUNNER, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', now())`)).toMatch(/A runner can't keep routines/);
-    expect(await refused(null, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', now())`)).toMatch(/permission denied|Not signed in/);
+    expect(await refused(RUNNER, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`)).toMatch(/A runner can't keep routines/);
+    expect(await refused(null, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`)).toMatch(/permission denied|Not signed in/);
 
     // Someone with no runner can't keep one, since nothing would run it.
     const lonely = await newUser();
-    expect(await refused(lonely, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', now())`)).toMatch(/No runner has accepted/);
+    expect(await refused(lonely, `select public.sync_cloud_routine('r', 'Mine', ${MASCOT}, 'risky', null, ${SCHEDULE}, 'UTC', false, now())`)).toMatch(/No runner has accepted/);
 
     expect(await as(BOB, "select public.forget_cloud_routine('routine-1') as gone")).toEqual([{ gone: false }]);
     expect(await as(ALICE, "select public.forget_cloud_routine('routine-1') as gone")).toEqual([{ gone: true }]);
@@ -92,7 +93,7 @@ describe("routines in the cloud", () => {
   it("shows a runner only its owner's due routines, and only when each is due", async () => {
     const dueNow = await sync(ALICE, "due");
     await sync(ALICE, "later", "now() + interval '1 hour'");
-    await sync(ALICE, "paused", "null");
+    await sync(ALICE, "paused", "now()", { paused: true });
     await sync(BOB, "bobs");
     expect((await due(RUNNER)).map(({ id }) => id)).toEqual([dueNow]);
     expect(await refused(ALICE, "select * from public.runner_due_routines()")).toMatch(/Not a linked runner/);
@@ -142,5 +143,56 @@ describe("routines in the cloud", () => {
     await as(ALICE, "select public.unlink_cloud_runner()");
     expect(await refused(RUNNER, "select * from public.runner_due_routines()")).toMatch(/Not a linked runner/);
     expect(await refused(RUNNER, `select public.runner_start_routine('${routine}', now(), null)`)).toMatch(/Not a linked runner/);
+  });
+
+  it("never starts a time again after a restart resends the routine with the time it first had", async () => {
+    const original = "now() - interval '1 minute'";
+    const routine = await sync(ALICE, "routine-1", original);
+    const at = await dueAt(routine);
+    const job = await startRun(RUNNER, routine, at);
+    await db.query("update public.cloud_jobs set status = 'done' where id = $1", [job]);
+    // The app starts again knowing nothing of what was sent, and sends the same routine with its first time.
+    await sync(ALICE, "routine-1", original);
+    expect(await due(RUNNER)).toEqual([]);
+    expect(await startRun(RUNNER, routine, at)).toBeNull();
+    // Even put back by hand, that time has had its job.
+    await db.query("update public.cloud_routines set next_run_at = $2 where id = $1", [routine, at]);
+    expect(await startRun(RUNNER, routine, at)).toBeNull();
+    expect((await db.query("select id from public.cloud_jobs where routine_id = $1", [routine])).rows).toHaveLength(1);
+  });
+
+  it("keeps a one-off's time when the app resends it with none, and still starts it once", async () => {
+    const once = `'{"kind":"once","at":1}'::jsonb`;
+    const routine = await sync(ALICE, "once", "now() - interval '1 minute'", { schedule: once });
+    const at = await dueAt(routine);
+    // The Mac has nothing more for it once its time has passed, and says so.
+    await sync(ALICE, "once", "null", { schedule: once });
+    expect(await dueAt(routine)).toBe(at);
+    expect(await startRun(RUNNER, routine, at, "null")).toBeTruthy();
+    expect(await due(RUNNER)).toEqual([]);
+  });
+
+  it("takes a new first time only for a changed schedule or a resume, and none while paused", async () => {
+    const routine = await sync(ALICE, "routine-1", "now() + interval '1 hour'");
+    const first = await dueAt(routine);
+    await sync(ALICE, "routine-1", "now() + interval '5 hours'");
+    expect(await dueAt(routine)).toBe(first);
+    await sync(ALICE, "routine-1", "now() + interval '2 hours'", { schedule: `'{"kind":"daily","time":"09:00"}'::jsonb` });
+    expect(await dueAt(routine)).not.toBe(first);
+    await sync(ALICE, "routine-1", "now()", { paused: true, schedule: `'{"kind":"daily","time":"09:00"}'::jsonb` });
+    expect(await dueAt(routine)).toBeNull();
+    await sync(ALICE, "routine-1", "now() + interval '3 hours'", { schedule: `'{"kind":"daily","time":"09:00"}'::jsonb` });
+    expect(await dueAt(routine)).not.toBeNull();
+  });
+
+  it("lists the owner's own keys, so one forgotten here can be taken away there after a restart", async () => {
+    await sync(ALICE, "kept");
+    await sync(ALICE, "deleted-on-the-mac");
+    await sync(BOB, "bobs");
+    const keys = async (uid: string) => (await as<{ key: string }>(uid, "select k as key from public.my_cloud_routine_keys() k")).map(({ key }) => key).sort();
+    expect(await keys(ALICE)).toEqual(["deleted-on-the-mac", "kept"]);
+    expect(await keys(RUNNER)).toEqual([]);
+    expect(await as(ALICE, "select public.forget_cloud_routine('deleted-on-the-mac') as gone")).toEqual([{ gone: true }]);
+    expect(await keys(ALICE)).toEqual(["kept"]);
   });
 });

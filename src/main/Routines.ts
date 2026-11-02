@@ -133,9 +133,8 @@ export class Routines {
 
     this.store.due(now).forEach((routine) => {
       const next = nextRun(routine.schedule, now);
-      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up. One in the cloud
-      // runs there, so here it only moves on to its next time.
-      if (this.active.has(routine.id) || routine.inCloud) {
+      // Still on the last one, perhaps waiting for an OK overnight. This time is skipped, not saved up.
+      if (this.active.has(routine.id)) {
         this.store.setNextRun(routine.id, next);
         this.events.onChanged();
       } else if (this.hasFreePlace) {
@@ -212,7 +211,8 @@ export class Routines {
         inCloud,
         schedule: scheduleLabel(schedule),
         paused,
-        nextRunAt,
+        // One in the cloud is never moved on here, so its time is worked out from its schedule.
+        nextRunAt: inCloud ? (paused ? null : nextRun(schedule, now)) : nextRunAt,
         status: this.statusOf(routine, latestRun, now),
         lastResult: lastResult(latestRun, now),
         latestRun,
@@ -225,12 +225,12 @@ export class Routines {
     if (this.active.has(routine.id) && latest) return latest.status;
     if (this.requested.has(routine.id)) return "queued";
     if (routine.paused) return "paused";
-    if (routine.nextRunAt !== null && routine.nextRunAt <= now) return "queued";
+    if (!routine.inCloud && routine.nextRunAt !== null && routine.nextRunAt <= now) return "queued";
     return latest?.status ?? "idle";
   }
 
-  // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites, and
-  // a paused one has no next time, so it waits there.
+  // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites. The
+  // first time is only when this would run it next, which the server takes for a new or changed one.
   cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] {
     return this.store.routines().filter(({ inCloud }) => inCloud).map((routine) => {
       const mascot = mascotOf(routine.mascotId);
@@ -242,9 +242,16 @@ export class Routines {
         contextId,
         schedule: routine.schedule,
         timeZone,
-        nextRunAt: routine.paused || routine.nextRunAt === null ? null : new Date(routine.nextRunAt).toISOString(),
+        paused: routine.paused,
+        firstRunAt: this.cloudNext(routine, Date.now()),
       };
     });
+  }
+
+  // When one in the cloud is next due, as far as this can tell. The server has the real time.
+  private cloudNext(routine: StoredRoutine, now: number): string | null {
+    const next = routine.paused ? null : nextRun(routine.schedule, now);
+    return next === null ? null : new Date(next).toISOString();
   }
 
   runs(routineId: string): RoutineRun[] {
@@ -259,8 +266,9 @@ export class Routines {
     const existing = id ? this.store.routine(id) : null;
     if (id && !existing) return { ok: false, error: "This routine no longer exists." };
 
-    // A changed time counts from now. Anything else leaves a time that's already set alone.
-    const sameSchedule = JSON.stringify(existing?.schedule) === JSON.stringify(draft.schedule);
+    // A changed time counts from now. Anything else leaves a time that's already set alone. One coming back from the
+    // cloud counts from now too, since its time here was never moved on.
+    const sameSchedule = JSON.stringify(existing?.schedule) === JSON.stringify(draft.schedule) && existing?.inCloud === (draft.inCloud === true);
     const next = nextRun(draft.schedule, now);
     if (draft.schedule.kind === "once" && next === null && !sameSchedule) {
       return { ok: false, error: "Choose a time that hasn’t passed." };

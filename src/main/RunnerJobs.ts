@@ -104,9 +104,9 @@ export class RunnerJobs implements ChatRunner {
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
   // What was last shared, and by whom, so an unchanged flock isn't sent again.
   private sharedFlock: string | null = null;
-  // What was last sent of each routine, by key, and for which account. The next time it's due isn't part of it, as that
-  // moves on by itself there.
-  private sharedRoutines: { account: string; rows: Map<string, string> } | null = null;
+  // What was last sent of each routine, by key, and for which account. Its first time isn't part of it, as the server
+  // owns when it's due. `reconciled` is the set of keys last checked against the server's, null until that's worked.
+  private sharedRoutines: { account: string; rows: Map<string, string>; reconciled: string | null } | null = null;
   private routinesSending: Promise<void> | null = null;
   private routinesAgain = false;
   private flockSending: Promise<void> | null = null;
@@ -210,18 +210,29 @@ export class RunnerJobs implements ChatRunner {
   private async shareRoutines(): Promise<void> {
     const account = this.signedIn;
     if (!account || !this.link?.accepted || !this.hooks.routines) return;
-    if (this.sharedRoutines?.account !== account) this.sharedRoutines = { account, rows: new Map() };
-    const sent = this.sharedRoutines.rows;
+    if (this.sharedRoutines?.account !== account) this.sharedRoutines = { account, rows: new Map(), reconciled: null };
+    const shared = this.sharedRoutines;
     const rows = this.hooks.routines();
     for (const row of rows) {
-      const shape = JSON.stringify({ ...row, nextRunAt: row.nextRunAt === null });
-      if (sent.get(row.key) === shape) continue;
+      const shape = JSON.stringify({ ...row, firstRunAt: null });
+      if (shared.rows.get(row.key) === shape) continue;
       // Tried again on the next change or the next look at the link.
-      if (await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true))) sent.set(row.key, shape);
+      if (await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true))) shared.rows.set(row.key, shape);
     }
-    for (const key of [...sent.keys()].filter((key) => !rows.some((row) => row.key === key))) {
-      if (await this.withToken(account, (token) => this.server!.forgetCloudRoutine(token, key).then(() => true))) sent.delete(key);
+    // Anything there that this no longer has goes, checked against the server's own keys, so one deleted or turned off
+    // while it couldn't be reached, or before a restart, still goes. Only when the keys here change, or until it's worked.
+    const keys = rows.map(({ key }) => key);
+    const local = JSON.stringify([...keys].sort());
+    if (shared.reconciled === local) return;
+    const there = await this.withToken(account, (token) => this.server!.myCloudRoutineKeys(token));
+    if (!there) return;
+    let gone = true;
+    for (const key of there.filter((key) => !keys.includes(key))) {
+      const forgotten = await this.withToken(account, (token) => this.server!.forgetCloudRoutine(token, key).then(() => true));
+      if (forgotten) shared.rows.delete(key);
+      else gone = false;
     }
+    if (gone) shared.reconciled = local;
   }
 
   async flockChanged(): Promise<void> {

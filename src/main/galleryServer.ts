@@ -236,8 +236,14 @@ export class GalleryServer {
     await this.request("/rest/v1/rpc/sync_cloud_routine", {
       method: "POST",
       token,
-      body: { p_key: row.key, p_prompt: row.prompt, p_mascot: row.mascot, p_action_approval: row.actionApproval, p_context_id: row.contextId, p_schedule: row.schedule, p_time_zone: row.timeZone, p_next_run_at: row.nextRunAt },
+      body: { p_key: row.key, p_prompt: row.prompt, p_mascot: row.mascot, p_action_approval: row.actionApproval, p_context_id: row.contextId, p_schedule: row.schedule, p_time_zone: row.timeZone, p_paused: row.paused, p_first_run_at: row.firstRunAt },
     });
+  }
+
+  // The keys of the user's routines in the cloud, whatever this app remembers sending.
+  async myCloudRoutineKeys(token: string): Promise<string[]> {
+    const keys = await this.request<unknown[]>("/rest/v1/rpc/my_cloud_routine_keys", { method: "POST", token, body: {} });
+    return (keys ?? []).filter((key): key is string => typeof key === "string");
   }
 
   async forgetCloudRoutine(token: string, key: string): Promise<void> {

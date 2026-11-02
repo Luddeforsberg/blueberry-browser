@@ -95,7 +95,8 @@ export const approvalFromRow = (row: Record<string, unknown>): (ChatApproval & {
 };
 
 // A routine that runs in the cloud, as the app keeps it there for the runner. Its bird's limits are narrowed by the
-// routine's own sites before it goes, and a paused one goes with no next time, so it waits there without running.
+// routine's own sites before it goes. When it's due is the server's from then on: `firstRunAt` only counts for a new
+// routine, a changed schedule or a resume.
 export interface CloudRoutineRow {
   key: string;
   prompt: string;
@@ -104,5 +105,6 @@ export interface CloudRoutineRow {
   contextId: string | null;
   schedule: object;
   timeZone: string;
-  nextRunAt: string | null;
+  paused: boolean;
+  firstRunAt: string | null;
 }
