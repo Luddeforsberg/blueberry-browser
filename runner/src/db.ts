@@ -3,6 +3,7 @@ import { actionApprovalFromRow, historyFromRow, type ApprovalToAsk, type CloudJo
 import type { ActionApproval } from "../../src/shared/ipc";
 import { GalleryServer, type ServerSession } from "../../src/main/galleryServer";
 import type { ChatStep } from "../../src/shared/library";
+import type { PushDb, PushSubscriptionRow } from "./push";
 
 // The runner's only way to Supabase: signed in as its own user, with the publishable key, through the `runner_*`
 // functions, which only reach the jobs of the owner it's linked to. Nothing here can decide an approval, and the database
@@ -108,7 +109,7 @@ export const runnerSession = ({ url, key, email, password }: DbConfig, server = 
 
 export type RunnerSession = ReturnType<typeof runnerSession>;
 
-export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & { accept(): Promise<boolean> } => {
+export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & { accept(): Promise<boolean> } => {
   const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
     const authorization = `Bearer ${await auth.token()}`;
     try {
@@ -163,6 +164,14 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
       const id = await rpc<unknown>("runner_ask", { p_job: jobId, p_kind: kind, p_text: text, p_need: need, p_site: site });
       if (typeof id !== "string") throw new DbError(500);
       return id;
+    },
+    // Where the owner wants a notification. Only the address and its keys, to send one with no content.
+    pushSubscriptions: async () =>
+      ((await rpc<Record<string, unknown>[]>("runner_push_subscriptions", {})) ?? []).flatMap((row): PushSubscriptionRow[] =>
+        typeof row.endpoint === "string" && typeof row.p256dh === "string" && typeof row.auth === "string" ? [{ endpoint: row.endpoint, p256dh: row.p256dh, auth: row.auth }] : []
+      ),
+    forgetPushSubscription: async (endpoint) => {
+      await rpc("runner_forget_push_subscription", { p_endpoint: endpoint });
     },
     decision: async (approvalId) => {
       const [row] = (await rpc<Record<string, unknown>[]>("runner_decision", { p_approval: approvalId })) ?? [];

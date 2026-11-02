@@ -4,6 +4,7 @@ import { CloudSessions, type CloudBrowser } from "../../src/main/cloudBrowser";
 import { isLocalEndpoint, localChrome } from "../../src/main/localChrome";
 import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from "./db";
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
+import { pushConfig, pusher } from "./push";
 import { quietConsole } from "./quietConsole";
 
 quietConsole();
@@ -54,6 +55,12 @@ const cloudBrowser = (contextId: string | null): CloudBrowser =>
 
 const settings = config as Exclude<typeof config, string>;
 const db = supabaseDb(settings, runnerSession(settings));
+
+// Notifications to the owner's phone, only with VAPID keys set.
+const push = pushConfig(process.env);
+if (typeof push === "string") fail(push);
+const notify = push && typeof push !== "string" ? pusher(push, db) : undefined;
+if (!notify) console.log("No VAPID keys, so no notifications go to the phone.");
 const unreleased = new UnreleasedBrowsers();
 const shutdown = new AbortController();
 let working: Promise<unknown> | null = null;
@@ -121,6 +128,7 @@ const loop = async () => {
       browser: (contextId) => sessionBrowser(new CloudSessions(cloudBrowser(contextId))),
       signal: shutdown.signal,
       unreleased,
+      notify,
     }).catch(() => console.error(`Job ${id}: the runner couldn't finish it.`));
     await working;
     working = null;

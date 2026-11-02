@@ -665,13 +665,27 @@ Settings > Cloud lets a bird work in a browser on Browserbase. It's off until a 
 
 ### On the runner
 
-A chat sent to the cloud runner is an ordinary chat in the list, with "Sent to the runner" over its first message in 12px `muted-foreground`, and its later messages go there too. Its steps and reply show as they're written, a little behind, and its approvals are cards in the chat and in Needs you, answered only from this window: the phone isn't sent them, and Claude can't answer them.
+A chat sent to the cloud runner is an ordinary chat in the list, with "Sent to the runner" over its first message in 12px `muted-foreground`, and its later messages go there too. Its steps and reply show as they're written, a little behind, and its approvals are cards in the chat and in Needs you, answered only by the user, from this window or the phone page (see On the phone). Telegram isn't sent them, and Claude can't answer them.
 
 - **Beside the chat,** while it runs and there's room, the same column as the working view: the crossed-out screen and **On the runner**, one line in `muted-foreground` saying it keeps going with this computer off, the live view in a `tray` box with `border` and the `card` radius, locked like a cloud tab's, and what it's doing now. With no live view, as from a test browser, the box says so.
 - **Handed to the user:** a sign-in or captcha unlocks the live view, the line says to do it there and press I'm done, and I'm done on the card gives the page back. There's no tab to go to. With no room beside the chat, the same view goes under the card, only while it waits.
 - **Another account:** signed out, or signed in as someone else, a runner chat shows only what's saved, and a new message there says which account it's on. Nothing of it is answered or shown meanwhile, and it comes back when that account signs in.
 - **Ask before acting** is never less than the default there, because nobody is watching: Never ask still asks before anything risky.
 - **No answer** in 30 minutes stops the job, and the chat says so as its error. Stop in the composer stops it on the runner.
+
+### On the phone
+
+`site/app/`, a page on the public site the user adds to their Home Screen: the jobs their birds are doing in the cloud, answered while the computer is off. It's the window in small: the `frame` gradient behind, one `canvas` card with the `card` radius for the page, plain rows split by `border`, and the bird standing on real edges. Words say "in the cloud", never "runner". The column is at most 560px, so it works on a desktop too.
+
+- **Signing in:** Berry stands on the top edge of a card that holds "Your flock, from your phone", one line on what it's for, email, password and **Sign in**. The same account as Settings.
+- **The list:** "Blueberry" on the frame with one quiet status, a 6px dot in `success` and "Ready", or a grey one and "Not set up" with a line in `warning` saying where to set it up. On the card, the composer with Berry standing on it, which opens Start. Then **Needs you**, each row the asking sentence in 16px, and **In the cloud**, each the prompt cut to two lines, with the bird at 28px in its mood and its name and status in 12px. A failed job's reason is in `warning`. Under the list, the notifications line and who's signed in, with **Sign out**.
+- **A job:** the prompt as the user's bubble, the bird's name, then what it's asking, its steps as footprints with the berry on the one it's on, the reply, and **In the cloud** with a cloud icon over the live view in a `tray` box. **Stop** sits on the frame while it goes.
+- **Asking:** the sentence, with sites for addresses, then the exact `describe` words in full in a `tray` block, never cut, with **Allow** filled and **Don't allow**. A question has an answer field, **Answer** and **Skip**, and an answer shaped like a code isn't sent: it says codes only go into the page itself.
+- **Handed to the user:** "Scout needs you to sign in on shop.example", with **Take over** and **Not now**. Take over unlocks the live view, which gets taller and the periwinkle reading ring, and the line under it says a code goes into the page itself, straight to the site. Then **I'm done** gives it back. There's no field on the page for a password or code.
+- **Locked:** otherwise the live view takes no touch, and the line under it says so with a lock: if the bird needs the user there, it asks.
+- **Starting a job:** the prompt box first and focused, then **Who goes**, the flock standing on a wire, the chosen one's name in semibold over a 2px `accent-ink` line, and its limits in words, all muted. One line says whose flock it is and when the Mac last shared it, or that only Berry is here until it does. **Send** is pinned to the bottom of the card, within reach of a thumb.
+- **After an answer,** one quiet line says what happened, such as "Allowed. Scout carries on.", for a few seconds.
+- **Notifications:** "Berry needs you" or "Berry finished", and nothing else, ever. The list says that beside **Turn on**. On an iPhone not yet on the Home Screen, it says to add it there first.
 
 ### Cloud tab
 

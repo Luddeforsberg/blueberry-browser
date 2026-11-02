@@ -22,7 +22,9 @@ svg { display: block; overflow: visible; }
 /* On the frame, above the card. */
 .top { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 8px 16px; }
 .top .title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
-.top .runner { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--muted-foreground)); }
+.top .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--muted-foreground)); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--success)); }
+.status-dot.off { background: rgb(var(--muted-foreground)); }
 .icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* The one card, floating on the frame like the page card. */
@@ -41,6 +43,10 @@ h2:first-child { padding-top: 0; }
 .muted { font-size: 14px; color: rgb(var(--muted-foreground)); }
 .small { font-size: 12px; color: rgb(var(--muted-foreground)); }
 .warning { color: rgb(var(--warning)); }
+.gap { margin-top: 16px; }
+.notify { margin-top: 24px; }
+.answer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.answer .actions { margin-top: 4px; }
 
 /* Buttons: full radius, filled only for a decision or the main action. */
 .button {
@@ -63,8 +69,8 @@ h2:first-child { padding-top: 0; }
 /* Birds. The drawing comes from poses.js with its palette set on it. */
 .bird svg { width: 100%; height: 100%; }
 .bird { flex-shrink: 0; }
-.bird.s24 { width: 24px; height: 24px; }
-.bird.s28 { width: 28px; height: 28px; }
+.bird.s24 { width: 28px; height: 28px; margin-top: -2px; }
+.bird.s28 { width: 32px; height: 32px; margin-top: -4px; }
 
 /* Signing in: Berry standing on the card's top edge, as it stands on the composer. */
 .signin { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 8px 8px; }
@@ -107,6 +113,10 @@ form .button.wide { margin-top: 8px; }
 .row .prompt { font-size: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: rgb(var(--muted-foreground)); }
 .row .meta.warning { color: rgb(var(--warning)); }
+.gap { margin-top: 16px; }
+.notify { margin-top: 24px; }
+.answer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.answer .actions { margin-top: 4px; }
 .row .chev { align-self: center; color: rgb(var(--muted-foreground)); }
 
 /* Exactly what will happen, in full, never cut. */
@@ -123,10 +133,11 @@ form .button.wide { margin-top: 8px; }
 
 .runner-head { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
 .runner-head b { font-weight: 600; }
-.runner-head .muted { font-size: 13px; }
 .live { position: relative; margin-top: 8px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 22px; border: 1px solid rgb(var(--border)); background: rgb(var(--tray)); }
 .live.yours { aspect-ratio: 3 / 4; box-shadow: var(--shadow-reading); border-color: transparent; }
-.live .lock { position: absolute; inset: 0; }
+.live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.live iframe.locked { pointer-events: none; }
+.live-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 13px; color: rgb(var(--muted-foreground)); }
 .lockline { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .lockline p { flex: 1; min-width: 0; font-size: 13px; color: rgb(var(--muted-foreground)); }
 .lockline .icon { color: rgb(var(--muted-foreground)); }
@@ -154,18 +165,18 @@ form .button.wide { margin-top: 8px; }
 .perch [aria-pressed="true"] .name { color: rgb(var(--foreground)); font-weight: 600; border-bottom-color: rgb(var(--accent-ink)); }
 .can { margin-top: 12px; }
 .can li { font-size: 14px; padding: 1px 0; }
-.can li.open { color: rgb(var(--warning)); }
-.start .composer { margin-top: 24px; }
+/* Starting a job: the box first, the flock under it, and Send pinned at the bottom within reach of a thumb. */
+.start { display: flex; flex-direction: column; padding-bottom: 0; }
+.start .composer { margin-top: 0; }
 .start .foot { margin-top: 12px; }
-.start .button.wide { margin-top: 16px; }
+.send-bar { position: sticky; bottom: 0; margin: auto -16px 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); background: rgb(var(--canvas)); border-radius: 0 0 22px 22px; }
 
-/* Empty. */
-.empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 0; text-align: center; }
-.empty .bird { width: 72px; height: 72px; }
 
 @media (min-width: 600px) {
   .card { padding: 32px 32px 40px; }
   .signin .card { padding: 32px 32px 32px; }
+  .start { padding-bottom: 0; }
+  .send-bar { margin-inline: -32px; padding-inline: 32px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .shimmer { animation: none; color: rgb(var(--foreground)); background: none; }

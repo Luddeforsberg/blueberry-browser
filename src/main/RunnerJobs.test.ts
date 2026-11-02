@@ -149,3 +149,47 @@ describe("runner jobs in the app", () => {
     runner.destroy();
   });
 });
+
+describe("the flock shared with the phone", () => {
+  const SCOUT = { ...BERRY, id: "m-1", name: "Scout", instructions: "Find cables.", sites: ["webhallen.com"] };
+  const make = (accepted: boolean) => {
+    const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
+    const syncCloudFlock = vi.fn(async () => {});
+    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted }), syncCloudFlock } as unknown as GalleryServer;
+    const flock = [BERRY, SCOUT];
+    const runner = new RunnerJobs(
+      server,
+      { get state() { return account.state; }, accessToken: async () => (account.state.status === "signed-in" ? "token" : null) },
+      join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
+      { changed: vi.fn(), finished: vi.fn(), contextId: () => null, flock: () => flock },
+      5
+    );
+    return { runner, account, syncCloudFlock, flock };
+  };
+
+  it("goes once a runner has accepted, again only when it changes, and never while signed out", async () => {
+    const { runner, account, syncCloudFlock, flock } = make(true);
+    await settle();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(1);
+    expect(syncCloudFlock).toHaveBeenLastCalledWith("token", [expect.objectContaining({ id: "m-1", name: "Scout", sites: ["webhallen.com"] })]);
+    await runner.flockChanged();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(1);
+    flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
+    await runner.flockChanged();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    account.state = { status: "signed-out", email: null, problem: null };
+    runner.accountChanged();
+    flock.pop();
+    await runner.flockChanged();
+    expect(syncCloudFlock).toHaveBeenCalledTimes(2);
+    runner.destroy();
+  });
+
+  it("isn't shared before a runner has accepted", async () => {
+    const { runner, syncCloudFlock } = make(false);
+    await settle();
+    await runner.flockChanged();
+    expect(syncCloudFlock).not.toHaveBeenCalled();
+    runner.destroy();
+  });
+});

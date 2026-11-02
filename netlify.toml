@@ -1,0 +1,23 @@
+# The public site and the phone page, as plain files: there's nothing to build. Deploy with `pnpm run site:deploy`.
+[build]
+  publish = "site"
+
+# Nobody may frame any of it, and nothing is guessed as another type.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+
+# The service worker is always checked for a new version, so a fix reaches phones on their next visit.
+[[headers]]
+  for = "/app/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/app/"
+
+[[headers]]
+  for = "/app/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"

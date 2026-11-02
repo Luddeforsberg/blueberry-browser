@@ -198,6 +198,11 @@ export class GalleryServer {
     await this.request("/rest/v1/rpc/unlink_cloud_runner", { method: "POST", token, body: {} });
   }
 
+  // The flock as the phone page sees it, replaced whole. Mascot fields only, never memory.
+  async syncCloudFlock(token: string, birds: object[]): Promise<void> {
+    await this.request("/rest/v1/rpc/sync_cloud_flock", { method: "POST", token, body: { p_birds: birds } });
+  }
+
   async myCloudRunner(token: string): Promise<{ email: string; accepted: boolean } | null> {
     const [row] = (await this.request<{ email?: unknown; accepted?: unknown }[]>("/rest/v1/rpc/my_cloud_runner", { method: "POST", token, body: {} })) ?? [];
     return row && typeof row.email === "string" ? { email: row.email, accepted: row.accepted === true } : null;
