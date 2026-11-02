@@ -8,6 +8,8 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { mascotSnapshot } from "../src/main/cloudJobs";
+import { BERRY } from "../src/shared/mascots";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { startFakeSupabase } from "./fakeSupabase";
@@ -21,6 +23,7 @@ const EMAIL = "ana@example.com";
 const RUNNER_EMAIL = "runner@example.com";
 const RUNNER_PASSWORD = "a long random runner password";
 const PROMPT = "Order the thing from my shop";
+const PHONE_PROMPT = "What's on my shop's front page?";
 
 const SHOP = `<!doctype html><title>Shop</title>
 <button id="order">Place order</button><p id="said">Nothing ordered</p>
@@ -150,6 +153,43 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), chatId);
     await expect(chrome.getByText("Ordered it")).toBeVisible();
     await shoot(chrome, "chat-done");
+
+    // A job sent from the phone, as the same account, shows here as a runner chat once the runner has done it, and a
+    // follow-up from here goes to the runner in the same conversation, carrying that exchange.
+    const base = supabase.env.SUPABASE_URL;
+    const asOwner = async (name: string, body: object) => {
+      const signIn = await fetch(`${base}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: supabase.env.SUPABASE_PUBLISHABLE_KEY, "content-type": "application/json" }, body: JSON.stringify({ email: EMAIL, password: "correct horse battery" }) });
+      const { access_token: token } = (await signIn.json()) as { access_token: string };
+      const response = await fetch(`${base}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: supabase.env.SUPABASE_PUBLISHABLE_KEY, authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+      expect(response.status, name).toBe(200);
+      return response.json();
+    };
+    model.replyWith("Found it from the phone");
+    const phoneJob = await asOwner("start_cloud_job", { p_prompt: PHONE_PROMPT, p_history: [], p_mascot: mascotSnapshot(BERRY), p_action_approval: "risky", p_context_id: null });
+    const phoneChat = async () =>
+      chrome.evaluate(async (prompt) => {
+        for (const { id } of (await window.chromeAPI.library.getLibrary()).chats) {
+          const chat = await window.chromeAPI.library.getChat(id);
+          if (chat?.messages[0]?.content === prompt) return { id, runner: chat.runner === true, messages: chat.messages.map(({ role, content }) => ({ role, content })) };
+        }
+        return null;
+      }, PHONE_PROMPT);
+    await expect.poll(async () => (await phoneChat())?.messages.at(-1)?.content, { timeout: 40_000 }).toBe("Found it from the phone");
+    const adopted = (await phoneChat())!;
+    expect(adopted.runner).toBe(true);
+    expect(adopted.messages.map(({ role }) => role)).toEqual(["user", "assistant"]);
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), adopted.id);
+    await expect(chrome.getByText("Sent to the runner")).toBeVisible();
+    await expect(chrome.getByText("Found it from the phone")).toBeVisible();
+    await shoot(chrome, "chat-from-phone");
+
+    model.replyWith("Followed up from the Mac");
+    await chrome.evaluate((id) => window.chromeAPI.chat.send(id, "And from here?", { seePage: false }), adopted.id);
+    await expect.poll(async () => (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'And from here?'"))[0]?.status, { timeout: 30_000 }).toBe("done");
+    const [followUp] = await supabase.cloudRows("select conversation_id, history from public.cloud_jobs where prompt = 'And from here?'");
+    expect(followUp.conversation_id).toBe(phoneJob);
+    expect(followUp.history).toEqual([{ role: "user", content: PHONE_PROMPT }, { role: "assistant", content: expect.stringContaining("Found it from the phone") }]);
+    await expect.poll(async () => (await phoneChat())?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Followed up from the Mac");
 
     // The runner says only which job and how it went.
     expect(runnerLog).toContain(`Job ${job.id}: done.`);

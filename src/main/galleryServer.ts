@@ -5,6 +5,9 @@
 const CALL_ABORT_MS = 10_000;
 // Enough for a young gallery. The page sorts and searches what comes back, so past this it would miss the rest.
 const LIST_LIMIT = 300;
+// A conversation's jobs come this many at a time, up to this many pages, far past any real conversation.
+const CONVERSATION_PAGE = 100;
+const CONVERSATION_PAGES = 50;
 
 const PUBLIC_COLUMNS = "id,name,palette,accessory,description,category,instructions,sites,tools,author_name,example_prompt,example_answer,add_count,created_at";
 
@@ -162,11 +165,16 @@ export class GalleryServer {
 
   // The cloud runner's jobs, always as the signed-in user, so row-level security keeps each to their own.
 
-  async startCloudJob(token: string, job: { prompt: string; history: unknown[]; mascot: object; actionApproval: string; contextId: string | null }): Promise<string | null> {
+  // `afterJobId` is the conversation's newest job, the one the history was built on. Answers 409 while another job of it
+  // is going, or if it has gone on since that one.
+  async startCloudJob(
+    token: string,
+    job: { prompt: string; history: unknown[]; mascot: object; actionApproval: string; contextId: string | null; conversationId: string; afterJobId: string | null }
+  ): Promise<string | null> {
     const id = await this.request<unknown>("/rest/v1/rpc/start_cloud_job", {
       method: "POST",
       token,
-      body: { p_prompt: job.prompt, p_history: job.history, p_mascot: job.mascot, p_action_approval: job.actionApproval, p_context_id: job.contextId },
+      body: { p_prompt: job.prompt, p_history: job.history, p_mascot: job.mascot, p_action_approval: job.actionApproval, p_context_id: job.contextId, p_conversation: job.conversationId, p_after_job: job.afterJobId },
     });
     return typeof id === "string" ? id : null;
   }
@@ -184,8 +192,27 @@ export class GalleryServer {
     return (await this.request<unknown>("/rest/v1/rpc/decide_cloud_approval", { method: "POST", token, body: { p_approval: id, p_allow: allow, p_answer: answer } })) === true;
   }
 
-  async forgetCloudJob(token: string, id: string): Promise<void> {
-    await this.request("/rest/v1/rpc/forget_cloud_job", { method: "POST", token, body: { p_job: id } });
+  // Every job of a conversation, so a chat deleted here doesn't come back as one started elsewhere.
+  async forgetCloudConversation(token: string, id: string): Promise<void> {
+    await this.request("/rest/v1/rpc/forget_cloud_conversation", { method: "POST", token, body: { p_conversation: id } });
+  }
+
+  // The newest jobs that belong to a conversation, so one started or followed up elsewhere shows here. Ids only.
+  async cloudConversationJobs(token: string): Promise<{ id: string; conversation_id: string; created_at: string }[]> {
+    const rows = (await this.request<Record<string, unknown>[]>("/rest/v1/cloud_jobs?select=id,conversation_id,created_at&conversation_id=not.is.null&order=created_at.desc&limit=50", { token })) ?? [];
+    return rows.filter((row): row is { id: string; conversation_id: string; created_at: string } => typeof row.id === "string" && typeof row.conversation_id === "string" && typeof row.created_at === "string");
+  }
+
+  // Every job of one conversation, oldest first, with what each asked and how it went, a page at a time.
+  async cloudConversation(token: string, id: string): Promise<Record<string, unknown>[]> {
+    const rows: Record<string, unknown>[] = [];
+    for (let page = 0; page < CONVERSATION_PAGES; page++) {
+      const path = `/rest/v1/cloud_jobs?select=id,prompt,mascot,status,steps,reply,error,created_at&conversation_id=eq.${encodeURIComponent(id)}&order=created_at.asc&limit=${CONVERSATION_PAGE}&offset=${page * CONVERSATION_PAGE}`;
+      const batch = (await this.request<Record<string, unknown>[]>(path, { token })) ?? [];
+      rows.push(...batch);
+      if (batch.length < CONVERSATION_PAGE) break;
+    }
+    return rows;
   }
 
   // The user's runner: an account of its own, named by email, which counts once the runner has accepted.

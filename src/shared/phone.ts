@@ -57,3 +57,70 @@ export const snapshotOf = ({ id, name, instructions, sites, tools, galleryId }: 
   tools: [...tools],
   fromGallery: !!galleryId,
 });
+
+// --- Conversations ---
+// A follow-up is a new job in the same conversation, carrying the messages before it, the same from the app and the phone.
+
+export const MAX_HISTORY = 40;
+export const MAX_HISTORY_TEXT = 8000;
+// Under the row's limit of 100,000 bytes, with room for the JSON around each message.
+const MAX_HISTORY_BYTES = 90_000;
+
+export interface HistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// The model sees what a bird did earlier by notes of its steps, never by the pages, which aren't kept.
+export const asHistoryMessage = ({ role, content, steps }: { role: "user" | "assistant"; content: string; steps?: readonly { text: string }[] }): HistoryMessage => ({
+  role,
+  content: steps?.length ? `<steps>\n${steps.map((step) => `- ${step.text}`).join("\n")}\n</steps>\n\n${content}` : content,
+});
+
+const bytes = (text: string) => new TextEncoder().encode(text).length;
+
+// Only the user's and the bird's messages, newest kept, each cut to length, and dropped from the oldest until it fits.
+export const fitHistory = (input: unknown): HistoryMessage[] => {
+  const messages = (Array.isArray(input) ? input : [])
+    .filter((message): message is HistoryMessage => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string")
+    .slice(-MAX_HISTORY)
+    .map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
+  while (messages.length > 0 && bytes(JSON.stringify(messages)) > MAX_HISTORY_BYTES) messages.shift();
+  return messages;
+};
+
+export interface ConversationJob {
+  id: string;
+  conversation_id?: string | null;
+  created_at: string;
+  history?: unknown;
+  prompt: string;
+  reply?: string;
+  steps?: unknown;
+}
+
+// What the next message in a conversation carries: the history of the job before it, then that job's prompt and what
+// came of it, as the app saves a runner chat's reply. A job with neither words nor steps left nothing to say.
+export const followUpHistory = (last: ConversationJob): HistoryMessage[] => {
+  const steps = (Array.isArray(last.steps) ? last.steps : []).filter((step): step is { text: string } => typeof step?.text === "string");
+  const reply = typeof last.reply === "string" ? last.reply : "";
+  return fitHistory([
+    ...fitHistory(last.history),
+    { role: "user", content: last.prompt },
+    ...(reply || steps.length ? [asHistoryMessage({ role: "assistant", content: reply, steps })] : []),
+  ]);
+};
+
+export const conversationIdOf = (job: Pick<ConversationJob, "id" | "conversation_id">): string => job.conversation_id || job.id;
+
+// One per conversation, the newest first, each with its jobs oldest first. A job from before conversations is one alone.
+export const conversationsOf = <T extends ConversationJob>(jobs: readonly T[]): { id: string; jobs: T[]; latest: T }[] => {
+  const groups = new Map<string, T[]>();
+  for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
+    const id = conversationIdOf(job);
+    groups.set(id, [...(groups.get(id) ?? []), job]);
+  }
+  return [...groups]
+    .map(([id, grouped]) => ({ id, jobs: grouped, latest: grouped.at(-1)! }))
+    .sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at));
+};

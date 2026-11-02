@@ -44,7 +44,6 @@ h2:first-child { padding-top: 0; }
 .small { font-size: 12px; color: rgb(var(--muted-foreground)); }
 .warning { color: rgb(var(--warning)); }
 .gap { margin-top: 16px; }
-.notify { margin-top: 24px; }
 .answer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .answer .actions { margin-top: 4px; }
 
@@ -63,6 +62,7 @@ h2:first-child { padding-top: 0; }
 .button.quiet.small { min-height: 28px; font-size: 12px; }
 .button.quiet:hover { background: rgb(var(--muted)); color: rgb(var(--foreground)); }
 .button.wide { width: 100%; min-height: 44px; font-size: 16px; }
+.button.icon-only { width: 36px; padding: 0; }
 .button:focus-visible, a:focus-visible, .row:focus-visible, .perch button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 
@@ -113,10 +113,6 @@ form .button.wide { margin-top: 8px; }
 .row .prompt { font-size: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: rgb(var(--muted-foreground)); }
 .row .meta.warning { color: rgb(var(--warning)); }
-.gap { margin-top: 16px; }
-.notify { margin-top: 24px; }
-.answer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.answer .actions { margin-top: 4px; }
 .row .chev { align-self: center; color: rgb(var(--muted-foreground)); }
 
 /* Exactly what will happen, in full, never cut. */
@@ -155,6 +151,20 @@ form .button.wide { margin-top: 8px; }
 }
 @keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 .reply { margin-top: 16px; white-space: pre-wrap; }
+/* A conversation: each job's exchange in turn, and the box to go on under the last once it's over. */
+.exchange + .exchange { margin-top: 32px; }
+.follow { margin-top: 32px; gap: 8px; }
+.follow textarea { min-height: 44px; }
+
+/* Settings: plain sections split by lines, as in the window. */
+.setting { padding: 16px 0; }
+.setting + .setting { border-top: 1px solid rgb(var(--border)); }
+.setting:first-child { padding-top: 0; }
+.setting .lockline { margin-top: 0; }
+.segmented { display: flex; padding: 2px; border-radius: 999px; background: rgb(var(--muted)); }
+.segmented button { flex: 1; min-height: 32px; border: 0; border-radius: 999px; background: none; font-size: 14px; color: rgb(var(--muted-foreground)); cursor: pointer; }
+.segmented [aria-checked="true"] { background: rgb(var(--surface)); color: rgb(var(--foreground)); font-weight: 600; box-shadow: 0 0 0 1px rgb(var(--border)); }
+.segmented button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
 
 /* Starting a job: the flock stands on a wire, and the one going stands up. */
 .perch { position: relative; display: flex; gap: 4px; overflow-x: auto; padding: 8px 0 0; margin: 0 -16px; padding-inline: 16px; scrollbar-width: none; }

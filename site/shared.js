@@ -173,6 +173,41 @@ var snapshotOf = ({ id, name, instructions, sites, tools, galleryId }) => ({
   tools: [...tools],
   fromGallery: !!galleryId
 });
+var MAX_HISTORY = 40;
+var MAX_HISTORY_TEXT = 8e3;
+var MAX_HISTORY_BYTES = 9e4;
+var asHistoryMessage = ({ role, content, steps }) => ({
+  role,
+  content: steps?.length ? `<steps>
+${steps.map((step) => `- ${step.text}`).join("\n")}
+</steps>
+
+${content}` : content
+});
+var bytes = (text) => new TextEncoder().encode(text).length;
+var fitHistory = (input) => {
+  const messages = (Array.isArray(input) ? input : []).filter((message) => (message?.role === "user" || message?.role === "assistant") && typeof message.content === "string").slice(-MAX_HISTORY).map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_TEXT) }));
+  while (messages.length > 0 && bytes(JSON.stringify(messages)) > MAX_HISTORY_BYTES) messages.shift();
+  return messages;
+};
+var followUpHistory = (last) => {
+  const steps = (Array.isArray(last.steps) ? last.steps : []).filter((step) => typeof step?.text === "string");
+  const reply = typeof last.reply === "string" ? last.reply : "";
+  return fitHistory([
+    ...fitHistory(last.history),
+    { role: "user", content: last.prompt },
+    ...reply || steps.length ? [asHistoryMessage({ role: "assistant", content: reply, steps })] : []
+  ]);
+};
+var conversationIdOf = (job) => job.conversation_id || job.id;
+var conversationsOf = (jobs) => {
+  const groups = /* @__PURE__ */ new Map();
+  for (const job of [...jobs].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))) {
+    const id = conversationIdOf(job);
+    groups.set(id, [...groups.get(id) ?? [], job]);
+  }
+  return [...groups].map(([id, grouped]) => ({ id, jobs: grouped, latest: grouped.at(-1) })).sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at));
+};
 
 // src/renderer/chrome/src/siteNames.ts
 var siteParts = (text) => {
@@ -209,7 +244,10 @@ var plausibleCode = (text) => {
 export {
   BERRY_ID,
   asContinuation,
+  conversationIdOf,
+  conversationsOf,
   flockFromRows,
+  followUpHistory,
   isUuid,
   parsePublishedRow,
   permissionsInWords,

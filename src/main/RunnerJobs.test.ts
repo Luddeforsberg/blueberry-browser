@@ -20,24 +20,45 @@ const setUp = () => {
   // Whether the runner is still linked, as the server would say.
   const link = { accepted: true };
   const jobs = new Map<string, { owner: string; row: Record<string, unknown> }>();
+  let made = 0;
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
-    startCloudJob: vi.fn(async (token: string) => {
+    startCloudJob: vi.fn(async (token: string, job: { prompt: string; history: unknown[]; conversationId: string; afterJobId: string | null }) => {
       await answering;
       if (!link.accepted) throw new ServerError(400, "");
-      const id = `job-${jobs.size + 1}`;
-      jobs.set(id, { owner: token, row: { id, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
+      const conversation = [...jobs.values()].filter(({ row }) => row.conversation_id === job.conversationId).map(({ row }) => row);
+      if (conversation.some((row) => !["done", "failed", "stopped"].includes(String(row.status)))) throw new ServerError(409, "");
+      // Refused unless it was built on the conversation's newest job, as the server does.
+      if ((conversation.at(-1)?.id ?? null) !== job.afterJobId) throw new ServerError(409, "");
+      const id = `job-${++made}`;
+      jobs.set(id, { owner: token, row: { id, conversation_id: job.conversationId, prompt: job.prompt, mascot: { id: "berry" }, created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
       return id;
+    }),
+    cloudConversationJobs: async (token: string) =>
+      [...jobs.values()].filter(({ owner }) => owner === token).map(({ row }) => row).reverse(),
+    cloudConversation: async (token: string, id: string) => [...jobs.values()].filter(({ owner, row }) => owner === token && row.conversation_id === id).map(({ row }) => row),
+    forgetCloudConversation: vi.fn(async (token: string, id: string) => {
+      jobs.forEach(({ owner, row }, key) => owner === token && row.conversation_id === id && jobs.delete(key));
     }),
     cloudJobs: async (token: string, ids: string[]) => ids.flatMap((id) => (jobs.get(id)?.owner === token ? [jobs.get(id)!.row] : [])),
     decideCloudApproval: vi.fn(async () => true),
     myCloudRunner: async () => (link.accepted ? { email: "runner@example.com", accepted: true } : null),
     stopCloudJob: vi.fn(async () => {}),
-    forgetCloudJob: vi.fn(async () => {}),
   } as unknown as GalleryServer;
   const changed = vi.fn();
   const finished = vi.fn();
+  // The chats this computer has, as `Chats` keeps them, with the messages from elsewhere.
+  const chats = new Map<string, { mascotId: string | null; said: string[] }>();
+  const adopt = vi.fn(({ prompt, mascotId }: { prompt: string; mascotId: string | null }) => {
+    const id = `adopted-${chats.size + 1}`;
+    chats.set(id, { mascotId, said: [] });
+    void prompt;
+    return id;
+  });
+  const followedUp = vi.fn((chatId: string, prompt: string) => chats.get(chatId)?.said.push(prompt));
+  // The Mac's own chat, as `Chats` keeps it: what's saved there, which a message sent from here builds its history on.
+  const transcript: { role: "user" | "assistant"; content: string }[] = [];
   const runner = new RunnerJobs(
     server,
     { get state() { return account.state; }, accessToken: async () => {
@@ -45,14 +66,37 @@ const setUp = () => {
       return account.state.status === "signed-in" ? tokenOf() : null;
     } },
     join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
-    { changed, finished, contextId: () => null },
+    {
+      changed,
+      finished: (chatId: string, result: { reply: string; steps: unknown[]; error: string | null }) => {
+        finished(chatId, result);
+        if (chatId === "chat-1" && result.reply) transcript.push({ role: "assistant", content: result.reply });
+      },
+      contextId: () => null,
+      adopt,
+      followedUp: (chatId: string, prompt: string) => {
+        followedUp(chatId, prompt);
+        if (chatId === "chat-1") transcript.push({ role: "user", content: prompt });
+      },
+    },
     5
   );
   const signIn = (email: string | null) => {
     account.state = email ? { status: "signed-in", email, problem: null } : { status: "signed-out", email: null, problem: null };
     runner.accountChanged();
   };
-  const send = () => runner.start("chat-1", { prompt: "Order it", earlier: [], mascot: BERRY, actionApproval: "risky" });
+  // As `Chats` sends: the history read from the chat when it goes, and the message saved once the runner has it.
+  const send = async (chatId = "chat-1", prompt = "Order it") => {
+    const problem = await runner.start(chatId, { prompt, earlier: () => (chatId === "chat-1" ? [...transcript] : []), mascot: BERRY, actionApproval: "risky" });
+    if (chatId === "chat-1") transcript.push({ role: "user", content: prompt });
+    return problem;
+  };
+  // A job sent from the phone, as Ana, in a conversation of its own or one it follows up.
+  const fromPhone = (prompt: string, conversationId = `phone-${made + 1}`, status = "running") => {
+    const id = `job-${++made}`;
+    jobs.set(id, { owner: ANA, row: { id, conversation_id: conversationId, prompt, mascot: { id: "m-scout" }, created_at: `2026-11-02T10:00:${String(made).padStart(2, "0")}Z`, status, steps: [], reply: status === "done" ? "Done there" : "" } });
+    return id;
+  };
   const hold = (set: (gate: Promise<void> | null) => void) => {
     let release = () => {};
     set(new Promise((resolve) => (release = resolve)));
@@ -63,7 +107,7 @@ const setUp = () => {
   };
   const holdTokens = () => hold((gate) => (refreshing = gate));
   const holdAnswers = () => hold((gate) => (answering = gate));
-  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers, link };
+  return { runner, jobs, signIn, send, changed, finished, server, holdTokens, holdAnswers, link, fromPhone, adopt, followedUp, chats, transcript };
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
@@ -83,7 +127,7 @@ describe("runner jobs in the app", () => {
 
   it.each([
     ["Stop", "stopCloudJob" as const],
-    ["deleting the chat", "forgetCloudJob" as const],
+    ["deleting the chat", "forgetCloudConversation" as const],
   ])("does %s on a job still being sent as soon as its id comes back", async (_, call) => {
     const { runner, send, server, holdAnswers } = setUp();
     const release = holdAnswers();
@@ -94,7 +138,8 @@ describe("runner jobs in the app", () => {
     release();
     await sending;
     await settle();
-    expect(server[call]).toHaveBeenCalledWith(ANA, "job-1");
+    if (call === "stopCloudJob") expect(server.stopCloudJob).toHaveBeenCalledWith(ANA, "job-1");
+    else expect(server.forgetCloudConversation).toHaveBeenCalledWith(ANA, expect.any(String));
     runner.destroy();
   });
 
@@ -150,12 +195,123 @@ describe("runner jobs in the app", () => {
   });
 });
 
+describe("conversations from elsewhere", () => {
+  it("shows a job sent from the phone as a runner chat, with its messages, and follows it to the end", async () => {
+    const { runner, jobs, fromPhone, adopt, chats, finished } = setUp();
+    await settle();
+    const id = fromPhone("Find a cable");
+    await runner.discover();
+    expect(adopt).toHaveBeenCalledWith({ prompt: "Find a cable", mascotId: "m-scout" });
+    expect(chats.get("adopted-1")?.said).toEqual(["Find a cable"]);
+    expect(runner.has("adopted-1")).toBe(true);
+    expect(runner.active()).toEqual(["adopted-1"]);
+    // Looking again adds nothing.
+    await runner.discover();
+    expect(adopt).toHaveBeenCalledTimes(1);
+
+    jobs.get(id)!.row = { ...jobs.get(id)!.row, status: "done", reply: "This one" };
+    await settle();
+    expect(finished).toHaveBeenCalledWith("adopted-1", { reply: "This one", steps: [], error: null });
+    runner.destroy();
+  });
+
+  it("adds a follow-up from the phone to the chat it follows, and sends the next from here in the same conversation", async () => {
+    const { runner, jobs, send, fromPhone, adopt, followedUp, finished, server } = setUp();
+    expect(await send()).toBeNull();
+    await settle();
+    const conversation = String(jobs.get("job-1")!.row.conversation_id);
+    jobs.get("job-1")!.row = { ...jobs.get("job-1")!.row, status: "done", reply: "Ordered" };
+    await settle();
+    expect(finished).toHaveBeenCalledTimes(1);
+
+    fromPhone("And the charger?", conversation, "done");
+    await runner.discover();
+    expect(adopt).not.toHaveBeenCalled();
+    expect(followedUp).toHaveBeenCalledWith("chat-1", "And the charger?");
+    expect(finished).toHaveBeenLastCalledWith("chat-1", { reply: "Done there", steps: [], error: null });
+
+    expect(await send("chat-1", "Thanks")).toBeNull();
+    expect(server.startCloudJob).toHaveBeenLastCalledWith(ANA, expect.objectContaining({ prompt: "Thanks", conversationId: conversation }));
+    // This computer's own job isn't taken for one from elsewhere.
+    await runner.discover();
+    expect(followedUp).toHaveBeenCalledTimes(1);
+    runner.destroy();
+  });
+
+  it("brings in an exchange sent from the phone since, before a message from here, and carries it", async () => {
+    const { runner, jobs, send, fromPhone, server, transcript } = setUp();
+    await send();
+    await settle();
+    const conversation = String(jobs.get("job-1")!.row.conversation_id);
+    jobs.get("job-1")!.row = { ...jobs.get("job-1")!.row, status: "done", reply: "Ordered" };
+    await settle();
+    // Sent and finished on the phone before this computer looked.
+    fromPhone("And the charger?", conversation, "done");
+    expect(await send("chat-1", "Thanks")).toBeNull();
+    const calls = (server.startCloudJob as unknown as { mock: { calls: [string, { prompt: string; history: unknown[]; afterJobId: string | null }][] } }).mock.calls;
+    // Refused once as built on job-1, then sent after job-2 with its exchange.
+    expect(calls.slice(-2).map(([, job]) => [job.prompt, job.afterJobId])).toEqual([["Thanks", "job-1"], ["Thanks", "job-2"]]);
+    expect(calls.at(-1)?.[1].history).toEqual([
+      { role: "user", content: "Order it" },
+      { role: "assistant", content: "Ordered" },
+      { role: "user", content: "And the charger?" },
+      { role: "assistant", content: "Done there" },
+    ]);
+    // And saved in that order.
+    expect(transcript.map(({ content }) => content)).toEqual(["Order it", "Ordered", "And the charger?", "Done there", "Thanks"]);
+    expect(runner.active()).toEqual(["chat-1"]);
+    runner.destroy();
+  });
+
+  it("says a job from elsewhere is going rather than sending a second one", async () => {
+    const { runner, jobs, send, fromPhone } = setUp();
+    await send();
+    await settle();
+    const conversation = String(jobs.get("job-1")!.row.conversation_id);
+    jobs.get("job-1")!.row = { ...jobs.get("job-1")!.row, status: "done" };
+    await settle();
+    fromPhone("From the phone", conversation);
+    expect(await send("chat-1", "From here")).toContain("already has a job going");
+    expect([...jobs.values()].filter(({ row }) => row.conversation_id === conversation)).toHaveLength(2);
+    runner.destroy();
+  });
+
+  it("deletes a chat's whole conversation, and never brings it back", async () => {
+    const { runner, jobs, fromPhone, adopt, server } = setUp();
+    await settle();
+    fromPhone("Find a cable", "phone-x", "done");
+    await runner.discover();
+    runner.forget("adopted-1");
+    await settle();
+    expect(server.forgetCloudConversation).toHaveBeenCalledWith(ANA, "phone-x");
+    // Even if the server still had it.
+    fromPhone("Again", "phone-x", "done");
+    await runner.discover();
+    expect(adopt).toHaveBeenCalledTimes(1);
+    expect(jobs.size).toBe(1);
+    runner.destroy();
+  });
+
+  it("finds nothing of another account's, or while signed out", async () => {
+    const { runner, fromPhone, adopt, signIn } = setUp();
+    await settle();
+    fromPhone("Ana's");
+    signIn(BO);
+    await settle();
+    await runner.discover();
+    signIn(null);
+    await runner.discover();
+    expect(adopt).not.toHaveBeenCalled();
+    runner.destroy();
+  });
+});
+
 describe("the flock shared with the phone", () => {
   const SCOUT = { ...BERRY, id: "m-1", name: "Scout", instructions: "Find cables.", sites: ["webhallen.com"] };
   const make = (accepted: boolean) => {
     const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
     const syncCloudFlock = vi.fn(async () => {});
-    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted }), syncCloudFlock } as unknown as GalleryServer;
+    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted }), syncCloudFlock, cloudConversationJobs: async () => [] } as unknown as GalleryServer;
     const flock = [BERRY, SCOUT];
     const runner = new RunnerJobs(
       server,

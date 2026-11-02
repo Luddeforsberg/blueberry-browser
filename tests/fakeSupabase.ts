@@ -12,7 +12,7 @@ type Row = Record<string, unknown> & { id: string; owner: string; hidden: boolea
 // The cloud runner's functions, which run in real Postgres here with the real migration, as the user each token stands
 // for, so the app and the runner, which signs in as a user of its own, meet the real rules.
 const CLOUD_FUNCTIONS = new Set([
-  "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job",
+  "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job", "forget_cloud_conversation",
   "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
   "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
   "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription",
@@ -34,6 +34,7 @@ const cloudDatabase = async () => {
   await db.exec(CLOUD_STANDINS);
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261102000000_cloud_jobs.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261103000000_phone.sql"), "utf8"));
+  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261104000000_cloud_conversations.sql"), "utf8"));
   // One connection, so one call at a time, each with its own role.
   let queue: Promise<unknown> = Promise.resolve();
   const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {
@@ -52,21 +53,31 @@ const cloudDatabase = async () => {
     queue = run.catch(() => {});
     return run;
   };
-  // A select in PostgREST's shape, for the few it's asked: columns, `owner=eq.`, an order and a limit.
+  // A select in PostgREST's shape, for the few it's asked: columns, `eq.` or `not.is.null` on a few columns, an order,
+  // a limit and an offset.
   const select = (uid: string | null, table: string, params: URLSearchParams) => {
     const run = queue.then(async () => {
       const columns = params.get("select") ?? "*";
       if (!/^[a-z_,*]+$/.test(columns)) throw Object.assign(new Error("Bad select"), { code: "PGRST100" });
-      const owner = params.get("owner")?.replace(/^eq\./, "");
+      const values: string[] = [];
+      const filters = ["owner", "id", "conversation_id"].flatMap((column) => {
+        const filter = params.get(column);
+        if (filter === null) return [];
+        if (filter === "not.is.null") return [`${column} is not null`];
+        if (!filter.startsWith("eq.")) throw Object.assign(new Error("Bad filter"), { code: "PGRST100" });
+        values.push(filter.slice(3));
+        return [`${column}::text = $${values.length}`];
+      });
       const [orderBy, direction] = (params.get("order") ?? "").split(".");
       const limit = Number(params.get("limit")) || 100;
+      const offset = Number(params.get("offset")) || 0;
       await db.query("select set_config('test.uid', $1, false)", [uid ?? ""]);
       await db.exec(`set role ${uid ? "authenticated" : "anon"}`);
       try {
-        const where = owner ? "where owner = $1" : "";
+        const where = filters.length ? `where ${filters.join(" and ")}` : "";
         const order = /^[a-z_]+$/.test(orderBy ?? "") ? `order by ${orderBy} ${direction === "desc" ? "desc" : "asc"}` : "";
-        const sql = `select ${columns} from public.${table} ${where} ${order} limit ${limit}`;
-        return (await db.query<Record<string, unknown>>(sql, owner ? [owner] : [])).rows;
+        const sql = `select ${columns} from public.${table} ${where} ${order} limit ${limit} offset ${offset}`;
+        return (await db.query<Record<string, unknown>>(sql, values)).rows;
       } finally {
         await db.exec("reset role");
       }
@@ -141,7 +152,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
         return answer(200, await cloud.call(uid ? "authenticated" : "anon", uid ?? null, cloudCall, body));
       } catch (error) {
         const { code, message } = error as { code?: string; message?: string };
-        return answer(code === "42501" ? 403 : 400, { code, message });
+        return answer(code === "42501" ? 403 : code === "23505" ? 409 : 400, { code, message });
       }
     }
 
@@ -151,7 +162,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
         return answer(200, await cloud.select(uid ?? null, cloudTable, url.searchParams));
       } catch (error) {
         const { code, message } = error as { code?: string; message?: string };
-        return answer(code === "42501" ? 403 : 400, { code, message });
+        return answer(code === "42501" ? 403 : code === "23505" ? 409 : 400, { code, message });
       }
     }
 
