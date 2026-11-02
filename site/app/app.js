@@ -25,6 +25,33 @@ const el = (tag, props = {}, ...children) => {
   return node;
 };
 
+// A reply's links and bold, built as elements so nothing from the server is read as HTML. Only http and https become
+// links, and they open outside the page.
+const LINKED = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"')\]]+)|\*\*([^*\n]+)\*\*/g;
+const webLink = (href, label) => {
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return label;
+    return el("a", { href: url.href, textContent: label, target: "_blank", rel: "noopener noreferrer" });
+  } catch {
+    return label;
+  }
+};
+const replyText = (text) => {
+  const parts = [];
+  let at = 0;
+  for (const match of text.matchAll(LINKED)) {
+    parts.push(text.slice(at, match.index));
+    const [whole, label, href, found, bold] = match;
+    // A sentence's full stop after a bare address isn't part of it.
+    const bare = found?.replace(/[.,;:!?]+$/, "");
+    parts.push(bold !== undefined ? el("strong", { textContent: bold }) : webLink(href ?? bare, label ?? bare));
+    at = match.index + (found ? whole.length - (found.length - bare.length) : whole.length);
+  }
+  parts.push(text.slice(at));
+  return parts.filter((part) => part !== "");
+};
+
 const svg = (tag, attrs = {}, ...children) => {
   const node = document.createElementNS(SVG, tag);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
@@ -531,7 +558,7 @@ const exchange = (job, newest) => {
     newest && state.said ? el("p", { className: "small gap", role: "status", textContent: state.said }) : null,
     ask ? says(mascot, ask) : null,
     steps(job),
-    job.reply ? el("p", { className: "reply", textContent: job.reply }) : null,
+    job.reply ? el("p", { className: "reply" }, ...replyText(job.reply)) : null,
     job.status === "failed" || job.status === "stopped" ? say(statusWords(job), job.status === "failed" ? "small warning gap" : "small gap") : null,
   ];
 };
