@@ -20,6 +20,7 @@ const NOT_TAKEN = "The runner's queue didn't take the job. Try again in a moment
 const TOO_MANY = "Five jobs are already waiting or going on the runner. Try again when one is done.";
 const FAILED = "The job failed on the runner.";
 const GONE = "This job isn't on your account any more.";
+const SWITCHED = "You signed in to another account while this was being sent, so it wasn't sent. Send it again.";
 const OTHER_ACCOUNT = (email: string) => `This chat's jobs are on ${email}. Sign in to that account to go on with it.`;
 
 interface Entry {
@@ -114,7 +115,8 @@ export class RunnerJobs implements ChatRunner {
       return problem;
     };
     try {
-      const token = await this.account.accessToken();
+      const token = await this.tokenFor(account);
+      if (token === "switched") return fail(SWITCHED);
       if (!token) return fail(SIGN_IN);
       const jobId = await this.server.startCloudJob(token, {
         prompt,
@@ -139,7 +141,7 @@ export class RunnerJobs implements ChatRunner {
     entry.approval = null;
     this.answered.add(approvalId);
     this.hooks.changed(chatId);
-    void this.withToken((token) => this.server!.decideCloudApproval(token, approvalId, allow, answer ?? null)).then((written) => {
+    void this.withToken(entry.account, (token) => this.server!.decideCloudApproval(token, approvalId, allow, answer ?? null)).then((written) => {
       // Still waiting on it, so the next look brings the card back.
       if (!written) this.answered.delete(approvalId);
     });
@@ -148,16 +150,17 @@ export class RunnerJobs implements ChatRunner {
 
   stop(chatId: string): void {
     const entry = this.entries.get(chatId);
-    const jobId = this.mine(entry) ? entry.jobId : null;
-    if (jobId) void this.withToken((token) => this.server!.stopCloudJob(token, jobId));
+    const jobId = entry?.jobId;
+    if (this.mine(entry) && jobId) void this.withToken(entry.account, (token) => this.server!.stopCloudJob(token, jobId));
   }
 
   forget(chatId: string): void {
     const entry = this.entries.get(chatId);
-    const jobId = this.mine(entry) ? entry.jobId : null;
+    const jobId = entry?.jobId;
+    const ours = this.mine(entry);
     this.entries.delete(chatId);
     this.save();
-    if (jobId) void this.withToken((token) => this.server!.forgetCloudJob(token, jobId));
+    if (ours && jobId) void this.withToken(entry.account, (token) => this.server!.forgetCloudJob(token, jobId));
   }
 
   // Signed in or out. Jobs carry on there either way. Nothing the last account saw stays here, not a card, a step or a
@@ -180,11 +183,18 @@ export class RunnerJobs implements ChatRunner {
     this.timer = null;
   }
 
-  private async withToken<T>(call: (token: string) => Promise<T>): Promise<T | null> {
+  // A token for that account only. A refresh can end after someone else signs in and hand back their token, so who is
+  // signed in is checked again once it's here, and nothing is sent with it otherwise.
+  private async tokenFor(account: string): Promise<string | null | "switched"> {
+    const token = await this.account.accessToken();
+    return this.signedIn === account ? token : "switched";
+  }
+
+  private async withToken<T>(account: string, call: (token: string) => Promise<T>): Promise<T | null> {
     if (!this.server) return null;
     try {
-      const token = await this.account.accessToken();
-      return token ? await call(token) : null;
+      const token = await this.tokenFor(account);
+      return token && token !== "switched" ? await call(token) : null;
     } catch {
       console.error("Couldn't reach the runner's jobs.");
       return null;
@@ -207,7 +217,7 @@ export class RunnerJobs implements ChatRunner {
     if (going.length === 0) return;
     this.polling = true;
     try {
-      const rows = await this.withToken((token) => this.server!.cloudJobs(token, going.map(([, entry]) => entry.jobId!)));
+      const rows = await this.withToken(account, (token) => this.server!.cloudJobs(token, going.map(([, entry]) => entry.jobId!)));
       // Someone else signed in while it was asking, so none of this is theirs.
       if (rows && this.signedIn === account) going.forEach(([chatId, entry]) => this.read(chatId, entry, rows.find((row) => row.id === entry.jobId)));
     } finally {

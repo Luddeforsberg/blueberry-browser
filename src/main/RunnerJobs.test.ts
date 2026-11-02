@@ -13,15 +13,17 @@ const BO = "bo@example.com";
 
 // The server as each account sees it: its own jobs only, as row-level security has it.
 const setUp = () => {
+  // While set, every token waits for it, as a refresh does.
+  let refreshing: Promise<void> | null = null;
   const jobs = new Map<string, { owner: string; row: Record<string, unknown> }>();
   const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
   const tokenOf = () => account.state.email ?? "";
   const server = {
-    startCloudJob: async (token: string) => {
+    startCloudJob: vi.fn(async (token: string) => {
       const id = `job-${jobs.size + 1}`;
       jobs.set(id, { owner: token, row: { id, status: "waiting", steps: [{ text: "Opened shop.example", done: true }], reply: "", live_view_url: LIVE, approval_id: `${id}-a`, approval_kind: "approval", approval_text: "Click Place order" } });
       return id;
-    },
+    }),
     cloudJobs: async (token: string, ids: string[]) => ids.flatMap((id) => (jobs.get(id)?.owner === token ? [jobs.get(id)!.row] : [])),
     decideCloudApproval: vi.fn(async () => true),
     stopCloudJob: async () => {},
@@ -31,7 +33,10 @@ const setUp = () => {
   const finished = vi.fn();
   const runner = new RunnerJobs(
     server,
-    { get state() { return account.state; }, accessToken: async () => (account.state.status === "signed-in" ? tokenOf() : null) },
+    { get state() { return account.state; }, accessToken: async () => {
+      await refreshing;
+      return account.state.status === "signed-in" ? tokenOf() : null;
+    } },
     join(mkdtempSync(join(tmpdir(), "runner-jobs-")), "runner-jobs.json"),
     { changed, finished, contextId: () => null },
     5
@@ -41,12 +46,32 @@ const setUp = () => {
     runner.accountChanged();
   };
   const send = () => runner.start("chat-1", { prompt: "Order it", earlier: [], mascot: BERRY, actionApproval: "risky" });
-  return { runner, jobs, signIn, send, changed, finished, server };
+  const holdTokens = () => {
+    let release = () => {};
+    refreshing = new Promise((resolve) => (release = resolve));
+    return () => {
+      refreshing = null;
+      release();
+    };
+  };
+  return { runner, jobs, signIn, send, changed, finished, server, holdTokens };
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
 
 describe("runner jobs in the app", () => {
+  it("doesn't send one account's job with a token that came back for another", async () => {
+    const { runner, signIn, send, server, holdTokens } = setUp();
+    const release = holdTokens();
+    const sending = send();
+    // Signed in as someone else while the refresh was out, which then hands back their token.
+    signIn(BO);
+    release();
+    expect(await sending).toContain("another account");
+    expect(server.startCloudJob).not.toHaveBeenCalled();
+    expect(runner.progress("chat-1")).toBeNull();
+  });
+
   it("shows nothing of a job once its account signs out, and can't answer it", async () => {
     const { runner, signIn, send, server } = setUp();
     expect(await send()).toBeNull();

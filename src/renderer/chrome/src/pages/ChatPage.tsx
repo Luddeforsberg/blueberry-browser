@@ -99,6 +99,10 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} avatarOutside />
                             </div>
                         )}
+                        {/* With no room beside the chat, a page handed to the user still has to be somewhere to do it in. */}
+                        {thread.runner && running && !roomBeside && thread.approval?.handoff && (
+                            <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
+                        )}
                         {thread.error && <ChatError message={thread.error} />}
                         {!running && thread.messages.at(-1)?.role === 'assistant' && (
                             <div>

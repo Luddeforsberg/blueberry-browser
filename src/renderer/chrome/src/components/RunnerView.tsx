@@ -4,21 +4,26 @@ import type { ChatApproval, ChatStep } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { liveFrameLock } from '../cloudView'
 
+const LOOK_AGAIN_MS = 2000
+
 // A job on the cloud runner, beside its chat: the live view of the page it's on, locked while it works. A page handed to
 // the user unlocks, so they can sign in there, and I'm done on the card gives it back. The address is Browserbase's
 // own page, checked in main, and goes nowhere but this screen.
 export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval: ChatApproval | null }> = ({ chatId, steps, approval }) => {
     const [url, setUrl] = useState<string | null>(null)
     const handoff = approval?.handoff
-    // Looked up again as the job moves on, since each page has its own.
-    const step = steps.length
+    // Asked again every few seconds while it's on screen, since the runner writes it after the step that opened the page,
+    // and each page has its own.
     useEffect(() => {
         let current = true
-        void window.chromeAPI.cloud.runnerView(chatId).then((next) => current && setUrl(next))
+        const look = () => void window.chromeAPI.cloud.runnerView(chatId).then((next) => current && setUrl(next))
+        look()
+        const timer = setInterval(look, LOOK_AGAIN_MS)
         return () => {
             current = false
+            clearInterval(timer)
         }
-    }, [chatId, step, approval?.id])
+    }, [chatId, approval?.id])
     const lock = liveFrameLock(!!handoff)
     const doing = steps.filter((one) => !one.done).at(-1)?.text ?? steps.at(-1)?.text ?? 'Waiting for the runner to start'
 
