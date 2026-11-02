@@ -31,14 +31,22 @@ test("Berry keeps a tab the user only looks at, and gives it up when they click 
     };
     const lastResults = () => JSON.stringify(model.requests.at(-1)?.messages.slice(-3));
 
-    model.callTools({ name: "open_tab", args: { url: `${origin}/first` } });
-    const chat = await ask(null, "Open it");
-    const first = (await tabs()).find(({ url }) => url === `${origin}/first`)!;
-    expect(first.isActive).toBe(false);
+    // A job's tabs close when it's done, but not one the user is looking at, so they go to look before this one ends.
+    const openAndLook = async (chatId: string | null, path: string) => {
+      model.callTools({ name: "open_tab", args: { url: `${origin}${path}` } });
+      const finish = model.holdBeforeFirstToken();
+      const asked = ask(chatId, "Open it");
+      await expect.poll(async () => (await tabs()).some(({ url }) => url === `${origin}${path}`)).toBe(true);
+      const opened = (await tabs()).find(({ url }) => url === `${origin}${path}`)!;
+      expect(opened.isActive).toBe(false);
+      await goTo(opened.id);
+      finish();
+      return { id: await asked, tab: opened };
+    };
+    const { id: chat, tab: first } = await openAndLook(null, "/first");
     const page = await findView(app, `${origin}/first`);
 
-    // The user goes to look. Berry still has the tab, with no tab named, and its own real click doesn't count as theirs.
-    await goTo(first.id);
+    // The user looks. Berry still has the tab, with no tab named, and its own real click doesn't count as theirs.
     model.callTools({ name: "list_tabs", args: {} });
     model.callTools({ name: "list_elements", args: {} });
     model.callTools({ name: "click", args: { ref: "e1" } });
@@ -59,10 +67,7 @@ test("Berry keeps a tab the user only looks at, and gives it up when they click 
     expect(saved?.messages.at(-1)?.steps?.map(({ text }) => text)).toEqual(["Left the tab you took over", "Left the tab you took over"]);
 
     // Typing counts as well, but a keyboard shortcut doesn't.
-    model.callTools({ name: "open_tab", args: { url: `${origin}/second` } });
-    await ask(chat, "Open another");
-    const second = (await tabs()).find(({ url }) => url === `${origin}/second`)!;
-    await goTo(second.id);
+    const { tab: second } = await openAndLook(chat, "/second");
     const press = (keyCode: string, modifiers: Array<"meta">) =>
       app.evaluate(({ webContents }, { url, keyCode, modifiers }) => {
         webContents.getAllWebContents().find((view) => view.getURL() === url)!.sendInputEvent({ type: "keyDown", keyCode, modifiers });

@@ -16,10 +16,11 @@ import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { CdpTab } from "./CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, WorkTabState } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, UsedPage, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
+import { addressToKeep, replyPointsTo } from "./jobTabs";
 import type { MemoryToOffer } from "./MemoryStore";
 
 const MAX_TITLE_LENGTH = 40;
@@ -572,6 +573,50 @@ export class Chats {
     return [...this.jobs.values()].some(({ own }) => own.has(tabId));
   }
 
+  // The chat whose running reply opened this tab and still has it. The sidebar shows it there, not with the user's tabs.
+  jobChatOf(tabId: string): string | null {
+    for (const [id, job] of this.jobs) {
+      // A task has no chat to show it under.
+      if (job.own.has(tabId) && this.runs.has(id) && !this.runs.get(id)?.onChange) return id;
+    }
+    return null;
+  }
+
+  // A reply is over, so the pages its job opened close, and the reply keeps their addresses to open again. The one the
+  // reply sends the user to stays, as theirs. One that can't close, such as the one they're looking at, stays the job's,
+  // since looking isn't taking over. One held for the user, or that another job is using, is left alone.
+  private closeJobTabs(chatId: string, run: Run): UsedPage[] {
+    const job = this.jobs.get(chatId);
+    if (!job || job.own.size === 0) return [];
+    const open = run.cloud
+      ? [...(run.usedInCloud ?? [])].filter((tab) => this.cloud?.page(tab.id) === tab)
+      : this.browser.allTabs();
+    const tabOf = (id: string) => open.find((tab) => tab.id === id) ?? null;
+    const usedNow = new Set([...this.runs.values()].flatMap((other) => [...other.tabs].map((tab) => tab.id)));
+    const used = run.cloud ? [...(run.usedInCloud ?? [])] : [...run.used];
+    const pages = new Map<string, UsedPage>();
+    used.forEach((tab) => {
+      if (!job.own.has(tab.id)) return;
+      const url = addressToKeep(tab.url, {
+        handedBack: [...this.handedBack].some((back) => back.id === tab.id),
+        codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
+      });
+      if (url) pages.set(url, { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) });
+    });
+    const current = job.current ? tabOf(job.current) : null;
+    const pointed = current && job.own.has(current.id) && replyPointsTo(run.partial, current.url) ? current.id : null;
+    [...job.own].forEach((id) => {
+      const tab = tabOf(id);
+      if (!tab || this.handedOver.has(id) || usedNow.has(id)) return;
+      if (id === pointed) {
+        job.own.delete(id);
+        job.takenOver.set(id, this.withoutCodes(tab.url));
+        // A cloud page's tab in the window closes it too.
+      } else if (this.browser.closeTab(id)) job.own.delete(id);
+    });
+    return [...pages.values()];
+  }
+
   // The user clicked or typed in this tab, or sent it somewhere. Looking at it isn't enough. From here on it may hold
   // anything, so the job that opened it can't reach it, and the model is told why.
   releaseTab(tabId: string): void {
@@ -841,11 +886,12 @@ export class Chats {
     if (this.runs.get(chatId) !== run) return;
     this.finished.set(chatId, { run, endedAt: Date.now() });
     this.runs.delete(chatId);
+    const pages = this.closeJobTabs(chatId, run);
     this.publishWorkingTabs();
     if (run.partial || run.steps.length > 0) {
       // A step cut off by Stop is over too.
       const steps = run.steps.map((step) => ({ ...step, done: true }));
-      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds });
+      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
     }
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);

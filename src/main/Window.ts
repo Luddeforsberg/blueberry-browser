@@ -643,6 +643,7 @@ export class Window {
       isLoading: tab.isLoading,
       berryWorking: tab.berryWorking,
       workingMascotId: tab.workingMascotId,
+      jobChatId: this.chats.jobChatOf(tab.id),
       canGoBack: tab.canGoBack,
       canGoForward: tab.canGoForward,
       zoomPercent: tab instanceof Tab ? this.siteZoom.percent(tab.url) : 100,

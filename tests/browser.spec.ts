@@ -388,7 +388,9 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
   expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Save");
   expect((await activeTab()).page).toBe("chat");
-  expect((await getTabs()).map((tab) => tab.url)).toContain(`${origin}/form`);
+  // It closed once the job was done, and the reply keeps it.
+  expect((await getTabs()).map((tab) => tab.url)).not.toContain(`${origin}/form`);
+  await expect(chrome.getByRole("button", { name: "Pages it used (1)" })).toBeVisible();
 });
 
 test("real input in a tab behind the chat, a card naming another site's frame, and a question", async () => {
@@ -406,6 +408,8 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   model.callTools({ name: "click", args: { ref: "f1.e1" } });
   model.callTools({ name: "ask_user", args: { question: "What is your password?" } });
   model.callTools({ name: "ask_user", args: { question: "Which colour?" } });
+  // Held, since its tab closes once it's done.
+  const finish = model.holdBeforeFirstToken();
   await message.fill("Press them");
   await message.press("Enter");
 
@@ -418,16 +422,16 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   await question.getByRole("textbox", { name: "Your answer" }).fill("Blue");
   await question.getByRole("button", { name: "Answer" }).click();
 
-  await expect(chrome.getByText("A reply from the model")).toBeVisible();
-  const said = JSON.stringify(model.requests.at(-1)?.messages);
-  expect(said).toContain("The user answered: Blue");
-  expect(said).toContain("never go through this chat");
+  await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("The user answered: Blue");
+  expect(JSON.stringify(model.requests.at(-1)?.messages)).toContain("never go through this chat");
 
   const page = app.windows().find((view) => view.url() === url)!;
   // The click arrived as a person's, in a tab the user isn't on.
   await expect(page).toHaveTitle("Real true");
   await expect(page.frames().at(-1)!.getByRole("button", { name: "Was pressed" })).toBeVisible();
   expect((await activeTab()).page).toBe("chat");
+  finish();
+  await expect(chrome.getByText("A reply from the model")).toBeVisible();
 });
 
 test("a real click that would land on something else is stopped, and only the named element gets clicked", async () => {
@@ -466,9 +470,11 @@ test("real keys, going back, and closing only a tab Berry opened", async () => {
   model.callTools({ name: "wait", args: { seconds: 0 } });
   model.callTools({ name: "click", args: { ref: "e3" } });
   model.callTools({ name: "go_back", args: {} });
+  // Held, since its tab closes once it's done.
+  const finish = model.holdBeforeFirstToken();
   await panel.getByRole("textbox", { name: "Message" }).fill("Go");
   await panel.getByRole("textbox", { name: "Message" }).press("Enter");
-  await expect(panel.getByText("A reply from the model")).toBeVisible();
+  await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain('"name":"go_back"');
 
   const said = JSON.stringify(model.requests.at(-1)?.messages);
   expect(said).toContain("You didn't open that tab");
@@ -482,6 +488,8 @@ test("real keys, going back, and closing only a tab Berry opened", async () => {
   const other = `${origin}/one`;
   // Tab ids count up, and the model is told which it opened.
   const nextId = `tab-${Math.max(...(await getTabs()).map((tab) => Number(tab.id.replace("tab-", "")))) + 1}`;
+  finish();
+  await expect(panel.getByText("A reply from the model")).toBeVisible();
   model.reset();
   model.callTools({ name: "open_tab", args: { url: other } });
   model.callTools({ name: "close_tab", args: { tabId: nextId } });
@@ -541,10 +549,8 @@ test("a tab behind the chat has a real size and can be seen, without showing ove
 
   release();
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
-  await expect.poll(() => placedView(url).then((view) => view.visible)).toBe(false);
-  const after = await placedView(url);
-  expect(after.bounds!.x).toBeLessThan(after.windowWidth - 1);
-  expect(after.underChrome).toBe(false);
+  // Once the job is done, its tab closes rather than staying parked.
+  await expect.poll(async () => (await getTabs()).some((tab) => tab.url === url)).toBe(false);
 });
 
 test("Berry finds more on a page, chooses dropdown options, and says what really happened", async () => {

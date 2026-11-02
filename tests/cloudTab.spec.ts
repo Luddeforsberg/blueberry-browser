@@ -46,7 +46,8 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     model.callTools({ name: "list_elements", args: {} });
     model.callTools({ name: "click", args: { ref: "e1" } });
     model.callTools({ name: "read_page", args: {} });
-    model.replyWith("Ordered it");
+    // Naming the site keeps its cloud tab open once the job is done.
+    model.replyWith("Ordered it on 127.0.0.1");
     const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Order the thing", { seePage: false, cloud: true }));
     expect(sent).not.toBeNull();
 
@@ -57,7 +58,7 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     await expect(card.locator("p").getByText(`Click the button “Place order” on ${shop}`)).toBeVisible();
     await card.getByRole("button", { name: "Allow" }).click();
 
-    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Ordered it");
+    await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Ordered it on 127.0.0.1");
     // Real input reached the page in the cloud browser, and nothing opened in this window.
     expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Order placed");
     const tabs = await chrome.evaluate(() => window.chromeAPI.browser.getTabs());

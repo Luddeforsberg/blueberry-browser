@@ -74,7 +74,8 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
 
     model.callTools({ name: "open_tab", args: { url: address } });
     model.callTools({ name: "read_page", args: {} });
-    model.replyWith("Cables from ", "€4.");
+    // Naming the site keeps its tab open once the job is done.
+    model.replyWith("Cables on 127.0.0.1 from ", "€4.");
     const { taskId } = jsonOf(await client.callTool({ name: "run_browser_task", arguments: { goal: "Find the cheapest cable" } }));
 
     // Opening a tab asks, with "always". Claude is told it's waiting, and can't say yes.
@@ -93,7 +94,7 @@ test("Claude gives Berry a job over MCP, can't allow its action, and the user do
     await expect.poll(async () => jsonOf(await client.callTool({ name: "get_task", arguments: { taskId } })).status, { timeout: 15_000 }).toBe("done");
     const done = await client.callTool({ name: "get_task", arguments: { taskId } });
     expect(textOf(done)).toMatch(/^Titles, addresses, page text/);
-    expect(jsonOf(done)).toMatchObject({ reply: "Cables from €4.", from: "Claude Code" });
+    expect(jsonOf(done)).toMatchObject({ reply: "Cables on 127.0.0.1 from €4.", from: "Claude Code" });
     expect(jsonOf(done).steps.length).toBeGreaterThan(0);
 
     // Context: tabs, and a page read through Berry's own tool, labelled as untrusted.

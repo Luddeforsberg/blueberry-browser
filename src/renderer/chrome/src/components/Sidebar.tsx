@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Bird, ChevronDown, Ellipsis, Hand, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
-import type { InternalPage } from '@shared/ipc'
+import type { InternalPage, TabInfo } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
 import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
@@ -124,12 +124,33 @@ const age = (time: number) => {
 
 const ICON = "size-4 shrink-0"
 
+// A page the chat's running job opened, under the chat rather than with the user's tabs. It closes when the job ends,
+// unless the user takes it over or the reply sends them there.
+const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
+    const { switchTab } = useBrowser()
+    return (
+        <li>
+            <button
+                type="button"
+                aria-current={tab.isActive ? 'page' : undefined}
+                onClick={() => !tab.isActive && void switchTab(tab.id)}
+                className={cn(ROW, "h-[30px] pl-9 gap-2.5 text-13 text-muted-foreground", tab.isActive ? "bg-selected shadow-selected text-foreground" : "hover:bg-foreground/5 hover:text-foreground")}
+            >
+                <Favicon src={tab.favicon} className="size-3.5" />
+                <span className="flex-1 truncate">{tab.title || 'New Tab'}</span>
+            </button>
+        </li>
+    )
+}
+
 // A chat in the sidebar. Hover or keyboard focus swaps its age for a button with Rename and Delete.
 export const ChatRow: React.FC<{
     chat: ChatThreadSummary
     selected: boolean
     onOpen: () => void
-}> = ({ chat, selected, onOpen }) => {
+    // The tabs its running job opened.
+    jobTabs?: TabInfo[]
+}> = ({ chat, selected, onOpen, jobTabs = [] }) => {
     const [editing, setEditing] = useState(false)
     // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
     const finished = useRef(false)
@@ -211,6 +232,11 @@ export const ChatRow: React.FC<{
             >
                 <Ellipsis className={ICON} />
             </button>
+            {jobTabs.length > 0 && (
+                <ul aria-label={`Pages ${mascot.name} opened`} className="mt-0.5 flex flex-col gap-0.5">
+                    {jobTabs.map((tab) => <JobTabRow key={tab.id} tab={tab} />)}
+                </ul>
+            )}
         </li>
     )
 }
@@ -218,7 +244,7 @@ export const ChatRow: React.FC<{
 // `floating` is the collapsed sidebar shown over the page, where the button pins it open again.
 export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) => {
     const { layout, theme, toggleSidebar } = useShell()
-    const { activeTab, createTab } = useBrowser()
+    const { activeTab, createTab, tabs } = useBrowser()
     const library = useLibrary()
     const browser = window.chromeAPI.browser
 
@@ -285,6 +311,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                                     key={chat.id}
                                     chat={chat}
                                     selected={isOpen('chat', chat.id)}
+                                    jobTabs={tabs.filter((tab) => tab.jobChatId === chat.id)}
                                     onOpen={() => void browser.openPage('chat', { param: chat.id, title: chat.title })}
                                 />
                             ))}

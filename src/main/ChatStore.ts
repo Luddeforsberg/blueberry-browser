@@ -30,6 +30,8 @@ const MIGRATIONS = [
   `ALTER TABLE messages ADD COLUMN memory TEXT;`,
   // The app outside Blueberry that started the chat, such as "Claude Code". Null for the user's own.
   `ALTER TABLE chats ADD COLUMN source TEXT;`,
+  // The pages a reply's job opened and closed when it ended.
+  `ALTER TABLE messages ADD COLUMN pages TEXT;`,
 ];
 
 // Saved chats, in a SQLite file in the user data folder. Built-in SQLite needs no native module to
@@ -74,12 +76,13 @@ export class ChatStore {
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
-      .prepare("SELECT role, content, steps, memory FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null }>;
-    const messages = rows.map(({ steps, memory, ...message }): ChatThreadMessage => ({
+      .prepare("SELECT role, content, steps, memory, pages FROM messages WHERE chat_id = ? ORDER BY id")
+      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null; pages: string | null }>;
+    const messages = rows.map(({ steps, memory, pages, ...message }): ChatThreadMessage => ({
       ...message,
       ...(steps ? { steps: JSON.parse(steps) } : {}),
       ...(memory ? { memoryIds: JSON.parse(memory) } : {}),
+      ...(pages ? { pages: JSON.parse(pages) } : {}),
     }));
     return { ...summary, messages };
   }
@@ -118,8 +121,15 @@ export class ChatStore {
 
   addMessage(chatId: string, message: ChatThreadMessage): void {
     this.db
-      .prepare("INSERT INTO messages (chat_id, role, content, steps, memory) VALUES (?, ?, ?, ?, ?)")
-      .run(chatId, message.role, message.content, message.steps?.length ? JSON.stringify(message.steps) : null, message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null);
+      .prepare("INSERT INTO messages (chat_id, role, content, steps, memory, pages) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(
+        chatId,
+        message.role,
+        message.content,
+        message.steps?.length ? JSON.stringify(message.steps) : null,
+        message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null,
+        message.pages?.length ? JSON.stringify(message.pages) : null
+      );
     this.db.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").run(Date.now(), chatId);
   }
 }
