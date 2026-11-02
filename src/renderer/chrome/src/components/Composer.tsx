@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Cloud, Plus, Square } from 'lucide-react'
+import { ArrowUp, Cloud, MonitorOff, Plus, Square } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { MascotChip, MascotPerch } from './MascotPerch'
@@ -34,7 +34,9 @@ export const Composer: React.FC<{
     onChooseMascot?: (id: string) => void
     // Whether this job runs in the cloud browser, where there is one.
     cloud?: { on: boolean; onToggle: () => void }
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud }) => {
+    // Whether a job in the cloud goes to the runner, which keeps going with this computer off. Only beside Cloud, once it's on.
+    runner?: { on: boolean; onToggle: () => void }
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, runner }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
 
@@ -104,6 +106,23 @@ export const Composer: React.FC<{
                     >
                         <Cloud className="size-4" />
                         {cloud.on && <span>Cloud</span>}
+                    </button>
+                )}
+                {cloud?.on && runner && (
+                    <button
+                        type="button"
+                        aria-label="Keep going with this computer off"
+                        aria-pressed={runner.on}
+                        title={runner.on ? 'Goes to the runner, which keeps going with this computer off' : 'Keep going with this computer off'}
+                        onClick={runner.onToggle}
+                        className={cn(
+                            "h-9 px-2.5 flex items-center gap-1.5 rounded-full text-13 outline-none transition-colors",
+                            "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                            runner.on ? "bg-muted text-accent-ink" : "text-muted-foreground"
+                        )}
+                    >
+                        <MonitorOff className="size-4" />
+                        {runner.on && <span>Keeps going</span>}
                     </button>
                 )}
                 {mascot && (

@@ -138,6 +138,35 @@ export interface ChatCloud {
   giveBack: (id: string) => void;
 }
 
+// Jobs on the cloud runner, which keep going with this computer off. Such a chat is saved here like any other, and its
+// reply, steps and approvals come from the runner's rows. Its approvals are answered only from here, by the user.
+export interface ChatRunner {
+  available: () => boolean;
+  has: (chatId: string) => boolean;
+  // The chats with a job going there now.
+  active: () => string[];
+  // Sends the newest message with the chat before it. Says why it couldn't, or null once it's queued.
+  start: (chatId: string, job: RunnerJobInput) => Promise<string | null>;
+  // Null when nothing is running there for this chat.
+  progress: (chatId: string) => RunnerProgress | null;
+  decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => boolean;
+  stop: (chatId: string) => void;
+  forget: (chatId: string) => void;
+}
+
+export interface RunnerJobInput {
+  prompt: string;
+  earlier: ReplyMessage[];
+  mascot: MascotProfile;
+  actionApproval: ActionApproval;
+}
+
+export interface RunnerProgress {
+  reply: string;
+  steps: ChatStep[];
+  approval: (ChatApproval & { askedAt: number }) | null;
+}
+
 // What a job needs of a bird's memory. No tool can reach any of this.
 export interface ChatMemory {
   factsOf: (mascotId: string) => MemoryFact[];
@@ -175,6 +204,9 @@ export interface TaskProgress {
   tokens: number;
   memoryIds?: string[];
 }
+
+// A runner with no window has no saved chats, so only what a task uses has to be there.
+export type ChatStoreLike = Pick<ChatStore, "chat" | "createChat" | "addMessage" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle">;
 
 export interface TaskResult {
   text: string;
@@ -217,7 +249,7 @@ export class Chats {
   private readonly finished = new Map<string, { run: Run; endedAt: number }>();
 
   constructor(
-    private readonly store: ChatStore,
+    private readonly store: ChatStoreLike,
     private readonly streamReply: StreamReply,
     private readonly generateTitle: GenerateTitle,
     private readonly browser: Pick<PageToolAccess<Tab>, "activeTab" | "allTabs"> & {
@@ -231,7 +263,8 @@ export class Chats {
     // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
     private readonly mascotOf: (id: string | null) => MascotProfile = () => BERRY,
     private readonly memory: ChatMemory | null = null,
-    private readonly cloud: ChatCloud | null = null
+    private readonly cloud: ChatCloud | null = null,
+    private readonly runner: ChatRunner | null = null
   ) {}
 
   // Chats started in the cloud, whose later messages go there too. Memory only, so after a restart a chat works here.
@@ -497,7 +530,31 @@ export class Chats {
           },
         ];
       })
+      .concat(this.runnerWaiting())
       .sort((a, b) => a.askedAt - b.askedAt);
+  }
+
+  // The runner's approvals, under their chat's id. The page they're about is in the cloud, so there's no tab to go to.
+  private runnerWaiting(): WaitingRun[] {
+    const runner = this.runner;
+    if (!runner) return [];
+    return runner.active().flatMap((chatId) => {
+      const progress = runner.progress(chatId);
+      const chat = this.store.chat(chatId);
+      if (!progress?.approval || !chat) return [];
+      return [
+        {
+          id: chatId,
+          approval: publicApproval(progress.approval),
+          mascotId: chat.mascotId ?? BERRY.id,
+          chatTitle: chat.title,
+          from: null,
+          lastStep: progress.steps.filter((step) => step.done).at(-1)?.text ?? null,
+          tabId: null,
+          askedAt: progress.approval.askedAt,
+        },
+      ];
+    });
   }
 
   // A page in a task's tab opened another. Nobody allowed that, so the task can't reach it, but it's cleared up with
@@ -591,6 +648,18 @@ export class Chats {
 
   private toThread(chat: StoredChat): ChatThread {
     const run = this.runs.get(chat.id);
+    if (this.runner?.has(chat.id)) {
+      const progress = this.runner.progress(chat.id);
+      return {
+        ...chat,
+        partial: progress?.reply ?? null,
+        steps: progress?.steps ?? [],
+        approval: progress?.approval ? publicApproval(progress.approval) : null,
+        error: this.errors.get(chat.id) ?? null,
+        memoryIds: [],
+        runner: true,
+      };
+    }
     return {
       ...chat,
       partial: run?.partial ?? null,
@@ -602,7 +671,7 @@ export class Chats {
   }
 
   isRunning(chatId: string): boolean {
-    return this.runs.has(chatId);
+    return this.runs.has(chatId) || !!this.runner?.progress(chatId);
   }
 
   // Starts a chat when `chatId` is null, as `mascotId` if it's given. An existing chat stays with its own mascot.
@@ -611,11 +680,14 @@ export class Chats {
   send(
     chatId: string | null,
     text: string,
-    { seePage, mascotId, from = null, sites = [], cloud = false }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; cloud?: boolean }
+    { seePage, mascotId, from = null, sites = [], cloud = false, runner = false }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; cloud?: boolean; runner?: boolean }
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
-    if (chatId && (!this.store.chat(chatId) || this.runs.has(chatId))) return null;
+    if (chatId && (!this.store.chat(chatId) || this.isRunning(chatId))) return null;
+    // Only the user starts one there, from this window, so not an app and never with a page.
+    const inRunner = (runner === true && from === null) || (chatId !== null && !!this.runner?.has(chatId));
+    if (inRunner) return this.sendToRunner(chatId, message, mascotId ?? null);
     const inCloud = cloud === true || (chatId !== null && this.cloudChats.has(chatId));
     // Asked for the cloud with it off, the job doesn't quietly run in the user's own tabs instead.
     if (inCloud && !this.cloud?.available()) return null;
@@ -642,6 +714,40 @@ export class Chats {
     return this.thread(id);
   }
 
+  private sendToRunner(chatId: string | null, message: string, mascotId: string | null): ChatThread | null {
+    const runner = this.runner;
+    if (!runner?.available()) return null;
+    const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
+    if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
+    const id = chatId ?? this.store.createChat(titleFrom(message), chosen, null);
+    const mascot = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
+    const earlier = (this.store.chat(id)?.messages ?? []).map(toReplyMessage);
+    this.store.addMessage(id, { role: "user", content: message });
+    this.errors.delete(id);
+    this.finished.delete(id);
+    void runner.start(id, { prompt: message, earlier, mascot, actionApproval: this.browser.actionApproval() }).then((problem) => {
+      if (!problem) return;
+      this.errors.set(id, problem);
+      this.notify(id);
+    });
+    this.notify(id);
+    return this.thread(id);
+  }
+
+  // The runner's rows changed.
+  runnerChanged(chatId: string): void {
+    this.notify(chatId);
+  }
+
+  // A job on the runner is over, and its reply is saved like any other.
+  runnerFinished(chatId: string, { reply, steps, error }: { reply: string; steps: ChatStep[]; error: string | null }): void {
+    if (!this.store.chat(chatId)) return;
+    if (reply || steps.length > 0) this.store.addMessage(chatId, { role: "assistant", content: reply, steps: steps.map((step) => ({ ...step, done: true })) });
+    if (error) this.errors.set(chatId, error);
+    this.notify(chatId);
+    if (reply && !error) void this.nameChat(chatId);
+  }
+
   private notify(chatId: string): void {
     const thread = this.thread(chatId);
     if (thread) this.events.onThread(thread);
@@ -663,6 +769,7 @@ export class Chats {
     this.finished.delete(chatId);
     this.jobs.delete(chatId);
     this.cloudChats.delete(chatId);
+    this.runner?.forget(chatId);
     this.memory?.dropOffers(chatId);
     if (!this.store.deleteChat(chatId)) return false;
     this.events.onListChanged();
@@ -671,6 +778,7 @@ export class Chats {
 
   stop(chatId: string): void {
     this.runs.get(chatId)?.controller.abort();
+    if (this.runner?.has(chatId)) this.runner.stop(chatId);
   }
 
   // Stop in the toolbar, from the tab being worked in rather than from a chat. The same as Stop in the chat or on a routine.
@@ -788,7 +896,16 @@ export class Chats {
 
   // Runs one message as a chat with no page would, with the same tools and the same approvals, under an id of the
   // caller's. Nothing is saved here. `stop` and `decide` take that id. Never rejects.
-  async runTask(id: string, message: string, onProgress: (progress: TaskProgress) => void, mascotId: string | null = null, sites: string[] = []): Promise<TaskResult> {
+  // With `cloud`, it works in the cloud browser's pages instead, as the cloud runner's jobs do, and `earlier` is the chat
+  // that came before the message.
+  async runTask(
+    id: string,
+    message: string,
+    onProgress: (progress: TaskProgress) => void,
+    mascotId: string | null = null,
+    sites: string[] = [],
+    { cloud = false, earlier = [] }: { cloud?: boolean; earlier?: ReplyMessage[] } = {}
+  ): Promise<TaskResult> {
     let tokens = 0;
     const mascot = this.mascotOf(mascotId);
     const run: Run = {
@@ -816,6 +933,7 @@ export class Chats {
       memoryNote: "",
       answers: [],
       handedOver: false,
+      cloud,
     };
     this.runs.set(id, run);
     this.taskPopups.set(id, new Set());
@@ -823,13 +941,14 @@ export class Chats {
     try {
       const tools = this.jobTools(id, run, null);
       this.recall(id, run, message);
-      await this.consume(id, run, [{ role: "user", content: message }], tools, () => {}, (used) => (tokens += used));
+      await this.consume(id, run, [...earlier, { role: "user", content: message }], tools, () => {}, (used) => (tokens += used));
     } catch (caught) {
       if (!run.controller.signal.aborted) {
         console.error("Error in a task:", caught);
         error = errorMessage(caught);
       }
     }
+    if (cloud) this.cloud?.release(id);
     this.runs.delete(id);
     this.publishWorkingTabs();
     this.offerToRemember(id, run, error !== null, { said: [], routine: message, stillWanted: () => true });
@@ -909,6 +1028,8 @@ export class Chats {
   // False if that request has already been answered or its reply has ended. `answer` is for a question.
   decide(chatId: string, approvalId: string, allow: boolean, answer?: string, { fromPhone = false, fromApp = false }: { fromPhone?: boolean; fromApp?: boolean } = {}): boolean {
     const run = this.runs.get(chatId);
+    // On the runner, only the user answers, from this window. The phone and apps can't.
+    if (!run && this.runner?.has(chatId)) return !fromPhone && !fromApp && this.runner.decide(chatId, approvalId, allow === true, typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined);
     if (run?.approval?.id !== approvalId) return false;
     run.answeredElsewhere = fromPhone || fromApp;
     const { answer: finish } = run.approval;

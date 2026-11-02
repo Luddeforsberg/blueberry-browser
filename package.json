@@ -16,6 +16,8 @@
     "test:e2e": "playwright test",
     "eval": "electron-vite build && playwright test -c evals/playwright.config.ts",
     "site:build": "node scripts/buildSite.mjs",
+    "runner:build": "esbuild runner/src/index.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=runner/dist/index.cjs",
+    "runner:start": "node runner/dist/index.cjs",
     "verify": "npm run typecheck && npm run lint && npm run test && electron-vite build && npm run test:e2e",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",

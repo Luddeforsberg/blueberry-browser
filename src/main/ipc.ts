@@ -115,6 +115,7 @@ export const CHANNEL_REGIONS: {
   "cloud:forget": ["chrome"],
   "cloud:end": ["chrome"],
   "cloud:view": ["chrome"],
+  "cloud:runner-view": ["chrome"],
   "cloud:watch": ["chrome"],
   "cloud:take-over": ["chrome"],
   "cloud:login-suggestions": ["chrome"],

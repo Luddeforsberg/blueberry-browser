@@ -159,4 +159,32 @@ export class GalleryServer {
   async recordAdd(token: string | null, mascot: string, install: string): Promise<void> {
     await this.request("/rest/v1/rpc/record_add", { method: "POST", body: { p_mascot: mascot, p_install: install }, token });
   }
+
+  // The cloud runner's jobs, always as the signed-in user, so row-level security keeps each to their own.
+
+  async startCloudJob(token: string, job: { prompt: string; history: unknown[]; mascot: object; actionApproval: string; contextId: string | null }): Promise<string | null> {
+    const id = await this.request<unknown>("/rest/v1/rpc/start_cloud_job", {
+      method: "POST",
+      token,
+      body: { p_prompt: job.prompt, p_history: job.history, p_mascot: job.mascot, p_action_approval: job.actionApproval, p_context_id: job.contextId },
+    });
+    return typeof id === "string" ? id : null;
+  }
+
+  async cloudJobs(token: string, ids: string[]): Promise<Record<string, unknown>[]> {
+    return (await this.request<Record<string, unknown>[]>("/rest/v1/rpc/my_cloud_jobs", { method: "POST", token, body: { p_ids: ids } })) ?? [];
+  }
+
+  async stopCloudJob(token: string, id: string): Promise<void> {
+    await this.request("/rest/v1/rpc/stop_cloud_job", { method: "POST", token, body: { p_job: id } });
+  }
+
+  // The user's own answer, the only way one is ever written. False if it was already answered or no longer waiting.
+  async decideCloudApproval(token: string, id: string, allow: boolean, answer: string | null): Promise<boolean> {
+    return (await this.request<unknown>("/rest/v1/rpc/decide_cloud_approval", { method: "POST", token, body: { p_approval: id, p_allow: allow, p_answer: answer } })) === true;
+  }
+
+  async forgetCloudJob(token: string, id: string): Promise<void> {
+    await this.request("/rest/v1/rpc/forget_cloud_job", { method: "POST", token, body: { p_job: id } });
+  }
 }

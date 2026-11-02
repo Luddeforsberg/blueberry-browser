@@ -164,6 +164,7 @@ export class EventManager {
     this.handle("cloud:forget", () => this.mainWindow.cloud.forget());
     this.handle("cloud:end", () => this.mainWindow.cloud.end());
     this.handle("cloud:view", (tabId) => this.mainWindow.cloud.view(tabId));
+    this.handle("cloud:runner-view", (chatId) => (typeof chatId === "string" ? this.mainWindow.runnerJobs.liveView(chatId) : null));
     this.handle("cloud:watch", (tabId) => this.mainWindow.cloud.watch(tabId));
     this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
     this.handle("cloud:login-suggestions", () => this.mainWindow.cloudLoginSuggestions());
@@ -176,7 +177,7 @@ export class EventManager {
 
   private handleChatEvents(): void {
     this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...options, cloud: options?.cloud === true }) : null
+      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...options, cloud: options?.cloud === true, runner: options?.runner === true }) : null
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));

@@ -37,6 +37,16 @@ interface LiveUrls {
   pages?: { id: string; url: string; debuggerFullscreenUrl?: string }[];
 }
 
+// Whether an address is Browserbase's own page, the only kind a live view may show in a frame.
+export const isLiveView = (url: string): boolean => {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && (hostname === "browserbase.com" || hostname.endsWith(".browserbase.com"));
+  } catch {
+    return false;
+  }
+};
+
 // The navbar is Browserbase's, and the tab in Blueberry already says where it is.
 const withoutNavbar = (url: string) => `${url}${url.includes("?") ? "&" : "?"}navbar=false`;
 

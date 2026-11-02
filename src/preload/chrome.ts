@@ -175,6 +175,7 @@ const chromeAPI: ChromeAPI = {
     forget: () => invoke("cloud:forget"),
     end: () => invoke("cloud:end"),
     view: (tabId) => invoke("cloud:view", tabId),
+    runnerView: (chatId) => invoke("cloud:runner-view", chatId),
     watch: (tabId) => invoke("cloud:watch", tabId),
     takeOver: (tabId) => invoke("cloud:take-over", tabId),
     loginSuggestions: () => invoke("cloud:login-suggestions"),
