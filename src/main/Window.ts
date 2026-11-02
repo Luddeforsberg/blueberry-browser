@@ -114,6 +114,9 @@ export class Window {
   private windowClosed = false;
   // Tabs Berry opened behind the chat. Where it goes in them isn't the user's history until they go there too.
   private readonly backgroundTabs = new Set<string>();
+  // Tabs a job opened that became the user's before they went there. Saved with the session, and kept out of history
+  // until they do, like a background tab.
+  private readonly unvisitedTabs = new Set<string>();
   // Kept here because a closed window, which is when this is saved last, can't be asked.
   private windowSize = { width: 0, height: 0 };
   private readonly glassSupported = supportsGlass();
@@ -279,7 +282,9 @@ export class Window {
       closeTab: (tabId) => this.tabCount > 1 && tabId !== this.activeTabId && this.closeTab(tabId, false),
       // Saved with the session from now on, like any other tab of theirs.
       giveToUser: (tabId) => {
-        if (this.backgroundTabs.delete(tabId)) this.saveSessionSoon();
+        if (!this.backgroundTabs.delete(tabId)) return;
+        this.unvisitedTabs.add(tabId);
+        this.saveSessionSoon();
       },
       actionApproval: () => this.settings.actionApproval,
       assistantName: () => (this.settings.showBerry ? BERRY.name : "Assistant"),
@@ -862,7 +867,7 @@ export class Window {
 
   // A full disk or a damaged file shouldn't get in the way of browsing.
   private saveVisit(tabId: string, save: () => void): void {
-    if (this.backgroundTabs.has(tabId)) return;
+    if (this.backgroundTabs.has(tabId) || this.unvisitedTabs.has(tabId)) return;
     try {
       save();
     } catch (error) {
@@ -961,6 +966,7 @@ export class Window {
     tab.destroy();
     this.tabsMap.delete(tabId);
     this.backgroundTabs.delete(tabId);
+    this.unvisitedTabs.delete(tabId);
     this.chats.tabClosed(tabId);
     this.workViews.sync();
 
@@ -990,7 +996,8 @@ export class Window {
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
     this.activeTabId = tabId;
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
-    if (this.backgroundTabs.delete(tabId) && tab instanceof Tab) {
+    const unvisited = this.unvisitedTabs.delete(tabId);
+    if ((this.backgroundTabs.delete(tabId) || unvisited) && tab instanceof Tab) {
       this.saveVisit(tabId, () => this.history.record(tab.url, tab.title, tab.favicon));
     }
     this.syncTabViews();

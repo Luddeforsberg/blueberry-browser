@@ -24,6 +24,12 @@ interface Drag {
 
 // Dragging a tab along its list: it follows the pointer, the others make room, and the new order
 // goes to main on release. Tabs must be the same size, which they are in both layouts.
+// Where Alt+arrow moves a tab to, counting only the tabs shown, as an index among all of them. Null at either end.
+export const nudgeTarget = (all: readonly string[], shown: readonly string[], tabId: string, delta: number): number | null => {
+    const neighbour = shown[shown.indexOf(tabId) + delta]
+    return shown.includes(tabId) && neighbour !== undefined ? all.indexOf(neighbour) : null
+}
+
 export const useTabDrag = (
     tabIds: string[],
     axis: 'x' | 'y',

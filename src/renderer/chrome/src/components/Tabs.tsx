@@ -6,7 +6,7 @@ import { useFlock } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { TabIcon } from './TabIcon'
 import { SHIMMER_TEXT } from './ChatMessage'
-import { useTabDrag } from './useTabDrag'
+import { nudgeTarget, useTabDrag } from './useTabDrag'
 import { cn } from '@common/lib/utils'
 
 const TabItem: React.FC<{
@@ -124,7 +124,10 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                         }}
                         onNudge={(delta, button) => {
                             nudged.current = button
-                            void moveTabBy(tab.id, delta)
+                            // With a job's tabs hidden, a step counts only the ones shown.
+                            if (tabs.length === allTabs.length) return void moveTabBy(tab.id, delta)
+                            const to = nudgeTarget(allTabs.map(({ id }) => id), tabs.map(({ id }) => id), tab.id, delta)
+                            if (to !== null) void moveTab(tab.id, to)
                         }}
                         {...itemProps(tab.id, index)}
                     />

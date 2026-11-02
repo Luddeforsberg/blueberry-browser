@@ -66,6 +66,13 @@ test.describe("a job's tabs", () => {
     await expect.poll(async () => (await tabs()).filter(({ url }) => url.startsWith(site.origin)).map(({ url, jobChatId }) => [url, jobChatId])).toEqual([[`${site.origin}/c`, null]]);
     await expect(underChat()).toHaveCount(0);
     await expect(userTabs().getByText("Page /c")).toBeVisible();
+    // Not in history until the user goes there, and then it is.
+    const recent = () => chrome.evaluate(() => window.chromeAPI.browser.getRecent());
+    expect((await recent()).map(({ title }) => title)).not.toContain("Page /c");
+    const chat = (await tabs()).find(({ page }) => page === "chat")!;
+    await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), (await tabs()).find(({ url }) => url === `${site.origin}/c`)!.id);
+    await expect.poll(async () => (await recent()).map(({ title }) => title)).toContain("Page /c");
+    await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), chat.id);
 
     await chrome.getByRole("button", { name: "Pages it used (3)" }).click();
     const used = chrome.getByRole("list", { name: "Pages it used" }).getByRole("button");
