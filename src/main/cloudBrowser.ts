@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext } from "playwright-core";
+import type { Browser, BrowserContext, Page, Request, Route } from "playwright-core";
 import { CdpTab, type CdpTabEvents } from "./CdpTab";
 
 // A browser somewhere else, reached over CDP, for a bird to work in. Plain Node, like `CdpTab`, so a runner without a
@@ -25,6 +25,9 @@ export const connectOverCdp = async (endpoint: string): Promise<Browser> => {
   return chromium.connectOverCDP(endpoint);
 };
 
+// How long a popup gets to say where it's going before it's closed.
+const POPUP_URL_MS = 2_000;
+
 export type CloudStatus = "idle" | "starting" | "running" | "ended";
 
 // The session, the job using it and its pages. Whoever owns this decides who may claim it.
@@ -35,6 +38,9 @@ export class CloudSessions {
   private readonly pages = new Map<string, { tab: CdpTab; jobId: string }>();
   private _status: CloudStatus = "idle";
   private _problem: string | null = null;
+  // Every page made here. Anything else in the context is a popup a page opened.
+  private readonly ours = new WeakSet<Page>();
+  private opening: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly browser: CloudBrowser,
@@ -80,6 +86,7 @@ export class CloudSessions {
       this.onChange();
       try {
         const session = await this.browser.start();
+        await this.stopPopups(session.context);
         this.session = session;
         this._status = "running";
         session.context.browser()?.on("disconnected", () => this.lost());
@@ -96,6 +103,49 @@ export class CloudSessions {
     return this.starting;
   }
 
+  // A popup is a new page nothing here watches. Playwright holds every new page until its routes are on, so its requests
+  // all come through here. Its first navigation comes before Playwright knows its frame, so it's checked against the
+  // job's limits like any navigation in its tabs, and refused where they say no. Everything else from a popup is
+  // refused, the popup is closed, and an address it was going to loads in the tab it came from, under that tab's limits:
+  // the same as following the link there.
+  private async stopPopups(context: BrowserContext): Promise<void> {
+    await context.route("**/*", (route, request) => this.route(route, request));
+    context.on("page", (page) => void this.closePopup(page));
+  }
+
+  private jobTabs(): CdpTab[] {
+    return [...this.pages.values()].filter(({ jobId }) => jobId === this.owner).map(({ tab }) => tab);
+  }
+
+  private route(route: Route, request: Request): Promise<void> {
+    let page: Page | null = null;
+    try {
+      page = request.frame().page();
+    } catch {
+      // A service worker's, or a navigation in a frame that doesn't exist yet, such as a popup's first.
+      const refused = request.isNavigationRequest() && this.jobTabs().filter((tab) => tab.refuse(request.url())).length > 0;
+      return refused ? route.abort("blockedbyclient").catch(() => {}) : route.fallback();
+    }
+    if (this.ours.has(page)) return route.fallback();
+    return route.abort("blockedbyclient").catch(() => {});
+  }
+
+  private async closePopup(page: Page): Promise<void> {
+    // Our own page is in `ours` once `newPage` is done.
+    await this.opening;
+    if (this.ours.has(page)) return;
+    const opener = await page.opener().catch(() => null);
+    // Where it was going, if it got that far.
+    await page.waitForURL(/^https?:/, { timeout: POPUP_URL_MS }).catch(() => {});
+    const url = page.url();
+    await page.close().catch(() => {});
+    if (!/^https?:/.test(url)) return;
+    // A link with `noopener` has no opener to find, so it goes where the job last acted.
+    const tabs = this.jobTabs();
+    const tab = tabs.find((one) => one.page === opener) ?? tabs.sort((a, b) => b.actedAt - a.actedAt)[0];
+    await tab?.loadURL(url).catch(() => {});
+  }
+
   private lost(): void {
     if (!this.session) return;
     this.session = null;
@@ -109,7 +159,10 @@ export class CloudSessions {
   async open(jobId: string, id: string, url: string, events: CdpTabEvents, allows?: (url: string) => boolean): Promise<CdpTab> {
     if (this.owner !== jobId) throw new Error("The cloud browser is working on another job.");
     const session = await this.ensure();
-    const page = await session.context.newPage();
+    const made = session.context.newPage();
+    this.opening = made.catch(() => null);
+    const page = await made;
+    this.ours.add(page);
     const tab = await CdpTab.attach(id, page, events);
     this.pages.set(id, { tab, jobId });
     page.on("close", () => {

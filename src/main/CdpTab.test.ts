@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createPageTools, type PageTool } from "./browserTools";
 import type { CdpTab } from "./CdpTab";
 import { CloudSessions } from "./cloudBrowser";
@@ -42,6 +42,11 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
         return;
       }
       response.setHeader("content-type", "text/html");
+      if (request.url === "/links") {
+        const away = origin.replace("127.0.0.1", "localhost");
+        response.end(`<title>Links</title><a href="${away}/popup-link" target="_blank">Link away</a> <button onclick="window.open('${away}/popup-script')">Open away</button> <a href="${origin}/next" target="_blank">Next</a>`);
+        return;
+      }
       response.end(request.url === "/" ? PAGE : `<title>${request.url}</title><p>${request.url}</p>`);
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -134,6 +139,34 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     expect(forbidden).toEqual([]);
     expect(redirected.url).not.toContain("localhost");
     await cloud.close("cloud-2");
+  });
+
+  it("lets no popup reach a site a limited mascot isn't allowed on, and opens none of its own", async () => {
+    const allowed = (url: string) => new URL(url).hostname === "127.0.0.1";
+    const links = await cloud.open("job", "cloud-3", `${origin}/links`, { onChange: () => {} }, allowed);
+    const pagesBefore = links.page.context().pages().length;
+    const main = tab;
+    tab = links;
+    try {
+      expect(await tool("click").run({ ref: await refOf("Link away") })).toContain("The page tried to go to localhost, which Scout isn't allowed on");
+      expect(await tool("click").run({ ref: await refOf("Open away") })).toMatch(/^Done\./);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    } finally {
+      tab = main;
+    }
+    expect(forbidden).toEqual([]);
+    expect(links.url).toBe(`${origin}/links`);
+    await vi.waitFor(() => expect(links.page.context().pages().length).toBe(pagesBefore), { timeout: 5000 });
+    // An allowed one is followed in the tab it came from instead.
+    tab = links;
+    try {
+      await tool("click").run({ ref: await refOf("Next") });
+    } finally {
+      tab = main;
+    }
+    await vi.waitFor(() => expect(links.url).toBe(`${origin}/next`), { timeout: 5000 });
+    expect(links.page.context().pages().length).toBe(pagesBefore);
+    await cloud.close("cloud-3");
   });
 
   it("lets one job at a time use the session", () => {

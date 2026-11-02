@@ -91,6 +91,7 @@ export class CdpTab implements PageTarget {
   private readonly refusalListeners = new Set<Set<string>>();
   private fetching: Promise<unknown> = Promise.resolve();
   private pressed = false;
+  private lastInput = 0;
   private closed = false;
   private screencast: ((jpeg: string) => void) | null = null;
 
@@ -310,8 +311,14 @@ export class CdpTab implements PageTarget {
     });
   }
 
+  // When Berry last clicked or typed here, which says where a popup with no opener came from.
+  get actedAt(): number {
+    return this.lastInput;
+  }
+
   async sendAgentInput(event: AgentInput): Promise<void> {
     if (this.closed) throw new Error("The page is closed");
+    this.lastInput = Date.now();
     if (!("keyCode" in event)) {
       if (event.type === "mouseDown") this.pressed = true;
       const held = this.pressed;
@@ -375,6 +382,14 @@ export class CdpTab implements PageTarget {
 
   refusesNavigation(url: string): boolean {
     return [...this.navigationLimits].some((allows) => !allows(url));
+  }
+
+  // For a navigation this tab caused somewhere it can't intercept itself, such as a popup it opened. True if a limit on
+  // now refuses it, which every call holding a limit hears about.
+  refuse(url: string): boolean {
+    if (!this.refusesNavigation(url)) return false;
+    this.refusalListeners.forEach((listener) => listener.add(url));
+    return true;
   }
 
   // Only while a limit is on does every new document wait to be checked, so a page with no limit loads as fast as any.
