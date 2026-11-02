@@ -10,6 +10,7 @@ import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { blankForm, setRoutinesView } from '../routinesView'
 import { useWorkView, WorkingStrip, WorkingView } from '../components/WorkingView'
+import { RunnerView } from '../components/RunnerView'
 
 // The chat keeps its width, so the working view only goes beside it when it can have this much of the page.
 const ROOM_FOR_WORK = 960
@@ -60,7 +61,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     if (!chatId || !thread) return <div ref={pageRef} className="h-full" />
 
     // Its bird hangs outside the column, so a column without room beside it moves over to make some.
-    const gutter = pageWidth < COLUMN_WITH_BIRD || (work && roomBeside) ? "pl-14" : "pl-6"
+    const onRunner = !!thread.runner && running && roomBeside
+    const gutter = pageWidth < COLUMN_WITH_BIRD || ((work || onRunner) && roomBeside) ? "pl-14" : "pl-6"
 
     // The reply being written holds the place it's saved in, so it stays the same element when it ends.
     const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps, memoryIds: thread.memoryIds }] : thread.messages
@@ -75,6 +77,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <div key={index} className="flex flex-col">
                                     {/* Another app wrote the first message, so it says whose words they are. */}
                                     {index === 0 && thread.from && <p className="mb-1.5 text-12 text-muted-foreground text-right">From {thread.from}</p>}
+                                    {index === 0 && thread.runner && <p className="mb-1.5 text-12 text-muted-foreground text-right">Sent to the runner</p>}
                                     <UserMessage content={message.content} />
                                 </div>
                             ) : (
@@ -95,6 +98,10 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <div ref={askingRef}>
                                 <ChatApprovalCard chatId={chatId} approval={thread.approval} mascot={mascot} avatarOutside />
                             </div>
+                        )}
+                        {/* With no room beside the chat, a page handed to the user still has to be somewhere to do it in. */}
+                        {thread.runner && running && !roomBeside && thread.approval?.handoff && (
+                            <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
                         )}
                         {thread.error && <ChatError message={thread.error} />}
                         {!running && thread.messages.at(-1)?.role === 'assistant' && (
@@ -120,6 +127,11 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     />
                 </div>
             </div>
+            {onRunner && (
+                <aside aria-label="What it’s working on" className="shrink-0 h-full overflow-y-auto overflow-x-hidden pl-6 pr-6 pt-16 pb-5" style={{ width: pictureWidth + WORK_GUTTER }}>
+                    <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
+                </aside>
+            )}
             {work && roomBeside && (
                 <aside aria-label="What it’s working on" className="shrink-0 h-full overflow-y-auto overflow-x-hidden pl-6 pr-6 pt-16 pb-5" style={{ width: pictureWidth + WORK_GUTTER }}>
                     <WorkingView

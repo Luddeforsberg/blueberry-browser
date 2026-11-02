@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { safeStorage, type WebContents } from "electron";
 import type { CloudState, CloudView } from "../shared/ipc";
-import { browserbase, type BrowserbaseSaved } from "./browserbase";
+import { browserbase, isLiveView, type BrowserbaseSaved } from "./browserbase";
 import type { CdpTab } from "./CdpTab";
 import type { ChatCloud } from "./Chats";
 import { CloudSessions, type CloudBrowser } from "./cloudBrowser";
@@ -86,6 +86,11 @@ export class CloudTabs implements ChatCloud {
           })
         : null;
     return browser && new CloudSessions(browser, () => this.changed());
+  }
+
+  // The Browserbase Context the sites brought along are in, for the cloud runner. Only its id: the cookies stay there.
+  get contextId(): string | null {
+    return this.local ? null : this.saved.contextId;
   }
 
   get state(): CloudState {
@@ -339,15 +344,6 @@ export class CloudTabs implements ChatCloud {
     void this.end();
   }
 }
-
-const isLiveView = (url: string): boolean => {
-  try {
-    const { protocol, hostname } = new URL(url);
-    return protocol === "https:" && (hostname === "browserbase.com" || hostname.endsWith(".browserbase.com"));
-  } catch {
-    return false;
-  }
-};
 
 const hostOf = (url: string): string => {
   try {

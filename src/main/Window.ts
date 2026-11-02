@@ -37,6 +37,7 @@ import { McpConnector } from "./McpConnector";
 import { createMcpTools, type McpTool } from "./mcpTools";
 import { readTabText } from "./mcpPages";
 import { CloudTabs } from "./CloudTabs";
+import { RunnerJobs } from "./RunnerJobs";
 import { confirmCloudLogin, readSiteCookies } from "./cloudLoginAccess";
 import { suggestLoginSites } from "./cloudLogins";
 import {
@@ -133,6 +134,7 @@ export class Window {
   readonly memory: MemoryStore;
   readonly mcp: McpConnector;
   readonly cloud: CloudTabs;
+  readonly runnerJobs: RunnerJobs;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -205,6 +207,7 @@ export class Window {
     const server = config && new GalleryServer(config);
     this.account = new Account(server, join(app.getPath("userData"), "account.json"), () => {
       sendToRenderer(this.chrome.view.webContents, "account:updated", this.account.state);
+      this.runnerJobs?.accountChanged();
     });
     this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
       this.broadcast("library:updated", this.librarySnapshot);
@@ -215,7 +218,8 @@ export class Window {
       this.phone.sync();
     });
     this.phone = new Phone(this.telegram, {
-      waiting: () => this.needsYou,
+      // The runner's are answered in this window only, so the phone isn't offered them.
+      waiting: () => this.needsYou.filter(({ id }) => !this.runnerJobs.has(id)),
       nameOf: ({ mascotId }) => this.mascotName(mascotId),
       away: () => this.userIsAway,
       decide: (id, approvalId, allow, answer) => this.chats.decide(id, approvalId, allow, answer, { fromPhone: true }),
@@ -257,6 +261,13 @@ export class Window {
     );
     this.cloud.start();
 
+    this.runnerJobs = new RunnerJobs(server, this.account, join(app.getPath("userData"), "runner-jobs.json"), {
+      changed: (chatId) => this.chats.runnerChanged(chatId),
+      finished: (chatId, result) => this.chats.runnerFinished(chatId, result),
+      contextId: () => this.cloud.contextId,
+      runnerUpdated: (state) => sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state),
+    });
+
     this.chats = new Chats(chatStore, streamReply, generateTitle, {
       activeTab: () => this.activeTab,
       allTabs: () => this.allTabs,
@@ -287,7 +298,7 @@ export class Window {
         this.notifyTabs();
         this.workViews.sync();
       },
-    }, (id) => this.mascotStore.resolve(id), this.memory, this.cloud);
+    }, (id) => this.mascotStore.resolve(id), this.memory, this.cloud, this.runnerJobs);
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -423,6 +434,7 @@ export class Window {
       this.telegram.close();
       this.mcp.close();
       this.cloud.destroy();
+      this.runnerJobs.destroy();
       this.permissionPrompt.destroy();
       session.defaultSession.off("will-download", onDownload);
       offDownloads();

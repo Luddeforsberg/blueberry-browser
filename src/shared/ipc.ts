@@ -335,6 +335,16 @@ export interface ChatSendOptions {
   mascotId?: string | null;
   // Work in a browser in the cloud rather than in this window's tabs. Ignored while the cloud is off.
   cloud?: boolean;
+  // Send it to the cloud runner, which keeps going with this computer off. Needs the user signed in.
+  runner?: boolean;
+}
+
+// Settings > Cloud > Runner: the account the cloud runner signs in as, linked to this user's, and whether the runner has
+// accepted. Only its email, never its password, which only the runner has.
+export interface RunnerState {
+  status: "not-set-up" | "signed-out" | "none" | "waiting" | "linked";
+  email: string | null;
+  problem: string | null;
 }
 
 // Settings > Cloud. The key and project id never come back here once saved: only whether there are any.
@@ -530,6 +540,12 @@ export interface InvokeChannels {
   "cloud:forget": { region: "chrome"; args: []; result: CloudState };
   "cloud:end": { region: "chrome"; args: []; result: CloudState };
   "cloud:view": { region: "chrome"; args: [tabId: string]; result: CloudView };
+  // The live view of a chat's job on the cloud runner, only ever Browserbase's page, or null while there's none.
+  "cloud:runner-view": { region: "chrome"; args: [chatId: string]; result: string | null };
+  // The runner's link, looked up again. Link names the runner's account by email.
+  "cloud:runner-state": { region: "chrome"; args: []; result: RunnerState };
+  "cloud:runner-link": { region: "chrome"; args: [email: string]; result: RunnerState };
+  "cloud:runner-unlink": { region: "chrome"; args: []; result: RunnerState };
   // Which cloud tab is on screen, or null. Pictures of it come as `cloud:frame`, to the chrome and nowhere else.
   "cloud:watch": { region: "chrome"; args: [tabId: string | null]; result: void };
   // The user takes the tab from the job, as clicking in a tab of the window's own does.
@@ -562,6 +578,7 @@ export interface EventChannels {
   "phone:answered": PhoneAnswered;
   "mcp:updated": McpState;
   "cloud:updated": CloudState;
+  "cloud:runner-updated": RunnerState;
   "cloud:frame": CloudFrame;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
@@ -775,6 +792,11 @@ export interface CloudAPI {
   forget: () => Promise<CloudState>;
   end: () => Promise<CloudState>;
   view: (tabId: string) => Promise<CloudView>;
+  runnerView: (chatId: string) => Promise<string | null>;
+  runnerState: () => Promise<RunnerState>;
+  linkRunner: (email: string) => Promise<RunnerState>;
+  unlinkRunner: () => Promise<RunnerState>;
+  onRunnerUpdated: (callback: (state: RunnerState) => void) => Unsubscribe;
   watch: (tabId: string | null) => Promise<void>;
   takeOver: (tabId: string) => Promise<boolean>;
   loginSuggestions: () => Promise<string[]>;

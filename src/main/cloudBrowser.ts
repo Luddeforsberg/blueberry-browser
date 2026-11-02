@@ -272,8 +272,9 @@ export class CloudSessions {
       this._unreleased = false;
       this._problem = null;
       return true;
-    } catch (error) {
-      console.error("Couldn't release the cloud session:", error);
+    } catch {
+      // Only that it failed, since this runs on the cloud runner too. Settings > Cloud says what to do.
+      console.error("Couldn't release the cloud session.");
       this._unreleased = true;
       this._problem = "The cloud session may still be running, and costing, because the provider didn't confirm it ended. Try again.";
       return false;

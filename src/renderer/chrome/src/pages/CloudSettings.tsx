@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import type { CloudLogin, CloudState } from '@shared/ipc'
+import type { CloudLogin, CloudState, RunnerState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { SettingsRow } from '../components/SettingsRow'
 import { useCloud } from '../useCloud'
+import { useRunner } from '../useRunner'
 
 const FIELD = 'min-w-0 h-8 rounded-card border bg-canvas px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
@@ -103,6 +104,49 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
     )
 }
 
+const runnerLine = (runner: RunnerState): string => {
+    if (runner.status === 'signed-out') return 'Sign in to your Blueberry account above to link one.'
+    if (runner.status === 'linked') return `${runner.email} is your runner. Cloud, then Keeps going, sends a job there.`
+    if (runner.status === 'waiting') return `Linked to ${runner.email}. Waiting for the runner to start and accept it.`
+    return 'The runner signs in as an account of its own. Create it in Supabase, give its email here, and set the same account on the runner.'
+}
+
+// The cloud runner, which keeps a job going with this computer off. It's its own account, linked here by email, and it
+// only counts once the runner accepts, naming this account back. Its password never comes here.
+const Runner: React.FC = () => {
+    const [runner, setRunner] = useRunner()
+    const [email, setEmail] = useState('')
+    const [busy, setBusy] = useState(false)
+    const api = window.chromeAPI.cloud
+    if (runner.status === 'not-set-up') return null
+
+    const link = async (event: React.FormEvent) => {
+        event.preventDefault()
+        setBusy(true)
+        const state = await api.linkRunner(email)
+        setBusy(false)
+        setRunner(state)
+        if (!state.problem) setEmail('')
+    }
+
+    return (
+        <div className="py-4 border-b last:border-b-0">
+            <h3 id="setting-cloud-runner" className="text-14 font-semibold">Runner</h3>
+            <p className="mt-0.5 text-13 text-muted-foreground">{runnerLine(runner)}</p>
+            {(runner.status === 'none' || runner.status === 'waiting') && (
+                <form className="mt-3 flex items-center gap-2" onSubmit={(event) => void link(event)}>
+                    <input aria-label="Runner's email" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="runner@example.com" className={`flex-1 ${FIELD}`} />
+                    <Button type="submit" disabled={busy || !email.trim()}>{busy ? 'Linking…' : 'Link'}</Button>
+                </form>
+            )}
+            {(runner.status === 'linked' || runner.status === 'waiting') && (
+                <Button className="mt-3" variant="outline" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
+            )}
+            {runner.problem && <p role="alert" className="mt-2 text-13 text-warning">{runner.problem}</p>}
+        </div>
+    )
+}
+
 // Browserbase, for birds that work in a browser in the cloud. Off until a key is saved. The key and project id leave
 // this page once and never come back to it.
 export const CloudSettings: React.FC = () => {
@@ -150,6 +194,8 @@ export const CloudSettings: React.FC = () => {
             )}
 
             {cloud.provider !== null && <SignedInTo cloud={cloud} />}
+
+            <Runner />
 
             {cloud.configured && (
                 <SettingsRow id="setting-cloud-forget" title="Browserbase key saved" description="It stays on this computer, encrypted. Forgetting it ends the cloud session too.">

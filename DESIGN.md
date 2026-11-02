@@ -660,6 +660,18 @@ Settings > Cloud lets a bird work in a browser on Browserbase. It's off until a 
 - **Signed in to:** what's copied and that it asks for Touch ID, then the sites brought along in a plain list split by `border`, each with its name, its status in words ("Brought over", "Checked by you" or, in `warning`, "Signed out when you checked") and the date, with **Check** and **Remove**. Under it a field for a site and **Bring along**, and up to eight sites from history and bookmarks as small outline buttons after "From your history:". **Forget all cloud logins** once there's anything to forget. Bringing a site along asks for Touch ID, or a plain confirm without it, and then opens the site in a cloud tab in front.
 - **A local test browser:** an unpackaged app started with `BLUEBERRY_CLOUD_LOCAL` says so here instead of asking for a key.
 - **Choosing it:** on the new tab page, while the cloud is on, a small cloud button sits in the composer beside the mascot. Pressed, it reads "Cloud" in `accent-ink` on `muted`, and that chat works in the cloud from then on.
+- **Runner:** in Settings > Cloud, while signed in to the Blueberry account, one plain row: what the runner is in one sentence, a field for the runner's email and **Link**. Linked, the line says it's waiting for the runner to accept, then that it's your runner, with **Unlink**. A problem shows in `warning` under it. The runner's password never comes here.
+- **Keeping going with the computer off:** once Cloud is pressed and a linked runner has accepted, a second button beside it, a crossed-out screen labelled "Keep going with this computer off", sends the chat to the cloud runner instead. Pressed, it reads "Keeps going" the same way. Without a linked runner, it isn't there.
+
+### On the runner
+
+A chat sent to the cloud runner is an ordinary chat in the list, with "Sent to the runner" over its first message in 12px `muted-foreground`, and its later messages go there too. Its steps and reply show as they're written, a little behind, and its approvals are cards in the chat and in Needs you, answered only from this window: the phone isn't sent them, and Claude can't answer them.
+
+- **Beside the chat,** while it runs and there's room, the same column as the working view: the crossed-out screen and **On the runner**, one line in `muted-foreground` saying it keeps going with this computer off, the live view in a `tray` box with `border` and the `card` radius, locked like a cloud tab's, and what it's doing now. With no live view, as from a test browser, the box says so.
+- **Handed to the user:** a sign-in or captcha unlocks the live view, the line says to do it there and press I'm done, and I'm done on the card gives the page back. There's no tab to go to. With no room beside the chat, the same view goes under the card, only while it waits.
+- **Another account:** signed out, or signed in as someone else, a runner chat shows only what's saved, and a new message there says which account it's on. Nothing of it is answered or shown meanwhile, and it comes back when that account signs in.
+- **Ask before acting** is never less than the default there, because nobody is watching: Never ask still asks before anything risky.
+- **No answer** in 30 minutes stops the job, and the chat says so as its error. Stop in the composer stops it on the runner.
 
 ### Cloud tab
 

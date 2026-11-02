@@ -88,6 +88,8 @@ export interface ChatThread extends ChatThreadSummary {
   error: string | null;
   // What the running reply went in remembering. Empty when no reply is running.
   memoryIds: string[];
+  // Its replies come from the cloud runner, which keeps going with this computer off.
+  runner?: boolean;
 }
 
 // Whether a tab in a job's working view has a picture, and why not if it doesn't.

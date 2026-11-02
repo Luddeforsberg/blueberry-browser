@@ -1,14 +1,61 @@
+import { PGlite } from "@electric-sql/pglite";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 
 export const FAKE_KEY = "sb_publishable_fake_for_tests_only";
 
 type Row = Record<string, unknown> & { id: string; owner: string; hidden: boolean; add_count: number };
 
+// The cloud runner's functions, which run in real Postgres here with the real migration, as the user each token stands
+// for, so the app and the runner, which signs in as a user of its own, meet the real rules.
+const CLOUD_FUNCTIONS = new Set([
+  "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job",
+  "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
+  "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
+]);
+const CLOUD_STANDINS = `
+  create role anon nologin;
+  create role authenticated nologin;
+  create schema auth;
+  create table auth.users (id uuid primary key, email text);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
+  grant usage on schema public, auth to anon, authenticated;
+  grant execute on function auth.uid() to anon, authenticated;
+`;
+
+const cloudDatabase = async () => {
+  const db = new PGlite();
+  await db.exec(CLOUD_STANDINS);
+  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261102000000_cloud_jobs.sql"), "utf8"));
+  // One connection, so one call at a time, each with its own role.
+  let queue: Promise<unknown> = Promise.resolve();
+  const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {
+    const run = queue.then(async () => {
+      const names = Object.keys(args).filter((key) => /^p_\w+$/.test(key));
+      await db.query("select set_config('test.uid', $1, false)", [uid ?? ""]);
+      await db.exec(`set role ${role}`);
+      try {
+        const { rows } = await db.query<Record<string, unknown>>(`select * from public.${name}(${names.map((key, at) => `${key} => $${at + 1}`).join(", ")})`, names.map((key) => args[key]));
+        // A function returning one value answers with it, as the REST API does. One returning rows answers with them.
+        return rows.length === 1 && Object.keys(rows[0]).length === 1 && name in rows[0] ? rows[0][name] : rows;
+      } finally {
+        await db.exec("reset role");
+      }
+    });
+    queue = run.catch(() => {});
+    return run;
+  };
+  return { db, call };
+};
+
 // A local stand-in for the parts of Supabase's REST and Auth APIs the app uses, so the app's real requests are what get
-// tested. The real rules are tested on real Postgres, in supabase/gallery.test.ts. This only keeps to their shape.
-export const startFakeSupabase = async () => {
+// tested. The real rules are tested on real Postgres, in supabase/gallery.test.ts. This only keeps to their shape, apart
+// from the cloud runner's jobs, which with `cloudJobs` are the real rules in real Postgres.
+export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boolean } = {}) => {
+  const cloud = cloudJobs ? await cloudDatabase() : null;
   const accounts = new Map<string, { password: string; id: string }>();
   const tokens = new Map<string, string>();
   const rows: Row[] = [];
@@ -44,6 +91,7 @@ export const startFakeSupabase = async () => {
       if (accounts.has(body.email)) return answer(422, { error_code: "user_already_exists", msg: "Exists" });
       const account = { password: body.password, id: randomUUID() };
       accounts.set(body.email, account);
+      await cloud?.db.query("insert into auth.users values ($1, $2)", [account.id, body.email]);
       return answer(200, sessionFor(body.email, account.id));
     }
     if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "password") {
@@ -52,6 +100,16 @@ export const startFakeSupabase = async () => {
       return answer(200, sessionFor(body.email, account.id));
     }
     if (route === "POST /auth/v1/logout") return answer(204);
+
+    const cloudCall = /^\/rest\/v1\/rpc\/(\w+)$/.exec(url.pathname)?.[1];
+    if (cloud && request.method === "POST" && cloudCall && CLOUD_FUNCTIONS.has(cloudCall)) {
+      try {
+        return answer(200, await cloud.call(uid ? "authenticated" : "anon", uid ?? null, cloudCall, body));
+      } catch (error) {
+        const { code, message } = error as { code?: string; message?: string };
+        return answer(code === "42501" ? 403 : 400, { code, message });
+      }
+    }
 
     if (route === "GET /rest/v1/mascots") return answer(200, rows.filter((row) => !row.hidden).map(({ owner: _owner, hidden: _hidden, ...row }) => row));
     if (route === "POST /rest/v1/rpc/my_mascots") return answer(200, rows.filter((row) => row.owner === uid).map(({ owner: _owner, ...row }) => row));
@@ -96,6 +154,17 @@ export const startFakeSupabase = async () => {
       rows.push(seeded);
       return seeded;
     },
-    close: () => server.close(),
+    // An account made the way the dashboard does, such as the runner's own.
+    addAccount: async (email: string, password: string) => {
+      const id = randomUUID();
+      accounts.set(email, { password, id });
+      await cloud?.db.query("insert into auth.users values ($1, $2)", [id, email]);
+    },
+    // What's in the cloud jobs' tables, as the database sees it.
+    cloudRows: async (sql: string) => (await cloud!.db.query<Record<string, unknown>>(sql)).rows,
+    close: () => {
+      server.close();
+      void cloud?.db.close();
+    },
   };
 };
