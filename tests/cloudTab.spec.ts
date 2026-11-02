@@ -143,7 +143,7 @@ test("with no key the cloud is off, and a saved key never comes back to the page
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
-    await expect(chrome.getByRole("button", { name: "Run in the cloud" })).toHaveCount(0);
+    await expect(chrome.getByRole("button", { name: "More options" })).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
     await expect(chrome.getByText("Off. Add a Browserbase key to turn it on.")).toBeVisible();
     await expect(chrome.getByRole("button", { name: "End cloud session" })).toBeDisabled();
@@ -157,7 +157,8 @@ test("with no key the cloud is off, and a saved key never comes back to the page
     expect(state).not.toContain("bb_live_not_a_real_key");
     expect(state).not.toContain("project-not-real");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-    await expect(chrome.getByRole("button", { name: "Run in the cloud" })).toBeVisible();
+    await chrome.getByRole("button", { name: "More options" }).click();
+    await expect(chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" })).toBeVisible();
 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
     await chrome.getByRole("button", { name: "Forget key" }).click();

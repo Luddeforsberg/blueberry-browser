@@ -106,9 +106,9 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
 
 const runnerLine = (runner: RunnerState): string => {
     if (runner.status === 'signed-out') return 'Sign in to your Blueberry account above to link one.'
-    if (runner.status === 'linked') return `${runner.email} is your runner. Cloud, then Keeps going, sends a job there.`
-    if (runner.status === 'waiting') return `Linked to ${runner.email}. Waiting for the runner to start and accept it.`
-    return 'The runner signs in as an account of its own. Create it in Supabase, give its email here, and set the same account on the runner.'
+    if (runner.status === 'linked') return `Jobs in the cloud run on ${runner.email}, and keep going with your Mac off.`
+    if (runner.status === 'waiting') return `Linked to ${runner.email}. Waiting for it to start and accept.`
+    return 'Jobs keep going with your Mac off on a server that signs in as an account of its own. Create it in Supabase, give its email here, and set the same account on the server.'
 }
 
 // The cloud runner, which keeps a job going with this computer off. It's its own account, linked here by email, and it
@@ -131,11 +131,11 @@ const Runner: React.FC = () => {
 
     return (
         <div className="py-4 border-b last:border-b-0">
-            <h3 id="setting-cloud-runner" className="text-14 font-semibold">Runner</h3>
+            <h3 id="setting-cloud-runner" className="text-14 font-semibold">With your Mac off</h3>
             <p className="mt-0.5 text-13 text-muted-foreground">{runnerLine(runner)}</p>
             {(runner.status === 'none' || runner.status === 'waiting') && (
                 <form className="mt-3 flex items-center gap-2" onSubmit={(event) => void link(event)}>
-                    <input aria-label="Runner's email" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="runner@example.com" className={`flex-1 ${FIELD}`} />
+                    <input aria-label="Its account’s email" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cloud@example.com" className={`flex-1 ${FIELD}`} />
                     <Button type="submit" disabled={busy || !email.trim()}>{busy ? 'Linking…' : 'Link'}</Button>
                 </form>
             )}

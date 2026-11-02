@@ -17,6 +17,7 @@ const LOST: Omit<MascotProfile, "id"> = {
 
 const galleryIdOf = (galleryId: unknown) => (typeof galleryId === "string" ? { galleryId } : {});
 const publishedIdOf = (publishedId: unknown) => (typeof publishedId === "string" ? { publishedId } : {});
+const worksInCloudOf = (input: unknown) => ((input as { worksInCloud?: unknown } | null)?.worksInCloud === true ? { worksInCloud: true } : {});
 
 // The flock, in a JSON file. Berry isn't in it: it's always there and can't be changed.
 export class MascotStore {
@@ -29,7 +30,7 @@ export class MascotStore {
         this.mascots = raw.flatMap((item: Partial<MascotProfile> | null) => {
           const parsed = parseMascotDraft(item);
           if ("error" in parsed || typeof item?.id !== "string" || item.id === BERRY_ID) return [];
-          return [{ ...parsed.draft, id: item.id, deletedAt: typeof item.deletedAt === "number" ? item.deletedAt : null, ...galleryIdOf(item.galleryId), ...publishedIdOf(item.publishedId) }];
+          return [{ ...parsed.draft, id: item.id, deletedAt: typeof item.deletedAt === "number" ? item.deletedAt : null, ...galleryIdOf(item.galleryId), ...publishedIdOf(item.publishedId), ...worksInCloudOf(item) }];
         });
       }
     } catch {
@@ -64,7 +65,8 @@ export class MascotStore {
     const savedId = id ?? randomUUID();
     // Editing a copy from the Gallery leaves it that copy, so the Gallery doesn't offer a second one.
     const before = id ? this.mascots.find((mascot) => mascot.id === id) : undefined;
-    const saved: MascotProfile = { ...draft, id: savedId, deletedAt: null, ...galleryIdOf(before ? before.galleryId : galleryId), ...publishedIdOf(before?.publishedId) };
+    // A Gallery entry is someone else's, so where it works is the user's own choice, made later.
+    const saved: MascotProfile = { ...draft, id: savedId, deletedAt: null, ...galleryIdOf(before ? before.galleryId : galleryId), ...publishedIdOf(before?.publishedId), ...(galleryId ? {} : worksInCloudOf(input)) };
     this.write(id ? this.mascots.map((mascot) => (mascot.id === id ? saved : mascot)) : [...this.mascots, saved]);
     return { ok: true, id: savedId };
   }

@@ -587,7 +587,7 @@ export class Window {
     return {
       pinned: this.pinnedStore.get(),
       bookmarks: this.bookmarkStore.get(),
-      chats: this.chatStore.summaries().map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id) })),
+      chats: this.chatStore.summaries().map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id), cloud: this.chats.inCloud(chat.id) })),
       routines: this.routines.list(),
       mascots: this.mascotStore.all(),
       needsYou: this.needsYou,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { MonitorOff } from 'lucide-react'
+import { Cloud } from 'lucide-react'
 import type { ChatApproval, ChatStep } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { liveFrameLock } from '../cloudView'
@@ -25,21 +25,21 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
         }
     }, [chatId, approval?.id])
     const lock = liveFrameLock(!!handoff)
-    const doing = steps.filter((one) => !one.done).at(-1)?.text ?? steps.at(-1)?.text ?? 'Waiting for the runner to start'
+    const doing = steps.filter((one) => !one.done).at(-1)?.text ?? steps.at(-1)?.text ?? 'Waiting to start in the cloud'
 
     return (
-        <section aria-label="On the runner" className="flex flex-col gap-2 animate-fade-in">
+        <section aria-label="In the cloud" className="flex flex-col gap-2 animate-fade-in">
             <p className="flex items-center gap-2 text-13">
-                <MonitorOff aria-hidden className="size-4 text-muted-foreground" />
-                <span className="font-semibold">On the runner</span>
+                <Cloud aria-hidden className="size-4 text-muted-foreground" />
+                <span className="font-semibold">In the cloud</span>
             </p>
             <p className="text-13 text-muted-foreground">
-                {handoff ? `Do it in the page below, then press I’m done.` : 'It keeps going with this computer off. Come back any time.'}
+                {handoff ? `Do it in the page below, then press I’m done.` : 'It keeps going with your Mac off. Come back any time.'}
             </p>
             <div className="relative aspect-[4/3] overflow-hidden rounded-card border bg-tray">
                 {url ? (
                     <iframe
-                        title="Live view of the runner’s page"
+                        title="Live view of the page in the cloud"
                         src={url}
                         sandbox="allow-same-origin allow-scripts"
                         inert={lock.inert}
@@ -48,7 +48,7 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
                     />
                 ) : (
                     <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-13 text-muted-foreground">
-                        No live view yet. A test browser on the runner never has one.
+                        No live view yet. A test browser in the cloud never has one.
                     </p>
                 )}
             </div>

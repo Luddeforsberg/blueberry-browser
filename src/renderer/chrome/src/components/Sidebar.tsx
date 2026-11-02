@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Bird, ChevronDown, Ellipsis, Hand, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Bird, ChevronDown, Cloud, Ellipsis, Hand, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
@@ -188,6 +188,11 @@ export const ChatRow: React.FC<{
                 {/* Berry's own chats stay plain until it's working, so a list of them stays quiet. */}
                 {(chat.mascotId || chat.running) && <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} className="-ml-0.5" />}
                 <span className="flex-1 truncate">{chat.title}</span>
+                {chat.cloud && (
+                    <span className="shrink-0 text-muted-foreground" title="In the cloud">
+                        <Cloud role="img" aria-label="In the cloud" className="size-3.5" />
+                    </span>
+                )}
                 {chat.running && (
                     <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
                         <BerryDot working />

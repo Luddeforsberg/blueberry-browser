@@ -40,6 +40,19 @@ describe("MascotStore", () => {
     expect(new MascotStore(path).all()).toEqual([BERRY]);
   });
 
+  it("keeps Works in the cloud through a restart, only when it's exactly true, and never from the Gallery", () => {
+    const path = file();
+    const store = new MascotStore(path);
+    const saved = store.save(null, { ...draft, worksInCloud: true });
+    const loose = store.save(null, { ...draft, name: "Pip", worksInCloud: "yes" });
+    const copy = store.addFromGallery("entry-1", { ...draft, name: "Wren", worksInCloud: true });
+    if (!saved.ok || !loose.ok || !copy.ok) throw new Error("not saved");
+    const again = new MascotStore(path);
+    expect(again.find(saved.id)?.worksInCloud).toBe(true);
+    expect(again.find(loose.id)?.worksInCloud).toBeUndefined();
+    expect(again.find(copy.id)?.worksInCloud).toBeUndefined();
+  });
+
   it("adds a Gallery copy once, lets a deleted one be added again, and keeps what it came from through an edit", () => {
     const path = file();
     const store = new MascotStore(path);
