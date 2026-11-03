@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import type { NeedsYouItem } from '@shared/library'
 import { Button } from '@common/components/Button'
+import { ExactWords } from '@common/components/ApprovalCard'
 import { BerryDot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
@@ -126,16 +127,13 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
             aria-label={`${name} is asking`}
             className={cn("group py-3 animate-fade-in", highlighted && "bg-muted -mx-3 px-3 rounded-card")}
         >
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3">
+                <Berry mood="asking" size={32} mascot={mascot} className="shrink-0" />
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                     <h2 className="pt-0.5 text-16">{shortened}</h2>
-                    {/* Open from the moment Allow can be reached, and it opens downwards, so Allow stays where it is. */}
-                    {shortened !== approval.text && (
-                        <p className="text-12 text-muted-foreground truncate group-hover:whitespace-normal group-focus-within:whitespace-normal">{approval.text}</p>
-                    )}
+                    {shortened !== approval.text && <ExactWords className="mt-2">{approval.text}</ExactWords>}
                     {question && <QuestionBox name={name} onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)} />}
                     <div className="mt-1 min-h-7 flex flex-wrap items-center gap-x-1.5 text-12 text-muted-foreground">
-                        <Berry mood="asking" size={24} mascot={mascot} className="shrink-0" />
                         <span className="min-w-0 truncate">{name} · {item.job}{item.from && ` · from ${item.from}`} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
                         <span className={cn("ml-auto flex items-center", QUIETLY)}>
                             {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={goToTab}>Go to the tab</Button>}

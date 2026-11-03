@@ -13,7 +13,7 @@ const STILL_AFTER = 4;
 const OTHER_TAB_MS = 3000;
 const THUMBNAIL_WIDTH = 240;
 // Twice what's on screen is sharp on any display, and this much is the most a picture can use.
-const MAX_PICTURE_WIDTH = 900;
+const MAX_PICTURE_WIDTH = 1200;
 const SHARPNESS = 2;
 
 // What `Chats` knows about a job and its tabs.

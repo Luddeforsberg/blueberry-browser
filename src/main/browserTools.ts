@@ -26,7 +26,7 @@ import {
   type FocusInfo,
 } from "./pageScripts";
 import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
-import { typingChunks, typingPauseMs, WAITING_WORDS, type Landing, type PageActor, type Spot } from "./PageActor";
+import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { PageFrame, PageTarget } from "./pageTarget";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { siteAllowed } from "../shared/mascots";
@@ -57,6 +57,8 @@ export interface PageTool {
   // Set on anything that changes something. Says exactly what will happen, for the user to allow. It's worked
   // out again just before the tool runs, and a different answer means nothing happens.
   describe?: (args: unknown) => Promise<string>;
+  // Called once as a card about this call is put to the user, not when `describe` is checked again.
+  whileAsking?: (args: unknown) => void;
   // Whether to ask in the default mode: anything that could delete, send, buy or change text.
   isRisky?: (args: unknown) => Promise<boolean>;
   // `run` answers with an image's data address when it worked, which the model gets as a picture.
@@ -101,15 +103,17 @@ const pageTool = <S extends z.ZodObject>(tool: {
   label: (args: z.infer<S>) => string;
   run: (args: z.infer<S>) => Promise<string>;
   describe?: (args: z.infer<S>) => Promise<string>;
+  whileAsking?: (args: z.infer<S>) => void;
   isRisky?: (args: z.infer<S>) => Promise<boolean>;
   returnsImage?: boolean;
 }): PageTool => {
-  const { describe, isRisky } = tool;
+  const { describe, whileAsking, isRisky } = tool;
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
     run: (args) => tool.run(tool.schema.parse(args)),
     describe: describe && ((args) => describe(tool.schema.parse(args))),
+    whileAsking: whileAsking && ((args) => whileAsking(tool.schema.parse(args))),
     isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
   };
 };
@@ -410,24 +414,32 @@ export const createPageTools = <T extends PageTarget>({
   const actorOn = (tab: T): PageActor | null => (tab.actor?.showing ? tab.actor : null);
   const unnamed = (name: string | undefined, fallback: string) => clipWords(name) || fallback;
 
+  // What a frame from another origin says about itself isn't believed, so its name isn't asked for, and it's only the frame's own edge.
+  const spotOfRef = async (tab: T, actor: PageActor, ref: string): Promise<{ spot: Spot; name: string | undefined; ref?: string } | null> => {
+    const entry = frameOf(tab, ref);
+    if (entry === "gone") return null;
+    if (entry) {
+      const spot = await actor.frameSpot(entry.origin);
+      return spot && { spot, name: `a frame from ${siteOf(entry.origin)}` };
+    }
+    const spot = await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
+    return spot && { spot, name: spot.name, ref };
+  };
   // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
   // or the tab taken over while it flew, and an action must not follow that.
   const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
     const actor = actorOn(tab);
     if (!actor) return true;
-    const entry = frameOf(tab, ref);
-    if (entry === "gone") return true;
-    // What a frame from another origin says about itself isn't believed, so its name isn't asked for, and it's only the frame's own edge.
-    const spot = entry
-      ? await actor.frameSpot(entry.origin)
-      : await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
-    if (spot) await actor.goTo(spot, entry ? words(`a frame from ${siteOf(entry.origin)}`) : words(spot.name), kind, entry ? undefined : ref);
+    const found = await spotOfRef(tab, actor, ref);
+    if (found) await actor.goTo(found.spot, words(found.name), kind, found.ref);
     return carryOn(tab);
   };
-  // While the card waits, it stands on what the card is about. Nothing waits for this, so the card goes out as it always did.
-  const standOnRef = (id: string | undefined, ref: string) => {
+  // While the card waits, it stands on what the card is about, then and whenever the user comes to look. Nothing waits
+  // for this, so the card goes out as it always did.
+  const standOnRef = ({ tabId: id, ref }: { tabId?: string; ref: string }) => {
     const tab = canSee() ? find(id) : null;
-    if (tab) void flyToRef(tab, ref, () => WAITING_WORDS, "ask");
+    const actor = tab?.actor;
+    if (tab && actor) actor.askAbout(() => (canSee() && find(tab.id) === tab ? spotOfRef(tab, actor, ref) : Promise.resolve(null)));
   };
   const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
@@ -560,7 +572,6 @@ export const createPageTools = <T extends PageTarget>({
   };
 
   const describeOn = async (id: string | undefined, ref: string, say: (info: ElementInfo) => string) => {
-    standOnRef(id, ref);
     const info = await element(id, ref);
     const tab = find(id);
     if (!info || !tab) return `Act on element ${ref}, which is no longer on the page`;
@@ -673,6 +684,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId, ref: z.string().max(20) }),
       label: ({ tabId: id }) => `Clicked something on ${site(id)}`,
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
+      whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
       run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
     }),
@@ -682,6 +694,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId, ref: z.string().max(20) }),
       label: ({ tabId: id }) => `Double-clicked something on ${site(id)}`,
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Double-click the ${role} “${name}”`),
+      whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
       run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 2)),
     }),
@@ -722,8 +735,8 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId, ref: z.string().max(20), toRef: z.string().max(20) }),
       label: ({ tabId: id }) => `Dragged something on ${site(id)}`,
       // No `isRisky`, so it always asks in the default mode: dropping something can mean anything on a page.
+      whileAsking: standOnRef,
       describe: async ({ tabId: id, ref, toRef }) => {
-        standOnRef(id, ref);
         const [from, to] = await Promise.all([element(id, ref), element(id, toRef)]);
         const tab = find(id);
         if (!from || !to || !tab) return `Drag element ${ref} onto ${toRef}, which are no longer on the page`;
@@ -840,6 +853,7 @@ export const createPageTools = <T extends PageTarget>({
         submit: z.boolean().optional().describe("Press Enter after typing."),
       }),
       label: ({ tabId: id }) => `Typed into a field on ${site(id)}`,
+      whileAsking: standOnRef,
       describe: ({ tabId: id, ref, text, submit }) =>
         describeOn(
           id,
@@ -882,8 +896,8 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId, ref: z.string().max(20), option: z.string().max(500) }),
       label: ({ tabId: id }) => `Chose an option on ${site(id)}`,
       // No `isRisky`, so it always asks in the default mode: changing a dropdown can run anything the page likes.
+      whileAsking: standOnRef,
       describe: async ({ tabId: id, ref, option }) => {
-        standOnRef(id, ref);
         const tab = canSee() ? find(id) : null;
         const info = tab && (await onRef<ElementInfo & { option: string | null; optionValue: string | null }>(tab, ref, (inner) => describeOption(inner, option)).catch(() => null));
         if (!tab || !info) return `Act on element ${ref}, which is no longer on the page`;

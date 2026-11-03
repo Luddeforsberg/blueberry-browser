@@ -116,4 +116,35 @@ describe("when the tab is taken away mid-draw", () => {
     actor.shown();
     await vi.waitFor(() => expect(sent.join("")).toContain(WAITING_WORDS));
   });
+
+  it("faces the user from where it is when what the card is about is out of view", async () => {
+    const sent: string[] = [];
+    const tab = {
+      isVisible: true,
+      berryWorking: true,
+      heldForUser: false,
+      existingView: {
+        webContents: {
+          isDestroyed: () => false,
+          executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
+            sent.push(code);
+            return true;
+          },
+        },
+      },
+    };
+    const options: ActorOptions = { on: true, plain: false, still: false, look: { palette: "jackdaw", accessory: "none" }, dark: false, windowShowing: true };
+    const actor = new PageActor(tab as never, () => options, () => 1);
+    const below = { left: 100, top: 2000, width: 120, height: 40, x: 160, y: 2020, viewWidth: 1200, viewHeight: 800 };
+    const find = vi.fn(async () => ({ spot: below }));
+    actor.askAbout(find);
+    actor.waitingForUser();
+    tab.isVisible = false;
+    actor.hidden();
+    sent.length = 0;
+    tab.isVisible = true;
+    actor.shown();
+    await vi.waitFor(() => expect(sent.join("")).toContain(WAITING_WORDS));
+    expect(find).toHaveBeenCalledTimes(2);
+  });
 });

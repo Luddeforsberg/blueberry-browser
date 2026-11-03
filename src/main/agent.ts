@@ -193,6 +193,8 @@ export async function* streamReply(
   });
   // What the user allowed, by tool call. The check is in here so no path reaches an action without it.
   const allowed = new Map<string, string>();
+  // Tool calls already put to the user. LangChain works the description out again when it resumes, which isn't asking.
+  const presented = new Set<string>();
   // A mascot's limit comes first: what it won't be allowed to do at all has nothing to ask about.
   const refusedOutright = async ({ refuses }: PageTool, args: unknown) => (await refuses?.(args)) ?? null;
   const needsAsking = async ({ isRisky }: PageTool, args: unknown): Promise<boolean> => {
@@ -208,7 +210,11 @@ export async function* streamReply(
               pageTool.name,
               {
                 allowedDecisions: ["approve" as const, "reject" as const],
-                description: ({ args }: { args: unknown }) => pageTool.describe!(args),
+                description: ({ args, id }: { args: unknown; id?: string }) => {
+                  if (id === undefined || !presented.has(id)) pageTool.whileAsking?.(args);
+                  if (id !== undefined) presented.add(id);
+                  return pageTool.describe!(args);
+                },
                 when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
                   !(await refusedOutright(pageTool, toolCall.args)) && needsAsking(pageTool, toolCall.args),
               },

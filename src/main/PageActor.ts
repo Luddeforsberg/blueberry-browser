@@ -73,6 +73,9 @@ export interface Spot {
 // "ask" stands where "land" would, and faces the user there until they answer.
 export type Landing = "land" | "perch" | "look" | "ask";
 
+// Where the element a waiting card is about is now, looked up again each time, since the page may have moved.
+export type FindAsked = () => Promise<{ spot: Spot; ref?: string } | null>;
+
 export const WAITING_WORDS = "Waiting for you";
 
 interface Place {
@@ -132,8 +135,8 @@ export class PageActor {
   private lastTouched = 0;
   // A job has stopped to ask, so it's facing the user, not working anything out.
   private waiting = false;
-  // Answered, and the tool hasn't started: `describe` runs again to check nothing changed, and that isn't a new question.
-  private justAnswered = false;
+  // What the waiting card is about, so the bird stands on it whenever the tab comes back into view.
+  private asked: FindAsked | null = null;
   private idleTimer: NodeJS.Timeout | null = null;
   private livelyUntil = 0;
   // What the line says now, for the chrome to say beside a picture, where the line itself would be too small to read.
@@ -216,7 +219,6 @@ export class PageActor {
 
   private async draw(name: string, args: { words?: string; [other: string]: unknown } = {}): Promise<boolean> {
     if (!this.showing) return false;
-    if (args.words) this.justAnswered = false;
     if (args.words !== undefined) this._saying = args.words;
     this.livelyUntil = Date.now() + LIVELY_MS;
     this.clearIdle();
@@ -264,12 +266,12 @@ export class PageActor {
     }, IDLE_AFTER_MS);
   }
 
-  // Flies to where it can do this. Resolves once it has landed, or at once if nobody can see it.
-  async goTo(spot: Spot, words: string, kind: Landing, ref?: string): Promise<void> {
-    if (!this.showing) return;
+  // Flies to where it can do this. Resolves once it has landed, or at once if nobody can see it, with whether it went.
+  async goTo(spot: Spot, words: string, kind: Landing, ref?: string): Promise<boolean> {
+    if (!this.showing) return false;
     const asking = kind === "ask";
     // Asking never scrolls anything, so what isn't in view leaves it where it is.
-    if (asking && (this.justAnswered || spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return;
+    if (asking && (spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return false;
     const { still, plain } = this.options();
     const unit = 1 / this.drawZoom;
     const size = (still ? 28 : BIRD_SIZE) * unit;
@@ -279,17 +281,18 @@ export class PageActor {
     const far = this.position ? Math.hypot(place.x - this.position.x, place.y - this.position.y) : Infinity;
     // Already there, as after an approval, so there's nothing to fly.
     if (far < 2) {
-      await this.draw("pose", { name: then, words });
+      const posed = await this.draw("pose", { name: then, words });
       if (!asking) this.idleSoon();
-      return;
+      return posed;
     }
     const ms = still ? MARKER_MS : flightMs(this.position, place);
     const arc = Math.min(size, Math.hypot(place.x - (this.position?.x ?? place.x), place.y - (this.position?.y ?? place.y)) * 0.18);
     const drawn = await this.draw("go", { x: place.x, y: place.y, ms, arc, turn: place.turn, ref, words, then });
-    if (!drawn) return;
+    if (!drawn) return false;
     this.position = place;
     await this.wait(ms);
     if (!asking) this.idleSoon();
+    return true;
   }
 
   // Starts the jab, and resolves as the beak is coming down, so the press and the beak arrive together.
@@ -327,8 +330,22 @@ export class PageActor {
 
   answered(): void {
     this.waiting = false;
-    this.justAnswered = true;
+    this.asked = null;
     this.idleSoon();
+  }
+
+  // A card is about to ask about an element. It stands there now if anyone can see it, and again whenever someone looks.
+  askAbout(find: FindAsked): void {
+    this.asked = find;
+    void this.standOnAsked(find);
+  }
+
+  // Whether it stood on the element. Not finding it, or finding it out of view, leaves it where it is.
+  private async standOnAsked(find: FindAsked): Promise<boolean> {
+    if (!this.showing) return false;
+    const found = await find().catch(() => null);
+    if (!found || this.asked !== find) return false;
+    return this.goTo(found.spot, WAITING_WORDS, "ask", found.ref);
   }
 
   typing(): void {
@@ -373,8 +390,12 @@ export class PageActor {
   // The tab has come to the front in the middle of a job.
   shown(): void {
     if (!this.showing) return;
-    if (this.waiting) void this.draw("pose", { name: "asking", words: WAITING_WORDS });
-    else void this.say("", "thinking");
+    if (!this.waiting) return void this.say("", "thinking");
+    const ask = () => void this.draw("pose", { name: "asking", words: WAITING_WORDS });
+    if (!this.asked) return ask();
+    void this.standOnAsked(this.asked).then((stood) => {
+      if (!stood && this.waiting) ask();
+    });
   }
 
   // Gone at once, and the next look starts fresh.
@@ -398,6 +419,7 @@ export class PageActor {
   // A job has let go of the tab: it finished, was stopped, or moved on.
   leave(): void {
     this.waiting = false;
+    this.asked = null;
     this.clearIdle();
     this.endWaits();
     this.position = null;

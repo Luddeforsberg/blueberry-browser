@@ -267,6 +267,15 @@ describe("streamReply with an action that needs approval", () => {
     expect(text).toBe("finished");
   });
 
+  it("tells the tool once that a card is up, not again when the answer resumes the run", async () => {
+    for (const answer of [true, false]) {
+      const whileAsking = vi.fn();
+      await reply(click({ whileAsking }), callsTool("1", "2"), async () => answer);
+      expect(whileAsking).toHaveBeenCalledTimes(2);
+      expect(whileAsking.mock.calls.map(([args]) => args)).toEqual([{ ref: "e-1" }, { ref: "e-2" }]);
+    }
+  });
+
   it("doesn't run when refused, and tells the model", async () => {
     const tool = click();
     const model = callsTool("1");

@@ -106,7 +106,7 @@ const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
         return <iframe title={`Live view of ${tab.title}`} src={view.url} sandbox="allow-same-origin allow-scripts" inert={lock.inert} tabIndex={lock.tabIndex} className={cn('absolute inset-0 size-full border-0', lock.className)} />
     }
     return view?.kind === 'frames' && frame
-        ? <img src={`data:image/jpeg;base64,${frame}`} alt="" draggable={false} className="absolute inset-0 size-full object-cover object-left-top" />
+        ? <img src={`data:image/jpeg;base64,${frame}`} alt="" draggable={false} className="absolute inset-0 size-full object-contain object-top" />
         : <div className="absolute inset-0 bg-tray" />
 }
 
@@ -121,7 +121,11 @@ const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: 
     return picture ? <img src={picture} alt="" decoding="sync" draggable={false} className="absolute inset-0 size-full object-cover object-top" /> : <div className="absolute inset-0 bg-tray" />
 }
 
-// The tab it's working in, as a small window, with its site along the top like the page card's own address row.
+// The user has this tab, so there's no picture to show.
+const isUsers = (tab: WorkTab) => tab.state === 'held' || tab.state === 'yours'
+
+// The tab it's working in, as a small window, with its site along the top like the page card's own address row. While
+// the user has the tab there's nothing to picture, so it's only that row, saying so.
 const WorkWindow: React.FC<{
     tab: WorkTab
     frames: WorkFrames
@@ -146,13 +150,23 @@ const WorkWindow: React.FC<{
                 live ? "shadow-reading" : "shadow-page"
             )}
         >
-            <span className="h-7 px-2.5 flex items-center gap-1.5 border-b text-12 text-muted-foreground transition-colors group-hover:text-foreground">
-                <Favicon src={tab.favicon} />
-                <span className="truncate">{tab.site}</span>
-            </span>
-            <span className="relative block bg-tray" style={{ aspectRatio: aspect }}>
-                <Picture tab={tab} frames={frames} name={name} big />
-            </span>
+            {isUsers(tab) ? (
+                <span className="h-10 px-3 flex items-center gap-2 text-13">
+                    <Favicon src={tab.favicon} />
+                    <span className="truncate text-muted-foreground transition-colors group-hover:text-foreground">{tab.site}</span>
+                    <span className="ml-auto shrink-0">You have this tab</span>
+                </span>
+            ) : (
+                <>
+                    <span className="h-7 px-2.5 flex items-center gap-1.5 border-b text-12 text-muted-foreground transition-colors group-hover:text-foreground">
+                        <Favicon src={tab.favicon} />
+                        <span className="truncate">{tab.site}</span>
+                    </span>
+                    <span className="relative block bg-tray" style={{ aspectRatio: aspect }}>
+                        <Picture tab={tab} frames={frames} name={name} big />
+                    </span>
+                </>
+            )}
         </button>
     </div>
 )
@@ -206,7 +220,8 @@ export const WorkingView: React.FC<{
                 )}
             </div>
 
-            {!ended && approval && (
+            {/* A handoff is answered in the tab itself, which the window above goes to. */}
+            {!ended && approval && !approval.handoff && (
                 <button type="button" onClick={onShowAsking} className="-mx-1.5 mt-1 w-fit h-6 px-1.5 flex items-center gap-1 rounded-control text-13 text-accent-ink outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden className="size-3.5" />
                     Answer in the chat

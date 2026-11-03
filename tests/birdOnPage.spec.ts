@@ -252,6 +252,37 @@ test("while a card waits it stands on what the card is about, and stays put if i
   }
 });
 
+test("coming back to the tab while a card waits, it stands on what the card is about again", async () => {
+  const { app, chrome, open, job, close, origin } = await setup({ actionApproval: "always" });
+  try {
+    await open("/two");
+    const { chatId, finished } = await job([
+      { name: "list_elements", args: {} },
+      { name: "click", args: { ref: "e2" } },
+    ]);
+    const approval = () => chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.approval?.id), chatId);
+    await expect.poll(approval).toBeTruthy();
+    await expect.poll(() => stateIn(app, "/two")).toMatchObject({ pose: "asking", flying: false });
+
+    const tabs = await chrome.evaluate(() => window.chromeAPI.browser.getTabs());
+    const two = tabs.find((tab) => tab.url === `${origin}/two`)!;
+    await open("/next");
+    await expect.poll(async () => (await stateIn(app, "/two"))?.attached ?? false).toBe(false);
+    await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), two.id);
+
+    await expect.poll(() => stateIn(app, "/two")).toMatchObject({ pose: "asking", words: "Waiting for you", attached: true, flying: false });
+    const { x, y } = (await stateIn(app, "/two"))!.spot!;
+    expect(x).toBeGreaterThan(500);
+    expect(x).toBeLessThan(660);
+    expect(y).toBeGreaterThanOrEqual(420);
+    expect(y).toBeLessThan(464);
+    await chrome.evaluate(([id, asked]) => window.chromeAPI.chat.decide(id!, asked!, false), [chatId, await approval()]);
+    await finished();
+  } finally {
+    await close();
+  }
+});
+
 test("its words stay off the target and the text beside it, and on screen", async () => {
   const { app, open, job, close } = await setup();
   try {

@@ -14,7 +14,7 @@ import { RunnerView } from '../components/RunnerView'
 
 // The chat keeps its width, so the working view only goes beside it when it can have this much of the page.
 const ROOM_FOR_WORK = 960
-const PICTURE_WIDTH = { min: 300, share: 0.32, max: 440 }
+const PICTURE_WIDTH = { min: 300, share: 0.38, max: 600 }
 const WORK_GUTTER = 48
 const COLUMN_WITH_BIRD = 888
 
