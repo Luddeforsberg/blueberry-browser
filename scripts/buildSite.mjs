@@ -160,7 +160,7 @@ writeFileSync(
 
 // The picture a shared link shows, since a link preview can't run the page: the flock on a wire, in light mode. It's
 // drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
-const SHARE_FLOCK = [["none", "jackdaw"], ["glasses", "kingfisher"], ["cap", "parakeet"], ["bow", "canary"], ["glasses", "flamingo"], ["crown", "robin"]];
+const SHARE_FLOCK = [["none", "jackdaw"], ["cap", "kingfisher"], ["glasses", "robin"], ["headphones", "flamingo"], ["cap", "parakeet"], ["headphones", "canary"]];
 const shareCard = `<!doctype html><html><head><meta charset="utf-8"><style>${readFileSync(join(site, "tokens.css"), "utf8")}
 ${readFileSync(join(site, "birds.css"), "utf8")}
 * { box-sizing: border-box; margin: 0; }

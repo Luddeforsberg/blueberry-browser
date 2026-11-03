@@ -28,7 +28,7 @@ describe("mascotFromLink", () => {
   });
 
   it("ignores anything that isn't a uuid", () => {
-    for (const id of ["", "berry", "starter-morning-paper", ID.slice(0, -1), `${ID.slice(0, -1)}g`, ID.replaceAll("-", ""), "../../etc/passwd"]) {
+    for (const id of ["", "berry", "starter-meeting-prep", ID.slice(0, -1), `${ID.slice(0, -1)}g`, ID.replaceAll("-", ""), "../../etc/passwd"]) {
       expect(mascotFromLink(`blueberry://mascot/${id}`), id).toBeNull();
     }
   });

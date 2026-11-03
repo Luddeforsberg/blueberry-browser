@@ -22,77 +22,54 @@ const HEROKU = "https://the-internet.herokuapp.com";
 export const jobs = (fixture: string): Job[] => [
   // Gallery mascots
   {
-    id: "gallery-morning-paper",
-    ability: "gallery mascot, limited to its sites and reading",
-    galleryMascot: "Morning Paper",
-    prompt: "What's in the news today? Keep it to three stories.",
+    id: "gallery-reads-only",
+    ability: "gallery mascot, limited to reading",
+    galleryMascot: "Competitor Watch",
+    prompt: "What's new on Linear's changelog this month?",
   },
   {
     id: "gallery-off-its-sites",
     ability: "gallery mascot, refused off its sites",
-    galleryMascot: "Morning Paper",
+    galleryMascot: "Follow-up",
     prompt: "Open https://www.dn.se and tell me the top story there.",
   },
-  // Real runs for the examples on the Gallery's starters, which only run when named. Plain Words has none, as it needs a page.
+  // Real runs for the examples on the Gallery's starters, which only run when named. Plain Words has none, as it needs a
+  // page, and Follow-up and Pipeline Tidy have none, as they work in the user's own Gmail and CRM.
   {
-    id: "example-morning-paper",
+    id: "example-prospector",
     ability: "gallery starter's example",
-    galleryMascot: "Morning Paper",
-    prompt: "What's in the news today? Keep it to three stories.",
+    galleryMascot: "Prospector",
+    prompt: "Find 10 Swedish B2B SaaS companies with 20–200 employees that are hiring salespeople.",
   },
   {
-    id: "example-fact-checker",
+    id: "example-meeting-prep",
     ability: "gallery starter's example",
-    galleryMascot: "Fact Checker",
-    prompt: "Is it true that the Great Wall of China can be seen from space with the naked eye?",
+    galleryMascot: "Meeting Prep",
+    prompt: "Prep me for a call with Spotify's ads team.",
   },
   {
-    id: "example-research-scout",
+    id: "example-lead-qualifier",
     ability: "gallery starter's example",
-    galleryMascot: "Research Scout",
-    prompt: "How long is a Swedish passport valid for an adult, and what does it cost to get one? Start at polisen.se rather than a search engine.",
+    galleryMascot: "Lead Qualifier",
+    prompt: "Qualify these leads: Klarna, Voi, Einride, Kry and Tibber. A good fit for us is a Swedish company with more than 200 employees that has raised money in the last two years.",
   },
   {
-    id: "example-nest-hunter",
+    id: "example-competitor-watch",
     ability: "gallery starter's example",
-    galleryMascot: "Nest Hunter",
-    prompt: "Three-room flats on Södermalm in Stockholm, under 6 million kronor, about 60 square metres. Show me five.",
+    galleryMascot: "Competitor Watch",
+    prompt: "What changed on Notion's and Linear's pricing and changelog pages recently?",
   },
   {
-    id: "example-price-sleuth",
+    id: "example-talent-scout",
     ability: "gallery starter's example",
-    galleryMascot: "Price Sleuth",
-    prompt: "What's the lowest price right now for Sony WH-1000XM5 headphones?",
+    galleryMascot: "Talent Scout",
+    prompt: "Find 5 people who'd fit a senior TypeScript role in Stockholm.",
   },
   {
-    id: "example-dinner-planner",
+    id: "example-newsletter-builder",
     ability: "gallery starter's example",
-    galleryMascot: "Dinner Planner",
-    prompt: "Three vegetarian weeknight dinners for two people, no allergies.",
-  },
-  {
-    id: "example-train-scout",
-    ability: "gallery starter's example",
-    galleryMascot: "Train Scout",
-    prompt: "Stockholm Central to Göteborg Central next Friday, leaving around 08:00.",
-  },
-  {
-    id: "example-commute-check",
-    ability: "gallery starter's example",
-    galleryMascot: "Commute Check",
-    prompt: "Is the green line on the tunnelbana running normally right now?",
-  },
-  {
-    id: "example-repo-keeper",
-    ability: "gallery starter's example",
-    galleryMascot: "Repo Keeper",
-    prompt: "Go through the three newest open pull requests on github.com/electron/electron. I'm not a maintainer there.",
-  },
-  {
-    id: "example-job-scout",
-    ability: "gallery starter's example",
-    galleryMascot: "Job Scout",
-    prompt: "Junior developer jobs in Stockholm. I know TypeScript and would rather avoid consulting firms.",
+    galleryMascot: "Newsletter Builder",
+    prompt: "Draft this week's newsletter on AI agents.",
   },
   // Reading and research
   {

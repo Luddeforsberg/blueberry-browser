@@ -170,9 +170,14 @@ test.describe("Berry on real websites", () => {
           await chrome
             .getByRole("button", { name: `Start a chat with ${job.galleryMascot}` })
             .click();
-          textbox = chrome.getByRole("textbox", { name: "Message" });
+          // Start a chat opens the new tab page with the mascot chosen.
+          textbox = chrome.getByRole("textbox", {
+            name: `Search, enter a URL, or ask ${job.galleryMascot}`,
+          });
           await textbox.fill(job.prompt);
-          await textbox.press("Enter");
+          await textbox.press(
+            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter",
+          );
         } else if (start) {
           await chrome.getByRole("button", { name: "Show Berry" }).click();
           textbox = chrome
@@ -224,9 +229,11 @@ test.describe("Berry on real websites", () => {
               { chat: id, approval: thread.approval.id },
             );
           }
+          // Nobody's there to take a page over either, so a handoff ends the run rather than waiting out the timeout.
+          const handedOver = Boolean(thread?.approval?.handoff);
           const overBudget = spent() + costOf(calls) >= BUDGET_USD;
-          if (overBudget || Date.now() - started > JOB_TIMEOUT_MS) {
-            endedBy = overBudget ? "budget" : "timeout";
+          if (handedOver || overBudget || Date.now() - started > JOB_TIMEOUT_MS) {
+            endedBy = handedOver ? "handoff" : overBudget ? "budget" : "timeout";
             await chrome.evaluate(
               (chat) => window.chromeAPI.chat.stop(chat),
               id,
