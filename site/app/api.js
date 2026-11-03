@@ -1,4 +1,5 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "../config.js";
+import { fetchWithin } from "../shared.js";
 
 // The phone page's only way to Supabase: the publishable key and the user's own session, as Blueberry's Account does, so
 // row-level security keeps everything to their own. The session is kept in localStorage, the best a phone browser offers.
@@ -43,10 +44,11 @@ const keep = (next, { same = false } = {}) => {
 
 export const signedIn = () => (session ? { email: session.email, userId: session.userId } : null);
 
+// A call that takes too long fails as if the server couldn't be reached, so nothing waits on it for good.
 const send = async (path, { method = "GET", body, token } = {}) => {
   let response;
   try {
-    response = await fetch(`${SUPABASE_URL}${path}`, {
+    response = await fetchWithin(`${SUPABASE_URL}${path}`, {
       method,
       headers: {
         apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -58,7 +60,7 @@ const send = async (path, { method = "GET", body, token } = {}) => {
   } catch {
     throw new ApiError(0);
   }
-  const text = await response.text();
+  const { text } = response;
   let parsed = null;
   try {
     parsed = text ? JSON.parse(text) : null;
@@ -87,7 +89,8 @@ export const signOut = async () => {
   if (token) await send("/auth/v1/logout", { method: "POST", token }).catch(() => {});
 };
 
-// A refresh token works once, so callers at the same time share one refresh. A refused one signs out.
+// A refresh token works once, so callers at the same time share one refresh. A refused one signs out. One that fails or
+// runs out of time is let go, so the next call tries again.
 let refreshing = null;
 const token = async () => {
   if (!session) throw new ApiError(401);

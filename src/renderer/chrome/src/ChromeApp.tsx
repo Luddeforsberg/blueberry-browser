@@ -1,4 +1,5 @@
 import React, { useRef } from 'react'
+import { Menu } from 'lucide-react'
 import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
 import { LibraryProvider, useFlock } from './contexts/LibraryContext'
@@ -13,6 +14,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { Onboarding } from './components/Onboarding'
 import { BerryCompanion } from './components/BerryCompanion'
 import { PageTrouble } from './components/PageTrouble'
+import { ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
 import { cn } from '@common/lib/utils'
 import { siteAllowed } from '@shared/mascots'
@@ -95,6 +97,12 @@ const Shell: React.FC = () => {
                 <Region rect={layout.chat}>
                     <ChatPanel />
                     <ResizeHandle panel="chat" />
+                </Region>
+            )}
+            {layout.menuButton.width > 0 && (
+                // Off a Mac the window has no menu bar, so this opens the same menu.
+                <Region rect={layout.menuButton}>
+                    <ToolBarButton Icon={Menu} label="Menu" onClick={() => void window.chromeAPI.layout.showAppMenu()} />
                 </Region>
             )}
             <BerryCompanion />

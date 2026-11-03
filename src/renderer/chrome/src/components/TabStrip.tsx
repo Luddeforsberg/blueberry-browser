@@ -5,9 +5,9 @@ import { Tabs } from './Tabs'
 export const TabStrip: React.FC = () => {
     const { layout, theme } = useShell()
 
-    // The tab row is the window's top edge here, so it keeps the system's window buttons clear.
+    // The tab row is the window's top edge here, so it keeps the system's window buttons clear, and off a Mac the menu button.
     const leftClear = theme.platform === 'mac' ? layout.controls.width : 8
-    const rightClear = !layout.chatOpen && theme.platform === 'windows' ? layout.controls.width : 8
+    const rightClear = !layout.chatOpen && theme.platform !== 'mac' ? layout.controls.width : 8
 
     return (
         <div

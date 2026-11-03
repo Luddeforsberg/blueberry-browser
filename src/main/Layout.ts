@@ -24,6 +24,10 @@ export const MIN_WINDOW = { width: 900, height: 600 };
 // Room kept clear for the system's window buttons.
 const MAC_CONTROLS_WIDTH = 80;
 const WINDOWS_CONTROLS_WIDTH = 138;
+// Off a Mac the menu bar is hidden, so a button left of the window buttons opens the app's menu. It's the size of a
+// toolbar button, with this much room on each side.
+const MENU_BUTTON_SIZE = 32;
+const MENU_BUTTON_GAP = 4;
 
 export interface LayoutOptions {
   mode: LayoutMode;
@@ -246,16 +250,28 @@ export function computeLayout(
   const cardWidth = Math.max(cardRight - cardX, 0);
 
   // The top row holds the window buttons: the toolbar when vertical, the tab row when horizontal.
+  // Off a Mac, the menu button is part of what's kept clear, so whatever sits in the top right corner leaves room for it.
   const topRow = vertical ? VERTICAL_TOP_ROW_HEIGHT : TAB_ROW_HEIGHT;
-  const controls: Rect =
-    platform === "darwin"
-      ? { x: 0, y: 0, width: MAC_CONTROLS_WIDTH, height: topRow }
-      : {
-          x: Math.max(window.width - WINDOWS_CONTROLS_WIDTH, 0),
-          y: 0,
-          width: Math.min(WINDOWS_CONTROLS_WIDTH, window.width),
-          height: topRow,
-        };
+  const mac = platform === "darwin";
+  // Linux has no window buttons of its own here, only the menu button.
+  const systemButtons = platform === "win32" ? WINDOWS_CONTROLS_WIDTH : 0;
+  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP;
+  const controls: Rect = mac
+    ? { x: 0, y: 0, width: controlsWidth, height: topRow }
+    : {
+        x: Math.max(window.width - controlsWidth, 0),
+        y: 0,
+        width: Math.min(controlsWidth, window.width),
+        height: topRow,
+      };
+  const menuButton: Rect = mac
+    ? EMPTY
+    : {
+        x: Math.max(window.width - systemButtons - MENU_BUTTON_GAP - MENU_BUTTON_SIZE, 0),
+        y: Math.round((topRow - MENU_BUTTON_SIZE) / 2),
+        width: MENU_BUTTON_SIZE,
+        height: MENU_BUTTON_SIZE,
+      };
 
   const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: middleWidth, height: TAB_ROW_HEIGHT };
   const toolbarY = vertical ? PAGE_INSET : TAB_ROW_HEIGHT;
@@ -275,6 +291,7 @@ export function computeLayout(
       chat: { min: CHAT_WIDTH.min, max: CHAT_WIDTH.max },
     },
     controls,
+    menuButton,
     sidebar: sidebar ? { x: 0, y: 0, width: left, height } : EMPTY,
     // The collapsed sidebar floats over the page, with room around its card for the shadow.
     floatingSidebar: vertical && !sidebar

@@ -182,6 +182,13 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     cloud.claim("job");
   });
 
+  it("fits the page's viewport to the size the cloud tab shows it at", async () => {
+    await tab.fitTo(900, 500);
+    expect(await tab.page.evaluate(() => [innerWidth, innerHeight])).toEqual([900, 500]);
+    await tab.fitTo(1280, 720);
+    expect(await tab.page.evaluate(() => [innerWidth, innerHeight])).toEqual([1280, 720]);
+  });
+
   it("lets one job at a time use the session", () => {
     expect(cloud.claim("another")).toBe(false);
     cloud.release("job");

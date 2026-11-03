@@ -277,6 +277,8 @@ export interface Layout {
   chatWidth: number;
   panelLimits: Record<ResizablePanel, { min: number; max: number }>;
   controls: Rect;
+  // Off a Mac, the button that opens the app's menu, inside `controls`. Empty on a Mac, which has the menu bar.
+  menuButton: Rect;
   sidebar: Rect;
   floatingSidebar: Rect;
   findBar: Rect;
@@ -431,6 +433,8 @@ export interface InvokeChannels {
   "layout:toggle-sidebar": { region: "chrome" | "overlay"; args: []; result: void };
   "layout:toggle-chat": { region: "chrome"; args: []; result: void };
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
+  // Off a Mac, the menu button opens the app's own menu under itself, since the window has no menu bar.
+  "layout:app-menu": { region: "chrome"; args: []; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer"; args: []; result: ThemeState };
@@ -558,6 +562,8 @@ export interface InvokeChannels {
   "cloud:relay-disconnect": { region: "chrome"; args: []; result: boolean };
   // Which cloud tab is on screen, or null. Pictures of it come as `cloud:frame`, to the chrome and nowhere else.
   "cloud:watch": { region: "chrome"; args: [tabId: string | null]; result: void };
+  // The size the cloud tab shows its page at, so the page's viewport fills it, as a tab of the window's own does.
+  "cloud:fit": { region: "chrome"; args: [tabId: string, width: number, height: number]; result: void };
   // The user takes the tab from the job, as clicking in a tab of the window's own does.
   "cloud:take-over": { region: "chrome"; args: [tabId: string]; result: boolean };
   // Sites from history and bookmarks to offer for bringing along. Names only.
@@ -648,6 +654,7 @@ export interface LayoutAPI {
   toggleSidebar: () => Promise<void>;
   toggleChat: () => Promise<void>;
   resize: (panel: ResizablePanel, width: number) => Promise<void>;
+  showAppMenu: () => Promise<void>;
   showFloatingSidebar: () => Promise<void>;
   hideFloatingSidebar: () => Promise<void>;
   onFloatingSidebarVisibility: (callback: (visible: boolean) => void) => Unsubscribe;
@@ -809,6 +816,7 @@ export interface CloudAPI {
   disconnectRelay: () => Promise<boolean>;
   onRunnerUpdated: (callback: (state: RunnerState) => void) => Unsubscribe;
   watch: (tabId: string | null) => Promise<void>;
+  fit: (tabId: string, width: number, height: number) => Promise<void>;
   takeOver: (tabId: string) => Promise<boolean>;
   loginSuggestions: () => Promise<string[]>;
   bringLogin: (site: string) => Promise<string | null>;

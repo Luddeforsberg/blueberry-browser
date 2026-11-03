@@ -1301,6 +1301,13 @@ export class Window {
     if (!canceled && filePaths[0]) this.updateSettings({ downloadFolder: filePaths[0] });
   }
 
+  // The window has no menu bar off a Mac, so the menu button opens the same menu, just under itself.
+  showAppMenu(): void {
+    const { menuButton } = this.layout;
+    if (menuButton.width === 0) return;
+    Menu.getApplicationMenu()?.popup({ window: this._baseWindow, x: menuButton.x, y: menuButton.y + menuButton.height });
+  }
+
   showBerryMenu(): void {
     const { keepBerryStill, showBerry } = this.settings;
     Menu.buildFromTemplate([

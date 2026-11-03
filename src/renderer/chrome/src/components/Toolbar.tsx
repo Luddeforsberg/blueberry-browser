@@ -68,7 +68,7 @@ export const Toolbar: React.FC = () => {
     // Saying it's watching matters more, and these are in the File menu too.
     const giveWay = useRecording().status === 'recording' && layout.page.width < NARROW_PAGE
     const leftClear = vertical && !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 8
-    const rightClear = vertical && !layout.chatOpen && theme.platform === 'windows' ? layout.controls.width : 8
+    const rightClear = vertical && !layout.chatOpen && theme.platform !== 'mac' ? layout.controls.width : 8
 
     return (
         <div className="h-full flex flex-col">

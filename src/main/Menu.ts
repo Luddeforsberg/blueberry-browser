@@ -163,16 +163,21 @@ export class AppMenu {
               this.mainWindow.updateSettings({ layoutMode: item.checked ? "horizontal" : "vertical" }),
           },
           { type: "separator" },
-          {
-            label: "Component Gallery",
-            click: () => this.mainWindow.openPage("gallery"),
-          },
-          {
-            label: "Toggle Developer Tools",
-            accelerator:
-              process.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
-            click: () => this.handleToggleDevTools(),
-          },
+          // For working on Blueberry itself, so a packaged app leaves them out.
+          ...(app.isPackaged
+            ? []
+            : [
+                {
+                  label: "Component Gallery",
+                  click: () => this.mainWindow.openPage("gallery"),
+                },
+                {
+                  label: "Toggle Developer Tools",
+                  accelerator:
+                    process.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
+                  click: () => this.handleToggleDevTools(),
+                },
+              ]),
           {
             label: "Toggle Fullscreen",
             accelerator:

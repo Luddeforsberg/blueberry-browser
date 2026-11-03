@@ -18,6 +18,8 @@ import { localChrome } from "./localChrome";
 const MAX_FIELD_LENGTH = 200;
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
+// What a cloud tab may ask its page's viewport to be, in pixels.
+const FIT = { min: { width: 320, height: 200 }, max: { width: 3840, height: 2160 } };
 
 interface Saved extends BrowserbaseSaved {
   apiKey: string | null;
@@ -240,6 +242,14 @@ export class CloudTabs implements ChatCloud {
       const chrome = this.hooks.chrome();
       if (this.watching === page && !chrome.isDestroyed()) sendToRenderer(chrome, "cloud:frame", { tabId: page.id, data });
     });
+  }
+
+  // The chrome says how big the tab shows the page, and the page's viewport follows, as a window's own tab does on a resize.
+  async fit(id: unknown, width: unknown, height: unknown): Promise<void> {
+    const page = typeof id === "string" ? this.page(id) : null;
+    if (!page || typeof width !== "number" || typeof height !== "number" || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    const within = (value: number, axis: "width" | "height") => Math.round(Math.min(Math.max(value, FIT.min[axis]), FIT.max[axis]));
+    await page.fitTo(within(width, "width"), within(height, "height"));
   }
 
   takeOver(id: unknown): boolean {

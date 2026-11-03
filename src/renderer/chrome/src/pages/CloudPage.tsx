@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { Cloud } from 'lucide-react'
 import { Button } from '@common/components/Button'
@@ -8,6 +8,29 @@ import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { liveFrameLock, useCloudView } from '../cloudView'
 
 const api = () => window.chromeAPI.cloud
+// A resize sends one size once it settles, rather than resizing the page in the cloud on every frame.
+const FIT_SETTLE_MS = 150
+
+// The page's viewport follows the area it's shown in, so its picture or live view fills that area.
+const useFitPage = (tabId: string, showing: boolean): React.RefObject<HTMLDivElement | null> => {
+    const area = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        const element = area.current
+        if (!showing || !element) return undefined
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const observer = new ResizeObserver(([entry]) => {
+            const { width, height } = entry.contentRect
+            clearTimeout(timer)
+            timer = setTimeout(() => void api().fit(tabId, Math.round(width), Math.round(height)), FIT_SETTLE_MS)
+        })
+        observer.observe(element)
+        return () => {
+            clearTimeout(timer)
+            observer.disconnect()
+        }
+    }, [tabId, showing])
+    return area
+}
 
 // A page in the cloud browser. Browserbase's live view sits in a frame, which only takes the pointer or the keyboard
 // once the user has taken the tab over, so nothing they do lands in the middle of a job. A local test browser sends pictures instead.
@@ -20,6 +43,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const asker = useAssistantName(useFlock().find(handoff?.mascotId ?? null))
 
     const pictures = view?.kind === 'frames'
+    const area = useFitPage(tab.id, pictures || view?.kind === 'live')
 
     if (view?.kind === 'gone') {
         return (
@@ -71,7 +95,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     <Button variant="outline" size="sm" onClick={takeOver}>Take over</Button>
                 )}
             </div>
-            <div className="relative flex-1 min-h-0">
+            <div ref={area} className="relative flex-1 min-h-0">
                 {view?.kind === 'live' && (
                     <iframe
                         title={`Live view of ${tab.title}`}
