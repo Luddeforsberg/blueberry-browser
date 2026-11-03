@@ -266,12 +266,12 @@ export class PageActor {
     }, IDLE_AFTER_MS);
   }
 
-  // Flies to where it can do this. Resolves once it has landed, or at once if nobody can see it.
-  async goTo(spot: Spot, words: string, kind: Landing, ref?: string): Promise<void> {
-    if (!this.showing) return;
+  // Flies to where it can do this. Resolves once it has landed, or at once if nobody can see it, with whether it went.
+  async goTo(spot: Spot, words: string, kind: Landing, ref?: string): Promise<boolean> {
+    if (!this.showing) return false;
     const asking = kind === "ask";
     // Asking never scrolls anything, so what isn't in view leaves it where it is.
-    if (asking && (spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return;
+    if (asking && (spot.top + spot.height < 0 || spot.top > spot.viewHeight || spot.left + spot.width < 0 || spot.left > spot.viewWidth)) return false;
     const { still, plain } = this.options();
     const unit = 1 / this.drawZoom;
     const size = (still ? 28 : BIRD_SIZE) * unit;
@@ -281,17 +281,18 @@ export class PageActor {
     const far = this.position ? Math.hypot(place.x - this.position.x, place.y - this.position.y) : Infinity;
     // Already there, as after an approval, so there's nothing to fly.
     if (far < 2) {
-      await this.draw("pose", { name: then, words });
+      const posed = await this.draw("pose", { name: then, words });
       if (!asking) this.idleSoon();
-      return;
+      return posed;
     }
     const ms = still ? MARKER_MS : flightMs(this.position, place);
     const arc = Math.min(size, Math.hypot(place.x - (this.position?.x ?? place.x), place.y - (this.position?.y ?? place.y)) * 0.18);
     const drawn = await this.draw("go", { x: place.x, y: place.y, ms, arc, turn: place.turn, ref, words, then });
-    if (!drawn) return;
+    if (!drawn) return false;
     this.position = place;
     await this.wait(ms);
     if (!asking) this.idleSoon();
+    return true;
   }
 
   // Starts the jab, and resolves as the beak is coming down, so the press and the beak arrive together.
@@ -339,13 +340,12 @@ export class PageActor {
     void this.standOnAsked(find);
   }
 
-  // Whether it found the element to stand on. Not finding it leaves it where it is.
+  // Whether it stood on the element. Not finding it, or finding it out of view, leaves it where it is.
   private async standOnAsked(find: FindAsked): Promise<boolean> {
     if (!this.showing) return false;
     const found = await find().catch(() => null);
     if (!found || this.asked !== find) return false;
-    await this.goTo(found.spot, WAITING_WORDS, "ask", found.ref);
-    return true;
+    return this.goTo(found.spot, WAITING_WORDS, "ask", found.ref);
   }
 
   typing(): void {

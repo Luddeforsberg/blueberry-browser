@@ -4,7 +4,7 @@ import { Button } from "./Button";
 
 // Exactly what will happen, set apart from the sentence above it, because this is what's being allowed. Never cut.
 export const ExactWords: React.FC<{ children: string; className?: string }> = ({ children, className }) => (
-  <p className={cn("rounded-control bg-tray px-3 py-2 text-12 text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>{children}</p>
+  <p className={cn("rounded-control bg-muted dark:bg-tray px-3 py-2 text-12 text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>{children}</p>
 );
 
 // A mascot saying something that needs an answer, in line with the conversation. In the main chat its bird hangs beside
