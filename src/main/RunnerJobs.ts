@@ -101,7 +101,7 @@ export class RunnerJobs implements ChatRunner {
   // Who was signed in when the account last changed, so a change clears what the last one saw.
   private seenAccount: string | null;
   // The runner linked to the signed-in account, as the server last said, and why linking last failed.
-  private link: { email: string; accepted: boolean } | null = null;
+  private link: { email: string; accepted: boolean; relayUrl: string | null } | null = null;
   private linkProblem: string | null = null;
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
   // What was last shared, and by whom, so an unchanged flock isn't sent again.
@@ -150,10 +150,11 @@ export class RunnerJobs implements ChatRunner {
   }
 
   get runnerState(): RunnerState {
-    if (!this.server) return { status: "not-set-up", email: null, problem: null };
-    if (!this.signedIn) return { status: "signed-out", email: null, problem: null };
-    if (!this.link) return { status: "none", email: null, problem: this.linkProblem };
-    return { status: this.link.accepted ? "linked" : "waiting", email: this.link.email, problem: this.linkProblem };
+    if (!this.server) return { status: "not-set-up", email: null, problem: null, relayUrl: null };
+    if (!this.signedIn) return { status: "signed-out", email: null, problem: null, relayUrl: null };
+    if (!this.link) return { status: "none", email: null, problem: this.linkProblem, relayUrl: null };
+    const linked = this.link.accepted;
+    return { status: linked ? "linked" : "waiting", email: this.link.email, problem: this.linkProblem, relayUrl: linked ? this.link.relayUrl : null };
   }
 
   // Asks the server who the runner is, and again now and then while someone's signed in.

@@ -47,6 +47,17 @@ export const publicPageLink = (site: string | undefined, id: string): string | n
   }
 };
 
+// The relay's address as the runner wrote it, only if it's an https one ending in /mcp, and nothing else about it.
+export const relayAddress = (input: unknown): string | null => {
+  if (typeof input !== "string" || input.length > 300) return null;
+  try {
+    const url = new URL(input);
+    return url.protocol === "https:" && url.pathname === "/mcp" && !url.search && !url.hash && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
 export class ServerError extends Error {
   constructor(
     readonly status: number,
@@ -250,8 +261,9 @@ export class GalleryServer {
     await this.request("/rest/v1/rpc/forget_cloud_routine", { method: "POST", token, body: { p_key: key } });
   }
 
-  async myCloudRunner(token: string): Promise<{ email: string; accepted: boolean } | null> {
-    const [row] = (await this.request<{ email?: unknown; accepted?: unknown }[]>("/rest/v1/rpc/my_cloud_runner", { method: "POST", token, body: {} })) ?? [];
-    return row && typeof row.email === "string" ? { email: row.email, accepted: row.accepted === true } : null;
+  // `relayUrl` is where ChatGPT or Claude connect, which the runner gives once it has accepted. Only an https one.
+  async myCloudRunner(token: string): Promise<{ email: string; accepted: boolean; relayUrl: string | null } | null> {
+    const [row] = (await this.request<{ email?: unknown; accepted?: unknown; relay_url?: unknown }[]>("/rest/v1/rpc/my_cloud_runner", { method: "POST", token, body: {} })) ?? [];
+    return row && typeof row.email === "string" ? { email: row.email, accepted: row.accepted === true, relayUrl: relayAddress(row.relay_url) } : null;
   }
 }

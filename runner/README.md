@@ -12,7 +12,7 @@ You link it to your account in Blueberry, and it accepts the link when it starts
 
 ## Deploy
 
-1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, then `supabase/migrations/20261103000000_phone.sql`, for the phone page, then `supabase/migrations/20261104000000_cloud_conversations.sql`, for follow-ups, and then `supabase/migrations/20261105000000_cloud_routines.sql`, for routines that run with the Mac off.
+1. **Run the migrations.** In the Supabase SQL editor, run `supabase/migrations/20261102000000_cloud_jobs.sql`, after the Gallery's, then `supabase/migrations/20261103000000_phone.sql`, for the phone page, then `supabase/migrations/20261104000000_cloud_conversations.sql`, for follow-ups, and then `supabase/migrations/20261105000000_cloud_routines.sql`, for routines that run with the Mac off, and then `supabase/migrations/20261106000000_cloud_relay.sql`, so Settings can show the address for ChatGPT and Claude.
 2. **Create the runner's user.** In the Supabase dashboard, Authentication > Users > Add user > Create new user, with an email of its own and a long random password. Tick Auto Confirm User. Don't use your own account.
 3. **Link it in Blueberry.** Signed in to your Blueberry account, open Settings > Cloud > With your Mac off, type the runner's email and press **Link**. It says it's waiting for the runner.
 4. **Create the service.** From the repo root, with `railway login` done:
@@ -37,6 +37,9 @@ You link it to your account in Blueberry, and it accepts the link when it starts
 
    | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Optional, for notifications on the phone page. `pnpm run push:keys` prints a pair. The subject is `mailto:` and your own address. Without them nothing goes to the phone, and the log says so once |
 
+   | `RELAY_PUBLIC_URL`, `RELAY_SECRET` | Optional, for ChatGPT and Claude (see below). The service's public address, such as `https://blueberry-runner.up.railway.app`, and at least 32 random characters, from `openssl rand -base64 32` |
+   | `RELAY_STATE_FILE` | Optional, a file on a Railway volume such as `/data/relay.json`, so connections survive a redeploy |
+
    `BROWSERBASE_CONTEXT_ID` is optional. Each job carries the Context id from the app, which is where the sites you brought along are.
 6. **Check.** The log says `Runner started, using Browserbase.` and `Linked to its owner.`, and Settings > Cloud > With your Mac off says jobs run on it within about ten seconds. After that the log has one line per job: its id and how it went. Nothing else: no prompt, page, cookie, code, password or key.
 
@@ -53,6 +56,20 @@ When the runner asks, it sends a push that says only "Berry needs you", and when
 
 To revoke it, press **Unlink** in Settings, or change the runner user's password or delete it in Supabase.
 
+## From ChatGPT and Claude
+
+With `RELAY_PUBLIC_URL` and `RELAY_SECRET` set, the runner also serves a remote MCP server at `/mcp`, so ChatGPT and Claude on the web or the phone can give your birds jobs with the Mac off. Each job is started as you, through `start_cloud_job` with your own session, exactly as the phone page sends one, and runs here like any other. It shows in Blueberry and on the phone page as a chat in the cloud. Its tools are `list_agents`, `start_job` (a task, a bird by name or id, and sites that can only narrow it), `get_job`, `list_jobs` and `stop_job`. Nothing there can answer an approval, a question or a sign-in: those wait for you in Blueberry or on the phone.
+
+1. **A public domain.** In Railway, the service's Settings > Networking > Generate Domain. Railway gives it HTTPS and sets `PORT`, which the relay listens on.
+2. **Set `RELAY_PUBLIC_URL`** to that address and **`RELAY_SECRET`** to a long random string, and redeploy. The log says `Relay listening on port …`, and Settings > Cloud > With your Mac off shows the address to paste, `https://<domain>/mcp`, once the runner has linked.
+3. **Keep connections across redeploys (optional).** Add a volume to the service, mounted at `/data`, and set `RELAY_STATE_FILE=/data/relay.json`. Without it, connections live in memory and ChatGPT or Claude ask you to sign in again after each deploy. The file is sealed with `RELAY_SECRET`, so changing the secret also means signing in again.
+4. **ChatGPT:** Settings > Apps & Connectors > Advanced settings, turn on Developer mode, then create a connector with the address and OAuth as the authentication. **Claude:** Settings > Connectors > Add custom connector, with the address.
+5. **Sign in** on the page that opens with your own Blueberry account, the one in `BLUEBERRY_RUNNER_OWNER`. No other account can connect, and nobody else's password is sent anywhere.
+
+How it signs in: OAuth 2.1 with PKCE (S256), dynamic client registration and refresh tokens, from the MCP SDK's auth router. ChatGPT and Claude only get the relay's own random tokens, kept here only as hashes. Your Supabase refresh token stays on the runner, in memory and, with a state file, sealed. Registered clients are signed rather than stored, and may only send their code back to ChatGPT, Claude or an app on the same computer. Sign-in tries are limited per address. The password goes to Supabase once and never to a log or the disk.
+
+One thing this changes: while someone is connected, the runner holds your own session, not just its own. The relay never calls `decide_cloud_approval` and has no route to it, but the database can no longer tell the runner process from you for that session. Disconnect in ChatGPT or Claude, or change your password, to end it.
+
 ## Try it locally
 
 ```sh
@@ -66,4 +83,4 @@ SUPABASE_URL=… SUPABASE_PUBLISHABLE_KEY=… BLUEBERRY_RUNNER_EMAIL=… BLUEBER
 
 ## Not tried yet
 
-None of this has run on Railway, real Supabase or real Browserbase, and no real push has been sent to a phone. In particular, whether Browserbase lets the runner's session use the Context while the app's own session is still open on it.
+None of this has run on Railway, real Supabase or real Browserbase, and no real push has been sent to a phone. The relay has only been tried with the MCP SDK's own client against a fake Supabase, never with real ChatGPT or Claude. In particular, whether Browserbase lets the runner's session use the Context while the app's own session is still open on it.

@@ -347,6 +347,8 @@ export interface RunnerState {
   status: "not-set-up" | "signed-out" | "none" | "waiting" | "linked";
   email: string | null;
   problem: string | null;
+  // Where ChatGPT or Claude can connect to the flock in the cloud, once linked and if the runner serves it.
+  relayUrl: string | null;
 }
 
 // Settings > Cloud. The key and project id never come back here once saved: only whether there are any.

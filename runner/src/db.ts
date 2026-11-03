@@ -110,7 +110,7 @@ export const runnerSession = ({ url, key, email, password }: DbConfig, server = 
 
 export type RunnerSession = ReturnType<typeof runnerSession>;
 
-export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & RoutineDb & { accept(): Promise<boolean> } => {
+export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & RoutineDb & { accept(): Promise<boolean>; setRelayUrl(url: string | null): Promise<void> } => {
   const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
     const authorization = `Bearer ${await auth.token()}`;
     try {
@@ -139,6 +139,10 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
   return {
     // Takes up the link the owner made in Blueberry. False until they have.
     accept: async () => (await rpc<unknown>("accept_cloud_runner_link", { p_owner_email: owner })) === true,
+    // Where ChatGPT and Claude connect, for the owner to see in Settings. Null when the relay is off.
+    setRelayUrl: async (relayUrl) => {
+      await rpc("runner_set_relay_url", { p_url: relayUrl });
+    },
     claim: async () => {
       const rows = await rpc<Record<string, unknown>[]>("runner_claim_job", {});
       const row = rows?.[0];
