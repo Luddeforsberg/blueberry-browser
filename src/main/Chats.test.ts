@@ -276,6 +276,34 @@ describe("Chats", () => {
       expect(result).toMatchObject({ stopped: true, error: null, text: "" });
       expect(chats.decide("run-1", "any", true)).toBe(false);
     });
+
+    it("ends a stopped run with the step that says so, even before it did anything", async () => {
+      let started = 0;
+      const waiting =
+        (step: string | null): StreamReply =>
+        async function* (_, signal, { onStep }) {
+          if (step) onStep(step)();
+          started++;
+          yield "";
+          if (!signal.aborted) await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+        };
+      const stopped = async (stream: StreamReply) => {
+        const { chats } = setup(stream);
+        const before = started;
+        const ended = chats.runTask("run-1", "Look", () => {});
+        await vi.waitFor(() => expect(started).toBe(before + 1));
+        chats.stop("run-1");
+        return ended;
+      };
+
+      expect((await stopped(waiting("Read a.com"))).steps).toEqual([{ text: "Read a.com", done: true }, { text: "Stopped here", done: true }]);
+      expect(await stopped(waiting(null))).toMatchObject({ stopped: true, text: "", steps: [{ text: "Stopped here", done: true }] });
+    });
+
+    it("adds no stopped step to a run that finished", async () => {
+      const { chats } = setup(replying("report"));
+      expect((await chats.runTask("run-1", "Look", () => {})).steps).toEqual([]);
+    });
   });
 
   it("streams a reply and saves it when it ends", async () => {
@@ -429,7 +457,25 @@ describe("Chats", () => {
 
     const thread = chats.thread(id);
     expect(thread).toMatchObject({ partial: null, error: null });
-    expect(thread?.messages.at(-1)).toEqual({ role: "assistant", content: "partial" });
+    expect(thread?.messages.at(-1)).toEqual({ role: "assistant", content: "partial", steps: [{ text: "Stopped here", done: true }] });
+  });
+
+  it("says it was stopped when stopped before anything was written or done", async () => {
+    let started = false;
+    const waiting: StreamReply = async function* (_, signal) {
+      started = true;
+      yield "";
+      await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+    };
+    const { chats, replyEnded } = setup(waiting);
+
+    const ended = replyEnded();
+    const { id } = send(chats, null, "first")!;
+    await vi.waitFor(() => expect(started).toBe(true));
+    chats.stop(id);
+    await ended;
+
+    expect(chats.thread(id)?.messages.at(-1)).toEqual({ role: "assistant", content: "", steps: [{ text: "Stopped here", done: true }] });
   });
 
   it("shows why a reply failed until the next message, and leaves no empty reply", async () => {
@@ -449,6 +495,18 @@ describe("Chats", () => {
     expect(send(chats, id, "again")?.error).toBeNull();
     await ended;
     expect(chats.thread(id)?.error).toBeNull();
+  });
+
+  it("says the model couldn't be reached when the connection fails", async () => {
+    // What LangChain's OpenAI client says when there's no network, wrapped or not.
+    const { chats, replyEnded } = setup(() => {
+      throw new Error("Connection error.");
+    });
+
+    const ended = replyEnded();
+    const { id } = send(chats, null, "first")!;
+    await ended;
+    expect(chats.thread(id)?.error).toBe("Couldn't reach the model. Check your connection and try again.");
   });
 
   it("can run several chats at once", async () => {
@@ -1015,7 +1073,7 @@ describe("Chats", () => {
       expect(chats.thread(id)?.messages.at(-1)).toEqual({
         role: "assistant",
         content: "",
-        steps: [{ text: "Read a.com", done: true }],
+        steps: [{ text: "Read a.com", done: true }, { text: "Stopped here", done: true }],
       });
     });
   });

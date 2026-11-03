@@ -58,6 +58,11 @@ describe('trailFor', () => {
         expect(texts(trailFor([asked, ...steps(9)], { running: true }))).toContain(asked.text)
     })
 
+    it('never collapses away where the user stopped it', () => {
+        const stopped = { text: 'Stopped here', done: true }
+        expect(texts(trailFor([...steps(6), stopped], { running: false }))).toEqual([stopped.text])
+    })
+
     it('shows every step when open, and still has the line to close it', () => {
         const trail = trailFor(steps(20), { running: false, open: true })
         expect(trail.shown).toHaveLength(20)

@@ -135,7 +135,7 @@ describe("a job on the runner", () => {
   it("stops when the user stops it while it waits", async () => {
     const { db, final } = fakeDb(["stop"]);
     expect(await runJob(JOB, { ...options, db, browser: fakeBrowser().browser, streamReply: askingReply })).toBe("stopped");
-    expect(final()).toEqual({ status: "stopped", steps: [], reply: "" });
+    expect(final()).toEqual({ status: "stopped", steps: [{ text: "Stopped here", done: true }], reply: "" });
   });
 
   it("stops when the runner shuts down", async () => {
