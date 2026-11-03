@@ -1204,7 +1204,7 @@ test("in the tab row at the smallest window, the active tab has as much room for
       items.map((item) => ({
         active: !!item.querySelector("[aria-current]"),
         width: item.getBoundingClientRect().width,
-        title: item.querySelector("button span")!.getBoundingClientRect().width,
+        title: item.querySelector("button span.truncate")!.getBoundingClientRect().width,
       }))
     );
 
