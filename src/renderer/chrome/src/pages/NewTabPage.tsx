@@ -172,7 +172,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         <div className="relative h-full overflow-y-auto">
             <div className="relative min-h-full overflow-hidden">
                 <Backdrop quiet={suggestions.length > 0} />
-                <div className="relative max-w-[800px] mx-auto px-6 pt-[22vh] pb-12">
+                {/* The space above is 22vh, less on a shorter window, so five recent pages still fit at 900px tall. */}
+                <div className="relative max-w-[800px] mx-auto px-6 pt-[clamp(104px,calc(100vh-796px),22vh)] pb-6">
                     <h1 className="sr-only">Where shall we start today?</h1>
                     {/* Room for Berry, who stands on the composer's top edge. */}
                     {isBerry && <div className="h-[84px]" />}
