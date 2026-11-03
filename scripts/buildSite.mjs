@@ -20,7 +20,7 @@ await build({
       `export { BERRY_ID, permissionsInWords } from "./src/shared/mascots";`,
       // The phone page: the flock as the app shares it, conversations and their history, the words for an approval, and what
       // counts as a code.
-      `export { conversationIdOf, conversationsOf, flockFromRows, followUpHistory, snapshotOf } from "./src/shared/phone";`,
+      `export { conversationIdOf, conversationsOf, flockFromRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,
       `export { plausibleCode } from "./src/main/phoneReplies";`,
     ].join("\n"),

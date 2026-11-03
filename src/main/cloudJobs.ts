@@ -2,7 +2,9 @@ import type { ReplyMessage } from "./agent";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatApproval, ChatStep, MascotProfile } from "../shared/library";
 import { BERRY, BERRY_ID, normaliseSite, parseMascotDraft } from "../shared/mascots";
-import { fitHistory } from "../shared/phone";
+import { fitHistory, type MascotSnapshot } from "../shared/phone";
+
+export { mascotSnapshot, type MascotSnapshot } from "../shared/phone";
 
 // What goes into a cloud job's row and what comes back out, for the app and the runner alike. Plain data, no Electron.
 // Everything read from a row is checked again here, whoever wrote it, and a mascot's limits can only come out the same
@@ -13,25 +15,6 @@ const MAX_STEP_TEXT = 300;
 
 export type CloudJobStatus = "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
 export const FINISHED: readonly CloudJobStatus[] = ["done", "failed", "stopped"];
-
-// The bird a job runs as, at the moment it was sent. Its look stays on the computer.
-export interface MascotSnapshot {
-  id: string;
-  name: string;
-  instructions: string;
-  sites: string[];
-  tools: string[];
-  fromGallery: boolean;
-}
-
-export const mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId }: MascotProfile): MascotSnapshot => ({
-  id,
-  name,
-  instructions,
-  sites: [...sites],
-  tools: [...tools],
-  fromGallery: !!galleryId,
-});
 
 // A row is written with the user's session, so it can only say what the user could have sent: a stolen session could
 // already make any bird and answer its approvals. What this stops is a row that's odd or edited. Berry's id is the only

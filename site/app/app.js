@@ -1,5 +1,5 @@
 import { appearance, setAppearance } from "../theme.js";
-import { asContinuation, BERRY_ID, conversationsOf, flockFromRows, followUpHistory, permissionsInWords, plausibleCode, snapshotOf, withSiteNames } from "../shared.js";
+import { asContinuation, BERRY_ID, conversationsOf, flockFromRows, followUpHistory, permissionsInWords, plausibleCode, mascotSnapshot, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
 import { POSES } from "./poses.js";
 import { pushState, register, turnOff, turnOn } from "./push.js";
@@ -520,7 +520,7 @@ const followUp = (conversation, mascot) => {
         if (!sender) return "gone";
         const last = await api.jobWithHistory(latest.id);
         if (!last) throw new api.ApiError(404);
-        await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: followUpHistory(last), p_mascot: snapshotOf(sender), p_action_approval: "risky", p_context_id: contextOf(), p_conversation: id, p_after_job: latest.id });
+        await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: followUpHistory(last), p_mascot: mascotSnapshot(sender), p_action_approval: "risky", p_context_id: contextOf(), p_conversation: id, p_after_job: latest.id });
       };
       try {
         let gone;
@@ -615,7 +615,7 @@ const startScreen = () => {
       problem.replaceChildren();
       try {
         // A new conversation, under the job's own id.
-        const id = await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: [], p_mascot: snapshotOf(chosen), p_action_approval: "risky", p_context_id: contextOf() });
+        const id = await api.rpc("start_cloud_job", { p_prompt: prompt, p_history: [], p_mascot: mascotSnapshot(chosen), p_action_approval: "risky", p_context_id: contextOf() });
         await load();
         location.hash = UUID.test(String(id)) ? `#chat/${id}` : "";
       } catch (error) {

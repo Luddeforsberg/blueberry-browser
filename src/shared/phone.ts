@@ -48,8 +48,18 @@ export const flockFromRows = (rows: unknown): MascotProfile[] => {
   return birds;
 };
 
-// The bird a job is sent as, in the shape the app sends and `mascotFromSnapshot` checks on the runner.
-export const snapshotOf = ({ id, name, instructions, sites, tools, galleryId }: MascotProfile) => ({
+// The bird a job is sent as, at the moment it was sent, in the shape `mascotFromSnapshot` checks on the runner. Its look
+// stays on the computer.
+export interface MascotSnapshot {
+  id: string;
+  name: string;
+  instructions: string;
+  sites: string[];
+  tools: string[];
+  fromGallery: boolean;
+}
+
+export const mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId }: MascotProfile): MascotSnapshot => ({
   id,
   name,
   instructions,
