@@ -68,7 +68,7 @@ beforeAll(async () => {
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const relay = relayConfig({ RELAY_PUBLIC_URL: origin, RELAY_SECRET: "x".repeat(40) });
   if (!relay || typeof relay === "string") throw new Error(String(relay));
-  server.on("request", relayApp(relay, config).app);
+  server.on("request", relayApp(relay, config, runnerDb).app);
 }, 60_000);
 
 afterAll(() => {
@@ -122,8 +122,11 @@ describe("OAuth", () => {
     const refreshed = await (await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: tokens.refresh_token })).json();
     expect(refreshed.access_token).toMatch(/^bb_at_/);
     expect(refreshed.access_token).not.toBe(tokens.access_token);
-    // The old refresh token is used up.
+    // The old refresh token coming back ends the whole connection, the new one with it.
     expect((await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: tokens.refresh_token })).status).toBe(400);
+    expect((await token({ grant_type: "refresh_token", client_id: client.client_id, refresh_token: refreshed.refresh_token })).status).toBe(400);
+    // And its grant is revoked in the database, not only forgotten here.
+    expect(await supabase.cloudRows("select count(*)::int as n from public.cloud_relay_grants where revoked_at is null")).toEqual([{ n: 0 }]);
   });
 
   it("refuses any account but the owner's, without sending its password anywhere", async () => {
@@ -133,6 +136,9 @@ describe("OAuth", () => {
     expect(refused.status).toBe(200);
     expect(await refused.text()).toContain("Only the Blueberry account this is set up for can connect here.");
     expect(supabase.received.slice(before).some(({ body }) => body.includes(STRANGER))).toBe(false);
+    // However often, a stranger never uses up the owner's tries.
+    for (let n = 0; n < 60; n++) await signInAt(authorizeUrl(client.client_id, pkce().challenge), STRANGER);
+    expect((await signInAt(authorizeUrl(client.client_id, pkce().challenge), OWNER)).status).toBe(302);
 
     const wrongPassword = await signInAt(authorizeUrl(client.client_id, pkce().challenge), OWNER, "not it");
     expect(await wrongPassword.text()).toContain("That email and password didn");
@@ -209,7 +215,7 @@ describe("the MCP endpoint", () => {
   it("starts a job as the user, which the runner takes like any other, and can't answer what it asks", async () => {
     const started = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Find the price of tea", agent: "Scout", sites: ["tea.shop.example"] } }));
     expect(started.status).toBe("queued");
-    const [row] = await supabase.cloudRows(`select j.prompt, j.mascot, j.action_approval, j.conversation_id::text, j.id::text, u.email from public.cloud_jobs j join auth.users u on u.id = j.owner where j.id = '${started.jobId}'`);
+    const [row] = await supabase.cloudRows(`select j.prompt, j.mascot, j.action_approval, j.conversation_id::text, u.email from public.cloud_jobs j join auth.users u on u.id = j.owner where j.id = '${started.jobId}'`);
     expect(row).toMatchObject({ prompt: "Find the price of tea", action_approval: "risky", email: OWNER, conversation_id: started.jobId });
     expect(row.mascot).toMatchObject({ id: "scout", sites: ["tea.shop.example"] });
 
@@ -225,13 +231,40 @@ describe("the MCP endpoint", () => {
     expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } }))).toMatchObject({ status: "done", reply: "It's £4." });
     expect(dataOf(await client.callTool({ name: "list_jobs", arguments: {} }))).toEqual([{ jobId: started.jobId, status: "done" }]);
 
-    // Nothing from the relay ever decided anything.
+    // Nothing from the relay ever decided anything, and after sign-in nothing went as the owner.
     expect(supabase.received.some(({ path }) => path.includes("decide_cloud_approval"))).toBe(false);
+    expect(supabase.received.some(({ path }) => /start_cloud_job|my_cloud_jobs|\/rest\/v1\/cloud_/.test(path))).toBe(false);
+  });
+
+  it("a waiting job whose question was just answered shows as running", async () => {
+    const started = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Ask me" } }));
+    await runnerDb.claim();
+    const approval = await runnerDb.ask(started.jobId, { kind: "question", text: "Which?", need: null, site: null });
+    await asOwner("decide_cloud_approval", { p_approval: approval, p_allow: true, p_answer: "The big one" });
+    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } })).status).toBe("running");
+    await runnerDb.update(started.jobId, { status: "done", reply: "Done" });
   });
 
   it("stops a job of its own", async () => {
     const started = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Wait" } }));
     expect(dataOf(await client.callTool({ name: "stop_job", arguments: { jobId: started.jobId } })).status).toBe("stopping");
     expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } })).status).toBe("stopped");
+  });
+});
+
+describe("after Unlink", () => {
+  it("ends the connection, and nothing it held works again", async () => {
+    const client = await connect();
+    expect((await client.callTool({ name: "list_agents", arguments: {} })).isError).toBeFalsy();
+    await asOwner("unlink_cloud_runner", {});
+    const refused = await client.callTool({ name: "start_job", arguments: { task: "Go" } });
+    expect(refused.isError).toBe(true);
+    expect(textOf(refused)).toMatch(/has ended/);
+    // The relay has let it go, so from then on the app is told to connect again.
+    await expect(client.callTool({ name: "list_agents", arguments: {} })).rejects.toThrow(/refresh token/);
+    await client.close();
+    // Linked again, the old connection stays ended: a new one has to sign in.
+    expect(await asOwner("link_cloud_runner", { p_email: RUNNER })).toBe(true);
+    expect(await runnerDb.accept()).toBe(true);
   });
 });

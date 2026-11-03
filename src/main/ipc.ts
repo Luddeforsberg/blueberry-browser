@@ -119,6 +119,7 @@ export const CHANNEL_REGIONS: {
   "cloud:runner-state": ["chrome"],
   "cloud:runner-link": ["chrome"],
   "cloud:runner-unlink": ["chrome"],
+  "cloud:relay-disconnect": ["chrome"],
   "cloud:watch": ["chrome"],
   "cloud:take-over": ["chrome"],
   "cloud:login-suggestions": ["chrome"],

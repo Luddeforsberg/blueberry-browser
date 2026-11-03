@@ -45,6 +45,16 @@ export interface RunnerDb {
   decision(approvalId: string): Promise<Decision>;
 }
 
+// What the relay may ask the database, as the runner, with a grant's secret.
+export interface RelayDb {
+  relayFlock(secret: string): Promise<Record<string, unknown>[]>;
+  relayStartJob(secret: string, prompt: string, mascot: object): Promise<string>;
+  // The grant's own jobs by id, or its newest with none.
+  relayJobs(secret: string, ids: string[] | null): Promise<Record<string, unknown>[]>;
+  relayStopJob(secret: string, jobId: string): Promise<void>;
+  relayRevoke(secret: string): Promise<void>;
+}
+
 export class DbError extends Error {
   constructor(readonly status: number) {
     super(status === 0 ? "Couldn't reach Supabase." : `Supabase answered ${status}.`);
@@ -110,7 +120,7 @@ export const runnerSession = ({ url, key, email, password }: DbConfig, server = 
 
 export type RunnerSession = ReturnType<typeof runnerSession>;
 
-export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & RoutineDb & { accept(): Promise<boolean>; setRelayUrl(url: string | null): Promise<void> } => {
+export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, send: typeof fetch = fetch): RunnerDb & PushDb & RoutineDb & RelayDb & { accept(): Promise<boolean>; setRelayUrl(url: string | null): Promise<void> } => {
   const call = async (name: string, body: object): Promise<{ status: number; text: string }> => {
     const authorization = `Bearer ${await auth.token()}`;
     try {
@@ -142,6 +152,20 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
     // Where ChatGPT and Claude connect, for the owner to see in Settings. Null when the relay is off.
     setRelayUrl: async (relayUrl) => {
       await rpc("runner_set_relay_url", { p_url: relayUrl });
+    },
+    // The relay's calls, as this runner, each with a grant's secret. None of them can decide anything.
+    relayFlock: async (secret) => (await rpc<Record<string, unknown>[]>("relay_flock", { p_secret: secret })) ?? [],
+    relayStartJob: async (secret, prompt, mascot) => {
+      const id = await rpc<unknown>("relay_start_job", { p_secret: secret, p_prompt: prompt, p_mascot: mascot });
+      if (typeof id !== "string") throw new DbError(500);
+      return id;
+    },
+    relayJobs: async (secret, ids) => (await rpc<Record<string, unknown>[]>("relay_jobs", { p_secret: secret, p_ids: ids })) ?? [],
+    relayStopJob: async (secret, jobId) => {
+      await rpc("relay_stop_job", { p_secret: secret, p_job: jobId });
+    },
+    relayRevoke: async (secret) => {
+      await rpc("relay_revoke_grant", { p_secret: secret });
     },
     claim: async () => {
       const rows = await rpc<Record<string, unknown>[]>("runner_claim_job", {});

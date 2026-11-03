@@ -99,6 +99,8 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     await expect(chrome.getByRole("heading", { name: "From ChatGPT or Claude" })).toBeVisible();
     await chrome.getByRole("heading", { name: "From ChatGPT or Claude" }).scrollIntoViewIfNeeded();
     await shoot(chrome, "settings-runner-relay");
+    await chrome.getByRole("button", { name: "Disconnect ChatGPT and Claude" }).click();
+    await expect(chrome.getByText("Disconnected. ChatGPT and Claude have to sign in again.")).toBeVisible();
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
 
     model.callTools({ name: "open_tab", args: { url: shop } });

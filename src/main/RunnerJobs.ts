@@ -194,6 +194,13 @@ export class RunnerJobs implements ChatRunner {
     return this.refreshLink();
   }
 
+  // Every app connected through the relay has to sign in again.
+  async disconnectRelay(): Promise<boolean> {
+    const account = this.signedIn;
+    if (!account) return false;
+    return (await this.withToken(account, (token) => this.server!.revokeRelayGrants(token).then(() => true))) === true;
+  }
+
   async unlinkRunner(): Promise<RunnerState> {
     const account = this.signedIn;
     this.linkProblem = null;

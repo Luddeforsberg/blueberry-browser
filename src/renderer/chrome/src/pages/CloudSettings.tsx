@@ -151,7 +151,13 @@ const Runner: React.FC = () => {
 
 // The address ChatGPT and Claude connect to, which the server in the cloud gives once it has accepted. Signing in there
 // takes this Blueberry account, and nothing else can connect.
-const FromOtherApps: React.FC<{ address: string }> = ({ address }) => (
+const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
+    const [said, setSaid] = useState<string | null>(null)
+    const disconnect = async () => {
+        setSaid(null)
+        setSaid((await window.chromeAPI.cloud.disconnectRelay()) ? 'Disconnected. ChatGPT and Claude have to sign in again.' : 'Couldn’t disconnect. Try again.')
+    }
+    return (
     <div className="mt-4">
         <div className="flex items-center gap-6">
             <div className="flex-1 min-w-0">
@@ -165,8 +171,11 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => (
             <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
             <li>Sign in with this Blueberry account when it asks.</li>
         </ol>
+        <Button className="mt-3" variant="outline" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
+        {said && <p role="status" className="mt-2 text-13 text-muted-foreground">{said}</p>}
     </div>
-)
+    )
+}
 
 // Browserbase, for birds that work in a browser in the cloud. Off until a key is saved. The key and project id leave
 // this page once and never come back to it.

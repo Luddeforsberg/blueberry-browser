@@ -7,26 +7,31 @@ import { InvalidClientMetadataError, InvalidGrantError, InvalidTargetError, Inva
 import type { AuthorizationParams, OAuthServerProvider } from "@modelcontextprotocol/sdk/server/auth/provider.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { OAuthClientInformationFull, OAuthTokenRevocationRequest, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { GalleryServer, ServerError, Unreachable, type ServerSession } from "../../src/main/galleryServer";
+import { ServerError, Unreachable, type GalleryServer } from "../../src/main/galleryServer";
 
 // OAuth for the relay, so ChatGPT and Claude start jobs as the user, never as the runner. The user signs in on a page
 // served here with their Blueberry email and password, which go to Supabase and nowhere else: never to a log or the
-// disk. Only the account the runner is linked to may. ChatGPT and Claude get the relay's own random tokens, and the
-// user's Supabase refresh token stays here, in memory and, with a state file, sealed with RELAY_SECRET. Registered
-// clients are signed rather than kept, so they survive a redeploy without any storage.
+// disk. Only the account the runner is linked to may. Their session is used once, to make a grant in the database tied to
+// their runner link, and then signed out: the relay never keeps it. What it keeps is the grant's secret, in memory and,
+// with a state file, sealed with RELAY_SECRET, and every call after that is the runner's own, through the `relay_*`
+// functions. ChatGPT and Claude get the relay's own random tokens. Registered clients are signed rather than kept, so
+// they survive a redeploy without any storage.
 
 const ACCESS_TTL_S = 60 * 60;
 const CODE_TTL_MS = 5 * 60_000;
 const FORM_TTL_MS = 15 * 60_000;
-const SUPABASE_REFRESH_BEFORE_MS = 60_000;
+// A connection ends after this long unused, and after this long whatever happens.
+export const IDLE_LIMIT_MS = 30 * 24 * 60 * 60_000;
+export const AGE_LIMIT_MS = 90 * 24 * 60 * 60_000;
 const MAX_GRANTS = 20;
 const MAX_CODES = 50;
-const MAX_JOBS_PER_GRANT = 200;
 const MAX_REDIRECTS = 5;
-// A light limit on sign-in tries, per address and in all.
+// Refresh tokens already used, per connection, so one that comes back is noticed.
+const MAX_USED_REFRESH = 50;
+// A light limit on the owner's sign-in tries, per address and in all. Anyone else is refused before it counts.
 const TRIES_WINDOW_MS = 15 * 60_000;
 const TRIES_PER_ADDRESS = 10;
-const TRIES_IN_ALL = 50;
+const TRIES_IN_ALL = 30;
 
 // Where a sign-in may send its code: ChatGPT and Claude, or an app on the same computer as the browser.
 const REDIRECT_HOSTS = ["chatgpt.com", "claude.ai", "claude.com"];
@@ -93,26 +98,32 @@ export const unseal = (keys: Keys, text: string): string | null => {
   }
 };
 
-// One connection from ChatGPT or Claude, as the user who signed in.
+// One connection from ChatGPT or Claude, standing for a grant in the database.
 interface Grant {
   id: string;
   clientId: string;
-  email: string;
-  // The user's Supabase refresh token, which changes each time it's used.
-  supabaseRefresh: string;
+  // The grant's secret, which the `relay_*` functions take. Never the user's session.
+  secret: string;
   accessHash: string;
   accessExpiresAt: number;
   refreshHash: string;
-  // Jobs started through this connection, the only ones it can see.
-  jobs: string[];
+  usedRefresh: string[];
+  createdAt: number;
+  lastUsedAt: number;
 }
 
 interface Code {
   clientId: string;
   redirectUri: string;
   challenge: string;
-  session: ServerSession;
+  secret: string;
   expiresAt: number;
+}
+
+// The two calls the grants need: one as the owner, once, and one as the runner.
+export interface RelayGrants {
+  create(ownerAccessToken: string): Promise<string>;
+  revoke(secret: string): Promise<void>;
 }
 
 export interface RelayAuthOptions {
@@ -121,21 +132,17 @@ export interface RelayAuthOptions {
   resource: URL;
   // The only account that may connect.
   owner: string;
-  server: GalleryServer;
+  server: Pick<GalleryServer, "signIn" | "signOut">;
+  grants: RelayGrants;
   // Where connections are kept across a restart, sealed. Without one, a redeploy means connecting again.
   stateFile?: string;
   now?: () => number;
 }
 
-export class SignInProblem extends Error {}
-
 export class RelayAuth implements OAuthServerProvider {
   private readonly keys: Keys;
   private readonly grants = new Map<string, Grant>();
   private readonly codes = new Map<string, Code>();
-  // The user's Supabase access token, per connection, memory only.
-  private readonly sessions = new Map<string, { accessToken: string; expiresAt: number }>();
-  private readonly refreshing = new Map<string, Promise<string>>();
   private tries: { at: number; from: string }[] = [];
   private readonly now: () => number;
 
@@ -191,7 +198,8 @@ export class RelayAuth implements OAuthServerProvider {
     res.status(200).type("html").send(signInPage({ app: appName(params.redirectUri), request }));
   }
 
-  // The form's answer: the password goes to Supabase once and is forgotten. Gives where to send the browser next.
+  // The form's answer: the password goes to Supabase once and is forgotten, and so is the session it gives, once the
+  // grant is made. Gives where to send the browser next.
   async signIn(form: { request?: unknown; email?: unknown; password?: unknown }, from: string): Promise<{ redirect: string } | { page: string }> {
     const request = unsigned(this.keys, form.request);
     if (!request || request.t !== "form" || typeof request.x !== "number" || request.x < this.now()) {
@@ -204,21 +212,28 @@ export class RelayAuth implements OAuthServerProvider {
     const email = typeof form.email === "string" ? form.email.trim() : "";
     const password = typeof form.password === "string" ? form.password : "";
     if (!email || !password) return again("Give your Blueberry email and password.");
-    if (!this.mayTry(from)) return again("Too many tries. Wait a few minutes and try again.");
-    // Nobody else's password is sent anywhere.
+    // Nobody else's password is sent anywhere, and nobody else's tries count against the owner's.
     if (email.toLowerCase() !== this.options.owner.toLowerCase()) return again("Only the Blueberry account this is set up for can connect here.");
-    let session: ServerSession | null;
+    if (!this.mayTry(from)) return again("Too many tries. Wait a few minutes and try again.");
+    let secret: string;
     try {
-      session = await this.options.server.signIn(email, password);
+      const session = await this.options.server.signIn(email, password);
+      if (!session || session.email.toLowerCase() !== this.options.owner.toLowerCase()) return again("Only the Blueberry account this is set up for can connect here.");
+      try {
+        secret = await this.options.grants.create(session.accessToken);
+      } finally {
+        // The session's work is done, so it's ended at Supabase too, not just dropped here.
+        await this.options.server.signOut(session.accessToken).catch(() => {});
+      }
     } catch (error) {
-      if (error instanceof ServerError && error.status === 400) return again("That email and password didn't match.");
+      if (error instanceof ServerError && error.status === 400 && error.code === "invalid_credentials") return again("That email and password didn't match.");
+      if (error instanceof ServerError) return again("Set up keeping going with your Mac off in Blueberry first, under Settings > Cloud, then try again.");
       return again(error instanceof Unreachable ? "Couldn't reach Blueberry's server. Try again." : "That didn't work. Try again.");
     }
-    if (!session || session.email.toLowerCase() !== this.options.owner.toLowerCase()) return again("Only the Blueberry account this is set up for can connect here.");
     const code = randomBytes(32).toString("base64url");
     this.dropExpired();
     if (this.codes.size >= MAX_CODES) this.codes.delete(this.codes.keys().next().value as string);
-    this.codes.set(hash(code), { clientId: client.client_id, redirectUri, challenge: String(request.ch), session, expiresAt: this.now() + CODE_TTL_MS });
+    this.codes.set(hash(code), { clientId: client.client_id, redirectUri, challenge: String(request.ch), secret, expiresAt: this.now() + CODE_TTL_MS });
     const target = new URL(redirectUri);
     target.searchParams.set("code", code);
     if (typeof request.s === "string") target.searchParams.set("state", request.s);
@@ -249,29 +264,47 @@ export class RelayAuth implements OAuthServerProvider {
     if (!code || code.clientId !== client.client_id || code.expiresAt < this.now()) throw new InvalidGrantError("That code isn't valid.");
     if (redirectUri !== undefined && redirectUri !== code.redirectUri) throw new InvalidGrantError("The redirect_uri doesn't match.");
     if (resource && resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
-    const grant: Grant = { id: randomUUID(), clientId: client.client_id, email: code.session.email, supabaseRefresh: code.session.refreshToken, accessHash: "", accessExpiresAt: 0, refreshHash: "", jobs: [] };
-    this.sessions.set(grant.id, { accessToken: code.session.accessToken, expiresAt: code.session.expiresAt });
+    const now = this.now();
+    const grant: Grant = { id: randomUUID(), clientId: client.client_id, secret: code.secret, accessHash: "", accessExpiresAt: 0, refreshHash: "", usedRefresh: [], createdAt: now, lastUsedAt: now };
     this.grants.set(grant.id, grant);
-    while (this.grants.size > MAX_GRANTS) this.forget(this.grants.keys().next().value as string);
+    while (this.grants.size > MAX_GRANTS) this.end(this.grants.keys().next().value as string);
     return this.issue(grant);
   }
 
   async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, _scopes?: string[], resource?: URL): Promise<OAuthTokens> {
+    const wanted = hash(refreshToken);
+    // One already used coming back means it was copied: the whole connection ends (RFC 9700 4.14.2).
+    const reused = [...this.grants.values()].find((one) => one.usedRefresh.includes(wanted));
+    if (reused) {
+      this.end(reused.id);
+      throw new InvalidGrantError("That refresh token was already used, so this connection has ended. Connect again.");
+    }
     const grant = this.byHash("refreshHash", refreshToken);
     if (!grant || grant.clientId !== client.client_id) throw new InvalidGrantError("That refresh token isn't valid.");
     if (resource && resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
+    if (this.expired(grant)) {
+      this.end(grant.id);
+      throw new InvalidGrantError("This connection has run out. Connect again.");
+    }
+    grant.usedRefresh = [...grant.usedRefresh, grant.refreshHash].slice(-MAX_USED_REFRESH);
+    grant.lastUsedAt = this.now();
     return this.issue(grant);
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
     const grant = this.byHash("accessHash", token);
-    if (!grant || grant.accessExpiresAt < this.now() || grant.email.toLowerCase() !== this.options.owner.toLowerCase()) throw new InvalidTokenError("Connect again from ChatGPT or Claude.");
+    if (!grant || grant.accessExpiresAt < this.now() || this.expired(grant)) throw new InvalidTokenError("Connect again from ChatGPT or Claude.");
     return { token, clientId: grant.clientId, scopes: [], expiresAt: Math.floor(grant.accessExpiresAt / 1000), resource: this.options.resource, extra: { grantId: grant.id } };
   }
 
   async revokeToken(client: OAuthClientInformationFull, request: OAuthTokenRevocationRequest): Promise<void> {
     const grant = this.byHash("refreshHash", request.token) ?? this.byHash("accessHash", request.token);
-    if (grant && grant.clientId === client.client_id) this.forget(grant.id);
+    if (grant && grant.clientId === client.client_id) this.end(grant.id);
+  }
+
+  private expired(grant: Grant): boolean {
+    const now = this.now();
+    return now - grant.lastUsedAt > IDLE_LIMIT_MS || now - grant.createdAt > AGE_LIMIT_MS;
   }
 
   private issue(grant: Grant): OAuthTokens {
@@ -289,10 +322,18 @@ export class RelayAuth implements OAuthServerProvider {
     return [...this.grants.values()].find((grant) => grant[field] === wanted) ?? null;
   }
 
-  private forget(grantId: string): void {
+  // Forgotten here and revoked in the database, so the secret is no use to anyone after.
+  end(grantId: string): void {
+    const grant = this.grants.get(grantId);
+    if (!grant) return;
     this.grants.delete(grantId);
-    this.sessions.delete(grantId);
     this.save();
+    void this.options.grants.revoke(grant.secret).catch(() => {});
+  }
+
+  // The database refused the grant, as after Unlink: nothing is left to revoke.
+  forget(grantId: string): void {
+    if (this.grants.delete(grantId)) this.save();
   }
 
   private dropExpired(): void {
@@ -300,48 +341,10 @@ export class RelayAuth implements OAuthServerProvider {
     for (const [key, code] of this.codes) if (code.expiresAt < now) this.codes.delete(key);
   }
 
-  // --- The user's own Supabase session, for each connection ---
-
-  // A Supabase access token for this connection's user, refreshed when it's due. A refused refresh ends the connection.
-  async userToken(grantId: string): Promise<string> {
+  secretOf(grantId: string): string {
     const grant = this.grants.get(grantId);
     if (!grant) throw new InvalidTokenError("Connect again from ChatGPT or Claude.");
-    const session = this.sessions.get(grantId);
-    if (session && session.expiresAt - this.now() > SUPABASE_REFRESH_BEFORE_MS) return session.accessToken;
-    const pending = this.refreshing.get(grantId);
-    if (pending) return pending;
-    const fresh = this.options.server
-      .refresh(grant.supabaseRefresh, grant.email)
-      .then((next) => {
-        if (!next) throw new ServerError(401, "");
-        grant.supabaseRefresh = next.refreshToken;
-        this.sessions.set(grantId, { accessToken: next.accessToken, expiresAt: next.expiresAt });
-        this.save();
-        return next.accessToken;
-      })
-      .catch((error: unknown) => {
-        if (error instanceof ServerError && (error.status === 400 || error.status === 401)) this.forget(grantId);
-        throw error;
-      })
-      .finally(() => this.refreshing.delete(grantId));
-    this.refreshing.set(grantId, fresh);
-    return fresh;
-  }
-
-  // The next call gets a new Supabase token, as when Supabase refused this one.
-  resetUserToken(grantId: string): void {
-    this.sessions.delete(grantId);
-  }
-
-  jobsOf(grantId: string): string[] {
-    return this.grants.get(grantId)?.jobs ?? [];
-  }
-
-  rememberJob(grantId: string, jobId: string): void {
-    const grant = this.grants.get(grantId);
-    if (!grant) return;
-    grant.jobs = [...grant.jobs, jobId].slice(-MAX_JOBS_PER_GRANT);
-    this.save();
+    return grant.secret;
   }
 
   // --- Kept across a restart, sealed ---
@@ -361,7 +364,11 @@ export class RelayAuth implements OAuthServerProvider {
       return;
     }
     try {
-      for (const grant of JSON.parse(plain) as Grant[]) if (typeof grant?.id === "string" && typeof grant.supabaseRefresh === "string") this.grants.set(grant.id, { ...grant, jobs: Array.isArray(grant.jobs) ? grant.jobs.map(String) : [] });
+      for (const grant of JSON.parse(plain) as Grant[]) {
+        if (typeof grant?.id === "string" && typeof grant.secret === "string" && typeof grant.createdAt === "number" && typeof grant.lastUsedAt === "number") {
+          this.grants.set(grant.id, { ...grant, usedRefresh: Array.isArray(grant.usedRefresh) ? grant.usedRefresh.map(String) : [] });
+        }
+      }
     } catch {
       // Nothing usable.
     }

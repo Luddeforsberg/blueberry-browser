@@ -550,6 +550,8 @@ export interface InvokeChannels {
   "cloud:runner-state": { region: "chrome"; args: []; result: RunnerState };
   "cloud:runner-link": { region: "chrome"; args: [email: string]; result: RunnerState };
   "cloud:runner-unlink": { region: "chrome"; args: []; result: RunnerState };
+  // Ends every connection ChatGPT or Claude made through the relay. False if it couldn't.
+  "cloud:relay-disconnect": { region: "chrome"; args: []; result: boolean };
   // Which cloud tab is on screen, or null. Pictures of it come as `cloud:frame`, to the chrome and nowhere else.
   "cloud:watch": { region: "chrome"; args: [tabId: string | null]; result: void };
   // The user takes the tab from the job, as clicking in a tab of the window's own does.
@@ -800,6 +802,7 @@ export interface CloudAPI {
   runnerState: () => Promise<RunnerState>;
   linkRunner: (email: string) => Promise<RunnerState>;
   unlinkRunner: () => Promise<RunnerState>;
+  disconnectRelay: () => Promise<boolean>;
   onRunnerUpdated: (callback: (state: RunnerState) => void) => Unsubscribe;
   watch: (tabId: string | null) => Promise<void>;
   takeOver: (tabId: string) => Promise<boolean>;

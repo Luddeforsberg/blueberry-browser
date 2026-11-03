@@ -16,6 +16,7 @@ const CLOUD_FUNCTIONS = new Set([
   "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
   "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
   "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription", "runner_set_relay_url",
+  "create_relay_grant", "revoke_relay_grants", "relay_flock", "relay_start_job", "relay_jobs", "relay_stop_job", "relay_revoke_grant",
 ]);
 // Tables the phone page reads with a plain select, as the user each token stands for, so row-level security decides.
 const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_flock"]);

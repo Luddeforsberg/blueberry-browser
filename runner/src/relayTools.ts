@@ -5,10 +5,11 @@ import type { MascotProfile } from "../../src/shared/library";
 import { BERRY, NOWHERE, narrowSites, normaliseSite, permissionsInWords } from "../../src/shared/mascots";
 import { snapshotOf } from "../../src/shared/phone";
 
-// What ChatGPT and Claude can ask of the flock in the cloud, through the relay, as the signed-in user. A job is the
-// same row the app and the phone send, through `start_cloud_job` with the user's session, so the runner takes it and
-// checks it like any other. Nothing here answers anything: questions, approvals and sign-ins are the user's, in Blueberry
-// or on the phone, and there's no route to `decide_cloud_approval`, cookies, logins, recordings or memory.
+// What ChatGPT and Claude can ask of the flock in the cloud, through the relay. Each call is a `relay_*` function, as the
+// runner with the grant the user made when they signed in, which acts as the user for that one thing. A job is the same
+// row the phone sends, so the runner takes it and checks it like any other. Nothing here answers anything: questions,
+// approvals and sign-ins are the user's, in Blueberry or on the phone, and there's no database function for the relay
+// that could, nor any route to cookies, logins, recordings or memory.
 
 const MAX_TASK_LENGTH = 4000;
 const MAX_SITES = 20;
@@ -17,17 +18,14 @@ const NOT_YOURS =
   "Only the user can answer this, in Blueberry or on their phone, and nothing you send can. Tell the user it's waiting " +
   "for them, then check again with get_job.";
 
-// Everything the tools need, each as the user. `started` and `remember` keep to the jobs this connection started.
+// Everything the tools need, for one connection. The database keeps it to the jobs this connection started.
 export interface RelayHost {
   flock: () => Promise<MascotProfile[]>;
-  // The Browserbase Context of the user's newest job that has one, as the phone takes it. Only the app knows it.
-  contextId: () => Promise<string | null>;
-  startJob: (job: { prompt: string; mascot: object; contextId: string | null }) => Promise<string | null>;
-  // Rows of `my_cloud_jobs`: status, steps, reply, error and any approval waiting.
-  jobs: (ids: string[]) => Promise<Record<string, unknown>[]>;
+  // The database adds the Context of the user's newest job that has one, as the phone does.
+  startJob: (prompt: string, mascot: object) => Promise<string>;
+  // Status, steps, reply, error and any approval waiting, for these jobs or, with null, the newest.
+  jobs: (ids: string[] | null) => Promise<Record<string, unknown>[]>;
   stop: (id: string) => Promise<void>;
-  started: () => string[];
-  remember: (id: string) => void;
 }
 
 const json = (data: unknown) => JSON.stringify(data, null, 2);
@@ -51,13 +49,15 @@ const waitingFor = (row: Record<string, unknown>) => {
 
 const statusOf = (status: unknown, waiting: boolean): string => {
   if (waiting) return "waiting_for_user";
+  // Waiting with nothing left to answer is the moment after the user answered: it carries on.
+  if (status === "waiting") return "running";
   const known: CloudJobStatus[] = ["queued", "running", "done", "failed", "stopped"];
   return known.includes(status as CloudJobStatus) ? String(status) : "unknown";
 };
 
 export const createRelayTools = (host: RelayHost): McpTool[] => {
   const job = async (id: string) => {
-    if (!host.started().includes(id)) return null;
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
     const [row] = await host.jobs([id]);
     if (!row) return null;
     const waiting = waitingFor(row);
@@ -112,9 +112,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
         // Only ever narrower: a bird kept to some sites can't be sent anywhere else.
         const narrowed = narrowSites(bird.sites, clean as string[]);
         if (narrowed.includes(NOWHERE)) return failed(`${bird.name} may only use ${bird.sites.join(", ")}, and none of those sites are among them.`, "Sites outside its limits");
-        const id = await host.startJob({ prompt, mascot: { ...snapshotOf(bird), sites: narrowed }, contextId: await host.contextId() });
-        if (!id) return failed(`${bird.name} couldn't start that job.`, "Couldn't start");
-        host.remember(id);
+        const id = await host.startJob(prompt, { ...snapshotOf(bird), sites: narrowed });
         return {
           text: json({
             jobId: id,
@@ -145,12 +143,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const ids = host.started().slice(-20).reverse();
-        const rows = ids.length ? await host.jobs(ids) : [];
-        const listed = ids.flatMap((id) => {
-          const row = rows.find((one) => one.id === id);
-          return row ? [{ jobId: id, status: statusOf(row.status, approvalFromRow(row) !== null) }] : [];
-        });
+        const listed = (await host.jobs(null)).map((row) => ({ jobId: String(row.id), status: statusOf(row.status, approvalFromRow(row) !== null) }));
         return { text: json(listed), summary: `${listed.length} jobs` };
       },
     },

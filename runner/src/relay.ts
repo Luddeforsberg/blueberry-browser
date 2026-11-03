@@ -6,16 +6,17 @@ import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelconte
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { GalleryServer } from "../../src/main/galleryServer";
 import { flockFromRows } from "../../src/shared/phone";
+import { DbError, type RelayDb } from "./db";
 import { RelayAuth } from "./relayAuth";
 import { createRelayTools, type RelayHost } from "./relayTools";
 
 // The relay: a public MCP endpoint at /mcp, for ChatGPT and Claude on the web or a phone, with OAuth so each job is
-// started as the user who signed in. Their jobs go through `start_cloud_job` with that user's own session, as the phone
-// page's do, and this runner then takes them like any other. Nothing here can answer an approval or a question: the
-// relay never calls `decide_cloud_approval`, and has no route to cookies, logins, recordings or memory. Nothing it logs
+// started as the user who signed in. It never keeps their session: it calls the `relay_*` functions as the runner, with
+// the grant they made, and this runner then takes the jobs like any other. Nothing here can answer an approval or a
+// question, because the database has no function that lets the runner, and there's no route to cookies, logins,
+// recordings or memory. Nothing it logs
 // holds a prompt, a page, a token or a password.
 
-const CALL_ABORT_MS = 15_000;
 const MAX_BODY = "1mb";
 const NAME = "blueberry";
 
@@ -54,67 +55,36 @@ export const relayConfig = (env: Record<string, string | undefined>): RelayConfi
   return { origin, secret, port, ...(env.RELAY_STATE_FILE ? { stateFile: env.RELAY_STATE_FILE } : {}) };
 };
 
-class RelayDbError extends Error {
-  constructor(readonly status: number) {
-    super(`Supabase answered ${status}.`);
-  }
-}
-
-// The user's own calls, with their Supabase session for this connection, so row-level security keeps it to their rows.
-const userHost = (auth: RelayAuth, grantId: string, { url, key }: { url: string; key: string }, send: typeof fetch): RelayHost => {
-  const call = async (path: string, body?: object): Promise<{ status: number; text: string }> => {
-    const token = await auth.userToken(grantId);
-    try {
-      const response = await send(`${url}${path}`, {
-        method: body === undefined ? "GET" : "POST",
-        headers: { apikey: key, authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "content-type": "application/json" }) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(CALL_ABORT_MS),
-      });
-      return { status: response.status, text: await response.text() };
-    } catch {
-      throw new RelayDbError(0);
-    }
-  };
-  const asUser = async <T>(path: string, body?: object): Promise<T> => {
-    let { status, text } = await call(path, body);
-    if (status === 401) {
-      auth.resetUserToken(grantId);
-      ({ status, text } = await call(path, body));
-    }
-    if (status < 200 || status >= 300) throw new RelayDbError(status);
-    return (text ? JSON.parse(text) : null) as T;
-  };
+// One connection's calls, as the runner with its grant. The database keeps each to that grant's owner and jobs.
+const grantHost = (auth: RelayAuth, grantId: string, db: RelayDb): RelayHost => {
+  const secret = () => auth.secretOf(grantId);
   return {
-    flock: async () => flockFromRows(await asUser("/rest/v1/cloud_flock?select=id,name,palette,accessory,instructions,sites,tools,from_gallery&order=position")),
-    contextId: async () => {
-      const rows = (await asUser<Record<string, unknown>[]>("/rest/v1/cloud_jobs?select=context_id,created_at&order=created_at.desc&limit=50")) ?? [];
-      const found = rows.find((row) => typeof row.context_id === "string");
-      return typeof found?.context_id === "string" ? found.context_id : null;
-    },
-    startJob: async ({ prompt, mascot, contextId }) => {
-      const id = await asUser<unknown>("/rest/v1/rpc/start_cloud_job", { p_prompt: prompt, p_history: [], p_mascot: mascot, p_action_approval: "risky", p_context_id: contextId });
-      return typeof id === "string" ? id : null;
-    },
-    jobs: async (ids) => (await asUser<Record<string, unknown>[]>("/rest/v1/rpc/my_cloud_jobs", { p_ids: ids })) ?? [],
-    stop: async (id) => {
-      await asUser("/rest/v1/rpc/stop_cloud_job", { p_job: id });
-    },
-    started: () => auth.jobsOf(grantId),
-    remember: (id) => auth.rememberJob(grantId, id),
+    flock: async () => flockFromRows(await db.relayFlock(secret())),
+    startJob: (prompt, mascot) => db.relayStartJob(secret(), prompt, mascot),
+    jobs: (ids) => db.relayJobs(secret(), ids),
+    stop: (id) => db.relayStopJob(secret(), id),
   };
 };
 
 // Words for a failed call that say what to do, never what came back.
 const problemWords = (error: unknown): string => {
-  if (error instanceof RelayDbError && error.status === 400) return "Blueberry refused that. There may be too many jobs going at once, or the cloud isn't set up in Blueberry on the Mac.";
-  if (error instanceof RelayDbError && error.status === 0) return "Couldn't reach Blueberry's server. Try again.";
+  if (error instanceof DbError && error.status === 403) return "This connection to Blueberry has ended, as when the cloud is unlinked in Blueberry. Connect again.";
+  if (error instanceof DbError && error.status === 400) return "Blueberry refused that. There may be too many jobs going at once, or the cloud isn't set up in Blueberry on the Mac.";
+  if (error instanceof DbError && error.status === 0) return "Couldn't reach Blueberry's server. Try again.";
   return "That didn't work in Blueberry. Try again, or connect again if it keeps failing.";
 };
 
-export const relayApp = (config: RelayConfig, db: { url: string; key: string; owner: string }, send: typeof fetch = fetch) => {
+export const relayApp = (config: RelayConfig, supabase: { url: string; key: string; owner: string }, db: RelayDb) => {
   const resource = new URL("/mcp", config.origin);
-  const auth = new RelayAuth({ secret: config.secret, resource, owner: db.owner, server: new GalleryServer({ url: db.url, key: db.key }), stateFile: config.stateFile });
+  const server = new GalleryServer({ url: supabase.url, key: supabase.key });
+  const auth = new RelayAuth({
+    secret: config.secret,
+    resource,
+    owner: supabase.owner,
+    server,
+    grants: { create: (token) => server.createRelayGrant(token), revoke: (secret) => db.relayRevoke(secret) },
+    stateFile: config.stateFile,
+  });
   const app = express();
   // Railway's proxy is the one in front.
   app.set("trust proxy", 1);
@@ -153,7 +123,7 @@ export const relayApp = (config: RelayConfig, db: { url: string; key: string; ow
       return;
     }
     const grantId = String(req.auth?.extra?.grantId ?? "");
-    const tools = createRelayTools(userHost(auth, grantId, db, send));
+    const tools = createRelayTools(grantHost(auth, grantId, db));
     const server = new McpServer({ name: NAME, version: "1.0.0" }, { instructions: INSTRUCTIONS });
     for (const tool of tools) {
       server.registerTool(
@@ -165,6 +135,8 @@ export const relayApp = (config: RelayConfig, db: { url: string; key: string; ow
             result = await tool.run(args ?? {}, "relay");
           } catch (error) {
             console.error(`Relay: ${tool.name} failed.`);
+            // Revoked in the database, as by Unlink or Disconnect, so it's no use keeping.
+            if (error instanceof DbError && error.status === 403) auth.forget(grantId);
             result = { text: problemWords(error), isError: true, summary: "Failed" };
           }
           return { content: [{ type: "text" as const, text: result.text }], ...(result.isError ? { isError: true } : {}) };
@@ -194,8 +166,8 @@ export const relayApp = (config: RelayConfig, db: { url: string; key: string; ow
   return { app, auth, resource };
 };
 
-export const startRelay = (config: RelayConfig, db: { url: string; key: string; owner: string }): Promise<Server> => {
-  const { app } = relayApp(config, db);
+export const startRelay = (config: RelayConfig, supabase: { url: string; key: string; owner: string }, db: RelayDb): Promise<Server> => {
+  const { app } = relayApp(config, supabase, db);
   return new Promise((resolve) => {
     const server = app.listen(config.port, () => resolve(server));
   });

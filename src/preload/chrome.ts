@@ -179,6 +179,7 @@ const chromeAPI: ChromeAPI = {
     runnerState: () => invoke("cloud:runner-state"),
     linkRunner: (email) => invoke("cloud:runner-link", email),
     unlinkRunner: () => invoke("cloud:runner-unlink"),
+    disconnectRelay: () => invoke("cloud:relay-disconnect"),
     onRunnerUpdated: (callback) => subscribe("cloud:runner-updated", callback),
     watch: (tabId) => invoke("cloud:watch", tabId),
     takeOver: (tabId) => invoke("cloud:take-over", tabId),

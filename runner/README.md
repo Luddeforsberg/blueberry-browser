@@ -66,9 +66,16 @@ With `RELAY_PUBLIC_URL` and `RELAY_SECRET` set, the runner also serves a remote 
 4. **ChatGPT:** Settings > Apps & Connectors > Advanced settings, turn on Developer mode, then create a connector with the address and OAuth as the authentication. **Claude:** Settings > Connectors > Add custom connector, with the address.
 5. **Sign in** on the page that opens with your own Blueberry account, the one in `BLUEBERRY_RUNNER_OWNER`. No other account can connect, and nobody else's password is sent anywhere.
 
-How it signs in: OAuth 2.1 with PKCE (S256), dynamic client registration and refresh tokens, from the MCP SDK's auth router. ChatGPT and Claude only get the relay's own random tokens, kept here only as hashes. Your Supabase refresh token stays on the runner, in memory and, with a state file, sealed. Registered clients are signed rather than stored, and may only send their code back to ChatGPT, Claude or an app on the same computer. Sign-in tries are limited per address. The password goes to Supabase once and never to a log or the disk.
+How it signs in: OAuth 2.1 with PKCE (S256), dynamic client registration and refresh tokens, from the MCP SDK's auth router. The relay never keeps your session. When you sign in on its page, your session is used once, for `create_relay_grant`, which ties a grant to your accepted runner link and gives back a random secret, kept in the database only as a hash. Then that session is signed out. From then on every call is the runner's own, through the `relay_*` functions with that secret, and each acts as you for that one thing only while the grant stands and the link is still accepted. There's no relay function for approvals, so the database still keeps the runner from answering one.
 
-One thing this changes: while someone is connected, the runner holds your own session, not just its own. The relay never calls `decide_cloud_approval` and has no route to it, but the database can no longer tell the runner process from you for that session. Disconnect in ChatGPT or Claude, or change your password, to end it.
+- ChatGPT and Claude only get the relay's own random tokens, kept here only as hashes.
+- A refresh token that comes back after it's been used ends the whole connection.
+- A connection ends after 30 days unused, and after 90 days whatever happens.
+- Registered clients are signed rather than stored, and may only send their code back to ChatGPT, Claude or an app on the same computer.
+- Any account but `BLUEBERRY_RUNNER_OWNER` is refused before anything is sent, without using up the owner's tries, which are limited per address and in all.
+- The password goes to Supabase once, and never to a log or the disk.
+
+**Unlink** in Settings, or linking another runner, revokes every grant. **Disconnect ChatGPT and Claude** in Settings > Cloud revokes them and keeps the runner.
 
 ## Try it locally
 
