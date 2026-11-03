@@ -4,8 +4,11 @@ import { dirname } from "path";
 import type { Bookmark } from "../shared/library";
 
 const WEB = /^https?:\/\//i;
+// A page names its own icon, so it could name one of any length. Longer than this, the site shows its letter.
+export const MAX_ICON_LENGTH = 2048;
 // Only an icon on the web, never a data address or anything else a page could name.
-const webIcon = (favicon: unknown) => (typeof favicon === "string" && WEB.test(favicon) ? { favicon } : {});
+const webIcon = (favicon: unknown) =>
+  typeof favicon === "string" && favicon.length <= MAX_ICON_LENGTH && WEB.test(favicon) ? { favicon } : {};
 
 export class BookmarkStore {
   private bookmarks: Bookmark[] = [];

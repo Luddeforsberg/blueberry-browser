@@ -415,7 +415,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
 
   // A site the user didn't name asks before it's opened.
   await expect(card.locator("p").getByText(`Open ${url} in a new tab`)).toBeVisible();
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   // Even a harmless-looking button in another site's frame asks, and says whose it is.
   await expect(card.locator("p").getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
   await card.getByRole("button", { name: "Allow", exact: true }).click();
@@ -1288,6 +1288,22 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
   await expect(sidebar.getByRole("list", { name: "Tabs", exact: true }).getByText("Plan a trip to Porto")).toHaveCount(0);
   await expect(sidebar.locator("[aria-current=page]")).toHaveCount(1);
+
+  // Collapsed, Chats still shows the open one, since nothing else does.
+  const chats = chrome.getByRole("button", { name: "Chats", exact: true });
+  await chats.click();
+  await expect(chats).toHaveAttribute("aria-expanded", "false");
+  await expect(chatInSidebar("Plan a trip to Porto")).toHaveAttribute("aria-current", "page");
+  await chats.click();
+
+  // Its row closes the tab, as closing a tab does, and keeps the chat. Another tab is open, since closing the last
+  // one closes the window.
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await chatInSidebar("Plan a trip to Porto").hover();
+  await chrome.getByRole("button", { name: "Close Plan a trip to Porto" }).click();
+  await expect.poll(async () => (await getTabs()).some((tab) => tab.page === "chat")).toBe(false);
+  await expect(chatInSidebar("Plan a trip to Porto")).toBeVisible();
+  await expect(chrome.getByRole("button", { name: "Close Plan a trip to Porto" })).toHaveCount(0);
 });
 
 test("the sidebar opens Routines and Settings as tabs, once each", async () => {

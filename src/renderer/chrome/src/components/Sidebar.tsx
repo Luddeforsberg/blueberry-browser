@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
-import { Bird, ChevronDown, Cloud, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import { Bird, ChevronDown, Cloud, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
@@ -47,8 +47,10 @@ const Section: React.FC<{
     id: string
     title: string
     collapsible?: boolean
+    // What stays showing while it's collapsed.
+    whenClosed?: React.ReactNode
     children: React.ReactNode
-}> = ({ id, title, collapsible = false, children }) => {
+}> = ({ id, title, collapsible = false, whenClosed, children }) => {
     const [open, setOpen] = useState(true)
 
     return (
@@ -68,7 +70,7 @@ const Section: React.FC<{
                     title
                 )}
             </h2>
-            {open && children}
+            {open ? children : whenClosed}
         </section>
     )
 }
@@ -125,6 +127,12 @@ const age = (time: number) => {
 
 const ICON = "size-4 shrink-0"
 
+// A chat row's own buttons, over its right end, until the row has the pointer or the keyboard.
+const ROW_ACTION = cn(
+    "absolute top-1 size-[26px] flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors app-region-no-drag",
+    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+)
+
 // A page the chat's running job opened, under the chat rather than with the user's tabs. It closes when the job ends,
 // unless the user takes it over or the reply sends them there.
 const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
@@ -151,7 +159,9 @@ export const ChatRow: React.FC<{
     onOpen: () => void
     // The tabs its running job opened.
     jobTabs?: TabInfo[]
-}> = ({ chat, selected, onOpen, jobTabs = [] }) => {
+    // Closes its tab, when it has one open, and keeps the chat, as closing any tab does.
+    onClose?: () => void
+}> = ({ chat, selected, onOpen, jobTabs = [], onClose }) => {
     const [editing, setEditing] = useState(false)
     // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
     const finished = useRef(false)
@@ -206,7 +216,7 @@ export const ChatRow: React.FC<{
                 type="button"
                 aria-current={selected ? 'page' : undefined}
                 onClick={onOpen}
-                className={cn(ROW, "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
+                className={cn(ROW, onClose ? "pr-[60px]" : "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
             >
                 {/* Only another bird, or one at work, is worth saying, so a Berry chat's name starts with its title. */}
                 <span className={LEADING_SLOT} aria-hidden={(!chat.mascotId && !chat.running) || undefined}>
@@ -234,13 +244,15 @@ export const ChatRow: React.FC<{
                 type="button"
                 aria-label={`More options for ${chat.title}`}
                 onClick={() => void showMenu()}
-                className={cn(
-                    "absolute right-1 top-1 size-[26px] flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors app-region-no-drag",
-                    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                )}
+                className={cn(ROW_ACTION, onClose ? "right-8" : "right-1")}
             >
                 <Ellipsis className={ICON} />
             </button>
+            {onClose && (
+                <button type="button" aria-label={`Close ${chat.title}`} onClick={onClose} className={cn(ROW_ACTION, "right-1")}>
+                    <X className="size-3" />
+                </button>
+            )}
             {jobTabs.length > 0 && (
                 <ul aria-label={`Pages ${mascot.name} opened`} className="mt-0.5 flex flex-col gap-0.5">
                     {jobTabs.map((tab) => <JobTabRow key={tab.id} tab={tab} />)}
@@ -253,12 +265,28 @@ export const ChatRow: React.FC<{
 // `floating` is the collapsed sidebar shown over the page, where the button pins it open again.
 export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) => {
     const { layout, theme, toggleSidebar } = useShell()
-    const { activeTab, createTab, tabs } = useBrowser()
+    const { activeTab, closeTab, createTab, tabs } = useBrowser()
     const library = useLibrary()
     const browser = window.chromeAPI.browser
 
     const isOpen = (page: InternalPage, param: string | null = null) =>
         activeTab?.page === page && (param === null || activeTab.pageParam === param)
+
+    // A chat's tab shows only as its row, so the row closes it too.
+    const chatRow = (chat: ChatThreadSummary) => {
+        const tab = tabs.find(({ page, pageParam }) => page === 'chat' && pageParam === chat.id)
+        return (
+            <ChatRow
+                key={chat.id}
+                chat={chat}
+                selected={isOpen('chat', chat.id)}
+                jobTabs={tabs.filter((jobTab) => jobTab.jobChatId === chat.id)}
+                onOpen={() => void browser.openPage('chat', { param: chat.id, title: chat.title })}
+                onClose={tab && (() => void closeTab(tab.id))}
+            />
+        )
+    }
+    const openChat = library.chats.find((chat) => isOpen('chat', chat.id))
 
     // The buttons on top sit on the toolbar's row, wherever this sidebar starts: the floating one is inset in its view.
     const nav = useRef<HTMLElement>(null)
@@ -322,18 +350,9 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 </ul>
 
                 {library.chats.length > 0 && (
-                    <Section id="sidebar-chats" title="Chats" collapsible>
-                        <ul>
-                            {library.chats.map((chat) => (
-                                <ChatRow
-                                    key={chat.id}
-                                    chat={chat}
-                                    selected={isOpen('chat', chat.id)}
-                                    jobTabs={tabs.filter((tab) => tab.jobChatId === chat.id)}
-                                    onOpen={() => void browser.openPage('chat', { param: chat.id, title: chat.title })}
-                                />
-                            ))}
-                        </ul>
+                    // Collapsed, the open chat stays, since Tabs doesn't list it.
+                    <Section id="sidebar-chats" title="Chats" collapsible whenClosed={openChat && <ul>{chatRow(openChat)}</ul>}>
+                        <ul>{library.chats.map(chatRow)}</ul>
                     </Section>
                 )}
 
