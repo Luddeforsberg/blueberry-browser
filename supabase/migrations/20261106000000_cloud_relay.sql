@@ -55,13 +55,17 @@ create index if not exists cloud_relay_jobs_grant on public.cloud_relay_jobs (gr
 alter table public.cloud_relay_jobs enable row level security;
 revoke all on table public.cloud_relay_jobs from public, anon, authenticated;
 
--- A link that's deleted, unaccepted or given another runner takes its grants with it.
+-- A link that's deleted, unaccepted or given another runner takes its grants with it. An account that accepts a link as
+-- someone's runner has no jobs of its own from then on, so its own grants go too.
 create or replace function public.revoke_relay_grants_of_link() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
   if tg_op = 'DELETE' or new.runner <> old.runner or not new.accepted then
     update public.cloud_relay_grants set revoked_at = now() where owner = old.owner and runner = old.runner and revoked_at is null;
+  end if;
+  if tg_op = 'UPDATE' and new.accepted and not old.accepted then
+    update public.cloud_relay_grants set revoked_at = now() where owner = new.runner and revoked_at is null;
   end if;
   return null;
 end;
@@ -160,6 +164,10 @@ declare
   newest_context text;
 begin
   perform public.lock_cloud_account(g.owner);
+  -- Checked again under the lock that accepting a link takes: an owner who has since become a runner starts nothing.
+  if exists (select 1 from public.cloud_runner_links l where l.runner = g.owner and l.accepted) then
+    raise exception 'A runner can''t start jobs' using errcode = '42501';
+  end if;
   if (select count(*) from public.cloud_jobs j where j.owner = g.owner and j.status in ('queued', 'running', 'waiting')) >= 5 then
     raise exception 'Too many cloud jobs at once' using errcode = 'P0001';
   end if;

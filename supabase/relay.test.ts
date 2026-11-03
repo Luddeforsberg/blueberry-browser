@@ -146,6 +146,20 @@ describe("the relay's grants", () => {
     expect((await db.query("select decision from public.cloud_approvals where id = $1", [approval])).rows).toEqual([{ decision: null }]);
   });
 
+  it("refuses a grant whose owner has since become someone's runner", async () => {
+    const secret = await grant(ALICE);
+    const carol = await newUser();
+    await as(carol, `select public.link_cloud_runner('${emailOf(ALICE)}')`);
+    // Accepting revokes Alice's own grants.
+    expect(await one(ALICE, `select public.accept_cloud_runner_link('${emailOf(carol)}')`)).toBe(true);
+    await refusesAll(RUNNER, secret);
+    await expect(as(ALICE, `select public.start_cloud_job('Go', '[]', ${MASCOT}, 'risky', null)`)).rejects.toThrow(/A runner can't start jobs/);
+    // And with the revocation undone, the check under the lock still refuses.
+    await db.query("update public.cloud_relay_grants set revoked_at = null where owner = $1", [ALICE]);
+    await expect(as(RUNNER, `select public.relay_start_job('${secret}', 'Go', ${MASCOT})`)).rejects.toThrow(/A runner can't start jobs/);
+    expect((await db.query("select count(*)::int as n from public.cloud_jobs where owner = $1", [ALICE])).rows).toEqual([{ n: 0 }]);
+  });
+
   it("keeps a few grants per owner at a time", async () => {
     const first = await grant(ALICE);
     for (let n = 0; n < 20; n++) await grant(ALICE);

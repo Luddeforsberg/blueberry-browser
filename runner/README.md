@@ -69,8 +69,9 @@ With `RELAY_PUBLIC_URL` and `RELAY_SECRET` set, the runner also serves a remote 
 How it signs in: OAuth 2.1 with PKCE (S256), dynamic client registration and refresh tokens, from the MCP SDK's auth router. The relay never keeps your session. When you sign in on its page, your session is used once, for `create_relay_grant`, which ties a grant to your accepted runner link and gives back a random secret, kept in the database only as a hash. Then that session is signed out. From then on every call is the runner's own, through the `relay_*` functions with that secret, and each acts as you for that one thing only while the grant stands and the link is still accepted. There's no relay function for approvals, so the database still keeps the runner from answering one.
 
 - ChatGPT and Claude only get the relay's own random tokens, kept here only as hashes.
-- A refresh token that comes back after it's been used ends the whole connection.
+- A refresh token that comes back after it's been used ends the whole connection, however many times it has turned over since: each one names its connection, signed.
 - A connection ends after 30 days unused, and after 90 days whatever happens.
+- An account that becomes someone else's runner loses its own grants, and the database refuses a job from one anyway.
 - Registered clients are signed rather than stored, and may only send their code back to ChatGPT, Claude or an app on the same computer.
 - Any account but `BLUEBERRY_RUNNER_OWNER` is refused before anything is sent, without using up the owner's tries, which are limited per address and in all.
 - The password goes to Supabase once, and never to a log or the disk.

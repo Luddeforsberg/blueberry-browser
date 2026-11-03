@@ -26,8 +26,6 @@ export const AGE_LIMIT_MS = 90 * 24 * 60 * 60_000;
 const MAX_GRANTS = 20;
 const MAX_CODES = 50;
 const MAX_REDIRECTS = 5;
-// Refresh tokens already used, per connection, so one that comes back is noticed.
-const MAX_USED_REFRESH = 50;
 // A light limit on the owner's sign-in tries, per address and in all. Anyone else is refused before it counts.
 const TRIES_WINDOW_MS = 15 * 60_000;
 const TRIES_PER_ADDRESS = 10;
@@ -106,8 +104,8 @@ interface Grant {
   secret: string;
   accessHash: string;
   accessExpiresAt: number;
+  // Only the newest refresh token. Every one names its connection, so an older one coming back is always noticed.
   refreshHash: string;
-  usedRefresh: string[];
   createdAt: number;
   lastUsedAt: number;
 }
@@ -265,28 +263,26 @@ export class RelayAuth implements OAuthServerProvider {
     if (redirectUri !== undefined && redirectUri !== code.redirectUri) throw new InvalidGrantError("The redirect_uri doesn't match.");
     if (resource && resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
     const now = this.now();
-    const grant: Grant = { id: randomUUID(), clientId: client.client_id, secret: code.secret, accessHash: "", accessExpiresAt: 0, refreshHash: "", usedRefresh: [], createdAt: now, lastUsedAt: now };
+    const grant: Grant = { id: randomUUID(), clientId: client.client_id, secret: code.secret, accessHash: "", accessExpiresAt: 0, refreshHash: "", createdAt: now, lastUsedAt: now };
     this.grants.set(grant.id, grant);
     while (this.grants.size > MAX_GRANTS) this.end(this.grants.keys().next().value as string);
     return this.issue(grant);
   }
 
   async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, _scopes?: string[], resource?: URL): Promise<OAuthTokens> {
-    const wanted = hash(refreshToken);
-    // One already used coming back means it was copied: the whole connection ends (RFC 9700 4.14.2).
-    const reused = [...this.grants.values()].find((one) => one.usedRefresh.includes(wanted));
-    if (reused) {
-      this.end(reused.id);
+    const grant = this.grants.get(this.connectionOf(refreshToken) ?? "");
+    if (!grant) throw new InvalidGrantError("That refresh token isn't valid.");
+    // A token of this connection that isn't its newest was used already, so it was copied: the whole connection ends,
+    // however long ago (RFC 9700 4.14.2). So does one of its tokens from another app.
+    if (hash(refreshToken) !== grant.refreshHash || grant.clientId !== client.client_id) {
+      this.end(grant.id);
       throw new InvalidGrantError("That refresh token was already used, so this connection has ended. Connect again.");
     }
-    const grant = this.byHash("refreshHash", refreshToken);
-    if (!grant || grant.clientId !== client.client_id) throw new InvalidGrantError("That refresh token isn't valid.");
     if (resource && resource.href !== this.options.resource.href) throw new InvalidTargetError("This server is only for its own MCP address.");
     if (this.expired(grant)) {
       this.end(grant.id);
       throw new InvalidGrantError("This connection has run out. Connect again.");
     }
-    grant.usedRefresh = [...grant.usedRefresh, grant.refreshHash].slice(-MAX_USED_REFRESH);
     grant.lastUsedAt = this.now();
     return this.issue(grant);
   }
@@ -309,12 +305,22 @@ export class RelayAuth implements OAuthServerProvider {
 
   private issue(grant: Grant): OAuthTokens {
     const access = newToken("at");
-    const refresh = newToken("rt");
+    // Names its connection, signed so nobody can make one that ends someone else's.
+    const body = `${grant.id}.${randomBytes(32).toString("base64url")}`;
+    const refresh = `bb_rt_${body}.${b64(mac(this.keys, `refresh:${body}`))}`;
     grant.accessHash = hash(access);
     grant.accessExpiresAt = this.now() + ACCESS_TTL_S * 1000;
     grant.refreshHash = hash(refresh);
     this.save();
     return { access_token: access, token_type: "bearer", expires_in: ACCESS_TTL_S, refresh_token: refresh };
+  }
+
+  private connectionOf(refreshToken: string): string | null {
+    const match = /^bb_rt_([0-9a-f-]{36})\.([\w-]+)\.([\w-]+)$/.exec(refreshToken);
+    if (!match) return null;
+    const given = Buffer.from(match[3], "base64url");
+    const wanted = mac(this.keys, `refresh:${match[1]}.${match[2]}`);
+    return given.length === wanted.length && timingSafeEqual(given, wanted) ? match[1] : null;
   }
 
   private byHash(field: "accessHash" | "refreshHash", token: string): Grant | null {
@@ -366,7 +372,7 @@ export class RelayAuth implements OAuthServerProvider {
     try {
       for (const grant of JSON.parse(plain) as Grant[]) {
         if (typeof grant?.id === "string" && typeof grant.secret === "string" && typeof grant.createdAt === "number" && typeof grant.lastUsedAt === "number") {
-          this.grants.set(grant.id, { ...grant, usedRefresh: Array.isArray(grant.usedRefresh) ? grant.usedRefresh.map(String) : [] });
+          this.grants.set(grant.id, grant);
         }
       }
     } catch {

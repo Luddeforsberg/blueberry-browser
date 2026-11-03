@@ -91,6 +91,26 @@ describe("RelayAuth", () => {
     await expect(auth.verifyAccessToken(next.access_token)).rejects.toThrow();
   });
 
+  it("ends the connection when its first refresh token comes back after 60 rotations", async () => {
+    const { auth, seen } = setUp();
+    const { client, tokens } = await connect(auth);
+    let latest = tokens;
+    for (let n = 0; n < 60; n++) latest = await auth.exchangeRefreshToken(client, latest.refresh_token!);
+    await expect(auth.exchangeRefreshToken(client, tokens.refresh_token!)).rejects.toThrow(/already used/);
+    expect(seen.revoked).toEqual(["grant-secret-1"]);
+    await expect(auth.exchangeRefreshToken(client, latest.refresh_token!)).rejects.toThrow();
+    await expect(auth.verifyAccessToken(latest.access_token)).rejects.toThrow();
+  });
+
+  it("ignores a refresh token it didn't sign, without ending anything", async () => {
+    const { auth, seen } = setUp();
+    const { client, tokens } = await connect(auth);
+    const [, id] = /^bb_rt_([^.]+)\./.exec(tokens.refresh_token!)!;
+    await expect(auth.exchangeRefreshToken(client, `bb_rt_${id}.made-up.made-up`)).rejects.toThrow(/isn't valid/);
+    expect(seen.revoked).toEqual([]);
+    await expect(auth.exchangeRefreshToken(client, tokens.refresh_token!)).resolves.toBeTruthy();
+  });
+
   it("ends a connection unused for 30 days", async () => {
     const { auth, seen, advance } = setUp();
     const { client, tokens } = await connect(auth);
