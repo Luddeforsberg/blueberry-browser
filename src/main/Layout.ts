@@ -289,6 +289,7 @@ export function computeLayout(
     },
     tabStrip,
     toolbar: { x: cardX, y: toolbarY, width: cardWidth, height: toolbarHeight },
+    addressRow: { x: cardX, y: toolbarY, width: cardWidth, height: ADDRESS_ROW_HEIGHT },
     chat: chat ? { x: window.width - right, y: 0, width: right, height } : EMPTY,
     page: {
       x: cardX,

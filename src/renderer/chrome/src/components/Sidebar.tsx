@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react'
-import { Bird, ChevronDown, Cloud, Ellipsis, Hand, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
+import { Bird, ChevronDown, Cloud, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
@@ -7,6 +7,7 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
+import { LEADING_SLOT } from './TabIcon'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
 import { NeedsYouCount } from './NeedsYou'
 import { RoutineDot } from './RoutineNotice'
@@ -21,21 +22,21 @@ const ROW = cn(
 )
 
 const SidebarRow: React.FC<{
-    leading?: React.ReactNode
+    leading: React.ReactNode
     label: string
     trailing?: React.ReactNode
     onClick: () => void
-    selected?: boolean
+    // Its page is the active tab. The tab under Tabs carries the highlight, so this row only stops being muted.
+    open?: boolean
     muted?: boolean
-}> = ({ leading, label, trailing, onClick, selected = false, muted = false }) => (
+}> = ({ leading, label, trailing, onClick, open = false, muted = false }) => (
     <li>
         <button
             type="button"
-            aria-current={selected ? 'page' : undefined}
             onClick={onClick}
-            className={cn(ROW, selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5", muted && !selected && "text-muted-foreground")}
+            className={cn(ROW, "hover:bg-foreground/5", muted && !open && "text-muted-foreground")}
         >
-            {leading}
+            <span className={LEADING_SLOT}>{leading}</span>
             <span className="flex-1 truncate">{label}</span>
             {trailing && <span className="shrink-0 text-12 text-muted-foreground tabular-nums">{trailing}</span>}
         </button>
@@ -106,7 +107,7 @@ const Cluster: React.FC = () => {
                             theme.glass ? "bg-surface/60" : "bg-surface"
                         )}
                     >
-                        <Favicon src={siteIcon(site.url)} fallback={site.title.charAt(0)} />
+                        <Favicon src={site.favicon ?? siteIcon(site.url)} fallback={site.title.charAt(0)} />
                     </button>
                 </li>
             ))}
@@ -136,7 +137,7 @@ const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 onClick={() => !tab.isActive && void switchTab(tab.id)}
                 className={cn(ROW, "h-[30px] pl-9 gap-2.5 text-13 text-muted-foreground", tab.isActive ? "bg-selected shadow-selected text-foreground" : "hover:bg-foreground/5 hover:text-foreground")}
             >
-                <Favicon src={tab.favicon} className="size-3.5" />
+                <Favicon src={tab.favicon} site={tab.url} className="size-3.5" />
                 <span className="flex-1 truncate">{tab.title || 'New Tab'}</span>
             </button>
         </li>
@@ -157,6 +158,7 @@ export const ChatRow: React.FC<{
     const api = window.chromeAPI.chat
     const { find } = useFlock()
     const mascot = find(chat.mascotId)
+    const { showBerry } = useShell().settings
 
     const showMenu = async () => {
         if ((await api.showMenu(chat.id)) === 'rename') {
@@ -206,8 +208,10 @@ export const ChatRow: React.FC<{
                 onClick={onOpen}
                 className={cn(ROW, "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
             >
-                {/* Berry's own chats stay plain until it's working, so a list of them stays quiet. */}
-                {(chat.mascotId || chat.running) && <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} className="-ml-0.5" />}
+                {/* Only another bird, or one at work, is worth saying, so a Berry chat's name starts with its title. */}
+                <span className={LEADING_SLOT} aria-hidden={(!chat.mascotId && !chat.running) || undefined}>
+                    {showBerry ? <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} /> : <MessageCircle className={cn(ICON, "text-muted-foreground")} />}
+                </span>
                 <span className="flex-1 truncate">{chat.title}</span>
                 {chat.cloud && (
                     <span className="shrink-0 text-muted-foreground" title="In the cloud">
@@ -256,12 +260,21 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
     const isOpen = (page: InternalPage, param: string | null = null) =>
         activeTab?.page === page && (param === null || activeTab.pageParam === param)
 
+    // The buttons on top sit on the toolbar's row, wherever this sidebar starts: the floating one is inset in its view.
+    const nav = useRef<HTMLElement>(null)
+    const [top, setTop] = useState(0)
+    useLayoutEffect(() => setTop(nav.current?.getBoundingClientRect().top ?? 0), [])
+    const above = layout.addressRow.y - (floating ? layout.floatingSidebar.y : layout.sidebar.y) - top
+
     return (
-        <nav aria-label="Sidebar" className="h-full flex flex-col">
+        <nav ref={nav} aria-label="Sidebar" className="h-full flex flex-col">
             <div
-                className="flex items-center justify-end gap-0.5 px-2.5 app-region-drag shrink-0"
+                className="flex items-center justify-end gap-0.5 px-2.5 pb-2 box-content app-region-drag shrink-0"
                 style={{
-                    height: layout.controls.height,
+                    // Padding, so the space above can still drag the window.
+                    paddingTop: Math.max(above, 0),
+                    marginTop: Math.min(above, 0),
+                    height: layout.addressRow.height,
                     paddingLeft: theme.platform === 'mac' ? layout.controls.width : undefined
                 }}
             >
@@ -288,7 +301,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         leading={<Hand className={ICON} />}
                         label="Needs you"
                         trailing={<NeedsYouCount />}
-                        selected={isOpen('needs-you')}
+                        open={isOpen('needs-you')}
                         onClick={() => void browser.openPage('needs-you')}
                     />
                     <SidebarRow
@@ -296,14 +309,14 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         leading={<RefreshCw className={ICON} />}
                         label="Routines"
                         trailing={<RoutineDot />}
-                        selected={isOpen('routines')}
+                        open={isOpen('routines')}
                         onClick={() => void browser.openPage('routines')}
                     />
                     <SidebarRow
                         muted
                         leading={<Bird className={ICON} />}
                         label="Flock"
-                        selected={isOpen('flock')}
+                        open={isOpen('flock')}
                         onClick={() => void browser.openPage('flock')}
                     />
                 </ul>
@@ -334,7 +347,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                     muted
                     leading={<Settings className={ICON} />}
                     label="Settings"
-                    selected={isOpen('settings')}
+                    open={isOpen('settings')}
                     onClick={() => void browser.openPage('settings')}
                 />
             </ul>

@@ -35,7 +35,7 @@ export const HistoryRow: React.FC<{
             )}
         >
             <span className="w-12 shrink-0 text-12 text-muted-foreground tabular-nums">{timeOf(entry.visitedAt)}</span>
-            <Favicon src={entry.favicon} />
+            <Favicon src={entry.favicon} site={entry.url} />
             <span className="min-w-0 truncate">{entry.title}</span>
             <span className="min-w-0 shrink-[2] truncate text-12 text-muted-foreground">{hostOf(entry.url)}</span>
         </button>

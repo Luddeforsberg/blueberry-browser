@@ -282,6 +282,8 @@ export interface Layout {
   findBar: Rect;
   tabStrip: Rect;
   toolbar: Rect;
+  // The toolbar's row of buttons and address, which the sidebar's and chat panel's own buttons line up with.
+  addressRow: Rect;
   chat: Rect;
   page: Rect;
   // The page's size, all but one pixel outside the window, for a tab Berry works in behind the user's.

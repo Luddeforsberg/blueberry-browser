@@ -383,7 +383,7 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   await expect(card.locator("p").getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
   const reachable = JSON.stringify(model.requests.at(-1)?.messages.at(-1));
   expect(reachable).not.toContain(origin);
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
 
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
   expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Save");
@@ -418,7 +418,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   await card.getByRole("button", { name: "Allow" }).click();
   // Even a harmless-looking button in another site's frame asks, and says whose it is.
   await expect(card.locator("p").getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
 
   const question = chrome.getByRole("region", { name: "Berry is asking" });
   await expect(question.getByText("Which colour?")).toBeVisible();
@@ -617,7 +617,7 @@ test("Berry finds more on a page, chooses dropdown options, and says what really
   await page.evaluate(() => {
     document.querySelector<HTMLOptionElement>("option[value=m]")!.value = "delete-everything";
   });
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect(replies).toHaveCount(++done);
   expect(String(model.requests.at(-1)?.messages.at(-1)?.content)).toContain("the page changed");
   expect(await value("#size")).toBe("s");
@@ -626,14 +626,14 @@ test("Berry finds more on a page, chooses dropdown options, and says what really
   model.callTools({ name: "click", args: { ref: named("Finished").ref } });
   await askInPanel("Tick it");
   await expect(card.locator("p").getByText(`Click the checkbox “Finished” on ${url}`)).toBeVisible();
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(replies).toHaveCount(++done);
 
   // An option with no text still says what it sends.
   model.callTools({ name: "choose_option", args: { ref: named("Size").ref, option: "" } });
   await askInPanel("Choose the blank one");
   await expect(card.locator("p").getByText(`Choose “” (sent as “blank”) in the dropdown “Size” on ${url}`)).toBeVisible();
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(replies).toHaveCount(++done);
 
   // An element that's gone says so.
@@ -681,7 +681,7 @@ test("Berry does nothing if a link changes while the user decides", async () => 
   await expect(card.locator("p").getByText(`Click the link “Continue” on ${origin}/form, which goes to ${origin}/one`)).toBeVisible();
 
   await page.evaluate(() => document.querySelector("a")!.setAttribute("href", "/delete"));
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect(panel.getByText("A reply from the model")).toBeVisible();
 
   expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("the page changed");
@@ -709,7 +709,7 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
   expect(listed).toContain('"name":"Save"');
   expect(listed).not.toContain("hunter2");
 
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(panel.getByText("A reply from the model")).toBeVisible();
   await expect(card).toHaveCount(0);
   expect(await page.title()).toBe("Form");
@@ -717,14 +717,14 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
 
   model.callTools({ name: "click", args: { ref: "e1" } });
   await askInPanel("Please save it");
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(() => page.title()).toBe("Saved");
   await expect(panel.getByText("Clicked something on")).toBeVisible();
 
   model.callTools({ name: "type_text", args: { ref: "e2", text: "hi there", submit: true } });
   await askInPanel("Write a note");
   await expect(card.locator("p").getByText(`Type “hi there” into the field “Note” and submit it on ${origin}/form, which goes to ${origin}/form`)).toBeVisible();
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(() => page.title()).toBe("Sent hi there");
   await expect(card).toHaveCount(0);
 });
@@ -765,22 +765,22 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   for (const [element, expected] of [[ref("Delete account"), "Delete account"], [ref("Ta bort inlägg"), "Ta bort inlägg"], [unnamed, "”"], [ref("Go"), "Go"]]) {
     await act("click", { ref: element });
     await expect(card.locator("p").getByText(expected, { exact: false })).toBeVisible();
-    await card.getByRole("button", { name: "Cancel" }).click();
+    await card.getByRole("button", { name: "Don’t allow" }).click();
     await expect(replies()).toHaveCount(++done);
   }
   await act("type_text", { ref: ref("Title"), text: "hello" });
   await expect(card.locator("p").getByText("Type “hello”", { exact: false })).toBeVisible();
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(replies()).toHaveCount(++done);
   await act("type_text", { ref: ref("Search"), text: "x".repeat(101) });
   await expect(card).toBeVisible();
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(replies()).toHaveCount(++done);
   // Not in the message, since an address the user typed doesn't ask.
   model.callTools({ name: "open_tab", args: { url: "https://unknown.example/?secret=abc" } });
   await askInPanel("Open it");
   await expect(card).toBeVisible();
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(replies()).toHaveCount(++done);
 
   await askBeforeActing("never");
@@ -821,7 +821,7 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
 
   model.callTools({ name: "open_tab", args: { url: "file:///etc/hosts" } });
   await askInPanel("Open the file");
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect(panel.getByText("A reply from the model")).toBeVisible();
   expect(JSON.stringify(model.requests.at(-1)?.messages.at(-1))).toContain("Only http and https");
 
@@ -830,7 +830,7 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
   await askInPanel("Open the form");
   await expect(card.locator("p").getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
   expect(await getTabs()).toHaveLength(before);
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(async () => (await getTabs()).length).toBe(before + 1);
   // It opens behind the user, who stays where they were.
   await expect.poll(async () => (await getTabs()).at(-1)?.title).toBe("Form");
@@ -1284,6 +1284,10 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
 
   await expect(chatInSidebar("Plan a trip to Porto")).toHaveAttribute("aria-current", "page");
+  // The chat is its row under Chats and nothing under Tabs, so it's listed and highlighted once.
+  const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
+  await expect(sidebar.getByRole("list", { name: "Tabs", exact: true }).getByText("Plan a trip to Porto")).toHaveCount(0);
+  await expect(sidebar.locator("[aria-current=page]")).toHaveCount(1);
 });
 
 test("the sidebar opens Routines and Settings as tabs, once each", async () => {
@@ -1414,7 +1418,11 @@ test("settings sits at the bottom of the sidebar", async () => {
 
   await row.click();
   expect((await activeTab()).page).toBe("settings");
-  await expect(row).toHaveAttribute("aria-current", "page");
+  // One highlight: the Settings tab has it, and the row it was opened from doesn't.
+  const tab = sidebar.getByRole("list", { name: "Tabs", exact: true }).getByRole("button", { name: "Settings", exact: true });
+  await expect(tab).toHaveAttribute("aria-current", "page");
+  await expect(sidebar.locator("[aria-current=page]")).toHaveCount(1);
+  await expect(row).not.toHaveClass(/bg-selected/);
 });
 
 test("dragging a tab reorders it in both layouts, and a short press only selects it", async () => {

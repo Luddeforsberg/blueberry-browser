@@ -3,6 +3,10 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { Bookmark } from "../shared/library";
 
+const WEB = /^https?:\/\//i;
+// Only an icon on the web, never a data address or anything else a page could name.
+const webIcon = (favicon: unknown) => (typeof favicon === "string" && WEB.test(favicon) ? { favicon } : {});
+
 export class BookmarkStore {
   private bookmarks: Bookmark[] = [];
 
@@ -10,10 +14,12 @@ export class BookmarkStore {
     try {
       const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
       if (Array.isArray(raw)) {
-        this.bookmarks = raw.filter((item): item is Bookmark =>
-          item && typeof item.id === "string" && typeof item.title === "string" &&
-          typeof item.url === "string" && /^https?:\/\//i.test(item.url)
-        );
+        this.bookmarks = raw
+          .filter((item): item is Bookmark =>
+            item && typeof item.id === "string" && typeof item.title === "string" &&
+            typeof item.url === "string" && WEB.test(item.url)
+          )
+          .map(({ id, title, url, favicon }) => ({ id, title, url, ...webIcon(favicon) }));
       }
     } catch {
       // A missing or unreadable file leaves the library empty, like settings.
@@ -24,12 +30,12 @@ export class BookmarkStore {
     return this.bookmarks;
   }
 
-  toggle(url: string, title: string): void {
-    if (!/^https?:\/\//i.test(url)) return;
+  toggle(url: string, title: string, favicon: string | null = null): void {
+    if (!WEB.test(url)) return;
     const existing = this.bookmarks.find((bookmark) => bookmark.url === url);
     this.save(existing
       ? this.bookmarks.filter((bookmark) => bookmark.id !== existing.id)
-      : [...this.bookmarks, { id: randomUUID(), title: title || url, url }]);
+      : [...this.bookmarks, { id: randomUUID(), title: title || url, url, ...webIcon(favicon) }]);
   }
 
   remove(id: string): void {

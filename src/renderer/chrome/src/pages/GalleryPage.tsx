@@ -400,7 +400,7 @@ export const GalleryPage: React.FC = () => {
                             question={<>I’d like to open <strong className="font-semibold">github.com</strong> in a new tab</>}
                             exactly="Open https://github.com/acme/checkout/pull/412?diff=split in a new tab"
                             onConfirm={() => undefined}
-                            onCancel={() => undefined}
+                            onDeny={() => undefined}
                         />
                     </div>
                 </Section>
@@ -467,10 +467,9 @@ export const GalleryPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-3">
                         <Button>Primary</Button>
                         <Button variant="outline">Outline</Button>
-                        <Button variant="ghost">Ghost</Button>
-                        <Button variant="link">Link</Button>
-                        <Button variant="destructive">Destructive</Button>
+                        <Button variant="ghost" className="text-muted-foreground">Quiet</Button>
                         <Button disabled>Disabled</Button>
+                        <Button variant="destructive">Stop recording</Button>
                     </div>
                 </Section>
 

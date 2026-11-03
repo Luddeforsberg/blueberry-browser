@@ -34,6 +34,18 @@ describe("BookmarkStore", () => {
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual([]);
   });
 
+  it("keeps the icon the page named, only if it's on the web", () => {
+    const file = tempFile();
+    const store = new BookmarkStore(file);
+    store.toggle("https://a.example/", "A", "https://cdn.a.example/icon.png");
+    store.toggle("https://b.example/", "B", "data:image/png;base64,AAAA");
+    store.toggle("https://c.example/", "C");
+    expect(new BookmarkStore(file).get().map(({ favicon }) => favicon)).toEqual(["https://cdn.a.example/icon.png", undefined, undefined]);
+
+    writeFileSync(file, JSON.stringify([{ ...site, favicon: "javascript:alert(1)" }, { ...site, id: "b", favicon: 7 }]));
+    expect(new BookmarkStore(file).get()).toEqual([site, { ...site, id: "b" }]);
+  });
+
   it("uses the address when a page has no title", () => {
     const store = new BookmarkStore(tempFile());
     store.toggle(site.url, "");

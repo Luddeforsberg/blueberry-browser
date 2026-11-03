@@ -69,8 +69,8 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
                                 <p className="text-14 font-semibold truncate">{login.site}</p>
                                 <p className={login.status === 'signed-out' ? 'text-13 text-warning' : 'text-13 text-muted-foreground'}>{loginStatus(login)}</p>
                             </div>
-                            <Button size="xs" variant="ghost" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
-                            <Button size="xs" variant="outline" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
+                            <Button size="xs" variant="ghost" className="text-muted-foreground" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
+                            <Button size="xs" variant="ghost" className="text-muted-foreground" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
                         </li>
                     ))}
                 </ul>
