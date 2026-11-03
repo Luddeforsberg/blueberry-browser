@@ -149,9 +149,9 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     for (const name of ["Sneaky", "Fake", "Berry", "Removed"]) await expect(gallery.getByRole("listitem", { name, exact: true })).toHaveCount(0);
 
     // Starters still show, with no made-up count.
-    const paper = gallery.getByRole("listitem", { name: "Morning Paper" });
-    await expect(paper).toContainText("By Blueberry");
-    await expect(paper).not.toContainText("adds");
+    const starter = gallery.getByRole("listitem", { name: "Prospector" });
+    await expect(starter).toContainText("By Blueberry");
+    await expect(starter).not.toContainText("adds");
 
     // Sorting is real.
     await expect(gallery.getByRole("heading").first()).toHaveText("Scout");
@@ -201,7 +201,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     server.state.down = true;
     const down = await chrome.evaluate(() => window.chromeAPI.mascots.gallery());
     expect(down.status).toBe("unreachable");
-    expect(down.entries.some((entry) => entry.draft.name === "Morning Paper")).toBe(true);
+    expect(down.entries.some((entry) => entry.draft.name === "Prospector")).toBe(true);
     expect(down.entries.some((entry) => entry.draft.name === "Popular")).toBe(false);
     server.state.down = false;
   } finally {
@@ -291,7 +291,7 @@ test("with no server set up there's no sign-in or publish control, and the Galle
     await expect(chrome.getByRole("button", { name: "Edit Scout" })).toBeVisible();
     await expect(chrome.getByRole("button", { name: "Publish Scout" })).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
-    await expect(chrome.getByRole("list", { name: "Gallery", exact: true }).getByRole("listitem", { name: "Morning Paper" })).toBeVisible();
+    await expect(chrome.getByRole("list", { name: "Gallery", exact: true }).getByRole("listitem", { name: "Prospector" })).toBeVisible();
     await expect(chrome.getByRole("radio", { name: "Most added" })).toHaveCount(0);
     await expect(chrome.getByText("Couldn’t reach the Gallery’s server")).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));

@@ -5,7 +5,7 @@ export interface RunRecord {
   job: string;
   ability: string;
   run: number;
-  endedBy: "finished" | "timeout" | "budget" | "error";
+  endedBy: "finished" | "timeout" | "budget" | "error" | "handoff";
   error: string | null;
   // Set when the job hit the step limit and was told to keep going.
   firstError?: string | null;

@@ -11,9 +11,9 @@ const entry = {
 };
 
 describe("the mascot catalog", () => {
-  it("has starters that pass a mascot's own checks unchanged, with one limited to reading and one that can go anywhere", () => {
+  it("has starters that pass a mascot's own checks unchanged, with some that only read and some kept to their sites", () => {
     const catalog = starterMascots();
-    expect(catalog.length).toBeGreaterThanOrEqual(10);
+    expect(catalog.length).toBe(9);
     expect(new Set(catalog.map(({ id }) => id)).size).toBe(catalog.length);
     expect(new Set(catalog.map(({ draft }) => draft.name.toLowerCase())).size).toBe(catalog.length);
     for (const { draft, author, description } of catalog) {
@@ -25,8 +25,9 @@ describe("the mascot catalog", () => {
       expect(description.length).toBeLessThanOrEqual(70);
     }
     expect(catalog.filter(({ draft }) => draft.sites.length > 0).length).toBeLessThan(catalog.length / 2);
-    expect(catalog.some(({ draft }) => draft.sites.length > 0 && !draft.tools.includes("click") && !draft.tools.includes("type"))).toBe(true);
-    expect(catalog.some(({ draft }) => draft.sites.length === 0 && draft.tools.includes("visit"))).toBe(true);
+    expect(catalog.filter(({ draft }) => draft.tools.join() === "visit").length).toBeGreaterThanOrEqual(3);
+    expect(catalog.find(({ id }) => id === "follow-up")?.draft.sites).toEqual(["mail.google.com"]);
+    expect(catalog.find(({ id }) => id === "pipeline-tidy")?.draft.sites).toEqual(["hubspot.com", "pipedrive.com"]);
   });
 
   it("drops anything on an entry that isn't a card's or a mascot's", () => {

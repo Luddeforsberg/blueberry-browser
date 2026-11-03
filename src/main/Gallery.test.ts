@@ -109,8 +109,8 @@ describe("Gallery.add", () => {
 
   it("adds a starter by its version too", async () => {
     const { gallery, mascots } = start(limited, open);
-    const paper = (await gallery.list()).entries.find((entry) => entry.id === "morning-paper");
-    expect(gallery.add("morning-paper", paper?.version, null)).toMatchObject({ ok: true });
-    expect(mascots.all().some((mascot) => mascot.galleryId === "morning-paper")).toBe(true);
+    const prep = (await gallery.list()).entries.find((entry) => entry.id === "meeting-prep");
+    expect(gallery.add("meeting-prep", prep?.version, null)).toMatchObject({ ok: true });
+    expect(mascots.all().some((mascot) => mascot.galleryId === "meeting-prep")).toBe(true);
   });
 });

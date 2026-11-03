@@ -10,27 +10,27 @@ const entry = (name: string, category: string, sites: string[], tools: GalleryMa
   draft: { name, look: { palette: "robin", accessory: "cap" }, instructions: "Look around.", sites, tools },
 });
 
-const hunter = entry("Nest Hunter", "Home", ["hemnet.se"], ["visit", "click", "type"]);
-const paper = entry("Morning Paper", "News", ["svt.se"], ["visit"]);
-const names = (query: string, category: string | null = null) => filterGallery([hunter, paper], query, category).map(({ draft }) => draft.name);
+const tidy = entry("Pipeline Tidy", "Work", ["pipedrive.com"], ["visit", "click", "type"]);
+const watch = entry("Competitor Watch", "News", ["linear.app"], ["visit"]);
+const names = (query: string, category: string | null = null) => filterGallery([tidy, watch], query, category).map(({ draft }) => draft.name);
 
 describe("filterGallery", () => {
   it.each([
-    ["", ["Nest Hunter", "Morning Paper"]],
-    ["   ", ["Nest Hunter", "Morning Paper"]],
-    ["HEMNET", ["Nest Hunter"]],
-    ["paper svt", ["Morning Paper"]],
-    ["paper hemnet", []],
-    ["can’t type", ["Morning Paper"]],
-    ["can't type", ["Morning Paper"]],
+    ["", ["Pipeline Tidy", "Competitor Watch"]],
+    ["   ", ["Pipeline Tidy", "Competitor Watch"]],
+    ["PIPEDRIVE", ["Pipeline Tidy"]],
+    ["watch linear", ["Competitor Watch"]],
+    ["watch pipedrive", []],
+    ["can’t type", ["Competitor Watch"]],
+    ["can't type", ["Competitor Watch"]],
     ["nothing like this", []],
   ])("finds %j", (query, expected) => {
     expect(names(query)).toEqual(expected);
   });
 
   it("keeps to the chosen category, along with the search", () => {
-    expect(names("", "News")).toEqual(["Morning Paper"]);
-    expect(names("hemnet", "News")).toEqual([]);
+    expect(names("", "News")).toEqual(["Competitor Watch"]);
+    expect(names("pipedrive", "News")).toEqual([]);
   });
 });
 

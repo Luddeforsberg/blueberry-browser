@@ -18,6 +18,7 @@ import {
   type ModelCall,
 } from "./meter";
 import { writeReport, type RunRecord } from "./report";
+import { recordWithoutQueries } from "./addresses";
 
 const BUDGET_USD = Number(process.env.EVAL_BUDGET ?? 10);
 const JOB_TIMEOUT_MS = 8 * 60_000;
@@ -40,7 +41,7 @@ const saveRun = (record: RunRecord) => {
     (run) => run.job !== record.job || run.run !== record.run,
   );
   // These get committed, so they don't name the folder they ran in.
-  const json = JSON.stringify([...others, record], null, 2).replaceAll(
+  const json = JSON.stringify([...others, recordWithoutQueries(record)], null, 2).replaceAll(
     process.cwd(),
     "<repo>",
   );
@@ -170,9 +171,14 @@ test.describe("Berry on real websites", () => {
           await chrome
             .getByRole("button", { name: `Start a chat with ${job.galleryMascot}` })
             .click();
-          textbox = chrome.getByRole("textbox", { name: "Message" });
+          // Start a chat opens the new tab page with the mascot chosen.
+          textbox = chrome.getByRole("textbox", {
+            name: `Search, enter a URL, or ask ${job.galleryMascot}`,
+          });
           await textbox.fill(job.prompt);
-          await textbox.press("Enter");
+          await textbox.press(
+            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter",
+          );
         } else if (start) {
           await chrome.getByRole("button", { name: "Show Berry" }).click();
           textbox = chrome
@@ -224,9 +230,11 @@ test.describe("Berry on real websites", () => {
               { chat: id, approval: thread.approval.id },
             );
           }
+          // Nobody's there to take a page over either, so a handoff ends the run rather than waiting out the timeout.
+          const handedOver = Boolean(thread?.approval?.handoff);
           const overBudget = spent() + costOf(calls) >= BUDGET_USD;
-          if (overBudget || Date.now() - started > JOB_TIMEOUT_MS) {
-            endedBy = overBudget ? "budget" : "timeout";
+          if (handedOver || overBudget || Date.now() - started > JOB_TIMEOUT_MS) {
+            endedBy = handedOver ? "handoff" : overBudget ? "budget" : "timeout";
             await chrome.evaluate(
               (chat) => window.chromeAPI.chat.stop(chat),
               id,
