@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, Lock, LockOpen, Search } from 'lucide-react'
-import type { GalleryListing, GalleryMascot, MascotExample, MascotProfile } from '@shared/library'
+import type { TabInfo } from '@shared/ipc'
+import type { GalleryLinked, GalleryListing, GalleryMascot, MascotExample, MascotProfile } from '@shared/library'
 import { MAX_MASCOT_NAME, permissionsInWords } from '@shared/mascots'
 import { Button } from '@common/components/Button'
 import { QuietChoice } from '@common/components/Controls'
@@ -10,7 +11,10 @@ import { useShell } from '../contexts/ShellContext'
 import { Berry } from '../components/Berry'
 import { ChatError, Markdown } from '../components/ChatMessage'
 import { CopyLink } from '../components/CopyLink'
-import { filterGallery, freeName, GALLERY_VIEW_EVENT, galleryView, setGalleryView, sortGallery, type GallerySort, type GalleryView } from '../galleryView'
+import { filterGallery, freeName, GALLERY_VIEW_EVENT, galleryView, openLinked, setGalleryView, sortGallery, type GallerySort, type GalleryView } from '../galleryView'
+
+// From the start, not only while the page shows, so a link that comes while another tab is in front isn't missed.
+window.chromeAPI.mascots.onLinked(openLinked)
 
 const asMascot = (entry: GalleryMascot): MascotProfile => ({ ...entry.draft, id: entry.id, deletedAt: null })
 
@@ -85,7 +89,7 @@ export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile |
                     <div className="mt-1.5"><Permissions draft={entry.draft} /></div>
                 </div>
                 <div className="ml-auto shrink-0 flex items-center gap-3">
-                    {entry.addCount !== undefined && !copy && <span className="text-12 text-muted-foreground tabular-nums">{entry.addCount === 1 ? '1 add' : `${entry.addCount} adds`}</span>}
+                    {entry.addCount !== undefined && (!copy || copy.publishedId === entry.id) && <span className="text-12 text-muted-foreground tabular-nums">{entry.addCount === 1 ? '1 add' : `${entry.addCount} adds`}</span>}
                     {!onReview ? null : copy ? (
                         <>
                             <InFlock />
@@ -102,7 +106,7 @@ export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile |
 }
 
 // Everything the mascot would be told and allowed, before there's a copy of it. Nothing is added until Add is pressed.
-const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBack: () => void }> = ({ entry, copy, onBack }) => {
+const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linked: boolean; onBack: () => void }> = ({ entry, copy, linked, onBack }) => {
     const { flock, choose } = useFlock()
     const { settings } = useShell()
     const { showBerry } = settings
@@ -118,10 +122,14 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
 
     // Once it's added there's nothing left to review, so coming back to the page shows the Gallery. Add is at the bottom
     // of a long page, so it goes back up to where the bird lands.
+    // A link that comes meanwhile keeps what it asked for.
     useEffect(() => {
         if (!added) return undefined
         page.current?.scrollIntoView({ block: 'start' })
-        return () => setGalleryView({ reviewing: null })
+        const asked = galleryView().linked?.asked
+        return () => {
+            if (galleryView().linked?.asked === asked) setGalleryView({ reviewing: null })
+        }
     }, [added])
 
     const add = async () => {
@@ -138,13 +146,13 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
             {/* The bird stands on the line under the heading, and the page carries on below it. */}
             <header className="mt-3 flex items-end gap-6 border-b">
                 <div className="min-w-0 flex-1 pb-5 [overflow-wrap:anywhere]">
+                    {linked && <p className="mb-1 text-13 text-muted-foreground">From a link you opened</p>}
                     <h1 className="text-20 font-semibold">{copy ? `${copy.name} is in your flock` : `Add ${name} to your flock?`}</h1>
                     <p className="mt-1 text-14">{entry.description}</p>
                     <p className="mt-1 text-13 text-muted-foreground">
                         By {entry.author}.
                         {entry.publishedAt !== undefined && ' Someone using Blueberry wrote this, and we haven’t checked it, so read what it’s told.'}
                     </p>
-                    {copy && <div className="mt-2"><InFlock /></div>}
                 </div>
                 <div aria-label="Preview" role="group" className="relative shrink-0" style={{ width: reviewBird, height: reviewBird * (showBerry ? FEET_Y : 1) }}>
                     <div key={copy ? 'added' : 'reviewing'} className={cn(copy && !settings.keepBerryStill && "motion-safe:animate-berry-hop")} style={{ transformOrigin: `${FEET_X * 100}% ${FEET_Y * 100}%` }}>
@@ -215,10 +223,34 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; onBac
     )
 }
 
-export const MascotGalleryPage: React.FC = () => {
+// What a link shows when its entry can't be: removed, hidden, or no server to ask.
+const LinkMissing: React.FC<{ status: GalleryListing['status']; onRetry: () => void; onBack: () => void }> = ({ status, onRetry, onBack }) => (
+    <article className="max-w-2xl mx-auto">
+        <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
+            <ArrowLeft />
+            Gallery
+        </Button>
+        <p className="mt-3 text-13 text-muted-foreground">From a link you opened</p>
+        <h1 className="mt-1 text-20 font-semibold">
+            {status === 'live' ? 'This mascot isn’t in the Gallery any more' : status === 'unreachable' ? 'Couldn’t reach the Gallery' : 'This Blueberry isn’t connected to the Gallery'}
+        </h1>
+        <p role="status" className="mt-1 text-14 text-muted-foreground">
+            {status === 'live'
+                ? 'Its author may have taken it down. Nothing was added.'
+                : status === 'unreachable'
+                  ? 'So the mascot from the link can’t be shown yet. Nothing was added.'
+                  : 'So it can only show the mascots that come with it. Nothing was added.'}
+        </p>
+        {status === 'unreachable' && <Button variant="outline" size="sm" className="mt-4" onClick={onRetry}>Try again</Button>}
+    </article>
+)
+
+export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { flock } = useFlock()
     const [view, setViewState] = useState<GalleryView>(galleryView)
     const [listing, setListing] = useState<GalleryListing | null>(null)
+    // What the server said about the entry a link asked for, now, by which link asked.
+    const [linkedAnswer, setLinkedAnswer] = useState<{ asked: number; answer: GalleryLinked } | null>(null)
     const entries = listing?.entries ?? null
     // Publishing or unpublishing changes this, and that changes what the page should show.
     const ownPublished = flock.map((mascot) => mascot.publishedId ?? '').join()
@@ -226,6 +258,8 @@ export const MascotGalleryPage: React.FC = () => {
     useEffect(() => {
         const follow = () => setViewState(galleryView())
         window.addEventListener(GALLERY_VIEW_EVENT, follow)
+        // A link can change it between the first render and here.
+        follow()
         return () => window.removeEventListener(GALLERY_VIEW_EVENT, follow)
     }, [])
 
@@ -234,17 +268,45 @@ export const MascotGalleryPage: React.FC = () => {
     }, [])
     useEffect(load, [load, ownPublished])
 
+    // A link that came before this window's page had loaded is only in the tab's param. The same one again comes as
+    // `gallery:linked`, which is listened for above.
+    useEffect(() => {
+        if (tab.pageParam && galleryView().linked?.id !== tab.pageParam) openLinked(tab.pageParam)
+    }, [tab.pageParam])
+    const asked = view.linked?.asked
+    useEffect(() => {
+        const link = galleryView().linked
+        if (!link) return undefined
+        let left = false
+        window.chromeAPI.mascots
+            .galleryLinked(link.id)
+            .catch((): GalleryLinked => ({ entry: null, status: 'unreachable' }))
+            .then((answer) => !left && setLinkedAnswer({ asked: link.asked, answer }))
+        return () => {
+            left = true
+        }
+    }, [asked])
+
     const categories = useMemo(() => [...new Set((entries ?? []).map((entry) => entry.category))], [entries])
     const shown = useMemo(() => sortGallery(filterGallery(entries ?? [], view.query, view.category), view.sort), [entries, view.query, view.category, view.sort])
     // Your own published one counts as in your flock, so it's never offered back to you.
     const copyOf = (entry: GalleryMascot) => flock.find((mascot) => mascot.galleryId === entry.id || mascot.publishedId === entry.id) ?? null
     const reviewing = entries?.find((entry) => entry.id === view.reviewing)
+    const back = () => setGalleryView({ reviewing: null })
+    const linkShowing = view.linked !== null && view.reviewing === view.linked.id
+    const linked = linkShowing && linkedAnswer && linkedAnswer.asked === view.linked?.asked ? linkedAnswer.answer : null
 
     return (
         <div className="h-full overflow-y-auto">
             <div className="max-w-5xl mx-auto px-8 py-10">
-                {reviewing ? (
-                    <Review key={reviewing.id} entry={reviewing} copy={copyOf(reviewing)} onBack={() => setGalleryView({ reviewing: null })} />
+                {linkShowing && !linked ? (
+                    <p role="status" className="max-w-2xl mx-auto text-14 text-muted-foreground">Getting the mascot from the Gallery…</p>
+                ) : linked?.entry ? (
+                    <Review key={linked.entry.id} entry={linked.entry} copy={copyOf(linked.entry)} linked onBack={back} />
+                ) : linked ? (
+                    <LinkMissing status={linked.status} onRetry={() => openLinked(view.reviewing ?? '')} onBack={back} />
+                ) : reviewing ? (
+                    <Review key={reviewing.id} entry={reviewing} copy={copyOf(reviewing)} linked={false} onBack={back} />
                 ) : (
                     <>
                         <div className="flex items-start justify-between gap-4">

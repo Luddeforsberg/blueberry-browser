@@ -6,14 +6,42 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https:; base-uri 'none'; form-action 'none'">
     <meta name="referrer" content="no-referrer">
     <title>Blueberry</title>
+    <meta name="description" content="A web browser with a flock of birds you give jobs to. They ask before anything that matters.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Blueberry">
+    <meta property="og:title" content="Blueberry">
+    <meta property="og:description" content="A web browser with a flock of birds you give jobs to. They ask before anything that matters.">
+    <meta property="og:image" content="https://blueberry-flock.netlify.app/flock.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Six birds from Blueberry standing on a wire, each holding a blueberry.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Blueberry">
+    <meta name="twitter:description" content="A web browser with a flock of birds you give jobs to. They ask before anything that matters.">
+    <meta name="twitter:image" content="https://blueberry-flock.netlify.app/flock.png">
     <link rel="stylesheet" href="./tokens.css">
+    <link rel="stylesheet" href="./birds.css">
     <link rel="stylesheet" href="./style.css">
-    <script type="module" src="./theme.js"></script>
+    <script type="module" src="./home.js"></script>
   </head>
   <body>
+    <div class="top"><a class="wordmark" href="/">Blueberry</a></div>
     <main>
-      <h1>Blueberry</h1>
-      <p class="muted">An AI browser with a flock of birds you can give jobs to. It isn’t out for download yet.</p>
+      <h1>A browser with birds that do the job</h1>
+      <p class="lede">Blueberry is a web browser with Berry inside it. Give it a job, carry on with your day, and come back to what it found. It asks before anything that matters.</p>
+      <ul class="flock" id="flock" aria-label="Some of the flock"></ul>
+      <section>
+        <ul class="points">
+          <li><strong>Grow a flock.</strong> Make a bird for a job you repeat, with a name, a look, its own instructions, and limits on which sites it may visit and whether it may click or type.</li>
+          <li><strong>It asks first.</strong> Anything that would change something waits on a card that says exactly what will happen, and nothing goes until you say yes.</li>
+          <li><strong>It works behind you.</strong> The tabs a bird opens stay behind yours. Watch it work, or click in and take over.</li>
+          <li><strong>Share a bird.</strong> Publish one to the Gallery and send its link. Anyone can read what it’s told, word for word, before adding their own copy.</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Getting it</h2>
+        <p class="muted">Blueberry isn’t out for download yet. If someone sent you a mascot’s link, that page shows everything it would be told and allowed to do.</p>
+      </section>
     </main>
   </body>
 </html>

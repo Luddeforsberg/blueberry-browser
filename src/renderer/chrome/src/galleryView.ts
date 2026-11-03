@@ -9,6 +9,9 @@ export interface GalleryView {
     // The entry being reviewed, by id.
     reviewing: string | null
     sort: GallerySort
+    // The entry the last `blueberry://mascot/` link opened, and how many links have come, so the same one twice asks the
+    // server again.
+    linked: { id: string; asked: number } | null
 }
 
 export type GallerySort = 'newest' | 'added'
@@ -16,7 +19,7 @@ export type GallerySort = 'newest' | 'added'
 export const GALLERY_VIEW_EVENT = 'blueberry:gallery-view'
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose your place.
-let current: GalleryView = { query: '', category: null, reviewing: null, sort: 'newest' }
+let current: GalleryView = { query: '', category: null, reviewing: null, sort: 'newest', linked: null }
 
 export const galleryView = () => current
 
@@ -24,6 +27,10 @@ export const setGalleryView = (patch: Partial<GalleryView>) => {
     current = { ...current, ...patch }
     window.dispatchEvent(new Event(GALLERY_VIEW_EVENT))
 }
+
+// Main has already checked the id is a uuid. It only opens that entry for review, where adding still takes Add.
+export const openLinked = (id: string) =>
+    setGalleryView({ reviewing: id, linked: { id, asked: (current.linked?.asked ?? 0) + 1 }, query: '', category: null })
 
 // Cards use a curly apostrophe, and keyboards type a straight one.
 const forSearch = (text: string) => text.toLowerCase().replace(/’/g, "'")

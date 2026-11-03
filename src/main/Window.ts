@@ -1419,8 +1419,16 @@ export class Window {
     this.desktopBerry.mainWindowGone();
   }
 
+  // A `blueberry://mascot/<id>` link, from any website, already checked to be only an id. It shows that Gallery entry,
+  // fetched again, and nothing more: adding it still takes Add. The event is for a Gallery already showing this param.
+  openMascotLink(id: string): void {
+    this.bringForward();
+    this.openPage("mascot-gallery", { param: id });
+    sendToRenderer(this.chrome.view.webContents, "gallery:linked", id);
+  }
+
   // The user pressed something outside Blueberry to come here, so this one time it may take the front.
-  private bringForward(): void {
+  bringForward(): void {
     if (this._baseWindow.isMinimized()) this._baseWindow.restore();
     if (process.platform === "darwin") app.show();
     this._baseWindow.show();

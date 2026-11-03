@@ -85,6 +85,7 @@ export const CHANNEL_REGIONS: {
   "mascots:save": ["chrome"],
   "mascots:delete": ["chrome"],
   "mascots:gallery": ["chrome"],
+  "mascots:gallery-linked": ["chrome"],
   "mascots:add-from-gallery": ["chrome"],
   "mascots:publish": ["chrome"],
   "mascots:unpublish": ["chrome"],

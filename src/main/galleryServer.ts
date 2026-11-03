@@ -151,6 +151,11 @@ export class GalleryServer {
     return (await this.request<unknown[]>(`/rest/v1/mascots?select=${PUBLIC_COLUMNS}&order=created_at.desc&limit=${LIST_LIMIT}`)) ?? [];
   }
 
+  // One by id, the way the public page asks, so a link finds it however many are newer. Null if it isn't shown.
+  async mascot(id: string): Promise<unknown> {
+    return (await this.request<unknown[]>(`/rest/v1/mascots?select=${PUBLIC_COLUMNS}&id=eq.${encodeURIComponent(id)}`))?.[0] ?? null;
+  }
+
   async myMascots(token: string): Promise<unknown[]> {
     return (await this.request<unknown[]>("/rest/v1/rpc/my_mascots", { method: "POST", body: {}, token })) ?? [];
   }

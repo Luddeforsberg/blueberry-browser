@@ -317,6 +317,12 @@ export interface GalleryListing {
   status: "starters" | "live" | "unreachable";
 }
 
+// One entry a link asked for, from the server. Null when it isn't there, or can't be asked.
+export interface GalleryLinked {
+  entry: GalleryMascot | null;
+  status: GalleryListing["status"];
+}
+
 // What the user chooses when publishing. The rest of what goes public is read from the mascot in main.
 export interface PublishChoices {
   author: string;

@@ -1,20 +1,96 @@
-/* Only tokens from tokens.css, and plain lines rather than cards. */
+/* The front page and a mascot's public page. Only tokens from tokens.css: the frame behind, one canvas card for the
+   page, as in the window, and plain lines split by `border` rather than cards. */
 * { box-sizing: border-box; }
-html { background: rgb(var(--canvas)); color: rgb(var(--foreground)); }
-body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif; overflow-wrap: anywhere; }
-main { max-width: 680px; margin: 0 auto; padding: 48px 24px; }
-h1 { margin: 8px 0 0; font-size: 20px; font-weight: 600; }
-h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+html { background: rgb(var(--background)); color: rgb(var(--foreground)); }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--frame);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
+  overflow-wrap: anywhere;
+  -webkit-text-size-adjust: 100%;
+  /* So the card's margin stays on the frame. */
+  display: flow-root;
+}
+p, h1, h2, h3, ul { margin: 0; }
+ul { padding: 0; list-style: none; }
+svg { display: block; overflow: visible; }
+a { color: rgb(var(--accent-ink)); }
+a:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; border-radius: 4px; }
+
+/* On the frame, above the card. */
+.top { max-width: 800px; margin: 0 auto; display: flex; align-items: center; min-height: 56px; padding: 8px 24px; }
+.wordmark { font-size: 14px; font-weight: 600; color: rgb(var(--foreground)); text-decoration: none; }
+
+/* The one card, floating on the frame like the page card. */
+main {
+  max-width: 776px;
+  margin: 0 auto 32px;
+  padding: 48px 56px 40px;
+  border-radius: 22px;
+  background: rgb(var(--canvas));
+  box-shadow: var(--shadow-page);
+}
+
+h1 { font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; }
+h2 { margin-bottom: 12px; font-size: 14px; font-weight: 600; }
 h3 { margin: 16px 0 4px; font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
-p { margin: 0; }
 section { padding: 24px 0; border-top: 1px solid rgb(var(--border)); }
-ul { margin: 0; padding: 0; list-style: none; }
-li { padding: 2px 0; font-size: 14px; }
+section:last-child { padding-bottom: 0; }
 .muted { color: rgb(var(--muted-foreground)); font-size: 14px; }
-.open { color: rgb(var(--warning)); }
+.small { margin-top: 12px; color: rgb(var(--muted-foreground)); font-size: 13px; }
 .words { font-size: 14px; white-space: pre-wrap; }
-.bird { display: block; height: 160px; }
-.bird svg { overflow: visible; }
-.top { padding-bottom: 24px; }
-.button { display: inline-block; margin-top: 16px; padding: 8px 16px; border-radius: 999px; background: rgb(var(--primary)); color: rgb(var(--primary-foreground)); font-size: 14px; text-decoration: none; }
+.lede { margin-top: 12px; font-size: 16px; }
+.meta { margin-top: 6px; font-size: 14px; color: rgb(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+
+/* Buttons: full radius, filled only for the main action. */
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 36px; padding: 0 16px; border-radius: 999px; border: 1px solid transparent;
+  background: rgb(var(--primary)); color: rgb(var(--primary-foreground));
+  font-size: 14px; text-decoration: none;
+  transition: background-color 100ms cubic-bezier(.32, .72, 0, 1), filter 100ms;
+}
+.button:active { filter: brightness(0.9); }
+.button.outline { background: transparent; color: rgb(var(--foreground)); border-color: rgb(var(--border)); }
+.button.outline:hover { background: rgb(var(--muted)); }
 .button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
+
+/* A mascot's page: the bird stands on the line under the heading, as in the app's review. */
+.hero { display: flex; align-items: flex-end; gap: 32px; padding-bottom: 32px; }
+.hero-text { flex: 1; min-width: 0; }
+.bird { flex-shrink: 0; width: 200px; height: calc(200px * 113 / 120); margin-bottom: -32px; }
+.bird svg { width: 200px; height: 200px; }
+
+/* What it may do, each line with a lock, open where it isn't limited. */
+.permissions li { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 16px; }
+.icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 4px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The front page's flock, standing on wires. Every third turns round. */
+.flock { display: flex; flex-wrap: wrap; margin-top: 40px; }
+.flock li { width: calc(100% / 3); padding-bottom: 12px; }
+.perch { display: flex; justify-content: center; height: calc(112px * 113 / 120); border-bottom: 1.5px solid rgb(var(--muted-foreground) / 0.45); }
+.perch svg { width: 112px; height: 112px; }
+.flock li:nth-child(3n) .perch svg { transform: scaleX(-1); }
+.flock .name, .flock .what { padding-right: 12px; }
+.flock .name { margin-top: 10px; font-size: 14px; font-weight: 600; }
+.flock .what { font-size: 13px; color: rgb(var(--muted-foreground)); }
+.points li { padding: 12px 0; border-top: 1px solid rgb(var(--border)); }
+.points li:first-child { border-top: 0; padding-top: 0; }
+.points strong { font-weight: 600; }
+
+@media (max-width: 600px) {
+  .top { padding: 8px 16px; }
+  main { margin: 0 8px 8px; padding: 24px 16px 32px; }
+  h1 { font-size: 28px; }
+  .hero { flex-direction: column-reverse; align-items: stretch; gap: 16px; padding-bottom: 24px; }
+  .bird { width: 144px; height: calc(144px * 113 / 120); margin: 0; border-bottom: 1.5px solid rgb(var(--muted-foreground) / 0.45); }
+  .bird svg { width: 144px; height: 144px; }
+  .actions .button { flex: 1 1 auto; }
+  .flock li { width: 50%; }
+  .flock li:nth-child(3n) .perch svg { transform: none; }
+  .flock li:nth-child(2n) .perch svg { transform: scaleX(-1); }
+  .perch { height: calc(96px * 113 / 120); }
+  .perch svg { width: 96px; height: 96px; }
+}

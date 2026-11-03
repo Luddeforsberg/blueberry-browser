@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -502,6 +502,7 @@ export interface InvokeChannels {
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
   "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
+  "mascots:gallery-linked": { region: "chrome"; args: [galleryId: string]; result: GalleryLinked };
   // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
   "mascots:add-from-gallery": { region: "chrome"; args: [galleryId: string, name: string | null]; result: MascotSaveResult };
   // By the mascot's id, so what goes public is read in main, not sent by a renderer. Only the choices come from there.
@@ -604,6 +605,8 @@ export interface EventChannels {
   "desktop:away": boolean;
   "settings:updated": Settings;
   "library:updated": LibrarySnapshot;
+  // A `blueberry://mascot/<id>` link was opened, so the Gallery shows that entry. Only ever a checked uuid.
+  "gallery:linked": string;
   "toolbar:focus-address": null;
   "overlay:visibility": boolean;
   "recording:updated": RecordingState;
@@ -737,11 +740,13 @@ export interface MascotsAPI {
   save: (id: string | null, draft: MascotDraft & { worksInCloud?: boolean }) => Promise<MascotSaveResult>;
   delete: (id: string) => Promise<boolean>;
   gallery: () => Promise<GalleryListing>;
+  galleryLinked: (galleryId: string) => Promise<GalleryLinked>;
   addFromGallery: (galleryId: string, name: string | null) => Promise<MascotSaveResult>;
   publish: (mascotId: string, choices: PublishChoices) => Promise<PublishResult>;
   unpublish: (publishedId: string) => Promise<PublishResult>;
   published: () => Promise<PublishedMascot[] | null>;
   lastAuthor: () => Promise<string>;
+  onLinked: (callback: (galleryId: string) => void) => Unsubscribe;
 }
 
 export interface MemoryAPI {

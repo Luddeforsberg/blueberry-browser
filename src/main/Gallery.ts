@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
-import type { GalleryListing, GalleryMascot, PublishedMascot, PublishResult } from "../shared/library";
-import { parsePublicDraft, parsePublishChoices, parsePublishedRow, publicRow } from "../shared/publishing";
+import type { GalleryLinked, GalleryListing, GalleryMascot, PublishedMascot, PublishResult } from "../shared/library";
+import { isUuid, parsePublicDraft, parsePublishChoices, parsePublishedRow, publicRow } from "../shared/publishing";
 import type { Account } from "./Account";
 import { GalleryServer, publicPageLink, ServerError, Unreachable } from "./galleryServer";
 import { starterMascots } from "./mascotCatalog";
@@ -60,6 +60,22 @@ export class Gallery {
       return { entries: [...published, ...starters], status: "live" };
     } catch {
       return { entries: starters, status: "unreachable" };
+    }
+  }
+
+  // The entry a `blueberry://mascot/` link named, asked of the server now. Like a row in the list, it's only shown, so
+  // adding it still takes Add on what was shown.
+  async linked(id: unknown): Promise<GalleryLinked> {
+    if (!this.server) return { entry: null, status: "starters" };
+    if (!isUuid(id)) return { entry: null, status: "live" };
+    try {
+      const row = parsePublishedRow(await this.server.mascot(id));
+      if (!row || row.id !== id.toLowerCase()) return { entry: null, status: "live" };
+      const entry = { ...row, link: publicPageLink(this.site, row.id) };
+      this.shown.set(entry.id, entry);
+      return { entry, status: "live" };
+    } catch {
+      return { entry: null, status: "unreachable" };
     }
   }
 

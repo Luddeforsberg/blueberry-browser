@@ -239,6 +239,7 @@ export class EventManager {
     this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
     this.handle("mascots:gallery", () => this.mainWindow.gallery.list());
+    this.handle("mascots:gallery-linked", (id) => this.mainWindow.gallery.linked(id));
     this.handle("mascots:add-from-gallery", (galleryId, name) => this.mainWindow.addFromGallery(galleryId, name));
     this.handle("mascots:publish", (mascotId, choices) => this.mainWindow.gallery.publish(mascotId, choices));
     this.handle("mascots:unpublish", (id) => this.mainWindow.confirmUnpublish(id));
