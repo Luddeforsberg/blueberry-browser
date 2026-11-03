@@ -15,7 +15,7 @@ import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 import { PublishMascot } from './PublishMascot'
 import { MascotMemory } from './MascotMemory'
-import { blankMascot, blankPublish, FLOCK_VIEW_EVENT, flockView, mascotForm, setFlockView, sitesFrom, surprise, toMascotDraft, type FlockView, type MascotFormValues } from '../flockView'
+import { blankMascot, blankPublish, FLOCK_VIEW_EVENT, flockView, flockViewFor, mascotForm, setFlockShowing, setFlockView, sitesFrom, surprise, toMascotDraft, type FlockView, type MascotFormValues } from '../flockView'
 import { blankForm, setRoutinesView } from '../routinesView'
 
 const api = () => window.chromeAPI.mascots
@@ -77,7 +77,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
             onMouseLeave={() => setNear(false)}
             onFocus={() => setNear(true)}
             onBlur={() => setNear(false)}
-            className="group relative min-w-0"
+            className="group relative min-w-0 flex flex-col"
         >
             <Wire top={line} sags={showBerry} />
             <div className="relative" style={{ height: line + WIRE_SAG }}>
@@ -87,7 +87,8 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
                     </div>
                 </div>
             </div>
-            <div className="mt-4 pr-6 [overflow-wrap:anywhere]" style={{ paddingLeft: BIRD_LEFT }}>
+            {/* A column to the bottom of the row, so every bird's actions sit on one line whatever is above them. */}
+            <div className="mt-4 pr-6 flex-1 flex flex-col [overflow-wrap:anywhere]" style={{ paddingLeft: BIRD_LEFT }}>
                 <h2 className="flex items-center gap-2 text-14 font-semibold">
                     {mascot.name}
                     {working && <BerryDot working />}
@@ -96,7 +97,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
                     {isBerry ? 'The original. Always here, and it can do all you let it.' : mascot.instructions}
                 </p>
                 {limits.length > 0 && <p className="mt-1 text-12 text-muted-foreground">{limits.join(' · ')}</p>}
-                <div className="mt-1 -ml-2.5 flex flex-wrap">
+                <div className="mt-auto pt-1 -ml-2.5 flex flex-wrap">
                     <Button size="xs" variant="ghost" className={QUIET_ACTION} onClick={chat}>Chat</Button>
                     {!isBerry && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
                     {onMemory && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`What ${isBerry && !showBerry ? 'Assistant' : mascot.name} remembers`} onClick={onMemory}>{remembers > 0 ? `Remembers ${remembers}` : 'Memory'}</Button>}
@@ -113,7 +114,7 @@ const ROOM_BIRD = 56
 const RoomActions: React.FC<{ onNew: () => void }> = ({ onNew }) => (
     <>
         <Button size="xs" variant="outline" onClick={onNew}>New mascot</Button>
-        <Button size="xs" variant="ghost" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Browse the Gallery</Button>
+        <Button size="xs" variant="outline" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Browse the Gallery</Button>
     </>
 )
 
@@ -146,7 +147,7 @@ const RoomForOneMore: React.FC<{ alone: boolean; onNew: () => void }> = ({ alone
             <div className="relative" style={{ height: line + WIRE_SAG }}>{ghost}</div>
             <div className="mt-4 flex flex-col items-start" style={{ paddingLeft: BIRD_LEFT }}>
                 <p className="text-13 text-muted-foreground">Room for one more</p>
-                <div className="mt-1 flex flex-col items-start gap-1 [&>*:last-child]:-ml-2.5"><RoomActions onNew={onNew} /></div>
+                <div className="mt-1 flex flex-col items-start gap-1"><RoomActions onNew={onNew} /></div>
             </div>
         </li>
     )
@@ -305,7 +306,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                                     onClick={() => { reactWith(null); set({ accessory: id }) }}
                                     className={cn("w-[84px] py-2 flex flex-col items-center gap-1 rounded-card outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", values.accessory === id ? "bg-muted" : "hover:bg-muted")}
                                 >
-                                    <Berry size={28} mascot={wearing(label, { palette: values.palette, accessory: id })} />
+                                    <Berry size={44} mascot={wearing(label, { palette: values.palette, accessory: id })} />
                                     <span className="text-12">{label}</span>
                                 </button>
                             </li>
@@ -324,7 +325,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                         onFocus={() => reactWith('curious')}
                         onBlur={() => setTyping(null)}
                         onChange={(event) => set({ name: event.target.value })}
-                        className={cn(INPUT, "mt-3 max-w-xs")}
+                        className={cn(INPUT, "mt-3")}
                     />
                 </section>
 
@@ -449,14 +450,18 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
     )
 }
 
-export const FlockPage: React.FC = () => {
-    const [view, setViewState] = useState<FlockView>(flockView)
+export const FlockPage: React.FC<{ tabId: string }> = ({ tabId }) => {
+    const [view, setViewState] = useState<FlockView>(() => flockViewFor(tabId))
 
     // The perch on a composer can start a new mascot from elsewhere.
     useEffect(() => {
         const follow = () => setViewState(flockView())
+        setFlockShowing(true)
         window.addEventListener(FLOCK_VIEW_EVENT, follow)
-        return () => window.removeEventListener(FLOCK_VIEW_EVENT, follow)
+        return () => {
+            window.removeEventListener(FLOCK_VIEW_EVENT, follow)
+            setFlockShowing(false)
+        }
     }, [])
 
     return (

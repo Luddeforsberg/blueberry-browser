@@ -145,6 +145,7 @@ const sheet = [
     const [, kind, token] = /^(fill|stroke)-(berry-[a-z-]+)$/.exec(name);
     return `.${name} { ${kind}: rgb(var(--${token})); }`;
   }),
+  ".berry-rim { filter: var(--berry-rim); }",
   ...keyframes,
   "@media (prefers-reduced-motion: no-preference) {",
   ...moving,

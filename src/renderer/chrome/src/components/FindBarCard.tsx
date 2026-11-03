@@ -48,7 +48,7 @@ export const FindBarCard: React.FC<{
                         onStep(!event.shiftKey)
                     }
                 }}
-                className="flex-1 min-w-0 h-8 px-2 rounded-control bg-transparent text-14 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex-1 min-w-0 h-8 px-2 rounded-card bg-transparent text-14 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
             <span aria-live="polite" className="shrink-0 px-1 text-12 tabular-nums text-muted-foreground">
                 {countText(value, result)}

@@ -36,6 +36,7 @@
     --berry-beak: 62 68 102;
     --berry-gear: 217 163 18;
     --berry-gear-shade: 168 124 8;
+    --berry-rim: none;
   }
 
   .dark {
@@ -65,12 +66,14 @@
     --shadow-card: 0 14px 40px rgb(0 0 0 / 0.4);
     --frame: linear-gradient(165deg, #38383b 0%, #2e2e30 40%, #262628 100%);
 
-    --berry-ink: 58 66 112;
-    --berry-wing: 82 92 142;
+    /* A dark bird, with a thin light rim so it holds its shape on a dark background. */
+    --berry-ink: 42 47 77;
+    --berry-wing: 61 68 112;
     --berry-nape: 168 176 200;
     --berry-eye: 244 241 230;
     --berry-pupil: 20 22 36;
-    --berry-beak: 92 100 140;
+    --berry-beak: 78 86 128;
+    --berry-rim: drop-shadow(0 0 0.75px rgb(255 255 255 / 0.45));
     --berry-gear: 255 210 63;
     --berry-gear-shade: 217 163 18;
   }
@@ -130,6 +133,7 @@
     --berry-beak: 232 201 176;
     --berry-gear: 63 194 182;
     --berry-gear-shade: 31 143 134;
+    --berry-rim: none;
   }
   [data-mascot="canary"] {
     --berry-ink: 183 127 0;
@@ -146,6 +150,7 @@
     --berry-beak: 240 138 58;
     --berry-gear: 240 96 126;
     --berry-gear-shade: 200 49 79;
+    --berry-rim: none;
   }
   [data-mascot="parakeet"] {
     --berry-ink: 31 138 76;
@@ -162,6 +167,7 @@
     --berry-beak: 243 154 67;
     --berry-gear: 244 122 82;
     --berry-gear-shade: 217 84 43;
+    --berry-rim: none;
   }
   [data-mascot="flamingo"] {
     --berry-ink: 209 63 124;
@@ -178,6 +184,7 @@
     --berry-beak: 246 219 229;
     --berry-gear: 76 198 217;
     --berry-gear-shade: 27 143 163;
+    --berry-rim: none;
   }
   [data-mascot="kingfisher"] {
     --berry-ink: 15 126 163;
@@ -194,5 +201,11 @@
     --berry-beak: 233 237 242;
     --berry-gear: 255 210 63;
     --berry-gear-shade: 232 169 0;
+    --berry-rim: none;
+  }
+
+  /* On every drawing of a bird, so the rim goes wherever it's drawn. */
+  .berry-rim {
+    filter: var(--berry-rim);
   }
 }

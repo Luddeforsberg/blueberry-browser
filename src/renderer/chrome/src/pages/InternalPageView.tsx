@@ -30,7 +30,7 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         case 'history':
             return <HistoryPage />
         case 'flock':
-            return <FlockPage />
+            return <FlockPage tabId={tab.id} />
         case 'mascot-gallery':
             return <MascotGalleryPage />
         case 'needs-you':

@@ -63,8 +63,9 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 </div>
             </div>
 
-            <div className="shrink-0 border-t py-4">
-                <div className="max-w-[672px] mx-auto px-8">
+            {/* Its line is as wide as the column, like the lines above it. */}
+            <div className="shrink-0 px-8 pb-4">
+                <div className="max-w-[608px] mx-auto border-t pt-4">
                     {drafting ? (
                         <p role="status" className="h-9 flex items-center gap-2 text-14">
                             <span className={SHIMMER_TEXT}>Writing it up as a routine</span>
