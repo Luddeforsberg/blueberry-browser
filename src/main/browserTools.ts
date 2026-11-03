@@ -8,11 +8,9 @@ import {
   describeElement,
   describeOption,
   finishTyping,
-  foreignFrameOnScreen,
   hasFocus,
   inputLanded,
   isHovered,
-  linksTo,
   listElements,
   planDrag,
   scriptedClick,
@@ -44,8 +42,6 @@ const MAX_MATCHES = 10;
 const MATCH_CONTEXT_LENGTH = 150;
 // A page that never finishes loading would otherwise hold its script, and the reply, forever.
 const READ_TIMEOUT_MS = 10_000;
-// How long a page gets to say whether it links to where a job is going, before it counts as not.
-const LINK_CHECK_MS = 1_000;
 const MAX_SCREENSHOT_WIDTH = 1280;
 const SCREENSHOT_QUALITY = 60;
 
@@ -145,12 +141,10 @@ const readText = async (tab: PageTarget, allowsFrame: (origin: string) => boolea
   }
 };
 
-// Whether a picture of this page could show a frame from a site outside `sites`. Where each frame is from comes from the
-// browser, and whether one is on screen from the page's own world. A page that can't say counts as showing one.
-export const showsFrameOffLimits = async (tab: PageTarget, sites: readonly string[]): Promise<boolean> => {
-  if (sites.length === 0 || tab.foreignFrames.every((frame) => siteAllowed(frame.origin, sites))) return false;
-  return (await tab.runInPage<boolean>(foreignFrameOnScreen).catch(() => true)) !== false;
-};
+// Whether a picture of this page could show a frame from a site outside `sites`. The browser's own frame tree says,
+// whether or not the frame looks to be on screen, since a page can hide one from any script, as in a shadow root.
+export const showsFrameOffLimits = (tab: PageTarget, sites: readonly string[]): boolean =>
+  sites.length > 0 && tab.foreignFrames.some((frame) => !siteAllowed(frame.origin, sites));
 
 const isWebAddress = (url: string): boolean => {
   try {
@@ -187,29 +181,28 @@ type ChooseResult =
 // Search text is short. A long one could be private text on its way out through a search box.
 const MAX_SAFE_TYPED_LENGTH = 100;
 
-// Words in an address are names and slugs. A longer run of letters and digits, or one that mixes them like this, is
-// more likely a token, a hash or text encoded on its way out.
+// Words in an address are names and slugs. Anything else is more likely a token, a hash or text encoded on its way
+// out: a long word, an escape or an "@", six digits in a row, or a word that looks like hex or base64.
 const MAX_PLAIN_WORD = 24;
 const MIXED_WORD = /^(?=(?:.*\p{N}){3})(?=(?:.*\p{L}){3}).{12,}$/u;
+const HEX_WORD = /^(?=.*\d)(?=.*[a-f])[\da-f]{4,}$/i;
+const BASE64_WORD = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[\dA-Za-z]{8,}$/;
 
-// Whether a path or host name could be carrying something out to the site: long, or with a word that isn't one.
-const looksLikeData = (piece: string): boolean => {
-  let text = piece;
-  try {
-    text = decodeURIComponent(piece);
-  } catch {
-    // Left as it is, which only makes it longer.
-  }
-  if (text.length > MAX_SAFE_TYPED_LENGTH) return true;
-  return (text.match(/[\p{L}\p{N}]+/gu) ?? []).some((word) => word.length > MAX_PLAIN_WORD || MIXED_WORD.test(word));
-};
+// Whether a path or host name could be carrying something out to the site. Only a plain one counts as not.
+const looksLikeData = (piece: string): boolean =>
+  piece.length > MAX_SAFE_TYPED_LENGTH ||
+  /[%@=]|\d{6}/.test(piece) ||
+  (piece.match(/[\p{L}\p{N}]+/gu) ?? []).some((word) => word.length > MAX_PLAIN_WORD || MIXED_WORD.test(word) || HEX_WORD.test(word) || BASE64_WORD.test(word));
 
-// Sites the user's own words name, such as "example.com", or the site of an address they pasted, which may be local.
+// Sites the user's own words name, such as "bücher.de", or the site of an address they pasted, which may be local. Only
+// whole names count, so "bücher.de" never names "cher.de", and each is the host the browser would go to.
+const ADDRESS = /https?:\/\/[^\s"'<>]+/giu;
+const SITE_NAME = /(?<![\p{L}\p{N}.-])(?:[\p{L}\p{N}-]+\.)+\p{L}{2,}(?![\p{L}\p{N}-])/gu;
 const namedSites = (text: string): string[] =>
-  [
-    ...[...text.toLowerCase().matchAll(/(?:[a-z0-9-]+\.)+[a-z]{2,}/g)].map(([site]) => site),
-    ...[...text.matchAll(/https?:\/\/[^\s"'<>]+/gi)].flatMap(([address]) => (URL.canParse(address) ? [new URL(address).hostname] : [])),
-  ].map((site) => site.replace(/^www\./, ""));
+  [...text.matchAll(ADDRESS), ...text.replace(ADDRESS, " ").matchAll(SITE_NAME)].flatMap(([named]) => {
+    const address = named.includes("://") ? named : `https://${named}`;
+    return URL.canParse(address) ? [new URL(address).hostname.replace(/^www\./, "")] : [];
+  });
 
 // The search pages where a short query is an ordinary search, by exact host and path. Anything wider lets data out:
 // script.google.com and docs.google.com/forms run what anyone publishes, and most big sites have an open redirect.
@@ -392,26 +385,29 @@ export const createPageTools = <T extends PageTarget>({
     return tab && !takenOver?.has(tab.id) && !heldByUser(tab.id) ? tab : null;
   };
   const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
-  // Where this job has been, and where it has reason to go. An address only counts by its site.
-  const trail = new Set([...namedSites(asked), ...beenTo, ...(limits?.sites ?? [])]);
+  // Where the user sent this job, and where it has been. An address only counts by its site.
+  const chosen = [...namedSites(asked), ...(limits?.sites ?? [])];
+  const been = new Set(beenTo);
   const usedTab = (tab: T) => {
-    trail.add(siteOf(tab.url));
+    been.add(siteOf(tab.url));
     onUse(tab);
   };
-  // In the default mode, going somewhere asks unless it's plainly safe: an address the user gave, or a link on the page
-  // it goes from to that page's own site; a short search on a well-known search page; or a plain address, with no
-  // query and nothing in it that looks like data, on a site this job is on or has reason to be on.
+  // In the default mode, going somewhere asks unless it's plainly safe: an address the user gave, a short search on a
+  // well-known search page, or a plain address on a site this job is on or has reason to be on. A reason to be on a
+  // site never covers data: a query, a path or host name that looks like it carries some, or a new subdomain of a site
+  // it has only been to, which whoever runs that site's names can read.
   const needsCard = async (url: string, from: T | null) => {
     if (!isWebAddress(url) || asked.includes(url)) return false;
     const address = new URL(url);
-    const sites = [...trail, ...(from ? [siteOf(from.url)] : [])];
-    const asks =
-      address.search !== "" || address.hash !== ""
-        ? address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address)
-        : looksLikeData(address.hostname) || looksLikeData(address.pathname) || !siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]);
-    // The page is only asked when it matters, and not for long, since the card waits on it.
-    if (!asks || !from || !canSee() || siteOf(url) !== siteOf(from.url)) return asks;
-    return !(await Promise.race([from.runInPage<boolean>(linksTo(address.href)).catch(() => false), pause(LINK_CHECK_MS).then(() => false)]));
+    if (address.search !== "" || address.hash !== "") {
+      return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
+    }
+    const visited = [...been, ...(from ? [siteOf(from.url)] : [])];
+    const host = siteOf(url);
+    const newSubdomain = !siteAllowed(url, chosen.length > 0 ? chosen : [NOWHERE]) && !visited.includes(host) && siteAllowed(url, visited.length > 0 ? visited : [NOWHERE]);
+    if (looksLikeData(address.hostname) || looksLikeData(address.pathname) || newSubdomain) return true;
+    const sites = [...chosen, ...visited];
+    return !siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]);
   };
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
@@ -993,10 +989,10 @@ export const createPageTools = <T extends PageTarget>({
           await actorOn(tab)?.say(`Looking at ${siteOf(tab.url)}`, "looking");
           await tab.settled();
           // Checked on both sides of the capture, so a frame that came in meanwhile doesn't go out in it.
-          const framed = async () => !!limits && (await showsFrameOffLimits(tab, limits.sites));
-          if (await framed()) return frameOffLimits(tab);
+          const framed = () => !!limits && showsFrameOffLimits(tab, limits.sites);
+          if (framed()) return frameOffLimits(tab);
           const image = await tab.screenshotJpeg(MAX_SCREENSHOT_WIDTH, SCREENSHOT_QUALITY);
-          if (await framed()) return frameOffLimits(tab);
+          if (framed()) return frameOffLimits(tab);
           if (!canSee()) return NO_ACCESS;
           if (!image) return `The page in tab ${tab.id} hasn't drawn anything to look at yet.`;
           return `data:image/jpeg;base64,${image.toString("base64")}`;

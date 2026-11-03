@@ -77,7 +77,22 @@ describe("whether an address with no query asks in the default mode", () => {
     ["data in a subdomain of this page's site", "https://nbswy3dpeb3w64tmmq.page.example/", {}, true],
     ["a long path on this page's site", `https://page.example/${"plain-words-".repeat(10)}`, {}, true],
     ["a token on this page's site that isn't a link on it", DOC, {}, true],
-    ["a token on this page's site that's a link on it", DOC, { linked: true }, false],
+    ["a token on this page's site that's a link on it", DOC, { linked: true }, true],
+    ["a link on it with a query, which a page can plant one per digit", "https://page.example/collect?c=0", { linked: true }, true],
+    // A site it has been on only spares the card for a plain address there, never for data.
+    ["an escape and an address on a site it has been on", "https://attacker.example/collect/alice%40mail.example-4111111111111111", { beenTo: ["attacker.example"] }, true],
+    ["an @ on a site it has been on", "https://attacker.example/u/alice@mail", { beenTo: ["attacker.example"] }, true],
+    ["hex split into short pieces on a site it has been on", "https://attacker.example/c/4a6f/686e/2044/6f65", { beenTo: ["attacker.example"] }, true],
+    ["six digits in a row on a site it has been on", "https://attacker.example/o/411111", { beenTo: ["attacker.example"] }, true],
+    ["a word like base64 on a site it has been on", "https://attacker.example/q/aGVsbG8g", { beenTo: ["attacker.example"] }, true],
+    ["a numeric subdomain of a site it has been on", "https://12.34.attacker.example/", { beenTo: ["attacker.example"] }, true],
+    ["a new subdomain of a site it has been on", "https://alice.attacker.example/", { beenTo: ["attacker.example"] }, true],
+    ["a plain page on a site it has been on", "https://attacker.example/news/today", { beenTo: ["attacker.example"] }, false],
+    ["five digits on this page's site", "https://page.example/orders/41111", {}, false],
+    // Only whole names count, so a name in another script doesn't name the end of itself.
+    ["the end of a name the user gave", "https://cher.de/", { asked: "Read https://bücher.de" }, true],
+    ["the end of a name the user wrote", "https://cher.de/", { asked: "Find it on bücher.de" }, true],
+    ["a name the user wrote in another script", "https://bücher.de/", { asked: "Find it on bücher.de" }, false],
     ["a link on it to another site", `https://attacker.example/collect/${TOKEN}`, { linked: true }, true],
     ["another page on this page's site", "https://page.example/about/team", {}, false],
     ["another page in this page's own subdomain", "https://www.page.example/news/2026/jet-engines-of-the-future", {}, false],
@@ -96,18 +111,14 @@ describe("whether an address with no query asks in the default mode", () => {
     expect(await asks(url, options)).toBe(expected);
   });
 
-  it("only asks the page about its links when the card depends on it, and not for long", async () => {
-    const runInPage = vi.fn(() => new Promise<boolean>(() => {}));
+  it("never asks the page, so a link on it changes nothing", async () => {
+    const runInPage = vi.fn(async () => true);
     const tab = { id: "tab-1", url: "https://page.example/", foreignFrames: [], runInPage } as unknown as Tab;
     const goTo = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} })
       .find(({ name }) => name === "go_to")!;
-    expect(await goTo.isRisky!({ url: "https://page.example/about" })).toBe(false);
-    expect(await goTo.isRisky!({ url: "https://elsewhere.example/" })).toBe(true);
-    expect(runInPage).not.toHaveBeenCalled();
-    const started = Date.now();
     expect(await goTo.isRisky!({ url: "https://page.example/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789" })).toBe(true);
-    expect(runInPage).toHaveBeenCalledTimes(1);
-    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(await goTo.isRisky!({ url: "https://page.example/about" })).toBe(false);
+    expect(runInPage).not.toHaveBeenCalled();
   });
 
   it("counts a site the job has been on in this reply", async () => {
@@ -345,41 +356,31 @@ describe("a mascot's limits", () => {
 
   describe("a screenshot", () => {
     const frame = (origin: string) => ({ origin, isDestroyed: () => false });
-    const shot = (foreignFrames: object[], runInPage: () => Promise<unknown>) => {
+    // The page's own script sees no frame on screen, as it wouldn't for one in a shadow root.
+    const shot = (foreignFrames: object[]) => {
       const screenshotJpeg = vi.fn(async () => IMAGE);
-      const tab = web("tab-1", "https://github.com/", { foreignFrames, runInPage: vi.fn(runInPage), screenshotJpeg });
+      const tab = web("tab-1", "https://github.com/", { foreignFrames, runInPage: vi.fn(async () => false), screenshotJpeg });
       return { tab, screenshotJpeg, run: () => setUp([tab]).tool("screenshot").run({}) };
     };
 
-    it("isn't taken while a frame from another site is on screen", async () => {
-      const { screenshotJpeg, run } = shot([frame("https://bank.example")], async () => true);
+    it("isn't taken while the page has a frame from another site, whatever its script says is on screen", async () => {
+      const { screenshotJpeg, run } = shot([frame("https://bank.example")]);
       expect(await run()).toMatch(/shows a frame from a site Scout isn't allowed on/);
       expect(screenshotJpeg).not.toHaveBeenCalled();
     });
 
-    it("isn't taken if the page can't say whether one is", async () => {
-      const { screenshotJpeg, run } = shot([frame("https://bank.example")], () => Promise.reject(new Error("gone")));
-      expect(await run()).toMatch(/isn't allowed on/);
-      expect(screenshotJpeg).not.toHaveBeenCalled();
-    });
-
-    it("is dropped if one came on screen while it was taken", async () => {
-      let onScreen = false;
-      const { screenshotJpeg, run } = shot([frame("https://bank.example")], async () => onScreen);
+    it("is dropped if one came in while it was taken", async () => {
+      const frames: object[] = [];
+      const { screenshotJpeg, run } = shot(frames);
       screenshotJpeg.mockImplementation(async () => {
-        onScreen = true;
+        frames.push(frame("https://bank.example"));
         return IMAGE;
       });
       expect(await run()).toMatch(/isn't allowed on/);
     });
 
-    it.each([
-      ["only frames from its own sites", [frame("https://gist.github.com")], true],
-      ["a frame from another site off screen", [frame("https://bank.example")], false],
-    ])("is taken with %s", async (_, frames, onScreen) => {
-      const { tab, run } = shot(frames, async () => onScreen);
-      expect(await run()).toMatch(/^data:image\/jpeg;base64,/);
-      if (frames[0].origin.endsWith("github.com")) expect(tab.runInPage).not.toHaveBeenCalled();
+    it("is taken with only frames from its own sites", async () => {
+      expect(await shot([frame("https://gist.github.com")]).run()).toMatch(/^data:image\/jpeg;base64,/);
     });
   });
 

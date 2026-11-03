@@ -1205,10 +1205,10 @@ export class Chats {
     const tab = this.pageAccess ? this.activeTab : null;
     // A mascot's limit covers the page that goes with a message too.
     if (!tab || !siteAllowed(tab.url, mascot.sites)) return null;
-    const framed = await showsFrameOffLimits(tab, mascot.sites);
+    const framedBefore = showsFrameOffLimits(tab, mascot.sites);
 
-    const [screenshot, text] = await Promise.all([
-      tab.mayShowCode || framed
+    const [captured, text] = await Promise.all([
+      tab.mayShowCode || framedBefore
         ? null
         : tab.screenshot().then(
             (image) => image.toDataURL(),
@@ -1222,6 +1222,9 @@ export class Chats {
         return null;
       }),
     ]);
+    // Checked again after the capture, so a frame that came in meanwhile doesn't go out in it.
+    const framed = framedBefore || showsFrameOffLimits(tab, mascot.sites);
+    const screenshot = framed ? null : captured;
     // "Can see" may have been switched off while the page was being read, so nothing read goes out.
     return this.pageAccess && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites)
       ? {

@@ -422,9 +422,9 @@ describe("Chats", () => {
 
   describe("the page sent with a message, for a bird with sites", () => {
     const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", instructions: "", sites: ["shop.example"], tools: ["visit"], deletedAt: null };
-    // A shop page showing a frame from the user's bank, which Scout isn't allowed on.
-    const framed = (onScreen: boolean) =>
-      ({ ...tab(), url: "https://shop.example/", foreignFrames: [{ origin: "https://bank.example", isDestroyed: () => false }], runInPage: async () => onScreen }) as unknown as Tab;
+    const BANK = { origin: "https://bank.example", isDestroyed: () => false };
+    // A shop page with a frame from the user's bank, which Scout isn't allowed on, whether or not it looks on screen.
+    const framed = () => ({ ...tab(), url: "https://shop.example/", foreignFrames: [BANK], runInPage: async () => false }) as unknown as Tab;
     const sentWith = async (mascotId: string | null, page: Tab) => {
       sent = [];
       let onEnd = () => {};
@@ -441,16 +441,33 @@ describe("Chats", () => {
       return JSON.stringify(sent[0].at(-1)!.content);
     };
 
-    it("goes without a picture while the frame is on screen, and says so", async () => {
-      const content = await sentWith("scout", framed(true));
+    it("goes without a picture while the page has the frame, and says so", async () => {
+      const content = await sentWith("scout", framed());
       expect(content).not.toContain("image_url");
       expect(content).toContain("page text");
       expect(content).toContain("shows a frame from a site Scout isn't allowed on");
     });
 
-    it("has its picture when the frame isn't on screen, and always for Berry", async () => {
-      expect(await sentWith("scout", framed(false))).toContain("image_url");
-      expect(await sentWith(null, framed(true))).toContain("image_url");
+    it("goes without the picture if the frame came in while it was taken", async () => {
+      const frames: object[] = [];
+      const page = {
+        ...tab({
+          screenshot: async () => {
+            frames.push(BANK);
+            return { toDataURL: () => SCREENSHOT };
+          },
+        }),
+        url: "https://shop.example/",
+        foreignFrames: frames,
+      } as unknown as Tab;
+      const content = await sentWith("scout", page);
+      expect(content).not.toContain("image_url");
+      expect(content).toContain("shows a frame from a site Scout isn't allowed on");
+    });
+
+    it("has its picture with no frame from another site, and always for Berry", async () => {
+      expect(await sentWith("scout", { ...tab(), url: "https://shop.example/", foreignFrames: [] } as unknown as Tab)).toContain("image_url");
+      expect(await sentWith(null, framed())).toContain("image_url");
     });
   });
 
