@@ -91,7 +91,7 @@ const createWindow = (): Window => {
 };
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId("com.electron");
+  electronApp.setAppUserModelId("com.ludwigforsberg.blueberry");
 
   mainWindow = createWindow();
 
