@@ -17,7 +17,7 @@ import { Berry } from '../components/Berry'
 const APPROVAL_DESCRIPTIONS: Record<ActionApproval, { description: string; more?: string }> = {
     risky: {
         description: 'Berry asks before anything that could delete, send, buy or change text, and before going to a site you didn’t name.',
-        more: 'Searches, and plain pages on sites you named or it has already been on, go ahead without asking. An address that could carry your data always asks.'
+        more: 'Short searches, an address you gave it yourself, and plain pages on sites you named or it has already been on go ahead without asking. Any other address that could carry your data asks first.'
     },
     always: { description: 'Berry asks before every click, every typed word and every new page.' },
     never: { description: "Berry never asks, so it can delete, send or buy without checking with you, even in routines or when a page tricks it." }
