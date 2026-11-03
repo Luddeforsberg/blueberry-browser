@@ -57,6 +57,13 @@ class CloudBusyError extends Error {
 // The step a stopped reply ends with. The chat's trail always shows it, by these words.
 const STOPPED_STEP = "Stopped here";
 
+// How a reply's steps are kept once it's over, in a chat, a routine or on the runner: a step cut off by Stop is over
+// too, and a stopped one says where it was stopped, so it never ends in nothing.
+const endedSteps = (steps: ChatStep[], stopped: boolean): ChatStep[] => [
+  ...steps.map((step) => ({ ...step, done: true })),
+  ...(stopped ? [{ text: STOPPED_STEP, done: true }] : []),
+];
+
 const errorMessage = (error: unknown): string => {
   if (error instanceof ModelConfigError || error instanceof CloudBusyError) return error.message;
   const message = error instanceof Error ? error.message.toLowerCase() : "";
@@ -939,9 +946,7 @@ export class Chats {
     this.runs.delete(chatId);
     const pages = this.closeJobTabs(chatId, run);
     this.publishWorkingTabs();
-    // A step cut off by Stop is over too, and the reply says where it was stopped, so it never ends in nothing.
-    const steps = run.steps.map((step) => ({ ...step, done: true }));
-    if (signal.aborted) steps.push({ text: STOPPED_STEP, done: true });
+    const steps = endedSteps(run.steps, signal.aborted);
     if (run.partial || steps.length > 0) {
       this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
     }
@@ -1081,7 +1086,7 @@ export class Chats {
     this.taskPopups.delete(id);
     return {
       text: run.partial,
-      steps: run.steps.map((step) => ({ ...step, done: true })),
+      steps: endedSteps(run.steps, run.controller.signal.aborted),
       error,
       stopped: run.controller.signal.aborted,
       tokens,

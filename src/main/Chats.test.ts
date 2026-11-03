@@ -276,6 +276,34 @@ describe("Chats", () => {
       expect(result).toMatchObject({ stopped: true, error: null, text: "" });
       expect(chats.decide("run-1", "any", true)).toBe(false);
     });
+
+    it("ends a stopped run with the step that says so, even before it did anything", async () => {
+      let started = 0;
+      const waiting =
+        (step: string | null): StreamReply =>
+        async function* (_, signal, { onStep }) {
+          if (step) onStep(step)();
+          started++;
+          yield "";
+          if (!signal.aborted) await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+        };
+      const stopped = async (stream: StreamReply) => {
+        const { chats } = setup(stream);
+        const before = started;
+        const ended = chats.runTask("run-1", "Look", () => {});
+        await vi.waitFor(() => expect(started).toBe(before + 1));
+        chats.stop("run-1");
+        return ended;
+      };
+
+      expect((await stopped(waiting("Read a.com"))).steps).toEqual([{ text: "Read a.com", done: true }, { text: "Stopped here", done: true }]);
+      expect(await stopped(waiting(null))).toMatchObject({ stopped: true, text: "", steps: [{ text: "Stopped here", done: true }] });
+    });
+
+    it("adds no stopped step to a run that finished", async () => {
+      const { chats } = setup(replying("report"));
+      expect((await chats.runTask("run-1", "Look", () => {})).steps).toEqual([]);
+    });
   });
 
   it("streams a reply and saves it when it ends", async () => {

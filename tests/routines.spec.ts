@@ -132,7 +132,9 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   await chrome.getByRole("button", { name: "Run again" }).click();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(1);
   await chrome.getByRole("button", { name: "Stop" }).click();
-  await expect(chrome.getByText("Stopped")).toBeVisible();
+  await expect(chrome.getByText("Stopped", { exact: true })).toBeVisible();
+  // Where it was stopped stays on the run's trail.
+  await expect(chrome.getByText("Stopped here")).toBeVisible();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(0);
   expect(requested).toEqual([]);
 });
