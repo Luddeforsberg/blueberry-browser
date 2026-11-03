@@ -45,7 +45,7 @@ test.describe("a job's tabs", () => {
     paths.forEach((path) => model.callTools({ name: "open_tab", args: { url: `${site.origin}${path}` } }));
     model.replyWith(reply);
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Find it and add it to my cart", { seePage: false }));
+    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Find it on ${origin} and add it to my cart`, { seePage: false }), site.origin);
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     return { chatId: sent!.id, finish };
   };

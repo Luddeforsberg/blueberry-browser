@@ -16,27 +16,34 @@ const screenshotTool = (tab: Tab, canSee: () => boolean) =>
     onUse: () => {},
   }).find((tool) => tool.name === "screenshot")!;
 
+type Asking = { open?: string; linked?: boolean; asked?: string; beenTo?: string[]; sites?: string[]; tool?: "open_tab" | "go_to" };
+
+// Whether going to `url` from a job on `open` asks in the default mode. `linked` is whether that page links to it.
+const asks = (url: string, { open = "https://page.example/", linked = false, asked, beenTo, sites, tool = "open_tab" }: Asking = {}) => {
+  const tab = { id: "tab-1", url: open, foreignFrames: [], runInPage: async () => linked } as unknown as Tab;
+  return createPageTools({
+    activeTab: () => tab,
+    allTabs: () => [tab],
+    openTab: () => tab,
+    closeTab: () => true,
+    ask: async () => null,
+    canSee: () => true,
+    onUse: () => {},
+    asked,
+    beenTo,
+    limits: sites && { name: "Scout", sites, tools: ["visit"] },
+  })
+    .find(({ name }) => name === tool)!
+    .isRisky!({ url });
+};
+
 describe("whether an address with a query asks in the default mode", () => {
-  const asks = (url: string, open = "https://page.example/") => {
-    const tab = { id: "tab-1", url: open } as unknown as Tab;
-    const openTab = createPageTools({
-      activeTab: () => tab,
-      allTabs: () => [tab],
-      openTab: () => tab,
-      closeTab: () => true,
-      ask: async () => null,
-      canSee: () => true,
-      onUse: () => {},
-    }).find((tool) => tool.name === "open_tab")!;
-    return openTab.isRisky!({ url });
-  };
   // Counts the "?" too, so this query and hash come to exactly `length`.
   const ofLength = (length: number) => `?q=${"a".repeat(length - 3)}`;
 
   it.each([
     ["a short search on a listed site", "https://www.youtube.com/results?search_query=jet+engine", false],
     ["a subdomain of one", "https://sv.wikipedia.org/w/index.php?search=jet", false],
-    ["no query, wherever it goes", "https://unknown.example/plain", false],
     ["exactly 100 characters", `https://www.youtube.com/results${ofLength(100)}`, false],
     ["101 characters", `https://www.youtube.com/results${ofLength(101)}`, true],
     ["a hash counting towards the limit", `https://www.youtube.com/results${ofLength(95)}#${"b".repeat(5)}`, true],
@@ -53,6 +60,72 @@ describe("whether an address with a query asks in the default mode", () => {
     ["a listed site without www", "https://youtube.com/results?search_query=jet", false],
   ])("%s", async (_, url, expected) => {
     expect(await asks(url)).toBe(expected);
+  });
+});
+
+describe("whether an address with no query asks in the default mode", () => {
+  const TOKEN = "c2VjcmV0IHBhc3N3b3JkIGh1bnRlcjI";
+  const DOC = `https://page.example/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit`;
+
+  it.each<[string, string, Asking, boolean]>([
+    // Codex's: private data out through the path or the host name, which asked for nothing.
+    ["data in the path, to go to", "https://attacker.example/collect/alice%40mail.example-4111111111111111", { tool: "go_to" }, true],
+    ["data in the path, to open", "https://attacker.example/collect/alice%40mail.example-4111111111111111", {}, true],
+    ["data in a subdomain", "https://alice-mail-example-4111111111111111.attacker.example/", {}, true],
+    // On a site it has reason to be on, only data asks.
+    ["data in the path of a site the user named", `https://attacker.example/collect/${TOKEN}`, { asked: "Look at attacker.example" }, true],
+    ["data in a subdomain of this page's site", "https://nbswy3dpeb3w64tmmq.page.example/", {}, true],
+    ["a long path on this page's site", `https://page.example/${"plain-words-".repeat(10)}`, {}, true],
+    ["a token on this page's site that isn't a link on it", DOC, {}, true],
+    ["a token on this page's site that's a link on it", DOC, { linked: true }, false],
+    ["a link on it to another site", `https://attacker.example/collect/${TOKEN}`, { linked: true }, true],
+    ["another page on this page's site", "https://page.example/about/team", {}, false],
+    ["another page in this page's own subdomain", "https://www.page.example/news/2026/jet-engines-of-the-future", {}, false],
+    // A site it has no reason to be on asks however plain.
+    ["a plain new site", "https://www.wikipedia.org/", {}, true],
+    ["a plain new site the user named", "https://www.wikipedia.org/", { asked: "Find jet engines on wikipedia.org" }, false],
+    ["a page in a subdomain of one", "https://en.wikipedia.org/wiki/Jet_engine", { asked: "Find jet engines on wikipedia.org" }, false],
+    ["only a site whose name ends like one", "https://notwikipedia.org/", { asked: "Find jet engines on wikipedia.org" }, true],
+    ["an address the user gave, token and all", "https://docs.example.com/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit", { asked: "Read https://docs.example.com/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit" }, false],
+    ["a local site the user gave an address on", "http://127.0.0.1:5173/settings", { asked: "Check http://127.0.0.1:5173/ for me" }, false],
+    ["a site an earlier reply was on", "https://example.org/news", { beenTo: ["example.org"] }, false],
+    ["a site the bird is limited to", "https://docs.github.com/en", { open: "https://github.com/", sites: ["github.com"] }, false],
+    ["a search", "https://www.google.com/search?q=jet+engine", {}, false],
+    ["a page no tab is on", "https://elsewhere.example/", { open: "about:blank" }, true],
+  ])("%s", async (_, url, options, expected) => {
+    expect(await asks(url, options)).toBe(expected);
+  });
+
+  it("only asks the page about its links when the card depends on it, and not for long", async () => {
+    const runInPage = vi.fn(() => new Promise<boolean>(() => {}));
+    const tab = { id: "tab-1", url: "https://page.example/", foreignFrames: [], runInPage } as unknown as Tab;
+    const goTo = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} })
+      .find(({ name }) => name === "go_to")!;
+    expect(await goTo.isRisky!({ url: "https://page.example/about" })).toBe(false);
+    expect(await goTo.isRisky!({ url: "https://elsewhere.example/" })).toBe(true);
+    expect(runInPage).not.toHaveBeenCalled();
+    const started = Date.now();
+    expect(await goTo.isRisky!({ url: "https://page.example/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789" })).toBe(true);
+    expect(runInPage).toHaveBeenCalledTimes(1);
+    expect(Date.now() - started).toBeLessThan(3_000);
+  });
+
+  it("counts a site the job has been on in this reply", async () => {
+    const tab = { id: "tab-1", url: "https://page.example/", foreignFrames: [], runInPage: async () => false } as unknown as Tab;
+    const other = { id: "tab-2", url: "https://other.example/", getTextWithFrames: async () => "words" } as unknown as Tab;
+    const tools = createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab, other],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+    });
+    const goTo = tools.find(({ name }) => name === "go_to")!;
+    expect(await goTo.isRisky!({ url: "https://other.example/plain" })).toBe(true);
+    await tools.find(({ name }) => name === "read_page")!.run({ tabId: "tab-2" });
+    expect(await goTo.isRisky!({ url: "https://other.example/plain" })).toBe(false);
   });
 });
 
@@ -87,6 +160,11 @@ describe("the screenshot tool", () => {
       },
     } as unknown as Tab;
     expect(await screenshotTool(tab, () => canSee).run({})).toMatch(/turned off page access/);
+  });
+
+  it("is taken for Berry whatever frames are on screen", async () => {
+    const tab = { settled, foreignFrames: [{ origin: "https://bank.example", isDestroyed: () => false }], runInPage: async () => true, screenshotJpeg: async () => IMAGE } as unknown as Tab;
+    expect(await screenshotTool(tab, () => true).run({})).toMatch(/^data:image\/jpeg;base64,/);
   });
 
   it("says so when there's nothing to see", async () => {
@@ -263,6 +341,46 @@ describe("a mascot's limits", () => {
     const [allowsFrame] = vi.mocked(tab.getTextWithFrames).mock.calls[0] as unknown as [(origin: string) => boolean];
     expect(allowsFrame("https://example.com")).toBe(false);
     expect(allowsFrame("https://gist.github.com")).toBe(true);
+  });
+
+  describe("a screenshot", () => {
+    const frame = (origin: string) => ({ origin, isDestroyed: () => false });
+    const shot = (foreignFrames: object[], runInPage: () => Promise<unknown>) => {
+      const screenshotJpeg = vi.fn(async () => IMAGE);
+      const tab = web("tab-1", "https://github.com/", { foreignFrames, runInPage: vi.fn(runInPage), screenshotJpeg });
+      return { tab, screenshotJpeg, run: () => setUp([tab]).tool("screenshot").run({}) };
+    };
+
+    it("isn't taken while a frame from another site is on screen", async () => {
+      const { screenshotJpeg, run } = shot([frame("https://bank.example")], async () => true);
+      expect(await run()).toMatch(/shows a frame from a site Scout isn't allowed on/);
+      expect(screenshotJpeg).not.toHaveBeenCalled();
+    });
+
+    it("isn't taken if the page can't say whether one is", async () => {
+      const { screenshotJpeg, run } = shot([frame("https://bank.example")], () => Promise.reject(new Error("gone")));
+      expect(await run()).toMatch(/isn't allowed on/);
+      expect(screenshotJpeg).not.toHaveBeenCalled();
+    });
+
+    it("is dropped if one came on screen while it was taken", async () => {
+      let onScreen = false;
+      const { screenshotJpeg, run } = shot([frame("https://bank.example")], async () => onScreen);
+      screenshotJpeg.mockImplementation(async () => {
+        onScreen = true;
+        return IMAGE;
+      });
+      expect(await run()).toMatch(/isn't allowed on/);
+    });
+
+    it.each([
+      ["only frames from its own sites", [frame("https://gist.github.com")], true],
+      ["a frame from another site off screen", [frame("https://bank.example")], false],
+    ])("is taken with %s", async (_, frames, onScreen) => {
+      const { tab, run } = shot(frames, async () => onScreen);
+      expect(await run()).toMatch(/^data:image\/jpeg;base64,/);
+      if (frames[0].origin.endsWith("github.com")) expect(tab.runInPage).not.toHaveBeenCalled();
+    });
   });
 
   it("drops what came back if the page took the tab off its sites meanwhile", async () => {

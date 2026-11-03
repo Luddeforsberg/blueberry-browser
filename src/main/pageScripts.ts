@@ -579,6 +579,28 @@ export const scrollPage = (direction: "up" | "down", smooth = false): string => 
   return { top: Math.round(window.scrollY), height: document.documentElement.scrollHeight };
 })()`;
 
+// Whether the page links to exactly this address, so going there is what a click on the link would do.
+export const linksTo = (url: string): string => `(() => [...document.links].some((link) => link.href === ${JSON.stringify(url)}))()`;
+
+// Whether a frame this world can't look into, because it's from another origin, is on screen. Same-origin frames are
+// looked through, since one from anywhere can sit inside them.
+export const foreignFrameOnScreen = `(() => {
+  const onScreen = (el) => {
+    const box = el.getBoundingClientRect();
+    const view = el.ownerDocument.defaultView;
+    return box.width > 0 && box.height > 0 && box.bottom > 0 && box.right > 0 && box.top < view.innerHeight && box.left < view.innerWidth &&
+      el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+  };
+  const search = (doc) => [...doc.querySelectorAll("iframe, frame, object, embed")].some((el) => {
+    let inner = null;
+    try {
+      inner = el.contentDocument;
+    } catch {}
+    return inner ? search(inner) : onScreen(el);
+  });
+  return search(document);
+})()`;
+
 // For typing a code from the phone, which `codeEntry.ts` does. These scripts never hold the code. The elements stay in
 // this isolated world, where the page can't change which ones they are.
 const CODE_SHARED = `

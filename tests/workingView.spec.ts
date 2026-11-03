@@ -30,7 +30,7 @@ const startJob = async (chrome: Page, model: FakeModel, url: string, mascotId?: 
   model.callTools({ name: "open_tab", args: { url } });
   model.replyWith("All done");
   const finish = model.holdBeforeFirstToken();
-  const sent = await chrome.evaluate((mascot) => window.chromeAPI.chat.send(null, "Have a look", { seePage: false, mascotId: mascot }), mascotId);
+  const sent = await chrome.evaluate(([mascot, address]) => window.chromeAPI.chat.send(null, `Have a look at ${address}`, { seePage: false, mascotId: mascot }), [mascotId, url]);
   await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
   await countFrames(chrome);
   return { chatId: sent!.id, finish };
@@ -143,7 +143,7 @@ test.describe("the working view", () => {
     model.callTools({ name: "open_tab", args: { url: `${site.origin}/job` } });
     model.thinkFor(700);
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Sign me in", { seePage: false }));
+    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Sign me in on ${origin}`, { seePage: false }), site.origin);
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     await countFrames(chrome);
     await expect(view().getByText("You have this tab")).toBeVisible({ timeout: 10_000 });
@@ -160,7 +160,7 @@ test.describe("the working view", () => {
     model.callTools({ name: "open_tab", args: { url: `${site.origin}/job` } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Sign me in", { seePage: false }));
+    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Sign me in on ${origin}`, { seePage: false }), site.origin);
     const chatId = sent!.id;
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), chatId);
     await countFrames(chrome);

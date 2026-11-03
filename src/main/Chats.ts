@@ -6,7 +6,7 @@ import {
   type StreamReply,
 } from "./agent";
 import { randomUUID } from "crypto";
-import { createPageTools, HANDOFF_WORDS, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
+import { createPageTools, HANDOFF_WORDS, showsFrameOffLimits, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
 import { enterCodeInTab } from "./codeEntry";
 import type { CodeResult } from "./Phone";
 import { codeEcho } from "./phoneReplies";
@@ -84,6 +84,8 @@ interface Page {
   url: string;
   text: string | null;
   screenshot: string | null;
+  // Said after the page, as ours rather than the page's.
+  note?: string;
 }
 
 const withPage = (message: string, page: Page): ReplyContent => {
@@ -92,7 +94,7 @@ const withPage = (message: string, page: Page): ReplyContent => {
     ...(page.screenshot
       ? [{ type: "image_url" as const, image_url: { url: page.screenshot } }]
       : []),
-    { type: "text" as const, text: `<page url="${page.url}">${text}</page>\n\n${message}` },
+    { type: "text" as const, text: `<page url="${page.url}">${text}</page>\n${page.note ? `${page.note}\n` : ""}\n${message}` },
   ];
 };
 
@@ -312,7 +314,7 @@ export class Chats {
 
   // The same tools on the cloud browser's pages. Only what this job opened there, and nothing in the window, so the
   // user's own tabs are out of reach. Approvals, limits, takeovers and handing a page to the user work as they do here.
-  private cloudTools(chatId: string, run: Run, job: Job): PageTool[] {
+  private cloudTools(chatId: string, run: Run, job: Job, asked: string): PageTool[] {
     const cloud = this.cloud;
     if (!cloud?.available()) throw new Error("The cloud browser is off.");
     if (!cloud.claim(chatId)) throw new CloudBusyError();
@@ -340,6 +342,8 @@ export class Chats {
       ownsTab: (id) => job.own.has(id),
       takenOver: job.takenOver,
       limits,
+      asked,
+      beenTo: run.earlierSites,
       closeTab: (tab) => cloud.close(tab.id),
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOverInCloud(chatId, run, job, tab, need),
@@ -380,7 +384,8 @@ export class Chats {
 
   // Tabs always open behind the user, so the approval cards, the reply and whatever they're doing stay in front. With
   // `page`, the page sent with this message, the tools also reach every open tab. Without it, only the job's own.
-  private jobTools(chatId: string, run: Run, page: Tab | null): PageTool[] {
+  // `asked` is what the user typed for this job, which names sites it may go to without asking.
+  private jobTools(chatId: string, run: Run, page: Tab | null, asked: string): PageTool[] {
     const job = this.jobs.get(chatId) ?? { own: new Set<string>(), takenOver: new Map<string, string>(), current: null };
     this.jobs.set(chatId, job);
     if (page) {
@@ -391,7 +396,7 @@ export class Chats {
       // That was the page from an earlier message. This one came without it, so it's out of reach.
       job.current = [...job.own].at(-1) ?? null;
     }
-    const tools = run.cloud ? this.cloudTools(chatId, run, job) : createPageTools<Tab>({
+    const tools = run.cloud ? this.cloudTools(chatId, run, job, asked) : createPageTools<Tab>({
       allTabs: () => this.browser.allTabs().filter((tab) => page || job.own.has(tab.id)),
       activeTab: () => this.browser.allTabs().find((tab) => tab.id === job.current) ?? null,
       openTab: (url) => {
@@ -416,6 +421,8 @@ export class Chats {
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
       limits: unlimited(run.mascot) ? undefined : run.mascot,
+      asked,
+      beenTo: run.earlierSites,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
@@ -929,8 +936,9 @@ export class Chats {
       if (page) this.letGo(page);
       run.withPage = page !== null;
       const messages = await this.withNewestPage(chatId, seePage, run.mascot);
-      const tools = this.jobTools(chatId, run, page);
-      this.recall(chatId, run, this.userWords(chatId).join("\n"));
+      const said = this.userWords(chatId).join("\n");
+      const tools = this.jobTools(chatId, run, page, said);
+      this.recall(chatId, run, said);
       await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
     } catch (error) {
       if (!signal.aborted) {
@@ -1068,7 +1076,8 @@ export class Chats {
     this.taskPopups.set(id, new Set());
     let error: string | null = null;
     try {
-      const tools = this.jobTools(id, run, null);
+      const said = [...earlier.flatMap(({ role, content }) => (role === "user" && typeof content === "string" ? [content] : [])), message].join("\n");
+      const tools = this.jobTools(id, run, null, said);
       this.recall(id, run, message);
       await this.consume(id, run, [...earlier, { role: "user", content: message }], tools, () => onText?.(run.partial), (used) => (tokens += used));
     } catch (caught) {
@@ -1196,9 +1205,10 @@ export class Chats {
     const tab = this.pageAccess ? this.activeTab : null;
     // A mascot's limit covers the page that goes with a message too.
     if (!tab || !siteAllowed(tab.url, mascot.sites)) return null;
+    const framed = await showsFrameOffLimits(tab, mascot.sites);
 
     const [screenshot, text] = await Promise.all([
-      tab.mayShowCode
+      tab.mayShowCode || framed
         ? null
         : tab.screenshot().then(
             (image) => image.toDataURL(),
@@ -1214,7 +1224,12 @@ export class Chats {
     ]);
     // "Can see" may have been switched off while the page was being read, so nothing read goes out.
     return this.pageAccess && !this.handedOver.has(tab.id) && siteAllowed(tab.url, mascot.sites)
-      ? { url: this.withoutCodes(tab.url), text: text === null ? null : this.withoutCodes(text), screenshot }
+      ? {
+          url: this.withoutCodes(tab.url),
+          text: text === null ? null : this.withoutCodes(text),
+          screenshot,
+          note: framed ? `No picture of the page came with this, because it shows a frame from a site ${mascot.name} isn't allowed on.` : undefined,
+        }
       : null;
   }
 

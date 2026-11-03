@@ -420,6 +420,55 @@ describe("Chats", () => {
     }
   });
 
+  describe("the page sent with a message, for a bird with sites", () => {
+    const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", instructions: "", sites: ["shop.example"], tools: ["visit"], deletedAt: null };
+    // A shop page showing a frame from the user's bank, which Scout isn't allowed on.
+    const framed = (onScreen: boolean) =>
+      ({ ...tab(), url: "https://shop.example/", foreignFrames: [{ origin: "https://bank.example", isDestroyed: () => false }], runInPage: async () => onScreen }) as unknown as Tab;
+    const sentWith = async (mascotId: string | null, page: Tab) => {
+      sent = [];
+      let onEnd = () => {};
+      const chats = new Chats(new ChatStore(":memory:"), recording, async () => null, {
+        activeTab: () => page,
+        allTabs: () => [page],
+        openBackgroundTab: () => page,
+        closeTab: () => true,
+        actionApproval: () => "always",
+      }, { onChunk: () => {}, onThread: (thread) => thread.partial === null && onEnd(), onListChanged: () => {}, onWorkingTabs: () => {} }, (id) => (id === "scout" ? SCOUT : BERRY));
+      const ended = new Promise<void>((resolve) => (onEnd = () => resolve()));
+      chats.send(null, "What's this?", { seePage: true, mascotId });
+      await ended;
+      return JSON.stringify(sent[0].at(-1)!.content);
+    };
+
+    it("goes without a picture while the frame is on screen, and says so", async () => {
+      const content = await sentWith("scout", framed(true));
+      expect(content).not.toContain("image_url");
+      expect(content).toContain("page text");
+      expect(content).toContain("shows a frame from a site Scout isn't allowed on");
+    });
+
+    it("has its picture when the frame isn't on screen, and always for Berry", async () => {
+      expect(await sentWith("scout", framed(false))).toContain("image_url");
+      expect(await sentWith(null, framed(true))).toContain("image_url");
+    });
+  });
+
+  it("lets a job go without asking to a site the user named, in a chat or a task", async () => {
+    const risky: boolean[] = [];
+    const stream: StreamReply = async function* (_, __, { tools }) {
+      const open = tools.find(({ name }) => name === "open_tab")!;
+      risky.push(await open.isRisky!({ url: "https://en.wikipedia.org/wiki/Jet_engine" }), await open.isRisky!({ url: "https://elsewhere.example/" }));
+      yield "ok";
+    };
+    const { chats, replyEnded } = setup(stream, null);
+    const ended = replyEnded();
+    send(chats, null, "Find jet engines on wikipedia.org", false);
+    await ended;
+    await chats.runTask("task-1", "Then the same", () => {}, null, [], { earlier: [{ role: "user", content: "Find jet engines on wikipedia.org" }] });
+    expect(risky).toEqual([false, true, false, true]);
+  });
+
   it("still replies when the page can't be read", async () => {
     const { chats, replyEnded } = setup(
       recording,

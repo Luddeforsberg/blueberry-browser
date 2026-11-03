@@ -35,7 +35,7 @@ test("Berry keeps a tab the user only looks at, and gives it up when they click 
     const openAndLook = async (chatId: string | null, path: string) => {
       model.callTools({ name: "open_tab", args: { url: `${origin}${path}` } });
       const finish = model.holdBeforeFirstToken();
-      const asked = ask(chatId, "Open it");
+      const asked = ask(chatId, `Open it on ${origin}`);
       await expect.poll(async () => (await tabs()).some(({ url }) => url === `${origin}${path}`)).toBe(true);
       const opened = (await tabs()).find(({ url }) => url === `${origin}${path}`)!;
       expect(opened.isActive).toBe(false);
