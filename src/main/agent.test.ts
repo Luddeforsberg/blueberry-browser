@@ -61,6 +61,18 @@ describe("streamReply", () => {
     expect(text).toBe("hello there");
   });
 
+  it("tells the model today's date", async () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 4, 9), toFake: ["Date"] });
+    try {
+      const model = fakeModel().respond(new AIMessage({ content: "ok" }));
+      await collect(streamReply([{ role: "user", content: "what's new this week?" }], new AbortController().signal, NO_TOOLS, model));
+      const system = model.calls[0]?.messages[0];
+      expect(JSON.stringify(system?.content)).toContain("Today is Wednesday, 4 November 2026.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports the tokens each model call used", async () => {
     const model = fakeModel().respond(
       new AIMessage({ content: "hello", usage_metadata: { input_tokens: 10, output_tokens: 5, total_tokens: 15 } })
