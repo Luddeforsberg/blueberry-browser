@@ -505,7 +505,7 @@ export const Mascot: React.FC<MascotProps> = ({
       onContextMenu={onContextMenu}
       data-reaction={reaction ?? undefined}
       data-mascot={look?.palette}
-      className={cn("shrink-0 overflow-visible", className)}
+      className={cn("shrink-0 overflow-visible berry-rim", className)}
     >
       <GearContext.Provider value={look?.accessory ?? "none"}>
         {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}

@@ -166,12 +166,12 @@ Berry has separate tokens and never uses the UI accent:
 
 | Token | Light | Dark |
 |---|---|---|
-| `berry-ink` (body) | `#181c2e` | `#3a4270` |
-| `berry-wing` | `#2e3454` | `#525c8e` |
+| `berry-ink` (body) | `#181c2e` | `#2a2f4d` |
+| `berry-wing` | `#2e3454` | `#3d4470` |
 | `berry-nape` | `#9ea6be` | `#a8b0c8` |
 | `berry-eye` | `#f4f1e6` | `#f4f1e6` |
 | `berry-pupil` | `#141624` | `#141624` |
-| `berry-beak` | `#3e4466` | `#5c648c` |
+| `berry-beak` | `#3e4466` | `#4e5680` |
 | `berry-fruit-mid` | `#4e5fb4` | Same |
 | `berry-fruit-dark` (shade) | `#2a3380` | Same |
 | `berry-fruit-bloom` | `#a4afe0` | Same |
@@ -179,7 +179,7 @@ Berry has separate tokens and never uses the UI accent:
 
 `berry-gear` and `berry-gear-shade` colour a mascot's accessory, with `berry-pupil` as its edge. Jackdaw's are `#d9a312` and `#a87c08` in light, `#ffd23f` and `#d9a312` in dark.
 
-Dark `berry-ink` is lifted just enough to stay visible while still reading as a dark bird. It is below the 3:1 for meaningful graphics, so the eyes, hood and berry carry the shape, and nothing may rely on Berry alone: moods have text labels.
+Dark `berry-ink` stays a dark bird, and a thin light rim (`berry-rim`, white at 45% with a 0.75px blur) holds its outline on dark backgrounds. The body is below the 3:1 for meaningful graphics, so the rim, eyes, hood and berry carry the shape, and nothing may rely on Berry alone: moods have text labels. The presets are bright enough in dark mode and have no rim.
 
 The flock's presets replace `berry-ink`, `wing`, `nape`, `beak`, `gear` and `gear-shade` on that mascot's drawing, through `data-mascot`. The eye and the blueberry never change. Body contrast is against `canvas`.
 
