@@ -131,7 +131,7 @@ export const HistoryPage: React.FC = () => {
 
                 {groupByDay(entries ?? []).map((day) => (
                     <section key={day.key} aria-label={day.label} className="mt-6">
-                        <h2 className="px-2 pb-1 text-14 font-semibold">{day.label}</h2>
+                        <h2 className="px-4 pb-1 text-14 font-semibold">{day.label}</h2>
                         <ul className="rounded-panel border bg-surface p-2">
                             {day.entries.map((entry) => (
                                 <HistoryRow

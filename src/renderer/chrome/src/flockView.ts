@@ -106,10 +106,27 @@ export const FLOCK_VIEW_EVENT = 'blueberry:flock-view'
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.
 let current: FlockView = { page: 'list' }
+// The Flock tab it belongs to, so a Flock tab opened again starts on the list. Null when it was set from elsewhere with
+// no Flock page showing, which is for the Flock tab about to show.
+let owner: string | null = null
+let showing = false
 
 export const flockView = () => current
 
+// What the Flock page in `tabId` shows: the list, unless it's that tab's own view or one just set for it.
+export const flockViewFor = (tabId: string): FlockView => {
+    if (owner !== null && owner !== tabId) current = { page: 'list' }
+    owner = tabId
+    return current
+}
+
+// Whether a Flock page is on screen, so a view set meanwhile is its own.
+export const setFlockShowing = (on: boolean) => {
+    showing = on
+}
+
 export const setFlockView = (view: FlockView) => {
     current = view
+    if (!showing) owner = null
     window.dispatchEvent(new Event(FLOCK_VIEW_EVENT))
 }

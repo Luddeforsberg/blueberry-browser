@@ -216,7 +216,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     )}
 
                     {/* Suggestions sit nearer the composer, so they're in view on an ordinary window. It stays where it is. */}
-                    <div className="relative mt-8">
+                    <div className="relative mt-14">
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
 
                         {suggestions.length > 0 ? (

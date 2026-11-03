@@ -5,6 +5,7 @@ import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
+import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { RoutineForm } from '../components/RoutineForm'
 import { ShowHowButton } from '../components/ShowBerry'
@@ -12,6 +13,10 @@ import { formatTime, RoutineApprovals, RoutineRunCard, RoutineStatusLabel } from
 import { blankForm, formFor, routinesView, setRoutinesView, type RoutinesView } from '../routinesView'
 
 const api = () => window.chromeAPI.routines
+const ROW_BIRD = 48
+const HIDDEN_ICON = 24
+// How far down the standing drawing its feet reach.
+const FEET_Y = 113 / 120
 
 const moodFor = (status: Routine['status']): Mood => {
     switch (status) {
@@ -33,6 +38,8 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
     const { routines } = useLibrary()
     const isBerry = useAssistantName() === 'Berry'
     const { find } = useFlock()
+    const { showBerry } = useShell().settings
+    const standing = showBerry ? ROW_BIRD : HIDDEN_ICON
 
     return (
         <>
@@ -59,22 +66,28 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                     </p>
                 </div>
             ) : (
-                <ul aria-label="Routines" className="mt-6 rounded-panel border bg-surface divide-y overflow-hidden">
+                // Rows with no box, each with the bird that runs it standing on the line under it, as in the Gallery.
+                <ul aria-label="Routines" className="mt-6 border-t">
                     {routines.map((routine) => (
-                        <li key={routine.id}>
+                        <li key={routine.id} className="border-b">
                             <button
                                 type="button"
                                 onClick={() => onOpen(routine.id)}
-                                className="w-full grid grid-cols-[1.4fr_1fr_1.4fr_130px] items-center gap-4 min-h-14 px-5 py-2 text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                className="w-full flex items-stretch gap-4 pr-3 text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
-                                <span className="min-w-0 flex items-center gap-2.5">
-                                    {routine.mascotId && <Berry mood={moodFor(routine.status)} size={24} mascot={find(routine.mascotId)} />}
-                                    <span className={cn("truncate", routine.status === 'running' && "font-semibold")}>{routine.name}</span>
+                                <span className={cn("shrink-0", showBerry ? "self-end" : "self-center ml-3")} style={{ width: standing, height: showBerry ? standing * FEET_Y : standing }}>
+                                    <Berry mood={moodFor(routine.status)} size={standing} mascot={find(routine.mascotId)} />
                                 </span>
-                                <span className="min-w-0 text-muted-foreground">{routine.schedule}</span>
-                                <span className="min-w-0 text-muted-foreground line-clamp-2">{routine.cloudNote ?? routine.lastResult}</span>
-                                <span className="flex justify-end">
-                                    <RoutineStatusLabel status={routine.status} />
+                                <span className="min-w-0 flex-1 py-3 flex items-center gap-6">
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-semibold">{routine.name}</span>
+                                        <span className="mt-0.5 block text-13 text-muted-foreground line-clamp-2">
+                                            {[routine.schedule, routine.cloudNote ?? routine.lastResult].filter(Boolean).join(' · ')}
+                                        </span>
+                                    </span>
+                                    <span className="shrink-0 text-13">
+                                        <RoutineStatusLabel status={routine.status} />
+                                    </span>
                                 </span>
                             </button>
                         </li>

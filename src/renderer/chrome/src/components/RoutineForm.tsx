@@ -80,12 +80,12 @@ export const RoutineForm: React.FC<{
                 label="What should it do?"
                 hint="Write it in plain words, as you would in a chat. It works in tabs of its own, and asks before acting just as a chat does."
             >
+                {/* Grows with the steps, so none of them is cut off. */}
                 <textarea
-                    rows={5}
                     maxLength={5000}
                     value={values.instructions}
                     onChange={(event) => set({ instructions: event.target.value })}
-                    className={cn(INPUT, "h-auto py-2 resize-y")}
+                    className={cn(INPUT, "h-auto min-h-28 py-2 resize-y [field-sizing:content]")}
                 />
             </Field>
 
@@ -105,14 +105,14 @@ export const RoutineForm: React.FC<{
                                         className={INPUT}
                                     />
                                 </label>
-                                <label className="flex items-center gap-2 text-13 text-muted-foreground">
-                                    <input
-                                        type="checkbox"
+                                <span className="flex items-center gap-2 text-13 text-muted-foreground">
+                                    <Switch
+                                        labelledBy={`recorded-ask-${at}`}
                                         checked={row.ask}
-                                        onChange={(event) => onChange(askForRecordedValue(values, at, event.target.checked))}
+                                        onChange={(on) => onChange(askForRecordedValue(values, at, on))}
                                     />
-                                    Ask me each run
-                                </label>
+                                    <span id={`recorded-ask-${at}`}>Ask me each run</span>
+                                </span>
                             </li>
                         ))}
                     </ul>
