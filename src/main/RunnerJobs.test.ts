@@ -414,7 +414,7 @@ describe("routines kept in the cloud", () => {
   });
 
   // A server holding the routines' keys, as `my_cloud_routine_keys` gives them. `failForgets` makes that many forgets fail.
-  const make = (onServer: string[], rows: () => CloudRoutineRow[], failForgets = 0) => {
+  const make = (onServer: string[], rows: () => CloudRoutineRow[] | null, failForgets = 0) => {
     const keys = new Set(onServer);
     let failing = failForgets;
     const syncCloudRoutine = vi.fn(async (_token: string, sent: CloudRoutineRow) => void keys.add(sent.key));
@@ -458,6 +458,21 @@ describe("routines kept in the cloud", () => {
     expect([...keys]).toEqual([]);
     await runner.routinesChanged();
     expect(forgetCloudRoutine).toHaveBeenCalledTimes(1);
+    runner.destroy();
+  });
+
+  it("leaves the cloud's routines alone while the ones here couldn't be read", async () => {
+    let rows: CloudRoutineRow[] | null = null;
+    const { runner, keys, syncCloudRoutine, forgetCloudRoutine } = make(["r1", "r2"], () => rows);
+    await settle();
+    await runner.routinesChanged();
+    expect(syncCloudRoutine).not.toHaveBeenCalled();
+    expect(forgetCloudRoutine).not.toHaveBeenCalled();
+    expect([...keys].sort()).toEqual(["r1", "r2"]);
+    // Read again, as on the next launch, it goes back to keeping them in step.
+    rows = [row("r1")];
+    await runner.routinesChanged();
+    expect(forgetCloudRoutine).toHaveBeenCalledWith("token", "r2");
     runner.destroy();
   });
 

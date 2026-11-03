@@ -99,7 +99,9 @@ const toRun = ({ steps, approval, seen, memory, ...row }: RunRow): RoutineRun =>
 export class RoutineStore {
   private readonly db: DatabaseSync;
 
-  constructor(file: string) {
+  // `fromMemory` is true when the file couldn't be opened and this runs from memory for the launch, so it doesn't know
+  // which routines are in the cloud.
+  constructor(file: string, readonly fromMemory = false) {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");

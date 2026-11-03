@@ -66,7 +66,8 @@ const createWindow = (): Window => {
   const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
   routineStore ??= openStore(
     join(app.getPath("userData"), "routines.db"),
-    (file) => new RoutineStore(file),
+    // Only the fallback opens it in memory.
+    (file) => new RoutineStore(file, file === ":memory:"),
     storeNotice("Your routines", "are")
   );
   mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));

@@ -72,8 +72,9 @@ export interface RunnerJobsHooks {
   adopt?: (first: { prompt: string; mascotId: string | null }) => string | null;
   // A message sent in that chat from elsewhere, saved as the user's.
   followedUp?: (chatId: string, prompt: string) => void;
-  // The routines that run in the cloud, as rows for it, kept there while a linked runner has accepted.
-  routines?: () => CloudRoutineRow[];
+  // The routines that run in the cloud, as rows for it, kept there while a linked runner has accepted. Null leaves the
+  // cloud's alone, neither sent nor forgotten.
+  routines?: () => CloudRoutineRow[] | null;
   // What `stillInCloud` or `cloudFailed` says about a routine changed.
   routinesSettled?: () => void;
 }
@@ -234,9 +235,10 @@ export class RunnerJobs implements ChatRunner {
   private async shareRoutines(): Promise<void> {
     const account = this.signedIn;
     if (!account || !this.link?.accepted || !this.hooks.routines) return;
+    const rows = this.hooks.routines();
+    if (!rows) return;
     if (this.sharedRoutines?.account !== account) this.sharedRoutines = { account, rows: new Map(), reconciled: null };
     const shared = this.sharedRoutines;
-    const rows = this.hooks.routines();
     const before = JSON.stringify([[...this.routinesThere].sort(), [...this.routinesFailed].sort()]);
     for (const row of rows) {
       const shape = JSON.stringify({ ...row, firstRunAt: null });

@@ -43,6 +43,33 @@ describe("holdQuit", () => {
     expect(work).toHaveBeenCalledTimes(1);
   });
 
+  it("holds a second Quit during the work too, and quits once when the work ends or the limit passes", async () => {
+    const { app, quits } = fakeApp();
+    const ending = deferred();
+    const work = vi.fn(() => ending.promise);
+    holdQuit(app, work, 60_000);
+    app.quit();
+    app.quit();
+    expect(quits).toEqual({ asked: 2, done: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(quits.done).toBe(0);
+    ending.resolve();
+    await vi.waitFor(() => expect(quits.done).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(quits).toEqual({ asked: 3, done: 1 });
+    expect(work).toHaveBeenCalledTimes(1);
+
+    const hanging = fakeApp();
+    holdQuit(hanging.app, () => new Promise(() => {}), 30);
+    hanging.app.quit();
+    hanging.app.quit();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(hanging.quits.done).toBe(0);
+    await vi.waitFor(() => expect(hanging.quits.done).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(hanging.quits).toEqual({ asked: 3, done: 1 });
+  });
+
   it("quits anyway when the work never ends, or fails", async () => {
     const hanging = fakeApp();
     holdQuit(hanging.app, () => new Promise(() => {}), 20);
