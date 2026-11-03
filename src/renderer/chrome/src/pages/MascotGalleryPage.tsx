@@ -133,7 +133,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
     }, [added])
 
     const add = async () => {
-        const result = await window.chromeAPI.mascots.addFromGallery(entry.id, clash ? ownName : null)
+        const result = await window.chromeAPI.mascots.addFromGallery(entry.id, entry.version ?? '', clash ? ownName : null)
         setError(result.ok ? null : result.error)
     }
 

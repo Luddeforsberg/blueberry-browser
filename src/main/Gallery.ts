@@ -1,6 +1,7 @@
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname } from "path";
+import type { MascotSaveResult } from "../shared/ipc";
 import type { GalleryLinked, GalleryListing, GalleryMascot, PublishedMascot, PublishResult } from "../shared/library";
 import { isUuid, parsePublicDraft, parsePublishChoices, parsePublishedRow, publicRow } from "../shared/publishing";
 import type { Account } from "./Account";
@@ -11,6 +12,16 @@ import type { MascotStore } from "./MascotStore";
 const NO_SERVER = "Publishing isn’t set up in this copy of Blueberry.";
 const CANT_REACH = "Couldn’t reach the Gallery, so nothing changed. Try again in a moment.";
 const SIGN_IN_FIRST = "Sign in to publish.";
+// Every version of an entry the page has been sent, so each review can be added as it was shown. Past this the oldest go.
+const MOST_SHOWN = 2000;
+
+// What a copy is made from, and nothing else, so two rows that would make the same copy are the same version.
+const versionOf = ({ draft }: GalleryMascot): string =>
+  createHash("sha256")
+    .update(JSON.stringify([draft.name, draft.look.palette, draft.look.accessory, draft.instructions, draft.sites, draft.tools]))
+    .digest("hex")
+    .slice(0, 32);
+const shownKey = (id: string, version: string) => `${id} ${version}`;
 
 const failure = (error: unknown): string => {
   if (error instanceof Unreachable) return CANT_REACH;
@@ -29,8 +40,9 @@ interface Saved {
 // The Gallery beyond the starters: what's published, and publishing. Everything from the server goes through
 // `parsePublishedRow`, and a copy goes through `MascotStore` like one made by hand.
 export class Gallery {
-  // What the page last showed, so a copy is exactly what the user reviewed, even if its author has changed it since.
-  private shown = new Map<string, GalleryMascot>(starterMascots().map((entry) => [entry.id, entry]));
+  // Every version the page was sent, by id and version, so a copy is exactly what the user reviewed, even if its author
+  // has changed it since or another fetch of the same entry came back in between.
+  private shown = new Map<string, GalleryMascot>();
   private saved: Saved;
 
   constructor(
@@ -49,14 +61,13 @@ export class Gallery {
   }
 
   async list(): Promise<GalleryListing> {
-    const starters = starterMascots();
+    const starters = starterMascots().map((entry) => this.show(entry));
     if (!this.server) return { entries: starters, status: "starters" };
     try {
       const published = (await this.server.listMascots()).flatMap((row) => {
         const entry = parsePublishedRow(row);
-        return entry ? [{ ...entry, link: publicPageLink(this.site, entry.id) }] : [];
+        return entry ? [this.show({ ...entry, link: publicPageLink(this.site, entry.id) })] : [];
       });
-      for (const entry of published) this.shown.set(entry.id, entry);
       return { entries: [...published, ...starters], status: "live" };
     } catch {
       return { entries: starters, status: "unreachable" };
@@ -71,21 +82,43 @@ export class Gallery {
     try {
       const row = parsePublishedRow(await this.server.mascot(id));
       if (!row || row.id !== id.toLowerCase()) return { entry: null, status: "live" };
-      const entry = { ...row, link: publicPageLink(this.site, row.id) };
-      this.shown.set(entry.id, entry);
-      return { entry, status: "live" };
+      return { entry: this.show({ ...row, link: publicPageLink(this.site, row.id) }), status: "live" };
     } catch {
       return { entry: null, status: "unreachable" };
     }
   }
 
-  entry(id: string): GalleryMascot | null {
-    return this.shown.get(id) ?? null;
+  // Exactly the version the page showed, or nothing. Never another one with the same id.
+  entry(id: unknown, version: unknown): GalleryMascot | null {
+    if (typeof id !== "string" || typeof version !== "string") return null;
+    return this.shown.get(shownKey(id, version)) ?? null;
+  }
+
+  // The copy is made from the version the user reviewed. If the page didn't show that one, nothing is added.
+  add(id: unknown, version: unknown, name: string | null): MascotSaveResult {
+    const entry = this.entry(id, version);
+    if (!entry) return { ok: false, error: "This mascot changed or left the Gallery since it was shown. Look it over again." };
+    const result = this.mascots.addFromGallery(entry.id, name === null ? entry.draft : { ...entry.draft, name });
+    if (result.ok) this.countAdd(entry);
+    return result;
+  }
+
+  private show(entry: GalleryMascot): GalleryMascot {
+    const shown = { ...entry, version: versionOf(entry) };
+    const key = shownKey(shown.id, shown.version);
+    // Shown again, it moves to the newest end, so the oldest are the ones that go.
+    this.shown.delete(key);
+    this.shown.set(key, shown);
+    for (const old of this.shown.keys()) {
+      if (this.shown.size <= MOST_SHOWN) break;
+      this.shown.delete(old);
+    }
+    return shown;
   }
 
   // Best effort: a mascot is added whether or not the count hears of it. Starters aren't on the server to count.
-  countAdd(id: string): void {
-    if (!this.server || !this.shown.get(id)?.publishedAt) return;
+  private countAdd({ id, publishedAt }: GalleryMascot): void {
+    if (!this.server || !publishedAt) return;
     const { server } = this;
     void this.account
       .accessToken()
@@ -130,7 +163,7 @@ export class Gallery {
       // No row deleted means it's another account's, or already gone. Saying it worked could leave it public.
       if (!(await this.server.deleteMascot(token, id))) return { ok: false, error: "That didn’t remove anything. It may be on another account, so sign in with the one that published it." };
       this.forgetPublished(id);
-      this.shown.delete(id);
+      for (const [key, entry] of this.shown) if (entry.id === id) this.shown.delete(key);
       this.onChange();
       return { ok: true, id, link: null };
     } catch (error) {

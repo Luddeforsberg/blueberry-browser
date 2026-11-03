@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mascotFromArgs, mascotFromLink } from "./mascotLink";
+import { FORWARD_MS, linkThrottle, mascotFromArgs, mascotFromLink, REPEAT_MS } from "./mascotLink";
 
 const ID = "3f2b8c1e-6d4a-4b7e-9c2f-1a5e8d7b6c40";
 
@@ -56,5 +56,41 @@ describe("mascotFromArgs", () => {
   it("finds nothing when there's no good link", () => {
     expect(mascotFromArgs([])).toBeNull();
     expect(mascotFromArgs(["/usr/bin/electron", ".", `blueberry://mascot/${ID}?x`, `--url=blueberry://mascot/${ID}`])).toBeNull();
+  });
+});
+
+describe("linkThrottle", () => {
+  const OTHER = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+  const clock = () => {
+    let now = 1_000_000;
+    return { now: () => now, wait: (ms: number) => (now += ms) };
+  };
+
+  it("opens the first link and brings the window forward", () => {
+    const time = clock();
+    expect(linkThrottle(time.now)(ID)).toEqual({ open: true, forward: true });
+  });
+
+  it("drops the same id again while it keeps coming, then opens it once it stops", () => {
+    const time = clock();
+    const allow = linkThrottle(time.now);
+    allow(ID);
+    for (let at = 0; at < 10; at++) {
+      time.wait(REPEAT_MS - 1);
+      expect(allow(ID)).toEqual({ open: false, forward: false });
+    }
+    time.wait(REPEAT_MS);
+    expect(allow(ID)).toEqual({ open: true, forward: true });
+  });
+
+  it("opens a different id, but comes forward at most once a while", () => {
+    const time = clock();
+    const allow = linkThrottle(time.now);
+    allow(ID);
+    time.wait(FORWARD_MS - 1);
+    expect(allow(OTHER)).toEqual({ open: true, forward: false });
+    time.wait(1);
+    expect(allow(ID)).toEqual({ open: true, forward: true });
+    expect(allow(OTHER)).toEqual({ open: true, forward: false });
   });
 });

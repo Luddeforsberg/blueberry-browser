@@ -247,6 +247,11 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     expect(await activePage()).toBe("new-tab");
     scout.description = "Sums up SVT, now without sport.";
+    // As if it were pressed again a while later, since the same link straight away is dropped.
+    await app.evaluate(() => {
+      const real = Date.now;
+      Date.now = () => real() + 10_000;
+    });
     await secondLaunch(`blueberry://mascot/${scout.id.toUpperCase()}`);
     await expect(chrome.getByText("Sums up SVT, now without sport.")).toBeVisible();
     await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();

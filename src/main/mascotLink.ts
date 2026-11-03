@@ -21,3 +21,22 @@ export const mascotFromArgs = (argv: readonly unknown[]): string | null => {
   }
   return null;
 };
+
+// Any page can hand the system the same link over and over. A repeat of the id that was just opened is dropped, and
+// keeps being dropped while it keeps coming, and the window comes forward at most once in a while.
+export const REPEAT_MS = 3000;
+export const FORWARD_MS = 2000;
+
+export const linkThrottle = (now: () => number = () => Date.now()) => {
+  let last: { id: string; at: number } | null = null;
+  let forwardAt = -Infinity;
+  return (id: string): { open: boolean; forward: boolean } => {
+    const at = now();
+    const repeat = last?.id === id && at - last.at < REPEAT_MS;
+    last = { id, at };
+    if (repeat) return { open: false, forward: false };
+    const forward = at - forwardAt >= FORWARD_MS;
+    if (forward) forwardAt = at;
+    return { open: true, forward };
+  };
+};

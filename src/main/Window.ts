@@ -20,6 +20,7 @@ import type { MascotStore } from "./MascotStore";
 import { Account } from "./Account";
 import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
+import { linkThrottle } from "./mascotLink";
 import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
@@ -122,6 +123,8 @@ export class Window {
   private windowSize = { width: 0, height: 0 };
   private readonly glassSupported = supportsGlass();
   private readonly tabsUnderChrome = new WeakSet<Tab>();
+  // `blueberry://mascot/` links come from any page, so a flood of them can't keep taking the front.
+  private readonly linkThrottle = linkThrottle();
   // What Needs you held last time, so only something new gets a notification.
   private knownWaiting = new Set<string>();
   readonly telegram: TelegramChannel;
@@ -1198,14 +1201,9 @@ export class Window {
     return result;
   }
 
-  async addFromGallery(galleryId: string, name: string | null): Promise<MascotSaveResult> {
-    const entry = this.gallery.entry(galleryId);
-    if (!entry) return { ok: false, error: "This mascot is no longer in the Gallery." };
-    const result = this.mascotStore.addFromGallery(galleryId, name === null ? entry.draft : { ...entry.draft, name });
-    if (result.ok) {
-      this.gallery.countAdd(galleryId);
-      this.mascotsChanged();
-    }
+  async addFromGallery(galleryId: string, version: string, name: string | null): Promise<MascotSaveResult> {
+    const result = this.gallery.add(galleryId, version, name);
+    if (result.ok) this.mascotsChanged();
     return result;
   }
 
@@ -1422,7 +1420,9 @@ export class Window {
   // A `blueberry://mascot/<id>` link, from any website, already checked to be only an id. It shows that Gallery entry,
   // fetched again, and nothing more: adding it still takes Add. The event is for a Gallery already showing this param.
   openMascotLink(id: string): void {
-    this.bringForward();
+    const { open, forward } = this.linkThrottle(id);
+    if (!open) return;
+    if (forward) this.bringForward();
     this.openPage("mascot-gallery", { param: id });
     sendToRenderer(this.chrome.view.webContents, "gallery:linked", id);
   }

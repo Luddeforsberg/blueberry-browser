@@ -504,7 +504,8 @@ export interface InvokeChannels {
   "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
   "mascots:gallery-linked": { region: "chrome"; args: [galleryId: string]; result: GalleryLinked };
   // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
-  "mascots:add-from-gallery": { region: "chrome"; args: [galleryId: string, name: string | null]; result: MascotSaveResult };
+  // `version` is the one the review showed, so what's added is what was read.
+  "mascots:add-from-gallery": { region: "chrome"; args: [galleryId: string, version: string, name: string | null]; result: MascotSaveResult };
   // By the mascot's id, so what goes public is read in main, not sent by a renderer. Only the choices come from there.
   "mascots:publish": { region: "chrome"; args: [mascotId: string, choices: PublishChoices]; result: PublishResult };
   // Asks first, in main.
@@ -741,7 +742,7 @@ export interface MascotsAPI {
   delete: (id: string) => Promise<boolean>;
   gallery: () => Promise<GalleryListing>;
   galleryLinked: (galleryId: string) => Promise<GalleryLinked>;
-  addFromGallery: (galleryId: string, name: string | null) => Promise<MascotSaveResult>;
+  addFromGallery: (galleryId: string, version: string, name: string | null) => Promise<MascotSaveResult>;
   publish: (mascotId: string, choices: PublishChoices) => Promise<PublishResult>;
   unpublish: (publishedId: string) => Promise<PublishResult>;
   published: () => Promise<PublishedMascot[] | null>;
