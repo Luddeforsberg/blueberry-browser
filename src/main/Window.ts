@@ -432,22 +432,28 @@ export class Window {
     this.macJobs = new MacJobs(server, this.account, {
       enabled: () => this.settings.relayOnMac,
       linked: () => this.runnerJobs.available(),
-      start: (prompt, { mascotId, sites, from }) => this.chats.send(null, prompt, { seePage: false, mascotId, sites, from })?.id ?? null,
-      run: (chatId) => {
+      // The bird from the row only narrows the one here with its id, and one that isn't here doesn't start.
+      start: (prompt, { bird, askAtLeast, from }, onEnd) => {
+        const clean = (text: string) => this.chats.withoutCodes(text);
+        const sent = this.chats.send(null, prompt, {
+          seePage: false,
+          mascotId: bird.id === BERRY.id ? null : bird.id,
+          sites: bird.sites,
+          tools: bird.tools,
+          askAtLeast,
+          from,
+          onEnd: (ended) => onEnd({ ...ended, reply: clean(ended.reply), steps: ended.steps.map((step) => ({ ...step, text: clean(step.text) })), error: ended.error && clean(ended.error) }),
+        });
+        return sent?.id ?? null;
+      },
+      progress: (chatId) => {
         const chat = this.chats.thread(chatId);
         if (!chat) return null;
-        const running = this.chats.isRunning(chatId);
-        const last = chat.messages.at(-1);
-        const reply = running ? (chat.partial ?? "") : last?.role === "assistant" ? last.content : "";
-        const steps = running ? chat.steps : last?.role === "assistant" ? (last.steps ?? []) : [];
         const clean = (text: string) => this.chats.withoutCodes(text);
         return {
-          running,
+          reply: clean(chat.partial ?? ""),
+          steps: chat.steps.map((step) => ({ ...step, text: clean(step.text) })),
           waiting: this.chats.waiting().some(({ id }) => id === chatId),
-          reply: clean(reply),
-          steps: steps.map((step) => ({ ...step, text: clean(step.text) })),
-          outcome: this.chats.work(chatId)?.outcome ?? null,
-          error: chat.error,
         };
       },
       stop: (chatId) => this.chats.stop(chatId),

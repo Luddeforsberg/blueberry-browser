@@ -141,6 +141,29 @@ describe("relay jobs on the Mac", () => {
     expect((await db.query("select status from public.cloud_jobs where id = any($1) order by created_at", [[quiet, late]])).rows).toEqual([{ status: "failed" }, { status: "failed" }]);
   });
 
+  it("ends Mac jobs that can't go on while the Mac is off, so they never hold up the cloud", async () => {
+    await one(ALICE, "select public.mac_presence(true)");
+    const stale: string[] = [];
+    for (let n = 0; n < 5; n++) stale.push((await start(SECRET, "mac"))!);
+    await as(ALICE, "select id from public.mac_claim_job()");
+    // The Mac goes away without saying so, as when it sleeps, and nothing of it calls again.
+    await db.query("update public.cloud_mac_presence set last_seen = now() - interval '1 hour' where owner = $1", [ALICE]);
+    await db.query("update public.cloud_jobs set created_at = now() - interval '6 minutes', heartbeat_at = now() - interval '3 minutes' where id = any($1)", [stale]);
+    // The relay's next job goes to the cloud rather than being refused as one too many.
+    expect(await targetOf((await start(SECRET, "auto"))!)).toBe("cloud");
+    expect((await as<{ status: string }>(RUNNER, `select status from public.relay_jobs('${SECRET}', array['${stale.join("','")}']::uuid[])`)).map(({ status }) => status)).toEqual(Array(5).fill("failed"));
+
+    // The runner's claim ends them too, with nothing from the relay.
+    const more: string[] = [];
+    await db.query("update public.cloud_mac_presence set last_seen = now() where owner = $1", [ALICE]);
+    for (let n = 0; n < 4; n++) more.push((await start(SECRET, "mac"))!);
+    await db.query("update public.cloud_jobs set created_at = now() - interval '6 minutes' where id = any($1)", [more]);
+    expect((await as<{ id: string }>(RUNNER, "select id from public.runner_claim_job()")).length).toBe(1);
+    expect((await db.query<{ status: string }>("select status from public.cloud_jobs where id = any($1)", [more])).rows.map(({ status }) => status)).toEqual(Array(4).fill("failed"));
+    // Nor did the runner get to read them.
+    expect(await as(RUNNER, "select id from public.cloud_jobs where target = 'mac'")).toEqual([]);
+  });
+
   it("keeps the presence table to the functions", async () => {
     await expect(as(ALICE, "select * from public.cloud_mac_presence")).rejects.toThrow(/permission denied/);
     await expect(as(ALICE, "select public.mac_available(gen_random_uuid())")).rejects.toThrow(/permission denied/);

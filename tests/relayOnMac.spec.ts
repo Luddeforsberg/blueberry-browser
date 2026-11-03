@@ -2,6 +2,8 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 /// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
+import { mascotSnapshot } from "../src/main/cloudJobs";
+import { BERRY } from "../src/shared/mascots";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 import { startFakeSupabase } from "./fakeSupabase";
@@ -37,7 +39,7 @@ test("a relay job runs as a chat on this Mac only while the switch is on, and it
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.cloud.runnerState())).status).toBe("linked");
     // The grant the relay's sign-in page makes, as the owner, once.
     const secret = await rpcAs(EMAIL, PASSWORD, "create_relay_grant", {});
-    const startJob = (where: string) => rpcAs(RUNNER_EMAIL, RUNNER_PASSWORD, "relay_start_job", { p_secret: secret, p_prompt: PROMPT, p_mascot: { id: "berry", name: "Berry", sites: [], tools: [] }, p_where: where });
+    const startJob = (where: string) => rpcAs(RUNNER_EMAIL, RUNNER_PASSWORD, "relay_start_job", { p_secret: secret, p_prompt: PROMPT, p_mascot: mascotSnapshot(BERRY), p_where: where });
 
     // Off by default: the Mac isn't there, so a job for it is refused.
     expect(await startJob("mac")).toBeNull();

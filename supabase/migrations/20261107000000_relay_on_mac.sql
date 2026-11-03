@@ -1,13 +1,39 @@
 -- Relay jobs on the owner's own Mac. A job from ChatGPT or Claude can run in Blueberry on the owner's Mac, with their real
 -- tabs and sign-ins, while it's on and they've allowed it in Settings. It's a row in `cloud_jobs` like any other, with
 -- `target` 'mac', written only by `relay_start_job` with a grant, as before. The runner never reads, claims or writes
--- one. Only the owner's own app session claims one, through `mac_claim_job`, and only while the opt-in kept here with the
+-- one, beyond its claim ending the ones that can't go on, unseen, as the relay's calls do too. Only the owner's own app session claims one, through `mac_claim_job`, and only while the opt-in kept here with the
 -- Mac's presence is on, so a stale app can't. Approvals for it stay on the Mac and never come here, so there's still
 -- nothing that answers one. Run it in the SQL editor, after the relay's. Running it again is safe.
 
 alter table public.cloud_jobs add column if not exists target text not null default 'cloud';
 alter table public.cloud_jobs drop constraint if exists target_shape;
 alter table public.cloud_jobs add constraint target_shape check (target in ('cloud', 'mac'));
+
+-- Whether the owner lets relay jobs run on their Mac, and when the app last said it's there. Nobody reads it directly.
+create table if not exists public.cloud_mac_presence (
+  owner uuid primary key references auth.users (id) on delete cascade,
+  enabled boolean not null default false,
+  last_seen timestamptz
+);
+alter table public.cloud_mac_presence enable row level security;
+revoke all on table public.cloud_mac_presence from public, anon, authenticated;
+
+-- An owner's Mac jobs that can't go on end as failed rather than starting again: one whose app went quiet for two
+-- minutes, since it may have done half of something, and one nobody took in five. Run wherever the owner's jobs are
+-- counted or claimed, by the app, the runner or the relay, so a Mac that's off never holds up the cloud. Not callable.
+create or replace function public.expire_mac_jobs(p_owner uuid) returns void
+language sql security definer set search_path = ''
+as $$
+  update public.cloud_jobs
+    set status = 'failed', error = case when status = 'queued' then 'Blueberry on the Mac didn''t take this job in time.'
+      else 'Blueberry on the Mac stopped while this job was going, so it ended there.' end,
+      finished_at = now(), updated_at = now()
+    where owner = p_owner and target = 'mac' and (
+      (status in ('running', 'waiting') and heartbeat_at < now() - interval '2 minutes')
+      or (status = 'queued' and created_at < now() - interval '5 minutes')
+    );
+$$;
+revoke all on function public.expire_mac_jobs(uuid) from public, anon, authenticated;
 
 -- --- The runner keeps to the cloud's ---
 
@@ -22,6 +48,8 @@ declare
   owner_of uuid := public.cloud_runner_for();
 begin
   if owner_of is null then raise exception 'Not a linked runner' using errcode = '42501'; end if;
+  -- Without seeing them, so a Mac that's off doesn't hold up the cloud's.
+  perform public.expire_mac_jobs(owner_of);
   update public.cloud_jobs
     set status = 'failed', error = 'The runner stopped while this job was going, so it ended there.',
       live_view_url = null, finished_at = now(), updated_at = now()
@@ -84,15 +112,6 @@ $$;
 
 -- --- The Mac ---
 
--- Whether the owner lets relay jobs run on their Mac, and when the app last said it's there. Nobody reads it directly.
-create table if not exists public.cloud_mac_presence (
-  owner uuid primary key references auth.users (id) on delete cascade,
-  enabled boolean not null default false,
-  last_seen timestamptz
-);
-alter table public.cloud_mac_presence enable row level security;
-revoke all on table public.cloud_mac_presence from public, anon, authenticated;
-
 -- Allowed, and seen in the last minute. Not callable.
 create or replace function public.mac_available(p_owner uuid) returns boolean
 language sql stable security definer set search_path = ''
@@ -122,8 +141,7 @@ begin
 end;
 $$;
 
--- As the owner, from the app, only while the switch is on here: takes their oldest job sent to the Mac. A job whose app
--- went quiet ends as failed rather than starting again, and so does one that waited too long for the Mac to take it.
+-- As the owner, from the app, only while the switch is on here: takes their oldest job sent to the Mac.
 create or replace function public.mac_claim_job() returns setof public.cloud_jobs
 language plpgsql security definer set search_path = ''
 as $$
@@ -134,12 +152,7 @@ begin
   if public.cloud_runner_for() is not null then raise exception 'A runner isn''t a Mac' using errcode = '42501'; end if;
   update public.cloud_mac_presence set last_seen = now() where owner = me and enabled;
   if not found then return; end if;
-  update public.cloud_jobs
-    set status = 'failed', error = 'Blueberry on the Mac stopped while this job was going, so it ended there.', finished_at = now(), updated_at = now()
-    where owner = me and target = 'mac' and status in ('running', 'waiting') and heartbeat_at < now() - interval '2 minutes';
-  update public.cloud_jobs
-    set status = 'failed', error = 'Blueberry on the Mac didn''t take this job in time.', finished_at = now(), updated_at = now()
-    where owner = me and target = 'mac' and status = 'queued' and created_at < now() - interval '5 minutes';
+  perform public.expire_mac_jobs(me);
   return query
     update public.cloud_jobs j
       set status = 'running', claimed_at = now(), heartbeat_at = now(), updated_at = now()
@@ -200,6 +213,7 @@ begin
   if exists (select 1 from public.cloud_runner_links l where l.runner = g.owner and l.accepted) then
     raise exception 'A runner can''t start jobs' using errcode = '42501';
   end if;
+  perform public.expire_mac_jobs(g.owner);
   goes := case when wanted = 'cloud' then 'cloud' when public.mac_available(g.owner) then 'mac' when wanted = 'mac' then null else 'cloud' end;
   if goes is null then return null; end if;
   if (select count(*) from public.cloud_jobs j where j.owner = g.owner and j.status in ('queued', 'running', 'waiting')) >= 5 then
@@ -215,7 +229,7 @@ begin
 end;
 $$;
 
--- As before, with where each job runs.
+-- As before, with where each job runs, after ending any of the owner's Mac jobs that can't go on.
 drop function if exists public.relay_jobs(text, uuid[]);
 create function public.relay_jobs(p_secret text, p_ids uuid[])
 returns table (
@@ -223,11 +237,12 @@ returns table (
   approval_id uuid, approval_kind text, approval_text text, approval_need text, approval_site text, approval_asked_at timestamptz,
   target text
 )
-language plpgsql stable security definer set search_path = ''
+language plpgsql security definer set search_path = ''
 as $$
 declare
   g public.cloud_relay_grants := public.relay_grant(p_secret);
 begin
+  perform public.expire_mac_jobs(g.owner);
   return query select j.id, j.status, j.steps, j.reply, j.error, j.created_at, a.id, a.kind, a.text, a.need, a.site, a.created_at, j.target
     from public.cloud_relay_jobs r
     join public.cloud_jobs j on j.id = r.job_id and j.owner = g.owner

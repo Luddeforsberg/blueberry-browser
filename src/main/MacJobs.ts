@@ -1,14 +1,17 @@
 import type { Account } from "./Account";
-import { stepsFromRow } from "./cloudJobs";
+import type { EndedReply } from "./Chats";
+import { actionApprovalFromRow, mascotFromSnapshot, stepsFromRow } from "./cloudJobs";
 import type { GalleryServer } from "./galleryServer";
-import type { ChatStep } from "../shared/library";
-import { BERRY } from "../shared/mascots";
+import type { ActionApproval } from "../shared/ipc";
+import type { ChatStep, MascotProfile } from "../shared/library";
 
 // Jobs from ChatGPT or Claude, through the relay, that run here in the user's own Blueberry rather than in the cloud.
 // Only while Settings > Cloud allows it, signed in with an accepted runner: then this says every half a minute that the
 // Mac is there, and takes the account's jobs for the Mac one at a time, as the signed-in owner. Each runs as an MCP job
 // does, through `Chats.send` with no page and a `from`, so every limit, approval and handoff is the chat's, and its
 // approvals stay here: nothing is written back but status, step notes and the reply. A Stop from the relay stops it.
+// The bird in the row is checked as the runner checks it, and only narrows the one here: tools, sites and how much it
+// asks. The job is that one reply, so nothing the user asks in the chat afterwards goes back to the relay.
 
 const POLL_MS = 3_000;
 const PRESENCE_MS = 30_000;
@@ -20,29 +23,21 @@ const MAX_ERROR = 500;
 export const RELAY_FROM = "ChatGPT or Claude";
 
 const NO_BIRD = "That bird isn't in Blueberry on the Mac, so the job didn't start.";
+const BAD_BIRD = "This job's bird didn't pass Blueberry's checks, so it didn't start.";
+const OFF_BEFORE = "Jobs from ChatGPT and Claude were turned off on the Mac before this one started.";
 const SWITCHED_OFF = "Jobs from ChatGPT and Claude were turned off on the Mac, so it stopped there.";
 const DELETED = "The chat was deleted on the Mac, so the job stopped there.";
-
-// A chat's latest reply, as the job's row takes it.
-export interface MacRun {
-  running: boolean;
-  // An approval, question or handoff is waiting on the user here.
-  waiting: boolean;
-  reply: string;
-  steps: ChatStep[];
-  outcome: "done" | "failed" | "stopped" | null;
-  error: string | null;
-}
 
 export interface MacJobsHost {
   // The switch in Settings.
   enabled: () => boolean;
   // Signed in with a runner that has accepted, which the relay needs.
   linked: () => boolean;
-  // Says the chat's id, or null if it couldn't start, such as for a bird that isn't in the flock.
-  start: (prompt: string, options: { mascotId: string | null; sites: string[]; from: string }) => string | null;
-  // Null once the chat is gone.
-  run: (chatId: string) => MacRun | null;
+  // Starts the reply as `bird`, which only narrows the one in the flock with the same id. Says the chat's id, or null if
+  // it couldn't start, such as for a bird that isn't in the flock. `onEnd` hears how that reply ended, and no later one.
+  start: (prompt: string, options: { bird: MascotProfile; askAtLeast: ActionApproval; from: string }, onEnd: (ended: EndedReply) => void) => string | null;
+  // The reply so far, while it runs. Null once the chat is gone.
+  progress: (chatId: string) => { reply: string; steps: ChatStep[]; waiting: boolean } | null;
   stop: (chatId: string) => void;
 }
 
@@ -50,6 +45,8 @@ interface Current {
   account: string;
   jobId: string;
   chatId: string;
+  // Set once, when its reply ends.
+  ended: EndedReply | null;
   stopped: boolean;
   // Why, when it was stopped by something here rather than by the user or the relay.
   why: string | null;
@@ -62,6 +59,7 @@ export class MacJobs {
   private current: Current | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking: Promise<void> | null = null;
+  private again = false;
   // The account this Mac last said it's there for, and when.
   private reporting: string | null = null;
   private reportedAt = 0;
@@ -81,8 +79,9 @@ export class MacJobs {
     void this.tick();
   }
 
-  // The switch, the account or the link changed, so it doesn't wait for the next round.
+  // The switch, the account or the link changed. Turned off, what's running stops here at once, before the server hears.
   sync(): void {
+    if (this.current && !this.wanted(this.current.account)) this.stopHere(this.current, SWITCHED_OFF);
     void this.tick();
   }
 
@@ -95,13 +94,23 @@ export class MacJobs {
     if (account) void this.withToken(account, (token) => this.server!.macPresence(token, false));
   }
 
-  // Which job it's running, for tests and the chat.
+  // Which job it's running, for tests.
   get running(): { jobId: string; chatId: string } | null {
     return this.current && { jobId: this.current.jobId, chatId: this.current.chatId };
   }
 
+  // One round at a time. Asked again during one, another follows it.
   tick(): Promise<void> {
-    this.ticking ??= this.round().finally(() => {
+    if (this.ticking) {
+      this.again = true;
+      return this.ticking;
+    }
+    this.ticking = (async () => {
+      do {
+        this.again = false;
+        await this.round();
+      } while (this.again);
+    })().finally(() => {
       this.ticking = null;
     });
     return this.ticking;
@@ -112,9 +121,19 @@ export class MacJobs {
     return status === "signed-in" ? email : null;
   }
 
+  private wanted(account: string | null): account is string {
+    return !!this.server && account !== null && this.signedIn === account && this.host.enabled() && this.host.linked();
+  }
+
+  private stopHere(job: Current, why: string): void {
+    if (job.stopped) return;
+    Object.assign(job, { stopped: true, why });
+    this.host.stop(job.chatId);
+  }
+
   private async round(): Promise<void> {
     const account = this.signedIn;
-    const wanted = !!this.server && account !== null && this.host.enabled() && this.host.linked();
+    const wanted = this.wanted(account);
     if (wanted) {
       if (this.reporting !== account || this.now() - this.reportedAt >= PRESENCE_MS) {
         const told = await this.withToken(account, (token) => this.server!.macPresence(token, true).then(() => true));
@@ -128,54 +147,60 @@ export class MacJobs {
       if (this.reporting === account) await this.withToken(account, (token) => this.server!.macPresence(token, false));
       this.reporting = null;
     }
-    if (this.current) await this.follow(wanted);
-    if (!this.current && wanted && this.reporting === account) await this.claim(account);
+    if (this.current) await this.follow();
+    if (!this.current && this.wanted(account) && this.reporting === account) await this.claim(account);
   }
 
   private async claim(account: string): Promise<void> {
     const row = await this.withToken(account, (token) => this.server!.macClaimJob(token));
-    if (!row || this.signedIn !== account) return;
+    if (!row) return;
     const jobId = String(row.id);
-    const mascot = (row.mascot && typeof row.mascot === "object" ? row.mascot : {}) as { id?: unknown; sites?: unknown };
-    const mascotId = typeof mascot.id === "string" && mascot.id !== BERRY.id ? mascot.id : null;
-    // The relay narrowed them already, and here they only narrow the bird's own again.
-    const sites = Array.isArray(mascot.sites) ? mascot.sites.filter((site): site is string => typeof site === "string") : [];
-    const chatId = this.host.start(String(row.prompt), { mascotId, sites, from: RELAY_FROM });
+    const fail = (error: string) => this.withToken(account, (token) => this.server!.macUpdateJob(token, jobId, { status: "failed", error }));
+    // Turned off, unlinked or signed out while it was being taken: it doesn't start. Signed out, it times out there.
+    if (!this.wanted(account)) {
+      await fail(OFF_BEFORE);
+      return;
+    }
+    // Checked as the runner checks it, so a row that's odd or edited doesn't run at all.
+    const bird = mascotFromSnapshot(row.mascot);
+    if (!bird) {
+      await fail(BAD_BIRD);
+      return;
+    }
+    const job: Current = { account, jobId, chatId: "", ended: null, stopped: false, why: null, finalTries: 0 };
+    const chatId = this.host.start(String(row.prompt), { bird, askAtLeast: actionApprovalFromRow(row.action_approval), from: RELAY_FROM }, (ended) => {
+      job.ended = ended;
+    });
     if (!chatId) {
-      await this.withToken(account, (token) => this.server!.macUpdateJob(token, jobId, { status: "failed", error: NO_BIRD }));
+      await fail(NO_BIRD);
       return;
     }
     console.log(`Mac job ${jobId}: started.`);
-    this.current = { account, jobId, chatId, stopped: false, why: null, finalTries: 0 };
+    job.chatId = chatId;
+    this.current = job;
   }
 
-  private async follow(wanted: boolean): Promise<void> {
+  private async follow(): Promise<void> {
     const job = this.current!;
     // Someone else signed in: it can't be written as them, so it stops here and times out there.
     if (job.account !== this.signedIn) {
-      this.host.stop(job.chatId);
+      this.stopHere(job, SWITCHED_OFF);
       this.current = null;
       return;
     }
-    if (!wanted && !job.stopped) {
-      Object.assign(job, { stopped: true, why: SWITCHED_OFF });
+    if (!this.wanted(job.account)) this.stopHere(job, SWITCHED_OFF);
+    const { ended } = job;
+    if (ended) {
+      const error = (ended.outcome === "stopped" ? job.why : ended.error)?.slice(0, MAX_ERROR);
+      return this.end(job, { status: ended.outcome, steps: stepsFromRow(ended.steps), reply: ended.reply.slice(0, MAX_REPLY), ...(error ? { error } : {}) });
+    }
+    const now = this.host.progress(job.chatId);
+    if (!now) return this.end(job, { status: "stopped", error: DELETED });
+    const stop = await this.write(job, { status: now.waiting ? "waiting" : "running", steps: stepsFromRow(now.steps), reply: now.reply.slice(0, MAX_REPLY) });
+    if (stop === true && !job.stopped && !job.ended) {
+      job.stopped = true;
       this.host.stop(job.chatId);
     }
-    const run = this.host.run(job.chatId);
-    if (!run) return this.end(job, { status: "stopped", error: DELETED });
-    const steps = stepsFromRow(run.steps);
-    const reply = run.reply.slice(0, MAX_REPLY);
-    if (run.running) {
-      const stop = await this.write(job, { status: run.waiting ? "waiting" : "running", steps, reply });
-      if (stop === true && !job.stopped) {
-        job.stopped = true;
-        this.host.stop(job.chatId);
-      }
-      return;
-    }
-    const status = run.outcome ?? (run.error ? "failed" : "done");
-    const error = (status === "stopped" ? job.why : run.error)?.slice(0, MAX_ERROR);
-    return this.end(job, { status, steps, reply, ...(error ? { error } : {}) });
   }
 
   // How it ended, tried a few rounds before it's left to time out there.

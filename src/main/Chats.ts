@@ -122,7 +122,27 @@ interface Run {
   cloud?: boolean;
   // The cloud pages it has used in this reply, latest last, like `used`.
   usedInCloud?: Set<CdpTab>;
+  // Asks at least this much before acting, whatever the setting, as for a job from the relay.
+  askAtLeast?: ActionApproval;
+  // Told once, when this reply ends, how it went. Not for a later reply in the same chat.
+  onEnd?: (ended: EndedReply) => void;
 }
+
+// How one reply ended, for whoever started it.
+export interface EndedReply {
+  reply: string;
+  steps: ChatStep[];
+  outcome: "done" | "failed" | "stopped";
+  error: string | null;
+}
+
+const ASKING: readonly ActionApproval[] = ["never", "risky", "always"];
+// The one that asks more.
+const stricter = (a: ActionApproval, b: ActionApproval | undefined): ActionApproval => (b && ASKING.indexOf(b) > ASKING.indexOf(a) ? b : a);
+
+// Berry as it comes, with nothing taken away, needs no limits at all.
+const unlimited = (mascot: MascotProfile): boolean =>
+  mascot.id === BERRY.id && mascot.sites.length === 0 && BERRY.tools.every((tool) => mascot.tools.includes(tool));
 
 // What a job in the cloud needs of the browser there. Its pages are `CdpTab`s, which the user sees as cloud tabs.
 export interface ChatCloud {
@@ -286,7 +306,7 @@ export class Chats {
     if (!cloud?.available()) throw new Error("The cloud browser is off.");
     if (!cloud.claim(chatId)) throw new CloudBusyError();
     const mine = () => cloud.pagesOf(chatId).filter((tab) => job.own.has(tab.id));
-    const limits = run.mascot.id === BERRY.id && run.mascot.sites.length === 0 ? undefined : run.mascot;
+    const limits = unlimited(run.mascot) ? undefined : run.mascot;
     return createPageTools<CdpTab>({
       allTabs: mine,
       activeTab: () => mine().find((tab) => tab.id === job.current) ?? null,
@@ -384,7 +404,7 @@ export class Chats {
       takenOver: job.takenOver,
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
-      limits: run.mascot.id === BERRY.id && run.mascot.sites.length === 0 ? undefined : run.mascot,
+      limits: unlimited(run.mascot) ? undefined : run.mascot,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
@@ -738,12 +758,23 @@ export class Chats {
   }
 
   // Starts a chat when `chatId` is null, as `mascotId` if it's given. An existing chat stays with its own mascot.
-  // The reply follows through the events. `from` names the app outside Blueberry that started a new chat, and `sites`
-  // can only narrow where this reply may go, on top of the mascot's own.
+  // The reply follows through the events. `from` names the app outside Blueberry that started a new chat, and `sites`,
+  // `tools` and `askAtLeast` can only narrow what this reply may do, on top of the mascot's own and the setting.
+  // `onEnd` hears how this reply ended, and nothing of a later one.
   send(
     chatId: string | null,
     text: string,
-    { seePage, mascotId, from = null, sites = [], cloud = false, runner = false }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; cloud?: boolean; runner?: boolean }
+    {
+      seePage,
+      mascotId,
+      from = null,
+      sites = [],
+      tools,
+      askAtLeast,
+      onEnd,
+      cloud = false,
+      runner = false,
+    }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; tools?: string[]; askAtLeast?: ActionApproval; onEnd?: (ended: EndedReply) => void; cloud?: boolean; runner?: boolean }
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
@@ -760,14 +791,15 @@ export class Chats {
     if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
     const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
     const profile = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
-    const mascot = sites.length > 0 ? { ...profile, sites: narrowSites(profile.sites, sites) } : profile;
+    const narrowed = sites.length > 0 ? { ...profile, sites: narrowSites(profile.sites, sites) } : profile;
+    const mascot = tools ? { ...narrowed, tools: narrowed.tools.filter((tool) => tools.includes(tool)) } : narrowed;
     this.store.addMessage(id, { role: "user", content: message });
     this.errors.delete(id);
     const earlier = this.finished.get(id)?.run;
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud };
+    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -903,11 +935,13 @@ export class Chats {
     this.runs.delete(chatId);
     const pages = this.closeJobTabs(chatId, run);
     this.publishWorkingTabs();
+    // A step cut off by Stop is over too.
+    const steps = run.steps.map((step) => ({ ...step, done: true }));
     if (run.partial || run.steps.length > 0) {
-      // A step cut off by Stop is over too.
-      const steps = run.steps.map((step) => ({ ...step, done: true }));
       this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
     }
+    const error = this.errors.get(chatId) ?? null;
+    run.onEnd?.({ reply: run.partial, steps, outcome: run.controller.signal.aborted ? "stopped" : error ? "failed" : "done", error });
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);
     // Another app wrote what this chat started with, so none of it is what the user said about themselves.
@@ -966,7 +1000,7 @@ export class Chats {
   ): Promise<void> {
     for await (const words of this.streamReply(messages, run.controller.signal, {
       tools,
-      actionApproval: this.browser.actionApproval,
+      actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
       approve: (text) => this.askToAllow(id, run, text),
       onStep: (text) => this.startStep(id, run, text),
       onUsage,
