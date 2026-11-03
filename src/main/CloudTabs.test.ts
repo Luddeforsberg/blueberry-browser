@@ -47,6 +47,38 @@ describe("CloudTabs", () => {
     vi.restoreAllMocks();
   });
 
+  it("keeps a page's size while a job works in it, and fits it to the latest size once the job lets go or the user takes over", async () => {
+    const fitTo = vi.fn(async () => {});
+    let working: string | null = "job-1";
+    vi.spyOn(CloudSessions.prototype, "page").mockImplementation((id) => ({ id, fitTo }) as unknown as CdpTab);
+    vi.spyOn(CloudSessions.prototype, "usedBy").mockImplementation(() => working);
+    vi.spyOn(CloudSessions.prototype, "pagesOf").mockImplementation((jobId) => (jobId === "job-1" ? [{ id: "tab-1" } as CdpTab] : []));
+    vi.spyOn(CloudSessions.prototype, "release").mockImplementation(() => {
+      working = null;
+    });
+    const tabs = makeTabs();
+    tabs.start();
+
+    await tabs.fit("tab-1", 800, 600);
+    await tabs.fit("tab-1", 1000, 700);
+    expect(fitTo).not.toHaveBeenCalled();
+    tabs.release("job-1");
+    await vi.waitFor(() => expect(fitTo).toHaveBeenCalledTimes(1));
+    expect(fitTo).toHaveBeenCalledWith(1000, 700);
+
+    // A job working there again, and the user taking the page from it.
+    working = "job-2";
+    await tabs.fit("tab-2", 900, 500);
+    expect(fitTo).toHaveBeenCalledTimes(1);
+    tabs.takeOver("tab-2");
+    await vi.waitFor(() => expect(fitTo).toHaveBeenCalledTimes(2));
+    expect(fitTo).toHaveBeenLastCalledWith(900, 500);
+    // Once it's the user's, it follows at once.
+    await tabs.fit("tab-2", 950, 550);
+    expect(fitTo).toHaveBeenLastCalledWith(950, 550);
+    vi.restoreAllMocks();
+  });
+
   it("lets the session wind down only once the last tab the user has there closes", async () => {
     let opened = 0;
     vi.spyOn(CloudSessions.prototype, "openForUser").mockImplementation(async (id) => ({ id, url: "https://example.com/" }) as CdpTab);

@@ -1574,6 +1574,24 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   await chrome.mouse.move(c.x + 20, a.y + a.height / 2, { steps: 8 });
   await chrome.mouse.up();
   await expect.poll(tabOrder).toEqual(["/b", "new-tab", "/a"]);
+
+  // The active tab is wider than the others in the row, so a drop goes by each tab's own size.
+  const back = (await strip.nth(2).boundingBox())!;
+  await chrome.mouse.move(back.x + 20, back.y + back.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(back.x - 800, back.y + back.height / 2, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
+  const wide = (await strip.nth(0).boundingBox())!;
+  const third = (await strip.nth(2).boundingBox())!;
+  expect(wide.width).toBeGreaterThan(third.width);
+  // Just past half of the third tab, which is less than one and a half of the wide tab's widths.
+  const along = third.x + third.width / 2 - (wide.x + wide.width) + 10;
+  await chrome.mouse.move(wide.x + 20, wide.y + wide.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(wide.x + 20 + along, wide.y + wide.height / 2, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(tabOrder).toEqual(["/b", "new-tab", "/a"]);
 });
 
 test("Alt and an arrow move the focused tab, and stop at the ends", async () => {

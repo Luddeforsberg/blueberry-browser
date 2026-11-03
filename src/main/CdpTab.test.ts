@@ -191,8 +191,11 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
 
   it("lets one job at a time use the session", () => {
     expect(cloud.claim("another")).toBe(false);
+    expect(cloud.usedBy("cloud-1")).toBe("job");
     cloud.release("job");
     expect(cloud.claim("another")).toBe(true);
+    // Its page is the old job's, which has let go of it.
+    expect(cloud.usedBy("cloud-1")).toBeNull();
     cloud.release("another");
     cloud.claim("job");
   });
