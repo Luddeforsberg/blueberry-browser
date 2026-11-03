@@ -5,7 +5,8 @@ import { Berry } from './Berry'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
-import { IMPORT_NOTES, SourceChoice, useHistoryImport } from './HistoryImport'
+import { IMPORT_DETAIL, IMPORT_NOTES, SourceChoice, useHistoryImport } from './HistoryImport'
+import { More } from './SettingsRow'
 
 // A small drawing of the window in each layout: the frame, the page card floating on it, and where the tabs go.
 const LayoutDrawing: React.FC<{ mode: LayoutMode }> = ({ mode }) => (
@@ -125,7 +126,7 @@ export const Onboarding: React.FC = () => {
                             </div>
                         )}
                         <ul className="mt-4 flex flex-col gap-2 text-13 text-muted-foreground text-left">
-                            {IMPORT_NOTES.map((note) => <li key={note}>{note}</li>)}
+                            {IMPORT_NOTES.map((note, index) => <li key={note}>{note}{index === IMPORT_NOTES.length - 1 && <> <More text={IMPORT_DETAIL} /></>}</li>)}
                         </ul>
                         {message && <p role="status" className="mt-4 text-15">{message}</p>}
                         {done ? (
@@ -148,7 +149,8 @@ export const Onboarding: React.FC = () => {
                         <ul className="mt-4 flex flex-col gap-2 text-15 text-muted-foreground text-left">
                             <li>I only read a page when you ask, and the chat always shows which one.</li>
                             <li>I only speak up about work you started.</li>
-                            <li>Your history stays on this computer, apart from the summary it takes to suggest something. You can turn that off in Settings.</li>
+                            <li>Your history stays on this computer, apart from a summary for suggestions, which you can turn off in Settings.</li>
+                            <li>I need an AI key to answer. For now it goes in Blueberry’s .env file.</li>
                         </ul>
                         <Button className="mt-8" onClick={finish}>Start browsing</Button>
                     </>

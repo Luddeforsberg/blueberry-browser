@@ -719,7 +719,7 @@ test("Berry only acts on a page once allowed, and shows what will happen", async
   await askInPanel("Please save it");
   await card.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(() => page.title()).toBe("Saved");
-  await expect(panel.getByText("Clicked something on")).toBeVisible();
+  await expect(panel.getByText("Clicked “Save” on 127.0.0.1")).toBeVisible();
 
   model.callTools({ name: "type_text", args: { ref: "e2", text: "hi there", submit: true } });
   await askInPanel("Write a note");
@@ -862,7 +862,7 @@ test("a missing API key says what to do", async () => {
   await input.fill("Plan a trip");
   await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
 
-  await expect(chrome.getByRole("alert")).toContainText("OPENAI_API_KEY");
+  await expect(chrome.getByRole("alert")).toContainText("Berry needs an AI key to answer.");
 });
 
 // A row's name starts with the chat's title, and a chat that isn't open adds its age.
@@ -1328,7 +1328,7 @@ test("settings are saved and come back after a restart", async () => {
   chrome = await findView(app, "view=chrome");
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-  await chrome.getByRole("button", { name: "Layout" }).click();
+  await chrome.getByRole("button", { name: "Appearance" }).click();
   await chrome.getByRole("radio", { name: "Horizontal" }).click();
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
 

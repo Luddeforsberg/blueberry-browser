@@ -45,7 +45,7 @@ const AllClear: React.FC = () => {
 const PhoneLine: React.FC = () => {
     const [phone] = usePhone()
     const openSettings = () => void window.chromeAPI.browser.openPage('settings', { param: 'Phone' })
-    const link = "text-13 text-muted-foreground rounded-control outline-none underline-offset-2 hover:underline hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    const link = "text-13 text-accent-ink rounded-control outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
     if (phone.status === 'connected' && !phone.problem) return <p className="text-13 text-muted-foreground">Replies from your phone are on</p>
     if (phone.status === 'connected') return <button type="button" onClick={openSettings} className={link}>Replies from your phone are paused</button>
     return <button type="button" onClick={openSettings} className={link}>Answer these from your phone</button>

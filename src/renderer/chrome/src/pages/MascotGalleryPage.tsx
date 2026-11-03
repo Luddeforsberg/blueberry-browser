@@ -256,7 +256,7 @@ export const MascotGalleryPage: React.FC = () => {
                                         : 'Birds made for one job. Each one shows you what it’s told, word for word, before you add it, and what you add is your own copy.'}
                                 </p>
                             </div>
-                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Your flock</Button>
+                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Flock</Button>
                         </div>
                         <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-1">
                             <label className="flex-1 min-w-[200px] max-w-xs h-8 flex items-center gap-2 text-muted-foreground">

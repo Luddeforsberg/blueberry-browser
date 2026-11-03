@@ -44,7 +44,8 @@ export const PhoneSettings: React.FC = () => {
             <SettingsRow
                 id="setting-phone"
                 title="Replies from your phone"
-                description="When a job needs you and you’re away, your own Telegram bot asks you, and your reply goes straight to the job. It runs from this computer, so it only works while Blueberry is open."
+                description="When a job needs you and you’re away, your own Telegram bot asks you, and your reply goes straight to the job."
+                more="It runs from this computer, so it only works while Blueberry is open."
             />
             <SettingsRow id="setting-phone-reads" title="What Telegram sees" description={WHO_READS} />
 
@@ -71,7 +72,7 @@ export const PhoneSettings: React.FC = () => {
 
             {phone.status === 'pairing' && (
                 <>
-                    <SettingsRow id="setting-phone-link" title={`Now connect @${phone.botName}`} description="Scan this with your phone’s camera, open it in Telegram and press Start. That chat is the only one Blueberry will listen to. It works once, for ten minutes.">
+                    <SettingsRow id="setting-phone-link" title={`Now connect @${phone.botName}`} description="Scan this with your phone’s camera, open it in Telegram and press Start." more="That chat is the only one Blueberry will listen to. It works once, for ten minutes.">
                         <Button variant="outline" onClick={() => void api.newLink().then(setPhone)}>New link</Button>
                     </SettingsRow>
                     <div className="py-4 border-b last:border-b-0">
@@ -93,10 +94,10 @@ export const PhoneSettings: React.FC = () => {
 
             {phone.status === 'connected' && (
                 <>
-                    <SettingsRow id="setting-phone-bot" title={`Connected to @${phone.botName}`} description="Disconnecting forgets the token and the chat. To stop the bot for good, revoke it with @BotFather too.">
+                    <SettingsRow id="setting-phone-bot" title={`Connected to @${phone.botName}`} description="Disconnecting forgets the token and the chat." more="To stop the bot for good, revoke it with @BotFather too.">
                         <Button variant="outline" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
                     </SettingsRow>
-                    <SettingsRow id="setting-phone-always" title="Send even when I’m here" description="Normally it only sends when the Blueberry window isn’t in front, or after a minute with no input. This is for trying it out or filming.">
+                    <SettingsRow id="setting-phone-always" title="Send even when I’m here" description="Normally it only sends when the Blueberry window isn’t in front, or after a minute with no input." more="This is for trying it out or filming.">
                         <Switch labelledBy="setting-phone-always" checked={settings.phoneAlways} onChange={(phoneAlways) => updateSettings({ phoneAlways })} />
                     </SettingsRow>
                 </>

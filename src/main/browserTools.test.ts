@@ -399,3 +399,40 @@ describe("a mascot's limits", () => {
     expect(await setUp([tab]).tool("read_page").run({})).not.toContain("the other site's words");
   });
 });
+
+describe("the step for an allowed click", () => {
+  const setUp = (name: string) => {
+    const tab = {
+      id: "t1",
+      url: "https://shop.example/basket",
+      foreignFrames: [],
+      runInPage: async () => ({ role: "button", name, target: null, riskyClick: true, safeToType: false, frameUrl: null }),
+    } as unknown as Tab;
+    const tools = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} });
+    return (tool: string) => tools.find(({ name: candidate }) => candidate === tool)!;
+  };
+
+  it("names what the card named, while the model's label stays the page's words free", async () => {
+    const tool = setUp("Place order");
+    expect(tool("click").allowedLabel!({ ref: "e1" })).toBeNull();
+    expect(await tool("click").describe!({ ref: "e1" })).toBe("Click the button “Place order” on https://shop.example/basket");
+    expect(tool("click").allowedLabel!({ ref: "e1" })).toBe("Clicked “Place order” on shop.example");
+    expect(tool("click").label({ ref: "e1" })).toBe("Clicked something on shop.example");
+    expect(tool("click").allowedLabel!({ ref: "e2" })).toBeNull();
+    await tool("double_click").describe!({ ref: "e1" });
+    expect(tool("double_click").allowedLabel!({ ref: "e1" })).toBe("Double-clicked “Place order” on shop.example");
+  });
+
+  it("cuts a long name short, takes out invisible characters, and says nothing for an unnamed element", async () => {
+    const long = setUp(`Buy‮ now\n\n${"and then some ".repeat(10)}`);
+    await long("click").describe!({ ref: "e1" });
+    const shown = long("click").allowedLabel!({ ref: "e1" })!;
+    expect(shown).toMatch(/^Clicked “Buy now and then some .*…” on shop\.example$/);
+    expect(shown).not.toContain("‮");
+    expect(shown.length).toBeLessThan(80);
+
+    const unnamed = setUp("");
+    await unnamed("click").describe!({ ref: "e1" });
+    expect(unnamed("click").allowedLabel!({ ref: "e1" })).toBeNull();
+  });
+});

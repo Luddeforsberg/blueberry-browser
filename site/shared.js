@@ -152,6 +152,20 @@ var parsePublishedRow = (input) => {
     publishedAt: Number.isNaN(publishedAt) ? 0 : publishedAt
   };
 };
+var linkSite = (href) => {
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.hostname.replace(/^www\./, "") : null;
+  } catch {
+    return null;
+  }
+};
+var linkWords = (text, href) => {
+  const site = linkSite(href);
+  if (!site || text === site) return text;
+  return text === href || text === "" ? site : `${text} (${site})`;
+};
+var plainFromMarkdown = (markdown) => markdown.replace(/^\s*(```|~~~).*$/gm, "").replace(/^\s{0,3}(?:[-*_]\s*){3,}$/gm, "").replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g, (_, text, href) => linkWords(text, href)).replace(/<(https?:\/\/[^>\s]+)>/g, (_, href) => linkWords(href, href)).replace(/^\s{0,3}#{1,6}\s+/gm, "").replace(/^\s{0,3}>\s?/gm, "").replace(/^(\s*)[-*+]\s+/gm, "$1\u2022 ").replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2").replace(/(^|[^\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?=[^\w*]|$)/g, "$1$2").replace(/~~(.+?)~~/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/\n{3,}/g, "\n\n").trim();
 
 // src/shared/phone.ts
 var flockFromRows = (rows) => {
@@ -252,6 +266,7 @@ export {
   mascotSnapshot,
   parsePublishedRow,
   permissionsInWords,
+  plainFromMarkdown,
   plausibleCode,
   withSiteNames
 };

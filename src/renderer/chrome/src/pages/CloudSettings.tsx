@@ -3,7 +3,7 @@ import type { CloudLogin, CloudState, RunnerState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
 import { CopyLink } from '../components/CopyLink'
-import { SettingsRow } from '../components/SettingsRow'
+import { More, SettingsRow } from '../components/SettingsRow'
 import { useShell } from '../contexts/ShellContext'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
@@ -58,7 +58,8 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
         <div className="py-4 border-b last:border-b-0">
             <h3 id="setting-cloud-logins" className="text-14 font-semibold">Signed in to</h3>
             <p className="mt-0.5 text-13 text-muted-foreground">
-                Bring your sign-in to a site along, and a bird in the cloud can use it as you. Only that site’s cookies are copied, after Touch ID, and they stay in the cloud browser. Nothing else from this browser goes there.
+                Bring your sign-in to a site along, and a bird in the cloud can use it as you.{' '}
+                <More about="setting-cloud-logins" text="Only that site’s cookies are copied, after Touch ID, and they stay in the cloud browser. Nothing else from this browser goes there." />
             </p>
 
             {cloud.logins.length > 0 && (
@@ -108,15 +109,16 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
 }
 
 const runnerLine = (runner: RunnerState): string => {
-    if (runner.status === 'signed-out') return 'Sign in to your Blueberry account above to link one.'
     if (runner.status === 'linked') return `Jobs in the cloud run on ${runner.email}, and keep going with your Mac off.`
     if (runner.status === 'waiting') return `Linked to ${runner.email}. Waiting for it to start and accept.`
-    return 'Jobs keep going with your Mac off on a server that signs in as an account of its own. Create it in Supabase, give its email here, and set the same account on the server.'
+    return 'Jobs can keep going with your Mac off on a server you run, linked here by the email of its own account.'
 }
+
+const LINK = 'rounded-control text-accent-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring'
 
 // The cloud runner, which keeps a job going with this computer off. It's its own account, linked here by email, and it
 // only counts once the runner accepts, naming this account back. Its password never comes here.
-const Runner: React.FC = () => {
+const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
     const [runner, setRunner] = useRunner()
     const [email, setEmail] = useState('')
     const [busy, setBusy] = useState(false)
@@ -135,7 +137,16 @@ const Runner: React.FC = () => {
     return (
         <div className="py-4 border-b last:border-b-0">
             <h3 id="setting-cloud-runner" className="text-14 font-semibold">With your Mac off</h3>
-            <p className="mt-0.5 text-13 text-muted-foreground">{runnerLine(runner)}</p>
+            {runner.status === 'signed-out' ? (
+                <p className="mt-0.5 text-13 text-muted-foreground">
+                    Sign in under <button type="button" onClick={openAccount} className={LINK}>Account</button> to keep jobs going with your Mac off.
+                </p>
+            ) : (
+                <p className="mt-0.5 text-13 text-muted-foreground">
+                    {runnerLine(runner)}
+                    {runner.status === 'none' && <> <More about="setting-cloud-runner" text="That server signs in as a Blueberry account of its own, not yours, and its password never comes here." /></>}
+                </p>
+            )}
             {(runner.status === 'none' || runner.status === 'waiting') && (
                 <form className="mt-3 flex items-center gap-2" onSubmit={(event) => void link(event)}>
                     <input aria-label="Its account’s email" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cloud@example.com" className={`flex-1 ${FIELD}`} />
@@ -165,7 +176,7 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
         <div className="flex items-center gap-6">
             <div className="flex-1 min-w-0">
                 <h4 id="setting-cloud-relay" className="text-13 font-semibold">From ChatGPT or Claude</h4>
-                <p className="mt-0.5 text-13 text-muted-foreground">Give your flock jobs from ChatGPT or Claude on the web or your phone, with your Mac off. They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you.</p>
+                <p className="mt-0.5 text-13 text-muted-foreground">Give your flock jobs from ChatGPT or Claude on the web or your phone, with your Mac off. <More about="setting-cloud-relay" text="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you." /></p>
             </div>
             <CopyLink link={address} label="Copy the address for ChatGPT or Claude" />
         </div>
@@ -177,7 +188,7 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
         <div className="mt-4 flex items-center gap-6">
             <div className="flex-1 min-w-0">
                 <h4 id="setting-cloud-relay-mac" className="text-13 font-semibold">Run their jobs on this Mac when it’s on</h4>
-                <p className="mt-0.5 text-13 text-muted-foreground">While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud, and asks you here. They never see the page you’re on.</p>
+                <p className="mt-0.5 text-13 text-muted-foreground">While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud. <More about="setting-cloud-relay-mac" text="It asks you here, and they never see the page you’re on." /></p>
             </div>
             <Switch labelledBy="setting-cloud-relay-mac" checked={settings.relayOnMac} onChange={(relayOnMac) => updateSettings({ relayOnMac })} />
         </div>
@@ -189,7 +200,7 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
 
 // Browserbase, for birds that work in a browser in the cloud. Off until a key is saved. The key and project id leave
 // this page once and never come back to it.
-export const CloudSettings: React.FC = () => {
+export const CloudSettings: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
     const [cloud, setCloud] = useCloud()
     const [apiKey, setApiKey] = useState('')
     const [projectId, setProjectId] = useState('')
@@ -213,16 +224,17 @@ export const CloudSettings: React.FC = () => {
             <SettingsRow
                 id="setting-cloud"
                 title="Work in the cloud"
-                description="A bird can do a job in a browser on Browserbase instead of in your tabs here. You watch it live in a cloud tab and can take over there, and it asks you before anything risky, the same as here. That browser is only signed in to the sites you bring along below."
+                description="A bird can do a job in a browser on Browserbase instead of in your tabs here, signed in only to the sites you bring along."
+                more="You watch it live in a cloud tab and can take over there, and it asks you before anything risky, the same as here."
             />
             <SettingsRow id="setting-cloud-status" title="Status" description={statusLine(cloud)}>
-                <Button variant="outline" disabled={!cloud.canEnd} onClick={() => void api.end().then(setCloud)}>End cloud session</Button>
+                {cloud.canEnd && <Button variant="outline" onClick={() => void api.end().then(setCloud)}>End cloud session</Button>}
             </SettingsRow>
 
             {cloud.provider !== 'local' && !cloud.configured && (
                 <div className="py-4 border-b last:border-b-0">
                     <h3 id="setting-cloud-key" className="text-14 font-semibold">Browserbase key</h3>
-                    <p className="mt-0.5 text-13 text-muted-foreground">From Settings in your Browserbase dashboard. Both are kept encrypted on this computer and only go to Browserbase.</p>
+                    <p className="mt-0.5 text-13 text-muted-foreground">Both are in Settings in your Browserbase dashboard, and stay encrypted on this computer, sent only to Browserbase.</p>
                     <form className="mt-3 flex flex-col gap-2" onSubmit={(event) => void save(event)}>
                         <input aria-label="API key" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" className={`w-full ${FIELD}`} />
                         <div className="flex items-center gap-2">
@@ -235,10 +247,10 @@ export const CloudSettings: React.FC = () => {
 
             {cloud.provider !== null && <SignedInTo cloud={cloud} />}
 
-            <Runner />
+            <Runner openAccount={openAccount} />
 
             {cloud.configured && (
-                <SettingsRow id="setting-cloud-forget" title="Browserbase key saved" description="It stays on this computer, encrypted. Forgetting it ends the cloud session too.">
+                <SettingsRow id="setting-cloud-forget" title="Browserbase key saved" description="It stays encrypted on this computer, and forgetting it ends the cloud session too.">
                     <Button variant="outline" onClick={() => void api.forget().then(setCloud)}>Forget key</Button>
                 </SettingsRow>
             )}

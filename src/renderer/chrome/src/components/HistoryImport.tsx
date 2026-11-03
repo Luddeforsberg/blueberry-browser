@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react'
 import type { HistoryImportResult, ImportSource } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
+import { More } from './SettingsRow'
 
-// What happens, in the one place both screens say it. The last line has to match `buildDigest` in suggestionDigest.ts.
+// What happens, in the one place both screens say it. The detail has to match `buildDigest` in suggestionDigest.ts.
 export const IMPORT_NOTES = [
-    'Only history comes across: addresses, page titles and visit times from the last 90 days, from every profile. Not passwords or cookies.',
-    'It stays on this computer.',
-    'To decide what to suggest, a summary of the last two weeks goes to the AI service: site names and page titles in the order you visited them, what you searched for, and your chat and routine titles. Never page text or full addresses. Local addresses, and sites it recognises as banks or mail, are left out. You can turn Suggestions off in Settings.'
+    'Only addresses, page titles and visit times from the last 90 days come across, from every profile, never passwords or cookies.',
+    'It stays on this computer, apart from a summary Suggestions sends to the AI service.',
 ]
+export const IMPORT_DETAIL = 'That summary covers the last two weeks: site names and page titles in the order you visited them, what you searched for, and your chat and routine titles. Never page text or full addresses. Local addresses, and sites it recognises as banks or mail, are left out. You can turn Suggestions off in Settings.'
 
 export const useHistoryImport = () => {
     const [sources, setSources] = useState<ImportSource[] | null>(null)
@@ -63,8 +64,8 @@ export const HistoryImportSettings: React.FC = () => {
         <div className="py-4 border-b">
             <div className="flex items-center gap-6">
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-14 font-semibold">Bring in history</h3>
-                    <p className="mt-0.5 text-13 text-muted-foreground">{IMPORT_NOTES.join(' ')}</p>
+                    <h3 id="setting-import" className="text-14 font-semibold">Bring in history</h3>
+                    <p className="mt-0.5 text-13 text-muted-foreground">{IMPORT_NOTES.join(' ')} <More about="setting-import" text={IMPORT_DETAIL} /></p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                     <SourceChoice sources={sources} source={source} choose={choose} />

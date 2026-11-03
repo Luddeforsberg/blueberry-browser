@@ -16,6 +16,9 @@ export type PinnedSite = Bookmark;
 export interface ChatStep {
   text: string;
   done: boolean;
+  // What the chat shows in its place, naming what the user allowed, such as a button. It has page text in it, so it's
+  // only ever drawn here: history, the cloud and other apps get `text`.
+  shown?: string;
 }
 
 // An action waiting for the user to allow it.

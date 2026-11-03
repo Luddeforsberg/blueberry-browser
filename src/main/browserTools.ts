@@ -30,6 +30,7 @@ import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } 
 import type { PageFrame, PageTarget } from "./pageTarget";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { NOWHERE, siteAllowed } from "../shared/mascots";
+import { cleanLine } from "../shared/publishing";
 
 const MAX_READ_LENGTH = 20_000;
 const MAX_ELEMENTS = 200;
@@ -65,6 +66,9 @@ export interface PageTool {
   returnsImage?: boolean;
   // Says why this call can't happen at all, before anything asks or runs: a mascot's limits, or a tab the user took over.
   refuses?: (args: unknown) => Promise<{ label: string; message: string } | null>;
+  // What the chat shows instead of `label` once the user allowed this call, naming what the card named. It has page text
+  // in it, so it never goes back to the model: only `label` does.
+  allowedLabel?: (args: unknown) => string | null;
 }
 
 // What each tool needs from a mascot. "reading" and "asking" are every mascot's. A tool that isn't listed here is
@@ -106,8 +110,9 @@ const pageTool = <S extends z.ZodObject>(tool: {
   whileAsking?: (args: z.infer<S>) => void;
   isRisky?: (args: z.infer<S>) => Promise<boolean>;
   returnsImage?: boolean;
+  allowedLabel?: (args: z.infer<S>) => string | null;
 }): PageTool => {
-  const { describe, whileAsking, isRisky } = tool;
+  const { describe, whileAsking, isRisky, allowedLabel } = tool;
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
@@ -115,6 +120,7 @@ const pageTool = <S extends z.ZodObject>(tool: {
     describe: describe && ((args) => describe(tool.schema.parse(args))),
     whileAsking: whileAsking && ((args) => whileAsking(tool.schema.parse(args))),
     isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
+    allowedLabel: allowedLabel && ((args) => allowedLabel(tool.schema.parse(args))),
   };
 };
 
@@ -620,11 +626,20 @@ export const createPageTools = <T extends PageTarget>({
     return refused.length === 0 || result.startsWith("data:image/") ? result : `${result} The page tried to go to ${siteOf(refused[0])}, which ${limits?.name} isn't allowed on, so it stayed here.`;
   };
 
+  // The name each element had when it was last described, which for an allowed call is the check just before it runs,
+  // so a step can say what the user allowed. Page text, so it's only for the screen.
+  const describedNames = new Map<string, string>();
   const describeOn = async (id: string | undefined, ref: string, say: (info: ElementInfo) => string) => {
     const info = await element(id, ref);
     const tab = find(id);
     if (!info || !tab) return `Act on element ${ref}, which is no longer on the page`;
+    describedNames.set(`${tab.id} ${ref}`, info.name);
     return `${say(info)}${placeOf(info)} ${tab.url}${info.target ? `, which goes to ${info.target}` : ""}`;
+  };
+  const clickedLabel = (verb: string, id: string | undefined, ref: string) => {
+    const tab = find(id);
+    const name = clipWords(tab ? cleanLine(describedNames.get(`${tab.id} ${ref}`) ?? "") : undefined);
+    return name && name !== "unnamed" ? `${verb} “${name}” on ${site(id)}` : null;
   };
 
   const tools = [
@@ -732,6 +747,7 @@ export const createPageTools = <T extends PageTarget>({
       description: "Click an element from list_elements with the real mouse. The user is asked first when it could change something.",
       schema: z.object({ tabId, ref: z.string().max(20) }),
       label: ({ tabId: id }) => `Clicked something on ${site(id)}`,
+      allowedLabel: ({ tabId: id, ref }) => clickedLabel("Clicked", id, ref),
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
@@ -742,6 +758,7 @@ export const createPageTools = <T extends PageTarget>({
       description: "Double-click an element from list_elements with the real mouse, such as a label a page edits that way. The user is asked first when it could change something.",
       schema: z.object({ tabId, ref: z.string().max(20) }),
       label: ({ tabId: id }) => `Double-clicked something on ${site(id)}`,
+      allowedLabel: ({ tabId: id, ref }) => clickedLabel("Double-clicked", id, ref),
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Double-click the ${role} “${name}”`),
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,

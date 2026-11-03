@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePublicDraft, parsePublishChoices, parsePublishedRow, publicRow, publishWarnings } from "./publishing";
+import { linkSite, parsePublicDraft, parsePublishChoices, parsePublishedRow, plainFromMarkdown, publicRow, publishWarnings } from "./publishing";
 import { MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME } from "./mascots";
 
 const ID = "00000000-0000-4000-8000-000000000001";
@@ -104,5 +104,37 @@ describe("what strangers publish", () => {
   it("stays quiet about ordinary words, and looks in the example too", () => {
     expect(publishWarnings({ instructions: "Check the password reset page on github.com and tell me about 2026-11-01." }, choices)).toEqual([]);
     expect(publishWarnings({ instructions: "Read." }, { ...choices, example: { prompt: "Mail a@b.se", answer: "Done" } })).toEqual(["There may be an email address in the example’s question."]);
+  });
+});
+
+describe("a stranger's example as plain words", () => {
+  it("names a link's site instead of its whole address", () => {
+    expect(linkSite("https://www.svt.se/nyheter/utrikes/a?inlagg=64849633")).toBe("svt.se");
+    expect(linkSite("mailto:someone@example.com")).toBeNull();
+    expect(linkSite("not a link")).toBeNull();
+  });
+
+  it("keeps the words and drops the markdown", () => {
+    const answer = [
+      "## Morning briefing",
+      "",
+      "- **Sweden:** a vote on _Tuesday_. [Ekot](https://www.sverigesradio.se/artikel/c-ledaren?x=1)",
+      "* See <https://www.svt.se/nyheter> and `code`",
+      "> Quoted ~~old~~ words",
+      "![A chart](https://tracker.example/pixel.png)",
+      "---",
+      "```",
+      "plain",
+      "```",
+    ].join("\n");
+    expect(plainFromMarkdown(answer)).toBe(
+      ["Morning briefing", "", "• Sweden: a vote on Tuesday. Ekot (sverigesradio.se)", "• See svt.se and code", "Quoted old words", "A chart", "", "plain"].join("\n")
+    );
+  });
+
+  it("leaves what isn't markdown alone, including markup, which only ever goes in as text", () => {
+    expect(plainFromMarkdown("snake_case_name and 2 * 3 * 4")).toBe("snake_case_name and 2 * 3 * 4");
+    expect(plainFromMarkdown('<img src=x onerror="alert(1)">')).toBe('<img src=x onerror="alert(1)">');
+    expect(plainFromMarkdown("")).toBe("");
   });
 });

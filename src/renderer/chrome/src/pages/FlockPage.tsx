@@ -168,7 +168,7 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
     }, [])
     return (
         <>
-            <h1 className="text-20 font-semibold">Your flock</h1>
+            <h1 className="text-20 font-semibold">Flock</h1>
             <p className="mt-1 text-14 text-muted-foreground">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
             <ul ref={list} aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid gap-y-10" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${COLUMN}px,1fr))` }}>
                 {flock.map((mascot, index) => (

@@ -132,3 +132,39 @@ export const publishWarnings = (draft: Pick<MascotProfile, "instructions">, { au
   return fields.flatMap(([where, text]) => SECRET_SHAPES.filter(({ shape }) => shape.test(text)).map(({ name }) => `There may be ${name} in ${where}.`));
 };
 
+
+// Where a stranger's link goes, as a site name, so it reads as words and not a long address. Null for anything that isn't
+// a web address.
+export const linkSite = (href: string): string | null => {
+  try {
+    const url = new URL(href);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.hostname.replace(/^www\./, "") : null;
+  } catch {
+    return null;
+  }
+};
+
+const linkWords = (text: string, href: string) => {
+  const site = linkSite(href);
+  if (!site || text === site) return text;
+  return text === href || text === "" ? site : `${text} (${site})`;
+};
+
+// A stranger's markdown as plain words, for a page that only takes text: links become their words and site, a picture
+// its description, and the marks around words go. Nothing here makes markup, so what comes out still goes in as text.
+export const plainFromMarkdown = (markdown: string): string =>
+  markdown
+    .replace(/^\s*(```|~~~).*$/gm, "")
+    .replace(/^\s{0,3}(?:[-*_]\s*){3,}$/gm, "")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]*)\]\(\s*<?([^)\s>]*)>?(?:\s+"[^"]*")?\s*\)/g, (_, text: string, href: string) => linkWords(text, href))
+    .replace(/<(https?:\/\/[^>\s]+)>/g, (_, href: string) => linkWords(href, href))
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s{0,3}>\s?/gm, "")
+    .replace(/^(\s*)[-*+]\s+/gm, "$1• ")
+    .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2")
+    .replace(/(^|[^\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?=[^\w*]|$)/g, "$1$2")
+    .replace(/~~(.+?)~~/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
