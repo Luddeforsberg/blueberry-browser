@@ -18,7 +18,7 @@ export const Composer: React.FC<{
     spellCheck?: boolean
     // Shown above the text, such as the page Berry can see.
     attachment?: React.ReactNode
-    // The + button. With no handler it stays disabled until attachments exist.
+    // The + button. With no handler and nothing for its menu, there's no + at all.
     onAdd?: () => void
     addLabel?: string
     // Leaves out the + button where there's nothing to add.
@@ -115,21 +115,19 @@ export const Composer: React.FC<{
                 {mascot && (
                     <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
                 )}
-                {!noAdd && (
+                {!noAdd && (onAdd || menu) && (
                     <div ref={menuRef} className="relative">
                         <button
                             ref={addRef}
                             type="button"
                             aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
-                            title={menu ? undefined : (addLabel ?? 'Adding files arrives with the backend')}
+                            title={menu ? undefined : addLabel}
                             aria-haspopup={menu ? 'menu' : undefined}
                             aria-expanded={menu ? menuOpen : undefined}
                             onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
-                            disabled={!onAdd && !menu}
                             className={cn(
                                 "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
                                 "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                                "disabled:hover:bg-transparent disabled:text-muted-foreground",
                                 menuOpen && "bg-muted"
                             )}
                         >

@@ -3,9 +3,9 @@ import type { ChatStep } from '@shared/library'
 // How many of the latest steps show while a job runs, or where one was cut short.
 const LATEST = 3
 
-// The user was asked something or the job stayed out of somewhere, which is worth seeing on any trail. The words come
-// from the tools' labels in `browserTools.ts`.
-const WORTH_KEEPING = /^(Asked you|Stayed off|Left the tab you took over)/
+// The user was asked something, the job stayed out of somewhere or it was stopped, which is worth seeing on any trail.
+// The words come from the tools' labels in `browserTools.ts` and from `STOPPED_STEP` in `Chats.ts`.
+const WORTH_KEEPING = /^(Asked you|Stayed off|Left the tab you took over|Stopped here)/
 
 export type TrailStep = { step: ChatStep; index: number }
 

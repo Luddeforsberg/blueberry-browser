@@ -54,6 +54,9 @@ class CloudBusyError extends Error {
   }
 }
 
+// The step a stopped reply ends with. The chat's trail always shows it, by these words.
+const STOPPED_STEP = "Stopped here";
+
 const errorMessage = (error: unknown): string => {
   if (error instanceof ModelConfigError || error instanceof CloudBusyError) return error.message;
   const message = error instanceof Error ? error.message.toLowerCase() : "";
@@ -63,7 +66,8 @@ const errorMessage = (error: unknown): string => {
   if (message.includes("429") || message.includes("rate limit")) {
     return "The model is rate limited right now. Try again in a moment.";
   }
-  if (message.includes("network") || message.includes("fetch") || message.includes("econnrefused")) {
+  // LangChain's OpenAI client says only "Connection error." with no network.
+  if (message.includes("network") || message.includes("fetch") || message.includes("econnrefused") || message.includes("connection error")) {
     return "Couldn't reach the model. Check your connection and try again.";
   }
   return "Something went wrong with this reply. Try again.";
@@ -935,9 +939,10 @@ export class Chats {
     this.runs.delete(chatId);
     const pages = this.closeJobTabs(chatId, run);
     this.publishWorkingTabs();
-    // A step cut off by Stop is over too.
+    // A step cut off by Stop is over too, and the reply says where it was stopped, so it never ends in nothing.
     const steps = run.steps.map((step) => ({ ...step, done: true }));
-    if (run.partial || run.steps.length > 0) {
+    if (signal.aborted) steps.push({ text: STOPPED_STEP, done: true });
+    if (run.partial || steps.length > 0) {
       this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
     }
     const error = this.errors.get(chatId) ?? null;
