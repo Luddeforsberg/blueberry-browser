@@ -107,6 +107,28 @@ describe("openStore", () => {
     expect(new ChatStore(file).summaries()).toHaveLength(1);
   });
 
+  it("tells the store when it isn't opening what was saved", () => {
+    const opened = (prepare: (file: string) => void, fail = false) => {
+      const file = tempFile();
+      prepare(file);
+      const recovered: boolean[] = [];
+      let attempts = 0;
+      openStore(
+        file,
+        (path, isRecovered) => {
+          if (fail && attempts++ === 0) throw Object.assign(new Error("database is locked"), { errcode: 5 });
+          recovered.push(isRecovered);
+          return new ChatStore(path);
+        },
+        () => {}
+      );
+      return recovered;
+    };
+    expect(opened(savedChat)).toEqual([false]);
+    expect(opened((file) => writeFileSync(file, "not a database".repeat(100)))).toEqual([true]);
+    expect(opened(savedChat, true)).toEqual([true]);
+  });
+
   it("recovers the history database the same way", () => {
     const file = tempFile("history.db");
     writeFileSync(file, "garbage".repeat(1000));

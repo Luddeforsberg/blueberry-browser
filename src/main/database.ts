@@ -45,17 +45,18 @@ export interface StoreProblem {
   movedTo: string | null;
 }
 
-// A database must never stop the app from starting. Only real damage moves the file, and it's never deleted.
-export const openStore = <T>(file: string, open: (file: string) => T, onProblem: (problem: StoreProblem) => void): T => {
+// A database must never stop the app from starting. Only real damage moves the file, and it's never deleted. `open` is
+// told `recovered` when what it opens isn't what was saved: a new file in place of a damaged one, or memory.
+export const openStore = <T>(file: string, open: (file: string, recovered: boolean) => T, onProblem: (problem: StoreProblem) => void): T => {
   try {
     if (existsSync(file)) checkFile(file);
-    return open(file);
+    return open(file, false);
   } catch (error) {
     console.error(`Failed to open ${file}:`, error);
     if (isDamage(error)) {
       try {
         const movedTo = moveAside(file);
-        const store = open(file);
+        const store = open(file, true);
         onProblem({ movedTo });
         return store;
       } catch (moveError) {
@@ -63,6 +64,6 @@ export const openStore = <T>(file: string, open: (file: string) => T, onProblem:
       }
     }
     onProblem({ movedTo: null });
-    return open(":memory:");
+    return open(":memory:", true);
   }
 };

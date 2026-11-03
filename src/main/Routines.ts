@@ -239,7 +239,7 @@ export class Routines {
   // first time is only when this would run it next, which the server takes for a new or changed one. Null when the saved
   // routines couldn't be read, so the cloud's are left as they are rather than taken for deleted.
   cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] | null {
-    if (this.store.fromMemory) return null;
+    if (this.store.recovered) return null;
     return this.store.routines().filter(({ inCloud }) => inCloud).map((routine) => {
       const mascot = mascotOf(routine.mascotId);
       return {
