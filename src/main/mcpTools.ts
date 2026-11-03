@@ -4,7 +4,8 @@ import { plausibleCode } from "./phoneReplies";
 import type { WaitingRun } from "./Chats";
 import type { Bookmark, ChatThread, ChatThreadSummary, MascotProfile, MemoryFact, Routine, RoutineRun } from "../shared/library";
 import type { HistoryEntry, Visit } from "../shared/ipc";
-import { BERRY, normaliseSite, permissionsInWords } from "../shared/mascots";
+import { BERRY } from "../shared/mascots";
+import { agentSummary, sitesFromApp } from "./mcpFlock";
 
 // What Claude and other apps on this computer can ask of Blueberry, over MCP. Every job goes through `Chats.send` or a
 // routine's run, exactly as the user's own would, so a mascot's limits and every approval apply unchanged. An app can
@@ -245,13 +246,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const agents = flock().map((mascot) => ({
-          id: mascot.id,
-          name: mascot.name,
-          for: mascot.id === BERRY.id ? "Anything. Berry is the user's general assistant in the browser." : mascot.instructions,
-          sites: mascot.sites.length > 0 ? mascot.sites : "any",
-          permissions: permissionsInWords(mascot).map(({ text }) => text),
-        }));
+        const agents = flock().map(agentSummary);
         return { text: json(agents), summary: `${count(agents.length, "bird")} in the flock` };
       },
     },
@@ -290,11 +285,9 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
       },
       readOnly: false,
       run: async ({ goal, sites }, client) => {
-        const given = Array.isArray(sites) ? sites.map(String) : [];
-        const clean = given.map((site) => normaliseSite(site));
-        const bad = given.find((_, index) => clean[index] === null);
-        if (bad !== undefined) return failed(`“${bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
-        return startJob(String(goal), BERRY, clean as string[], client);
+        const parsed = sitesFromApp(sites);
+        if ("bad" in parsed) return failed(`“${parsed.bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
+        return startJob(String(goal), BERRY, parsed.sites, client);
       },
     },
     {

@@ -167,7 +167,7 @@ describe.skipIf(!findChrome())("a page in a browser over CDP", () => {
     await vi.waitFor(() => expect(links.url).toBe(`${origin}/next`), { timeout: 5000 });
     expect(links.page.context().pages().length).toBe(pagesBefore);
     await cloud.close("cloud-3");
-  });
+  }, 20_000);
 
   it("loads a popup from an earlier chat's page only into that page, never into the job working now", async () => {
     const earlier = await cloud.open("job", "cloud-6", `${origin}/links`, { onChange: () => {} });

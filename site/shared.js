@@ -165,7 +165,7 @@ var flockFromRows = (rows) => {
   }
   return birds;
 };
-var snapshotOf = ({ id, name, instructions, sites, tools, galleryId }) => ({
+var mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId }) => ({
   id,
   name,
   instructions,
@@ -249,9 +249,9 @@ export {
   flockFromRows,
   followUpHistory,
   isUuid,
+  mascotSnapshot,
   parsePublishedRow,
   permissionsInWords,
   plausibleCode,
-  snapshotOf,
   withSiteNames
 };
