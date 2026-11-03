@@ -221,7 +221,7 @@ test("pages Berry opens behind the chat stay out of history until the user goes 
   model.callTools({ name: "open_tab", args: { url: `${origin}/page-berrys` } });
   // Held, since its tab closes once the job is done.
   const finish = model.holdBeforeFirstToken();
-  await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Open that page", { seePage: false }));
+  await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Open that page on ${address}`, { seePage: false }), origin);
   await expect.poll(async () => (await tabs(chrome)).find((tab) => tab.title === "Title of page-berrys")?.isActive).toBe(false);
   await expect.poll(() => model.requests.length, { timeout: 15_000 }).toBeGreaterThan(1);
   const recent = () => chrome.evaluate(() => window.chromeAPI.browser.getRecent());

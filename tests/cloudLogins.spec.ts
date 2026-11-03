@@ -87,7 +87,7 @@ test("a site's sign-in comes into the cloud after confirming, can be taken out, 
     model.callTools({ name: "open_tab", args: { url: `${site}account` } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     model.replyWith("Carried on");
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Check my account", { seePage: false, cloud: true }));
+    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Check my account on ${address}`, { seePage: false, cloud: true }), site);
     expect(sent).not.toBeNull();
     await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible({ timeout: 20_000 });
     const waiting = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou[0];

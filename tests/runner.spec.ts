@@ -111,7 +111,7 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
 
     // Do this in the cloud, from the new tab page. With a runner linked, that's where it goes.
     const composer = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
-    await composer.fill(PROMPT);
+    await composer.fill(`${PROMPT} at ${shop}`);
     await chrome.getByRole("button", { name: "More options" }).click();
     await chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" }).click();
     await expect(chrome.getByRole("button", { name: "Send to the cloud" })).toBeVisible();

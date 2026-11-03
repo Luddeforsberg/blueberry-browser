@@ -63,7 +63,7 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
     const address = `${site.origin}/account`;
     model.callTools({ name: "open_tab", args: { url: address } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Check my orders", { seePage: false }));
+    const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Check my orders on ${origin}`, { seePage: false }), site.origin);
     await chrome.getByRole("button", { name: "Needs you" }).click();
 
     const row = chrome.getByRole("listitem", { name: "Berry is asking" });

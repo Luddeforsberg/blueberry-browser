@@ -29,7 +29,7 @@ import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, la
 import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { PageFrame, PageTarget } from "./pageTarget";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
-import { siteAllowed } from "../shared/mascots";
+import { NOWHERE, siteAllowed } from "../shared/mascots";
 
 const MAX_READ_LENGTH = 20_000;
 const MAX_ELEMENTS = 200;
@@ -141,6 +141,11 @@ const readText = async (tab: PageTarget, allowsFrame: (origin: string) => boolea
   }
 };
 
+// Whether a picture of this page could show a frame from a site outside `sites`. The browser's own frame tree says,
+// whether or not the frame looks to be on screen, since a page can hide one from any script, as in a shadow root.
+export const showsFrameOffLimits = (tab: PageTarget, sites: readonly string[]): boolean =>
+  sites.length > 0 && tab.foreignFrames.some((frame) => !siteAllowed(frame.origin, sites));
+
 const isWebAddress = (url: string): boolean => {
   try {
     return ["http:", "https:"].includes(new URL(url).protocol);
@@ -176,14 +181,29 @@ type ChooseResult =
 // Search text is short. A long one could be private text on its way out through a search box.
 const MAX_SAFE_TYPED_LENGTH = 100;
 
-// An address with a query can carry anything out to the site in it, which a plain one has little room for.
-const carriesData = (url: string): boolean => {
-  try {
-    const { search, hash } = new URL(url);
-    return search !== "" || hash !== "";
-  } catch {
-    return false;
-  }
+// Words in an address are names and slugs. Anything else is more likely a token, a hash or text encoded on its way
+// out: a long word, an escape or an "@", six digits in a row, or a word that looks like hex or base64.
+const MAX_PLAIN_WORD = 24;
+const MIXED_WORD = /^(?=(?:.*\p{N}){3})(?=(?:.*\p{L}){3}).{12,}$/u;
+const HEX_WORD = /^(?=.*\d)(?=.*[a-f])[\da-f]{4,}$/i;
+const BASE64_WORD = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[\dA-Za-z]{8,}$/;
+
+// Whether a path or host name could be carrying something out to the site. Only a plain one counts as not.
+const looksLikeData = (piece: string): boolean =>
+  piece.length > MAX_SAFE_TYPED_LENGTH ||
+  /[%@=]|\d{6}/.test(piece) ||
+  (piece.match(/[\p{L}\p{N}]+/gu) ?? []).some((word) => word.length > MAX_PLAIN_WORD || MIXED_WORD.test(word) || HEX_WORD.test(word) || BASE64_WORD.test(word));
+
+// Sites the user's own words name, such as "bücher.de", or the site of an address they pasted, which may be local. Only
+// whole names count, marks and all, so "bücher.de" never names "cher.de", and each is the host the browser would go to.
+const ADDRESS = /https?:\/\/[^\s"'<>]+/giu;
+const SITE_NAME = /(?<![\p{L}\p{M}\p{N}.-])(?:[\p{L}\p{M}\p{N}-]+\.)+\p{L}[\p{L}\p{M}]+(?![\p{L}\p{M}\p{N}-])/gu;
+const namedSites = (said: string): string[] => {
+  const text = said.normalize("NFC");
+  return [...text.matchAll(ADDRESS), ...text.replace(ADDRESS, " ").matchAll(SITE_NAME)].flatMap(([named]) => {
+    const address = named.includes("://") ? named : `https://${named}`;
+    return URL.canParse(address) ? [new URL(address).hostname.replace(/^www\./, "")] : [];
+  });
 };
 
 // The search pages where a short query is an ordinary search, by exact host and path. Anything wider lets data out:
@@ -283,6 +303,10 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   onUse: (tab: T) => void;
   // A mascot other than Berry. It only ever takes tools and sites away. Approvals work the same either way.
   limits?: Pick<MascotProfile, "name" | "sites" | "tools">;
+  // What the user asked, in their own words, and the sites earlier replies in this chat were on. With the sites this job
+  // goes to, they're where it may go without asking. Anywhere else asks in the default mode.
+  asked?: string;
+  beenTo?: Iterable<string>;
   // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
   stopped?: () => boolean;
 }
@@ -301,6 +325,8 @@ export const createPageTools = <T extends PageTarget>({
   canSee,
   onUse,
   limits,
+  asked = "",
+  beenTo = [],
   stopped = () => false,
 }: PageToolAccess<T>): PageTool[] => {
   const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
@@ -311,6 +337,8 @@ export const createPageTools = <T extends PageTarget>({
       message: `${limits?.name} isn't allowed on ${name}, so nothing happened and nothing was read from it. It may only use ${limits?.sites.join(", ")}. Tell the user if the job needs that site.`,
     };
   };
+  const frameOffLimits = (tab: T) =>
+    `Screenshots of tab ${tab.id} aren't available, because it shows a frame from a site ${limits?.name} isn't allowed on. Read its text instead.`;
   const opened = new Set<string>();
   let lastQuestion: Promise<void> = Promise.resolve();
   // Tools can run at the same time, and the chat shows one request at a time.
@@ -359,11 +387,32 @@ export const createPageTools = <T extends PageTarget>({
     return tab && !takenOver?.has(tab.id) && !heldByUser(tab.id) ? tab : null;
   };
   const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
-  // In the default mode, an address carrying data asks unless it's a short search on a well-known search page.
-  const needsCard = (url: string) => {
-    if (!carriesData(url)) return false;
+  // Where the user sent this job, and where it has been. An address only counts by its site.
+  const chosen = [...namedSites(asked), ...(limits?.sites ?? [])];
+  const been = new Set(beenTo);
+  const usedTab = (tab: T) => {
+    been.add(siteOf(tab.url));
+    onUse(tab);
+  };
+  // In the default mode, going somewhere asks unless it's plainly safe: an address the user gave, a short search on a
+  // well-known search page, or a plain address on a site this job is on or has reason to be on. A reason to be on a
+  // site never covers data: a query, a path or host name that looks like it carries some, or a new subdomain of a site
+  // it has only been to, which whoever runs that site's names can read.
+  const needsCard = async (url: string, from: T | null) => {
+    if (!isWebAddress(url)) return false;
     const address = new URL(url);
-    return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
+    // A name and password in an address go to the site when it asks for them, whoever's site it is.
+    if (address.username !== "" || address.password !== "") return true;
+    if (asked.includes(url)) return false;
+    if (address.search !== "" || address.hash !== "") {
+      return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
+    }
+    const visited = [...been, ...(from ? [siteOf(from.url)] : [])];
+    const host = siteOf(url);
+    const newSubdomain = !siteAllowed(url, chosen.length > 0 ? chosen : [NOWHERE]) && !visited.includes(host) && siteAllowed(url, visited.length > 0 ? visited : [NOWHERE]);
+    if (looksLikeData(address.hostname) || looksLikeData(address.pathname) || newSubdomain) return true;
+    const sites = [...chosen, ...visited];
+    return !siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]);
   };
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
@@ -375,7 +424,7 @@ export const createPageTools = <T extends PageTarget>({
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return noTab(id);
-    onUse(tab);
+    usedTab(tab);
     const [text] = await Promise.all([readText(tab, allowed), actorOn(tab)?.read(`${doing} ${siteOf(tab.url)}`)]);
     if (!canSee()) return NO_ACCESS;
     const taken = tookOver(tab.id);
@@ -387,7 +436,7 @@ export const createPageTools = <T extends PageTarget>({
     if (!canSee()) return NO_ACCESS;
     const tab = find(id);
     if (!tab) return noTab(id);
-    onUse(tab);
+    usedTab(tab);
     try {
       const result = await act(tab);
       return tookOver(tab.id) ?? result;
@@ -838,7 +887,7 @@ export const createPageTools = <T extends PageTarget>({
         if (!done) return "The user didn't do that, so the page is as it was or the tab is gone. Carry on without it if you can, and say what you couldn't do. Don't hand it to them again unless they ask.";
         // They may have ended up anywhere, and a limited mascot still doesn't get to read it.
         if (!allowed(tab.url)) return offLimits(tab.url).message;
-        onUse(tab);
+        usedTab(tab);
         const back = done === "code" ? `A code was entered in tab ${tab.id} from the user's phone, and the tab is yours again.` : `The user says they're done, and tab ${tab.id} is yours again.`;
         return `${back} ${await whereNow(tab)} You couldn't see it meanwhile, so look at the page again to see whether it worked, then carry on with the job.`;
       },
@@ -944,7 +993,11 @@ export const createPageTools = <T extends PageTarget>({
           if (tab.mayShowCode) return `Screenshots of tab ${tab.id} aren't available for now, because a code from the user's phone went in there and the page might show it. Read its text instead.`;
           await actorOn(tab)?.say(`Looking at ${siteOf(tab.url)}`, "looking");
           await tab.settled();
+          // Checked on both sides of the capture, so a frame that came in meanwhile doesn't go out in it.
+          const framed = () => !!limits && showsFrameOffLimits(tab, limits.sites);
+          if (framed()) return frameOffLimits(tab);
           const image = await tab.screenshotJpeg(MAX_SCREENSHOT_WIDTH, SCREENSHOT_QUALITY);
+          if (framed()) return frameOffLimits(tab);
           if (!canSee()) return NO_ACCESS;
           if (!image) return `The page in tab ${tab.id} hasn't drawn anything to look at yet.`;
           return `data:image/jpeg;base64,${image.toString("base64")}`;
@@ -992,7 +1045,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId, url: z.string().max(2000) }),
       label: ({ url }) => `Went to ${siteOf(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
-      isRisky: async ({ url }) => needsCard(url),
+      isRisky: async ({ tabId: id, url }) => needsCard(url, find(id)),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
@@ -1014,7 +1067,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ url: z.string().max(2000) }),
       label: ({ url }) => `Opened ${siteOf(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
-      isRisky: async ({ url }) => needsCard(url),
+      isRisky: async ({ url }) => needsCard(url, find()),
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
@@ -1027,7 +1080,7 @@ export const createPageTools = <T extends PageTarget>({
           return `No tab was opened. ${error instanceof Error ? error.message : ""}`.trim();
         }
         opened.add(tab.id);
-        onUse(tab);
+        usedTab(tab);
         return limits ? (await limitedRun(tab, () => whereNow(tab))) : whereNow(tab);
       },
     }),

@@ -48,7 +48,7 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     model.callTools({ name: "read_page", args: {} });
     // Naming the site keeps its cloud tab open once the job is done.
     model.replyWith("Ordered it on 127.0.0.1");
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Order the thing", { seePage: false, cloud: true }));
+    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Order the thing on ${address}`, { seePage: false, cloud: true }), shop);
     expect(sent).not.toBeNull();
 
     // The same approval as anywhere, in Needs you and on the chat.
@@ -109,7 +109,7 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
     model.callTools({ name: "open_tab", args: { url: shop } });
     model.replyWith("Had a look");
     const finish = model.holdBeforeFirstToken();
-    const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Have a look at the shop", { seePage: false, cloud: true }));
+    const sent = await chrome.evaluate((address) => window.chromeAPI.chat.send(null, `Have a look at the shop on ${address}`, { seePage: false, cloud: true }), shop);
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
 
     const view = chrome.getByRole("complementary", { name: /working on/ });
