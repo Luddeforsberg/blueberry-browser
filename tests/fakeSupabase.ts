@@ -181,7 +181,7 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       }
     }
 
-    if (route === "GET /rest/v1/mascots") return answer(200, rows.filter((row) => !row.hidden).map(({ owner: _owner, hidden: _hidden, ...row }) => row));
+    if (route === "GET /rest/v1/mascots") return answer(200, rows.filter((row) => !row.hidden && (!id || row.id === id)).map(({ owner: _owner, hidden: _hidden, ...row }) => row));
     if (route === "POST /rest/v1/rpc/my_mascots") return answer(200, rows.filter((row) => row.owner === uid).map(({ owner: _owner, ...row }) => row));
     if (route === "POST /rest/v1/rpc/record_add") {
       const row = rows.find((candidate) => candidate.id === body.p_mascot);

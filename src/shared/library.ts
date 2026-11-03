@@ -308,6 +308,8 @@ export interface GalleryMascot {
   publishedAt?: number;
   // Its public page, once the site's address is set.
   link?: string | null;
+  // Set by main on everything it sends the page, from what a copy would be made of. Add names it back.
+  version?: string;
 }
 
 // What the Gallery page shows, and whether the published ones are among it. "starters" means no server is set up, so
@@ -315,6 +317,12 @@ export interface GalleryMascot {
 export interface GalleryListing {
   entries: GalleryMascot[];
   status: "starters" | "live" | "unreachable";
+}
+
+// One entry a link asked for, from the server. Null when it isn't there, or can't be asked.
+export interface GalleryLinked {
+  entry: GalleryMascot | null;
+  status: GalleryListing["status"];
 }
 
 // What the user chooses when publishing. The rest of what goes public is read from the mascot in main.

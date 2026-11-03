@@ -157,3 +157,29 @@ writeFileSync(
   join(root, "src/main/pageActorArt.ts"),
   `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n`
 );
+
+// The picture a shared link shows, since a link preview can't run the page: the flock on a wire, in light mode. It's
+// drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
+const SHARE_FLOCK = [["none", "jackdaw"], ["glasses", "kingfisher"], ["cap", "parakeet"], ["bow", "canary"], ["glasses", "flamingo"], ["crown", "robin"]];
+const shareCard = `<!doctype html><html><head><meta charset="utf-8"><style>${readFileSync(join(site, "tokens.css"), "utf8")}
+${readFileSync(join(site, "birds.css"), "utf8")}
+* { box-sizing: border-box; margin: 0; }
+body { width: 1200px; height: 630px; padding: 36px; background: var(--frame); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+.card { height: 100%; padding: 64px 72px 0; border-radius: 22px; background: rgb(var(--canvas)); box-shadow: var(--shadow-page); display: flex; flex-direction: column; }
+h1 { font-size: 72px; font-weight: 600; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
+p { margin-top: 12px; font-size: 30px; color: rgb(var(--muted-foreground)); }
+.wire { margin-top: auto; display: flex; justify-content: space-between; border-bottom: 2px solid rgb(var(--muted-foreground) / 0.45); margin-bottom: 64px; }
+.wire div { width: 150px; height: ${Math.round((150 * 113) / 120)}px; }
+.wire svg { width: 150px; height: 150px; overflow: visible; }
+.wire div:nth-child(3n) svg { transform: scaleX(-1); }
+</style></head><body><div class="card"><h1>Blueberry</h1><p>A browser with a flock of birds you give jobs to.</p><div class="wire">${SHARE_FLOCK.map(([accessory, palette]) => `<div>${birds[accessory].replace('data-mascot="jackdaw"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
+try {
+  const { chromium } = await import("playwright-core");
+  const browser = await chromium.launch({ channel: "chrome" });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: "light" });
+  await page.setContent(shareCard);
+  await page.screenshot({ path: join(site, "flock.png") });
+  await browser.close();
+} catch (error) {
+  console.warn(`Couldn't draw site/flock.png, so it wasn't changed: ${error.message.split("\n")[0]}`);
+}

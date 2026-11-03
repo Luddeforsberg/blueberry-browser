@@ -9,6 +9,11 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+# Links from the public mascot page, `blueberry://mascot/<id>`. Only that form is read, in src/main/mascotLink.ts.
+protocols:
+  - name: Blueberry
+    schemes:
+      - blueberry
 asarUnpack:
   - resources/**
 win:

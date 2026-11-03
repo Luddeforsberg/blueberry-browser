@@ -16,7 +16,17 @@ import { SessionStore } from "./Session";
 import { openStore, type StoreProblem } from "./database";
 import { holdQuit } from "./holdQuit";
 import type { CloudTabs } from "./CloudTabs";
+import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascotLink";
 import { join } from "path";
+
+// One copy per profile, so a link or a second launch goes to the window that's already open.
+const firstCopy = app.requestSingleInstanceLock();
+if (!firstCopy) app.quit();
+
+// `blueberry://` links, which any website can hand to the system. A packaged app is registered through its bundle and
+// installer (`protocols` in electron-builder.yml), and an unpackaged one names Electron and this app's folder.
+if (process.defaultApp) app.setAsDefaultProtocolClient(LINK_SCHEME, process.execPath, [app.getAppPath()]);
+else app.setAsDefaultProtocolClient(LINK_SCHEME);
 
 let mainWindow: Window | null = null;
 let eventManager: EventManager | null = null;
@@ -90,10 +100,39 @@ const createWindow = (): Window => {
   return window;
 };
 
+// A Gallery entry a link asked for before there was a window to show it in. Windows and Linux start with it in argv.
+let linkedMascot: string | null = mascotFromArgs(process.argv);
+
+const openLinked = (id: string): void => {
+  if (!app.isReady()) {
+    linkedMascot = id;
+    return;
+  }
+  if (!mainWindow || BaseWindow.getAllWindows().length === 0) mainWindow = createWindow();
+  mainWindow.openMascotLink(id);
+};
+
+// Only `blueberry://mascot/<uuid>` is read. Anything else does nothing at all.
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  const id = mascotFromLink(url);
+  if (id) openLinked(id);
+});
+
+app.on("second-instance", (_event, argv) => {
+  const id = mascotFromArgs(argv);
+  if (id) openLinked(id);
+  // A plain second launch brings this one forward. A link we don't read does nothing.
+  else if (!argv.some((arg) => arg.toLowerCase().startsWith(`${LINK_SCHEME}:`))) mainWindow?.bringForward();
+});
+
 app.whenReady().then(() => {
+  if (!firstCopy) return;
   electronApp.setAppUserModelId("com.ludwigforsberg.blueberry");
 
-  mainWindow = createWindow();
+  mainWindow ??= createWindow();
+  if (linkedMascot) mainWindow.openMascotLink(linkedMascot);
+  linkedMascot = null;
 
   app.on("activate", () => {
     // On macOS it's common to re-create a window in the app when the
