@@ -93,6 +93,12 @@ describe("whether an address with no query asks in the default mode", () => {
     ["the end of a name the user gave", "https://cher.de/", { asked: "Read https://bücher.de" }, true],
     ["the end of a name the user wrote", "https://cher.de/", { asked: "Find it on bücher.de" }, true],
     ["a name the user wrote in another script", "https://bücher.de/", { asked: "Find it on bücher.de" }, false],
+    ["the end of a name written with a combining mark", "https://cher.de/", { asked: "Find it on bu\u0308cher.de" }, true],
+    ["a name written with a combining mark", "https://bücher.de/", { asked: "Find it on bu\u0308cher.de" }, false],
+    // Credentials in an address go out to the site when it asks for them.
+    ["a name and password on a site it has been on", "https://4111111111111111:x@attacker.example/", { beenTo: ["attacker.example"] }, true],
+    ["only a name on this page's site", "https://alice@page.example/", {}, true],
+    ["credentials in an address the user gave", "https://alice:pw@page.example/", { asked: "Open https://alice:pw@page.example/" }, true],
     ["a link on it to another site", `https://attacker.example/collect/${TOKEN}`, { linked: true }, true],
     ["another page on this page's site", "https://page.example/about/team", {}, false],
     ["another page in this page's own subdomain", "https://www.page.example/news/2026/jet-engines-of-the-future", {}, false],

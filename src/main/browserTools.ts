@@ -195,14 +195,16 @@ const looksLikeData = (piece: string): boolean =>
   (piece.match(/[\p{L}\p{N}]+/gu) ?? []).some((word) => word.length > MAX_PLAIN_WORD || MIXED_WORD.test(word) || HEX_WORD.test(word) || BASE64_WORD.test(word));
 
 // Sites the user's own words name, such as "bücher.de", or the site of an address they pasted, which may be local. Only
-// whole names count, so "bücher.de" never names "cher.de", and each is the host the browser would go to.
+// whole names count, marks and all, so "bücher.de" never names "cher.de", and each is the host the browser would go to.
 const ADDRESS = /https?:\/\/[^\s"'<>]+/giu;
-const SITE_NAME = /(?<![\p{L}\p{N}.-])(?:[\p{L}\p{N}-]+\.)+\p{L}{2,}(?![\p{L}\p{N}-])/gu;
-const namedSites = (text: string): string[] =>
-  [...text.matchAll(ADDRESS), ...text.replace(ADDRESS, " ").matchAll(SITE_NAME)].flatMap(([named]) => {
+const SITE_NAME = /(?<![\p{L}\p{M}\p{N}.-])(?:[\p{L}\p{M}\p{N}-]+\.)+\p{L}[\p{L}\p{M}]+(?![\p{L}\p{M}\p{N}-])/gu;
+const namedSites = (said: string): string[] => {
+  const text = said.normalize("NFC");
+  return [...text.matchAll(ADDRESS), ...text.replace(ADDRESS, " ").matchAll(SITE_NAME)].flatMap(([named]) => {
     const address = named.includes("://") ? named : `https://${named}`;
     return URL.canParse(address) ? [new URL(address).hostname.replace(/^www\./, "")] : [];
   });
+};
 
 // The search pages where a short query is an ordinary search, by exact host and path. Anything wider lets data out:
 // script.google.com and docs.google.com/forms run what anyone publishes, and most big sites have an open redirect.
@@ -397,8 +399,11 @@ export const createPageTools = <T extends PageTarget>({
   // site never covers data: a query, a path or host name that looks like it carries some, or a new subdomain of a site
   // it has only been to, which whoever runs that site's names can read.
   const needsCard = async (url: string, from: T | null) => {
-    if (!isWebAddress(url) || asked.includes(url)) return false;
+    if (!isWebAddress(url)) return false;
     const address = new URL(url);
+    // A name and password in an address go to the site when it asks for them, whoever's site it is.
+    if (address.username !== "" || address.password !== "") return true;
+    if (asked.includes(url)) return false;
     if (address.search !== "" || address.hash !== "") {
       return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
     }
