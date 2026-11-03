@@ -15,7 +15,8 @@ const CLOUD_FUNCTIONS = new Set([
   "start_cloud_job", "my_cloud_jobs", "stop_cloud_job", "decide_cloud_approval", "forget_cloud_job", "forget_cloud_conversation",
   "link_cloud_runner", "unlink_cloud_runner", "my_cloud_runner", "accept_cloud_runner_link",
   "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
-  "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription",
+  "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription", "runner_set_relay_url",
+  "create_relay_grant", "revoke_relay_grants", "relay_flock", "relay_start_job", "relay_jobs", "relay_stop_job", "relay_revoke_grant",
 ]);
 // Tables the phone page reads with a plain select, as the user each token stands for, so row-level security decides.
 const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_flock"]);
@@ -36,6 +37,7 @@ const cloudDatabase = async () => {
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261103000000_phone.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261104000000_cloud_conversations.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261105000000_cloud_routines.sql"), "utf8"));
+  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261106000000_cloud_relay.sql"), "utf8"));
   // One connection, so one call at a time, each with its own role.
   let queue: Promise<unknown> = Promise.resolve();
   const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {
@@ -96,6 +98,8 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
   const cloud = cloudJobs ? await cloudDatabase() : null;
   const accounts = new Map<string, { password: string; id: string }>();
   const tokens = new Map<string, string>();
+  // Each refresh token works once, as Supabase's do.
+  const refreshTokens = new Map<string, { email: string; id: string }>();
   const rows: Row[] = [];
   const adders = new Set<string>();
   // Everything the app ever sent, to check nothing extra left the computer.
@@ -105,7 +109,9 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
   const sessionFor = (email: string, id: string) => {
     const token = `access-${randomUUID()}`;
     tokens.set(token, id);
-    return { access_token: token, refresh_token: `refresh-${randomUUID()}`, expires_in: 3600, user: { id, email } };
+    const refresh = `refresh-${randomUUID()}`;
+    refreshTokens.set(refresh, { email, id });
+    return { access_token: token, refresh_token: refresh, expires_in: 3600, user: { id, email } };
   };
 
   const server = createServer(async (request, response) => {
@@ -144,6 +150,12 @@ export const startFakeSupabase = async ({ cloudJobs = false }: { cloudJobs?: boo
       const account = accounts.get(body.email);
       if (!account || account.password !== body.password) return answer(400, { error_code: "invalid_credentials", msg: "Invalid login credentials" });
       return answer(200, sessionFor(body.email, account.id));
+    }
+    if (route === "POST /auth/v1/token" && url.searchParams.get("grant_type") === "refresh_token") {
+      const found = refreshTokens.get(body.refresh_token);
+      if (!found) return answer(400, { error_code: "refresh_token_not_found", msg: "Invalid Refresh Token" });
+      refreshTokens.delete(body.refresh_token);
+      return answer(200, sessionFor(found.email, found.id));
     }
     if (route === "POST /auth/v1/logout") return answer(204);
 

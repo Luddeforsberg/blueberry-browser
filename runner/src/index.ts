@@ -6,6 +6,7 @@ import { DbError, dbConfig, runnerSession, supabaseDb, type ClaimedJob } from ".
 import { runJob, sessionBrowser, UnreleasedBrowsers } from "./job";
 import { pushConfig, pusher } from "./push";
 import { quietConsole } from "./quietConsole";
+import { relayConfig, startRelay } from "./relay";
 import { startDueRoutines } from "./routines";
 
 quietConsole();
@@ -62,6 +63,18 @@ const push = pushConfig(process.env);
 if (typeof push === "string") fail(push);
 const notify = push && typeof push !== "string" ? pusher(push, db) : undefined;
 if (!notify) console.log("No VAPID keys, so no notifications go to the phone.");
+// The relay, for ChatGPT and Claude, only with RELAY_PUBLIC_URL and RELAY_SECRET set.
+const relay = relayConfig(process.env);
+if (typeof relay === "string") fail(relay);
+const relaySettings = relay && typeof relay !== "string" ? relay : null;
+// Only an https address is shown in Settings, so one for trying it locally isn't sent.
+const relayUrl = relaySettings?.origin.startsWith("https://") ? `${relaySettings.origin}/mcp` : null;
+if (relaySettings) {
+  void startRelay(relaySettings, settings, db).then(() => console.log(`Relay listening on port ${relaySettings.port}, for ChatGPT and Claude.`));
+} else {
+  console.log("No RELAY_PUBLIC_URL and RELAY_SECRET, so ChatGPT and Claude can't connect.");
+}
+
 const unreleased = new UnreleasedBrowsers();
 const shutdown = new AbortController();
 let working: Promise<unknown> | null = null;
@@ -90,6 +103,8 @@ const link = async (): Promise<void> => {
     return;
   }
   console.log(linked ? "Linked to its owner." : NOT_LINKED);
+  // Before the relay's migration has run this fails, and nothing else depends on it.
+  if (linked) await db.setRelayUrl(relayUrl).catch(() => console.error("Couldn't share the relay's address with Blueberry."));
 };
 
 const loop = async () => {

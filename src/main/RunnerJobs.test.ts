@@ -44,7 +44,7 @@ const setUp = () => {
     }),
     cloudJobs: async (token: string, ids: string[]) => ids.flatMap((id) => (jobs.get(id)?.owner === token ? [jobs.get(id)!.row] : [])),
     decideCloudApproval: vi.fn(async () => true),
-    myCloudRunner: async () => (link.accepted ? { email: "runner@example.com", accepted: true } : null),
+    myCloudRunner: async () => (link.accepted ? { email: "runner@example.com", accepted: true, relayUrl: null } : null),
     stopCloudJob: vi.fn(async () => {}),
   } as unknown as GalleryServer;
   const changed = vi.fn();
@@ -312,7 +312,7 @@ describe("the flock shared with the phone", () => {
   const make = (accepted: boolean) => {
     const account = { state: { status: "signed-in", email: ANA, problem: null } as AccountState };
     const syncCloudFlock = vi.fn(async () => {});
-    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted }), syncCloudFlock, cloudConversationJobs: async () => [] } as unknown as GalleryServer;
+    const server = { myCloudRunner: async () => ({ email: "runner@example.com", accepted, relayUrl: null }), syncCloudFlock, cloudConversationJobs: async () => [] } as unknown as GalleryServer;
     const flock = [BERRY, SCOUT];
     const runner = new RunnerJobs(
       server,
@@ -401,7 +401,7 @@ describe("routines kept in the cloud", () => {
       keys.delete(key);
     });
     const server = {
-      myCloudRunner: async () => ({ email: "runner@example.com", accepted: true }),
+      myCloudRunner: async () => ({ email: "runner@example.com", accepted: true, relayUrl: null }),
       syncCloudFlock: async () => {},
       syncCloudRoutine,
       forgetCloudRoutine,

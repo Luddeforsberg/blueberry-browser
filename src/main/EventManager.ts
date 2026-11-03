@@ -168,6 +168,7 @@ export class EventManager {
     this.handle("cloud:runner-state", () => this.mainWindow.runnerJobs.refreshLink());
     this.handle("cloud:runner-link", (email) => this.mainWindow.runnerJobs.linkRunner(email));
     this.handle("cloud:runner-unlink", () => this.mainWindow.runnerJobs.unlinkRunner());
+    this.handle("cloud:relay-disconnect", () => this.mainWindow.runnerJobs.disconnectRelay());
     this.handle("cloud:watch", (tabId) => this.mainWindow.cloud.watch(tabId));
     this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
     this.handle("cloud:login-suggestions", () => this.mainWindow.cloudLoginSuggestions());

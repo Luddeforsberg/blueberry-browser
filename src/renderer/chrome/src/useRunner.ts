@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { RunnerState } from '@shared/ipc'
 
 // Starts as not set up, so no control shows until main has said there's a linked runner.
-const UNKNOWN: RunnerState = { status: 'not-set-up', email: null, problem: null }
+const UNKNOWN: RunnerState = { status: 'not-set-up', email: null, problem: null, relayUrl: null }
 
 export const useRunner = () => {
     const [state, setState] = useState(UNKNOWN)

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import type { CloudLogin, CloudState, RunnerState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
+import { CopyLink } from '../components/CopyLink'
 import { SettingsRow } from '../components/SettingsRow'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
@@ -143,7 +144,36 @@ const Runner: React.FC = () => {
                 <Button className="mt-3" variant="outline" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
             )}
             {runner.problem && <p role="alert" className="mt-2 text-13 text-warning">{runner.problem}</p>}
+            {runner.status === 'linked' && runner.relayUrl && <FromOtherApps address={runner.relayUrl} />}
         </div>
+    )
+}
+
+// The address ChatGPT and Claude connect to, which the server in the cloud gives once it has accepted. Signing in there
+// takes this Blueberry account, and nothing else can connect.
+const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
+    const [said, setSaid] = useState<string | null>(null)
+    const disconnect = async () => {
+        setSaid(null)
+        setSaid((await window.chromeAPI.cloud.disconnectRelay()) ? 'Disconnected. ChatGPT and Claude have to sign in again.' : 'Couldn’t disconnect. Try again.')
+    }
+    return (
+    <div className="mt-4">
+        <div className="flex items-center gap-6">
+            <div className="flex-1 min-w-0">
+                <h4 id="setting-cloud-relay" className="text-13 font-semibold">From ChatGPT or Claude</h4>
+                <p className="mt-0.5 text-13 text-muted-foreground">Give your flock jobs from ChatGPT or Claude on the web or your phone, with your Mac off. They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you.</p>
+            </div>
+            <CopyLink link={address} label="Copy the address for ChatGPT or Claude" />
+        </div>
+        <pre aria-labelledby="setting-cloud-relay" className="mt-3 rounded-control bg-tray px-3 py-2.5 text-12 text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
+        <ol className="mt-2 list-decimal pl-5 text-13 text-muted-foreground">
+            <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
+            <li>Sign in with this Blueberry account when it asks.</li>
+        </ol>
+        <Button className="mt-3" variant="outline" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
+        {said && <p role="status" className="mt-2 text-13 text-muted-foreground">{said}</p>}
+    </div>
     )
 }
 

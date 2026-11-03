@@ -93,6 +93,14 @@ test("a job on the runner keeps going without the app's agent, waits on Needs yo
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.cloud.runnerState())).status, { timeout: 20_000 }).toBe("linked");
     await expect(chrome.getByText(`Jobs in the cloud run on ${RUNNER_EMAIL}`)).toBeVisible();
     await shoot(chrome, "settings-runner-linked");
+    // With the relay on, the runner gives its address, and Settings shows it for ChatGPT and Claude.
+    await supabase.cloudRows("update public.cloud_runner_links set relay_url = 'https://runner.example/mcp'");
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.cloud.runnerState())).relayUrl).toBe("https://runner.example/mcp");
+    await expect(chrome.getByRole("heading", { name: "From ChatGPT or Claude" })).toBeVisible();
+    await chrome.getByRole("heading", { name: "From ChatGPT or Claude" }).scrollIntoViewIfNeeded();
+    await shoot(chrome, "settings-runner-relay");
+    await chrome.getByRole("button", { name: "Disconnect ChatGPT and Claude" }).click();
+    await expect(chrome.getByText("Disconnected. ChatGPT and Claude have to sign in again.")).toBeVisible();
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
 
     model.callTools({ name: "open_tab", args: { url: shop } });
