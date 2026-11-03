@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FORWARD_MS, linkThrottle, mascotFromArgs, mascotFromLink, REPEAT_MS } from "./mascotLink";
+import { FLOOD_LINKS, FLOOD_MS, FORWARD_MS, linkThrottle, mascotFromArgs, mascotFromLink, QUIET_MS, REPEAT_MS } from "./mascotLink";
 
 const ID = "3f2b8c1e-6d4a-4b7e-9c2f-1a5e8d7b6c40";
 
@@ -83,6 +83,37 @@ describe("linkThrottle", () => {
     expect(allow(ID)).toEqual({ open: true, forward: true });
   });
 
+  it("ignores every link for a while once a few have come close together, whatever the ids", () => {
+    const time = clock();
+    const allow = linkThrottle(time.now);
+    let opened = 0;
+    let forward = 0;
+    // Two ids taking turns, as fast as a page can, for ten seconds.
+    for (let at = 0; at < 1000; at++) {
+      const result = allow(at % 2 ? ID : OTHER);
+      opened += result.open ? 1 : 0;
+      forward += result.forward ? 1 : 0;
+      time.wait(10);
+    }
+    expect(opened).toBe(FLOOD_LINKS);
+    expect(forward).toBe(1);
+    // Ids that aren't in the Gallery count the same, and the quiet lasts its whole length from the third link, at 20ms.
+    expect(allow("00000000-0000-4000-8000-000000000000").open).toBe(false);
+    time.wait(QUIET_MS + 20 - 10_000 - 1);
+    expect(allow(OTHER).open).toBe(false);
+    time.wait(1);
+    expect(allow(OTHER)).toEqual({ open: true, forward: true });
+  });
+
+  it("lets links through again once they're spread out", () => {
+    const time = clock();
+    const allow = linkThrottle(time.now);
+    for (let at = 0; at < 10; at++) {
+      expect(allow(at % 2 ? ID : OTHER).open).toBe(true);
+      time.wait(FLOOD_MS / (FLOOD_LINKS - 1));
+    }
+  });
+
   it("opens a different id, but comes forward at most once a while", () => {
     const time = clock();
     const allow = linkThrottle(time.now);
@@ -91,6 +122,5 @@ describe("linkThrottle", () => {
     expect(allow(OTHER)).toEqual({ open: true, forward: false });
     time.wait(1);
     expect(allow(ID)).toEqual({ open: true, forward: true });
-    expect(allow(OTHER)).toEqual({ open: true, forward: false });
   });
 });
