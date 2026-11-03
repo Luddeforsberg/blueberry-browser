@@ -207,9 +207,10 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
 
   writeFileSync(join(profile, "chats.db"), "not a database".repeat(1000));
   writeFileSync(join(profile, "history.db"), "not a database".repeat(1000));
+  writeFileSync(join(profile, "routines.db"), "not a database".repeat(1000));
   ({ app, chrome } = await launch(profile));
   await expect.poll(async () => (await tabs(chrome)).length).toBe(1);
-  expect(readdirSync(profile).filter((file) => file.includes(".corrupt-"))).toHaveLength(2);
+  expect(readdirSync(profile).filter((file) => file.includes(".corrupt-"))).toHaveLength(3);
   expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ chats }) => chats))).toEqual([]);
   await app.close();
 });

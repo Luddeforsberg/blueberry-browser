@@ -53,3 +53,22 @@ describe("the runner's own sign-in", () => {
     expect(sent).toEqual(["Bearer token-1", "Bearer token-2"]);
   });
 });
+
+describe("the runner's writes", () => {
+  it("cuts a reply, an error and steps to the row's limits, so how a job ended is saved", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const send = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response("false", { status: 200 });
+    });
+    const db = supabaseDb(CONFIG, runnerSession(CONFIG, fakeAuth() as unknown as GalleryServer), send as unknown as typeof fetch);
+    const steps = Array.from({ length: 501 }, (_, index) => ({ text: `Step ${index}`, done: true }));
+    expect(await db.update("job-1", { status: "done", reply: "🫐".repeat(40_001), error: "x".repeat(501), steps })).toBe(false);
+    const [body] = bodies as { p_status: string; p_reply: string; p_error: string; p_steps: unknown[] }[];
+    expect(body.p_status).toBe("done");
+    expect(Array.from(body.p_reply)).toHaveLength(40_000);
+    expect(body.p_reply.endsWith(" (cut short)")).toBe(true);
+    expect(body.p_error).toHaveLength(500);
+    expect(body.p_steps).toHaveLength(500);
+  });
+});

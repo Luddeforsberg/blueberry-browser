@@ -38,4 +38,36 @@ describe("CloudTabs", () => {
     tabs.tabClosed("tab-2");
     expect(winding).toHaveBeenCalledTimes(1);
   });
+
+  it("gives Quit one promise to wait for, which ends once the session has, and never closes a tab on the way", async () => {
+    let ended = () => {};
+    const ending = vi.spyOn(CloudSessions.prototype, "end").mockImplementation(() => new Promise<void>((resolve) => (ended = resolve)));
+    const closeTab = vi.fn();
+    const tabs = new CloudTabs(
+      join(mkdtempSync(join(tmpdir(), "cloud-tabs-")), "cloud.json"),
+      {
+        chrome: () => ({ isDestroyed: () => true }) as never,
+        openTab: () => "tab-1",
+        updateTab: () => {},
+        closeTab,
+        takenOver: () => {},
+        showTab: () => {},
+        confirmLogin: async () => true,
+        readCookies: async () => [],
+      },
+      { endpoint: "http://127.0.0.1:1" }
+    );
+    tabs.start();
+    // As when the window closes, and then Quit asks again.
+    const closing = tabs.destroy();
+    expect(tabs.destroy()).toBe(closing);
+    let done = false;
+    void closing.then(() => (done = true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(ending).toHaveBeenCalledTimes(1);
+    expect(done).toBe(false);
+    ended();
+    await closing;
+    expect(closeTab).not.toHaveBeenCalled();
+  });
 });

@@ -70,7 +70,11 @@ const relaySettings = relay && typeof relay !== "string" ? relay : null;
 // Only an https address is shown in Settings, so one for trying it locally isn't sent.
 const relayUrl = relaySettings?.origin.startsWith("https://") ? `${relaySettings.origin}/mcp` : null;
 if (relaySettings) {
-  void startRelay(relaySettings, settings, db).then(() => console.log(`Relay listening on port ${relaySettings.port}, for ChatGPT and Claude.`));
+  // Cloud jobs go on without it. Only the words: the error could say more than the log should.
+  void startRelay(relaySettings, settings, db).then(
+    () => console.log(`Relay listening on port ${relaySettings.port}, for ChatGPT and Claude.`),
+    () => console.error("Relay couldn't start.")
+  );
 } else {
   console.log("No RELAY_PUBLIC_URL and RELAY_SECRET, so ChatGPT and Claude can't connect.");
 }

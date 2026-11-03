@@ -109,11 +109,11 @@ describe("the scheduler", () => {
     // What goes to the cloud: its bird narrowed to the routine's sites, and no next time once it's paused.
     const scout = (): MascotProfile => ({ id: "m-1", name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find.", sites: [], tools: ["visit"], deletedAt: null });
     const options = { actionApproval: "risky", contextId: "ctx-1", timeZone: "Europe/Stockholm" } as const;
-    const [row] = routines.cloudRows(scout, options);
+    const [row] = routines.cloudRows(scout, options)!;
     expect(row).toMatchObject({ key: id, mascot: { id: "m-1", sites: ["shop.example"] }, schedule: { kind: "daily", time: "13:00" }, timeZone: "Europe/Stockholm", paused: false, firstRunAt: new Date(NOW + 60 * MINUTE + DAY).toISOString() });
     expect(row.prompt).toContain("Look");
     routines.setPaused(id, true);
-    expect(routines.cloudRows(scout, options)[0]).toMatchObject({ paused: true, firstRunAt: null });
+    expect(routines.cloudRows(scout, options)![0]).toMatchObject({ paused: true, firstRunAt: null });
     save(routines, daily("13:00", "Here"));
     expect(routines.cloudRows(scout, options)).toHaveLength(1);
   });
@@ -143,6 +143,12 @@ describe("the scheduler", () => {
     save(routines, { name: "Ask me", instructions: "Look", schedule: { kind: "manual" }, inCloud: true });
     expect(routines.list()[0].inCloud).toBe(false);
     expect(routines.cloudRows(() => { throw new Error("not asked"); }, { actionApproval: "risky", contextId: null, timeZone: "UTC" })).toEqual([]);
+  });
+
+  it("sends no rows to the cloud while the saved routines couldn't be read, so none there is taken for deleted", () => {
+    const { routines } = setup(new RoutineStore(":memory:", true));
+    save(routines, { ...daily("13:00"), inCloud: true });
+    expect(routines.cloudRows(() => { throw new Error("not asked"); }, { actionApproval: "risky", contextId: null, timeZone: "UTC" })).toBeNull();
   });
 
   it("says when a routine couldn't be sent to the cloud", () => {

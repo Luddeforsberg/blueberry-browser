@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionApprovalFromRow, approvalFromRow, historyFromRow, mascotFromSnapshot, mascotSnapshot } from "./cloudJobs";
+import { actionApprovalFromRow, approvalFromRow, fitJobUpdate, historyFromRow, mascotFromSnapshot, mascotSnapshot } from "./cloudJobs";
 import { BERRY } from "../shared/mascots";
 
 const SCOUT = { id: "m-1", name: "Scout", instructions: "Find flights.", sites: ["sas.se"], tools: ["visit"], fromGallery: false };
@@ -56,5 +56,57 @@ describe("what else comes back from a row", () => {
       handoff: { need: "sign-in", tabId: "", site: "sas.se" },
     });
     expect(approvalFromRow({ approval_id: null })).toBeNull();
+  });
+});
+
+describe("what a job writes to its row", () => {
+  // Characters as Postgres counts them.
+  const length = (text: string) => Array.from(text).length;
+  // The steps as Postgres writes them out, which `steps_shape` measures.
+  const stepsBytes = (steps: unknown[]) => Buffer.byteLength(JSON.stringify(steps).replace(/":/g, '": ').replace(/,"/g, ', "').replace(/},{/g, "}, {"));
+
+  it.each([
+    ["letters", "a"],
+    ["characters of two UTF-16 units", "🫐"],
+    ["characters of two bytes", "é"],
+  ])("keeps a reply of 40,000 %s whole, and cuts one more, saying so", (_, character) => {
+    const full = character.repeat(40_000);
+    expect(fitJobUpdate({ reply: full }).reply).toBe(full);
+    const cut = fitJobUpdate({ reply: full + character }).reply!;
+    expect(length(cut)).toBe(40_000);
+    expect(cut).toBe(character.repeat(39_988) + " (cut short)");
+  });
+
+  it("never cuts a character in half", () => {
+    const cut = fitJobUpdate({ reply: "a" + "🫐".repeat(40_000) }).reply!;
+    expect(length(cut)).toBe(40_000);
+    expect(cut.isWellFormed()).toBe(true);
+  });
+
+  it("cuts an error at 500", () => {
+    expect(fitJobUpdate({ error: "x".repeat(500) }).error).toHaveLength(500);
+    expect(fitJobUpdate({ error: "x".repeat(501) }).error).toBe("x".repeat(488) + " (cut short)");
+  });
+
+  it("keeps the latest steps that fit, after a note that earlier ones were left out", () => {
+    const few = [{ text: "Opened shop.example", done: true }];
+    expect(fitJobUpdate({ steps: few }).steps).toEqual(few);
+
+    const many = Array.from({ length: 501 }, (_, index) => ({ text: `Step ${index}`, done: true }));
+    const fewer = fitJobUpdate({ steps: many }).steps!;
+    expect(fewer).toHaveLength(500);
+    expect(fewer[0]).toEqual({ text: "Earlier steps (cut short)", done: true });
+    expect(fewer.at(-1)).toEqual({ text: "Step 500", done: true });
+
+    const long = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"🫐".repeat(400)}`, done: false }));
+    const fitted = fitJobUpdate({ steps: long }).steps!;
+    expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
+    expect(fitted[0].text).toBe("Earlier steps (cut short)");
+    expect(fitted.at(-1)!.text.startsWith("499 ")).toBe(true);
+    expect(fitted.slice(1).every(({ text }) => length(text) === 300 && text.endsWith(" (cut short)"))).toBe(true);
+  });
+
+  it("leaves out what wasn't in the update", () => {
+    expect(fitJobUpdate({ status: "running" } as { status: string; reply?: string })).toEqual({ status: "running" });
   });
 });

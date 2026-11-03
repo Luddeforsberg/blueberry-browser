@@ -170,7 +170,8 @@ export const relayApp = (config: RelayConfig, supabase: { url: string; key: stri
 
 export const startRelay = (config: RelayConfig, supabase: { url: string; key: string; owner: string }, db: RelayDb): Promise<Server> => {
   const { app } = relayApp(config, supabase, db);
-  return new Promise((resolve) => {
-    const server = app.listen(config.port, () => resolve(server));
+  // Express hands a server error, such as the port being taken, to this callback rather than throwing it.
+  return new Promise((resolve, reject) => {
+    const server = app.listen(config.port, (error?: Error) => (error ? reject(error) : resolve(server)));
   });
 };

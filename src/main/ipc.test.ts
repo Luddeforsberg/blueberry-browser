@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WebContents, WebFrameMain } from "electron";
-import { isTrustedSender, type ChromeEndpoint } from "./ipc";
+import { chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
 
 const CHROME_URL = "file:///app/out/renderer/chrome/index.html";
 
@@ -47,5 +47,15 @@ describe("isTrustedSender", () => {
   it("rejects a frame that's already gone", () => {
     const event = { sender: chrome.webContents, senderFrame: null };
     expect(isTrustedSender(event, chrome.endpoint)).toBe(false);
+  });
+});
+
+describe("chatSendOptions", () => {
+  it("passes on only what a renderer may set, of the right type", () => {
+    expect(chatSendOptions({ seePage: true, mascotId: "m-1", cloud: true, runner: true })).toEqual({ seePage: true, mascotId: "m-1", cloud: true, runner: true });
+    const sneaky = { seePage: "yes", mascotId: 7, cloud: 1, from: "ChatGPT or Claude", sites: ["bank.example"], tools: [], askAtLeast: "never", onEnd: () => {} };
+    expect(chatSendOptions(sneaky)).toEqual({ seePage: false, mascotId: null, cloud: false, runner: false });
+    expect(chatSendOptions(null)).toEqual({ seePage: false, mascotId: null, cloud: false, runner: false });
+    expect(chatSendOptions("seePage")).toEqual({ seePage: false, mascotId: null, cloud: false, runner: false });
   });
 });

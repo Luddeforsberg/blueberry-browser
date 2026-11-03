@@ -99,7 +99,9 @@ const toRun = ({ steps, approval, seen, memory, ...row }: RunRow): RoutineRun =>
 export class RoutineStore {
   private readonly db: DatabaseSync;
 
-  constructor(file: string) {
+  // `recovered` is true when this launch started without the saved routines, in memory or in a new file in place of a
+  // damaged one, so it doesn't know which routines are in the cloud.
+  constructor(file: string, readonly recovered = false) {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");

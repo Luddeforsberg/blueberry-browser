@@ -84,6 +84,50 @@ describe("Account", () => {
     expect(ended.account.state).toMatchObject({ status: "signed-out", problem: expect.stringContaining("sign in again") });
   });
 
+  // Each call waits for its own answer, which the test gives in whatever order it likes.
+  const deferredSignIns = () => {
+    const answers: ((session: ServerSession | Error) => void)[] = [];
+    const signIn = vi.fn(() => new Promise<ServerSession>((resolve, reject) => answers.push((answer) => (answer instanceof Error ? reject(answer) : resolve(answer)))));
+    return { signIn, answer: (index: number, session: ServerSession | Error) => answers[index](session) };
+  };
+
+  it("stays signed out when a sign-in that was on its way comes back afterwards, and ends that session there", async () => {
+    const { signIn, answer } = deferredSignIns();
+    const signOut = vi.fn(async () => {});
+    const { account, file } = start({ signIn, signOut });
+    const signingIn = account.signIn("a@b.se", "pw");
+    await account.signOut();
+    answer(0, session("late"));
+    expect((await signingIn).status).toBe("signed-out");
+    expect(await account.accessToken()).toBeNull();
+    expect(() => readFileSync(file)).toThrow();
+    expect(signOut).toHaveBeenCalledWith("access-late");
+  });
+
+  it("keeps the newest of two sign-ins, whichever answers last", async () => {
+    const { signIn, answer } = deferredSignIns();
+    const signOut = vi.fn(async () => {});
+    const { account, file } = start({ signIn, signOut });
+    const first = account.signIn("a@b.se", "pw");
+    const second = account.signIn("a@b.se", "pw");
+    answer(1, session("second"));
+    expect((await second).status).toBe("signed-in");
+    answer(0, session("first"));
+    await first;
+    expect(await account.accessToken()).toBe("access-second");
+    expect(await start({}, file).account.accessToken()).toBe("access-second");
+    expect(signOut).toHaveBeenCalledWith("access-first");
+
+    // An older one failing late doesn't put a problem on the newer one.
+    const third = account.signIn("a@b.se", "pw");
+    const fourth = account.signIn("a@b.se", "pw");
+    answer(3, session("fourth"));
+    await fourth;
+    answer(2, new ServerError(400, "invalid_credentials"));
+    await third;
+    expect(account.state).toEqual({ status: "signed-in", email: "ana@example.com", problem: null });
+  });
+
   it("forgets the session here even if the server can't be told", async () => {
     const { account, file } = start({ signIn: async () => session("one"), signOut: async () => { throw new Unreachable(); } });
     await account.signIn("a@b.se", "pw");

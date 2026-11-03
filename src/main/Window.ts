@@ -495,7 +495,7 @@ export class Window {
       this.phone.stop();
       this.telegram.close();
       this.mcp.close();
-      this.cloud.destroy();
+      void this.cloud.destroy();
       this.runnerJobs.destroy();
       this.macJobs.destroy();
       this.permissionPrompt.destroy();

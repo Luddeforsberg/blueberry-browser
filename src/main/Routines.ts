@@ -236,8 +236,10 @@ export class Routines {
   }
 
   // The routines that run in the cloud, as rows for it. Each bird's limits are narrowed by the routine's own sites. The
-  // first time is only when this would run it next, which the server takes for a new or changed one.
-  cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] {
+  // first time is only when this would run it next, which the server takes for a new or changed one. Null when the saved
+  // routines couldn't be read, so the cloud's are left as they are rather than taken for deleted.
+  cloudRows(mascotOf: (id: string | null) => MascotProfile, { actionApproval, contextId, timeZone }: { actionApproval: ActionApproval; contextId: string | null; timeZone: string }): CloudRoutineRow[] | null {
+    if (this.store.recovered) return null;
     return this.store.routines().filter(({ inCloud }) => inCloud).map((routine) => {
       const mascot = mascotOf(routine.mascotId);
       return {

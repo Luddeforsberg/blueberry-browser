@@ -1,6 +1,6 @@
 import type { Account } from "./Account";
 import type { EndedReply } from "./Chats";
-import { actionApprovalFromRow, mascotFromSnapshot, stepsFromRow } from "./cloudJobs";
+import { actionApprovalFromRow, fitJobUpdate, mascotFromSnapshot, stepsFromRow } from "./cloudJobs";
 import type { GalleryServer } from "./galleryServer";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatStep, MascotProfile } from "../shared/library";
@@ -16,8 +16,6 @@ import type { ChatStep, MascotProfile } from "../shared/library";
 const POLL_MS = 3_000;
 const PRESENCE_MS = 30_000;
 const FINAL_TRIES = 5;
-const MAX_REPLY = 40_000;
-const MAX_ERROR = 500;
 
 // What the chat says it came from.
 export const RELAY_FROM = "ChatGPT or Claude";
@@ -25,6 +23,7 @@ export const RELAY_FROM = "ChatGPT or Claude";
 const NO_BIRD = "That bird isn't in Blueberry on the Mac, so the job didn't start.";
 const BAD_BIRD = "This job's bird didn't pass Blueberry's checks, so it didn't start.";
 const OFF_BEFORE = "Jobs from ChatGPT and Claude were turned off on the Mac before this one started.";
+const QUIT_BEFORE = "Blueberry quit on the Mac before this job started.";
 const SWITCHED_OFF = "Jobs from ChatGPT and Claude were turned off on the Mac, so it stopped there.";
 const DELETED = "The chat was deleted on the Mac, so the job stopped there.";
 
@@ -63,6 +62,8 @@ export class MacJobs {
   // The account this Mac last said it's there for, and when.
   private reporting: string | null = null;
   private reportedAt = 0;
+  // Quitting. Nothing that comes back after it starts or follows a job.
+  private destroyed = false;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -87,6 +88,7 @@ export class MacJobs {
 
   // The app is quitting. What it was running ends with it, and the server is told, as far as there's time.
   destroy(): void {
+    this.destroyed = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     const account = this.reporting;
@@ -109,7 +111,7 @@ export class MacJobs {
       do {
         this.again = false;
         await this.round();
-      } while (this.again);
+      } while (this.again && !this.destroyed);
     })().finally(() => {
       this.ticking = null;
     });
@@ -122,7 +124,7 @@ export class MacJobs {
   }
 
   private wanted(account: string | null): account is string {
-    return !!this.server && account !== null && this.signedIn === account && this.host.enabled() && this.host.linked();
+    return !this.destroyed && !!this.server && account !== null && this.signedIn === account && this.host.enabled() && this.host.linked();
   }
 
   private stopHere(job: Current, why: string): void {
@@ -132,12 +134,13 @@ export class MacJobs {
   }
 
   private async round(): Promise<void> {
+    if (this.destroyed) return;
     const account = this.signedIn;
     const wanted = this.wanted(account);
     if (wanted) {
       if (this.reporting !== account || this.now() - this.reportedAt >= PRESENCE_MS) {
         const told = await this.withToken(account, (token) => this.server!.macPresence(token, true).then(() => true));
-        if (told) {
+        if (told && !this.destroyed) {
           this.reporting = account;
           this.reportedAt = this.now();
         }
@@ -147,6 +150,7 @@ export class MacJobs {
       if (this.reporting === account) await this.withToken(account, (token) => this.server!.macPresence(token, false));
       this.reporting = null;
     }
+    if (this.destroyed) return;
     if (this.current) await this.follow();
     if (!this.current && this.wanted(account) && this.reporting === account) await this.claim(account);
   }
@@ -156,9 +160,9 @@ export class MacJobs {
     if (!row) return;
     const jobId = String(row.id);
     const fail = (error: string) => this.withToken(account, (token) => this.server!.macUpdateJob(token, jobId, { status: "failed", error }));
-    // Turned off, unlinked or signed out while it was being taken: it doesn't start. Signed out, it times out there.
+    // Turned off, unlinked, signed out or quit while it was being taken: it doesn't start. Signed out, it times out there.
     if (!this.wanted(account)) {
-      await fail(OFF_BEFORE);
+      await fail(this.destroyed ? QUIT_BEFORE : OFF_BEFORE);
       return;
     }
     // Checked as the runner checks it, so a row that's odd or edited doesn't run at all.
@@ -191,13 +195,13 @@ export class MacJobs {
     if (!this.wanted(job.account)) this.stopHere(job, SWITCHED_OFF);
     const { ended } = job;
     if (ended) {
-      const error = (ended.outcome === "stopped" ? job.why : ended.error)?.slice(0, MAX_ERROR);
-      return this.end(job, { status: ended.outcome, steps: stepsFromRow(ended.steps), reply: ended.reply.slice(0, MAX_REPLY), ...(error ? { error } : {}) });
+      const error = ended.outcome === "stopped" ? job.why : ended.error;
+      return this.end(job, { status: ended.outcome, steps: stepsFromRow(ended.steps), reply: ended.reply, ...(error ? { error } : {}) });
     }
     const now = this.host.progress(job.chatId);
     if (!now) return this.end(job, { status: "stopped", error: DELETED });
-    const stop = await this.write(job, { status: now.waiting ? "waiting" : "running", steps: stepsFromRow(now.steps), reply: now.reply.slice(0, MAX_REPLY) });
-    if (stop === true && !job.stopped && !job.ended) {
+    const stop = await this.write(job, { status: now.waiting ? "waiting" : "running", steps: stepsFromRow(now.steps), reply: now.reply });
+    if (stop === true && !job.stopped && !job.ended && !this.destroyed) {
       job.stopped = true;
       this.host.stop(job.chatId);
     }
@@ -211,8 +215,9 @@ export class MacJobs {
     this.current = null;
   }
 
+  // Cut to the row's limits, as the runner's are, so how it ended is always saved.
   private write(job: Current, update: Update): Promise<boolean | null> {
-    return this.withToken(job.account, (token) => this.server!.macUpdateJob(token, job.jobId, update));
+    return this.withToken(job.account, (token) => this.server!.macUpdateJob(token, job.jobId, fitJobUpdate(update)));
   }
 
   // A token for that account only, checked again once it's here, as in `RunnerJobs`.

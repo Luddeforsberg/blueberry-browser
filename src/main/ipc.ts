@@ -1,5 +1,5 @@
 import type { WebContents, WebFrameMain } from "electron";
-import type { EventChannels, InvokeChannel, InvokeChannels } from "../shared/ipc";
+import type { ChatSendOptions, EventChannels, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
 const BOTH = ["chrome", "overlay"] as const;
 
@@ -164,6 +164,13 @@ export const isTrustedSender = (
   if (frame !== event.sender.mainFrame) return false;
   const actual = withoutHashOrQuery(frame.url);
   return actual !== null && actual === withoutHashOrQuery(endpoint.url);
+};
+
+// What a renderer may ask of `chat:send`, and nothing else, each checked for its type. What only main sets on a reply,
+// such as `from`, `sites`, `tools`, `askAtLeast` and `onEnd`, can't come in this way.
+export const chatSendOptions = (options: unknown): ChatSendOptions => {
+  const { seePage, mascotId, cloud, runner } = (options ?? {}) as Record<string, unknown>;
+  return { seePage: seePage === true, mascotId: typeof mascotId === "string" ? mascotId : null, cloud: cloud === true, runner: runner === true };
 };
 
 export const sendToRenderer = <C extends keyof EventChannels>(

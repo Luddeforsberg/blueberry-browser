@@ -164,6 +164,33 @@ describe("MacJobs", () => {
     expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/turned off on the Mac before this one started/) });
   });
 
+  it("doesn't start a job whose claim comes back after the app quit, and nothing runs after it", async () => {
+    const { jobs, server, host, rows, holdClaims } = setUp();
+    const release = holdClaims();
+    const round = jobs.tick();
+    await vi.waitFor(() => expect(server.macClaimJob).toHaveBeenCalled());
+    jobs.destroy();
+    release();
+    await round;
+    expect(host.start).not.toHaveBeenCalled();
+    expect(jobs.running).toBeNull();
+    expect(rows.get("job-1")).toMatchObject({ status: "failed", error: expect.stringMatching(/quit on the Mac before this job started/) });
+    await jobs.tick();
+    expect(server.macClaimJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes a reply too long for the row cut short, so how it ended is saved", async () => {
+    const { jobs, chats, rows } = setUp();
+    await jobs.tick();
+    chats.get("chat-1")!.end({ reply: "🫐".repeat(40_001), steps: [], outcome: "failed", error: "x".repeat(501) });
+    await jobs.tick();
+    const { status, reply, error } = rows.get("job-1")!;
+    expect(status).toBe("failed");
+    expect(Array.from(reply)).toHaveLength(40_000);
+    expect(reply.endsWith(" (cut short)")).toBe(true);
+    expect(error).toHaveLength(500);
+  });
+
   it("says it's there again every half a minute", async () => {
     const { jobs, server, presence, queue, later } = setUp();
     queue.length = 0;
