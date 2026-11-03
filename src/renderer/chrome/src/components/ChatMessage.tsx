@@ -7,7 +7,7 @@ import { BERRY_ID } from '@shared/mascots'
 import { ChevronRight } from 'lucide-react'
 import { ApprovalCard, MascotSays } from '@common/components/ApprovalCard'
 import { useShell } from '../contexts/ShellContext'
-import { asContinuation, siteParts } from '../siteNames'
+import { asContinuation, siteParts, withSiteNames } from '../siteNames'
 import { trailFor } from '../stepTrail'
 import { Button } from '@common/components/Button'
 import { BerryDot } from '@common/components/Mascot'
@@ -317,7 +317,7 @@ const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot, avat
 }
 
 // An action Berry wants to take, which waits here until the user answers. The sentence names the sites, and the exact
-// words stay under it in full, because that's what is being allowed.
+// words stay under it in full, because that's what is being allowed. With no address to shorten, the sentence is them.
 export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, mascot, avatarOutside }) => {
     const name = useAssistantName(mascot)
     const { showBerry } = useShell().settings
@@ -334,7 +334,7 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
                     {siteParts(asContinuation(approval.text)).map((part, index) => (part.site ? <Site key={index}>{part.text}</Site> : part.text))}
                 </>
             }
-            exactly={approval.text}
+            exactly={withSiteNames(approval.text) === approval.text ? undefined : approval.text}
             onConfirm={() => decide(true)}
             onCancel={() => decide(false)}
         />

@@ -208,7 +208,10 @@ export async function* streamReply(
               pageTool.name,
               {
                 allowedDecisions: ["approve" as const, "reject" as const],
-                description: ({ args }: { args: unknown }) => pageTool.describe!(args),
+                description: ({ args }: { args: unknown }) => {
+                  pageTool.whileAsking?.(args);
+                  return pageTool.describe!(args);
+                },
                 when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
                   !(await refusedOutright(pageTool, toolCall.args)) && needsAsking(pageTool, toolCall.args),
               },
