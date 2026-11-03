@@ -2,8 +2,9 @@ import { z } from "zod";
 import { approvalFromRow, stepsFromRow, type CloudJobStatus } from "../../src/main/cloudJobs";
 import { UNTRUSTED_NOTE, type McpTool, type McpToolResult } from "../../src/main/mcpTools";
 import type { MascotProfile } from "../../src/shared/library";
-import { BERRY, NOWHERE, narrowSites, normaliseSite, permissionsInWords } from "../../src/shared/mascots";
-import { snapshotOf } from "../../src/shared/phone";
+import { BERRY, NOWHERE, narrowSites } from "../../src/shared/mascots";
+import { agentSummary, sitesFromApp } from "../../src/main/mcpFlock";
+import { mascotSnapshot } from "../../src/shared/phone";
 import type { RelayWhere } from "./db";
 
 // What ChatGPT and Claude can ask of the flock, through the relay, in the cloud or in Blueberry on the user's Mac. Each
@@ -93,13 +94,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const birds = (await host.flock()).map((bird) => ({
-          id: bird.id,
-          name: bird.name,
-          for: bird.id === BERRY.id ? "Anything. Berry is the user's general assistant in the browser." : bird.instructions,
-          sites: bird.sites.length > 0 ? bird.sites : "any",
-          permissions: permissionsInWords(bird).map(({ text }) => text),
-        }));
+        const birds = (await host.flock()).map(agentSummary);
         return { text: json(birds), summary: `${birds.length} birds` };
       },
     },
@@ -120,15 +115,13 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
         if (!prompt) return failed("Say what the job is.", "Empty task");
         const bird = findBird(await host.flock(), typeof agent === "string" ? agent : undefined);
         if (!bird) return failed(`There's no bird called ${String(agent)}. list_agents names them.`, "No such bird");
-        const given = Array.isArray(sites) ? sites.map(String) : [];
-        const clean = given.map((site) => normaliseSite(site));
-        const bad = given.find((_, index) => clean[index] === null);
-        if (bad !== undefined) return failed(`“${bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
+        const parsed = sitesFromApp(sites);
+        if ("bad" in parsed) return failed(`“${parsed.bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
         // Only ever narrower: a bird kept to some sites can't be sent anywhere else.
-        const narrowed = narrowSites(bird.sites, clean as string[]);
+        const narrowed = narrowSites(bird.sites, parsed.sites);
         if (narrowed.includes(NOWHERE)) return failed(`${bird.name} may only use ${bird.sites.join(", ")}, and none of those sites are among them.`, "Sites outside its limits");
         const wanted: RelayWhere = where === "mac" || where === "cloud" ? where : "auto";
-        const id = await host.startJob(prompt, { ...snapshotOf(bird), sites: narrowed }, wanted);
+        const id = await host.startJob(prompt, { ...mascotSnapshot(bird), sites: narrowed }, wanted);
         if (!id) return failed(MAC_OFF, "Mac not available");
         const [row] = await host.jobs([id]);
         const mac = !!row && onMac(row);
