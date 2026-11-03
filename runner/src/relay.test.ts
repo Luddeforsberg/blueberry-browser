@@ -229,7 +229,7 @@ describe("the MCP endpoint", () => {
 
     await runnerDb.update(started.jobId, { status: "done", reply: "It's £4." });
     expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } }))).toMatchObject({ status: "done", reply: "It's £4." });
-    expect(dataOf(await client.callTool({ name: "list_jobs", arguments: {} }))).toEqual([{ jobId: started.jobId, status: "done" }]);
+    expect(dataOf(await client.callTool({ name: "list_jobs", arguments: {} }))).toEqual([{ jobId: started.jobId, where: "cloud", status: "done" }]);
 
     // Nothing from the relay ever decided anything, and after sign-in nothing went as the owner.
     expect(supabase.received.some(({ path }) => path.includes("decide_cloud_approval"))).toBe(false);
@@ -243,6 +243,36 @@ describe("the MCP endpoint", () => {
     await asOwner("decide_cloud_approval", { p_approval: approval, p_allow: true, p_answer: "The big one" });
     expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: started.jobId } })).status).toBe("running");
     await runnerDb.update(started.jobId, { status: "done", reply: "Done" });
+  });
+
+  it("sends a job to the Mac only while it's there, and says so when it isn't", async () => {
+    const offline = await client.callTool({ name: "start_job", arguments: { task: "On my Mac", where: "mac" } });
+    expect(offline.isError).toBe(true);
+    expect(textOf(offline)).toMatch(/Blueberry isn't open on the user's Mac/);
+    const auto = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Anywhere" } }));
+    expect(auto.where).toBe("cloud");
+    await runnerDb.claim();
+    await runnerDb.update(auto.jobId, { status: "done", reply: "Done" });
+
+    expect(await asOwner("mac_presence", { p_on: true })).toBe(true);
+    const onMac = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Anywhere, Mac first" } }));
+    expect(onMac).toMatchObject({ where: "mac", status: "queued" });
+    const cloud = dataOf(await client.callTool({ name: "start_job", arguments: { task: "Only the cloud", where: "cloud" } }));
+    expect(cloud.where).toBe("cloud");
+    // The runner takes the cloud's and never the Mac's.
+    expect((await runnerDb.claim())?.id).toBe(cloud.jobId);
+    expect(await runnerDb.claim()).toBeNull();
+    await runnerDb.update(cloud.jobId, { status: "done", reply: "Done" });
+
+    // Waiting on the Mac says only that.
+    const [claimed] = await asOwner("mac_claim_job", {});
+    expect(claimed.id).toBe(onMac.jobId);
+    await asOwner("mac_update_job", { p_job: onMac.jobId, p_status: "waiting", p_steps: [{ text: "Opened the shop", done: true }] });
+    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: onMac.jobId } }))).toMatchObject({ where: "mac", status: "waiting_for_user", steps: ["Opened the shop"], waitingFor: { kind: "user_on_mac" } });
+    expect(dataOf(await client.callTool({ name: "stop_job", arguments: { jobId: onMac.jobId } })).status).toBe("stopping");
+    expect(await asOwner("mac_update_job", { p_job: onMac.jobId, p_status: "stopped", p_reply: "Stopped" })).toBe(true);
+    expect(dataOf(await client.callTool({ name: "get_job", arguments: { jobId: onMac.jobId } }))).toMatchObject({ status: "stopped", reply: "Stopped" });
+    expect(await asOwner("mac_presence", { p_on: false })).toBe(false);
   });
 
   it("stops a job of its own", async () => {

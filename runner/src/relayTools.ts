@@ -4,15 +4,24 @@ import { UNTRUSTED_NOTE, type McpTool, type McpToolResult } from "../../src/main
 import type { MascotProfile } from "../../src/shared/library";
 import { BERRY, NOWHERE, narrowSites, normaliseSite, permissionsInWords } from "../../src/shared/mascots";
 import { snapshotOf } from "../../src/shared/phone";
+import type { RelayWhere } from "./db";
 
-// What ChatGPT and Claude can ask of the flock in the cloud, through the relay. Each call is a `relay_*` function, as the
-// runner with the grant the user made when they signed in, which acts as the user for that one thing. A job is the same
-// row the phone sends, so the runner takes it and checks it like any other. Nothing here answers anything: questions,
+// What ChatGPT and Claude can ask of the flock, through the relay, in the cloud or in Blueberry on the user's Mac. Each
+// call is a `relay_*` function, as the runner with the grant the user made when they signed in, which acts as the user
+// for that one thing. A job is the same row the phone sends, so the runner takes it and checks it like any other. Nothing here answers anything: questions,
 // approvals and sign-ins are the user's, in Blueberry or on the phone, and there's no database function for the relay
-// that could, nor any route to cookies, logins, recordings or memory.
+// that could, nor any route to cookies, logins, recordings or memory. A job for the Mac is the same kind of row, which
+// only the user's own Blueberry takes, and only while they allow it there. Its approvals never leave the Mac.
 
 const MAX_TASK_LENGTH = 4000;
 const MAX_SITES = 20;
+
+const MAC_OFF =
+  "Blueberry isn't open on the user's Mac right now, or they haven't allowed jobs from here to run there (Settings > " +
+  "Cloud in Blueberry). Ask them to open it, or start the job with where: \"cloud\" or \"auto\".";
+
+const ON_MAC =
+  "It's waiting for the user in Blueberry on their Mac, where only they can answer. Tell them, then check again with get_job.";
 
 const NOT_YOURS =
   "Only the user can answer this, in Blueberry or on their phone, and nothing you send can. Tell the user it's waiting " +
@@ -21,8 +30,9 @@ const NOT_YOURS =
 // Everything the tools need, for one connection. The database keeps it to the jobs this connection started.
 export interface RelayHost {
   flock: () => Promise<MascotProfile[]>;
-  // The database adds the Context of the user's newest job that has one, as the phone does.
-  startJob: (prompt: string, mascot: object) => Promise<string>;
+  // The database adds the Context of the user's newest job that has one, as the phone does, and decides where it goes.
+  // Null when it was for the Mac and the Mac isn't there.
+  startJob: (prompt: string, mascot: object, where: RelayWhere) => Promise<string | null>;
   // Status, steps, reply, error and any approval waiting, for these jobs or, with null, the newest.
   jobs: (ids: string[] | null) => Promise<Record<string, unknown>[]>;
   stop: (id: string) => Promise<void>;
@@ -38,8 +48,11 @@ const findBird = (flock: MascotProfile[], wanted: string | undefined) => {
   return flock.find((bird) => bird.id.toLowerCase() === name || bird.name.toLowerCase() === name) ?? null;
 };
 
-// What a job is waiting for, in words. Nothing of it can be answered from here.
+const onMac = (row: Record<string, unknown>) => row.target === "mac";
+
+// What a job is waiting for, in words. Nothing of it can be answered from here. On the Mac, only that it's waiting.
 const waitingFor = (row: Record<string, unknown>) => {
+  if (onMac(row)) return row.status === "waiting" ? { kind: "user_on_mac", note: ON_MAC } : null;
   const approval = approvalFromRow(row);
   if (!approval) return null;
   if (approval.question) return { kind: "question", question: approval.text, note: NOT_YOURS };
@@ -63,6 +76,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
     const waiting = waitingFor(row);
     return {
       jobId: id,
+      where: onMac(row) ? "mac" : "cloud",
       status: statusOf(row.status, waiting !== null),
       steps: stepsFromRow(row.steps).map(({ text }) => text),
       reply: typeof row.reply === "string" && row.reply ? row.reply : null,
@@ -93,14 +107,15 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       name: "start_job",
       title: "Give a bird a job",
       description:
-        "Start a job in the cloud for one of the user's birds, by name or id from list_agents, or Berry if you leave it out. It works in a browser in the cloud, signed in to the sites the user brought there, keeps going with their computer off, and asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the bird may do. Returns a job id at once: check on it with get_job.",
+        "Start a job for one of the user's birds, by name or id from list_agents, or Berry if you leave it out. `where` says where it runs. \"cloud\": in a browser in the cloud, signed in only to the sites the user brought there, and it keeps going with their computer off. \"mac\": in Blueberry on the user's own Mac, with their real tabs and sign-ins, only while it's open and they've allowed it, and otherwise you get an error saying so. \"auto\", the default: the Mac if it's available, and the cloud if not. Either way it asks the user before anything risky. `sites` keeps it to those sites, and can only narrow what the bird may do. Returns a job id at once, and where it went: check on it with get_job.",
       shape: {
         task: z.string().min(1).max(MAX_TASK_LENGTH).describe("What to do, in plain words, as you'd ask a person."),
         agent: z.string().max(100).optional().describe("The bird's name or id. Leave out for Berry."),
         sites: z.array(z.string().max(200)).max(MAX_SITES).optional().describe("Only these sites, such as example.com. Leave out for the bird's own."),
+        where: z.enum(["auto", "mac", "cloud"]).optional().describe("auto (the default): the user's Mac if Blueberry is open there and allowed, otherwise the cloud. mac: only the Mac. cloud: only the cloud."),
       },
       readOnly: false,
-      run: async ({ task, agent, sites }) => {
+      run: async ({ task, agent, sites, where }) => {
         const prompt = String(task ?? "").trim().slice(0, MAX_TASK_LENGTH);
         if (!prompt) return failed("Say what the job is.", "Empty task");
         const bird = findBird(await host.flock(), typeof agent === "string" ? agent : undefined);
@@ -112,13 +127,20 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
         // Only ever narrower: a bird kept to some sites can't be sent anywhere else.
         const narrowed = narrowSites(bird.sites, clean as string[]);
         if (narrowed.includes(NOWHERE)) return failed(`${bird.name} may only use ${bird.sites.join(", ")}, and none of those sites are among them.`, "Sites outside its limits");
-        const id = await host.startJob(prompt, { ...snapshotOf(bird), sites: narrowed });
+        const wanted: RelayWhere = where === "mac" || where === "cloud" ? where : "auto";
+        const id = await host.startJob(prompt, { ...snapshotOf(bird), sites: narrowed }, wanted);
+        if (!id) return failed(MAC_OFF, "Mac not available");
+        const [row] = await host.jobs([id]);
+        const mac = !!row && onMac(row);
         return {
           text: json({
             jobId: id,
             agent: bird.name,
+            where: mac ? "mac" : "cloud",
             status: "queued",
-            note: "It runs in the cloud and can take a few minutes. Check on it with get_job. It may stop to ask the user, who answers in Blueberry or on their phone.",
+            note: mac
+              ? "It runs in Blueberry on the user's Mac and can take a few minutes. Check on it with get_job. It may stop to ask the user, who answers there."
+              : "It runs in the cloud and can take a few minutes. Check on it with get_job. It may stop to ask the user, who answers in Blueberry or on their phone.",
           }),
           summary: "Started a job",
         };
@@ -143,7 +165,7 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const listed = (await host.jobs(null)).map((row) => ({ jobId: String(row.id), status: statusOf(row.status, approvalFromRow(row) !== null) }));
+        const listed = (await host.jobs(null)).map((row) => ({ jobId: String(row.id), where: onMac(row) ? "mac" : "cloud", status: statusOf(row.status, waitingFor(row) !== null) }));
         return { text: json(listed), summary: `${listed.length} jobs` };
       },
     },

@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chosenMascotId: null,
   desktopBerry: false,
   desktopBerrySpot: null,
+  relayOnMac: false,
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -76,6 +77,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     chosenMascotId: input.chosenMascotId === null || typeof input.chosenMascotId === "string" ? input.chosenMascotId : base.chosenMascotId,
     desktopBerry: bool(input.desktopBerry, base.desktopBerry),
     desktopBerrySpot: spot(input.desktopBerrySpot, base.desktopBerrySpot),
+    relayOnMac: bool(input.relayOnMac, base.relayOnMac),
   };
 }
 
