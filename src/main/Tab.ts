@@ -117,7 +117,7 @@ export class Tab implements PageTarget {
     this._id = id;
     this.events = events;
     this._url = url;
-    this._title = "New Tab";
+    this._title = "New tab";
     this.actor = new PageActor(this, events.actorOptions, () => this.webContentsView?.webContents.getZoomFactor() ?? 1);
 
     if (restored) {

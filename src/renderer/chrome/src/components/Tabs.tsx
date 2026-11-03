@@ -54,7 +54,7 @@ const TabItem: React.FC<{
             className="flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
         >
             <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
-            <span className={cn("flex-1 min-w-0 text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New Tab'}</span>
+            <span className={cn("flex-1 min-w-0 text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New tab'}</span>
             {perch && <span aria-hidden className="w-8 shrink-0" />}
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>

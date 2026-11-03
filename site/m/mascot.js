@@ -1,7 +1,7 @@
 import "../theme.js";
 import { BIRDS } from "../birds.js";
 import { GET_BLUEBERRY_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "../config.js";
-import { isUuid, parsePublishedRow, permissionsInWords } from "../shared.js";
+import { isUuid, parsePublishedRow, permissionsInWords, plainFromMarkdown } from "../shared.js";
 
 const COLUMNS = "id,name,palette,accessory,description,category,instructions,sites,tools,author_name,example_prompt,example_answer,add_count,created_at";
 
@@ -45,7 +45,7 @@ const show = ({ draft, author, description, example, addCount }) => {
     ...(example
       ? [el("section", {}, el("h2", { textContent: "An example" }),
           el("h3", { textContent: "I asked this" }), el("p", { className: "words", textContent: example.prompt }),
-          el("h3", { textContent: "And here’s what it gave me" }), el("p", { className: "words", textContent: example.answer }))]
+          el("h3", { textContent: "And here’s what it gave me" }), el("p", { className: "words", textContent: plainFromMarkdown(example.answer) }))]
       : []),
     el("section", {}, el("p", { className: "muted", textContent: "Someone using Blueberry wrote this, and we haven’t checked it. Adding it gives you your own copy, which nothing here can change." })),
   );

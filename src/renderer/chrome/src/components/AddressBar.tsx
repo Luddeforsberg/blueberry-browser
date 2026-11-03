@@ -27,8 +27,8 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     downloads: 'Downloads',
     gallery: 'Component gallery',
     history: 'History',
-    flock: 'Your flock',
-    'mascot-gallery': 'Mascot gallery',
+    flock: 'Flock',
+    'mascot-gallery': 'Gallery',
     'needs-you': 'Needs you',
     recording: 'What I watched',
     cloud: 'Cloud tab'

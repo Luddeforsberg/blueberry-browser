@@ -146,7 +146,7 @@ const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 className={cn(ROW, "h-[30px] pl-9 gap-2.5 text-13 text-muted-foreground", tab.isActive ? "bg-selected shadow-selected text-foreground" : "hover:bg-foreground/5 hover:text-foreground")}
             >
                 <Favicon src={tab.favicon} site={tab.url} className="size-3.5" />
-                <span className="flex-1 truncate">{tab.title || 'New Tab'}</span>
+                <span className="flex-1 truncate">{tab.title || 'New tab'}</span>
             </button>
         </li>
     )
@@ -323,7 +323,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
             <div className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-2">
                 <Cluster />
                 <ul aria-label="Places">
-                    <SidebarRow leading={<Plus className={ICON} />} label="New Tab" onClick={() => createTab()} />
+                    <SidebarRow leading={<Plus className={ICON} />} label="New tab" onClick={() => createTab()} />
                     <SidebarRow
                         muted={library.needsYou.length === 0}
                         leading={<Hand className={ICON} />}

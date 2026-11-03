@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, MascotProfile, UsedPage } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
+import { linkSite } from '@shared/publishing'
 import { ChevronRight } from 'lucide-react'
 import { ApprovalCard, MascotSays } from '@common/components/ApprovalCard'
 import { useShell } from '../contexts/ShellContext'
@@ -36,16 +37,16 @@ export const useFollowReply = (sentCount: number, partial: string | null | undef
 }
 
 // `fromStranger` is for what someone else wrote: nothing in it can load anything or take you anywhere. An image is
-// only its description, a link is its words and address as text, and raw HTML shows as text, which ReactMarkdown does
+// only its description, a link is its words and its site as text, and raw HTML shows as text, which ReactMarkdown does
 // by itself as long as no plugin here parses it.
 const STRANGER_COMPONENTS: Components = {
     img: ({ alt }) => <span>{alt}</span>,
-    a: ({ children, href }) => (
-        <span>
-            {children}
-            {href && String(children) !== href && ` (${href})`}
-        </span>
-    ),
+    a: ({ children, href }) => {
+        const site = href ? linkSite(href) : null
+        const words = String(children)
+        if (!site || words === site) return <span>{children}</span>
+        return <span>{words === href ? site : <>{children} ({site})</>}</span>
+    },
 }
 
 export const Markdown: React.FC<{ content: string; fromStranger?: boolean; className?: string }> = ({ content, fromStranger, className }) => (
@@ -224,7 +225,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
                                 )}
                             </span>
                             <span>
-                                <span className={step.done ? undefined : SHIMMER_TEXT}>{step.text}</span>
+                                <span className={step.done ? undefined : SHIMMER_TEXT}>{step.shown ?? step.text}</span>
                                 {!step.done && <span className="sr-only"> (in progress)</span>}
                             </span>
                         </li>

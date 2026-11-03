@@ -7,7 +7,7 @@ import { SettingsRow } from '../components/SettingsRow'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useAccount } from '../useAccount'
 
-const NEVER_NEEDED = 'Browsing, chatting and adding mascots from the Gallery never need one.'
+const NEEDED_FOR = 'publishing a mascot and keeping cloud jobs going with your Mac off'
 
 // Your published mascots, read from the server, so this still works for one whose copy here is gone.
 const PublishedList: React.FC = () => {
@@ -54,12 +54,12 @@ const PublishedList: React.FC = () => {
 export const AccountSettings: React.FC = () => {
     const [account, setAccount] = useAccount()
     if (account.status === 'not-set-up') {
-        return <SettingsRow id="setting-account" title="No account" description={`${NEVER_NEEDED} Publishing your own needs one, and this copy of Blueberry isn’t set up for that.`} />
+        return <SettingsRow id="setting-account" title="No account" description={`This copy of Blueberry isn’t set up for accounts, which only ${NEEDED_FOR} need.`} />
     }
     if (account.status === 'signed-out') {
         return (
             <>
-                <SettingsRow id="setting-account" title="Not signed in" description={`${NEVER_NEEDED} You only need an account to publish a mascot of your own.`} />
+                <SettingsRow id="setting-account" title="Not signed in" description={`Browsing, chatting and the Gallery never need one: it’s only for ${NEEDED_FOR}.`} />
                 <div className="py-4">
                     <AccountForm problem={account.problem} onResult={setAccount} />
                 </div>

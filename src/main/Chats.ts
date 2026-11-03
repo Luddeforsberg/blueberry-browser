@@ -1020,7 +1020,7 @@ export class Chats {
       tools,
       actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
       approve: (text) => this.askToAllow(id, run, text),
-      onStep: (text) => this.startStep(id, run, text),
+      onStep: (text, shown) => this.startStep(id, run, text, shown),
       onUsage,
       mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
     })) {
@@ -1115,8 +1115,8 @@ export class Chats {
     if (thread) this.events.onThread(thread);
   }
 
-  private startStep(chatId: string, run: Run, text: string): () => void {
-    const step: ChatStep = { text, done: false };
+  private startStep(chatId: string, run: Run, text: string, shown?: string): () => void {
+    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}) };
     run.steps.push(step);
     run.breakBeforeText = run.partial !== "";
     this.publish(chatId, run);

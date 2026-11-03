@@ -147,7 +147,7 @@ test("with no key the cloud is off, and a saved key never comes back to the page
     await expect(chrome.getByRole("button", { name: "More options" })).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
     await expect(chrome.getByText("Off. Add a Browserbase key to turn it on.")).toBeVisible();
-    await expect(chrome.getByRole("button", { name: "End cloud session" })).toBeDisabled();
+    await expect(chrome.getByRole("button", { name: "End cloud session" })).toHaveCount(0);
     await shoot(chrome, "settings-cloud-no-key");
 
     await chrome.getByRole("textbox", { name: "API key" }).fill("bb_live_not_a_real_key");

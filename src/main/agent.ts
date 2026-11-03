@@ -25,8 +25,9 @@ export interface ReplyOptions {
   actionApproval: () => ActionApproval;
   // Resolves with the user's answer, and rejects if the reply is stopped first.
   approve: (description: string) => Promise<boolean>;
-  // Called as each tool starts, with what the chat should show. The result is called when it ends.
-  onStep: (text: string) => () => void;
+  // Called as each tool starts, with what the chat should show. The result is called when it ends. `shown` is set for a
+  // call the user allowed, naming what they allowed, and is only for the screen.
+  onStep: (text: string, shown?: string) => () => void;
   // Told the tokens each model call used, as they're reported.
   onUsage?: (tokens: number) => void;
   // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
@@ -134,6 +135,8 @@ export const shortenOldResults = async (messages: BaseMessage[]): Promise<BaseMe
   return messages.map((message, at) => (old.has(at) ? shortened(message, ToolMessage) : message));
 };
 
+export const NO_KEY = "Berry needs an AI key to answer. For now that goes in Blueberry’s .env file, and then Blueberry needs a restart.";
+
 export const modelConfig = (env: Record<string, string | undefined> = process.env) => {
   const provider = env.LLM_PROVIDER?.toLowerCase() || "openai";
   if (provider !== "openai" && provider !== "anthropic") {
@@ -141,7 +144,8 @@ export const modelConfig = (env: Record<string, string | undefined> = process.en
   }
   const apiKey = env[API_KEYS[provider]];
   if (!apiKey) {
-    throw new ModelConfigError(`Replies need an API key. Add ${API_KEYS[provider]} to the .env file and restart.`);
+    // Keys only come from the .env file for now, as Settings has nowhere to put one.
+    throw new ModelConfigError(NO_KEY);
   }
   return {
     provider,
@@ -244,7 +248,7 @@ export async function* streamReply(
           const allowedAs = allowed.get(config.toolCall?.id ?? "");
           if (describe && allowedAs !== undefined && (await describe(args)) !== allowedAs) return CHANGED;
           if (describe && allowedAs === undefined && (await needsAsking(pageTool, args))) return CHANGED;
-          const finish = onStep(label(args));
+          const finish = onStep(label(args), (allowedAs !== undefined && pageTool.allowedLabel?.(args)) || undefined);
           try {
             const result = await run(args);
             // A failure is words. The image goes with a reminder, because it can have instructions drawn in it too.

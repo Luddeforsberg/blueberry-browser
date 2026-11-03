@@ -47,7 +47,8 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   await app.close();
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
-  await expect(chrome.getByRole("button", { name: "Bookmark this page", exact: true })).toBeDisabled();
+  // Our own pages can't be saved, so the new tab page has no star.
+  await expect(chrome.getByRole("button", { name: "Bookmark this page", exact: true })).toHaveCount(0);
   await visit();
   await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
   let saved = chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "Saved page" });
@@ -94,7 +95,7 @@ test("pinning a page keeps it across restarts, and the sidebar has Settings and 
   await expect(sidebar.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   await expect(sidebar.getByText("Sam Rivera")).toHaveCount(0);
   await expect(sidebar.getByText("sam@example.com")).toHaveCount(0);
-  await expect(chrome.getByRole("button", { name: "Pin this page", exact: true })).toBeDisabled();
+  await expect(chrome.getByRole("button", { name: "Pin this page", exact: true })).toHaveCount(0);
 
   await visit();
   await chrome.getByRole("button", { name: "Pin this page", exact: true }).click();

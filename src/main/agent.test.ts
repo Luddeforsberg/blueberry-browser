@@ -4,7 +4,7 @@ import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { generateTitle, ModelConfigError, modelConfig, shortenOldResults, streamReply } from "./agent";
+import { generateTitle, ModelConfigError, modelConfig, NO_KEY, shortenOldResults, streamReply } from "./agent";
 
 const NO_TOOLS = {
   tools: [],
@@ -22,8 +22,13 @@ const collect = async (stream: AsyncIterable<string>) => {
 describe("modelConfig", () => {
   it("defaults to OpenAI, and needs its key", () => {
     expect(modelConfig({ OPENAI_API_KEY: "key" })).toMatchObject({ provider: "openai", apiKey: "key", model: "gpt-6.1-terra" });
-    expect(() => modelConfig({})).toThrow(/OPENAI_API_KEY/);
+    expect(() => modelConfig({})).toThrow(NO_KEY);
     expect(() => modelConfig({ OPENAI_API_KEY: "" })).toThrow(ModelConfigError);
+  });
+
+  it("says plainly what's missing without a key, with no variable names", () => {
+    expect(NO_KEY).toMatch(/^Berry needs an AI key to answer\./);
+    expect(NO_KEY).not.toMatch(/[A-Z]+_[A-Z_]+/);
   });
 
   it("uses the chosen provider's key and model", () => {
@@ -34,7 +39,7 @@ describe("modelConfig", () => {
       model: "custom",
       titleModel: "claude-haiku-5-5",
     });
-    expect(() => modelConfig({ LLM_PROVIDER: "anthropic", OPENAI_API_KEY: "key" })).toThrow(/ANTHROPIC_API_KEY/);
+    expect(() => modelConfig({ LLM_PROVIDER: "anthropic", OPENAI_API_KEY: "key" })).toThrow(NO_KEY);
   });
 
   it("names chats with a cheap model from the chosen provider, unless overridden", () => {
@@ -159,6 +164,36 @@ describe("a mascot's limits and approvals", () => {
       expect(approve).not.toHaveBeenCalled();
       expect(run).not.toHaveBeenCalled();
     }
+  });
+
+  it("names what was allowed in the step on screen only, and only once it's allowed", async () => {
+    const seen: [string, string | undefined][] = [];
+    const run = (mode: "risky" | "never", isRisky: boolean) =>
+      collect(
+        streamReply(
+          [{ role: "user", content: "hi" }],
+          new AbortController().signal,
+          {
+            ...NO_TOOLS,
+            tools: [click({ isRisky: async () => isRisky, allowedLabel: () => "Clicked “Delete” on example.com" })],
+            approve: async () => true,
+            actionApproval: () => mode,
+            onStep: (text, shown) => {
+              seen.push([text, shown]);
+              return () => {};
+            },
+          },
+          clicking()
+        )
+      );
+    await run("risky", true);
+    await run("never", true);
+    await run("risky", false);
+    expect(seen).toEqual([
+      ["Clicked", "Clicked “Delete” on example.com"],
+      ["Clicked", undefined],
+      ["Clicked", undefined],
+    ]);
   });
 
   it("doesn't let a limit passing late skip the card", async () => {

@@ -37,7 +37,7 @@ export const AccountForm: React.FC<{ problem: string | null; onResult: (state: A
             <div>
                 <Button type="submit" disabled={busy || !email.trim() || !password}>{busy ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</Button>
             </div>
-            <p className="text-12 text-muted-foreground">These go to the Gallery’s sign-in service and nowhere else. Berry, tools and mascots never see them, and your email is never shown to anyone.</p>
+            <p className="text-12 text-muted-foreground">These go to Blueberry’s sign-in service and nowhere else. Berry, tools and mascots never see them, and your email is never shown to anyone.</p>
         </form>
     )
 }
