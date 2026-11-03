@@ -1251,13 +1251,13 @@ export class Window {
   toggleBookmark(): void {
     const tab = this.activeTab;
     if (!tab) return;
-    this.saveBookmarks(() => this.bookmarkStore.toggle(tab.url, tab.title));
+    this.saveBookmarks(() => this.bookmarkStore.toggle(tab.url, tab.title, tab.favicon));
   }
 
   togglePin(): void {
     const tab = this.activeTab;
     if (!tab) return;
-    this.saveBookmarks(() => this.pinnedStore.toggle(tab.url, tab.title));
+    this.saveBookmarks(() => this.pinnedStore.toggle(tab.url, tab.title, tab.favicon));
   }
 
   // One button can stand for a site that's both pinned and bookmarked, so it offers whatever applies.

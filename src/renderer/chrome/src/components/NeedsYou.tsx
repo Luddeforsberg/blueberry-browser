@@ -129,25 +129,27 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
         >
             <div className="flex items-start gap-3">
                 <Berry mood="asking" size={32} mascot={mascot} className="shrink-0" />
+                {/* The one action shows on the right, and comes first from the keyboard, as Allow does on the card. */}
+                {!question && !handoff && <Button size="sm" className="shrink-0 order-last" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>}
+                {handoff && onThatTab && <Button size="sm" className="shrink-0 order-last" onClick={done}>I’m done</Button>}
+                {handoff && !onThatTab && canGoToTab && <Button size="sm" variant="outline" className="shrink-0 order-last" onClick={goToTab}>Go to the tab</Button>}
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                     <h2 className="pt-0.5 text-16">{shortened}</h2>
                     {shortened !== approval.text && <ExactWords className="mt-2">{approval.text}</ExactWords>}
                     {question && <QuestionBox name={name} onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)} />}
-                    <div className="mt-1 min-h-7 flex flex-wrap items-center gap-x-1.5 text-12 text-muted-foreground">
-                        <span className="min-w-0 truncate">{name} · {item.job}{item.from && ` · from ${item.from}`} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
-                        <span className={cn("ml-auto flex items-center", QUIETLY)}>
+                    {/* One line, so the actions waiting unseen never leave an empty strip under it. */}
+                    <div className="mt-1 h-7 flex items-center gap-x-1.5 text-12 text-muted-foreground">
+                        <span className="min-w-0 flex-1 truncate">{name} · {item.job}{item.from && ` · from ${item.from}`} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
+                        <span className={cn("shrink-0 flex items-center", QUIETLY)}>
+                            {!question && !handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>}
                             {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={goToTab}>Go to the tab</Button>}
                             <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
                             {question && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Skipped. ${name} carries on without it.`)}>Skip</Button>}
                             {handoff && !onThatTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={done}>I’m done</Button>}
                             {handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `${name} carries on without it.`)}>Not now</Button>}
-                            {!question && !handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>}
                         </span>
                     </div>
                 </div>
-                {!question && !handoff && <Button size="sm" className="shrink-0" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>}
-                {handoff && onThatTab && <Button size="sm" className="shrink-0" onClick={done}>I’m done</Button>}
-                {handoff && !onThatTab && canGoToTab && <Button size="sm" variant="outline" className="shrink-0" onClick={goToTab}>Go to the tab</Button>}
             </div>
         </li>
     )

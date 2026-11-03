@@ -152,14 +152,14 @@ const WorkWindow: React.FC<{
         >
             {isUsers(tab) ? (
                 <span className="h-10 px-3 flex items-center gap-2 text-13">
-                    <Favicon src={tab.favicon} />
+                    <Favicon src={tab.favicon} site={tab.site} />
                     <span className="truncate text-muted-foreground transition-colors group-hover:text-foreground">{tab.site}</span>
                     <span className="ml-auto shrink-0">You have this tab</span>
                 </span>
             ) : (
                 <>
                     <span className="h-7 px-2.5 flex items-center gap-1.5 border-b text-12 text-muted-foreground transition-colors group-hover:text-foreground">
-                        <Favicon src={tab.favicon} />
+                        <Favicon src={tab.favicon} site={tab.site} />
                         <span className="truncate">{tab.site}</span>
                     </span>
                     <span className="relative block bg-tray" style={{ aspectRatio: aspect }}>

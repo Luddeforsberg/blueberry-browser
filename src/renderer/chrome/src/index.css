@@ -55,9 +55,15 @@
   background: transparent;
 }
 
+/* Out of sight until the pointer is over what scrolls, or it's scrolling. */
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--border));
+  background: transparent;
   border-radius: 9999px;
+}
+
+:hover::-webkit-scrollbar-thumb,
+[data-scrolling]::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
 }
 
 ::-webkit-scrollbar-thumb:hover {

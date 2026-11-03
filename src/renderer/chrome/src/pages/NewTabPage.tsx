@@ -252,7 +252,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                             "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
                                         )}
                                     >
-                                        <Favicon src={visit.favicon} />
+                                        <Favicon src={visit.favicon} site={visit.url} />
                                         <span className="flex-1 truncate">{visit.title}</span>
                                         <span className="text-12 text-muted-foreground tabular-nums">
                                             {timeOf(visit.visitedAt)}

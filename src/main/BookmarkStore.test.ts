@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
-import { BookmarkStore } from "./BookmarkStore";
+import { BookmarkStore, MAX_ICON_LENGTH } from "./BookmarkStore";
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-bookmarks-")), "pinned.json");
 const site = { id: "a", title: "Example", url: "https://example.com/" };
@@ -32,6 +32,30 @@ describe("BookmarkStore", () => {
     store.toggle(site.url, "A new title");
     expect(store.get()).toEqual([]);
     expect(JSON.parse(readFileSync(file, "utf8"))).toEqual([]);
+  });
+
+  it("keeps the icon the page named, only if it's on the web", () => {
+    const file = tempFile();
+    const store = new BookmarkStore(file);
+    store.toggle("https://a.example/", "A", "https://cdn.a.example/icon.png");
+    store.toggle("https://b.example/", "B", "data:image/png;base64,AAAA");
+    store.toggle("https://c.example/", "C");
+    expect(new BookmarkStore(file).get().map(({ favicon }) => favicon)).toEqual(["https://cdn.a.example/icon.png", undefined, undefined]);
+
+    writeFileSync(file, JSON.stringify([{ ...site, favicon: "javascript:alert(1)" }, { ...site, id: "b", favicon: 7 }]));
+    expect(new BookmarkStore(file).get()).toEqual([site, { ...site, id: "b" }]);
+  });
+
+  it("keeps an icon address up to its limit, and drops a longer one, when saving and when reading the file", () => {
+    const icon = (length: number) => `https://a.example/${"i".repeat(length - "https://a.example/".length)}`;
+    const file = tempFile();
+    const store = new BookmarkStore(file);
+    store.toggle("https://a.example/", "A", icon(MAX_ICON_LENGTH));
+    store.toggle("https://b.example/", "B", icon(MAX_ICON_LENGTH + 1));
+    expect(store.get().map(({ favicon }) => favicon?.length)).toEqual([MAX_ICON_LENGTH, undefined]);
+
+    writeFileSync(file, JSON.stringify([{ ...site, favicon: icon(MAX_ICON_LENGTH) }, { ...site, id: "b", favicon: icon(1024 * 1024) }]));
+    expect(new BookmarkStore(file).get()).toEqual([{ ...site, favicon: icon(MAX_ICON_LENGTH) }, { ...site, id: "b" }]);
   });
 
   it("uses the address when a page has no title", () => {

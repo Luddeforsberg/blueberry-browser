@@ -2,9 +2,9 @@ import React, { useLayoutEffect, useRef } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
-import { useFlock } from '../contexts/LibraryContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { TabIcon } from './TabIcon'
+import { LEADING_SLOT, TabIcon } from './TabIcon'
 import { SHIMMER_TEXT } from './ChatMessage'
 import { nudgeTarget, useTabDrag } from './useTabDrag'
 import { cn } from '@common/lib/utils'
@@ -53,7 +53,7 @@ const TabItem: React.FC<{
             }}
             className="flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
         >
-            <TabIcon tab={tab} />
+            <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
             <span className={cn("flex-1 min-w-0 text-14 truncate", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New Tab'}</span>
             {perch && <span aria-hidden className="w-8 shrink-0" />}
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
@@ -85,9 +85,12 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     showNew = true
 }) => {
     const { tabs: allTabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
+    const { chats } = useLibrary()
     const vertical = mode === 'vertical'
-    // In the sidebar, a running job's tabs show under its chat. The tab row has no chats, so it shows them all.
-    const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId) : allTabs
+    // In the sidebar, a chat is its row under Chats, and a running job's tabs show under that chat. The tab row has
+    // no chats, so it shows them all.
+    const listedChat = (tab: TabInfo) => tab.page === 'chat' && chats.some(({ id }) => id === tab.pageParam)
+    const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId && !listedChat(tab)) : allTabs
     // A drag counts places in this list, and the window in all of them.
     const moveShown = (tabId: string, toIndex: number) =>
         moveTab(tabId, toIndex < tabs.length ? allTabs.indexOf(tabs[toIndex]) : allTabs.length - 1)

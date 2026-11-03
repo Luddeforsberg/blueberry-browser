@@ -1,17 +1,16 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
 // All of it is saved locally.
 
-export interface PinnedSite {
-  id: string;
-  title: string;
-  url: string;
-}
-
 export interface Bookmark {
   id: string;
   title: string;
   url: string;
+  // The icon the page itself named when it was saved, which needn't be at /favicon.ico.
+  favicon?: string;
 }
+
+// Pins are kept the same way as bookmarks, in a file of their own.
+export type PinnedSite = Bookmark;
 
 // Something Berry did on the way to a reply.
 export interface ChatStep {

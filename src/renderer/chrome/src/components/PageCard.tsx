@@ -15,7 +15,7 @@ export const PageCard: React.FC<{
         className="group/page relative inline-flex max-w-[240px] items-center gap-2.5 p-1.5 pr-4 rounded-card bg-tray"
     >
         <span className="size-9 shrink-0 flex items-center justify-center rounded-control bg-surface border">
-            <Favicon src={favicon} />
+            <Favicon src={favicon} site={host} />
         </span>
         <span className="min-w-0 flex flex-col">
             <span className="text-13 truncate">{title}</span>

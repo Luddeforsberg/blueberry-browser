@@ -92,7 +92,7 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   await chrome.getByRole("textbox", { name: "Message" }).press("Enter");
   const card = chrome.getByRole("region", { name: "Approval needed" });
   await expect(card.getByRole("heading")).toContainText("127.0.0.1");
-  await card.getByRole("button", { name: "Cancel" }).click();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(card).toHaveCount(0);
 
   // A page can't take it off its site either: not by a link it clicks, and not by a server redirect.

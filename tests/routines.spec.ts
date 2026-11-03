@@ -84,7 +84,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   expect(requested).toEqual([]);
 
   // Allowed, the run opens its tab behind the current view and closes it when it's done.
-  await cards.getByRole("button", { name: "Allow" }).click();
+  await cards.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(() => requested).toContain("/prices?from=ARN");
   // A page behind the user that opens a popup doesn't come to the front, and the popup closes with the run.
   const page = await findView(app, "/prices?from=ARN");

@@ -13,11 +13,13 @@ export const ChatPanel: React.FC = () => {
 
     return (
         <aside aria-label="Berry" className="h-full flex flex-col">
+            {/* On the toolbar's row, so its buttons line up with the toolbar's. */}
             <div
-                className="flex items-center gap-1 px-3 app-region-drag shrink-0"
+                className="flex items-center gap-1 px-3 pb-2 box-content app-region-drag shrink-0"
                 style={{
-                    height: layout.controls.height + 8,
-                    paddingRight: theme.platform === 'windows' ? layout.controls.width : undefined
+                    paddingTop: layout.addressRow.y - layout.chat.y,
+                    height: layout.addressRow.height,
+                    paddingRight: theme.platform === 'windows' && layout.addressRow.y < layout.controls.y + layout.controls.height ? layout.controls.width : undefined
                 }}
             >
                 <ToolBarButton Icon={SquarePen} label="New chat" active={messages.length > 0} onClick={clearChat} />

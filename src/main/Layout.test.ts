@@ -35,6 +35,7 @@ describe("computeLayout", () => {
     expect(layout.sidebar).toEqual({ x: 0, y: 0, width: 240, height: 800 });
     expect(layout.chat).toEqual({ x: 920, y: 0, width: 360, height: 800 });
     expect(layout.toolbar).toEqual({ x: 240, y: 8, width: 680, height: 40 });
+    expect(layout.addressRow).toEqual(layout.toolbar);
     expect(layout.page).toEqual({ x: 240, y: 48, width: 680, height: 744 });
   });
 
@@ -120,6 +121,8 @@ describe("computeLayout", () => {
     expect(layout.floatingSidebar.width).toBe(0);
     expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 920, height: 40 });
     expect(layout.toolbar).toEqual({ x: 8, y: 40, width: 912, height: 76 });
+    // The bookmarks bar is under the address row, so the panel's buttons line up with the row alone.
+    expect(layout.addressRow).toEqual({ x: 8, y: 40, width: 912, height: 40 });
     expect(layout.page).toEqual({ x: 8, y: 116, width: 912, height: 676 });
     expect(layout.controls.height).toBe(40);
   });

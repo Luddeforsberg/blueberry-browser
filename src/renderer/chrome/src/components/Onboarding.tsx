@@ -89,7 +89,7 @@ export const Onboarding: React.FC = () => {
                                 <Button className="mt-8" disabled={busy} onClick={() => void bringIn()}>
                                     {busy ? 'Bringing it in…' : 'Bring it in'}
                                 </Button>
-                                <Button variant="link" className="mt-2 text-muted-foreground" disabled={busy} onClick={next}>Skip</Button>
+                                <Button variant="ghost" className="mt-2 text-muted-foreground" disabled={busy} onClick={next}>Skip</Button>
                             </>
                         )}
                     </>
@@ -109,7 +109,7 @@ export const Onboarding: React.FC = () => {
                 )}
 
                 {(name === 'meet' || name === 'yours') && (
-                    <Button variant="link" className="mt-2 text-muted-foreground" onClick={finish}>
+                    <Button variant="ghost" className="mt-2 text-muted-foreground" onClick={finish}>
                         Skip setup
                     </Button>
                 )}

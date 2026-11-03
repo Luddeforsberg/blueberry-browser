@@ -56,7 +56,7 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     const card = chrome.getByRole("region", { name: "Approval needed" });
     await expect(card.locator("p").getByText(`Click the button “Place order” on ${shop}`)).toBeVisible();
-    await card.getByRole("button", { name: "Allow" }).click();
+    await card.getByRole("button", { name: "Allow", exact: true }).click();
 
     await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content, { timeout: 15_000 }).toBe("Ordered it on 127.0.0.1");
     // Real input reached the page in the cloud browser, and nothing opened in this window.

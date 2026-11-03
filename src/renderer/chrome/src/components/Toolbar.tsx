@@ -38,7 +38,7 @@ const BookmarksBar: React.FC = () => {
                         }}
                         className="h-7 px-2 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                        <Favicon src={siteIcon(site.url)} />
+                        <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} />
                         {site.title}
                     </button>
                 </li>
@@ -102,7 +102,8 @@ export const Toolbar: React.FC = () => {
                 {(!vertical || !layout.sidebarOpen) && <WorkingNotice />}
                 {(!vertical || !layout.sidebarOpen) && <RoutineNotice />}
 
-                {!giveWay && (
+                {/* Our own pages can't be saved, so they don't offer to. */}
+                {!giveWay && !activeTab?.page && (
                     <>
                         <ToolBarButton
                             label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}

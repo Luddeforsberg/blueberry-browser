@@ -37,15 +37,15 @@ export const ApprovalCard: React.FC<{
   question: React.ReactNode;
   exactly?: string;
   onConfirm: () => void;
-  onCancel: () => void;
-}> = ({ avatar, avatarOutside, question, exactly, onConfirm, onCancel }) => (
+  onDeny: () => void;
+}> = ({ avatar, avatarOutside, question, exactly, onConfirm, onDeny }) => (
   <MascotSays label="Approval needed" avatar={avatar} avatarOutside={avatarOutside} title={question} exactly={exactly}>
     <div className="flex items-center gap-2">
       <Button size="sm" onClick={onConfirm}>
         Allow
       </Button>
-      <Button size="sm" variant="outline" onClick={onCancel}>
-        Cancel
+      <Button size="sm" variant="outline" onClick={onDeny}>
+        Don’t allow
       </Button>
     </div>
   </MascotSays>

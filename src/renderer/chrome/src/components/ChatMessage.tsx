@@ -336,7 +336,7 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
             }
             exactly={withSiteNames(approval.text) === approval.text ? undefined : approval.text}
             onConfirm={() => decide(true)}
-            onCancel={() => decide(false)}
+            onDeny={() => decide(false)}
         />
     )
 }

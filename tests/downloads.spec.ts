@@ -179,7 +179,7 @@ test("a site can't use anything until the user answers, and the answer can be ch
   }, `${origin}/`);
   await expect(card).toBeVisible();
 
-  await card.getByRole("button", { name: "Allow" }).click();
+  await card.getByRole("button", { name: "Allow", exact: true }).click();
   expect(await ask).toBe("granted");
   await expect.poll(notifications).toBe("granted");
 
