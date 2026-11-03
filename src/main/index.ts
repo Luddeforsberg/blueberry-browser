@@ -14,6 +14,8 @@ import { installSessionHandlers } from "./sessionHandlers";
 import { HistoryStore } from "./HistoryStore";
 import { SessionStore } from "./Session";
 import { openStore, type StoreProblem } from "./database";
+import { holdQuit } from "./holdQuit";
+import type { CloudTabs } from "./CloudTabs";
 import { join } from "path";
 
 let mainWindow: Window | null = null;
@@ -26,6 +28,8 @@ let mascotStore: MascotStore | null = null;
 let downloads: Downloads | null = null;
 let sitePermissions: SitePermissions | null = null;
 let historyStore: HistoryStore | null = null;
+// Kept after its window closes, so Quit can wait for its session to end.
+let cloud: CloudTabs | null = null;
 // Said once, after the window it sits on is open.
 let storeNotices: string[] = [];
 
@@ -60,7 +64,11 @@ const createWindow = (): Window => {
   );
   const bookmarks = new BookmarkStore(join(app.getPath("userData"), "bookmarks.json"));
   const pinned = new BookmarkStore(join(app.getPath("userData"), "pinned.json"));
-  routineStore ??= new RoutineStore(join(app.getPath("userData"), "routines.db"));
+  routineStore ??= openStore(
+    join(app.getPath("userData"), "routines.db"),
+    (file) => new RoutineStore(file),
+    storeNotice("Your routines", "are")
+  );
   mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
   const savedSettings = settings;
   if (!downloads || !sitePermissions) {
@@ -75,6 +83,7 @@ const createWindow = (): Window => {
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
   const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, mascotStore, downloads, sitePermissions, historyStore, sessionStore);
+  cloud = window.cloud;
   showStoreNotices(window);
   menu = new AppMenu(window);
   eventManager = new EventManager(window);
@@ -98,6 +107,9 @@ app.whenReady().then(() => {
     }
   });
 });
+
+// A cloud session left running costs until it times out, and a local test browser would be left behind.
+holdQuit(app, () => cloud?.destroy());
 
 app.on("will-quit", () => globalShortcut.unregisterAll());
 

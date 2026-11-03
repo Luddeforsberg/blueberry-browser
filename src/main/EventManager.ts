@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
-import { CHANNEL_REGIONS, isTrustedSender, type ChromeEndpoint } from "./ipc";
+import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
 import type { ChromeRegion, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
 type Result<C extends InvokeChannel> =
@@ -181,7 +181,7 @@ export class EventManager {
 
   private handleChatEvents(): void {
     this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...options, cloud: options?.cloud === true, runner: options?.runner === true }) : null
+      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, chatSendOptions(options)) : null
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));

@@ -118,6 +118,8 @@ export class RunnerJobs implements ChatRunner {
   private routinesAgain = false;
   private flockSending: Promise<void> | null = null;
   private flockAgain = false;
+  // Quitting. Nothing that comes back after it is used, and nothing is asked again.
+  private destroyed = false;
 
   constructor(
     private readonly server: GalleryServer | null,
@@ -165,6 +167,7 @@ export class RunnerJobs implements ChatRunner {
     if (!account) this.link = null;
     else {
       const link = await this.withToken(account, (token) => this.server!.myCloudRunner(token).then((found) => ({ found })));
+      if (this.destroyed) return this.runnerState;
       if (link && this.signedIn === account) this.link = link.found;
       // No runner has accepted, so nothing in the cloud can run a routine, and none needs holding back here.
       if (link && this.signedIn === account && !link.found?.accepted && this.routinesThere.size > 0) {
@@ -239,13 +242,16 @@ export class RunnerJobs implements ChatRunner {
       const shape = JSON.stringify({ ...row, firstRunAt: null });
       if (shared.rows.get(row.key) === shape) continue;
       // Tried again on the next change or the next look at the link.
-      if (await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true))) {
+      const synced = await this.withToken(account, (token) => this.server!.syncCloudRoutine(token, row).then(() => true));
+      if (this.destroyed) return;
+      if (synced) {
         shared.rows.set(row.key, shape);
         this.routinesThere.add(row.key);
         this.routinesFailed.delete(row.key);
       } else this.routinesFailed.add(row.key);
     }
     await this.reconcileRoutines(account, shared, rows);
+    if (this.destroyed) return;
     [...this.routinesFailed].filter((key) => !rows.some((row) => row.key === key)).forEach((key) => this.routinesFailed.delete(key));
     if (JSON.stringify([[...this.routinesThere].sort(), [...this.routinesFailed].sort()]) !== before) {
       this.save();
@@ -446,6 +452,7 @@ export class RunnerJobs implements ChatRunner {
   }
 
   destroy(): void {
+    this.destroyed = true;
     clearInterval(this.discoverTimer);
     if (this.timer) clearTimeout(this.timer);
     if (this.linkTimer) clearTimeout(this.linkTimer);
@@ -464,7 +471,9 @@ export class RunnerJobs implements ChatRunner {
     if (!this.server) return null;
     try {
       const token = await this.tokenFor(account);
-      return token && token !== "switched" ? await call(token) : null;
+      if (!token || token === "switched" || this.destroyed) return null;
+      const result = await call(token);
+      return this.destroyed ? null : result;
     } catch {
       console.error("Couldn't reach the runner's jobs.");
       return null;
@@ -472,7 +481,7 @@ export class RunnerJobs implements ChatRunner {
   }
 
   private schedule(): void {
-    if (this.timer || !this.server) return;
+    if (this.destroyed || this.timer || !this.server) return;
     if (![...this.entries.values()].some((entry) => entry.active && entry.jobId && this.mine(entry))) return;
     this.timer = setTimeout(() => {
       this.timer = null;

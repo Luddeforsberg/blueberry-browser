@@ -62,6 +62,44 @@ export const stepsFromRow = (input: unknown): ChatStep[] =>
     .slice(-MAX_STEPS)
     .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true }));
 
+// The database's own limits on what a job writes: `reply_shape`, `error_shape` and `steps_shape` in the migrations. A
+// write over any of them is refused whole, so every one is cut to fit here, and says so, and how a job ended is always
+// saved. Postgres counts characters as code points, so this does too, and never cuts a character in half.
+const MAX_REPLY = 40_000;
+const MAX_ERROR = 500;
+const MAX_STEPS_BYTES = 100_000;
+const CUT_SHORT = " (cut short)";
+const EARLIER_STEPS: ChatStep = { text: "Earlier steps (cut short)", done: true };
+const utf8 = new TextEncoder();
+
+const fitText = (text: string, max: number): string => {
+  if (text.length <= max) return text;
+  const characters = Array.from(text);
+  return characters.length <= max ? text : characters.slice(0, max - CUT_SHORT.length).join("") + CUT_SHORT;
+};
+
+// A step's bytes as Postgres writes the array out, which puts a space after each colon and comma, with its separator.
+const stepBytes = (step: ChatStep) => utf8.encode(JSON.stringify(step)).length + 5;
+
+// The latest steps that fit, after a note that earlier ones were left out.
+const fitSteps = (steps: ChatStep[]): ChatStep[] => {
+  const fitted = steps.map(({ text, done }) => ({ text: fitText(text, MAX_STEP_TEXT), done }));
+  const sizes = fitted.map(stepBytes);
+  let bytes = 2 + sizes.reduce((sum, size) => sum + size, 0);
+  if (fitted.length <= MAX_STEPS && bytes <= MAX_STEPS_BYTES) return fitted;
+  bytes = 2 + stepBytes(EARLIER_STEPS);
+  let first = fitted.length;
+  while (first > 0 && fitted.length - first < MAX_STEPS - 1 && bytes + sizes[first - 1] <= MAX_STEPS_BYTES) bytes += sizes[--first];
+  return [EARLIER_STEPS, ...fitted.slice(first)];
+};
+
+export const fitJobUpdate = <T extends { steps?: ChatStep[]; reply?: string; error?: string }>(update: T): T => ({
+  ...update,
+  ...(update.steps !== undefined ? { steps: fitSteps(update.steps) } : {}),
+  ...(update.reply !== undefined ? { reply: fitText(update.reply, MAX_REPLY) } : {}),
+  ...(update.error !== undefined ? { error: fitText(update.error, MAX_ERROR) } : {}),
+});
+
 // Nobody is at the computer to see what a job does, so it never asks less than the default: "Never ask" becomes "risky".
 export const actionApprovalFromRow = (input: unknown): ActionApproval => (input === "always" ? "always" : "risky");
 

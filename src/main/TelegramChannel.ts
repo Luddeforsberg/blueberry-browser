@@ -70,14 +70,17 @@ interface Saved {
   chatId: number | null;
 }
 
-const sleep = (ms: number, signal: AbortSignal) =>
+// Ends early on abort. Either way the other is undone, so a poller that backs off for long doesn't gather listeners.
+export const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve) => {
     if (signal.aborted || ms <= 0) return resolve();
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => {
+    const wake = () => {
       clearTimeout(timer);
+      signal.removeEventListener("abort", wake);
       resolve();
-    }, { once: true });
+    };
+    const timer = setTimeout(wake, ms);
+    signal.addEventListener("abort", wake, { once: true });
   });
 
 export class TelegramChannel implements PhoneChannel {

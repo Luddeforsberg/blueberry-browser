@@ -1,5 +1,5 @@
 import type { ReplyMessage } from "../../src/main/agent";
-import { actionApprovalFromRow, historyFromRow, type ApprovalToAsk, type CloudJobStatus } from "../../src/main/cloudJobs";
+import { actionApprovalFromRow, fitJobUpdate, historyFromRow, type ApprovalToAsk, type CloudJobStatus } from "../../src/main/cloudJobs";
 import type { ActionApproval } from "../../src/shared/ipc";
 import { GalleryServer, type ServerSession } from "../../src/main/galleryServer";
 import type { ChatStep } from "../../src/shared/library";
@@ -185,15 +185,18 @@ export const supabaseDb = ({ url, key, owner }: DbConfig, auth: RunnerSession, s
         contextId: typeof row.context_id === "string" ? row.context_id : null,
       };
     },
-    update: async (jobId, { status, steps, reply, error, liveView }) =>
-      (await rpc<boolean>("runner_update_job", {
+    // Cut to the row's limits, so a long reply or many steps can't stop how it ended being saved.
+    update: async (jobId, update) => {
+      const { status, steps, reply, error, liveView } = fitJobUpdate(update);
+      return (await rpc<boolean>("runner_update_job", {
         p_job: jobId,
         p_status: status ?? null,
         p_steps: steps ?? null,
         p_reply: reply ?? null,
         p_error: error ?? null,
         p_live_view: liveView ?? null,
-      })) !== false,
+      })) !== false;
+    },
     ask: async (jobId, { kind, text, need, site }) => {
       const id = await rpc<unknown>("runner_ask", { p_job: jobId, p_kind: kind, p_text: text, p_need: need, p_site: site });
       if (typeof id !== "string") throw new DbError(500);

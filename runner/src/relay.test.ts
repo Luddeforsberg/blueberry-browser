@@ -8,7 +8,7 @@ import { UnauthorizedError, type OAuthClientProvider } from "@modelcontextprotoc
 import type { OAuthClientInformationMixed, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { startFakeSupabase } from "../../tests/fakeSupabase";
 import { supabaseDb, runnerSession, type DbConfig } from "./db";
-import { relayApp, relayConfig } from "./relay";
+import { relayApp, relayConfig, startRelay } from "./relay";
 
 // The relay against the real migrations in Postgres, through the fake Supabase: OAuth as the owner, a job started as them,
 // taken by the runner as any other, and nothing that can answer what it asks.
@@ -83,6 +83,20 @@ describe("relayConfig", () => {
     expect(relayConfig({ RELAY_PUBLIC_URL: "http://a.example", RELAY_SECRET: "x".repeat(40) })).toMatch(/https/);
     expect(relayConfig({ RELAY_PUBLIC_URL: "https://a.example/mcp", RELAY_SECRET: "short" })).toMatch(/32/);
     expect(relayConfig({ RELAY_PUBLIC_URL: "https://a.example/mcp", RELAY_SECRET: "x".repeat(40), PORT: "3000" })).toEqual({ origin: "https://a.example", secret: "x".repeat(40), port: 3000 });
+  });
+});
+
+describe("startRelay", () => {
+  it("says it couldn't start when its port is taken, rather than that it's listening", async () => {
+    const taken = createServer();
+    await new Promise<void>((resolve) => taken.listen(0, resolve));
+    const port = (taken.address() as AddressInfo).port;
+    const config = { origin: "https://relay.example", secret: "x".repeat(40), port };
+    try {
+      await expect(startRelay(config, { url: supabase.env.SUPABASE_URL, key: supabase.env.SUPABASE_PUBLISHABLE_KEY, owner: OWNER }, runnerDb)).rejects.toThrow(/EADDRINUSE/);
+    } finally {
+      taken.close();
+    }
   });
 });
 

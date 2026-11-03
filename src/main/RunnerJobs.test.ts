@@ -144,6 +144,28 @@ describe("runner jobs in the app", () => {
     runner.destroy();
   });
 
+  it("uses nothing that comes back after it's destroyed, and asks nothing again", async () => {
+    const { runner, send, server, jobs, changed, finished, holdTokens } = setUp();
+    expect(await send()).toBeNull();
+    await settle();
+    // A poll and a look at the link, each waiting for a token when the app quits.
+    const release = holdTokens();
+    await settle();
+    const linking = runner.refreshLink();
+    const polled = vi.spyOn(server, "cloudJobs");
+    const linked = vi.spyOn(server, "myCloudRunner");
+    jobs.get("job-1")!.row.status = "done";
+    changed.mockClear();
+    runner.destroy();
+    release();
+    await linking;
+    await settle();
+    expect(polled).not.toHaveBeenCalled();
+    expect(linked).not.toHaveBeenCalled();
+    expect(finished).not.toHaveBeenCalled();
+    expect(changed).not.toHaveBeenCalled();
+  });
+
   it("says a runner unlinked elsewhere is why a job wasn't taken, and stops offering it", async () => {
     const { runner, send, link } = setUp();
     await settle();

@@ -199,6 +199,29 @@ describe("Browserbase", () => {
     expect(sessions.canEnd).toBe(false);
   });
 
+  it("releases a session by its saved id at once, even while connecting to it never finishes", async () => {
+    const { calls, send } = stub({
+      "POST /sessions": { status: 201, body: { id: "sess-1", status: "RUNNING", connectUrl: "wss://x" } },
+      "POST /sessions/sess-1": { body: { id: "sess-1", status: "COMPLETED" } },
+    });
+    let connected = () => {};
+    const fake = fakeBrowser();
+    const connect = () => new Promise<Browser>((resolve) => (connected = () => resolve(fake.browser)));
+    const provider = browserbase({ apiKey: "k", projectId: "p", saved: { contextId: "ctx", sessionId: null }, onSaved: () => {}, fetch: send, connect });
+    const sessions = new CloudSessions(provider);
+    sessions.claim("job");
+    const opening = sessions.open("job", "cloud-1", "https://example.com/", { onChange: () => {} }).catch(() => null);
+    await expect.poll(() => provider.hasSession).toBe(true);
+    const ending = sessions.end();
+    const released = () => calls.filter(({ method, url, body }) => method === "POST" && url.endsWith("/sessions/sess-1") && body?.status === "REQUEST_RELEASE");
+    await expect.poll(() => released().length).toBe(1);
+    expect(provider.hasSession).toBe(false);
+    connected();
+    await ending;
+    await opening;
+    expect(sessions.canEnd).toBe(false);
+  });
+
   it("counts a session that has already ended as released", async () => {
     const { send } = stub({
       "POST /sessions/sess-1": { status: 400, body: {} },

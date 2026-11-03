@@ -51,6 +51,7 @@ export class CloudTabs implements ChatCloud {
   // Tabs the user opened to see whether they're signed in, and the site each is for. No job can reach them.
   private readonly checking = new Map<string, string>();
   private readonly logins: CloudLogins;
+  private ending: Promise<void> | null = null;
 
   constructor(
     private readonly file: string,
@@ -340,8 +341,16 @@ export class CloudTabs implements ChatCloud {
     }
   }
 
-  destroy(): void {
-    void this.end();
+  // The window closed or the app is quitting. The session ends at the provider, from its saved id if need be, and
+  // nothing waits on a page or a tab first, as the window may be gone. The same promise however often it's asked, so
+  // Quit can wait for the one the closed window started.
+  destroy(): Promise<void> {
+    this.ending ??= (async () => {
+      this.logins.cancelPending();
+      this.watching = null;
+      await this.sessions?.end();
+    })().catch(() => {});
+    return this.ending;
   }
 }
 

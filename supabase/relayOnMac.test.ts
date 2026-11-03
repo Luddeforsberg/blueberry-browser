@@ -2,6 +2,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { fitJobUpdate } from "../src/main/cloudJobs";
+import type { ChatStep } from "../src/shared/library";
 
 // Relay jobs on the owner's Mac, in real Postgres as Supabase's roles, on top of every migration before it.
 const SUPABASE_STANDINS = `
@@ -27,10 +29,10 @@ const MASCOT = `'{"id":"berry","name":"Berry","sites":[],"tools":["visit","click
 
 describe("relay jobs on the Mac", () => {
   let db: PGlite;
-  const as = async <T = Record<string, unknown>>(uid: string | null, sql: string): Promise<T[]> => {
+  const as = async <T = Record<string, unknown>>(uid: string | null, sql: string, params?: unknown[]): Promise<T[]> => {
     await db.exec(`set test.uid = '${uid ?? ""}'; set role ${uid ? "authenticated" : "anon"};`);
     try {
-      return (await db.query<T>(sql)).rows;
+      return (await db.query<T>(sql, params)).rows;
     } finally {
       await db.exec("reset role");
     }
@@ -162,6 +164,37 @@ describe("relay jobs on the Mac", () => {
     expect((await db.query<{ status: string }>("select status from public.cloud_jobs where id = any($1)", [more])).rows.map(({ status }) => status)).toEqual(Array(4).fill("failed"));
     // Nor did the runner get to read them.
     expect(await as(RUNNER, "select id from public.cloud_jobs where target = 'mac'")).toEqual([]);
+  });
+
+  it("saves the longest reply, error and steps a job can write, once they're cut to fit, from the runner and the Mac", async () => {
+    await one(ALICE, "select public.mac_presence(true)");
+    const cloud = (await start(SECRET, "cloud"))!;
+    expect((await as<{ id: string }>(RUNNER, "select id from public.runner_claim_job()")).map(({ id }) => id)).toEqual([cloud]);
+    const mac = (await start(SECRET, "mac"))!;
+    expect((await as<{ id: string }>(ALICE, "select id from public.mac_claim_job()")).map(({ id }) => id)).toEqual([mac]);
+    // As `supabaseDb` and `GalleryServer.macUpdateJob` send it.
+    const write = (job: string, { steps, reply, error }: { steps?: ChatStep[]; reply?: string; error?: string }) =>
+      as(job === cloud ? RUNNER : ALICE, `select public.${job === cloud ? "runner" : "mac"}_update_job($1, null, $2::jsonb, $3, $4)`, [job, steps ? JSON.stringify(steps) : null, reply ?? null, error ?? null]);
+    const saved = async (job: string) =>
+      (await db.query<{ reply: number; error: number; steps: number }>("select char_length(reply) as reply, char_length(error) as error, jsonb_array_length(steps) as steps from public.cloud_jobs where id = $1", [job])).rows[0];
+    const longSteps = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"🫐".repeat(400)}`, done: true }));
+
+    for (const job of [cloud, mac]) {
+      for (const character of ["a", "🫐"]) {
+        await write(job, { reply: character.repeat(40_000) });
+        expect((await saved(job)).reply).toBe(40_000);
+        await expect(write(job, { reply: character.repeat(40_001) })).rejects.toThrow(/reply_shape/);
+        await write(job, fitJobUpdate({ reply: character.repeat(40_001) }));
+        expect((await saved(job)).reply).toBe(40_000);
+      }
+      await expect(write(job, { error: "x".repeat(501) })).rejects.toThrow(/error_shape/);
+      await expect(write(job, { steps: longSteps })).rejects.toThrow(/steps_shape/);
+      await write(job, fitJobUpdate({ steps: longSteps, error: "x".repeat(501) }));
+      expect(await saved(job)).toMatchObject({ error: 500, steps: expect.any(Number) });
+      // The last write that fits is just under the limit, so the estimate isn't far off it.
+      const bytes = (await db.query<{ bytes: number }>("select octet_length(steps::text) as bytes from public.cloud_jobs where id = $1", [job])).rows[0].bytes;
+      expect(bytes).toBeGreaterThan(98_000);
+    }
   });
 
   it("keeps the presence table to the functions", async () => {

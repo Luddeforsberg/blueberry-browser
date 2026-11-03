@@ -38,6 +38,8 @@ export class Account {
   private session: ServerSession | null = null;
   private problem: string | null = null;
   private refreshing: Promise<string | null> | null = null;
+  // Counts every sign-in and sign-out, so the answer to one that's been overtaken changes nothing.
+  private generation = 0;
 
   constructor(
     // Null when no server is set up, and then nothing here does anything.
@@ -66,13 +68,19 @@ export class Account {
     const address = typeof email === "string" ? email.trim() : "";
     const secret = typeof password === "string" ? password : "";
     if (!address || !secret) return this.say("Enter your email and a password.");
+    const generation = ++this.generation;
     try {
       const session = await call(this.server, address, secret);
+      // Signed out, or in again, while it was on its way. Its session is ended there, as nobody here will use it.
+      if (generation !== this.generation) {
+        if (session) void this.server.signOut(session.accessToken).catch(() => console.error("Couldn't end the session on the server."));
+        return this.state;
+      }
       if (!session) return this.say(CONFIRM_FIRST);
       this.problem = null;
       this.keep(session);
     } catch (error) {
-      return this.say(inWords(error));
+      return generation === this.generation ? this.say(inWords(error)) : this.state;
     }
     this.onChange();
     return this.state;
@@ -80,6 +88,7 @@ export class Account {
 
   // Forgets it here whatever the server says, as nothing else can be done about a server that can't be reached.
   async signOut(): Promise<AccountState> {
+    this.generation++;
     const token = this.session?.accessToken;
     this.session = null;
     this.problem = null;

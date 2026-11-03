@@ -284,6 +284,8 @@ export class CloudSessions {
   // Everything goes: the session at the provider first, then the connection, the pages and the job's claim.
   async end(): Promise<void> {
     this.keepOpen();
+    // Released by its saved id before waiting, so a session that's still starting, and may never finish, stops costing.
+    if (!this.session && this.starting) await this.releaseAtProvider();
     const session = this.session ?? (await this.starting?.catch(() => null)) ?? null;
     await this.releaseAtProvider();
     await session?.close().catch(() => {});
