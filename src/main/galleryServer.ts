@@ -210,9 +210,10 @@ export class GalleryServer {
     await this.request("/rest/v1/rpc/forget_cloud_conversation", { method: "POST", token, body: { p_conversation: id } });
   }
 
-  // The newest jobs that belong to a conversation, so one started or followed up elsewhere shows here. Ids only.
+  // The newest jobs that belong to a conversation, so one started or followed up elsewhere shows here. Ids only. A job
+  // for this Mac is a chat of its own here already, so only the cloud's.
   async cloudConversationJobs(token: string): Promise<{ id: string; conversation_id: string; created_at: string }[]> {
-    const rows = (await this.request<Record<string, unknown>[]>("/rest/v1/cloud_jobs?select=id,conversation_id,created_at&conversation_id=not.is.null&order=created_at.desc&limit=50", { token })) ?? [];
+    const rows = (await this.request<Record<string, unknown>[]>("/rest/v1/cloud_jobs?select=id,conversation_id,created_at&conversation_id=not.is.null&target=eq.cloud&order=created_at.desc&limit=50", { token })) ?? [];
     return rows.filter((row): row is { id: string; conversation_id: string; created_at: string } => typeof row.id === "string" && typeof row.conversation_id === "string" && typeof row.created_at === "string");
   }
 
@@ -226,6 +227,27 @@ export class GalleryServer {
       if (batch.length < CONVERSATION_PAGE) break;
     }
     return rows;
+  }
+
+  // Relay jobs on this Mac, as the signed-in owner. Says that this Mac takes them, or that it stopped.
+  async macPresence(token: string, on: boolean): Promise<void> {
+    await this.request("/rest/v1/rpc/mac_presence", { method: "POST", token, body: { p_on: on } });
+  }
+
+  // The owner's oldest job for the Mac, now theirs to run, or null. Nothing while the switch is off on the server.
+  async macClaimJob(token: string): Promise<Record<string, unknown> | null> {
+    const [row] = (await this.request<Record<string, unknown>[]>("/rest/v1/rpc/mac_claim_job", { method: "POST", token, body: {} })) ?? [];
+    return row && typeof row.id === "string" && typeof row.prompt === "string" ? row : null;
+  }
+
+  // What happened so far on one it took. Null leaves a field as it is. Answers whether to stop.
+  async macUpdateJob(token: string, id: string, update: { status?: string; steps?: unknown[]; reply?: string; error?: string }): Promise<boolean> {
+    const stop = await this.request<unknown>("/rest/v1/rpc/mac_update_job", {
+      method: "POST",
+      token,
+      body: { p_job: id, p_status: update.status ?? null, p_steps: update.steps ?? null, p_reply: update.reply ?? null, p_error: update.error ?? null },
+    });
+    return stop !== false;
   }
 
   // The user's runner: an account of its own, named by email, which counts once the runner has accepted.

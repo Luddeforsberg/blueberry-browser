@@ -127,10 +127,11 @@ export const rpc = (name, body = {}) => asUser(`/rest/v1/rpc/${name}`, { method:
 
 const JOB_COLUMNS = "id,conversation_id,prompt,mascot,status,steps,reply,error,live_view_url,context_id,created_at,updated_at";
 
-// The user's newest jobs, then what each waiting one is asking. The page puts them together into conversations.
+// The user's newest jobs in the cloud, then what each waiting one is asking. The page puts them together into
+// conversations. One run on the Mac is answered there, so it isn't here.
 export const jobs = async () => {
   const me = encodeURIComponent(session?.userId ?? "");
-  const rows = (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&order=created_at.desc&limit=100`)) ?? [];
+  const rows = (await asUser(`/rest/v1/cloud_jobs?select=${JOB_COLUMNS}&owner=eq.${me}&target=eq.cloud&order=created_at.desc&limit=100`)) ?? [];
   const waiting = rows.filter((row) => row.status === "waiting").map((row) => row.id);
   const asks = waiting.length ? ((await rpc("my_cloud_jobs", { p_ids: waiting })) ?? []) : [];
   return rows.map((row) => ({ ...row, ask: asks.find((ask) => ask.id === row.id && typeof ask.approval_id === "string") ?? null }));

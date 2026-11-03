@@ -55,6 +55,8 @@ export interface Settings {
   desktopBerry: boolean;
   // Where along the edge it stands, from 0 to 1. Null until it's been dragged.
   desktopBerrySpot: DesktopBerrySpot | null;
+  // Jobs from ChatGPT or Claude, through the relay, run in this Blueberry while it's open, instead of in the cloud.
+  relayOnMac: boolean;
 }
 
 export type DesktopEdge = "bottom" | "top" | "left" | "right";

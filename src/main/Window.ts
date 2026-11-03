@@ -38,6 +38,7 @@ import { createMcpTools, type McpTool } from "./mcpTools";
 import { readTabText } from "./mcpPages";
 import { CloudTabs } from "./CloudTabs";
 import { RunnerJobs } from "./RunnerJobs";
+import { MacJobs } from "./MacJobs";
 import { confirmCloudLogin, readSiteCookies } from "./cloudLoginAccess";
 import { suggestLoginSites } from "./cloudLogins";
 import {
@@ -138,6 +139,7 @@ export class Window {
   readonly mcp: McpConnector;
   readonly cloud: CloudTabs;
   readonly runnerJobs: RunnerJobs;
+  private readonly macJobs: MacJobs;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -211,6 +213,7 @@ export class Window {
     this.account = new Account(server, join(app.getPath("userData"), "account.json"), () => {
       sendToRenderer(this.chrome.view.webContents, "account:updated", this.account.state);
       this.runnerJobs?.accountChanged();
+      this.macJobs?.sync();
     });
     this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
       this.broadcast("library:updated", this.librarySnapshot);
@@ -268,7 +271,10 @@ export class Window {
       changed: (chatId) => this.chats.runnerChanged(chatId),
       finished: (chatId, result) => this.chats.runnerFinished(chatId, result),
       contextId: () => this.cloud.contextId,
-      runnerUpdated: (state) => sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state),
+      runnerUpdated: (state) => {
+        sendToRenderer(this.chrome.view.webContents, "cloud:runner-updated", state);
+        this.macJobs?.sync();
+      },
       flock: () => this.mascotStore.all(),
       adopt: ({ prompt, mascotId }) => this.chats.adoptRunnerChat(prompt, mascotId),
       followedUp: (chatId, prompt) => this.chats.runnerFollowedUp(chatId, prompt),
@@ -422,6 +428,37 @@ export class Window {
 
     this.mcp = new McpConnector(join(app.getPath("userData"), "mcp.json"), () => this.mcpTools, () => sendToRenderer(this.chrome.view.webContents, "mcp:updated", this.mcp.state));
 
+    // Relay jobs on this Mac, run as an MCP job is: no page, a `from`, and every limit and approval of the chat.
+    this.macJobs = new MacJobs(server, this.account, {
+      enabled: () => this.settings.relayOnMac,
+      linked: () => this.runnerJobs.available(),
+      // The bird from the row only narrows the one here with its id, and one that isn't here doesn't start.
+      start: (prompt, { bird, askAtLeast, from }, onEnd) => {
+        const clean = (text: string) => this.chats.withoutCodes(text);
+        const sent = this.chats.send(null, prompt, {
+          seePage: false,
+          mascotId: bird.id === BERRY.id ? null : bird.id,
+          sites: bird.sites,
+          tools: bird.tools,
+          askAtLeast,
+          from,
+          onEnd: (ended) => onEnd({ ...ended, reply: clean(ended.reply), steps: ended.steps.map((step) => ({ ...step, text: clean(step.text) })), error: ended.error && clean(ended.error) }),
+        });
+        return sent?.id ?? null;
+      },
+      progress: (chatId) => {
+        const chat = this.chats.thread(chatId);
+        if (!chat) return null;
+        const clean = (text: string) => this.chats.withoutCodes(text);
+        return {
+          reply: clean(chat.partial ?? ""),
+          steps: chat.steps.map((step) => ({ ...step, text: clean(step.text) })),
+          waiting: this.chats.waiting().some(({ id }) => id === chatId),
+        };
+      },
+      stop: (chatId) => this.chats.stop(chatId),
+    });
+
     if (restored) this.restoreSession(restored);
     else this.createTab();
     this.updateAllBounds();
@@ -430,6 +467,7 @@ export class Window {
     this.telegram.start();
     this.phone.start();
     this.mcp.start();
+    this.macJobs.start();
 
     this.windowSize = this._baseWindow.getBounds();
     this._baseWindow.on("resize", () => {
@@ -459,6 +497,7 @@ export class Window {
       this.mcp.close();
       this.cloud.destroy();
       this.runnerJobs.destroy();
+      this.macJobs.destroy();
       this.permissionPrompt.destroy();
       session.defaultSession.off("will-download", onDownload);
       offDownloads();
@@ -1312,6 +1351,7 @@ export class Window {
     if (after.onStartup !== before.onStartup) this.saveSessionSoon();
     if (after.suggestions !== before.suggestions) this.publishSuggestions();
     if (after.phoneAlways !== before.phoneAlways) this.phone.sync();
+    if (after.relayOnMac !== before.relayOnMac) this.macJobs.sync();
     this.desktopBerry.sync(after.desktopBerry && !before.desktopBerry);
 
     this.broadcast("settings:updated", after);

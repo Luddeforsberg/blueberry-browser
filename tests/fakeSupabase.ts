@@ -17,6 +17,7 @@ const CLOUD_FUNCTIONS = new Set([
   "runner_claim_job", "runner_update_job", "runner_ask", "runner_decision",
   "sync_cloud_flock", "save_push_subscription", "forget_push_subscription", "runner_push_subscriptions", "runner_forget_push_subscription", "runner_set_relay_url",
   "create_relay_grant", "revoke_relay_grants", "relay_flock", "relay_start_job", "relay_jobs", "relay_stop_job", "relay_revoke_grant",
+  "mac_presence", "mac_claim_job", "mac_update_job",
 ]);
 // Tables the phone page reads with a plain select, as the user each token stands for, so row-level security decides.
 const CLOUD_TABLES = new Set(["cloud_jobs", "cloud_flock"]);
@@ -38,6 +39,7 @@ const cloudDatabase = async () => {
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261104000000_cloud_conversations.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261105000000_cloud_routines.sql"), "utf8"));
   await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261106000000_cloud_relay.sql"), "utf8"));
+  await db.exec(readFileSync(join(__dirname, "../supabase/migrations/20261107000000_relay_on_mac.sql"), "utf8"));
   // One connection, so one call at a time, each with its own role.
   let queue: Promise<unknown> = Promise.resolve();
   const call = (role: string, uid: string | null, name: string, args: Record<string, unknown>) => {
@@ -63,7 +65,7 @@ const cloudDatabase = async () => {
       const columns = params.get("select") ?? "*";
       if (!/^[a-z_,*]+$/.test(columns)) throw Object.assign(new Error("Bad select"), { code: "PGRST100" });
       const values: string[] = [];
-      const filters = ["owner", "id", "conversation_id"].flatMap((column) => {
+      const filters = ["owner", "id", "conversation_id", "target"].flatMap((column) => {
         const filter = params.get(column);
         if (filter === null) return [];
         if (filter === "not.is.null") return [`${column} is not null`];

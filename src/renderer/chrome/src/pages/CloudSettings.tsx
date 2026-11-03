@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import type { CloudLogin, CloudState, RunnerState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
+import { Switch } from '@common/components/Controls'
 import { CopyLink } from '../components/CopyLink'
 import { SettingsRow } from '../components/SettingsRow'
+import { useShell } from '../contexts/ShellContext'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 
@@ -152,6 +154,7 @@ const Runner: React.FC = () => {
 // The address ChatGPT and Claude connect to, which the server in the cloud gives once it has accepted. Signing in there
 // takes this Blueberry account, and nothing else can connect.
 const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
+    const { settings, updateSettings } = useShell()
     const [said, setSaid] = useState<string | null>(null)
     const disconnect = async () => {
         setSaid(null)
@@ -171,6 +174,13 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
             <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
             <li>Sign in with this Blueberry account when it asks.</li>
         </ol>
+        <div className="mt-4 flex items-center gap-6">
+            <div className="flex-1 min-w-0">
+                <h4 id="setting-cloud-relay-mac" className="text-13 font-semibold">Run their jobs on this Mac when it’s on</h4>
+                <p className="mt-0.5 text-13 text-muted-foreground">While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud, and asks you here. They never see the page you’re on.</p>
+            </div>
+            <Switch labelledBy="setting-cloud-relay-mac" checked={settings.relayOnMac} onChange={(relayOnMac) => updateSettings({ relayOnMac })} />
+        </div>
         <Button className="mt-3" variant="outline" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
         {said && <p role="status" className="mt-2 text-13 text-muted-foreground">{said}</p>}
     </div>

@@ -1215,4 +1215,63 @@ describe("Chats", () => {
       expect(threads).toHaveLength(seen);
     });
   });
+
+  describe("a reply that only narrows", () => {
+    const SCOUT: MascotProfile = { ...BERRY, id: "scout", name: "Scout", instructions: "Finds prices.", sites: ["shop.example"], tools: ["visit", "click", "type"], deletedAt: null };
+    const narrowing = () => {
+      const seen: { tools: string[]; asks: string }[] = [];
+      let release = () => {};
+      const stream: StreamReply = async function* (_, __, { tools, actionApproval }) {
+        seen.push({ tools: tools.map(({ name }) => name), asks: actionApproval() });
+        if (seen.length === 1) await new Promise<void>((resolve) => (release = resolve));
+        yield `reply ${seen.length}`;
+      };
+      const store = new ChatStore(":memory:");
+      const chats = new Chats(store, stream, async () => null, {
+        activeTab: () => null,
+        allTabs: () => [],
+        openBackgroundTab: () => tab(),
+        closeTab: () => true,
+        actionApproval: () => "never",
+      }, { onChunk: () => {}, onThread: () => {}, onListChanged: () => {}, onWorkingTabs: () => {} }, (id) => (id === "scout" ? SCOUT : id === null ? BERRY : { ...SCOUT, id, deletedAt: 1 }));
+      return { chats, seen, release: () => release() };
+    };
+
+    it("never gets a tool or a laxer ask than both the bird here and what it was sent with allow", async () => {
+      const { chats, seen, release } = narrowing();
+      chats.send(null, "Look", { seePage: false, mascotId: "scout", tools: ["visit", "read"], askAtLeast: "risky", from: "ChatGPT or Claude" });
+      await vi.waitFor(() => expect(seen).toHaveLength(1));
+      release();
+      expect(seen[0].tools).toEqual(expect.arrayContaining(["open_tab", "read_page"]));
+      expect(seen[0].tools).not.toContain("click");
+      expect(seen[0].tools).not.toContain("type_text");
+      // Asked at least as much as the job says, though the setting here is Never ask.
+      expect(seen[0].asks).toBe("risky");
+      // Berry with fewer tools is limited too.
+      chats.send(null, "Look", { seePage: false, mascotId: null, tools: [], from: "ChatGPT or Claude" });
+      await vi.waitFor(() => expect(seen).toHaveLength(2));
+      expect(seen[1].tools).not.toContain("click");
+      expect(seen[1].tools).not.toContain("open_tab");
+      expect(seen[1].asks).toBe("never");
+    });
+
+    it("refuses a bird that isn't in the flock here", () => {
+      const { chats } = narrowing();
+      expect(chats.send(null, "Look", { seePage: false, mascotId: "gone", from: "ChatGPT or Claude" })).toBeNull();
+    });
+
+    it("tells whoever started a reply how that reply ended, and nothing of a later one", async () => {
+      const { chats, seen, release } = narrowing();
+      const ended = vi.fn();
+      const thread = chats.send(null, "First", { seePage: false, onEnd: ended })!;
+      await vi.waitFor(() => expect(seen).toHaveLength(1));
+      release();
+      await vi.waitFor(() => expect(ended).toHaveBeenCalledTimes(1));
+      expect(ended).toHaveBeenCalledWith({ reply: "reply 1", steps: [], outcome: "done", error: null });
+      chats.send(thread.id, "Then this, only here", { seePage: false });
+      await vi.waitFor(() => expect(chats.isRunning(thread.id)).toBe(false));
+      expect(seen).toHaveLength(2);
+      expect(ended).toHaveBeenCalledTimes(1);
+    });
+  });
 });
