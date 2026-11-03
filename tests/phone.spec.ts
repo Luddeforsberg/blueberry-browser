@@ -322,8 +322,9 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await page.getByRole("link", { name: "Settings" }).click();
     await expect(page.getByText("Signed in as bo@example.com")).toBeVisible();
     await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    const polled = page.waitForResponse((response) => response.url().includes("/rest/v1/cloud_jobs?"));
     await page.getByRole("link", { name: "Jobs" }).click();
-    await page.waitForTimeout(3_500);
+    await polled;
     await expect(page.getByText(/Scout|Penny|shop\.example/)).toHaveCount(0);
 
     // Nothing the user typed into the live view, or the code-shaped answer, ever reached the server.

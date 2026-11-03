@@ -4,6 +4,9 @@
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24"
+  },
   "author": "Ludwig Forsberg",
   "homepage": "https://github.com/Luddeforsberg/blueberry-browser",
   "scripts": {

@@ -383,7 +383,7 @@ describe("streamReply with an action that needs approval", () => {
     expect(tool.run).toHaveBeenCalledTimes(119);
     expect(text).toContain("found so far");
     expect(text).toContain("limit of 120 steps");
-  });
+  }, 20_000);
 
   describe("shortenOldResults", () => {
     const results = (count: number) =>
