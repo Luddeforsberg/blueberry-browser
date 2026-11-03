@@ -18,6 +18,7 @@ import {
   type ModelCall,
 } from "./meter";
 import { writeReport, type RunRecord } from "./report";
+import { recordWithoutQueries } from "./addresses";
 
 const BUDGET_USD = Number(process.env.EVAL_BUDGET ?? 10);
 const JOB_TIMEOUT_MS = 8 * 60_000;
@@ -40,7 +41,7 @@ const saveRun = (record: RunRecord) => {
     (run) => run.job !== record.job || run.run !== record.run,
   );
   // These get committed, so they don't name the folder they ran in.
-  const json = JSON.stringify([...others, record], null, 2).replaceAll(
+  const json = JSON.stringify([...others, recordWithoutQueries(record)], null, 2).replaceAll(
     process.cwd(),
     "<repo>",
   );
