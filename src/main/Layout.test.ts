@@ -78,12 +78,30 @@ describe("computeLayout", () => {
     const size = { width: 1280, height: 800 };
 
     expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 56 });
+    // Off a Mac, the menu button is kept clear too, left of the system's buttons.
     expect(computeLayout(size, { ...both, platform: "win32" }).controls).toEqual({
-      x: 1142,
+      x: 1102,
       y: 0,
-      width: 138,
+      width: 178,
       height: 56,
     });
+  });
+
+  it("puts the menu button left of the window buttons off a Mac, centred in the top row", () => {
+    const size = { width: 1280, height: 800 };
+
+    expect(computeLayout(size, both).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 12, width: 32, height: 32 });
+    expect(computeLayout(size, { ...both, platform: "win32", mode: "horizontal" }).menuButton).toEqual({ x: 1106, y: 4, width: 32, height: 32 });
+    // Linux has no window buttons here, so it's in the corner.
+    expect(computeLayout(size, { ...both, platform: "linux" })).toMatchObject({
+      controls: { x: 1240, width: 40 },
+      menuButton: { x: 1244, width: 32 },
+    });
+    // Inside what the chrome keeps clear, at the smallest window too.
+    const smallest = computeLayout({ width: 900, height: 600 }, { ...both, platform: "win32" });
+    expect(smallest.menuButton.x).toBeGreaterThanOrEqual(smallest.controls.x);
+    expect(smallest.menuButton.x + smallest.menuButton.width).toBeLessThanOrEqual(900 - 138);
   });
 
   it("never returns a negative size when the window is smaller than the chrome", () => {
@@ -103,6 +121,7 @@ describe("computeLayout", () => {
         layout.chat,
         layout.page,
         layout.controls,
+        layout.menuButton,
       ]) {
         expect(rect.width).toBeGreaterThanOrEqual(0);
         expect(rect.height).toBeGreaterThanOrEqual(0);

@@ -1192,6 +1192,64 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
 });
 
+test("in the tab row at the smallest window, the active tab has as much room for its title, and a crowded row shows icons", async () => {
+  await setContentSize(900, 600);
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
+  await openFixture("/a");
+  await openFixture("/b");
+  for (const page of ["history", "downloads", "settings"] as const) await chrome.evaluate((page) => window.chromeAPI.browser.openPage(page), page);
+  const row = chrome.getByRole("list", { name: "Tabs" });
+  const titles = () =>
+    row.getByRole("listitem").evaluateAll((items) =>
+      items.map((item) => ({
+        active: !!item.querySelector("[aria-current]"),
+        width: item.getBoundingClientRect().width,
+        title: item.querySelector("button span.truncate")!.getBoundingClientRect().width,
+      }))
+    );
+
+  await expect.poll(async () => (await titles()).length).toBe(6);
+  const six = await titles();
+  const others = six.filter((tab) => !tab.active).map((tab) => tab.title);
+  // The bird perches on the active tab and its close button always shows, so it's wider to make up for them.
+  expect(six.find((tab) => tab.active)!.title).toBeGreaterThanOrEqual(Math.min(...others) - 1);
+  expect(Math.min(...others)).toBeGreaterThan(40);
+
+  for (let i = 0; i < 4; i++) await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
+  await expect.poll(async () => (await titles()).filter((tab) => !tab.active).every((tab) => tab.width < 72 && tab.title <= 1)).toBe(true);
+  // Only the icon shows, and the title is still its name.
+  await expect(row.getByRole("button", { name: "History", exact: true })).toBeVisible();
+  const history = row.getByRole("listitem").filter({ has: chrome.getByRole("button", { name: "History", exact: true }) });
+  await expect(history.getByRole("button", { name: "Close History" })).toBeHidden();
+  await history.hover();
+  await expect(history.getByRole("button", { name: "Close History" })).toBeVisible();
+});
+
+test("off a Mac, the menu button opens the app's own menu just under itself", async () => {
+  const button = chrome.getByRole("button", { name: "Menu", exact: true });
+  if (process.platform === "darwin") return void (await expect(button).toHaveCount(0));
+  await app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu()!;
+    menu.popup = (options) => {
+      (globalThis as { popped?: unknown }).popped = { x: options?.x, y: options?.y, window: !!options?.window };
+    };
+  });
+
+  for (const layoutMode of ["vertical", "horizontal"] as const) {
+    await chrome.evaluate((layoutMode) => window.chromeAPI.settings.updateSettings({ layoutMode }), layoutMode);
+    const { menuButton, controls } = await chrome.evaluate(() => window.chromeAPI.layout.getLayout());
+    // Where the layout puts it, inside the room kept clear left of the window buttons.
+    await expect.poll(() => button.boundingBox()).toEqual(menuButton);
+    expect(menuButton.x).toBeGreaterThanOrEqual(controls.x);
+    await app.evaluate(() => void ((globalThis as { popped?: unknown }).popped = null));
+    await button.click();
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as { popped?: unknown }).popped))
+      .toEqual({ x: menuButton.x, y: menuButton.y + menuButton.height, window: true });
+  }
+});
+
 test("the sidebar and chat resize within their limits, by pointer or keyboard", async () => {
   const [width] = await setContentSize(1400, 700);
   expect(width).toBeGreaterThanOrEqual(1400);
@@ -1514,6 +1572,24 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   await chrome.mouse.move(a.x + 20, a.y + a.height / 2);
   await chrome.mouse.down();
   await chrome.mouse.move(c.x + 20, a.y + a.height / 2, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(tabOrder).toEqual(["/b", "new-tab", "/a"]);
+
+  // The active tab is wider than the others in the row, so a drop goes by each tab's own size.
+  const back = (await strip.nth(2).boundingBox())!;
+  await chrome.mouse.move(back.x + 20, back.y + back.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(back.x - 800, back.y + back.height / 2, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
+  const wide = (await strip.nth(0).boundingBox())!;
+  const third = (await strip.nth(2).boundingBox())!;
+  expect(wide.width).toBeGreaterThan(third.width);
+  // Just past half of the third tab, which is less than one and a half of the wide tab's widths.
+  const along = third.x + third.width / 2 - (wide.x + wide.width) + 10;
+  await chrome.mouse.move(wide.x + 20, wide.y + wide.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(wide.x + 20 + along, wide.y + wide.height / 2, { steps: 8 });
   await chrome.mouse.up();
   await expect.poll(tabOrder).toEqual(["/b", "new-tab", "/a"]);
 });

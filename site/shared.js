@@ -223,6 +223,27 @@ var conversationsOf = (jobs) => {
   return [...groups].map(([id, grouped]) => ({ id, jobs: grouped, latest: grouped.at(-1) })).sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at));
 };
 
+// src/shared/phoneCalls.ts
+var CALL_DEADLINE_MS = 15e3;
+var RUNNER_LINK_EVERY_MS = 6e4;
+var fetchWithin = async (url, init, ms = CALL_DEADLINE_MS, fetcher = fetch) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    const response = await fetcher(url, { ...init, signal: controller.signal });
+    return { ok: response.ok, status: response.status, text: await response.text() };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+var oneAtATime = (work) => {
+  let out = null;
+  return () => out ??= work().finally(() => {
+    out = null;
+  });
+};
+var runnerLinkDue = (checkedAt, now) => checkedAt === null || now - checkedAt >= RUNNER_LINK_EVERY_MS;
+
 // src/renderer/chrome/src/siteNames.ts
 var siteParts = (text) => {
   const parts = [];
@@ -260,13 +281,16 @@ export {
   asContinuation,
   conversationIdOf,
   conversationsOf,
+  fetchWithin,
   flockFromRows,
   followUpHistory,
   isUuid,
   mascotSnapshot,
+  oneAtATime,
   parsePublishedRow,
   permissionsInWords,
   plainFromMarkdown,
   plausibleCode,
+  runnerLinkDue,
   withSiteNames
 };

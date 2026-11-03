@@ -63,6 +63,7 @@ h2:first-child { padding-top: 0; }
 .button.quiet:hover { background: rgb(var(--muted)); color: rgb(var(--foreground)); }
 .button.wide { width: 100%; min-height: 44px; font-size: 16px; }
 .button.icon-only { width: 36px; padding: 0; }
+.button.back { gap: 2px; padding-left: 4px; }
 .button:focus-visible, a:focus-visible, .row:focus-visible, .perch button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 

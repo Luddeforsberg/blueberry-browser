@@ -128,6 +128,8 @@ export class EventManager {
 
     this.handle("layout:resize", (panel, width) => this.mainWindow.resizePanel(panel, width));
 
+    this.handle("layout:app-menu", () => this.mainWindow.showAppMenu());
+
     this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
 
     this.handle("overlay:hide", () => this.mainWindow.hideFloatingSidebar());
@@ -170,6 +172,7 @@ export class EventManager {
     this.handle("cloud:runner-unlink", () => this.mainWindow.runnerJobs.unlinkRunner());
     this.handle("cloud:relay-disconnect", () => this.mainWindow.runnerJobs.disconnectRelay());
     this.handle("cloud:watch", (tabId) => this.mainWindow.cloud.watch(tabId));
+    this.handle("cloud:fit", (tabId, width, height) => this.mainWindow.cloud.fit(tabId, width, height));
     this.handle("cloud:take-over", (tabId) => this.mainWindow.cloud.takeOver(tabId));
     this.handle("cloud:login-suggestions", () => this.mainWindow.cloudLoginSuggestions());
     this.handle("cloud:bring-login", (site) => this.mainWindow.cloud.bringLogin(site));

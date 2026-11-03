@@ -18,6 +18,8 @@ import { localChrome } from "./localChrome";
 const MAX_FIELD_LENGTH = 200;
 const NOT_SAFE = "This computer can't keep the key encrypted, so it wasn't saved.";
 const NOT_SAVED = "The key couldn't be saved.";
+// What a cloud tab may ask its page's viewport to be, in pixels.
+const FIT = { min: { width: 320, height: 200 }, max: { width: 3840, height: 2160 } };
 
 interface Saved extends BrowserbaseSaved {
   apiKey: string | null;
@@ -48,6 +50,9 @@ export class CloudTabs implements ChatCloud {
   private problem: string | null = null;
   private readonly taken = new Set<string>();
   private watching: CdpTab | null = null;
+  // The size the chrome last asked for, for a page a job is working in. A job's input aims at fixed points, so the page
+  // only changes size once the job lets go of it.
+  private readonly pendingFits = new Map<string, { width: number; height: number }>();
   // Tabs the user opened to see whether they're signed in, and the site each is for. No job can reach them.
   private readonly checking = new Map<string, string>();
   private readonly logins: CloudLogins;
@@ -150,6 +155,7 @@ export class CloudTabs implements ChatCloud {
     (this.sessions?.pageIds ?? []).forEach((id) => this.hooks.closeTab(id));
     this.taken.clear();
     this.checking.clear();
+    this.pendingFits.clear();
     await this.sessions?.end();
     this.changed();
     return this.state;
@@ -166,7 +172,9 @@ export class CloudTabs implements ChatCloud {
   }
 
   release(jobId: string): void {
+    const pages = this.sessions?.pagesOf(jobId).map(({ id }) => id) ?? [];
     this.sessions?.release(jobId);
+    pages.forEach((id) => void this.applyFit(id));
   }
 
   async open(jobId: string, url: string, allows?: (url: string) => boolean): Promise<CdpTab> {
@@ -211,6 +219,7 @@ export class CloudTabs implements ChatCloud {
   tabClosed(id: string): void {
     const wasUsers = this.taken.delete(id);
     this.checking.delete(id);
+    this.pendingFits.delete(id);
     // The user may still have another tab there, which keeps it open.
     if (wasUsers && this.taken.size === 0) this.sessions?.endWhenIdle();
     if (this.watching?.id === id) void this.watch(null);
@@ -242,12 +251,30 @@ export class CloudTabs implements ChatCloud {
     });
   }
 
+  // The chrome says how big the tab shows the page, and the page's viewport follows, as a window's own tab does on a resize.
+  async fit(id: unknown, width: unknown, height: unknown): Promise<void> {
+    const page = typeof id === "string" ? this.page(id) : null;
+    if (!page || typeof width !== "number" || typeof height !== "number" || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    const within = (value: number, axis: "width" | "height") => Math.round(Math.min(Math.max(value, FIT.min[axis]), FIT.max[axis]));
+    this.pendingFits.set(page.id, { width: within(width, "width"), height: within(height, "height") });
+    await this.applyFit(page.id);
+  }
+
+  private async applyFit(id: string): Promise<void> {
+    const size = this.pendingFits.get(id);
+    const page = this.page(id);
+    if (!size || !page || (this.sessions?.usedBy(id) && !this.taken.has(id))) return;
+    this.pendingFits.delete(id);
+    await page.fitTo(size.width, size.height);
+  }
+
   takeOver(id: unknown): boolean {
     if (typeof id !== "string" || !this.page(id)) return false;
     this.taken.add(id);
     this.sessions?.keepOpen();
     this.hooks.takenOver(id);
     this.changed();
+    void this.applyFit(id);
     return true;
   }
 

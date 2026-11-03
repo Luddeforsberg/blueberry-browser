@@ -1,5 +1,5 @@
 import { appearance, setAppearance } from "../theme.js";
-import { asContinuation, BERRY_ID, conversationsOf, flockFromRows, followUpHistory, permissionsInWords, plausibleCode, mascotSnapshot, withSiteNames } from "../shared.js";
+import { asContinuation, BERRY_ID, conversationsOf, flockFromRows, followUpHistory, oneAtATime, permissionsInWords, plausibleCode, runnerLinkDue, mascotSnapshot, withSiteNames } from "../shared.js";
 import * as api from "./api.js";
 import { POSES } from "./poses.js";
 import { pushState, register, turnOff, turnOn } from "./push.js";
@@ -62,6 +62,7 @@ const svg = (tag, attrs = {}, ...children) => {
 // Lucide's shapes, drawn here so the page loads nothing from elsewhere.
 const ICONS = {
   next: ["m9 18 6-6-6-6"],
+  back: ["m15 18-6-6 6-6"],
   cloud: ["M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"],
   lock: ["M7 11V7a5 5 0 0 1 10 0v4", "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"],
   unlocked: ["M7 11V7a5 5 0 0 1 9.9-1", "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"],
@@ -95,7 +96,8 @@ const bird = (mascot, mood, size = "") => {
 };
 
 const button = (text, { kind = "", onClick } = {}) => el("button", { type: "button", className: `button ${kind}`, textContent: text, onclick: onClick });
-const link = (text, href, kind = "") => el("a", { className: `button ${kind}`, href, textContent: text });
+// Back to the list from any other screen, with a chevron like the rows that lead away from it.
+const back = () => el("a", { className: "button quiet back", href: "#" }, icon("back"), "Jobs");
 const top = (...children) => el("header", { className: "top" }, ...children);
 const card = (...children) => el("main", { className: "card" }, ...children);
 const say = (words, kind = "muted") => el("p", { className: kind, role: kind.includes("warning") ? "alert" : undefined, textContent: words });
@@ -194,10 +196,14 @@ const saying = (words) => {
 
 // --- Loading ---
 
+// When the page last heard whether a runner is linked. Linking or unlinking happens on the Mac, so it asks again now and then.
+let linkCheckedAt = null;
+
 const load = async () => {
   const asked = api.sessionVersion();
   try {
-    const [jobs, flock, linked] = await Promise.all([api.jobs(), api.flock(), state.linked === null ? api.runner() : Promise.resolve(undefined)]);
+    const askLink = state.linked === null || runnerLinkDue(linkCheckedAt, Date.now());
+    const [jobs, flock, linked] = await Promise.all([api.jobs(), api.flock(), askLink ? api.runner() : Promise.resolve(undefined)]);
     // Someone signed out or in while it was asking, so none of this is theirs.
     if (api.sessionVersion() !== asked) return;
     // A new question takes the place of whatever was said about the last one.
@@ -206,15 +212,19 @@ const load = async () => {
     state.jobs = jobs;
     state.flock = flockFromRows(flock);
     state.flockShared = flock.map((row) => row.updated_at).sort().at(-1) ?? null;
-    if (linked !== undefined) state.linked = linked?.accepted === true;
+    if (linked !== undefined) {
+      state.linked = linked?.accepted === true;
+      linkCheckedAt = Date.now();
+    }
     state.problem = null;
   } catch (error) {
     if (api.sessionVersion() === asked) state.problem = problemWords(error);
   }
 };
 
+// One poll at a time: one asked for while another is out is that one, so there's only ever one timer going.
 let timer = null;
-const poll = async () => {
+const poll = oneAtATime(async () => {
   clearTimeout(timer);
   if (!api.signedIn()) return show();
   if (document.visibilityState === "visible") {
@@ -222,9 +232,12 @@ const poll = async () => {
     show();
   }
   timer = setTimeout(poll, POLL_MS);
-};
+});
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") void poll();
+  if (document.visibilityState !== "visible") return;
+  // Coming back after a while, the link may have changed on the Mac.
+  linkCheckedAt = null;
+  void poll();
 });
 
 // --- Signing in ---
@@ -353,7 +366,7 @@ const listScreen = () => {
 const APPEARANCES = [["system", "System"], ["light", "Light"], ["dark", "Dark"]];
 
 const settingsScreen = () => [
-  top(link("Jobs", "#", "quiet"), el("span", { className: "title", textContent: "Settings" })),
+  top(back(), el("span", { className: "title", textContent: "Settings" })),
   card(
     el("section", { className: "setting", ariaLabelledby: "appearance" },
       el("h2", { id: "appearance", textContent: "Appearance" }),
@@ -564,7 +577,7 @@ const exchange = (job, newest) => {
 };
 
 const chatScreen = (conversation) => {
-  if (!conversation) return [top(link("Jobs", "#", "quiet")), card(say(state.jobs === null ? "Loading…" : "This conversation isn’t on your account any more."))];
+  if (!conversation) return [top(back()), card(say(state.jobs === null ? "Loading…" : "This conversation isn’t on your account any more."))];
   const job = conversation.latest;
   const mascot = mascotOf(job);
   const ask = askOf(job);
@@ -579,7 +592,7 @@ const chatScreen = (conversation) => {
     show(true);
   };
   return [
-    top(link("Jobs", "#", "quiet"), el("span", { className: "title" }), going(job) ? button("Stop", { kind: "outline", onClick: stop }) : null),
+    top(back(), el("span", { className: "title" }), going(job) ? button("Stop", { kind: "outline", onClick: stop }) : null),
     card(
       ...conversation.jobs.flatMap((one) => el("div", { className: "exchange" }, ...exchange(one, one === job))),
       ...(going(job) ? liveView(job, mascot, ask) : [followUp(conversation, mascot)])),
@@ -629,7 +642,7 @@ const startScreen = () => {
     : "Only Berry is here. Your other birds show once Blueberry on your Mac is signed in and set up to keep going in the cloud.";
   setTimeout(() => box.focus(), 0);
   return [
-    top(link("Cancel", "#", "quiet")),
+    top(back()),
     el("main", { className: "card start" },
       el("div", { className: "composer" }, box),
       el("h2", { textContent: "Who goes" }),

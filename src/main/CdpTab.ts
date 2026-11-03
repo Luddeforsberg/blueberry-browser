@@ -412,6 +412,14 @@ export class CdpTab implements PageTarget {
     return this.fetching;
   }
 
+  // The page's viewport, set to the size the user sees it at.
+  async fitTo(width: number, height: number): Promise<void> {
+    if (this.closed) return;
+    const now = this.page.viewportSize();
+    if (now?.width === width && now.height === height) return;
+    await this.page.setViewportSize({ width, height }).catch(() => {});
+  }
+
   // Pictures of the page as it changes, for the user's screen and nothing else. Null stops them.
   async watch(onFrame: ((jpeg: string) => void) | null): Promise<void> {
     const was = this.screencast;

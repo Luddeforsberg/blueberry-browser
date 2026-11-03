@@ -249,6 +249,12 @@ export class CloudSessions {
     return [...this.pages.keys()];
   }
 
+  // The job working in a page now: the one that opened it, while it still has the session.
+  usedBy(id: string): string | null {
+    const jobId = this.pages.get(id)?.jobId;
+    return jobId && jobId === this.owner ? jobId : null;
+  }
+
   pagesOf(jobId: string): CdpTab[] {
     return [...this.pages.values()].filter((page) => page.jobId === jobId && !page.tab.isClosed).map(({ tab }) => tab);
   }
