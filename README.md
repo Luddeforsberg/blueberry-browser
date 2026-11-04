@@ -8,51 +8,41 @@ An AI browser that works on your behalf. Grow a flock of birds for the jobs you 
 
 ## What it does
 
-Blueberry is a browser first, designed for the Mac: tabs, history, bookmarks, downloads, find, zoom and site permissions, in a window made to look like the skin of a blueberry. Berry, a jackdaw with a blueberry in its beak, lives in the chat panel and on the new tab page, and does jobs in the browser when you ask.
+Blueberry is a browser first, designed for the Mac: tabs, history, bookmarks, downloads, find, zoom and site permissions, in a window made to look like the skin of a blueberry. Berry, a jackdaw with a blueberry in its beak, does jobs in the browser when you ask, and you can grow a flock of other birds beside it, each with its own name, look, instructions and limits.
 
-### The flock
+Strawberry has all of that too. The sections below are where Blueberry tries to do better than Strawberry does today, each starting from what's missing there. What I say about Strawberry is how I understand it as of November 2026.
 
-Berry is the first of a flock. Each bird has a name, a look, instructions and limits: which sites it may use, and whether it may go to pages, click and type. Limits only take away. A bird limited to two sites can't read or open anything else, and no bird has a setting that skips an approval. Chats and routines run as whichever bird you choose.
+### Jobs that keep going when you leave
 
-### The Gallery
+Strawberry's routines run on your own computer, so they only run while it's on and awake, which makes them much less useful than they sound. In Blueberry a job or a routine can run in a browser in the cloud instead, on Browserbase, with the sign-ins you chose to bring along, and a runner on Railway keeps it going with the Mac closed. The phone page follows those jobs from anywhere: start one as any bird, watch the live view, answer what it asks, or take over for a sign-in. Strawberry has nothing like it on the phone.
 
-Starter birds for work, such as Prospector, Meeting Prep and Competitor Watch, come with the app. With a server set up, people can sign in, publish their own, and browse what others published. Every entry shows its permissions in plain words before you add it, and a copy is yours from then on. Each published bird has a public page on the site, whose Open in Blueberry button hands the app a `blueberry://mascot/<id>` link. A link only opens the review, and never adds or runs anything.
+### Answering from your phone
 
-### Suggestions
+Strawberry marks a chat that needs you, for a sign-in or anything else, but only on the computer. A job that stops for a 2FA code while you're at lunch has wasted the hour. In Blueberry, everything a job waits on is in one Needs you list, and with your own Telegram bot connected, the same items reach your phone: Allow and Don't allow as buttons, a reply for a question, and a code typed straight into the page without the model seeing it. That makes it practical to leave several jobs running at once and walk away. Telegram is one channel behind a small interface, so iMessage or WhatsApp could follow, and so could sign-ins from the phone.
 
-The new tab page offers work it noticed you trying to get done: a search you repeat, the same pricing pages checked every week, a routine that keeps failing. A cheap model reads a digest of your recent browsing, chats and routine results, at most about once an hour, and proposes work citing items in it. Code then checks each proposal: the items it cites must exist, and the sites, the numbers in what the card says, and any schedule must come from them. A suggestion only fills in a prompt, a routine or a new bird for you to confirm. To start with something on the first day, onboarding and Settings can bring in the last 90 days of history from Chrome, Arc, Brave or Edge.
+### Your birds, from ChatGPT and Claude
+
+Strawberry lets you connect MCP servers to it, but it isn't one itself, so nothing else can use it. Most people will keep ChatGPT or Claude open next to whatever browser they use, so Blueberry doesn't try to replace them. It gives them your browser. Claude Code and Claude Desktop on the same computer can hand whole jobs to your birds over MCP, and with the runner deployed, so can ChatGPT and Claude on the web, even from your phone with the Mac off. The chat keeps its threads and plans, the bird brings your logins and what it sees in the browser, and every job runs with the bird's limits and approvals. Both get better: the chat app can act in your real browser, and the bird gets the context of everything you planned there. You get something out of Blueberry without switching browsers all at once, which also fits where Strawberry seems to be heading, as an agent platform rather than only a browser.
 
 ### Show Berry how
 
-Press it, do the job once, and press Stop. Berry writes up what it saw as notes you can read and trim, then a cheap model turns them into a routine: a name, numbered steps and the values that might change. Its sites come from the notes, and a run can't go anywhere else. It watches only the tab in front, only between start and Stop, and never keeps what's typed into a password or payment field.
+Strawberry's advice for making a routine is to talk it through with your companion, which still means describing the job well enough in words, and that's harder than doing it. It has no built-in way to just show it. In Blueberry you press Show Berry how, do the job once, and press Stop. Berry writes up what it saw as notes you can read and trim, and a cheap model turns them into a routine with numbered steps and the values that might change. It watches only the tab in front, only between start and Stop, and never keeps what's typed into a password or payment field.
 
-### Routines
+### The Gallery
 
-A routine is instructions, a bird and a schedule: when you ask, once, daily, weekly or monthly. A run works like a chat with no page, opens its own tabs behind you and closes them when it ends. Each keeps its last 50 runs with their steps and reports.
+Strawberry gives each companion a public page you can send to someone, and nine official companions to pick from, but there's nowhere to browse what other people made. That's a real gap: a new user often can't see why they'd want more than one assistant. The Gallery shows them, and it doubles as marketing, since people share their birds and see how often they're added. It has starter birds for work, such as Prospector, Meeting Prep and Competitor Watch, and, with a server set up, the birds other people published. Every entry shows its instructions and permissions word for word before you add it, and the copy is yours from then on. Each published bird also has a public page you can send to a colleague, whose Open in Blueberry button opens its review in the app through a `blueberry://` link. A link never adds or runs anything.
 
-### Working behind you
+### Suggestions that keep coming
 
-Tabs a bird opens stay behind the one you're on, so you keep browsing while it works. Clicking, typing or navigating in one of its tabs takes it over, and the bird leaves it alone. In the main chat, the working view beside the conversation shows a live picture of the job's tab with the bird working in it. On the page itself the bird flies to what it's about to click and pecks it before the real click, and Stop Berry sits in the toolbar where no page can reach it.
-
-### Needs you
-
-Every approval, question and sign-in waiting on you is on one page, as a plain list. A sign-in, code or captcha is handed to you in its tab, and the bird can't see that tab until you press I'm done. With your own Telegram bot connected, the same items from jobs on this computer reach your phone while Blueberry is open: Allow and Don't allow as buttons, a reply to answer a question, and a code typed straight into the page by code the model can't call.
-
-### The cloud
-
-With a Browserbase API key and project id in Settings > Cloud, a bird can work in a browser in the cloud instead, watched live in a cloud tab and taken over the same way. You can bring chosen sites' sign-ins along, one site at a time, after Touch ID or a confirm. With a Supabase project and the runner deployed on Railway, cloud jobs and scheduled routines keep going with the Mac closed. The phone page at `site/app/` follows them from anywhere: start a job as any bird, answer approvals, take over the live view for a sign-in, and get a notification that only says "Berry needs you" or "Berry finished". See [runner/README.md](runner/README.md).
-
-### From other AI apps
-
-Settings > Claude lets Claude Code, Claude Desktop and other apps on the same computer hand whole jobs to your birds over MCP, on 127.0.0.1 with a token. With the runner deployed, its relay lets ChatGPT and Claude on the web start jobs too, after you sign in with OAuth, and those jobs run in the cloud, or on your Mac while Blueberry is open and a switch in Settings allows it. In every case the job is an ordinary chat with the usual limits, and the app that started it can't allow anything.
-
-### What a bird remembers
-
-When you say something is a habit ("I always", "from now on") or ask it to remember, one quiet line under the reply offers to keep it. Nothing is kept until you say yes. Each bird's page in Flock shows every word it remembers, to edit or forget, and later jobs say what they went in with. Memory stays on this computer, apart from the bird, so it never goes with a copy or anything published.
+Strawberry's suggestions mostly happen once, at onboarding. Its companion reads your imported history and what you tell it, then suggests your role, apps to connect and a first task, and the Routines page offers routine ideas such as a morning summary or industry news. As far as I know, none of it keeps changing as you work, and nothing suggests a new companion. In Blueberry, suggestions on the new tab page keep coming from what you actually do. At most about once an hour, a cheap model reads a digest of your recent browsing, chats and routine runs and proposes a prompt, a routine or a new bird, and code checks each one against what it cites before it shows. They change as your week does. On the first day, Blueberry can bring in the last 90 days of history from Chrome, Arc, Brave or Edge, so the first suggestions are already about you.
 
 ### Berry on the desktop
 
-Turned on in Settings, the bird waits tucked behind an edge of the screen, above every app. `⌥Space` opens a prompt from anywhere, and the job runs in the browser where you're signed in. It never reads the screen, the clipboard or another app.
+In Strawberry, work starts inside the browser, but most work happens in other apps. Turned on in Settings, Berry waits tucked behind an edge of the screen, above every app, and `⌥Space` gives it a job from anywhere. The job runs in the browser where you're signed in. It never reads the screen, the clipboard or another app. It's a first step toward an agent that isn't tied to one window, and it could grow into working on the desktop itself, if the agent platform matters more than the browser.
+
+### The rest
+
+The flock itself, routines on a schedule, jobs that work in tabs behind yours with a live picture of them beside the chat, and birds that keep a habit only when you say yes and show every word they keep. Strawberry has all of these, and they work much the same here. Blueberry needs them because everything above is built on them. The same goes for the safety rules below, which every AI browser needs.
 
 ## Safety
 
