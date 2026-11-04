@@ -16,7 +16,7 @@ const useMcp = () => {
     return [state, setState] as const
 }
 
-const timeOf = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+const timeOf = (at: number) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
 // The snippet shows the key hidden. Copying puts the real one on the clipboard from main, so it never reaches this page.
 const Snippet: React.FC<{ snippet: McpSnippet }> = ({ snippet }) => {

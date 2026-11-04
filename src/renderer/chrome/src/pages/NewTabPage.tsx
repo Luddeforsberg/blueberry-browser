@@ -26,7 +26,7 @@ const TRAY_BUTTON = cn(
 const WORK_CARDS = 3
 
 const timeOf = (visitedAt: number) =>
-    new Date(visitedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    new Date(visitedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
 // A heading, one smart input and recent work. Recent only lists pages really visited.
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {

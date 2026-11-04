@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Bird, ChevronDown, Cloud, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage, TabInfo } from '@shared/ipc'
@@ -262,6 +262,26 @@ export const ChatRow: React.FC<{
     )
 }
 
+// Whether a scrolling list has rows below what shows.
+const useMoreBelow = () => {
+    const list = useRef<HTMLDivElement>(null)
+    const [moreBelow, setMoreBelow] = useState(false)
+    const check = () => {
+        const element = list.current
+        if (element) setMoreBelow(element.scrollTop + element.clientHeight < element.scrollHeight - 1)
+    }
+    useEffect(() => {
+        const element = list.current
+        if (!element) return
+        const observer = new ResizeObserver(check)
+        observer.observe(element)
+        // The rows' own wrapper, since adding a tab changes what scrolls but not the list's size.
+        if (element.firstElementChild) observer.observe(element.firstElementChild)
+        return () => observer.disconnect()
+    }, [])
+    return { list, moreBelow, check }
+}
+
 // `floating` is the collapsed sidebar shown over the page, where the button pins it open again.
 export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) => {
     const { layout, theme, toggleSidebar } = useShell()
@@ -293,6 +313,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
     const [top, setTop] = useState(0)
     useLayoutEffect(() => setTop(nav.current?.getBoundingClientRect().top ?? 0), [])
     const above = layout.addressRow.y - (floating ? layout.floatingSidebar.y : layout.sidebar.y) - top
+    const { list, moreBelow, check } = useMoreBelow()
 
     return (
         <nav ref={nav} aria-label="Sidebar" className="h-full flex flex-col">
@@ -320,45 +341,55 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 />
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-2">
-                <Cluster />
-                <ul aria-label="Places">
-                    <SidebarRow leading={<Plus className={ICON} />} label="New tab" onClick={() => createTab()} />
-                    <SidebarRow
-                        muted={library.needsYou.length === 0}
-                        leading={<Hand className={ICON} />}
-                        label="Needs you"
-                        trailing={<NeedsYouCount />}
-                        open={isOpen('needs-you')}
-                        onClick={() => void browser.openPage('needs-you')}
-                    />
-                    <SidebarRow
-                        muted
-                        leading={<RefreshCw className={ICON} />}
-                        label="Routines"
-                        trailing={<RoutineDot />}
-                        open={isOpen('routines')}
-                        onClick={() => void browser.openPage('routines')}
-                    />
-                    <SidebarRow
-                        muted
-                        leading={<Bird className={ICON} />}
-                        label="Flock"
-                        open={isOpen('flock')}
-                        onClick={() => void browser.openPage('flock')}
-                    />
-                </ul>
-
-                {library.chats.length > 0 && (
-                    // Collapsed, the open chat stays, since Tabs doesn't list it.
-                    <Section id="sidebar-chats" title="Chats" collapsible whenClosed={openChat && <ul>{chatRow(openChat)}</ul>}>
-                        <ul>{library.chats.map(chatRow)}</ul>
-                    </Section>
+            {/* While rows go on below, the cut one fades out, so none looks as if it's under Settings. */}
+            <div
+                ref={list}
+                onScroll={check}
+                className={cn(
+                    "flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-2",
+                    moreBelow && "[mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent)]"
                 )}
+            >
+                <div>
+                    <Cluster />
+                    <ul aria-label="Places">
+                        <SidebarRow leading={<Plus className={ICON} />} label="New tab" onClick={() => createTab()} />
+                        <SidebarRow
+                            muted={library.needsYou.length === 0}
+                            leading={<Hand className={ICON} />}
+                            label="Needs you"
+                            trailing={<NeedsYouCount />}
+                            open={isOpen('needs-you')}
+                            onClick={() => void browser.openPage('needs-you')}
+                        />
+                        <SidebarRow
+                            muted
+                            leading={<RefreshCw className={ICON} />}
+                            label="Routines"
+                            trailing={<RoutineDot />}
+                            open={isOpen('routines')}
+                            onClick={() => void browser.openPage('routines')}
+                        />
+                        <SidebarRow
+                            muted
+                            leading={<Bird className={ICON} />}
+                            label="Flock"
+                            open={isOpen('flock')}
+                            onClick={() => void browser.openPage('flock')}
+                        />
+                    </ul>
 
-                <Section id="sidebar-tabs" title="Tabs">
-                    <Tabs mode="vertical" labelledBy="sidebar-tabs" showNew={false} />
-                </Section>
+                    {library.chats.length > 0 && (
+                        // Collapsed, the open chat stays, since Tabs doesn't list it.
+                        <Section id="sidebar-chats" title="Chats" collapsible whenClosed={openChat && <ul>{chatRow(openChat)}</ul>}>
+                            <ul>{library.chats.map(chatRow)}</ul>
+                        </Section>
+                    )}
+
+                    <Section id="sidebar-tabs" title="Tabs">
+                        <Tabs mode="vertical" labelledBy="sidebar-tabs" showNew={false} />
+                    </Section>
+                </div>
             </div>
 
             <ul className="shrink-0 p-2">
