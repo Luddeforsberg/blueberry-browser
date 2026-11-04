@@ -88,6 +88,8 @@ cp .env.example .env    # set LLM_PROVIDER and one key, OPENAI_API_KEY or ANTHRO
 pnpm dev
 ```
 
+A packaged app (`pnpm exec electron-builder --dir`) doesn't bundle `.env`. It reads it from its user data folder, `~/Library/Application Support/blueberry-browser/.env` on a Mac, so copy it there.
+
 That's the whole browser, with Berry, the flock, routines, Suggestions, Show Berry how, Needs you and the bundled Gallery. The rest needs something set up:
 
 - **Accounts and publishing to the Gallery** need a Supabase project with the migrations in `supabase/migrations`, and `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in `.env`.
