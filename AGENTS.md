@@ -40,7 +40,7 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-e
 - `src/main`: the Electron main process. `Window` owns a `BaseWindow` with one window-sized chrome view underneath, one `WebContentsView` per tab above it, an overlay view on top for the collapsed sidebar when it floats over the page, and another for the find bar (`src/main/FindBar.ts`).
 - `src/main/Layout.ts`: the only place that decides where regions go. `Window` places the tab views with it and sends it to the chrome renderer, which draws each region at those rects. Don't hard-code sizes anywhere else.
 - `src/shared/ipc.ts`: the one IPC contract. Every channel, its arguments, its result and which chrome view may call it live here. Add a channel here first, then to `CHANNEL_REGIONS` in `src/main/ipc.ts`, and then to the preload.
-- `src/preload`: one sandboxed preload per chrome view, typed against the contract. The `.d.ts` files beside them expose those types to the renderers.
+- `src/preload`: one sandboxed preload, `chrome.ts`, shared by every chrome view and typed against the contract. `chrome.d.ts` beside it exposes those types to the renderers.
 - `src/main/EventManager.ts`: registers every IPC handler, and rejects calls from any view or frame other than the one the contract names.
 - `src/shared/library.ts`: what the sidebar and pages show, all of it saved locally.
 - `src/main/BookmarkStore.ts`: one list of saved sites in a JSON file. There are two of them, `bookmarks.json` and `pinned.json`, and the chrome's `useSavedSites` puts them together for the cluster and the bookmarks bar.

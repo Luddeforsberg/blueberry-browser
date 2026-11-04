@@ -20,7 +20,7 @@ Starter birds for work, such as Prospector, Meeting Prep and Competitor Watch, c
 
 ### Suggestions
 
-The new tab page offers work it noticed you trying to get done: a search you repeat, fares compared across sites, a routine that keeps failing. A cheap model reads a digest of your recent browsing, chats and routine results, at most about once an hour, and proposes work citing items in it. Code then checks each proposal: the items it cites must exist, and the sites, the numbers in what the card says, and any schedule must come from them. A suggestion only fills in a prompt, a routine or a new bird for you to confirm. To start with something on the first day, onboarding and Settings can bring in the last 90 days of history from Chrome, Arc, Brave or Edge.
+The new tab page offers work it noticed you trying to get done: a search you repeat, the same pricing pages checked every week, a routine that keeps failing. A cheap model reads a digest of your recent browsing, chats and routine results, at most about once an hour, and proposes work citing items in it. Code then checks each proposal: the items it cites must exist, and the sites, the numbers in what the card says, and any schedule must come from them. A suggestion only fills in a prompt, a routine or a new bird for you to confirm. To start with something on the first day, onboarding and Settings can bring in the last 90 days of history from Chrome, Arc, Brave or Edge.
 
 ### Show Berry how
 
