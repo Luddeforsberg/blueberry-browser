@@ -1,7 +1,7 @@
 {
   "name": "blueberry-browser",
   "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "description": "An AI browser with a flock of birds that do web work for you and ask before anything risky",
   "main": "./out/main/index.js",
   "packageManager": "pnpm@12.16.1",
   "engines": {

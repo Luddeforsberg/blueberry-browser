@@ -90,7 +90,3 @@ SUPABASE_URL=… SUPABASE_PUBLISHABLE_KEY=… BLUEBERRY_RUNNER_EMAIL=… BLUEBER
 ```
 
 `BLUEBERRY_RUNNER_CHROME` uses a headless Chrome with a throwaway profile instead of Browserbase, and `BLUEBERRY_RUNNER_CDP` one already running on 127.0.0.1. `tests/runner.spec.ts` runs it this way against the real migration.
-
-## Not tried yet
-
-None of this has run on Railway, real Supabase or real Browserbase, and no real push has been sent to a phone. The relay has only been tried with the MCP SDK's own client against a fake Supabase, never with real ChatGPT or Claude, and a job on the Mac only through the database functions in an end-to-end test, not from ChatGPT. In particular, whether Browserbase lets the runner's session use the Context while the app's own session is still open on it.

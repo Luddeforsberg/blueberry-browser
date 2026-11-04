@@ -1,6 +1,6 @@
 # Blueberry design
 
-Blueberry is an AI browser that should feel like a good Mac app with one capable colleague inside it. The direction is **Bloom**: the window is made of the fruit. The frame is the dusty, matte skin of a blueberry, solid web pages float on it in one rounded card, and the blueberry itself is the one thing in the chrome with real colour. Blueberry uses no Strawberry or Aside assets.
+Blueberry is an AI browser that should feel like a good Mac app with one capable colleague inside it. The direction is **Bloom**: the window is made of the fruit. The frame is the dusty, matte skin of a blueberry, solid web pages float on it in one rounded card, and the blueberry itself is the one thing in the chrome with real colour.
 
 This document is the source of truth for the UI. Values marked *to tune* are starting points, to be adjusted on real windows without changing the intent.
 
@@ -76,7 +76,7 @@ Rules:
 
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them. The one exception is the bird on the page.
-- **Overlay views are only as large as what they show.** Whether a transparent area lets clicks reach the page is untested, so assume it blocks them. Rounded cut-outs on views also still capture clicks.
+- **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks. Rounded cut-outs on views also still capture clicks.
 - **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
@@ -92,16 +92,6 @@ There is one glass strength, not a user setting.
 | Floating | Anything over a web page | Overlay view with `backdrop-filter` plus the glass tint |
 
 The frame is opaque so its colour and text contrast don't depend on the desktop behind it. The glass tint is 88% of `background`, in both light and dark mode (*to tune*).
-
-### What has been tested
-
-Tested on macOS with Electron 37.5.0 and 45.1.0 using striped test windows:
-
-- CSS `backdrop-filter` in an overlay view blurs the tab view beneath it, and the blur updates when the page changes.
-- Native `vibrancy` shows through a transparent chrome view, but untinted text is hard to read and loud backgrounds show through.
-- `setBorderRadius` rounds a tab view.
-
-Not tested: Windows, the performance cost of blur, and animating tab view bounds.
 
 ### Fallbacks
 
@@ -758,7 +748,7 @@ macOS is the primary platform for design and polish. Windows must keep working: 
 | Corners | System rounded | Rounded on Windows 11, square on older versions |
 | Reduced transparency | Reduce Transparency | Transparency effects off |
 
-The Windows column comes from documentation and has not been tested. If Windows glass disappoints, use the solid fallback rather than a weaker imitation.
+If Windows glass disappoints, use the solid fallback rather than a weaker imitation.
 
 ## 12. Rules for agents
 

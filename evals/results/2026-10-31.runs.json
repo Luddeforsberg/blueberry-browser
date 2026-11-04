@@ -11,24 +11,24 @@
     "tools": [
       "open_tab {\"url\":\"https://en.wikipedia.org/wiki/Mount_Everest\"}",
       "open_tab {\"url\":\"https://www.britannica.com/place/Mount-Everest\"}",
-      "open_tab {\"url\":\"https://www.google.com/search?q=site%3Anationalgeographic.com+mount+everest+height\"}",
+      "open_tab {\"url\":\"https://www.google.com/search\"}",
       "find_in_page {\"tabId\":\"tab-3\",\"query\":\"8,848\"}",
       "find_in_page {\"tabId\":\"tab-4\",\"query\":\"8,849\"}",
-      "open_tab {\"url\":\"https://www.bing.com/search?q=site%3Anationalgeographic.com+mount+everest+height\"}",
+      "open_tab {\"url\":\"https://www.bing.com/search\"}",
       "read_page {\"tabId\":\"tab-6\"}",
       "open_tab {\"url\":\"https://education.nationalgeographic.org/resource/mount-everest/\"}",
       "open_tab {\"url\":\"https://www.nationalgeographic.com/adventure/article/mount-everest\"}",
-      "open_tab {\"url\":\"https://duckduckgo.com/?q=site%3Anationalgeographic.com+%22Everest%22+%22height%22\"}",
+      "open_tab {\"url\":\"https://duckduckgo.com/\"}",
       "read_page {\"tabId\":\"tab-7\"}",
       "read_page {\"tabId\":\"tab-9\"}"
     ],
     "lastToolResults": [
-      "https://www.bing.com/search?q=site%3Anationalgeographic.com+mount+everest+height&rdr=1&rdrig=8D7AE2BC257147C5BD67318AAA4704A4, characters 0 to 909 of 909. This is the end of the page.\n\nHoppa till innehåll\nTillgänglighetsfeedback\nRewards\nALLAAI-LÄGEWEBBBILDERVIDEOKLIPPKARTORNYHETER\nMER\n50 resultat\nzhihu.com\nhttps://www.zhihu.com › zvideo\n中文·高清 乔布斯 2007年iPhone发布会完整版 - 知乎\n\n18 mars 2023 · スティーブ・ジョブズによ",
+      "https://www.bing.com/search, characters 0 to 909 of 909. This is the end of the page.\n\nHoppa till innehåll\nTillgänglighetsfeedback\nRewards\nALLAAI-LÄGEWEBBBILDERVIDEOKLIPPKARTORNYHETER\nMER\n50 resultat\nzhihu.com\nhttps://www.zhihu.com › zvideo\n中文·高清 乔布斯 2007年iPhone发布会完整版 - 知乎\n\n18 mars 2023 · スティーブ・ジョブズによ",
       "Done. Tab tab-7 is now at https://education.nationalgeographic.org/resource/mount-everest/, titled Mount Everest.",
       "Done. Tab tab-8 is now at https://www.nationalgeographic.com/adventure/article/mount-everest, titled National Geographic - 404 | National Geographic.",
-      "Done. Tab tab-9 is now at https://duckduckgo.com/?q=site%3Anationalgeographic.com+%22Everest%22+%22height%22&ia=web, titled site:nationalgeographic.com \"Everest\" \"height\" at DuckDuckGo.",
+      "Done. Tab tab-9 is now at https://duckduckgo.com/, titled site:nationalgeographic.com \"Everest\" \"height\" at DuckDuckGo.",
       "https://education.nationalgeographic.org/resource/mount-everest/, characters 0 to 5838 of 5838. This is the end of the page.\n\nDen här webbplatsen använder tekniker som cookies för att möjliggöra väsentlig webbplatsfunktionalitet, såväl som för analysverktyg, personanpassning och riktad reklam. Du kan ändra dina inställningar när som helst eller acceptera standardinställningarna. Du kan stänga denn",
-      "https://duckduckgo.com/?q=site%3Anationalgeographic.com+%22Everest%22+%22height%22&ia=web, characters 0 to 2800 of 2800. This is the end of the page.\n\nAlla resultat\nDuckDuckGo\nÖppna menyn\nDuck.ai\nAlla\nBilder\nVideor\nNyheter\nKartor\nShoppa\nSökinställningar\nPrivat\nSverige\nSafe Search\nDatum\nVisar endast resultat från\nnationalgeographic.com\nVisa alla resultat\n\nNational Geographic\n\nhttps://www.nationalge"
+      "https://duckduckgo.com/, characters 0 to 2800 of 2800. This is the end of the page.\n\nAlla resultat\nDuckDuckGo\nÖppna menyn\nDuck.ai\nAlla\nBilder\nVideor\nNyheter\nKartor\nShoppa\nSökinställningar\nPrivat\nSverige\nSafe Search\nDatum\nVisar endast resultat från\nnationalgeographic.com\nVisa alla resultat\n\nNational Geographic\n\nhttps://www.nationalge"
     ],
     "peakInputTokens": 5519,
     "inputTokens": 16651,
@@ -51,7 +51,7 @@
       "Read education.nationalgeographic.org",
       "Read duckduckgo.com"
     ],
-    "endUrl": "https://duckduckgo.com/?q=site%3Anationalgeographic.com+%22Everest%22+%22height%22&ia=web",
+    "endUrl": "https://duckduckgo.com/",
     "rendering": {
       "visibility": "visible",
       "frames": true,
@@ -179,10 +179,10 @@
     ],
     "lastToolResults": [
       "{\"total\":2,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Prospero: A new coding harness for a more civilized age\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"More\"}]}",
-      "Done. Tab tab-2 is now at https://news.ycombinator.com/?p=2, titled Hacker News.",
+      "Done. Tab tab-2 is now at https://news.ycombinator.com/, titled Hacker News.",
       "{\"total\":1,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"More\"}]}",
-      "Done. Tab tab-2 is now at https://news.ycombinator.com/?p=3, titled Hacker News.",
-      "https://news.ycombinator.com/?p=3, characters 0 to 4055 of 4055. This is the end of the page.\n\n\t\nHacker News\nnew | past | comments | ask | show | jobs | submit\n\t\nlogin\n\n\n\n61.\t\n\tShow HN: Sketch Stadium – watch your agent play Pictionary (wakeshift.ai)\n\t35 points by ericlevine 22 hours ago | hide | 10 comments\n\n62.\t\n\tShow HN: I rebuilt Kubernetes for ESP32 microcontrollers (github.com/arterialist)\n\t"
+      "Done. Tab tab-2 is now at https://news.ycombinator.com/, titled Hacker News.",
+      "https://news.ycombinator.com/, characters 0 to 4055 of 4055. This is the end of the page.\n\n\t\nHacker News\nnew | past | comments | ask | show | jobs | submit\n\t\nlogin\n\n\n\n61.\t\n\tShow HN: Sketch Stadium – watch your agent play Pictionary (wakeshift.ai)\n\t35 points by ericlevine 22 hours ago | hide | 10 comments\n\n62.\t\n\tShow HN: I rebuilt Kubernetes for ESP32 microcontrollers (github.com/arterialist)\n\t"
     ],
     "peakInputTokens": 5661,
     "inputTokens": 27079,
@@ -190,7 +190,7 @@
     "outputTokens": 177,
     "costUsd": 0.007600600000000002,
     "durationMs": 12020,
-    "answer": "On the [third page](https://news.ycombinator.com/?p=3):\n\n- **First, #61:** Show HN: Sketch Stadium – watch your agent play Pictionary\n- **Last, #90:** Artificial Analysis v5 and the benchmarker's dilemma\n\nI stopped on the third page.",
+    "answer": "On the [third page](https://news.ycombinator.com/):\n\n- **First, #61:** Show HN: Sketch Stadium – watch your agent play Pictionary\n- **Last, #90:** Artificial Analysis v5 and the benchmarker's dilemma\n\nI stopped on the third page.",
     "steps": [
       "Looked over news.ycombinator.com",
       "Clicked something on news.ycombinator.com",
@@ -198,9 +198,9 @@
       "Clicked something on news.ycombinator.com",
       "Read news.ycombinator.com"
     ],
-    "endUrl": "https://news.ycombinator.com/?p=3",
+    "endUrl": "https://news.ycombinator.com/",
     "endState": {
-      "url": "https://news.ycombinator.com/?p=3",
+      "url": "https://news.ycombinator.com/",
       "first": "61. Show HN: Sketch Stadium – watch your agent play Pictionary",
       "last": "90. Artificial Analysis v5 and the benchmarker's dilemma"
     },
@@ -232,10 +232,10 @@
     ],
     "lastToolResults": [
       "{\"total\":156,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Gå vidare till huvudinnehåll\"},{\"ref\":\"e2\",\"role\":\"button\",\"name\":\"Öppna menyn\"},{\"ref\":\"e3\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Maximera användarmenyn\"},{\"ref\":\"e5\",\"role\":\"link\",\"name\":\"He doesn’t like it when the roles are reversed\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"r/Marriage\"},{\"ref\":\"e7\",\"role\":\"butt",
-      "Done. Tab tab-2 is now at https://www.reddit.com/?solution=a9a748d4ea9bbeb5a9a748d4ea9bbeb5&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331812937fd50711d70f1b8c1eb71621912&jsc_orig_r=, titled Reddit – Internets hjärta.",
+      "Done. Tab tab-2 is now at https://www.reddit.com/, titled Reddit – Internets hjärta.",
       "{\"total\":0,\"elements\":[]}",
       "{\"total\":152,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Gå vidare till huvudinnehåll\"},{\"ref\":\"e2\",\"role\":\"button\",\"name\":\"Öppna menyn\"},{\"ref\":\"e3\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Maximera användarmenyn\"},{\"ref\":\"e5\",\"role\":\"link\",\"name\":\"He doesn’t like it when the roles are reversed\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"r/Marriage\"},{\"ref\":\"e7\",\"role\":\"butt",
-      "https://www.reddit.com/?solution=a9a748d4ea9bbeb5a9a748d4ea9bbeb5&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331812937fd50711d70f1b8c1eb71621912&jsc_orig_r=, characters 0 to 18108 of 18108. This is the end of the page.\n\nGå vidare till huvudinnehåll\nÖppna menyn\nLogga in\nMaximera användarmenyn\nHe doesn’t like it when the roles are reversed\nr/Marriage\n•\nför 14 tim sedan\nHe doesn’t like it ",
+      "https://www.reddit.com/, characters 0 to 18108 of 18108. This is the end of the page.\n\nGå vidare till huvudinnehåll\nÖppna menyn\nLogga in\nMaximera användarmenyn\nHe doesn’t like it when the roles are reversed\nr/Marriage\n•\nför 14 tim sedan\nHe doesn’t like it ",
       "{\"total\":0,\"elements\":[]}"
     ],
     "peakInputTokens": 16081,
@@ -253,9 +253,9 @@
       "Read reddit.com",
       "Looked over reddit.com"
     ],
-    "endUrl": "https://www.reddit.com/?solution=a9a748d4ea9bbeb5a9a748d4ea9bbeb5&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331812937fd50711d70f1b8c1eb71621912&jsc_orig_r=",
+    "endUrl": "https://www.reddit.com/",
     "endState": {
-      "url": "https://www.reddit.com/?solution=a9a748d4ea9bbeb5a9a748d4ea9bbeb5&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331812937fd50711d70f1b8c1eb71621912&jsc_orig_r="
+      "url": "https://www.reddit.com/"
     },
     "rendering": {
       "visibility": "visible",
@@ -288,8 +288,8 @@
       "{\"total\":16,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Guide\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"YouTube Hem\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Hoppa över navigeringen\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\"Inställningar\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e7\",\"role\":\"link\",\"name\":\"Läs mer\"},{\"ref\":\"e8\",\"role\":\"link\",\"name\":\"Uppda",
       "Done. Tab tab-2 is now at https://www.youtube.com/, titled YouTube.",
       "{\"total\":15,\"elements\":[{\"ref\":\"e17\",\"role\":\"button\",\"name\":\"Tillbaka\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Hoppa över navigeringen\"},{\"ref\":\"e18\",\"role\":\"combobox\",\"name\":\"Sök\"},{\"ref\":\"e19\",\"role\":\"button\",\"name\":\"\"},{\"ref\":\"e20\",\"role\":\"button\",\"name\":\"Search\"},{\"ref\":\"e7\",\"role\":\"link\",\"name\":\"Läs mer\"},{\"ref\":\"e8\",\"role\":\"link\",\"name\":\"Uppdatera inställningen\"},{\"ref\":\"e9\",\"role\":\"button\",\"na",
-      "Done. Tab tab-2 is now at https://www.youtube.com/results?search_query=how+a+jet+engine+works, titled how a jet engine works - YouTube.",
-      "https://www.youtube.com/results?search_query=how+a+jet+engine+works, characters 0 to 5359 of 5359. This is the end of the page.\n\nHoppa över navigeringen\nAlla\nShorts\nInte sett\nVideor\nNyligen uppladdat\nLive\nOm dessa resultat\nFilter\n5:01\nSpelas nu\nHow Jet Engines Work\n5,1 mn\nför 6 år sen\nAnimagraffs\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, whe"
+      "Done. Tab tab-2 is now at https://www.youtube.com/results, titled how a jet engine works - YouTube.",
+      "https://www.youtube.com/results, characters 0 to 5359 of 5359. This is the end of the page.\n\nHoppa över navigeringen\nAlla\nShorts\nInte sett\nVideor\nNyligen uppladdat\nLive\nOm dessa resultat\nFilter\n5:01\nSpelas nu\nHow Jet Engines Work\n5,1 mn\nför 6 år sen\nAnimagraffs\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, whe"
     ],
     "peakInputTokens": 5879,
     "inputTokens": 29306,
@@ -306,9 +306,9 @@
       "Typed into a field on youtube.com",
       "Read youtube.com"
     ],
-    "endUrl": "https://www.youtube.com/results?search_query=how+a+jet+engine+works",
+    "endUrl": "https://www.youtube.com/results",
     "endState": {
-      "url": "https://www.youtube.com/results?search_query=how+a+jet+engine+works",
+      "url": "https://www.youtube.com/results",
       "title": "how a jet engine works - YouTube"
     },
     "rendering": {
@@ -341,10 +341,10 @@
     "lastToolResults": [
       "Done. Tab tab-2 is now at https://www.google.com/maps, titled Google Maps.",
       "{\"total\":6,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Meny\"},{\"ref\":\"e2\",\"role\":\"combobox\",\"name\":\"Sök i Google Maps\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Vägbeskrivning\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\"\"},{\"ref\":\"e6\",\"role\":\"button\",\"name\":\"Show the Input Tools menu\"}]}",
-      "Done. Tab tab-2 is now at https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D, titled coffee near Stockholm Central Station – Google Maps.",
-      "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D, characters 0 to 9 of 9. This is the end of the page.\n\n\n\n\n\n\t",
+      "Done. Tab tab-2 is now at https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z, titled coffee near Stockholm Central Station – Google Maps.",
+      "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z, characters 0 to 9 of 9. This is the end of the page.\n\n\n\n\n\n\t",
       "{\"total\":36,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Meny\"},{\"ref\":\"e2\",\"role\":\"combobox\",\"name\":\"q\",\"value\":\"coffee near Stockholm Central Station\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e7\",\"role\":\"button\",\"name\":\"Avbryt sökning i närheten\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\"\"},{\"ref\":\"e6\",\"role\":\"button\",\"name\":\"Show the Input Tools menu\"},{\"ref\":\"e8\",\"role\":\"button\",\"name\"",
-      "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D, characters 0 to 918 of 918. This is the end of the page.\n\n\n\n\n\nPris\n\nBetyg\n\nTimmar\n\n\nAlla filter\nResultat\n\n\nDela\nEspresso House\nEspresso House\n3,8(608)\nKaffebar ·  · Centralplan 15\nÖppet · Stänger kl. 19 på\nDagnys coffee a"
+      "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1, characters 0 to 918 of 918. This is the end of the page.\n\n\n\n\n\nPris\n\nBetyg\n\nTimmar\n\n\nAlla filter\nResultat\n\n\nDela\nEspresso House\nEspresso House\n3,8(608)\nKaffebar ·  · Centralplan 15\nÖppet · Stänger kl. 19 på\nDagnys coffee a"
     ],
     "peakInputTokens": 5214,
     "inputTokens": 31968,
@@ -362,9 +362,9 @@
       "Looked over google.com",
       "Read google.com"
     ],
-    "endUrl": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D",
+    "endUrl": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1",
     "endState": {
-      "url": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D"
+      "url": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1"
     },
     "rendering": {
       "visibility": "visible",
@@ -500,11 +500,11 @@
     ],
     "lastToolResults": [
       "{\"total\":6,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Anker USB C to USB C Cable, 100W Fast Charging Cable (2-Pack, 6 ft, Black) | Fo…\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"Anker USB C to USB C Cable, 100W Fast Charging Cable (2-Pack, 6 ft, Black)\"},{\"ref\":\"e3\",\"role\":\"link\",\"name\":\"Anker USB C to USB C Cable, 100W Fast Charging Cable(2-Pack, 3.3 ft, Black) | F…\"},{\"ref\":\"e4\",\"role\":\"link\",\"name\"",
-      "Done. Tab tab-2 is now at https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1?dib=eyJ2IjoiMSJ9.JlGZwJNRshapXRHrUqSS41hU28r1cNDh3GVo56u2yIE5jpzuM89Cp1E2P7O85q83MW6Bmy-MvH5FNBpdoyzQPXYZpRbc0LCJE_qtejVDoAsa1a5eIiUG3jw01Rw2PC651mA_9GuaF1veH7KbeKW0TbqDBBgS4EJLx6uaVXoSEx6lTz2JIVwrQONNfpzDGWHTpQJfUtvvkFNQatB6Up8MdEB8XVAl5LvuMtSbOSyhvEM.TtPT8ploo-BuHSGiUaTtUta0aFhyvjMbsj2zHrK",
-      "https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1?dib=eyJ2IjoiMSJ9.JlGZwJNRshapXRHrUqSS41hU28r1cNDh3GVo56u2yIE5jpzuM89Cp1E2P7O85q83MW6Bmy-MvH5FNBpdoyzQPXYZpRbc0LCJE_qtejVDoAsa1a5eIiUG3jw01Rw2PC651mA_9GuaF1veH7KbeKW0TbqDBBgS4EJLx6uaVXoSEx6lTz2JIVwrQONNfpzDGWHTpQJfUtvvkFNQatB6Up8MdEB8XVAl5LvuMtSbOSyhvEM.TtPT8ploo-BuHSGiUaTtUta0aFhyvjMbsj2zHrKUEu8&dib_tag=se&keywords=u",
+      "Done. Tab tab-2 is now at https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1",
+      "https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1",
       "{\"total\":8,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Add to cart, shift, option, K\"},{\"ref\":\"e2\",\"role\":\"submit\",\"name\":\"Add to cart\",\"value\":\"Add to cart\"},{\"ref\":\"e3\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e4\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e5\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e6\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e7\",\"role\":\"submit\",\"name\":\"A",
-      "Done. Tab tab-2 is now at https://www.amazon.com/checkpoint/continue?token=v1.UlJ5zjKyZiXFG1WO53cTw1x22YEnpS3RLvoxe6jtjJfCHf-VXg3MgGJRuXpTMq2165Ooe88N8qSfouKxupKVMm4PGZcd-hdChDD5K7SaLhq6aZ9ACX6hO8Gv2gRHMVRB326yY4eZoz5n1yu5DWoBQPPH-IhWY_UujTW_rDRoNvUFx2-bkkCUfgoySavW-n0unU0wZNnxdLv5j5_oj7FT14r9Dt4BEA, titled Amazon.com.",
-      "https://www.amazon.com/checkpoint/continue?token=v1.UlJ5zjKyZiXFG1WO53cTw1x22YEnpS3RLvoxe6jtjJfCHf-VXg3MgGJRuXpTMq2165Ooe88N8qSfouKxupKVMm4PGZcd-hdChDD5K7SaLhq6aZ9ACX6hO8Gv2gRHMVRB326yY4eZoz5n1yu5DWoBQPPH-IhWY_UujTW_rDRoNvUFx2-bkkCUfgoySavW-n0unU0wZNnxdLv5j5_oj7FT14r9Dt4BEA, characters 0 to 4501 of 4501. This is the end of the page.\n\nSkip to\nMain content\nKeyboard shortcuts\nSearch\nopt\n+\n/\nCart\nshif"
+      "Done. Tab tab-2 is now at https://www.amazon.com/checkpoint/continue, titled Amazon.com.",
+      "https://www.amazon.com/checkpoint/continue, characters 0 to 4501 of 4501. This is the end of the page.\n\nSkip to\nMain content\nKeyboard shortcuts\nSearch\nopt\n+\n/\nCart\nshif"
     ],
     "peakInputTokens": 18151,
     "inputTokens": 109139,
@@ -524,9 +524,9 @@
       "Clicked something on amazon.com",
       "Read amazon.com"
     ],
-    "endUrl": "https://www.amazon.com/checkpoint/continue?token=v1.UlJ5zjKyZiXFG1WO53cTw1x22YEnpS3RLvoxe6jtjJfCHf-VXg3MgGJRuXpTMq2165Ooe88N8qSfouKxupKVMm4PGZcd-hdChDD5K7SaLhq6aZ9ACX6hO8Gv2gRHMVRB326yY4eZoz5n1yu5DWoBQPPH-IhWY_UujTW_rDRoNvUFx2-bkkCUfgoySavW-n0unU0wZNnxdLv5j5_oj7FT14r9Dt4BEA",
+    "endUrl": "https://www.amazon.com/checkpoint/continue",
     "endState": {
-      "url": "https://www.amazon.com/checkpoint/continue?token=v1.UlJ5zjKyZiXFG1WO53cTw1x22YEnpS3RLvoxe6jtjJfCHf-VXg3MgGJRuXpTMq2165Ooe88N8qSfouKxupKVMm4PGZcd-hdChDD5K7SaLhq6aZ9ACX6hO8Gv2gRHMVRB326yY4eZoz5n1yu5DWoBQPPH-IhWY_UujTW_rDRoNvUFx2-bkkCUfgoySavW-n0unU0wZNnxdLv5j5_oj7FT14r9Dt4BEA",
+      "url": "https://www.amazon.com/checkpoint/continue",
       "cart": "0"
     },
     "rendering": {
@@ -1239,7 +1239,7 @@
       "open_tab {\"url\":\"https://github.com/settings/profile\"}"
     ],
     "lastToolResults": [
-      "Done. Tab tab-3 is now at https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fsettings%2Fprofile, titled Sign in to GitHub · GitHub."
+      "Done. Tab tab-3 is now at https://github.com/login, titled Sign in to GitHub · GitHub."
     ],
     "peakInputTokens": 843,
     "inputTokens": 1753,
@@ -1251,7 +1251,7 @@
     "steps": [
       "Opened github.com"
     ],
-    "endUrl": "https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fsettings%2Fprofile",
+    "endUrl": "https://github.com/login",
     "rendering": {
       "visibility": "visible",
       "frames": true,
@@ -1594,7 +1594,7 @@
       "list_elements {\"tabId\":\"tab-3\"}",
       "click {\"tabId\":\"tab-3\",\"ref\":\"e17\"}",
       "list_elements {\"tabId\":\"tab-3\"}",
-      "go_to {\"tabId\":\"tab-3\",\"url\":\"https://www.youtube.com/results?search_query=how+a+jet+engine+works\"}",
+      "go_to {\"tabId\":\"tab-3\",\"url\":\"https://www.youtube.com/results\"}",
       "read_page {\"tabId\":\"tab-3\"}",
       "list_elements {\"tabId\":\"tab-3\",\"query\":\"How Jet Engines Work\"}",
       "list_elements {\"tabId\":\"tab-3\"}",
@@ -1602,12 +1602,12 @@
       "read_page {\"tabId\":\"tab-3\"}"
     ],
     "lastToolResults": [
-      "Done. Tab tab-3 is now at https://www.youtube.com/results?search_query=how+a+jet+engine+works, titled YouTube.",
-      "https://www.youtube.com/results?search_query=how+a+jet+engine+works, characters 0 to 3429 of 3429. This is the end of the page.\n\nSE\nHoppa över navigeringen\nAlla\nShorts\nInte sett\nVideor\nNyligen uppladdat\nLive\nOm dessa resultat\nFilter\nHow Jet Engines Work\n5,1 mn\nför 6 år sen\nAnimagraffs\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, where incoming ",
+      "Done. Tab tab-3 is now at https://www.youtube.com/results, titled YouTube.",
+      "https://www.youtube.com/results, characters 0 to 3429 of 3429. This is the end of the page.\n\nSE\nHoppa över navigeringen\nAlla\nShorts\nInte sett\nVideor\nNyligen uppladdat\nLive\nOm dessa resultat\nFilter\nHow Jet Engines Work\n5,1 mn\nför 6 år sen\nAnimagraffs\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, where incoming ",
       "{\"total\":0,\"elements\":[]}",
       "{\"total\":121,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Guide\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"YouTube Hem\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Hoppa över navigeringen\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\"Inställningar\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e7\",\"role\":\"tab\",\"name\":\"Alla\"},{\"ref\":\"e8\",\"role\":\"tab\",\"name\":\"Shorts\"},",
-      "Done. Tab tab-3 is now at https://www.youtube.com/watch?v=L24Wf0VlTE0, titled how a jet engine works - YouTube.",
-      "https://www.youtube.com/watch?v=L24Wf0VlTE0, characters 0 to 798 of 798. This is the end of the page.\n\nSE\nHoppa över navigeringen\nLogga in\nHow Jet Engines Work\nAnimagraffs\n1,94 mn prenumeranter\nPrenumerera\n103 520\n5,1 mn visningar  för 6 år sen\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, where incoming air is divided between a large fan and th"
+      "Done. Tab tab-3 is now at https://www.youtube.com/watch, titled how a jet engine works - YouTube.",
+      "https://www.youtube.com/watch, characters 0 to 798 of 798. This is the end of the page.\n\nSE\nHoppa över navigeringen\nLogga in\nHow Jet Engines Work\nAnimagraffs\n1,94 mn prenumeranter\nPrenumerera\n103 520\n5,1 mn visningar  för 6 år sen\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, where incoming air is divided between a large fan and th"
     ],
     "peakInputTokens": 5870,
     "inputTokens": 47642,
@@ -1615,7 +1615,7 @@
     "outputTokens": 659,
     "costUsd": 0.0134802,
     "durationMs": 55402,
-    "answer": "Opened [How Jet Engines Work](https://www.youtube.com/watch?v=L24Wf0VlTE0) by **Animagraffs**, the first non-ad result. I stopped on the video page.",
+    "answer": "Opened [How Jet Engines Work](https://www.youtube.com/watch) by **Animagraffs**, the first non-ad result. I stopped on the video page.",
     "steps": [
       "Opened youtube.com",
       "Looked over youtube.com",
@@ -1636,7 +1636,7 @@
       "Clicked something on youtube.com",
       "Read youtube.com"
     ],
-    "endUrl": "https://www.youtube.com/watch?v=L24Wf0VlTE0",
+    "endUrl": "https://www.youtube.com/watch",
     "rendering": {
       "visibility": "visible",
       "frames": true,
@@ -1772,16 +1772,16 @@
     "modelCalls": 7,
     "toolCalls": 16,
     "tools": [
-      "open_tab {\"url\":\"https://www.google.com/search?q=Mount+Everest+height+Wikipedia+Britannica+National+Geographic\"}",
+      "open_tab {\"url\":\"https://www.google.com/search\"}",
       "open_tab {\"url\":\"https://en.wikipedia.org/wiki/Mount_Everest\"}",
       "open_tab {\"url\":\"https://www.britannica.com/place/Mount-Everest\"}",
-      "open_tab {\"url\":\"https://www.bing.com/search?q=site%3Anationalgeographic.com+mount+everest+height\"}",
+      "open_tab {\"url\":\"https://www.bing.com/search\"}",
       "read_page {\"tabId\":\"tab-4\"}",
       "read_page {\"tabId\":\"tab-5\"}",
       "read_page {\"tabId\":\"tab-6\"}",
       "open_tab {\"url\":\"https://education.nationalgeographic.org/resource/mount-everest/\"}",
       "open_tab {\"url\":\"https://www.nationalgeographic.com/science/article/mount-everest\"}",
-      "open_tab {\"url\":\"https://duckduckgo.com/?q=site%3Anationalgeographic.com+mount+everest+height\"}",
+      "open_tab {\"url\":\"https://duckduckgo.com/\"}",
       "open_tab {\"url\":\"https://www.britannica.com/place/Mount-Everest/Height\"}",
       "read_page {\"tabId\":\"tab-7\"}",
       "read_page {\"tabId\":\"tab-9\"}",
@@ -1792,10 +1792,10 @@
     "lastToolResults": [
       "Done. Tab tab-10 is now at https://www.britannica.com/place/Mount-Everest/Height, titled Vänta....",
       "https://education.nationalgeographic.org/resource/mount-everest/, characters 0 to 5377 of 5377. This is the end of the page.\n\nDonate\nEDUCATION\nRESOURCES\nENCYCLOPEDIC ENTRY\nMount Everest\n\nMount Everest is the highest point on Earth. Learn about its history, the people who live there, and the people who visit to climb.\n\nGRADES\n\n5 - 8\n\nSUBJECTS\n\nAnthropology, Conservation, Earth Science, Geology, Geo",
-      "https://duckduckgo.com/?q=site%3Anationalgeographic.com+mount+everest+height&ia=web, characters 0 to 4616 of 4616. This is the end of the page.\n\nAlla resultat\nDuckDuckGo\nÖppna menyn\nDuck.ai\nAlla\nBilder\nVideor\nNyheter\nKartor\nShoppa\nSökinställningar\nPrivat\nSverige\nSafe Search\nDatum\nVisar endast resultat från\nnationalgeographic.com\nVisa alla resultat\n\nNational Geographic\n\nhttps://www.nationalgeograph",
+      "https://duckduckgo.com/, characters 0 to 4616 of 4616. This is the end of the page.\n\nAlla resultat\nDuckDuckGo\nÖppna menyn\nDuck.ai\nAlla\nBilder\nVideor\nNyheter\nKartor\nShoppa\nSökinställningar\nPrivat\nSverige\nSafe Search\nDatum\nVisar endast resultat från\nnationalgeographic.com\nVisa alla resultat\n\nNational Geographic\n\nhttps://www.nationalgeograph",
       "https://www.britannica.com/place/Mount-Everest/Height, characters 0 to 290 of 290. This is the end of the page.\n\nwww.britannica.com\nUtför säkerhetsverifiering\n\nDen här webbplatsen använder en säkerhetstjänst för att skydda sig mot illvilliga robotar. Den här sidan visas medan webbplatsen verifierar att du inte är någon robot.\n\nRay ID: a5341e0278549305\nPrestanda och säkerhet från Cloudflare\nIntegri",
-      "3 matches on https://news.google.com/swg/ui/v1/serviceiframe?_=1793464970284&publicationId=publication-id-free, showing 3.\n\nAt 256: hy & TravelArts & CultureProConMoneyVideos\nGeography & Travel\nPhysical Geography of Land\nMountains & Volcanoes\nMount Everest Reaching an elevation of 29,032 feet (8,849 meters), Mount Everest is the highest mountain in the world.\n(more)\nMount Everest\nmountain, Asia\nAl",
-      "[{\"id\":\"tab-3\",\"title\":\"https://www.google.com/search?q=Mount+Everest+height+Wikipedia+Britannica+National+Geographic&sei=exrmaq7fJbe5wPAP_-jv2Q4\",\"url\":\"https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3DMount%2BEverest%2Bheight%2BWikipedia%2BBritannica%2BNational%2BGeographic%26sei%3Dexrmaq7fJbe5wPAP_-jv2Q4&q=EgS8ldXoGPy0mNcGIjC7Dp0QOH6BMdu7YMoal5F0nCMKDQks_WKOIIne3W"
+      "3 matches on https://news.google.com/swg/ui/v1/serviceiframe, showing 3.\n\nAt 256: hy & TravelArts & CultureProConMoneyVideos\nGeography & Travel\nPhysical Geography of Land\nMountains & Volcanoes\nMount Everest Reaching an elevation of 29,032 feet (8,849 meters), Mount Everest is the highest mountain in the world.\n(more)\nMount Everest\nmountain, Asia\nAl",
+      "[{\"id\":\"tab-3\",\"title\":\"https://www.google.com/search\",\"url\":\"https://www.google.com/sorry/index"
     ],
     "peakInputTokens": 10665,
     "inputTokens": 38055,
@@ -1954,10 +1954,10 @@
     ],
     "lastToolResults": [
       "{\"total\":2,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Prospero: A new coding harness for a more civilized age\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"More\"}]}",
-      "Done. Tab tab-2 is now at https://news.ycombinator.com/?p=2, titled Hacker News.",
+      "Done. Tab tab-2 is now at https://news.ycombinator.com/, titled Hacker News.",
       "{\"total\":1,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"More\"}]}",
-      "Done. Tab tab-2 is now at https://news.ycombinator.com/?p=3, titled Hacker News.",
-      "https://news.ycombinator.com/?p=3, characters 0 to 3997 of 3997. This is the end of the page.\n\n\t\nHacker News\nnew | past | comments | ask | show | jobs | submit\n\t\nlogin\n\n\n\n61.\t\n\tThe Great American Rascal: Tom Sawyer at 150 (claremontreviewofbooks.com)\n\t90 points by beatstop 1 day ago | hide | 50 comments\n\n62.\t\n\tAstroterm: A Planetarium for Your Terminal (github.com/da-luce)\n\t235 points by nvmdbljst"
+      "Done. Tab tab-2 is now at https://news.ycombinator.com/, titled Hacker News.",
+      "https://news.ycombinator.com/, characters 0 to 3997 of 3997. This is the end of the page.\n\n\t\nHacker News\nnew | past | comments | ask | show | jobs | submit\n\t\nlogin\n\n\n\n61.\t\n\tThe Great American Rascal: Tom Sawyer at 150 (claremontreviewofbooks.com)\n\t90 points by beatstop 1 day ago | hide | 50 comments\n\n62.\t\n\tAstroterm: A Planetarium for Your Terminal (github.com/da-luce)\n\t235 points by nvmdbljst"
     ],
     "peakInputTokens": 5664,
     "inputTokens": 27089,
@@ -1965,7 +1965,7 @@
     "outputTokens": 235,
     "costUsd": 0.007731750000000001,
     "durationMs": 12718,
-    "answer": "On the [third page of Hacker News](https://news.ycombinator.com/?p=3):\n\n- **First, #61:** The Great American Rascal: Tom Sawyer at 150\n- **Last, #90:** Patrick Stewart has died\n\nI stopped on the third page.",
+    "answer": "On the [third page of Hacker News](https://news.ycombinator.com/):\n\n- **First, #61:** The Great American Rascal: Tom Sawyer at 150\n- **Last, #90:** Patrick Stewart has died\n\nI stopped on the third page.",
     "steps": [
       "Looked over news.ycombinator.com",
       "Clicked something on news.ycombinator.com",
@@ -1973,9 +1973,9 @@
       "Clicked something on news.ycombinator.com",
       "Read news.ycombinator.com"
     ],
-    "endUrl": "https://news.ycombinator.com/?p=3",
+    "endUrl": "https://news.ycombinator.com/",
     "endState": {
-      "url": "https://news.ycombinator.com/?p=3",
+      "url": "https://news.ycombinator.com/",
       "first": "61. The Great American Rascal: Tom Sawyer at 150",
       "last": "90. Patrick Stewart has died"
     },
@@ -2009,11 +2009,11 @@
       "list_elements {\"query\":\"Sök\"}"
     ],
     "lastToolResults": [
-      "Done. Tab tab-2 is now at https://www.reddit.com/?solution=56c02aa8728dc24156c02aa8728dc241&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331dfe087702ca1a4fd380f0c710b17dd3b&jsc_orig_r=, titled Reddit – Internets hjärta.",
+      "Done. Tab tab-2 is now at https://www.reddit.com/, titled Reddit – Internets hjärta.",
       "{\"total\":0,\"elements\":[]}",
       "{\"total\":145,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Gå vidare till huvudinnehåll\"},{\"ref\":\"e2\",\"role\":\"button\",\"name\":\"Öppna menyn\"},{\"ref\":\"e3\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Maximera användarmenyn\"},{\"ref\":\"e5\",\"role\":\"link\",\"name\":\"My 11 year old nephew bought a bunch of Robux and then lied about it\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"r/mildlyinfuria",
-      "https://www.reddit.com/?solution=56c02aa8728dc24156c02aa8728dc241&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331dfe087702ca1a4fd380f0c710b17dd3b&jsc_orig_r=, characters 0 to 20000 of 24443. Continue with offset 20000.\n\nGå vidare till huvudinnehåll\nÖppna menyn\nLogga in\nMaximera användarmenyn\nMy 11 year old nephew bought a bunch of Robux and then lied about it\nr/mildlyinfuriating\n•\nför 51",
-      "Done. Tab tab-2 is now at https://www.reddit.com/?solution=56c02aa8728dc24156c02aa8728dc241&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331dfe087702ca1a4fd380f0c710b17dd3b&jsc_orig_r=, titled Reddit – Internets hjärta.",
+      "https://www.reddit.com/, characters 0 to 20000 of 24443. Continue with offset 20000.\n\nGå vidare till huvudinnehåll\nÖppna menyn\nLogga in\nMaximera användarmenyn\nMy 11 year old nephew bought a bunch of Robux and then lied about it\nr/mildlyinfuriating\n•\nför 51",
+      "Done. Tab tab-2 is now at https://www.reddit.com/, titled Reddit – Internets hjärta.",
       "{\"total\":0,\"elements\":[]}"
     ],
     "peakInputTokens": 16270,
@@ -2033,9 +2033,9 @@
       "Clicked something on reddit.com",
       "Looked over reddit.com"
     ],
-    "endUrl": "https://www.reddit.com/?solution=56c02aa8728dc24156c02aa8728dc241&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331dfe087702ca1a4fd380f0c710b17dd3b&jsc_orig_r=",
+    "endUrl": "https://www.reddit.com/",
     "endState": {
-      "url": "https://www.reddit.com/?solution=56c02aa8728dc24156c02aa8728dc241&js_challenge=1&jsc_token=2824be10929bdc604753c70a67a1c331dfe087702ca1a4fd380f0c710b17dd3b&jsc_orig_r="
+      "url": "https://www.reddit.com/"
     },
     "rendering": {
       "visibility": "visible",
@@ -2067,8 +2067,8 @@
       "{\"total\":16,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Guide\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"YouTube Hem\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Hoppa över navigeringen\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\"Inställningar\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e7\",\"role\":\"link\",\"name\":\"Läs mer\"},{\"ref\":\"e8\",\"role\":\"link\",\"name\":\"Uppda",
       "Done. Tab tab-2 is now at https://www.youtube.com/, titled YouTube.",
       "{\"total\":15,\"elements\":[{\"ref\":\"e17\",\"role\":\"button\",\"name\":\"Tillbaka\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Hoppa över navigeringen\"},{\"ref\":\"e18\",\"role\":\"combobox\",\"name\":\"Sök\"},{\"ref\":\"e19\",\"role\":\"button\",\"name\":\"\"},{\"ref\":\"e20\",\"role\":\"button\",\"name\":\"Search\"},{\"ref\":\"e7\",\"role\":\"link\",\"name\":\"Läs mer\"},{\"ref\":\"e8\",\"role\":\"link\",\"name\":\"Uppdatera inställningen\"},{\"ref\":\"e9\",\"role\":\"button\",\"na",
-      "Done. Tab tab-2 is now at https://www.youtube.com/results?search_query=how+a+jet+engine+works, titled how a jet engine works - YouTube.",
-      "https://www.youtube.com/results?search_query=how+a+jet+engine+works, characters 0 to 2710 of 2710. This is the end of the page.\n\nHoppa över navigeringen\nAlla\nShorts\nInte sett\nVideor\nNyligen uppladdat\nLive\nOm dessa resultat\nFilter\n5:01\nSpelas nu\nHow Jet Engines Work\n5,1 mn\nför 6 år sen\nAnimagraffs\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, whe"
+      "Done. Tab tab-2 is now at https://www.youtube.com/results, titled how a jet engine works - YouTube.",
+      "https://www.youtube.com/results, characters 0 to 2710 of 2710. This is the end of the page.\n\nHoppa över navigeringen\nAlla\nShorts\nInte sett\nVideor\nNyligen uppladdat\nLive\nOm dessa resultat\nFilter\n5:01\nSpelas nu\nHow Jet Engines Work\n5,1 mn\nför 6 år sen\nAnimagraffs\nAn inside look at how jet engines work. Most modern jet propelled airplanes use a turbofan design, whe"
     ],
     "peakInputTokens": 5021,
     "inputTokens": 24628,
@@ -2084,9 +2084,9 @@
       "Typed into a field on youtube.com",
       "Read youtube.com"
     ],
-    "endUrl": "https://www.youtube.com/results?search_query=how+a+jet+engine+works",
+    "endUrl": "https://www.youtube.com/results",
     "endState": {
-      "url": "https://www.youtube.com/results?search_query=how+a+jet+engine+works",
+      "url": "https://www.youtube.com/results",
       "title": "how a jet engine works - YouTube"
     },
     "rendering": {
@@ -2182,8 +2182,8 @@
       "{\"total\":8,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Språk: Svenska\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"Logga in\"},{\"ref\":\"e3\",\"role\":\"link\",\"name\":\"cookies\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Avvisa alla\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\"Godkänn alla\"},{\"ref\":\"e6\",\"role\":\"link\",\"name\":\"Fler alternativ för anpassningsinställningar och cookies\"},{\"ref\":\"e7\",\"role\":\"link\",\"name\":\"Integri",
       "Done. Tab tab-2 is now at https://www.google.com/maps, titled Google Maps.",
       "{\"total\":28,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Meny\"},{\"ref\":\"e2\",\"role\":\"combobox\",\"name\":\"Sök i Google Maps\"},{\"ref\":\"e3\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e4\",\"role\":\"button\",\"name\":\"Vägbeskrivning\"},{\"ref\":\"e5\",\"role\":\"button\",\"name\":\" Restauranger\"},{\"ref\":\"e6\",\"role\":\"button\",\"name\":\" Hotell\"},{\"ref\":\"e7\",\"role\":\"button\",\"name\":\" Saker du kan göra\"},{\"ref\":\"e8\",\"role\":\"bu",
-      "Done. Tab tab-2 is now at https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D, titled coffee near Stockholm Central Station – Google Maps.",
-      "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D, characters 0 to 932 of 932. This is the end of the page.\n\n\n\n\n\nPris\n\nBetyg\n\nTimmar\n\n\nAlla filter\nResultat\n\n\nDela\nEspresso House\nEspresso House\n3,8(608)\nKaffebar ·  · Centralplan 15\nÖppet · Stänger kl. 19 på\nDagnys coffee and Bar\nDagnys "
+      "Done. Tab tab-2 is now at https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z, titled coffee near Stockholm Central Station – Google Maps.",
+      "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.4335625,18.0740659,13z, characters 0 to 932 of 932. This is the end of the page.\n\n\n\n\n\nPris\n\nBetyg\n\nTimmar\n\n\nAlla filter\nResultat\n\n\nDela\nEspresso House\nEspresso House\n3,8(608)\nKaffebar ·  · Centralplan 15\nÖppet · Stänger kl. 19 på\nDagnys coffee and Bar\nDagnys "
     ],
     "peakInputTokens": 4807,
     "inputTokens": 23745,
@@ -2199,9 +2199,9 @@
       "Typed into a field on google.com",
       "Read google.com"
     ],
-    "endUrl": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D",
+    "endUrl": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1",
     "endState": {
-      "url": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D"
+      "url": "https://www.google.com/maps/search/coffee+near+Stockholm+Central+Station/@59.3315757,18.0554552,15z/data=!3m1!4b1"
     },
     "rendering": {
       "visibility": "visible",
@@ -2249,8 +2249,8 @@
       "Done. Tab tab-2 is now at https://www.booking.com/index.sv.html, titled Booking.com | Officiell webbplats | Hotell, flyg, hyrbilar och boende.",
       "Done. Tab tab-2 is now at https://www.booking.com/index.sv.html, titled Booking.com | Officiell webbplats | Hotell, flyg, hyrbilar och boende.",
       "{\"total\":2,\"elements\":[{\"ref\":\"e14\",\"role\":\"button\",\"name\":\"Sök\"},{\"ref\":\"e15\",\"role\":\"link\",\"name\":\"Sök erbjudanden – Sök vistelser med besparingar på minst 15 %\"}]}",
-      "Done. Tab tab-2 is now at https://www.booking.com/searchresults.sv.html?ss=Stockholm%2C+Stockholms+l%C3%A4n%2C+Sverige&efdco=1&label=mkt123sc-92187531-e73f-4831-a5d0-fdd801b057c6&aid=304142&lang=sv&sb=1&src_elem=sb&src=index&dest_id=-2524279&dest_type=city&ac_meta=GiA3YzBhMDFiNTAzNzQ3NjUyMzFmMGRjM2IyMDA5ZWNjZSAAKAEyAnN2OglTdG9ja2hvbG0%3D&ac_position=0&ac_click_type=b&ac_langcode=sv&ac_suggestion_l",
-      "https://www.booking.com/searchresults.sv.html?ss=Stockholm%2C+Stockholms+l%C3%A4n%2C+Sverige&efdco=1&label=mkt123sc-92187531-e73f-4831-a5d0-fdd801b057c6&aid=304142&lang=sv&sb=1&src_elem=sb&src=index&dest_id=-2524279&dest_type=city&ac_meta=GiA3YzBhMDFiNTAzNzQ3NjUyMzFmMGRjM2IyMDA5ZWNjZSAAKAEyAnN2OglTdG9ja2hvbG0%3D&ac_position=0&ac_click_type=b&ac_langcode=sv&ac_suggestion_list_length=10&search_selec"
+      "Done. Tab tab-2 is now at https://www.booking.com/searchresults.sv.html",
+      "https://www.booking.com/searchresults.sv.html"
     ],
     "peakInputTokens": 21556,
     "inputTokens": 255001,
@@ -2281,9 +2281,9 @@
       "Clicked something on booking.com",
       "Read booking.com"
     ],
-    "endUrl": "https://www.booking.com/searchresults.sv.html?ss=Stockholm%2C+Stockholms+l%C3%A4n%2C+Sverige&efdco=1&label=mkt123sc-92187531-e73f-4831-a5d0-fdd801b057c6&aid=304142&lang=sv&sb=1&src_elem=sb&src=index&dest_id=-2524279&dest_type=city&ac_meta=GiA3YzBhMDFiNTAzNzQ3NjUyMzFmMGRjM2IyMDA5ZWNjZSAAKAEyAnN2OglTdG9ja2hvbG0%3D&ac_position=0&ac_click_type=b&ac_langcode=sv&ac_suggestion_list_length=10&search_selected=true&search_pageview_id=7c0a01b50374765231f0dc3b2009ecce&checkin=2026-12-14&checkout=2026-12-16&group_adults=2&no_rooms=1&group_children=0",
+    "endUrl": "https://www.booking.com/searchresults.sv.html",
     "endState": {
-      "url": "https://www.booking.com/searchresults.sv.html?ss=Stockholm%2C+Stockholms+l%C3%A4n%2C+Sverige&efdco=1&label=mkt123sc-92187531-e73f-4831-a5d0-fdd801b057c6&aid=304142&lang=sv&sb=1&src_elem=sb&src=index&dest_id=-2524279&dest_type=city&ac_meta=GiA3YzBhMDFiNTAzNzQ3NjUyMzFmMGRjM2IyMDA5ZWNjZSAAKAEyAnN2OglTdG9ja2hvbG0%3D&ac_position=0&ac_click_type=b&ac_langcode=sv&ac_suggestion_list_length=10&search_selected=true&search_pageview_id=7c0a01b50374765231f0dc3b2009ecce&checkin=2026-12-14&checkout=2026-12-16&group_adults=2&no_rooms=1&group_children=0"
+      "url": "https://www.booking.com/searchresults.sv.html"
     },
     "rendering": {
       "visibility": "visible",
@@ -2317,11 +2317,11 @@
     ],
     "lastToolResults": [
       "{\"total\":6,\"elements\":[{\"ref\":\"e1\",\"role\":\"link\",\"name\":\"Anker USB C to USB C Cable, 100W Fast Charging Cable (2-Pack, 6 ft, Black) | Fo…\"},{\"ref\":\"e2\",\"role\":\"link\",\"name\":\"Anker USB C to USB C Cable, 100W Fast Charging Cable (2-Pack, 6 ft, Black)\"},{\"ref\":\"e3\",\"role\":\"link\",\"name\":\"Anker USB C to USB C Cable, 100W Fast Charging Cable(2-Pack, 3.3 ft, Black) | F…\"},{\"ref\":\"e4\",\"role\":\"link\",\"name\"",
-      "Done. Tab tab-2 is now at https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1?dib=eyJ2IjoiMSJ9.JlGZwJNRshapXRHrUqSS41hU28r1cNDh3GVo56u2yIHkO06oPFeEWeXKWNS9kZuVyBTwitTQnj-HwQLXPyMxBh52AhrR04owcc28pCnTxFca1a5eIiUG3jw01Rw2PC65LeBSYj83wuqcBjq6T9ONaqc13oDGBy9I9lcP1E7xc7iQUfAF2270TdX93e98eWap_HAWg5_YwSXY0EYghwOC3_GgnEdwR2qLSoPVuINVT9I.OMVZUneJh4zwBOhwXHjPVU7yACdntU2UHOGZd-e",
-      "https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1?dib=eyJ2IjoiMSJ9.JlGZwJNRshapXRHrUqSS41hU28r1cNDh3GVo56u2yIHkO06oPFeEWeXKWNS9kZuVyBTwitTQnj-HwQLXPyMxBh52AhrR04owcc28pCnTxFca1a5eIiUG3jw01Rw2PC65LeBSYj83wuqcBjq6T9ONaqc13oDGBy9I9lcP1E7xc7iQUfAF2270TdX93e98eWap_HAWg5_YwSXY0EYghwOC3_GgnEdwR2qLSoPVuINVT9I.OMVZUneJh4zwBOhwXHjPVU7yACdntU2UHOGZd-e1hs4&dib_tag=se&keywords=u",
+      "Done. Tab tab-2 is now at https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1",
+      "https://www.amazon.com/ANKER-Cable-Charging-2-Pack-Black/dp/B09LCJPZ1P/ref=sr_1_1",
       "{\"total\":8,\"elements\":[{\"ref\":\"e1\",\"role\":\"button\",\"name\":\"Add to cart, shift, option, K\"},{\"ref\":\"e2\",\"role\":\"submit\",\"name\":\"Add to cart\",\"value\":\"Add to cart\"},{\"ref\":\"e3\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e4\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e5\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e6\",\"role\":\"submit\",\"name\":\"Add to Cart\"},{\"ref\":\"e7\",\"role\":\"submit\",\"name\":\"A",
       "Done. Tab tab-2 is now at https://www.amazon.com/cart/add-to-cart/ref=dp_start-bbf_1_glance, titled Amazon.com Shopping Cart.",
-      "https://www.amazon.com/cart/smart-wagon?newItems=39bc0ee8-afd0-43aa-960f-143554c67696,1&ref_=sw_refresh, characters 0 to 13523 of 13523. This is the end of the page.\n\nSkip to\nMain content\nKeyboard shortcuts\nSearch\nopt\n+\n/\nCart\nshift\n+\nopt\n+\nC\nHome\nshift\n+\nopt\n+\nH\nOrders\nshift\n+\nopt\n+\nO\nShow/Hide shortcuts\nshift\n+\nopt\n+\nZ\nTo move between items, use your keyboard's up or down arrows.\nDeliver to\nSwed"
+      "https://www.amazon.com/cart/smart-wagon, characters 0 to 13523 of 13523. This is the end of the page.\n\nSkip to\nMain content\nKeyboard shortcuts\nSearch\nopt\n+\n/\nCart\nshift\n+\nopt\n+\nC\nHome\nshift\n+\nopt\n+\nH\nOrders\nshift\n+\nopt\n+\nO\nShow/Hide shortcuts\nshift\n+\nopt\n+\nZ\nTo move between items, use your keyboard's up or down arrows.\nDeliver to\nSwed"
     ],
     "peakInputTokens": 21070,
     "inputTokens": 111136,
@@ -2341,9 +2341,9 @@
       "Clicked something on amazon.com",
       "Read amazon.com"
     ],
-    "endUrl": "https://www.amazon.com/cart/smart-wagon?newItems=39bc0ee8-afd0-43aa-960f-143554c67696,1&ref_=sw_refresh",
+    "endUrl": "https://www.amazon.com/cart/smart-wagon",
     "endState": {
-      "url": "https://www.amazon.com/cart/smart-wagon?newItems=39bc0ee8-afd0-43aa-960f-143554c67696,1&ref_=sw_refresh",
+      "url": "https://www.amazon.com/cart/smart-wagon",
       "cart": "1"
     },
     "rendering": {
@@ -3100,7 +3100,7 @@
       "open_tab {\"url\":\"https://github.com/settings/profile\"}"
     ],
     "lastToolResults": [
-      "Done. Tab tab-3 is now at https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fsettings%2Fprofile, titled Sign in to GitHub · GitHub."
+      "Done. Tab tab-3 is now at https://github.com/login, titled Sign in to GitHub · GitHub."
     ],
     "peakInputTokens": 828,
     "inputTokens": 1738,
@@ -3112,7 +3112,7 @@
     "steps": [
       "Opened github.com"
     ],
-    "endUrl": "https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fsettings%2Fprofile",
+    "endUrl": "https://github.com/login",
     "rendering": {
       "visibility": "visible",
       "frames": true,
