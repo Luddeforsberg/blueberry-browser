@@ -18,6 +18,11 @@ import { holdQuit } from "./holdQuit";
 import type { CloudTabs } from "./CloudTabs";
 import { LINK_SCHEME, mascotFromArgs, mascotFromLink } from "./mascotLink";
 import { join } from "path";
+import * as dotenv from "dotenv";
+
+// A packaged app leaves `.env` out of its bundle, so it reads one from the user data folder instead, for the model and the
+// Gallery server. Both are read only once the window opens, after this.
+if (app.isPackaged) dotenv.config({ path: join(app.getPath("userData"), ".env"), quiet: true });
 
 // One copy per profile, so a link or a second launch goes to the window that's already open.
 const firstCopy = app.requestSingleInstanceLock();
