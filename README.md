@@ -1,6 +1,6 @@
 # Blueberry
 
-A browser with a flock of birds that do your web work behind you, and stop to ask before anything risky.
+An AI browser that works on your behalf. Grow a flock of birds for the jobs you repeat, and it notices what you do and offers to take it over.
 
 <!-- video -->
 
