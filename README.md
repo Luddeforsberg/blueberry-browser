@@ -111,11 +111,3 @@ That's the whole browser, with Berry, the flock, routines, Suggestions, Show Ber
 | `pnpm run push:keys` | Print a new VAPID key pair for notifications on the phone page |
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it |
 | `pnpm run verify` | Typecheck, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
-
-## How it was made
-
-Blueberry was built with coding agents: Claude Code wrote the changes, and Codex reviewed them. Each feature was one PR, merged in order before the next began, so the [closed pull requests](https://github.com/Luddeforsberg/blueberry-browser/pulls?q=is%3Apr+is%3Aclosed) read as the build history. GitHub Actions is out of minutes for now, so `pnpm run verify` runs locally in place of CI, and each PR says what it printed.
-
-What Berry can do is measured on real websites with the real model, through the jobs in [evals/](evals/). On the first run, 14 of 29 jobs were done on every run. After the work on the agent, 25 of 29 were, though 17 of those ran once. The results and notes are in [evals/results/](evals/results/).
-
-It began as a fork of the Blueberry Browser challenge repo.
