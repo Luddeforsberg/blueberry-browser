@@ -93,15 +93,10 @@ export const RoutineRunCard: React.FC<{
                         : 'The app closed before this finished, so it stopped there.'}
                 </p>
             )}
-            {(open || (ended && onRunAgain) || run.tokens !== null) && (
+            {(open || (ended && onRunAgain)) && (
                 <div className="mt-3 flex items-center gap-3">
                     {open && <Button size="sm" variant="outline" onClick={onStop}>Stop</Button>}
                     {ended && onRunAgain && <Button size="sm" variant="outline" onClick={onRunAgain}>Run again</Button>}
-                    {run.tokens !== null && (
-                        <span className="text-12 text-muted-foreground tabular-nums">
-                            {run.tokens.toLocaleString()} tokens used
-                        </span>
-                    )}
                 </div>
             )}
         </li>
