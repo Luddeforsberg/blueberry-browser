@@ -71,7 +71,17 @@ export interface TabEvents {
   onUserInput: () => void;
   // What the bird on this page looks like and may do, read each time so a setting reaches it straight away.
   actorOptions: () => ActorOptions;
+  // The page closed itself, as a sign-in popup does when it's done.
+  onClosedByPage: () => void;
 }
+
+// Every web page gets these, a popup included: no preload, no Node, sandboxed and isolated.
+export const TAB_WEB_PREFERENCES = {
+  nodeIntegration: false,
+  contextIsolation: true,
+  sandbox: true,
+  webSecurity: true,
+} as const;
 
 export class Tab implements PageTarget {
   readonly kind = "web";
@@ -107,20 +117,32 @@ export class Tab implements PageTarget {
   readonly actor: PageActor;
   private _pictureScale: number | null = null;
   private leavingTimer: NodeJS.Timeout | null = null;
+  // Set once we close the page, so its going isn't taken for the page closing itself.
+  private closing = false;
+  // A popup's page, made by Electron for `window.open` so the page that opened it can still reach it.
+  private readonly opened: WebContents | null;
+  // The tab whose page opened this one, which can send it anywhere again by name.
+  private readonly opener: Tab | null;
 
   constructor(
     id: string,
     url: string,
     events: TabEvents,
-    restored?: SavedWebTab
+    restored?: SavedWebTab,
+    popup?: { page: WebContents; opener: Tab }
   ) {
     this._id = id;
     this.events = events;
     this._url = url;
     this._title = "New tab";
     this.actor = new PageActor(this, events.actorOptions, () => this.webContentsView?.webContents.getZoomFactor() ?? 1);
+    this.opened = popup?.page ?? null;
+    this.opener = popup?.opener ?? null;
 
-    if (restored) {
+    if (popup) {
+      // Its first page is already on the way, so it only needs a view.
+      void this.view;
+    } else if (restored) {
       this._title = restored.title || this._title;
       this._favicon = restored.favicon;
       this.unloaded = restored;
@@ -132,14 +154,7 @@ export class Tab implements PageTarget {
 
   private createView(): WebContentsView {
     // Create the WebContentsView for web content only
-    const view = new WebContentsView({
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: true,
-        webSecurity: true,
-      },
-    });
+    const view = new WebContentsView(this.opened ? { webContents: this.opened } : { webPreferences: TAB_WEB_PREFERENCES });
     view.setBorderRadius(PAGE_RADIUS);
     view.setVisible(this.shouldDraw);
     this.setupEventListeners(view.webContents);
@@ -232,7 +247,10 @@ export class Tab implements PageTarget {
     contents.on("destroyed", () => {
       this.stopWaiting();
       this.actor.destroyed();
+      if (!this.closing) this.events.onClosedByPage();
     });
+    // A popup may ask to be resized or moved, but it's a tab, so the window stays as it is.
+    contents.on("content-bounds-updated", (event) => event.preventDefault());
   }
 
   private userInput(): void {
@@ -241,7 +259,8 @@ export class Tab implements PageTarget {
   }
 
   refusesNavigation(url: string): boolean {
-    return [...this.navigationLimits].some((allows) => !allows(url));
+    // `window.open` with the same name sends a popup somewhere new without asking us, so its opener's limits hold here.
+    return [...this.navigationLimits].some((allows) => !allows(url)) || !!this.opener?.refusesNavigation(url);
   }
 
   // For as long as `act` runs, the page can't take this tab anywhere `allows` says no to. The user's own use of the tab
@@ -721,6 +740,8 @@ export class Tab implements PageTarget {
   destroy(): void {
     if (this.leavingTimer) clearTimeout(this.leavingTimer);
     this.leavingTimer = null;
-    this.webContentsView?.webContents.close();
+    this.closing = true;
+    const contents = this.webContentsView?.webContents;
+    if (contents && !contents.isDestroyed()) contents.close();
   }
 }
