@@ -253,6 +253,9 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     await page.frameLocator("#sheet").getByRole("textbox", { name: "Cell A2" }).click();
     await page.keyboard.type("Head of People");
     await page.keyboard.press("Enter");
+    // The same words in the next cell are another entry.
+    await page.keyboard.type("Head of People");
+    await page.keyboard.press("Enter");
 
     await page.getByRole("textbox", { name: "Password", exact: true }).click();
     await page.keyboard.type(PASSWORD);
@@ -265,6 +268,12 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     await page.getByRole("textbox", { name: "Shown password" }).click();
     await page.keyboard.press("Meta+a");
     await page.keyboard.press("Meta+c");
+    // Pasted somewhere plain, it's still a secret.
+    await page.getByRole("textbox", { name: "Name" }).click();
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.press("Meta+v");
+    await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("shown-secret");
+    await page.getByRole("textbox", { name: "Password", exact: true }).click();
 
     await chrome.getByRole("button", { name: "Stop" }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toBeVisible();
@@ -273,7 +282,7 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     await expect(notes.filter({ hasText: "Clicked Anna Svensson" })).toHaveCount(0);
     await expect(notes.filter({ hasText: "Pasted in Name" })).toHaveCount(1);
     await expect(notes.filter({ hasText: "Typed “Anna Svensson” in Name" })).toHaveCount(1);
-    await expect(notes.filter({ hasText: "Typed “Head of People” in Cell A2" })).toHaveCount(1);
+    await expect(notes.filter({ hasText: "Typed “Head of People” in Cell A2" })).toHaveCount(2);
     await expect(notes.filter({ hasText: "Copied from the password field" })).toHaveCount(1);
 
     const said = JSON.stringify(await chrome.evaluate(() => window.chromeAPI.recording.state()));

@@ -85,11 +85,17 @@ const SCRIPT = `
     sent.set(el, value);
     push({ type: "typed", label: fieldName(el), value: shortValue(value) });
   };
+  // A secret copied here makes the field it's next pasted into one too. Nothing of it is kept but its kind.
+  let copiedSecret = null;
   // What's being copied, from the field it's in or from the page, and only after the field is ruled out as a secret.
   const copied = (el) => {
+    copiedSecret = null;
     if (el && holdsText(el)) {
       const secret = secretKind(el);
-      if (secret) return push({ type: "secret", secret, copied: true });
+      if (secret) {
+        copiedSecret = secret;
+        return push({ type: "secret", secret, copied: true });
+      }
     }
     const field = el && holdsText(el) && !el.isContentEditable ? el : null;
     let text = "";
@@ -99,7 +105,8 @@ const SCRIPT = `
       // A field with no selection to speak of, such as an email address.
     }
     if (!text.trim()) return;
-    push(looksLikeCard(text) ? { type: "secret", secret: "card", copied: true } : { type: "copied", value: shortValue(text) });
+    if (looksLikeCard(text)) copiedSecret = "card";
+    push(copiedSecret ? { type: "secret", secret: copiedSecret, copied: true } : { type: "copied", value: shortValue(text) });
   };
   const finishAll = () => [...dirty].forEach(finishField);
 
@@ -142,7 +149,10 @@ const SCRIPT = `
       // An editor like a spreadsheet's keeps the keyboard and empties itself on Enter or Tab, so what's in it is read
       // before the page gets the key. Shift and Enter is a new line.
       if (el.isContentEditable) {
-        if (dirty.has(el) && !(event.key === "Enter" && event.shiftKey)) finishField(el);
+        if (!dirty.has(el) || (event.key === "Enter" && event.shiftKey)) return;
+        finishField(el);
+        // The same words in the next cell are a note of their own.
+        sent.delete(el);
         return;
       }
       if (event.key !== "Enter") return;
@@ -167,6 +177,7 @@ const SCRIPT = `
       const el = realTarget(event);
       if (!el || !holdsText(el)) return;
       // What's pasted is read from the field like anything typed, once the user has finished with it.
+      if (copiedSecret && !secretKind(el)) secrets.set(el, copiedSecret);
       const secret = secretKind(el);
       push(secret ? { type: "secret", secret } : { type: "pasted", label: fieldName(el) });
     }));

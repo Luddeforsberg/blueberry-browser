@@ -267,13 +267,14 @@ Only ever name the sites in "sites". Reply with JSON only, in this shape: {"name
 const SITE_NAME = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 const NOT_A_SITE = /\.(js|ts|py|md|txt|pdf|csv|html|json)$/i;
 
-// What was typed after copying it, which is the page's on that run rather than anything the user chose.
+// What was typed after copying it, which is the page's on that run rather than anything the user chose. The copy has to
+// be there as whole words, so a copied "1" doesn't make a date the page's.
 const fromCopy = (steps: readonly TrailStep[]): Set<string> => {
-  const copies: string[] = [];
+  const copies: RegExp[] = [];
   const typed = new Set<string>();
   for (const { id, kind, value } of steps) {
-    if (kind === "copied") copies.push(normal(value));
-    else if ((kind === "typed" || kind === "searched") && copies.some((copy) => normal(value).includes(copy))) typed.add(id);
+    if (kind === "copied") copies.push(new RegExp(`(?<![\\p{L}\\p{N}])${normal(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u"));
+    else if ((kind === "typed" || kind === "searched") && copies.some((copy) => copy.test(normal(value)))) typed.add(id);
   }
   return typed;
 };

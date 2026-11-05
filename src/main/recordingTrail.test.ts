@@ -231,6 +231,14 @@ describe("the draft", () => {
     expect(draftFromReply(reply, made.steps).changes).toEqual([{ label: "City", value: "London" }]);
   });
 
+  it("only counts a copy that's there as whole words", () => {
+    const { note, made } = trail();
+    note({ type: "copied", value: "1" });
+    note({ type: "typed", label: "Date", value: "2026-11-05" });
+    note({ type: "typed", label: "Count", value: "1 more" });
+    expect(plainDraft(made.steps).changes).toEqual([{ label: "Date", value: "2026-11-05" }]);
+  });
+
   it("goes without a step's site once that step is taken out", () => {
     const { went, made } = trail();
     went("https://a.example/");
