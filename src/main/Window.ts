@@ -81,7 +81,7 @@ const supportsGlass = (): boolean => {
 };
 
 // A page opened by another with `window.open`, and the tab that opened it.
-type Popup = { page: WebContents; openerId: string };
+type Popup = { page: WebContents; opener: Tab };
 
 // The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach.
 const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
@@ -547,7 +547,7 @@ export class Window {
           // Electron passes the page it made for the popup along with the options, though its types leave it out.
           const page = (options as { webContents?: WebContents }).webContents;
           if (!page) throw new Error("Electron gave no page for the popup");
-          const popup = { page, openerId: opener.id };
+          const popup = { page, opener };
           const tab = behind ? this.createBackgroundTab(url, popup) : this.createTab(url, popup);
           tab.limitFirstLoadLike(opener);
           if (behind) this.chats.notePopup(opener.id, tab.id);
@@ -558,7 +558,7 @@ export class Window {
   }
 
   // A popup that closes itself takes the user back to the page that opened it, if they were looking at the popup.
-  private closedByPage(tabId: string, openerId: string | null): void {
+  private closedByPage(tabId: string, openerId: string | undefined): void {
     if (this.windowClosed || !this.tabsMap.has(tabId)) return;
     // Its page is gone, so the tab goes before anything else looks at it.
     const wasActive = this.activeTabId === tabId;
@@ -924,7 +924,7 @@ export class Window {
           dark: nativeTheme.shouldUseDarkColors,
           windowShowing: this.windowShowing,
         }),
-        onClosedByPage: () => this.closedByPage(tabId, popup?.openerId ?? null),
+        onClosedByPage: () => this.closedByPage(tabId, popup?.opener.id),
         onDetails: () =>
           this.saveVisit(tabId, () => {
             if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
@@ -945,7 +945,7 @@ export class Window {
         },
       },
       restored,
-      popup?.page
+      popup
     );
     return tab;
   }

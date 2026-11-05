@@ -121,22 +121,25 @@ export class Tab implements PageTarget {
   private closing = false;
   // A popup's page, made by Electron for `window.open` so the page that opened it can still reach it.
   private readonly opened: WebContents | null;
+  // The tab whose page opened this one, which can send it anywhere again by name.
+  private readonly opener: Tab | null;
 
   constructor(
     id: string,
     url: string,
     events: TabEvents,
     restored?: SavedWebTab,
-    opened?: WebContents
+    popup?: { page: WebContents; opener: Tab }
   ) {
     this._id = id;
     this.events = events;
     this._url = url;
     this._title = "New tab";
     this.actor = new PageActor(this, events.actorOptions, () => this.webContentsView?.webContents.getZoomFactor() ?? 1);
-    this.opened = opened ?? null;
+    this.opened = popup?.page ?? null;
+    this.opener = popup?.opener ?? null;
 
-    if (opened) {
+    if (popup) {
       // Its first page is already on the way, so it only needs a view.
       void this.view;
     } else if (restored) {
@@ -256,7 +259,8 @@ export class Tab implements PageTarget {
   }
 
   refusesNavigation(url: string): boolean {
-    return [...this.navigationLimits].some((allows) => !allows(url));
+    // `window.open` with the same name sends a popup somewhere new without asking us, so its opener's limits hold here.
+    return [...this.navigationLimits].some((allows) => !allows(url)) || !!this.opener?.refusesNavigation(url);
   }
 
   // For as long as `act` runs, the page can't take this tab anywhere `allows` says no to. The user's own use of the tab
