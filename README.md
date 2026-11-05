@@ -4,7 +4,7 @@ An AI browser that works on your behalf. Grow a flock of birds for the jobs you 
 
 <!-- video -->
 
-![Competitor Watch reading Linear's changelog, with the working view beside the chat](docs/images/hero.jpg)
+![Hedda reading ArcticStartup's job board for Swedish startups that just raised, with the working view beside the chat](docs/images/hero.jpg)
 
 ## What it does
 
@@ -57,12 +57,12 @@ The flock itself, routines on a schedule, jobs that work in tabs behind yours wi
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/approval.jpg" alt="An approval card with the exact text Berry would type into a sales form"><br>An approval card says exactly what will happen before anything does.</td>
-<td width="50%"><img src="docs/images/flock.jpg" alt="The Flock page with six birds on wires"><br>The flock: Berry and five birds from the Gallery, each with its own limits.</td>
+<td width="50%"><img src="docs/images/approval.jpg" alt="An approval card with the exact text Berry would type into lemlist's contact sales form"><br>An approval card says exactly what will happen before anything does.</td>
+<td width="50%"><img src="docs/images/flock.jpg" alt="The Flock page with Berry, Hedda, Otis, Ines and Juno on wires"><br>The flock: Berry and four birds of your own, each with its own limits.</td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/images/new-tab.jpg" alt="The new tab page with two suggestions on the art blueberry"><br>Suggestions on the new tab page, written from what you browsed.</td>
-<td width="50%"><img src="docs/images/show-berry-how.jpg" alt="The notes Berry took while watching a job, before it becomes a routine"><br>Show Berry how: the notes from one recorded job, before they become a routine.</td>
+<td width="50%"><img src="docs/images/new-tab.jpg" alt="The new tab page with three suggestions on the art blueberry: a prompt, a routine and a new bird"><br>Suggestions on the new tab page, written from what you browsed.</td>
+<td width="50%"><img src="docs/images/show-berry-how.jpg" alt="The notes Berry took while watching a job on ArcticStartup, before it becomes a routine"><br>Show Berry how: the notes from one recorded job, before they become a routine.</td>
 </tr>
 </table>
 

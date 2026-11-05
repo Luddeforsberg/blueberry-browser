@@ -158,14 +158,14 @@ writeFileSync(
   `${NOTE}export type ArtNode = [tag: string, attributes: Record<string, string>, ...children: ArtNode[]];\n\nexport const ACTOR_ART = ${JSON.stringify(tree)} as unknown as Record<string, Record<string, ArtNode>>;\n\nexport const ACTOR_ART_SHEET = ${JSON.stringify(sheet)};\n`
 );
 
-// The picture a shared link shows, since a link preview can't run the page: the flock on a wire, in light mode. It's
+// The picture a shared link shows, since a link preview can't run the page: the flock on a wire, on `canvas` in light mode. It's
 // drawn by the Chrome on this computer, so without one it says so and leaves the old picture.
 const SHARE_FLOCK = [["none", "jackdaw"], ["cap", "kingfisher"], ["glasses", "robin"], ["headphones", "flamingo"], ["cap", "parakeet"], ["headphones", "canary"]];
 const shareCard = `<!doctype html><html><head><meta charset="utf-8"><style>${readFileSync(join(site, "tokens.css"), "utf8")}
 ${readFileSync(join(site, "birds.css"), "utf8")}
 * { box-sizing: border-box; margin: 0; }
-body { width: 1200px; height: 630px; padding: 36px; background: var(--frame); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
-.card { height: 100%; padding: 64px 72px 0; border-radius: 22px; background: rgb(var(--canvas)); box-shadow: var(--shadow-page); display: flex; flex-direction: column; }
+body { width: 1200px; height: 630px; background: rgb(var(--canvas)); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+.card { height: 100%; padding: 100px 108px 36px; display: flex; flex-direction: column; }
 h1 { font-size: 72px; font-weight: 600; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
 p { margin-top: 12px; font-size: 30px; color: rgb(var(--muted-foreground)); }
 .wire { margin-top: auto; display: flex; justify-content: space-between; border-bottom: 2px solid rgb(var(--muted-foreground) / 0.45); margin-bottom: 64px; }
