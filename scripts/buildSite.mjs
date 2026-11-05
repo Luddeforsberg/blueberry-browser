@@ -172,7 +172,7 @@ p { margin-top: 12px; font-size: 30px; color: rgb(var(--muted-foreground)); }
 .wire div { width: 150px; height: ${Math.round((150 * 113) / 120)}px; }
 .wire svg { width: 150px; height: 150px; overflow: visible; }
 .wire div:nth-child(3n) svg { transform: scaleX(-1); }
-</style></head><body><div class="card"><h1>Blueberry</h1><p>A browser with a flock of birds you give jobs to.</p><div class="wire">${SHARE_FLOCK.map(([accessory, palette]) => `<div>${birds[accessory].replace('data-mascot="jackdaw"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
+</style></head><body><div class="card"><h1>Blueberry</h1><p>An AI browser that works on your behalf.</p><div class="wire">${SHARE_FLOCK.map(([accessory, palette]) => `<div>${birds[accessory].replace('data-mascot="jackdaw"', `data-mascot="${palette}"`)}</div>`).join("")}</div></div></body></html>`;
 try {
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome" });
