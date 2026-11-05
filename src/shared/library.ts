@@ -358,7 +358,7 @@ export type SuggestionWords = { id: string; title: string } & (
 export type Suggestion = SuggestionWords & { why: string };
 
 // One thing Berry saw the user do while it was being shown something. Only ever in memory, and only in main and the chrome.
-export type TrailKind = "went" | "searched" | "clicked" | "typed" | "secret" | "chose" | "ticked" | "pressed" | "switched" | "frame" | "file";
+export type TrailKind = "went" | "searched" | "clicked" | "typed" | "secret" | "chose" | "ticked" | "pressed" | "switched" | "frame" | "file" | "copied" | "pasted";
 
 export interface TrailStep {
   id: string;
@@ -370,7 +370,7 @@ export interface TrailStep {
   path: string;
   // What the page calls the thing. Untrusted, and a name only.
   label: string;
-  // What the user typed or chose. Never set for a secret field.
+  // What the user typed, chose or copied. Never set for a secret field.
   value: string;
   // Typed, and then sent with Enter.
   submitted?: boolean;

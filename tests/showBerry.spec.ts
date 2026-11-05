@@ -202,6 +202,102 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
   }
 });
 
+// A name copied off one page and pasted into another, then a sheet-like editor that empties itself on Enter.
+const COPY_PAGE = `<!doctype html><title>Profile</title>
+  <h1>Anna Svensson</h1>
+  <input aria-label="Name">
+  <input type="password" aria-label="Password">
+  <input type="password" id="shown" aria-label="Shown password"><button onclick="document.getElementById('shown').type='text'">Show password</button>
+  <iframe id="sheet" width="300" height="80" srcdoc="<div contenteditable role='textbox' aria-label='Cell A2' style='min-height:24px'></div><script>
+    document.querySelector('div').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); event.target.textContent = ''; } });
+  </script>"></iframe>`;
+
+test("copying from a page and pasting it in is noted, and a secret is copied without its value", async () => {
+  test.setTimeout(60_000);
+  const server = createServer((_, response) => {
+    response.setHeader("content-type", "text/html");
+    response.end(COPY_PAGE);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const app = await launchApp();
+  // Copying here is a real copy, so whatever was on the clipboard goes back on it afterwards.
+  await app.evaluate(async ({ clipboard }) => {
+    (globalThis as { savedClipboard?: unknown }).savedClipboard = await clipboard.read();
+  });
+
+  try {
+    const chrome = await findView(app, "view=chrome");
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
+    await chrome.getByRole("button", { name: "Show Berry how" }).click();
+    await chrome.evaluate(async (url) => {
+      const { browser } = window.chromeAPI;
+      const tabs = await browser.getTabs();
+      await browser.navigateTab(tabs.find(({ page }) => page === "routines")!.id, url);
+    }, `${origin}/profile`);
+    const page = await findView(app, `${origin}/profile`);
+    await page.waitForLoadState();
+    await page.waitForTimeout(300);
+
+    // Dragging over the name selects it, which isn't clicking it.
+    const name = await page.getByRole("heading", { name: "Anna Svensson" }).boundingBox();
+    await page.mouse.move(name!.x + 1, name!.y + name!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(name!.x + name!.width - 1, name!.y + name!.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await page.keyboard.press("Meta+c");
+    await page.getByRole("textbox", { name: "Name" }).click();
+    await page.keyboard.press("Meta+v");
+    await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("Anna Svensson");
+
+    await page.frameLocator("#sheet").getByRole("textbox", { name: "Cell A2" }).click();
+    await page.keyboard.type("Head of People");
+    await page.keyboard.press("Enter");
+    // The same words in the next cell are another entry.
+    await page.keyboard.type("Head of People");
+    await page.keyboard.press("Enter");
+
+    await page.getByRole("textbox", { name: "Password", exact: true }).click();
+    await page.keyboard.type(PASSWORD);
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.press("Meta+c");
+    // A revealed password can be copied, and it's still a password.
+    await page.getByRole("textbox", { name: "Shown password" }).click();
+    await page.keyboard.type("shown-secret");
+    await page.getByRole("button", { name: "Show password" }).click();
+    await page.getByRole("textbox", { name: "Shown password" }).click();
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.press("Meta+c");
+    // Pasted somewhere plain, it's still a secret.
+    await page.getByRole("textbox", { name: "Name" }).click();
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.press("Meta+v");
+    await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("shown-secret");
+    await page.getByRole("textbox", { name: "Password", exact: true }).click();
+
+    await chrome.getByRole("button", { name: "Stop" }).click();
+    await expect(chrome.getByRole("heading", { name: "What I watched" })).toBeVisible();
+    const notes = chrome.locator("ol li");
+    await expect(notes.filter({ hasText: "Copied “Anna Svensson”" })).toHaveCount(1);
+    await expect(notes.filter({ hasText: "Clicked Anna Svensson" })).toHaveCount(0);
+    await expect(notes.filter({ hasText: "Pasted in Name" })).toHaveCount(1);
+    await expect(notes.filter({ hasText: "Typed “Anna Svensson” in Name" })).toHaveCount(1);
+    await expect(notes.filter({ hasText: "Typed “Head of People” in Cell A2" })).toHaveCount(2);
+    await expect(notes.filter({ hasText: "Copied from the password field" })).toHaveCount(1);
+
+    const said = JSON.stringify(await chrome.evaluate(() => window.chromeAPI.recording.state()));
+    expect(said).not.toContain(PASSWORD);
+    expect(said).not.toContain("shown-secret");
+  } finally {
+    await app.evaluate(async ({ clipboard }) => {
+      const saved = (globalThis as { savedClipboard?: Electron.ClipboardItem[] }).savedClipboard ?? [];
+      await (saved.length > 0 ? clipboard.write(saved) : clipboard.clear());
+    }).catch(() => {});
+    await app.close();
+    server.close();
+  }
+});
+
 test("with nothing to go through, there's nothing to send", async () => {
   const app = await launchApp();
   try {

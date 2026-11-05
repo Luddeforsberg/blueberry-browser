@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { createPageTools } from "./browserTools";
 import { draftFromReply, MAX_STEPS, plainDraft, searchIn, siteOfHost, sitesOf, Trail, trailAddress, trailForModel } from "./recordingTrail";
+import type { Tab } from "./Tab";
+import { narrowSites } from "../shared/mascots";
 
 const trail = (site = "shop.example") => {
   const made = new Trail();
@@ -25,6 +28,44 @@ describe("addresses", () => {
     expect(siteOfHost("cdn.webhallen.com")).toBe("webhallen.com");
     expect(siteOfHost("127.0.0.1")).toBe("127.0.0.1");
     expect(siteOfHost("localhost")).toBe("localhost");
+  });
+
+  it("keeps the whole host where one company runs many products", () => {
+    expect(siteOfHost("docs.google.com")).toBe("docs.google.com");
+    expect(siteOfHost("www.google.com")).toBe("google.com");
+    expect(siteOfHost("google.com")).toBe("google.com");
+    expect(siteOfHost("acme.sharepoint.com")).toBe("acme.sharepoint.com");
+    expect(siteOfHost("outlook.live.com")).toBe("outlook.live.com");
+    expect(siteOfHost("WWW.Docs.Google.com")).toBe("docs.google.com");
+    // Only those names themselves, not one that ends like them or has them inside.
+    expect(siteOfHost("mail.notgoogle.com")).toBe("notgoogle.com");
+    expect(siteOfHost("docs.google.com.evil.example")).toBe("evil.example");
+    expect(siteOfHost("google.co.uk")).toBe("google.co.uk");
+  });
+
+  it("lets a routine on a Google Sheet reach the sheet and its sign-in, and nothing else of Google's", async () => {
+    const { went, made } = trail();
+    went("https://docs.google.com/spreadsheets/d/abc");
+    went("https://accounts.google.com/signin");
+    const sites = sitesOf(made.steps);
+    expect(sites).toEqual(["docs.google.com", "accounts.google.com"]);
+
+    const tab = { id: "tab-1", url: "https://docs.google.com/spreadsheets/d/abc", foreignFrames: [] } as unknown as Tab;
+    const goTo = createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+      limits: { name: "Berry", sites: narrowSites([], sites), tools: ["visit"] },
+    }).find(({ name }) => name === "go_to")!;
+    expect(await goTo.refuses!({ url: "https://docs.google.com/spreadsheets/d/other" })).toBeNull();
+    expect(await goTo.refuses!({ url: "https://accounts.google.com/" })).toBeNull();
+    expect(await goTo.refuses!({ url: "https://mail.google.com/" })).not.toBeNull();
+    expect(await goTo.refuses!({ url: "https://drive.google.com/" })).not.toBeNull();
+    expect(await goTo.refuses!({ url: "https://www.google.com/" })).not.toBeNull();
   });
 
   it("keeps a port, and a scheme that isn't https, so the routine can get back there", () => {
@@ -99,6 +140,38 @@ describe("the trail", () => {
     expect(texts()).toEqual(["Clicked Add to cart"]);
   });
 
+  it("notes what was copied and where it was pasted, and not the click that selected it", () => {
+    const { note, made, texts } = trail();
+    note({ type: "click", label: "Next", role: "button" });
+    note({ type: "click", label: "Anna Svensson", role: "element" });
+    note({ type: "copied", value: "Anna" });
+    note({ type: "pasted", label: "Name" });
+    note({ type: "typed", label: "Name", value: "Anna" });
+    note({ type: "pasted", label: "" });
+    expect(texts()).toEqual(["Clicked Next", "Copied “Anna”", "Pasted in Name", "Typed “Anna” in Name", "Pasted in a field"]);
+    // A click on something else stays, and so does an empty copy, which says nothing.
+    note({ type: "copied", value: "  " });
+    expect(made.steps).toHaveLength(5);
+    const sent = trailForModel(made.steps).steps;
+    expect(sent[1]).toEqual({ did: "copied", site: "shop.example", copied: "Anna" });
+    expect(sent[3]).toMatchObject({ did: "typed", typed: "Anna", from_copy: true });
+  });
+
+  it("says something was copied from a secret field, and has no way to hold it", () => {
+    const { note, made, texts } = trail();
+    note({ type: "secret", secret: "password" });
+    note({ type: "secret", secret: "password", copied: true, value: "hunter2" });
+    note({ type: "secret", secret: "password", copied: true });
+    note({ type: "secret", secret: "card", copied: true });
+    expect(texts()).toEqual(["Typed in the password field", "Copied from the password field", "Copied from the card field"]);
+    expect(JSON.stringify(made.steps)).not.toContain("hunter2");
+    expect(trailForModel(made.steps).steps.map(({ did }) => did)).toEqual([
+      "typed in a secret field: password field",
+      "copied from a secret field: password field",
+      "copied from a secret field: card field",
+    ]);
+  });
+
   it("stops at the most it can keep", () => {
     const { note, made } = trail();
     for (let at = 0; at <= MAX_STEPS; at++) note({ type: "click", label: `Button ${at}`, role: "button" });
@@ -138,6 +211,32 @@ describe("the draft", () => {
       changes: [{ label: "Search", value: "usb-c cable" }, { label: "Card", value: "4111" }, { label: "Gone", value: "not there" }],
     });
     expect(draftFromReply(reply, seen()).changes.map(({ label }) => label)).toEqual(["Search"]);
+  });
+
+  it("never offers what was copied from a page as something to change", () => {
+    const { note, went, made } = trail();
+    went("https://www.shop.example/");
+    note({ type: "copied", value: "Ada Lovelace" });
+    note({ type: "typed", label: "Search", value: "ada lovelace" });
+    went("https://www.shop.example/search?q=ada+lovelace");
+    note({ type: "typed", label: "Note", value: "Ada Lovelace, mathematician" });
+    note({ type: "typed", label: "City", value: "London" });
+    expect(made.steps.map(({ kind }) => kind)).toEqual(["went", "copied", "searched", "typed", "typed"]);
+    expect(plainDraft(made.steps).changes).toEqual([{ label: "City", value: "London" }]);
+    const reply = JSON.stringify({
+      name: "Look someone up",
+      instructions: "1. Copy the name from the page.\n2. Search shop.example for Ada Lovelace.\n3. Note Ada Lovelace, mathematician, in London.",
+      changes: [{ label: "Name", value: "Ada Lovelace" }, { label: "Note", value: "Ada Lovelace, mathematician" }, { label: "City", value: "London" }],
+    });
+    expect(draftFromReply(reply, made.steps).changes).toEqual([{ label: "City", value: "London" }]);
+  });
+
+  it("only counts a copy that's there as whole words", () => {
+    const { note, made } = trail();
+    note({ type: "copied", value: "1" });
+    note({ type: "typed", label: "Date", value: "2026-11-05" });
+    note({ type: "typed", label: "Count", value: "1 more" });
+    expect(plainDraft(made.steps).changes).toEqual([{ label: "Date", value: "2026-11-05" }]);
   });
 
   it("goes without a step's site once that step is taken out", () => {

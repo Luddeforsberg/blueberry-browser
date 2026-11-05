@@ -4,8 +4,9 @@ import { SHARED } from "./pageScripts";
 // page's, so no tool can reach it and no page can see it. It stops existing at Stop, and nothing here touches the disk.
 //
 // Secret fields are decided before any value is read, and `secretKind` returning anything means `.value` is never touched
-// for that field. Keys are looked at only for being Enter, so what's typed is only ever read from a field, once, when the
-// user has finished with it. A secret has no label either, because a page chooses its labels.
+// for that field. Keys are looked at only for being Enter or Tab, so what's typed is only ever read from a field, once, when
+// the user has finished with it. A secret has no label either, because a page chooses its labels. The clipboard is never
+// read: a copy is what's selected on the page, and a paste is only noted as happening.
 
 const MAX_VALUE_LENGTH = 200;
 const MAX_QUEUE = 40;
@@ -61,6 +62,7 @@ const SCRIPT = `
     return clip(el.getAttribute("aria-label") || byId || labelOf(el) || el.placeholder || el.title || el.getAttribute("name") || "");
   };
 
+  const shortValue = (value) => value.replace(/\\s+/g, " ").trim().slice(0, ${MAX_VALUE_LENGTH});
   const dirty = new Set();
   const sent = new WeakMap();
   const SAW_CARD = Symbol();
@@ -81,7 +83,30 @@ const SCRIPT = `
       return;
     }
     sent.set(el, value);
-    push({ type: "typed", label: fieldName(el), value: value.replace(/\\s+/g, " ").trim().slice(0, ${MAX_VALUE_LENGTH}) });
+    push({ type: "typed", label: fieldName(el), value: shortValue(value) });
+  };
+  // A secret copied here makes the field it's next pasted into one too. Nothing of it is kept but its kind.
+  let copiedSecret = null;
+  // What's being copied, from the field it's in or from the page, and only after the field is ruled out as a secret.
+  const copied = (el) => {
+    copiedSecret = null;
+    if (el && holdsText(el)) {
+      const secret = secretKind(el);
+      if (secret) {
+        copiedSecret = secret;
+        return push({ type: "secret", secret, copied: true });
+      }
+    }
+    const field = el && holdsText(el) && !el.isContentEditable ? el : null;
+    let text = "";
+    try {
+      text = field ? field.value.slice(field.selectionStart ?? 0, field.selectionEnd ?? 0) : String(el?.ownerDocument.getSelection() ?? "");
+    } catch {
+      // A field with no selection to speak of, such as an email address.
+    }
+    if (!text.trim()) return;
+    if (looksLikeCard(text)) copiedSecret = "card";
+    push(copiedSecret ? { type: "secret", secret: copiedSecret, copied: true } : { type: "copied", value: shortValue(text) });
   };
   const finishAll = () => [...dirty].forEach(finishField);
 
@@ -118,9 +143,19 @@ const SCRIPT = `
       if (el && dirty.has(el)) finishField(el);
     }));
     on(where, "keydown", trusted((event) => {
-      if (event.key !== "Enter" || event.isComposing) return;
+      if ((event.key !== "Enter" && event.key !== "Tab") || event.isComposing) return;
       const el = realTarget(event);
-      if (!el || !holdsText(el) || el.tagName === "TEXTAREA" || el.isContentEditable) return;
+      if (!el || !holdsText(el) || el.tagName === "TEXTAREA") return;
+      // An editor like a spreadsheet's keeps the keyboard and empties itself on Enter or Tab, so what's in it is read
+      // before the page gets the key. Shift and Enter is a new line.
+      if (el.isContentEditable) {
+        if (!dirty.has(el) || (event.key === "Enter" && event.shiftKey)) return;
+        finishField(el);
+        // The same words in the next cell are a note of their own.
+        sent.delete(el);
+        return;
+      }
+      if (event.key !== "Enter") return;
       finishField(el);
       const secret = secretKind(el);
       push(secret ? { type: "enter", secret } : { type: "enter", label: fieldName(el) });
@@ -137,9 +172,21 @@ const SCRIPT = `
       else if (el.type === "radio") push({ type: "chose", label: fieldName(el.closest("fieldset") ?? el), value: nameOf(el) });
       else if (el.type === "file") push({ type: "file", label: fieldName(el) });
     }));
+    on(where, "copy", trusted((event) => copied(realTarget(event))));
+    on(where, "paste", trusted((event) => {
+      const el = realTarget(event);
+      if (!el || !holdsText(el)) return;
+      // What's pasted is read from the field like anything typed, once the user has finished with it.
+      if (copiedSecret && !secretKind(el)) secrets.set(el, copiedSecret);
+      const secret = secretKind(el);
+      push(secret ? { type: "secret", secret } : { type: "pasted", label: fieldName(el) });
+    }));
     on(where, "click", trusted((event) => {
       const el = realTarget(event);
       if (!el || el.closest("input,textarea,select,[contenteditable=true],[contenteditable='']")) return;
+      // Dragging over text or clicking twice on it selects it, and that isn't pressing it.
+      const selected = el.ownerDocument.getSelection();
+      if (selected && !selected.isCollapsed && selected.toString().trim() && selected.containsNode(el, true)) return;
       const control = el.closest(ROLES);
       // A label for a box is reported by the box.
       if (control?.tagName === "LABEL" && control.control) return;
