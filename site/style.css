@@ -1,16 +1,16 @@
-/* The front page and a mascot's public page. Only tokens from tokens.css: the frame behind, one canvas card for the
-   page, as in the window, and plain lines split by `border` rather than cards. */
+/* The front page and a mascot's public page. Only tokens from tokens.css. These are web pages, not the window, so there's
+   no frame and no card: the content sits on `canvas`, on one grid with one left edge, and plain lines split by `border`.
+   See The public site and the phone page in DESIGN.md. */
 * { box-sizing: border-box; }
-html { background: rgb(var(--background)); color: rgb(var(--foreground)); }
+:root { --gutter: 20px; --page: 1040px; --wire: rgb(var(--muted-foreground) / 0.45); }
+html { background: rgb(var(--canvas)); color: rgb(var(--foreground)); }
 body {
   margin: 0;
   min-height: 100dvh;
-  background: var(--frame);
+  background: rgb(var(--canvas));
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
   overflow-wrap: anywhere;
   -webkit-text-size-adjust: 100%;
-  /* So the card's margin stays on the frame. */
-  display: flow-root;
 }
 p, h1, h2, h3, ul { margin: 0; }
 ul { padding: 0; list-style: none; }
@@ -18,79 +18,103 @@ svg { display: block; overflow: visible; }
 a { color: rgb(var(--accent-ink)); }
 a:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; border-radius: 4px; }
 
-/* On the frame, above the card. */
-.top { max-width: 800px; margin: 0 auto; display: flex; align-items: center; min-height: 56px; padding: 8px 24px; }
-.wordmark { font-size: 14px; font-weight: 600; color: rgb(var(--foreground)); text-decoration: none; }
-
-/* The one card, floating on the frame like the page card. */
-main {
-  max-width: 776px;
-  margin: 0 auto 32px;
-  padding: 48px 56px 40px;
-  border-radius: 22px;
-  background: rgb(var(--canvas));
-  box-shadow: var(--shadow-page);
+/* One column for everything, the header included, so every page starts at the same left edge. */
+.top, main {
+  width: 100%;
+  max-width: calc(var(--page) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
 }
+.top { display: flex; align-items: center; min-height: 64px; }
+.wordmark { font-size: 16px; font-weight: 600; color: rgb(var(--foreground)); text-decoration: none; }
+main { padding-top: 40px; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 
-h1 { font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; }
-h2 { margin-bottom: 12px; font-size: 14px; font-weight: 600; }
+h1 { font-size: 34px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; text-wrap: balance; }
+h2 { font-size: 14px; font-weight: 600; line-height: 24px; }
 h3 { margin: 16px 0 4px; font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
 section { padding: 24px 0; border-top: 1px solid rgb(var(--border)); }
-section:last-child { padding-bottom: 0; }
+section > h2 { margin-bottom: 8px; }
 .muted { color: rgb(var(--muted-foreground)); font-size: 14px; }
-.small { margin-top: 12px; color: rgb(var(--muted-foreground)); font-size: 13px; }
-.words { font-size: 14px; white-space: pre-wrap; }
-.lede { margin-top: 12px; font-size: 16px; }
-.meta { margin-top: 6px; font-size: 14px; color: rgb(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.small { margin-top: 12px; color: rgb(var(--muted-foreground)); font-size: 13px; max-width: 48em; }
+.words { font-size: 16px; white-space: pre-wrap; max-width: 40em; }
+.lede { margin-top: 12px; font-size: 16px; max-width: 34em; }
+.meta { margin-top: 8px; font-size: 14px; color: rgb(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 
-/* Buttons: full radius, filled only for the main action. */
+/* Buttons: full radius, filled only for the main action, 44px tall so a thumb finds them. */
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .button {
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: 36px; padding: 0 16px; border-radius: 999px; border: 1px solid transparent;
+  min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid transparent;
   background: rgb(var(--primary)); color: rgb(var(--primary-foreground));
-  font-size: 14px; text-decoration: none;
+  font-size: 14px; font-weight: 600; text-decoration: none;
   transition: background-color 100ms cubic-bezier(.32, .72, 0, 1), filter 100ms;
 }
 .button:active { filter: brightness(0.9); }
-.button.outline { background: transparent; color: rgb(var(--foreground)); border-color: rgb(var(--border)); }
+.button.outline { background: transparent; color: rgb(var(--foreground)); border-color: rgb(var(--border)); font-weight: 400; }
 .button.outline:hover { background: rgb(var(--muted)); }
 .button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
 
-/* A mascot's page: the bird stands on the line under the heading, as in the app's review. */
-.hero { display: flex; align-items: flex-end; gap: 32px; padding-bottom: 32px; }
+/* A mascot's page: the bird stands on the line under the heading, as in the app's review. On a phone it stands on its
+   own short wire above the name. */
+.hero { display: flex; flex-direction: column-reverse; gap: 24px; padding-bottom: 32px; }
 .hero-text { flex: 1; min-width: 0; }
-.bird { flex-shrink: 0; width: 200px; height: calc(200px * 113 / 120); margin-bottom: -32px; }
-.bird svg { width: 200px; height: 200px; }
+.bird { flex-shrink: 0; width: 144px; height: calc(144px * 113 / 120); border-bottom: 1.5px solid var(--wire); }
+.bird svg { width: 144px; height: 144px; }
 
 /* What it may do, each line with a lock, open where it isn't limited. */
 .permissions li { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 16px; }
 .icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 4px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-/* The front page's flock, standing on wires. Every third turns round. */
-.flock { display: flex; flex-wrap: wrap; margin-top: 40px; }
-.flock li { width: calc(100% / 3); padding-bottom: 12px; }
-.perch { display: flex; justify-content: center; height: calc(112px * 113 / 120); border-bottom: 1.5px solid rgb(var(--muted-foreground) / 0.45); }
-.perch svg { width: 112px; height: 112px; }
-.flock li:nth-child(3n) .perch svg { transform: scaleX(-1); }
-.flock .name, .flock .what { padding-right: 12px; }
-.flock .name { margin-top: 10px; font-size: 14px; font-weight: 600; }
-.flock .what { font-size: 13px; color: rgb(var(--muted-foreground)); }
-.points li { padding: 12px 0; border-top: 1px solid rgb(var(--border)); }
-.points li:first-child { border-top: 0; padding-top: 0; }
-.points strong { font-weight: 600; }
+/* The flock, standing on wires the width of the page, as on the app's Flock page: each bird at the start of its place,
+   its name under it. Every other one turns round, or every third on a wide row. */
+.flock { display: flex; flex-wrap: wrap; margin-top: 48px; }
+.flock li { width: 50%; padding-bottom: 16px; }
+.perch { display: flex; height: calc(96px * 113 / 120); border-bottom: 1.5px solid var(--wire); }
+.perch svg { width: 96px; height: 96px; }
+.flock li:nth-child(2n) .perch svg { transform: scaleX(-1); }
+.flock .name, .flock .what { padding-right: 16px; }
+.flock .name { margin-top: 12px; font-size: 14px; font-weight: 600; }
+.flock .what { margin-top: 2px; font-size: 13px; color: rgb(var(--muted-foreground)); }
 
-@media (max-width: 600px) {
-  .top { padding: 8px 16px; }
-  main { margin: 0 8px 8px; padding: 24px 16px 32px; }
-  h1 { font-size: 28px; }
-  .hero { flex-direction: column-reverse; align-items: stretch; gap: 16px; padding-bottom: 24px; }
-  .bird { width: 144px; height: calc(144px * 113 / 120); margin: 0; border-bottom: 1.5px solid rgb(var(--muted-foreground) / 0.45); }
-  .bird svg { width: 144px; height: 144px; }
-  .actions .button { flex: 1 1 auto; }
-  .flock li { width: 50%; }
-  .flock li:nth-child(3n) .perch svg { transform: none; }
-  .flock li:nth-child(2n) .perch svg { transform: scaleX(-1); }
-  .perch { height: calc(96px * 113 / 120); }
-  .perch svg { width: 96px; height: 96px; }
+/* What it does: rows split by lines, each with its point first. */
+.points { margin-top: 40px; }
+.points li { padding: 20px 0; border-top: 1px solid rgb(var(--border)); }
+.points strong { display: block; margin-bottom: 4px; font-weight: 600; }
+
+@media (min-width: 600px) {
+  :root { --gutter: 32px; }
+  main { padding-top: 56px; }
+  .hero { flex-direction: row; align-items: flex-end; gap: 32px; }
+  .bird { width: 200px; height: calc(200px * 113 / 120); margin-bottom: -32px; border-bottom: 0; }
+  .bird svg { width: 200px; height: 200px; }
+  .flock li { width: calc(100% / 3); }
+  .flock li:nth-child(2n) .perch svg { transform: none; }
+  .flock li:nth-child(3n) .perch svg { transform: scaleX(-1); }
+  .perch { height: calc(120px * 113 / 120); }
+  .perch svg { width: 120px; height: 120px; }
+}
+
+/* Wide: a larger heading, the whole flock on one wire, and every section as a row of the same two columns, its heading
+   on the left and what it says on the right. The second starts a third of the way across, under the third bird. */
+@media (min-width: 960px) {
+  :root { --gutter: 48px; }
+  main { padding-top: 88px; padding-bottom: 120px; }
+  h1 { font-size: 48px; letter-spacing: -0.025em; }
+  .intro h1 { max-width: 13em; }
+  .lede { margin-top: 16px; font-size: 20px; line-height: 1.45; color: rgb(var(--muted-foreground)); }
+  .hero-text .lede { color: rgb(var(--foreground)); }
+  .flock { margin-top: 72px; }
+  .flock li { width: calc(100% / 6); }
+  .flock .name { font-size: 16px; }
+  .flock .what { font-size: 14px; }
+  .points { margin-top: 56px; }
+  .points li, section { display: grid; grid-template-columns: calc(100% / 3) minmax(0, 40em); }
+  .points li { padding: 24px 0; }
+  .points strong { margin: 0; padding-right: 32px; }
+  section { padding: 32px 0; }
+  section > * { grid-column: 2; }
+  section > h2 { grid-column: 1; grid-row: 1 / span 20; margin: 0; padding-right: 32px; }
+  section > h3:first-of-type { margin-top: 0; }
+  .hero { padding-bottom: 40px; }
+  .bird { margin-bottom: -40px; }
 }
