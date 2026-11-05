@@ -14,7 +14,9 @@ Strawberry has all of that too. The sections below are where Blueberry tries to 
 
 ### Jobs that keep going when you leave
 
-Strawberry's routines run on your own computer, so they only run while it's on and awake, which makes them much less useful than they sound. In Blueberry a job or a routine can run in a browser in the cloud instead, on Browserbase, with the sign-ins you chose to bring along, and a runner on Railway keeps it going with the Mac closed. The phone page follows those jobs from anywhere: start one as any bird, watch the live view, answer what it asks, or take over for a sign-in. Strawberry has nothing like it on the phone.
+Strawberry's routines run on your own computer, so they only run while it's open and awake. The Monday 08:00 report doesn't happen if the laptop is closed in your bag, and a long job means leaving the lid open with the browser busy until it's done. You end up working around your computer's schedule.
+
+In Blueberry, any job or routine can run in a browser in the cloud instead. Close the laptop on the train and the job keeps going. The morning routine runs at 08:00 whether the Mac is on or not, and the summary is there when you open it. The job gets its own browser on Browserbase, signed in to the sites you chose to bring along, so it never takes over your tabs or slows your computer down. A small runner on Railway starts and follows it with the Mac off, as the same bird with the same limits and the same approvals as at your desk. You can start one from the phone app, or from ChatGPT or Claude, wherever you are.
 
 ### Answering from your phone
 
