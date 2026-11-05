@@ -37,6 +37,8 @@ svg { display: block; overflow: visible; }
 /* After a way back, the title is centred on the bar, as an app's is, so it never reads on from "Jobs". */
 .top .back + .title { position: absolute; left: 88px; right: 88px; padding: 0; text-align: center; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top .title ~ .button { margin-left: auto; }
+/* An action on the bar is a word, like the way back, so its text keeps to the gutter instead of a pill sitting past it. */
+.top .button.outline { border-color: transparent; padding: 0 8px; color: rgb(var(--accent-ink)); font-weight: 600; }
 .top .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--muted-foreground)); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--success)); }
 .status-dot.off { background: rgb(var(--muted-foreground)); }
