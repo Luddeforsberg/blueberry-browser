@@ -18,9 +18,7 @@ Strawberry's routines run on your own computer, so they only run while it's on a
 
 ### Answering from your phone
 
-Strawberry marks a chat that needs you, for a sign-in or anything else, but only on the computer. A job that stops for a 2FA code while you're at lunch has wasted the hour. In Blueberry, everything a job waits on is in one Needs you list, and with your own Telegram bot connected, the same items reach your phone: Allow and Don't allow as buttons, a reply for a question, and a code typed straight into the page without the model seeing it. That makes it practical to leave several jobs running at once and walk away. Telegram is one channel behind a small interface, so iMessage or WhatsApp could follow, and so could sign-ins from the phone.
-
-<img src="docs/images/phone-approval.jpg" width="320" alt="The phone page with a cloud job waiting on Allow or Don't allow"><br>A job in the cloud waits on the phone page in the same way, with the exact words of what it will do.
+Strawberry marks a chat that needs you, for a sign-in or anything else, but only on the computer. Go to lunch and you may come back to an agent that spent the hour waiting for one 2FA code. In Blueberry, whatever a job is waiting on comes to your phone. Jobs in the cloud show up in the phone app, which you add to your home screen, and it tells you when one needs you and lets you start new ones. Jobs on your Mac come through your own Telegram bot. On either you can allow or refuse a step, answer a question, or type a code straight into the page, where the model never sees it. If you run several agents at once, you keep them all moving from one list. If you just want lunch, the work is done when you get back. The app and Telegram are channels behind a small interface, so WhatsApp or iMessage could come next.
 
 ### Your birds, from ChatGPT and Claude
 
