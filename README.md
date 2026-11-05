@@ -67,6 +67,8 @@ Three of the features above are also how Blueberry gets users and keeps them.
 
 ## More screenshots
 
+Every feature above, in screenshots: [docs/screenshots](docs/screenshots/README.md).
+
 <table>
 <tr>
 <td width="50%"><img src="docs/images/approval.jpg" alt="An approval card with the exact text Berry would type into lemlist's contact sales form"><br>An approval card says exactly what will happen before anything does.</td>
