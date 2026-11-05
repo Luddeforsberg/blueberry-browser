@@ -83,7 +83,7 @@ var permissionsInWords = ({ sites, tools }) => {
   const visits = tools.includes("visit");
   const clicks = tools.includes("click");
   const types = tools.includes("type");
-  const where = sites.length > 0 ? { text: `Only ${visits ? "visits" : "reads"} ${inList(sites)}`, open: false } : { text: visits ? "Can go anywhere" : "Reads any page you have open", open: true };
+  const where = sites.length > 0 ? { text: `Only ${visits ? "visits" : "reads"} ${inList(sites)}`, open: false } : { text: visits ? "Can search the web and go anywhere" : "Reads any page you have open", open: true };
   const hands = clicks && types ? { text: "Can click and type", open: true } : clicks ? { text: "Can click, but can\u2019t type", open: false } : types ? { text: "Can type, but can\u2019t click", open: false } : { text: "Can\u2019t type or click", open: false };
   const noVisit = clicks || types ? "Can\u2019t go to an address by itself" : "Can\u2019t open pages by itself";
   return visits ? [where, hands] : [where, { text: noVisit, open: false }, hands];

@@ -80,6 +80,12 @@ export const jobs = (fixture: string): Job[] => [
       STOP,
   },
   {
+    // Asked from the desktop once and took 50 steps of rewording one search. A direct path is a few.
+    id: "company-hiring",
+    ability: "research, direct path",
+    prompt: "Check if Strawberry Browser is hiring salespeople, and who leads their team",
+  },
+  {
     id: "table-with-links",
     ability: "research, link addresses",
     prompt:

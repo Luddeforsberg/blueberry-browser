@@ -149,7 +149,7 @@ export const permissionsInWords = ({ sites, tools }: Pick<MascotDraft, "sites" |
   const where: PermissionLine =
     sites.length > 0
       ? { text: `Only ${visits ? "visits" : "reads"} ${inList(sites)}`, open: false }
-      : { text: visits ? "Can go anywhere" : "Reads any page you have open", open: true };
+      : { text: visits ? "Can search the web and go anywhere" : "Reads any page you have open", open: true };
   const hands: PermissionLine =
     clicks && types
       ? { text: "Can click and type", open: true }
