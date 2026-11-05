@@ -48,6 +48,14 @@ In Strawberry, work starts inside the browser, but most work happens in other ap
 
 The flock itself, routines on a schedule, jobs that work in tabs behind yours with a live picture of them beside the chat, and birds that keep a habit only when you say yes and show every word they keep. Strawberry has all of these, and they work much the same here. Blueberry needs them because everything above is built on them. The same goes for the safety rules below, which every AI browser needs.
 
+## How it grows
+
+Three of the features above are also how Blueberry gets users and keeps them.
+
+- **Every shared bird is a landing page.** A published bird gets a public page showing what it's told, what it's allowed to do, and an Open in Blueberry button. People share the birds they make, the add count tells the next person it's worth trying, and each share brings someone new to Blueberry.
+- **It starts where people already are.** Through the relay, people in ChatGPT and Claude can use your birds without switching browsers. They get something out of Blueberry first and switch later.
+- **It keeps giving people a reason to come back.** Most people drop a new agent because they don't know what to use it for. Strawberry's suggestions mostly come once, at onboarding. In Blueberry they keep coming from what you actually do, including new birds for the jobs you repeat, so a week in there's still something new worth handing over. Importing your history means even the first ones are about you.
+
 ## Safety
 
 - By default, a bird stops before anything risky on an approval card with the exact sentence of what will happen, and does nothing if the page changed after you allowed it. A job on the cloud runner never asks less than that.
