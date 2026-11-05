@@ -56,7 +56,7 @@ https://github.com/user-attachments/assets/9d6a5aff-b464-427e-b61e-298dcad6accc
 
 In Strawberry, work starts inside the browser, but most work happens in other apps. You're in Slack or Mail, see something worth looking into, and hand it to Berry with `⌥Space` without switching apps. Turned on in Settings, Berry waits tucked behind an edge of the screen, above every app. The job runs in the browser where you're signed in. It never reads the screen, the clipboard or another app. Later it could work on the desktop itself.
 
-https://github.com/user-attachments/assets/19556d57-1b0b-45db-a709-66a27fcd8beb
+https://github.com/user-attachments/assets/41e38ba9-bc74-4f5c-8847-5d0c17a92315
 
 ### The rest
 
