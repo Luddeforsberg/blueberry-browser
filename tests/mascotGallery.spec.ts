@@ -17,7 +17,7 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
     await chrome.getByRole("button", { name: "Flock", exact: true }).click();
     await chrome.getByRole("button", { name: "Browse the Gallery" }).click();
     const gallery = chrome.getByRole("list", { name: "Gallery", exact: true });
-    await expect(gallery.getByRole("listitem", { name: "Prospector" })).toContainText("Can go anywhere");
+    await expect(gallery.getByRole("listitem", { name: "Prospector" })).toContainText("Can search the web and go anywhere");
     await expect(gallery.getByRole("listitem", { name: "Follow-up" })).toContainText("Only visits mail.google.com");
 
     // The search and the categories really filter.
@@ -33,13 +33,13 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
       window.chromeAPI.mascots.save(null, { name: "Meeting Prep", look: { palette: "robin", accessory: "cap" }, instructions: "Mine.", sites: [], tools: [] })
     );
     const card = gallery.getByRole("listitem", { name: "Meeting Prep" });
-    await expect(card).toContainText("Can go anywhere");
+    await expect(card).toContainText("Can search the web and go anywhere");
     await expect(card).toContainText("Can’t type or click");
     await expect(card).toContainText("with an example");
     await expect(gallery.getByRole("listitem", { name: "Follow-up" })).not.toContainText("with an example");
     await card.getByRole("button", { name: "Add Meeting Prep" }).click();
     await expect(chrome.getByText("Before a call, I'll name the company")).toBeVisible();
-    await expect(chrome.getByRole("list", { name: "What it’s allowed to do" })).toContainText("Can go anywhere");
+    await expect(chrome.getByRole("list", { name: "What it’s allowed to do" })).toContainText("Can search the web and go anywhere");
     await expect(chrome.getByRole("region", { name: "Example" })).toContainText("Prep me for a call");
     const rename = chrome.getByLabel("You already have a Meeting Prep. Name this one");
     await expect(rename).toHaveValue("Meeting Prep 2");

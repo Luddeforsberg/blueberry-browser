@@ -5,8 +5,8 @@ const words = (sites: string[], tools: ("visit" | "click" | "type")[]) => permis
 
 describe("permissionsInWords", () => {
   it.each([
-    [[], ["visit", "click", "type"], ["Can go anywhere", "Can click and type"]],
-    [[], ["visit"], ["Can go anywhere", "Can’t type or click"]],
+    [[], ["visit", "click", "type"], ["Can search the web and go anywhere", "Can click and type"]],
+    [[], ["visit"], ["Can search the web and go anywhere", "Can’t type or click"]],
     [[], [], ["Reads any page you have open", "Can’t open pages by itself", "Can’t type or click"]],
     [["hemnet.se"], ["visit"], ["Only visits hemnet.se", "Can’t type or click"]],
     [["hemnet.se", "booli.se"], ["visit", "click"], ["Only visits hemnet.se and booli.se", "Can click, but can’t type"]],
