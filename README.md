@@ -8,7 +8,7 @@ An AI browser that works on your behalf. Grow a flock of birds for the jobs you 
 
 ## What it does
 
-Blueberry is a browser first, designed for the Mac: tabs, history, bookmarks, downloads, find, zoom and site permissions, in a window made to look like the skin of a blueberry. Berry, a jackdaw with a blueberry in its beak, does jobs in the browser when you ask, and you can grow a flock of other birds beside it, each with its own name, look, instructions and limits.
+Blueberry is a full web browser, one you can use every day even without the AI: tabs, history, bookmarks, downloads, find, zoom and site permissions, in a window made to look like the skin of a blueberry. Berry, a jackdaw with a blueberry in its beak, does jobs in the browser when you ask, and you can grow a flock of other birds beside it, each with its own name, look, instructions and limits.
 
 Strawberry has all of that too. The sections below are where Blueberry tries to do better than Strawberry does today, each starting from what's missing there. What I say about Strawberry is how I understand it as of November 2026.
 
