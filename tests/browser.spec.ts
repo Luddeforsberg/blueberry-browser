@@ -240,6 +240,55 @@ test("links that open a new window become tabs, from every tab and from the chro
   expect(await windows()).toBe(1);
 });
 
+test("a page's popup is a real one, shown as a tab, and closing itself goes back to the page", async () => {
+  // A sign-in popup on another site: it tells its opener how it went, and closes when told.
+  const signIn = createServer((_, response) => {
+    response.setHeader("content-type", "text/html");
+    response.end(`<!doctype html><title>Sign in</title><body><script>
+      window.resizeTo(300, 200);
+      window.opener.postMessage("signed in", "*");
+      window.addEventListener("message", (event) => { if (event.data === "done") window.close(); });
+    </script></body>`);
+  });
+  await new Promise<void>((resolve) => signIn.listen(0, "127.0.0.1", resolve));
+  const signInOrigin = `http://127.0.0.1:${(signIn.address() as AddressInfo).port}`;
+  try {
+    const page = await openFixture();
+    const opener = (await activeTab()).id;
+    const count = (await getTabs()).length;
+    const bounds = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getBounds());
+    const before = await bounds();
+
+    await page.evaluate(() => window.addEventListener("message", (event) => { document.title = `Got ${event.data}`; }));
+    const opened = await page.evaluate((url) => {
+      (window as Window & { popup?: Window | null }).popup = window.open(url, "signin", "width=300,height=200");
+      return (window as Window & { popup?: Window | null }).popup !== null;
+    }, `${signInOrigin}/`);
+    expect(opened).toBe(true);
+    await expect.poll(async () => (await activeTab()).url).toContain(signInOrigin);
+    expect(await getTabs()).toHaveLength(count + 1);
+    await expect.poll(() => page.title()).toBe("Got signed in");
+
+    // It has a tab's preferences, not the opener's or anything it asked for, and the window kept its size.
+    const preferences = await app.evaluate(({ webContents }, origin) => {
+      const popup = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(origin));
+      // Electron's own record of what the page was made with, which its types leave out.
+      const made = (popup as (typeof popup & { getLastWebPreferences?: () => Electron.WebPreferences | null }) | undefined)?.getLastWebPreferences?.();
+      const { sandbox, contextIsolation, nodeIntegration, preload } = made ?? {};
+      return { sandbox, contextIsolation, nodeIntegration, preload };
+    }, signInOrigin);
+    expect(preferences).toEqual({ sandbox: true, contextIsolation: true, nodeIntegration: false, preload: undefined });
+    expect(await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length)).toBe(1);
+    expect(await bounds()).toEqual(before);
+
+    await page.evaluate(() => (window as Window & { popup?: Window | null }).popup?.postMessage("done", "*"));
+    await expect.poll(async () => (await getTabs()).length).toBe(count);
+    expect((await activeTab()).id).toBe(opener);
+  } finally {
+    signIn.close();
+  }
+});
+
 test("window.open ignores anything that isn't a web link", async () => {
   const page = await openFixture();
   const count = (await getTabs()).length;

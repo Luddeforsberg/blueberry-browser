@@ -80,7 +80,7 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-e
 - `src/renderer/chrome`: the one chrome renderer, drawing the sidebar or tab row, toolbar, chat panel, glass, and internal pages such as the new tab page, which open as tabs with no web view. The overlay view loads the same page with `?view=overlay`. Shared code lives in `src/renderer/common`.
 - `src/renderer/common/components/Mascot.tsx`: Berry and the flock, behind `<Mascot mood size look>`. Screens use the chrome's `Berry` wrapper, which applies Show Berry and Keep Berry still. Replace the artwork here without touching screens, and add new components to the gallery page (View > Component Gallery).
 - `src/renderer/chrome/src/components/Composer.tsx` and `ChatMessage.tsx`: the one composer and message layout, used by the new tab page, the main chat and the chat panel. Change them here so the chats stay alike. `ChatApprovalCard` and `ApprovalCard.tsx` show approvals everywhere but Needs you. `siteNames.ts` only shortens addresses for the sentence on top, so the exact words from `describe` always stay under it in full.
-- Web pages run in `Tab` views with no preload and no Node access.
+- Web pages run in `Tab` views with no preload and no Node access. A page's `window.open` makes a real popup through `Window.openLinksInTabs`: a tab around the page Electron made, with the same `TAB_WEB_PREFERENCES` as any tab, so the opener can still talk to it, as Continue with Google needs. It closes when the page closes itself. The chrome's own links still open as plain tabs with no opener.
 
 ## Traps
 

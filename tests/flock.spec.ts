@@ -25,7 +25,7 @@ test.beforeAll(async () => {
       return;
     }
     const links: Record<string, string> = {
-      "/popup": `<a target="_blank" href="/redirect">A new tab away</a>`,
+      "/popup": `<a target="_blank" href="/redirect">A new tab away</a> <a target="_blank" href="http://localhost:${port}/secret-popup">A new tab off the site</a>`,
     };
     response.setHeader("content-type", "text/html");
     response.end(`<!doctype html><title>Page</title><body>${links[request.url ?? ""] ?? `<a href="http://localhost:${port}/secret-link">A plain link away</a>`}</body>`);
@@ -100,13 +100,14 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   model.callTools({ name: "list_elements", args: {} });
   model.callTools({ name: "click", args: { ref: "e1" } });
   model.callTools({ name: "open_tab", args: { url: `http://127.0.0.1:${port}/redirect` } });
-  // Nor through a new tab it opens.
+  // Nor through a new tab it opens, whether it starts off the site or is sent there.
   model.callTools({ name: "open_tab", args: { url: `http://127.0.0.1:${port}/popup` } });
   model.callTools({ name: "list_elements", args: {} });
   model.callTools({ name: "click", args: { ref: "e1" } });
+  model.callTools({ name: "click", args: { ref: "e2" } });
   await chrome.getByRole("textbox", { name: "Message" }).fill("Follow the link");
   await chrome.getByRole("textbox", { name: "Message" }).press("Enter");
-  await expect.poll(() => model.requests.at(-1)?.messages.filter((message) => message.role === "tool").length, { timeout: 15_000 }).toBeGreaterThanOrEqual(7);
+  await expect.poll(() => model.requests.at(-1)?.messages.filter((message) => message.role === "tool").length, { timeout: 15_000 }).toBeGreaterThanOrEqual(8);
   await expect(chrome.getByRole("button", { name: "Save as routine" })).toBeVisible({ timeout: 15_000 });
   await chrome.waitForTimeout(800);
   const tools = JSON.stringify(model.requests.at(-1)?.messages.filter((message) => message.role === "tool"));

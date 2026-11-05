@@ -1,6 +1,6 @@
 import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, systemPreferences, type WebContents } from "electron";
 import { release } from "os";
-import { Tab } from "./Tab";
+import { TAB_WEB_PREFERENCES, Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
 import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
@@ -79,6 +79,9 @@ const supportsGlass = (): boolean => {
   if (process.platform !== "win32") return false;
   return Number(release().split(".")[2]) >= 22621;
 };
+
+// A page opened by another with `window.open`, and the tab that opened it.
+type Popup = { page: WebContents; openerId: string };
 
 // The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach.
 const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
@@ -522,19 +525,45 @@ export class Window {
   // Without a handler, window.open starts a new window that inherits the opener's preload.
   private openLinksInTabs(webContents: WebContents): void {
     webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/i.test(url)) {
-        // A page behind the current one, perhaps one Berry is using, doesn't get to come to the front.
-        const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
-        // A limited mascot's click can't open what it couldn't go to.
-        if (opener?.refusesNavigation(url)) return { action: "deny" };
-        // Nor does one Berry opened, even with the user watching. If they had clicked here, it would be theirs by now.
-        const behind = !!opener && (opener.id !== this.activeTabId || this.chats.isOwnTab(opener.id));
-        const popup = behind ? this.createBackgroundTab(url) : this.createTab(url);
-        if (opener) popup.limitFirstLoadLike(opener);
-        if (behind) this.chats.notePopup(opener.id, popup.id);
+      if (!/^https?:/i.test(url)) return { action: "deny" };
+      const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
+      // The chrome's own links open as plain tabs, so no page is ever a child of the chrome.
+      if (!opener) {
+        this.createTab(url);
+        return { action: "deny" };
       }
-      return { action: "deny" };
+      // A limited mascot's click can't open what it couldn't go to.
+      if (opener.refusesNavigation(url)) return { action: "deny" };
+      // A page behind the current one, perhaps one Berry is using, doesn't get to come to the front.
+      // Nor does one Berry opened, even with the user watching. If they had clicked here, it would be theirs by now.
+      const behind = opener.id !== this.activeTabId || this.chats.isOwnTab(opener.id);
+      // A real popup, so the page that opened it can talk to it, as a sign-in with Google needs. It's a tab with a
+      // tab's preferences, its size is ignored, and it stays when its opener goes, like any tab.
+      return {
+        action: "allow",
+        outlivesOpener: true,
+        overrideBrowserWindowOptions: { webPreferences: TAB_WEB_PREFERENCES },
+        createWindow: (options) => {
+          // Electron passes the page it made for the popup along with the options, though its types leave it out.
+          const page = (options as { webContents?: WebContents }).webContents;
+          if (!page) throw new Error("Electron gave no page for the popup");
+          const popup = { page, openerId: opener.id };
+          const tab = behind ? this.createBackgroundTab(url, popup) : this.createTab(url, popup);
+          tab.limitFirstLoadLike(opener);
+          if (behind) this.chats.notePopup(opener.id, tab.id);
+          return tab.webContents;
+        },
+      };
     });
+  }
+
+  // A popup that closes itself takes the user back to the page that opened it, if they were looking at the popup.
+  private closedByPage(tabId: string, openerId: string | null): void {
+    if (this.windowClosed || !this.tabsMap.has(tabId)) return;
+    // Its page is gone, so the tab goes before anything else looks at it.
+    const wasActive = this.activeTabId === tabId;
+    this.closeTab(tabId, false);
+    if (wasActive && openerId && this.tabsMap.has(openerId)) this.switchActiveTab(openerId);
   }
 
   private titleBarOverlay() {
@@ -731,11 +760,11 @@ export class Window {
   }
 
   // With no address, a tab opens on the new tab page.
-  createTab(url: string): Tab;
+  createTab(url: string, popup?: Popup): Tab;
   createTab(url?: string): BrowserTab;
-  createTab(url?: string): BrowserTab {
+  createTab(url?: string, popup?: Popup): BrowserTab {
     if (!url) return this.openPage("new-tab");
-    const tab = this.createWebTab(`tab-${++this.tabCounter}`, url);
+    const tab = this.createWebTab(`tab-${++this.tabCounter}`, url, undefined, popup);
     this.tabsMap.set(tab.id, tab);
     this.switchActiveTab(tab.id);
     return tab;
@@ -787,10 +816,10 @@ export class Window {
     if (!this.windowClosed) this.sessionStore.saveSoon(() => this.currentSession);
   }
 
-  private createBackgroundTab(url: string): Tab {
+  private createBackgroundTab(url: string, popup?: Popup): Tab {
     const id = `tab-${++this.tabCounter}`;
     this.backgroundTabs.add(id);
-    const tab = this.createWebTab(id, url);
+    const tab = this.createWebTab(id, url, undefined, popup);
     // Berry never makes a sound. Going to the tab turns it back on.
     tab.webContents.setAudioMuted(true);
     this.tabsMap.set(tab.id, tab);
@@ -871,7 +900,7 @@ export class Window {
     return true;
   }
 
-  private createWebTab(tabId: string, url: string, restored?: SavedWebTab): Tab {
+  private createWebTab(tabId: string, url: string, restored?: SavedWebTab, popup?: Popup): Tab {
     // Loading starts inside the constructor, so these can run before `tab` is assigned.
     let tab: Tab | null = null;
     tab = new Tab(
@@ -895,6 +924,7 @@ export class Window {
           dark: nativeTheme.shouldUseDarkColors,
           windowShowing: this.windowShowing,
         }),
+        onClosedByPage: () => this.closedByPage(tabId, popup?.openerId ?? null),
         onDetails: () =>
           this.saveVisit(tabId, () => {
             if (tab) this.history.update(tab.url, { title: tab.title, favicon: tab.favicon });
@@ -914,7 +944,8 @@ export class Window {
           });
         },
       },
-      restored
+      restored,
+      popup?.page
     );
     return tab;
   }
