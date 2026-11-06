@@ -106,7 +106,10 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
                         )}
                         {thread.error && <ChatError message={thread.error} />}
-                        {!running && thread.messages.at(-1)?.role === 'assistant' && (
+                        {/* Only once Berry has done something in this chat: a reply that's just a question has nothing to repeat. */}
+                        {!running &&
+                            thread.messages.at(-1)?.role === 'assistant' &&
+                            thread.messages.some((message) => message.role === 'assistant' && (message.steps?.length ?? 0) > 0) && (
                             <div>
                                 <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>
                                     Save as routine
