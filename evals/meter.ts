@@ -16,6 +16,7 @@ export interface ModelCall {
 // US$ per million tokens: [input, cached input, output], from developers.openai.com/api/docs/pricing on 2026-10-31.
 // A model not listed here is priced high, so the budget errs towards stopping.
 const PRICES: Record<string, [number, number, number]> = {
+  "gpt-6.1-sol": [2, 0.1, 10],
   "gpt-6.1-terra": [1, 0.05, 5],
   "gpt-6-luna": [0.1, 0.01, 0.5],
 };
