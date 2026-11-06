@@ -2,6 +2,8 @@ appId: com.ludwigforsberg.blueberry
 productName: blueberry-browser
 directories:
   buildResources: build
+# Berry on lavender, made from the bird in Mascot.tsx. electron-builder makes the .icns and .ico from it.
+icon: resources/icon.png
 files:
   - '!**/.vscode/*'
   - '!src/*'
