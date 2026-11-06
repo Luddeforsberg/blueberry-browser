@@ -92,6 +92,8 @@ export interface ChatThread extends ChatThreadSummary {
   messages: ChatThreadMessage[];
   // The reply being written, which is saved once it ends. Null when no reply is running.
   partial: string | null;
+  // What the running reply said it's doing, until its answer starts. Only for the screen, and never saved.
+  statusLine: string | null;
   // What the running reply has done so far. Empty when no reply is running.
   steps: ChatStep[];
   approval: ChatApproval | null;
@@ -198,6 +200,8 @@ export interface RoutineRun {
   seen: boolean;
   // What its bird remembered going into this run, by id.
   memoryIds?: string[];
+  // While it runs, what it said it's doing, until its answer starts. Only on the Routines page, and never saved.
+  statusLine?: string;
 }
 
 export interface Routine {

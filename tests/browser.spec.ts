@@ -416,6 +416,30 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   await expect.poll(() => model.requests.length).toBe(3);
 });
 
+test("what Berry says before a tool call shows above the reply while it works, and isn't part of the answer", async () => {
+  await openFixture();
+  await openChat();
+  const panel = chrome.getByRole("complementary", { name: "Berry" });
+
+  model.sayThenCallTools("I'll search the page first.", { name: "find_in_page", args: { query: "HELLO" } });
+  model.replyWith("It says hello.");
+  const answer = model.holdBeforeFirstToken();
+  await askInPanel("Does it say hello?");
+  const statusLine = panel.getByRole("status").filter({ hasText: "I'll search the page first." });
+  await expect(statusLine).toBeVisible();
+  await expect.poll(() => model.requests.length).toBe(2);
+  expect(JSON.stringify(model.requests[0].messages[0])).toContain("The user is here to answer.");
+
+  answer();
+  await expect(panel.getByText("It says hello.")).toBeVisible();
+  await expect(statusLine).toHaveCount(0);
+  await expect(panel.getByText("I'll search the page first.")).toHaveCount(0);
+  // The next request carries the earlier reply as the model will see it, with only its answer.
+  await askInPanel("Thanks");
+  await expect.poll(() => model.requests.length).toBe(3);
+  expect(JSON.stringify(model.requests[2].messages)).not.toContain("I'll search the page first.");
+});
+
 test("a chat with no page opens tabs behind itself, and reaches only those", async () => {
   await askBeforeActing("always");
   await openFixture();

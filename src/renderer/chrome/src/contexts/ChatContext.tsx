@@ -9,6 +9,7 @@ export interface Message {
     memoryIds?: string[]
     pages?: UsedPage[]
     isStreaming?: boolean
+    statusLine?: string | null
 }
 
 interface ChatContextType {
@@ -61,8 +62,8 @@ const toMessages = (thread: ChatThread | null): Message[] => {
     if (!thread) return []
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
     // Before the first words arrive, the thinking state stands in for the reply.
-    return thread.partial || thread.steps.length > 0 || thread.approval
-        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', steps: thread.steps, memoryIds: thread.memoryIds, isStreaming: true }]
+    return thread.partial || thread.statusLine || thread.steps.length > 0 || thread.approval
+        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', statusLine: thread.statusLine, steps: thread.steps, memoryIds: thread.memoryIds, isStreaming: true }]
         : saved
 }
 
