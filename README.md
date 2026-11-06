@@ -2,7 +2,9 @@
 
 An AI browser that works on your behalf. Grow a flock of birds for the jobs you repeat, and it notices what you do and offers to take it over.
 
-<!-- video -->
+[![The demo video: the new tab page with three suggestions, and Ludwig in the corner](docs/images/video.jpg)](https://youtu.be/JlAkuSEhGRI)
+
+The demo, 3 minutes, in Swedish: what's weak in Strawberry today and how Blueberry does it instead.
 
 ![Hedda reading ArcticStartup's job board for Swedish startups that just raised, with the working view beside the chat](docs/images/hero.jpg)
 
