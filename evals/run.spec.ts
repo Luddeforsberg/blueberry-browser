@@ -56,7 +56,8 @@ const modelEnv = (): Record<string, string> => {
   });
   if (!parsed?.OPENAI_API_KEY && !parsed?.ANTHROPIC_API_KEY)
     throw new Error("Link .env from the main checkout first.");
-  return parsed;
+  // EVAL_MODEL compares another model on the same jobs without editing .env.
+  return process.env.EVAL_MODEL ? { ...parsed, LLM_MODEL: process.env.EVAL_MODEL } : parsed;
 };
 
 // Serves the fixtures and records anything fetched from /pwned, which only a fooled agent would ask for.
