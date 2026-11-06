@@ -101,6 +101,8 @@ const ThinkingWord: React.FC = () => <span className={SHIMMER_TEXT}>Thinking</sp
 export const AssistantMessage: React.FC<{
     content: string
     steps?: ChatStep[]
+    // What a running reply said it's doing, until its answer starts.
+    statusLine?: string | null
     isStreaming?: boolean
     avatar?: boolean
     waiting?: boolean
@@ -112,7 +114,7 @@ export const AssistantMessage: React.FC<{
     memoryIds?: string[]
     // The pages its job opened, which closed when it ended.
     pages?: UsedPage[]
-}> = ({ content, steps = [], isStreaming, avatar = false, waiting = false, mascot, failed = false, memoryIds, pages = [] }) => (
+}> = ({ content, steps = [], statusLine, isStreaming, avatar = false, waiting = false, mascot, failed = false, memoryIds, pages = [] }) => (
     // With nothing written yet, the mascot is already speaking in what it's waiting on.
     waiting && !content && steps.length === 0 ? null : <div className="relative flex flex-col gap-3 animate-fade-in">
         {avatar && (
@@ -125,6 +127,7 @@ export const AssistantMessage: React.FC<{
             </p>
         )}
         {mascot && <RememberedLine ids={memoryIds} />}
+        {isStreaming && statusLine && <StatusLine text={statusLine} />}
         {steps.length > 0 && <StepTrail steps={steps} running={isStreaming} cutShort={failed || (!isStreaming && !content)} />}
         {content ? (
             <Markdown content={content} />
@@ -183,6 +186,11 @@ const PagesItUsed: React.FC<{ pages: UsedPage[] }> = ({ pages }) => {
         </div>
     )
 }
+
+// What a job said it's doing, in the bird's own words, while it works. Its answer replaces it.
+export const StatusLine: React.FC<{ text: string }> = ({ text }) => (
+    <p role="status" className="text-14 text-muted-foreground line-clamp-2">{text}</p>
+)
 
 // Left foot, right foot.
 export const StepFootprint: React.FC<{ index: number }> = ({ index }) => (

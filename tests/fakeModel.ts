@@ -24,7 +24,7 @@ export const startFakeModel = async () => {
   let holdStart: Promise<void> | null = null;
   let hold: Promise<void> | null = null;
   let title = "NONE";
-  let toolCalls: Array<Array<{ name: string; args: object }>> = [];
+  let toolCalls: Array<{ calls: Array<{ name: string; args: object }>; say?: string }> = [];
   let thinkMs = 0;
   const requests: FakeModelRequest[] = [];
   const titleRequests: FakeModelRequest[] = [];
@@ -65,13 +65,15 @@ export const startFakeModel = async () => {
     const nextCalls = toolCalls.shift();
     if (thinkMs) await new Promise((resolve) => setTimeout(resolve, thinkMs));
     if (nextCalls) {
-      const calls = nextCalls.map(({ name, args }, index) => ({
+      const calls = nextCalls.calls.map(({ name, args }, index) => ({
         index,
         id: `call-${requests.length}-${index}`,
         type: "function",
         function: { name, arguments: JSON.stringify(args) },
       }));
       response.setHeader("content-type", "text/event-stream");
+      // Words come before the call in the same message, as a real model's do.
+      if (nextCalls.say) response.write(sseChunk({ role: "assistant", content: nextCalls.say }, null));
       response.write(sseChunk({ role: "assistant", content: null, tool_calls: calls }, null));
       response.write(sseChunk({}, "tool_calls"));
       response.end("data: [DONE]\n\n");
@@ -131,7 +133,11 @@ export const startFakeModel = async () => {
     },
     // The next reply asks for these tools instead of answering. Call again for the reply after that.
     callTools(...calls: Array<{ name: string; args: object }>) {
-      toolCalls.push(calls);
+      toolCalls.push({ calls });
+    },
+    // The same, with words written first in that message.
+    sayThenCallTools(say: string, ...calls: Array<{ name: string; args: object }>) {
+      toolCalls.push({ calls, say });
     },
     // How long each answer takes, as a real model's does, for anything watching the time between steps.
     thinkFor(ms: number) {

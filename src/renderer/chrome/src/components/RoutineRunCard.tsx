@@ -4,7 +4,7 @@ import { BerryDot } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { ChatApprovalCard, ChatError, Markdown, StepTrail } from './ChatMessage'
+import { ChatApprovalCard, ChatError, Markdown, StatusLine, StepTrail } from './ChatMessage'
 import { MemoryOffers, RememberedLine } from './MemoryInChat'
 
 // Status colours always come with words, so colour is never the only signal.
@@ -56,6 +56,11 @@ export const RoutineRunCard: React.FC<{
             {(run.memoryIds?.length ?? 0) > 0 && (
                 <div className="mt-3">
                     <RememberedLine ids={run.memoryIds} />
+                </div>
+            )}
+            {open && run.statusLine && (
+                <div className="mt-3">
+                    <StatusLine text={run.statusLine} />
                 </div>
             )}
             {run.steps.length > 0 && (

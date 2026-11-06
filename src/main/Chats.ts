@@ -106,6 +106,8 @@ const toReplyMessage = (message: ChatThreadMessage): ReplyMessage => asHistoryMe
 interface Run {
   controller: AbortController;
   partial: string;
+  // What it said it's doing, in a message that went on to use tools, until its answer starts. Never saved or sent on.
+  statusLine: string | null;
   steps: ChatStep[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
@@ -141,6 +143,8 @@ interface Run {
   askAtLeast?: ActionApproval;
   // Told once, when this reply ends, how it went. Not for a later reply in the same chat.
   onEnd?: (ended: EndedReply) => void;
+  // The user typed this here and is there to answer, so it may ask or plan before starting.
+  userPresent: boolean;
 }
 
 // How one reply ended, for whoever started it.
@@ -237,6 +241,8 @@ export interface WaitingRun {
 
 export interface TaskProgress {
   steps: ChatStep[];
+  // For the screen only: what it said it's doing, until its answer starts.
+  statusLine?: string | null;
   approval: ChatApproval | null;
   tokens: number;
   memoryIds?: string[];
@@ -755,6 +761,7 @@ export class Chats {
         ...chat,
         messages: pending === undefined ? chat.messages : [...chat.messages, { role: "user", content: pending }],
         partial: progress?.reply ?? null,
+        statusLine: null,
         steps: progress?.steps ?? [],
         approval: progress?.approval ? publicApproval(progress.approval) : null,
         error: this.errors.get(chat.id) ?? null,
@@ -765,6 +772,7 @@ export class Chats {
     return {
       ...chat,
       partial: run?.partial ?? null,
+      statusLine: run?.statusLine ?? null,
       steps: run?.steps ?? [],
       approval: run?.approval ? publicApproval(run.approval) : null,
       error: this.errors.get(chat.id) ?? null,
@@ -784,7 +792,8 @@ export class Chats {
   // Starts a chat when `chatId` is null, as `mascotId` if it's given. An existing chat stays with its own mascot.
   // The reply follows through the events. `from` names the app outside Blueberry that started a new chat, and `sites`,
   // `tools` and `askAtLeast` can only narrow what this reply may do, on top of the mascot's own and the setting.
-  // `onEnd` hears how this reply ended, and nothing of a later one.
+  // `onEnd` hears how this reply ended, and nothing of a later one. `userPresent` is only for a message the user typed in
+  // one of Blueberry's own composers, where they're there to answer a question before it starts.
   send(
     chatId: string | null,
     text: string,
@@ -798,7 +807,8 @@ export class Chats {
       onEnd,
       cloud = false,
       runner = false,
-    }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; tools?: string[]; askAtLeast?: ActionApproval; onEnd?: (ended: EndedReply) => void; cloud?: boolean; runner?: boolean }
+      userPresent = false,
+    }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; tools?: string[]; askAtLeast?: ActionApproval; onEnd?: (ended: EndedReply) => void; cloud?: boolean; runner?: boolean; userPresent?: boolean }
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
@@ -823,7 +833,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -945,7 +955,9 @@ export class Chats {
       const said = this.userWords(chatId).join("\n");
       const tools = this.jobTools(chatId, run, page, said);
       this.recall(chatId, run, said);
-      await this.consume(chatId, run, messages, tools, (content) => this.events.onChunk(chatId, content));
+      await this.consume(chatId, run, messages, tools, (content) => {
+        if (content) this.events.onChunk(chatId, content);
+      });
     } catch (error) {
       if (!signal.aborted) {
         console.error("Error in chat reply:", error);
@@ -1019,21 +1031,40 @@ export class Chats {
     run: Run,
     messages: ReplyMessage[],
     tools: PageTool[],
+    // Hears each piece of the answer as it's added, or nothing when the whole reply went out instead, as it does when the
+    // answer is taken back or the status line goes.
     onWords: (content: string) => void,
     onUsage?: (tokens: number) => void
   ): Promise<void> {
-    for await (const words of this.streamReply(messages, run.controller.signal, {
+    for await (const part of this.streamReply(messages, run.controller.signal, {
       tools,
       actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
       approve: (text) => this.askToAllow(id, run, text),
       onStep: (text, shown) => this.startStep(id, run, text, shown),
       onUsage,
       mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
+      userPresent: run.userPresent,
     })) {
-      const content = run.breakBeforeText ? `\n\n${words}` : words;
+      if (typeof part !== "string") {
+        // What streamed as the answer was on the way to it, so it comes out of the answer.
+        const tookBack = run.partial !== "";
+        run.partial = "";
+        run.breakBeforeText = false;
+        run.statusLine = part.statusLine;
+        this.publish(id, run);
+        if (tookBack) onWords("");
+        continue;
+      }
+      const content = run.breakBeforeText ? `\n\n${part}` : part;
       run.breakBeforeText = false;
       run.partial += content;
-      onWords(content);
+      // The answer has started, so the line saying what it's doing goes, and the whole reply goes out with it.
+      if (run.statusLine === null) onWords(content);
+      else {
+        run.statusLine = null;
+        this.publish(id, run);
+        onWords("");
+      }
     }
   }
 
@@ -1054,6 +1085,7 @@ export class Chats {
     const run: Run = {
       controller: new AbortController(),
       partial: "",
+      statusLine: null,
       steps: [],
       breakBeforeText: false,
       approval: null,
@@ -1067,6 +1099,7 @@ export class Chats {
       onChange: () =>
         onProgress({
           steps: run.steps.map((step) => ({ ...step })),
+          statusLine: run.statusLine,
           approval: run.approval && publicApproval(run.approval),
           tokens,
           memoryIds: run.memoryIds,
@@ -1077,6 +1110,7 @@ export class Chats {
       answers: [],
       handedOver: false,
       cloud,
+      userPresent: false,
     };
     this.runs.set(id, run);
     this.taskPopups.set(id, new Set());

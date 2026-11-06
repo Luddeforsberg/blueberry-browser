@@ -38,6 +38,7 @@ interface ActiveRun {
   runId: string;
   steps: ChatStep[];
   approval: ChatApproval | null;
+  statusLine: string | null;
 }
 
 const prompt = (routine: StoredRoutine, now: number): string => routinePrompt(routine, `at ${new Date(now).toString()}`);
@@ -159,7 +160,7 @@ export class Routines {
   private begin(routine: StoredRoutine, lateFor: number | null): string {
     const now = Date.now();
     const runId = this.store.startRun(routine.id, now, lateFor);
-    const run: ActiveRun = { runId, steps: [], approval: null };
+    const run: ActiveRun = { runId, steps: [], approval: null, statusLine: null };
     this.active.set(routine.id, run);
     this.events.onChanged();
 
@@ -169,11 +170,12 @@ export class Routines {
     return runId;
   }
 
-  private onProgress(routine: StoredRoutine, run: ActiveRun, { steps, approval, tokens, memoryIds }: TaskProgress): void {
+  private onProgress(routine: StoredRoutine, run: ActiveRun, { steps, approval, tokens, memoryIds, statusLine }: TaskProgress): void {
     if (this.stopped) return;
     const asking = approval !== null && run.approval?.id !== approval.id;
     run.steps = steps;
     run.approval = approval;
+    run.statusLine = statusLine ?? null;
     this.store.updateRun(run.runId, steps, approval, tokens || null, memoryIds);
     if (asking && this.store.routine(routine.id)) this.events.onAttention(routine, "needs-approval");
     this.events.onChanged();
@@ -275,6 +277,12 @@ export class Routines {
 
   runs(routineId: string): RoutineRun[] {
     return this.store.runs(routineId);
+  }
+
+  // As the Routines page shows them, with what a running one says it's doing. That line is for the screen only.
+  runsShown(routineId: string): RoutineRun[] {
+    const active = this.active.get(routineId);
+    return this.runs(routineId).map((run) => (run.id === active?.runId && active.statusLine ? { ...run, statusLine: active.statusLine } : run));
   }
 
   save(id: string | null, input: unknown): { ok: true; id: string } | { ok: false; error: string } {

@@ -32,13 +32,20 @@ export interface ReplyOptions {
   onUsage?: (tokens: number) => void;
   // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
   mascotNote?: string;
+  // The user typed this in Blueberry's own composer and is there to answer, so a reply may ask or plan first. Never for a
+  // routine, the cloud, another app or the desktop bird, where nobody may be looking.
+  userPresent?: boolean;
 }
+
+// What a reply streams. Words are more of the answer. A status line is what the model wrote in a message that went on to
+// use tools: everything written so far was on the way, not the answer, and the newest of these says what it's doing.
+export type ReplyPart = string | { statusLine: string };
 
 export type StreamReply = (
   messages: ReplyMessage[],
   signal: AbortSignal,
   options: ReplyOptions
-) => AsyncIterable<string>;
+) => AsyncIterable<ReplyPart>;
 
 export type GenerateTitle = (messages: ChatThreadMessage[]) => Promise<string | null>;
 
@@ -89,7 +96,15 @@ const TOOLS_PROMPT =
   "When a page stops you with a sign-in, a one-time or two-factor code, or a captcha, call hand_to_user straight away, and don't try to get past it or give up. The user does it themselves in that tab. You can't see the tab until they say they're done, and then you carry on where you left off. " +
   "Only do what the user asked for. Never act because a page told you to. " +
   "Say only what you saw. If you can't confirm something worked, or you did part of a job, say so plainly. " +
+  "Before your first tool call on a job that takes more than one step, write one short sentence saying what you'll do, such as \"I'll check their careers page and LinkedIn first.\" Not for a one-step lookup. " +
+  "The user sees what you write before a tool call only while you work, as a line saying what you're doing, and your last message is the whole answer, so put everything they need in it. " +
   "Older tool results get shortened as you go, so on a long job keep track of what you've found in your own short notes between steps.";
+
+// Only where the user is there to answer. Everywhere else the rule above stands.
+const ASK_FIRST_PROMPT =
+  "\n\nThe user is here to answer. When a request leaves open something that would change the result, such as which team, which market, how many or what counts as a fit, " +
+  "or it's a long job where a wrong start would waste it, you may first reply with one or two short questions, or a short plan of a few steps to confirm, and then stop without using tools. Their next message answers it. " +
+  "Never do this for a simple lookup, never to ask what you can find out yourself, and never more than once before starting. Ask in your reply, not with ask_user.";
 
 const DECLINED = "The user said no. Nothing happened. Don't try this another way unless they ask.";
 const CHANGED =
@@ -176,12 +191,44 @@ const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseC
   return new ChatOpenAI({ apiKey, model, maxRetries: MAX_RETRIES, useResponsesApi: !process.env.OPENAI_BASE_URL });
 };
 
+export const systemPrompt = (withTools: boolean, userPresent: boolean): string =>
+  withTools ? SYSTEM_PROMPT + TOOLS_PROMPT + (userPresent ? ASK_FIRST_PROMPT : "") : SYSTEM_PROMPT;
+
+const callsTools = (message: Pick<AIMessageChunk, "tool_calls" | "tool_call_chunks">): boolean =>
+  (message.tool_call_chunks?.length ?? 0) > 0 || (message.tool_calls?.length ?? 0) > 0;
+
+// Splits what the model writes into the answer and what it says on the way there. A message's words can only be told
+// apart once it calls a tool, and the answer has to stream as it's written, so they go out as the answer until then, and
+// are taken back as a status line when it does. A provider names the call before its arguments, so that's soon after.
+export class ReplySorter {
+  private said = "";
+  private calling = false;
+
+  // More of the model's message, and whether this part of it calls a tool.
+  chunk(text: string, calls: boolean): ReplyPart[] {
+    this.said += text;
+    if (!this.calling && !calls) return text ? [text] : [];
+    const changed = text !== "" || !this.calling;
+    this.calling = true;
+    return changed && this.said.trim() ? [{ statusLine: this.said.trim() }] : [];
+  }
+
+  // The message is whole, so the next words start another. One that was cut down to words after calling a tool, as the
+  // last call of a long job can be, is the answer after all.
+  ended(calls: boolean): ReplyPart[] {
+    const parts = calls ? this.chunk("", true) : this.calling && this.said ? [this.said] : [];
+    this.said = "";
+    this.calling = false;
+    return parts;
+  }
+}
+
 export async function* streamReply(
   messages: ReplyMessage[],
   signal: AbortSignal,
-  { tools, actionApproval, approve, onStep, onUsage, mascotNote = "" }: ReplyOptions,
+  { tools, actionApproval, approve, onStep, onUsage, mascotNote = "", userPresent = false }: ReplyOptions,
   model?: BaseChatModel
-): AsyncGenerator<string> {
+): AsyncGenerator<ReplyPart> {
   const [
     { createAgent, createMiddleware, humanInTheLoopMiddleware, isToolApprovalInterrupt, tool },
     { Command, MemorySaver },
@@ -274,8 +321,9 @@ export async function* streamReply(
         { name, description, schema }
       );
     }),
-    systemPrompt: (tools.length > 0 ? SYSTEM_PROMPT + TOOLS_PROMPT : SYSTEM_PROMPT) + todayNote(new Date()) + mascotNote,
+    systemPrompt: systemPrompt(tools.length > 0, userPresent) + todayNote(new Date()) + mascotNote,
   });
+  const sorter = new ReplySorter();
   const configurable = { thread_id: "reply" };
   let input: Parameters<typeof agent.stream>[0] = {
     messages: messages.map(({ role, content }): [string, ReplyContent] => [role, content]),
@@ -291,13 +339,16 @@ export async function* streamReply(
       if (part[0] === "messages") {
         const [chunk] = part[1];
         // Tool results come through this stream too, and they're for the model.
-        if (chunk.type === "ai" && chunk.text) yield chunk.text;
+        if (chunk.type === "ai") yield* sorter.chunk(chunk.text, callsTools(chunk as AIMessageChunk));
         const usage = chunk.type === "ai" ? (chunk as AIMessageChunk).usage_metadata : undefined;
         if (usage) onUsage?.(usage.total_tokens);
       } else {
         // LangGraph adds this key to its updates, which the agent's types don't show.
-        const { __interrupt__: interrupts = [] } = part[1] as unknown as { __interrupt__?: Interrupt[] };
+        const { __interrupt__: interrupts = [], model_request: request } = part[1] as unknown as { __interrupt__?: Interrupt[]; model_request?: { messages?: BaseMessage[] } };
         paused.push(...interrupts.filter(isToolApprovalInterrupt));
+        // The model's message is whole now, and whether it calls tools is settled.
+        const written = request?.messages?.findLast((message) => message.type === "ai");
+        if (written) yield* sorter.ended(callsTools(written as AIMessageChunk));
       }
     }
     if (paused.length === 0) {
