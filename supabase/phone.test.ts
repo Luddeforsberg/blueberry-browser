@@ -55,7 +55,7 @@ describe("the phone page's database rules", () => {
     RUNNER = await newUser();
     BOB = await newUser();
     await link(ALICE, RUNNER);
-  }, 30_000);
+  });
   afterAll(() => db.close());
 
   it("keeps each flock to its owner, replaced whole on every sync", async () => {
