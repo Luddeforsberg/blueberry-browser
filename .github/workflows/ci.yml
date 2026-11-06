@@ -31,6 +31,5 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run test
       - run: pnpm exec electron-vite build
-      # macOS only for now: 15 of them fail on Windows, which went untested while Actions was out of minutes.
-      - run: pnpm run test:e2e
-        if: runner.os != 'Windows'
+      # No end-to-end tests here: 15 of them need a real screen, where the bird on the page has its poses, and
+      # GitHub's runners have none. They run on a Mac with `pnpm run verify` before every PR.

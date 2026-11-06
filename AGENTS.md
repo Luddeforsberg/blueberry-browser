@@ -21,7 +21,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it. See `runner/README.md` |
 | `pnpm run verify` | Typecheck, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
 
-CI runs typecheck, lint, unit tests and build on macOS and Windows, and the end-to-end tests on macOS only, because 15 of them fail on Windows and haven't been fixed yet. It doesn't package the app. The repo is public, so Actions is free.
+CI runs typecheck, lint, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
 
 ## How we build
 
