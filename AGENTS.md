@@ -21,13 +21,13 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it. See `runner/README.md` |
 | `pnpm run verify` | Typecheck, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
 
-CI runs typecheck, lint, unit tests and build on macOS and Windows. The end-to-end tests run on macOS for every PR, and on Windows only for pushes to `main`. It doesn't package the app. GitHub Actions is out of minutes for now, so CI shows red without running anything. Run `pnpm run verify` instead.
+CI runs typecheck, lint, unit tests and build on macOS and Windows, and the end-to-end tests on macOS only, because 15 of them fail on Windows and haven't been fixed yet. It doesn't package the app. The repo is public, so Actions is free.
 
 ## How we build
 
 - **One branch and one PR per working feature, from the latest `main`.** Don't stack PRs. Each runs in its own worktree.
-- **Every PR goes through `self-check`, proof and `file-pr`.** One `review-loop` round only for changes that touch what Berry may do, permissions or secrets. While GitHub Actions is out of minutes, its red checks mean nothing and nobody waits for them.
-- **`pnpm run verify` replaces CI.** It runs what CI runs on macOS. Put the result in the PR. Windows isn't checked until CI returns.
+- **Every PR goes through `self-check`, proof and `file-pr`.** One `review-loop` round only for changes that touch what Berry may do, permissions or secrets.
+- **Run `pnpm run verify` before filing.** It runs what CI runs on macOS. Put the result in the PR.
 - **The project manager agent merges.** It merges PRs one at a time and reruns `verify` on anything `main` has moved under.
 - **The user merges anything that lets Berry do more without asking.** Say so at the top of the PR.
 - **Tests stay small:** one end-to-end test of the main flow, plus unit tests only for real logic. If a test fails with no link to the change, rerun it once and move on. Look into it only if the same test keeps failing. Don't write tests for test helpers.
