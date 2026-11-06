@@ -73,6 +73,7 @@ const TOOLS_PROMPT =
   "Only look at the user's other pages when the request needs it. " +
   "Go to the most direct source first, such as a company's own site and its careers or team page, before searching around it. " +
   "If you have web_search, use it to find where to look rather than opening a search page. Don't run the same search again in other words. " +
+  "If you have fetch_page, use it to read a public page you only need to read, rather than opening a tab. Open a tab when you need to click or type, need to be signed in, or the fetch came back empty or blocked. " +
   "Stop as soon as you can answer. If you can't find something, say so plainly rather than searching on. " +
   "The user carries on browsing while you work. Tabs you open stay behind them, so say a page is ready in its tab rather than that it's on their screen. They can watch you work in it, which changes nothing. " +
   "If a tool says the user took over a tab, leave it alone, don't open that page again, and say so in your reply. " +

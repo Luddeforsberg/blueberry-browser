@@ -7,6 +7,7 @@ import {
 } from "./agent";
 import { randomUUID } from "crypto";
 import { firecrawlSearch } from "./webSearch";
+import { firecrawlFetch } from "./webFetch";
 import { createPageTools, HANDOFF_WORDS, showsFrameOffLimits, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
 import { enterCodeInTab } from "./codeEntry";
 import type { CodeResult } from "./Phone";
@@ -346,6 +347,7 @@ export class Chats {
       asked,
       beenTo: run.earlierSites,
       search: firecrawlSearch(),
+      fetchPage: firecrawlFetch(),
       closeTab: (tab) => cloud.close(tab.id),
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOverInCloud(chatId, run, job, tab, need),
@@ -426,6 +428,7 @@ export class Chats {
       asked,
       beenTo: run.earlierSites,
       search: firecrawlSearch(),
+      fetchPage: firecrawlFetch(),
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });

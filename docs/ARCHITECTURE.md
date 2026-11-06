@@ -26,7 +26,7 @@ flowchart LR
   Main --> Agent
   Agent -- tools --> Tabs
   Agent --> Model
-  Agent -- web_search --> Search
+  Agent -- web_search and fetch_page --> Search
   Main -- cloud tabs --> Browserbase
   Main -- rows and functions --> Supabase
   Runner -- same agent code --> Browserbase
@@ -62,13 +62,13 @@ Each tab is a [src/main/Tab.ts](../src/main/Tab.ts) around its own `WebContentsV
 
 Every chat goes through [src/main/Chats.ts](../src/main/Chats.ts), which saves it to SQLite and gets the reply from a LangChain agent built in [src/main/agent.ts](../src/main/agent.ts). The model is OpenAI or Anthropic, chosen in `.env`, and LangChain only loads with the first message. A cheaper model from the same provider names chats and does the small jobs elsewhere in the app.
 
-What Berry can do in the browser is in [src/main/browserTools.ts](../src/main/browserTools.ts): `list_tabs`, `read_page`, `find_in_page`, `list_elements`, `click`, `type_text`, `choose_option`, `hover`, `drag`, `press_key`, `screenshot`, `go_to`, `open_tab`, `web_search`, `ask_user`, `hand_to_user` and a few more. They're plain definitions that `agent.ts` wraps as LangChain tools. What they run in a page is in [src/main/pageScripts.ts](../src/main/pageScripts.ts), in an isolated world that shares the page's DOM but not its variables. Scripts in a frame from another origin run in that frame's own world, and nothing it says about itself is believed. Clicks and typing are real mouse and keyboard events sent to the tab where they can be ([src/main/pageInput.ts](../src/main/pageInput.ts)), aimed after the page settles, and a press that would land on anything but the named element is stopped. Frames from another origin, native pickers and drags, and a few fallbacks get scripted input instead.
+What Berry can do in the browser is in [src/main/browserTools.ts](../src/main/browserTools.ts): `list_tabs`, `read_page`, `find_in_page`, `list_elements`, `click`, `type_text`, `choose_option`, `hover`, `drag`, `press_key`, `screenshot`, `go_to`, `open_tab`, `web_search`, `fetch_page`, `ask_user`, `hand_to_user` and a few more. They're plain definitions that `agent.ts` wraps as LangChain tools. What they run in a page is in [src/main/pageScripts.ts](../src/main/pageScripts.ts), in an isolated world that shares the page's DOM but not its variables. Scripts in a frame from another origin run in that frame's own world, and nothing it says about itself is believed. Clicks and typing are real mouse and keyboard events sent to the tab where they can be ([src/main/pageInput.ts](../src/main/pageInput.ts)), aimed after the page settles, and a press that would land on anything but the named element is stopped. Frames from another origin, native pickers and drags, and a few fallbacks get scripted input instead.
 
 Tabs a job opens stay behind the user. While a reply runs, its tabs show under the chat in the sidebar, and when it ends they close, except one the user took over or the one the reply points to. Their addresses are saved on the reply. The bird drawn on the page while it works ([src/main/PageActor.ts](../src/main/PageActor.ts) and [src/main/pageActorScript.ts](../src/main/pageActorScript.ts)) only draws, and takes no clicks.
 
 A run has a step limit of 120 model calls. On the last, tools are taken away and the model is asked to write up what it found, once more if it comes back empty, so a long job doesn't end with nothing.
 
-`web_search` asks Firecrawl ([src/main/webSearch.ts](../src/main/webSearch.ts)) for a few results as title, address and snippet, which is faster than opening a search page and reading it. The key stays in main, the results are marked as untrusted, and a query that could carry data out asks first, by the same check as an address.
+`web_search` asks Firecrawl ([src/main/webSearch.ts](../src/main/webSearch.ts)) for a few results as title, address and snippet, which is faster than opening a search page and reading it. The key stays in main, the results are marked as untrusted, and a query that could carry data out asks first, by the same check as an address. `fetch_page` asks Firecrawl ([src/main/webFetch.ts](../src/main/webFetch.ts)) for a public page's main text as markdown, so reading a page is one call rather than opening a tab and reading it. It goes through the same check as `open_tab`, since the address goes out to Firecrawl and from there to the site, and a bird limited to sites may only fetch from them, wherever a redirect ends. Firecrawl has none of the user's sign-ins, so Berry opens a tab to click, type, or read a signed-in page.
 
 Beside the main chat, the working view ([src/main/WorkViews.ts](../src/main/WorkViews.ts) and [WorkingView.tsx](../src/renderer/chrome/src/components/WorkingView.tsx)) shows live pictures of the tabs a job is using, so the user can watch without leaving the chat. Those pictures go only to the chrome renderer, never to the model, a chat or the disk.
 
