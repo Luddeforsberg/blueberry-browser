@@ -19,12 +19,14 @@ flowchart LR
   Browserbase[Browserbase]
   Phone[Phone page]
   Apps[ChatGPT and Claude]
+  Search[Firecrawl]
 
   Chrome -- typed IPC --> Main
   Main -- places and loads --> Tabs
   Main --> Agent
   Agent -- tools --> Tabs
   Agent --> Model
+  Agent -- web_search --> Search
   Main -- cloud tabs --> Browserbase
   Main -- rows and functions --> Supabase
   Runner -- same agent code --> Browserbase
@@ -44,6 +46,12 @@ Every chrome view loads the same React renderer in [src/renderer/chrome](../src/
 
 [src/main/Layout.ts](../src/main/Layout.ts) is the only place that decides where regions go. `computeLayout` turns the window size, layout mode and panel widths into rectangles. `Window` places the tab views with them and sends the same rectangles to the chrome renderer, which draws each region there. Nothing else hard-codes a size.
 
+## The browser itself
+
+Each tab is a [src/main/Tab.ts](../src/main/Tab.ts) around its own `WebContentsView`. Open tabs and the layout are saved to `session.json` by [src/main/Session.ts](../src/main/Session.ts) soon after each change, and a restored tab gets no view until it's first shown, so a long session opens fast. When a page calls `window.open`, `Window.openLinksInTabs` makes a real popup as a new tab around the page Electron created, so the opener can still talk to it, as "Continue with Google" sign-ins need.
+
+[src/main/sessionHandlers.ts](../src/main/sessionHandlers.ts) connects downloads ([src/main/Downloads.ts](../src/main/Downloads.ts)) and site permissions ([src/main/SitePermissions.ts](../src/main/SitePermissions.ts)) to the session once, before anything loads. A site may use only what the user allowed it, and anything the list doesn't name is refused. History, bookmarks, find in page and zoom work as in any browser, and the menu is in [src/main/Menu.ts](../src/main/Menu.ts). History from another browser comes in through [src/main/browserHistory.ts](../src/main/browserHistory.ts), which copies a Chromium profile's `History` file to a temporary folder, reads only address, title and time, and deletes the copy.
+
 ## The typed IPC contract
 
 [src/shared/ipc.ts](../src/shared/ipc.ts) is the one contract between main and the renderer: every channel, its arguments, its result, and which chrome region may call it. It's types only, because the preload is sandboxed and can't load shared runtime code. [src/preload/chrome.ts](../src/preload/chrome.ts) exposes it to the renderer as `chromeAPI`.
@@ -54,11 +62,15 @@ Every chrome view loads the same React renderer in [src/renderer/chrome](../src/
 
 Every chat goes through [src/main/Chats.ts](../src/main/Chats.ts), which saves it to SQLite and gets the reply from a LangChain agent built in [src/main/agent.ts](../src/main/agent.ts). The model is OpenAI or Anthropic, chosen in `.env`, and LangChain only loads with the first message. A cheaper model from the same provider names chats and does the small jobs elsewhere in the app.
 
-What Berry can do in the browser is in [src/main/browserTools.ts](../src/main/browserTools.ts): `list_tabs`, `read_page`, `find_in_page`, `list_elements`, `click`, `type_text`, `choose_option`, `hover`, `drag`, `press_key`, `screenshot`, `go_to`, `open_tab`, `ask_user`, `hand_to_user` and a few more. They're plain definitions that `agent.ts` wraps as LangChain tools. What they run in a page is in [src/main/pageScripts.ts](../src/main/pageScripts.ts), in an isolated world that shares the page's DOM but not its variables. Scripts in a frame from another origin run in that frame's own world, and nothing it says about itself is believed. Clicks and typing are real mouse and keyboard events sent to the tab where they can be ([src/main/pageInput.ts](../src/main/pageInput.ts)), aimed after the page settles, and a press that would land on anything but the named element is stopped. Frames from another origin, native pickers and drags, and a few fallbacks get scripted input instead.
+What Berry can do in the browser is in [src/main/browserTools.ts](../src/main/browserTools.ts): `list_tabs`, `read_page`, `find_in_page`, `list_elements`, `click`, `type_text`, `choose_option`, `hover`, `drag`, `press_key`, `screenshot`, `go_to`, `open_tab`, `web_search`, `ask_user`, `hand_to_user` and a few more. They're plain definitions that `agent.ts` wraps as LangChain tools. What they run in a page is in [src/main/pageScripts.ts](../src/main/pageScripts.ts), in an isolated world that shares the page's DOM but not its variables. Scripts in a frame from another origin run in that frame's own world, and nothing it says about itself is believed. Clicks and typing are real mouse and keyboard events sent to the tab where they can be ([src/main/pageInput.ts](../src/main/pageInput.ts)), aimed after the page settles, and a press that would land on anything but the named element is stopped. Frames from another origin, native pickers and drags, and a few fallbacks get scripted input instead.
 
 Tabs a job opens stay behind the user. While a reply runs, its tabs show under the chat in the sidebar, and when it ends they close, except one the user took over or the one the reply points to. Their addresses are saved on the reply. The bird drawn on the page while it works ([src/main/PageActor.ts](../src/main/PageActor.ts) and [src/main/pageActorScript.ts](../src/main/pageActorScript.ts)) only draws, and takes no clicks.
 
 A run has a step limit of 120 model calls. On the last, tools are taken away and the model is asked to write up what it found, once more if it comes back empty, so a long job doesn't end with nothing.
+
+`web_search` asks Firecrawl ([src/main/webSearch.ts](../src/main/webSearch.ts)) for a few results as title, address and snippet, which is faster than opening a search page and reading it. The key stays in main, the results are marked as untrusted, and a query that could carry data out asks first, by the same check as an address.
+
+Beside the main chat, the working view ([src/main/WorkViews.ts](../src/main/WorkViews.ts) and [WorkingView.tsx](../src/renderer/chrome/src/components/WorkingView.tsx)) shows live pictures of the tabs a job is using, so the user can watch without leaving the chat. Those pictures go only to the chrome renderer, never to the model, a chat or the disk.
 
 ## One set of tools, two kinds of browser
 
@@ -73,6 +85,12 @@ A tool that changes something has a `describe` function, which gives the exact s
 Cards show in the chat, on Routines and on the Needs you page, which lists everything waiting ([src/renderer/chrome/src/pages/NeedsYouPage.tsx](../src/renderer/chrome/src/pages/NeedsYouPage.tsx)). With a Telegram bot connected, [src/main/Phone.ts](../src/main/Phone.ts) sends the same items from jobs on this computer to the user's phone through [src/main/TelegramChannel.ts](../src/main/TelegramChannel.ts), and answers go back through the same `chat:decide`.
 
 A sign-in, code or captcha is a handoff. `hand_to_user` gives the tab to the user, and no job can reach it until they press I'm done. A code sent from the phone is typed into the field by [src/main/codeEntry.ts](../src/main/codeEntry.ts), the only thing that can use a held tab. The model is only told that a code went in, and for an hour `Chats` takes the code out of anything it's told in case the page shows it again, and that tab gives no screenshots.
+
+## Routines and Show Berry how
+
+A routine is a saved job with a schedule. [src/main/Routines.ts](../src/main/Routines.ts) checks what's due, keeps routines and their runs in `routines.db` ([src/main/RoutineStore.ts](../src/main/RoutineStore.ts)), and runs each through `Chats.runTask`, the same path as a chat with no page. [src/main/routineSchedule.ts](../src/main/routineSchedule.ts) holds the schedule rules. However many times were missed while the Mac was asleep, one run covers them. A routine can also run in the cloud instead (see The cloud path).
+
+Show Berry how makes a routine from doing a job once by hand. [src/main/recorderScript.ts](../src/main/recorderScript.ts) watches the tab in front, in an isolated world of its own, and notes clicks, typing, choices, copies and pastes. Password fields are recognised before their value is read, so no secret leaves the page, and the clipboard is never read. [src/main/recordingTrail.ts](../src/main/recordingTrail.ts) turns that into notes the user can read and trim, with queries taken off addresses, and [src/main/Recordings.ts](../src/main/Recordings.ts) sends the notes to the cheap model, which writes the routine's steps and what might change next time. The routine's sites come from the notes in code, not from the model, and it can only reach those.
 
 ## Mascots and their limits
 
@@ -90,7 +108,9 @@ What a bird remembers is in `memory.json` ([src/main/MemoryStore.ts](../src/main
 
 [src/main/Suggestions.ts](../src/main/Suggestions.ts) decides what the birds on the new tab page say. [src/main/suggestionDigest.ts](../src/main/suggestionDigest.ts) builds what the cheap model reads: browsing sessions, search queries, chats, routines, the flock and earlier feedback, each item with a short id. Page text and full addresses aren't in it. The model proposes prompts, routines or new mascots citing those ids, at most about once an hour, and `verifyProposals` in [src/main/suggestionProposals.ts](../src/main/suggestionProposals.ts) drops any that cites an id that isn't there, or whose words on the card hold a number its evidence doesn't. Its sites are narrowed to the ones in its evidence, and a routine whose schedule doesn't match when the user really looked becomes a prompt instead. Without a model, the repeated-pattern rules in [src/main/suggestionPatterns.ts](../src/main/suggestionPatterns.ts) fill in.
 
-History from another browser comes in through [src/main/browserHistory.ts](../src/main/browserHistory.ts), which copies a Chromium profile's `History` file to a temporary folder, reads only address, title and time, and deletes the copy.
+## Berry on the desktop
+
+With it on, Berry waits at the edge of the screen when the user is in another app ([src/main/DesktopBerry.ts](../src/main/DesktopBerry.ts)). It's two small `panel` windows: a transparent one for the bird, drawn by [DesktopApp.tsx](../src/renderer/chrome/src/DesktopApp.tsx), and one for the prompt box that ⌥Space opens. [src/main/desktopBerryState.ts](../src/main/desktopBerryState.ts) decides who shows and what it says, for example that a job finished or needs the user. All it can do is send a job through `Chats.send` and bring Blueberry forward, so it adds nothing a chat can't do. It never reads the screen, the clipboard or another app.
 
 ## The cloud path
 
