@@ -29,6 +29,7 @@ const ConversationTurnComponent: React.FC<{
             <AssistantMessage
                 content={turn.assistant.content}
                 steps={turn.assistant.steps}
+                statusLine={turn.assistant.statusLine}
                 isStreaming={turn.assistant.isStreaming}
                 waiting={waiting}
                 mascot={mascot}

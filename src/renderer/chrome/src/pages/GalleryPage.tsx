@@ -285,6 +285,12 @@ export const GalleryPage: React.FC = () => {
                     <div className="max-w-xl flex flex-col gap-5">
                         <UserMessage content="What did the Monday digest find?" />
                         <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." />
+                        <AssistantMessage
+                            content=""
+                            isStreaming
+                            statusLine="I'll check their careers page and LinkedIn first."
+                            steps={[{ text: 'Opened strawberrybrowser.com/careers', done: false }]}
+                        />
                         <ThinkingMessage />
                         <ChatError message="The model is rate limited right now. Try again in a moment." />
                         <StepTrail

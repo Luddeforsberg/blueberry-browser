@@ -85,6 +85,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     key={index}
                                     content={message.content}
                                     steps={message.steps}
+                                    statusLine={thread.statusLine}
                                     isStreaming={running && index === messages.length - 1}
                                     avatar
                                     waiting={thread.approval !== null}

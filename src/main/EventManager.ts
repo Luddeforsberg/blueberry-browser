@@ -183,8 +183,9 @@ export class EventManager {
   }
 
   private handleChatEvents(): void {
+    // Only Blueberry's own composers send this, so the user is there to answer if Berry asks before it starts.
     this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, chatSendOptions(options)) : null
+      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true }) : null
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
@@ -230,7 +231,7 @@ export class EventManager {
     this.handle("routines:delete", (id) => this.mainWindow.confirmDeleteRoutine(id));
     this.handle("routines:run-now", (id) => routines.runNow(id));
     this.handle("routines:stop", (runId) => routines.stop(runId));
-    this.handle("routines:runs", (id) => routines.runs(id));
+    this.handle("routines:runs", (id) => routines.runsShown(id));
     this.handle("routines:mark-seen", () => routines.markSeen());
     this.handle("memory:decide", (offerId, keep) => this.mainWindow.memory.decide(offerId, keep === true));
     this.handle("memory:edit", (factId, text) => this.mainWindow.memory.edit(factId, text));

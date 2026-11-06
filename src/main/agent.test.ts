@@ -4,7 +4,7 @@ import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { generateTitle, ModelConfigError, modelConfig, NO_KEY, shortenOldResults, streamReply } from "./agent";
+import { generateTitle, ModelConfigError, modelConfig, NO_KEY, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
 
 const NO_TOOLS = {
   tools: [],
@@ -13,9 +13,10 @@ const NO_TOOLS = {
   onStep: () => () => {},
 };
 
-const collect = async (stream: AsyncIterable<string>) => {
+// The answer as it ends up: a status line takes back what came before it.
+const collect = async (stream: AsyncIterable<ReplyPart>) => {
   let text = "";
-  for await (const token of stream) text += token;
+  for await (const part of stream) text = typeof part === "string" ? text + part : "";
   return text;
 };
 
@@ -59,6 +60,29 @@ describe("streamReply", () => {
       streamReply([{ role: "user", content: "hi" }], new AbortController().signal, NO_TOOLS, model)
     );
     expect(text).toBe("hello there");
+  });
+
+  it("shows what it writes before a tool call as a status line, and answers with its last message only", async () => {
+    const look: PageTool = { name: "read_page", description: "Reads the page", schema: z.object({}), label: () => "Read example.com", run: async () => "page" };
+    const model = fakeModel()
+      .respond(new AIMessage({ content: "I'll read the page first.", tool_calls: [{ name: "read_page", args: {}, id: "call-1" }] }))
+      .respond(new AIMessage("It says hello."));
+    const parts: ReplyPart[] = [];
+    for await (const part of streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [look] }, model)) parts.push(part);
+    expect(parts).toEqual([{ statusLine: "I'll read the page first." }, "It says hello."]);
+  });
+
+  it("lets it ask or plan first only where the user is there to answer", async () => {
+    const tools = [{ name: "read_page", description: "Reads the page", schema: z.object({}), label: () => "Read", run: async () => "page" }];
+    const promptWith = async (userPresent?: boolean) => {
+      const model = fakeModel().respond(new AIMessage({ content: "ok" }));
+      await collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools, userPresent }, model));
+      return JSON.stringify(model.calls[0]?.messages[0]?.content);
+    };
+    expect(await promptWith(true)).toContain("The user is here to answer.");
+    expect(await promptWith(false)).not.toContain("The user is here to answer.");
+    expect(await promptWith()).not.toContain("The user is here to answer.");
+    expect(systemPrompt(false, true)).not.toContain("The user is here to answer.");
   });
 
   it("tells the model today's date", async () => {
@@ -129,7 +153,7 @@ describe("streamReply", () => {
   it("stops when aborted", async () => {
     const model = new FakeListChatModel({ responses: ["a long reply"], sleep: 20 });
     const controller = new AbortController();
-    const seen: string[] = [];
+    const seen: ReplyPart[] = [];
     const run = async () => {
       for await (const token of streamReply([{ role: "user", content: "hi" }], controller.signal, NO_TOOLS, model)) {
         seen.push(token);
@@ -215,6 +239,45 @@ describe("a mascot's limits and approvals", () => {
     const approve = vi.fn(async () => true);
     await reply(click({ refuses: async () => (checks++ === 0 ? { label: "x", message: "x" } : null) }, run), approve);
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe("ReplySorter", () => {
+  it("streams a message's words as the answer while it calls no tool", () => {
+    const sorter = new ReplySorter();
+    expect([...sorter.chunk("Found ", false), ...sorter.chunk("it.", false), ...sorter.ended(false)]).toEqual(["Found ", "it."]);
+  });
+
+  it("takes words back as a status line once their message calls a tool, and keeps it up to date", () => {
+    const sorter = new ReplySorter();
+    expect(sorter.chunk("I'll check ", false)).toEqual(["I'll check "]);
+    expect(sorter.chunk("their careers page.", false)).toEqual(["their careers page."]);
+    expect(sorter.chunk("", true)).toEqual([{ statusLine: "I'll check their careers page." }]);
+    expect(sorter.chunk("", true)).toEqual([]);
+    expect(sorter.chunk(" Then LinkedIn.", false)).toEqual([{ statusLine: "I'll check their careers page. Then LinkedIn." }]);
+    expect(sorter.ended(true)).toEqual([]);
+  });
+
+  it("says nothing for a message that only calls tools", () => {
+    const sorter = new ReplySorter();
+    expect([...sorter.chunk("", true), ...sorter.chunk(" ", false), ...sorter.ended(true)]).toEqual([]);
+  });
+
+  it("takes words back when only the whole message shows the call", () => {
+    const sorter = new ReplySorter();
+    expect([...sorter.chunk("Looking.", false), ...sorter.ended(true)]).toEqual(["Looking.", { statusLine: "Looking." }]);
+  });
+
+  it("gives words back as the answer when the message ended up calling nothing", () => {
+    const sorter = new ReplySorter();
+    expect([...sorter.chunk("Here's what I found.", true), ...sorter.ended(false)]).toEqual([{ statusLine: "Here's what I found." }, "Here's what I found."]);
+  });
+
+  it("starts each message afresh", () => {
+    const sorter = new ReplySorter();
+    sorter.chunk("First.", true);
+    sorter.ended(true);
+    expect([...sorter.chunk("The answer.", false), ...sorter.ended(false)]).toEqual(["The answer."]);
   });
 });
 
