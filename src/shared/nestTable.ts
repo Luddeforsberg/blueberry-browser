@@ -104,11 +104,13 @@ export const findTable = (markdown: string, { streaming = false } = {}): Table |
   return best;
 };
 
-// What a cell says, for drawing: links become their words, and emphasis and code marks go.
-export const plainCell = (cell: string): string => unmark(cell.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")).trim();
-
-// Line breaks and emphasis and code marks, gone, with nothing trimmed.
-const unmark = (text: string): string => text.replace(/<br\s*\/?>/gi, " ").replace(/(\*\*|__|\*|_|`)(?=\S)([^*_`]*?\S)\1/g, "$2");
+// What a cell says as plain words: links become their words, emphasis and code marks go, and a line break is a space.
+export const plainCell = (cell: string): string =>
+  cellParts(cell)
+    .map((part) => part.text)
+    .join("")
+    .replace(/\s*\n\s*/g, " ")
+    .trim();
 
 // What a run is called on the card: its row's first cell with words in it.
 export const rowName = (row: readonly string[]): string => plainCell(row.find((cell) => plainCell(cell) !== "") ?? "") || "A row";
@@ -149,43 +151,206 @@ export const safeHref = (href: string): string | null => {
   }
 };
 
+// One run of a cell's words with the same look: a link, bold, italic or code, or any of them together.
 export interface CellPart {
   text: string;
   href?: string;
+  strong?: boolean;
+  em?: boolean;
+  code?: boolean;
 }
 
-const LINKS = /(!?)\[([^\]]*)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>|)\]]+)/g;
+type Marks = Omit<CellPart, "text">;
 
-// What a cell says, with its links kept: a markdown link is its words linking to its address, and a bare web address
-// links to itself. An image is only its words, and anything that isn't a web address is plain text.
-export const cellParts = (cell: string): CellPart[] => {
-  const parts: CellPart[] = [];
-  const add = (text: string, href?: string) => {
-    if (!text) return;
-    const last = parts.at(-1);
-    if (!href && last && !last.href) last.text += text;
-    else parts.push(href ? { text, href } : { text });
-  };
-  let at = 0;
-  for (const match of cell.matchAll(LINKS)) {
-    add(cell.slice(at, match.index));
-    const [whole, image, words, address, bare] = match;
-    // A full stop or comma after a bare address ends the sentence, not the address.
-    const target = bare ? bare.replace(/[.,;:!?]+$/, "") : address;
-    const href = safeHref(target) ?? undefined;
-    if (bare) add(target, href);
-    if (bare) add(bare.slice(target.length));
-    else if (image || !href) add(words);
-    else add(words || address, href);
-    at = match.index + whole.length;
+// A link's words and address stop at the next bracket, so a cell of unclosed brackets is read once, not once per bracket.
+const LINK = /(!?)\[([^[\]]*)\]\(([^)[\]\s]+)\)/y;
+const BARE = /https?:\/\/[^\s<>|)\]]+/y;
+const BREAK = /<br\s*\/?>/iy;
+const ESCAPED = /[\\`*_[\]()#+\-.!|<>~]/;
+const WORDLIKE = /[\p{L}\p{N}]/u;
+const SPACE = /\s/;
+
+// A sticky pattern's match at exactly `at`, without copying the text from there.
+const matchAt = (pattern: RegExp, text: string, at: number) => {
+  pattern.lastIndex = at;
+  return pattern.exec(text);
+};
+
+const runOf = (text: string, at: number, char: string) => {
+  let end = at;
+  while (text[end] === char) end++;
+  return end - at;
+};
+
+// What one piece of text has already searched for and not found, so no search runs twice over the same words, however
+// many unclosed marks or backticks a cell has. A search that finds nothing from one place finds nothing from any later
+// one either, so each kind only ever fails once.
+interface Searches {
+  // The run length of backticks, and from where a closing run of that length isn't there.
+  code: Map<number, number>;
+  // An emphasis mark, and from where it doesn't close.
+  marks: Map<string, number>;
+}
+
+// Where a code span that opens at `at` ends, as the index past its closing backticks, or -1 when it never closes.
+const codeEnd = (text: string, at: number, searches: Searches): number => {
+  const run = runOf(text, at, "`");
+  const failed = searches.code.get(run);
+  if (failed !== undefined && at >= failed) return -1;
+  for (let next = text.indexOf("`", at + run); next !== -1; ) {
+    const length = runOf(text, next, "`");
+    if (length === run) return next + run;
+    next = text.indexOf("`", next + length);
   }
-  add(cell.slice(at));
-  // Emphasis and code marks go from the words, as in `plainCell`, and the cell's own ends are trimmed.
-  const shown = parts.map((part) => ({ ...part, text: part.href ? part.text : unmark(part.text) }));
-  if (shown[0] && !shown[0].href) shown[0].text = shown[0].text.trimStart();
-  const last = shown.at(-1);
+  searches.code.set(run, at);
+  return -1;
+};
+
+// Where the emphasis `mark` opened before `from` closes: the next mark after words, outside code and links, that isn't
+// inside a word when it's an underscore. A double mark closes on the last two of a longer run, so `***both***` is bold
+// around italic. -1 when it never closes.
+const closingMark = (text: string, from: number, mark: string, searches: Searches): number => {
+  const failed = searches.marks.get(mark);
+  if (failed !== undefined && from >= failed) return -1;
+  for (let at = from; at < text.length; at++) {
+    const char = text[at];
+    if (char === "\\") at++;
+    else if (char === "`") {
+      const end = codeEnd(text, at, searches);
+      at = (end === -1 ? at + runOf(text, at, "`") : end) - 1;
+    } else if (char === "[") {
+      const link = matchAt(LINK, text, at);
+      if (link) at += link[0].length - 1;
+    } else if (text.startsWith(mark, at) && at > from && !SPACE.test(text[at - 1])) {
+      if (mark.length === 1 && text[at + 1] === mark) {
+        // A single mark can't close on half of a double one, which is emphasis of its own inside.
+        at += runOf(text, at, mark) - 1;
+        continue;
+      }
+      const close = mark.length === 2 ? at + runOf(text, at, mark[0]) - 2 : at;
+      if (mark[0] !== "_" || !WORDLIKE.test(text[close + mark.length] ?? "")) return close;
+      at = close + mark.length - 1;
+    } else if (mark.length === 1 && text.startsWith(mark.repeat(2), at)) at++;
+  }
+  searches.marks.set(mark, from);
+  return -1;
+};
+
+// `links` is off for an image's words and a link's words that go nowhere, so nothing in them can become a link.
+const parseInline = (text: string, marks: Marks, out: CellPart[], links = true) => {
+  const searches: Searches = { code: new Map(), marks: new Map() };
+  let words = "";
+  const flush = () => {
+    if (words) out.push({ text: words, ...marks });
+    words = "";
+  };
+  for (let at = 0; at < text.length; ) {
+    const char = text[at];
+    if (char === "\\" && ESCAPED.test(text[at + 1] ?? "")) {
+      words += text[at + 1];
+      at += 2;
+      continue;
+    }
+    if (char === "`") {
+      const run = runOf(text, at, "`");
+      const end = codeEnd(text, at, searches);
+      if (end === -1) {
+        words += text.slice(at, at + run);
+        at += run;
+        continue;
+      }
+      const code = text.slice(at + run, end - run).trim();
+      flush();
+      if (code) out.push({ text: code, ...marks, code: true });
+      at = end;
+      continue;
+    }
+    const link = char === "[" || (char === "!" && text[at + 1] === "[") ? matchAt(LINK, text, at) : null;
+    if (link) {
+      const [whole, image, inner, address] = link;
+      const href = image || marks.href || !links ? null : safeHref(address);
+      flush();
+      // An image is only its words, and anything that isn't a web address is plain text.
+      if (href && !inner) out.push({ text: address, ...marks, href });
+      else if (href) parseInline(inner, { ...marks, href }, out);
+      else parseInline(inner, marks, out, false);
+      at += whole.length;
+      continue;
+    }
+    const bare = links && !marks.href && char === "h" && !WORDLIKE.test(text[at - 1] ?? "") ? matchAt(BARE, text, at) : null;
+    if (bare) {
+      // A full stop or comma after a bare address ends the sentence, not the address.
+      const address = bare[0].replace(/[.,;:!?]+$/, "");
+      const href = safeHref(address);
+      if (href) {
+        flush();
+        out.push({ text: address, ...marks, href });
+      } else words += address;
+      at += address.length;
+      continue;
+    }
+    const lineBreak = char === "<" ? matchAt(BREAK, text, at) : null;
+    if (lineBreak) {
+      words += "\n";
+      at += lineBreak[0].length;
+      continue;
+    }
+    if (char === "*" || char === "_") {
+      const opens = char === "*" || !WORDLIKE.test(text[at - 1] ?? "");
+      const tried = !opens
+        ? undefined
+        : [char.repeat(2), char].find((mark) => text.startsWith(mark, at) && !SPACE.test(text[at + mark.length] ?? " ") && closingMark(text, at + mark.length, mark, searches) !== -1);
+      if (tried) {
+        const close = closingMark(text, at + tried.length, tried, searches);
+        flush();
+        parseInline(text.slice(at + tried.length, close), { ...marks, [tried.length === 2 ? "strong" : "em"]: true }, out, links);
+        at = close + tried.length;
+        continue;
+      }
+    }
+    words += char;
+    at++;
+  }
+  flush();
+};
+
+const sameMarks = (a: CellPart, b: CellPart) => a.href === b.href && !!a.strong === !!b.strong && !!a.em === !!b.em && !!a.code === !!b.code;
+
+// What a cell says, as runs of words with their look: bold, italic and code from its markdown, and its links, where a
+// markdown link is its words linking to its address and a bare web address links to itself. An image is only its words,
+// anything that isn't a web address is plain text, and a line break is a new line.
+export const cellParts = (cell: string): CellPart[] => {
+  const parsed: CellPart[] = [];
+  parseInline(cell, {}, parsed);
+  const parts: CellPart[] = [];
+  for (const part of parsed) {
+    const last = parts.at(-1);
+    if (last && sameMarks(last, part)) last.text += part.text;
+    else parts.push({ ...part });
+  }
+  // The cell's own ends are trimmed.
+  if (parts[0] && !parts[0].href) parts[0].text = parts[0].text.trimStart();
+  const last = parts.at(-1);
   if (last && !last.href) last.text = last.text.trimEnd();
-  return shown.filter((part) => part.text !== "");
+  return parts.filter((part) => part.text !== "");
+};
+
+// A cell as plain words with its links written out, for a spreadsheet: a link is its words and its address, or only
+// its address when its words are that address.
+export const exportCellText = (cell: string): string => {
+  const parts = cellParts(cell);
+  let text = "";
+  for (let at = 0; at < parts.length; at++) {
+    const { href } = parts[at];
+    if (!href) {
+      text += parts[at].text;
+      continue;
+    }
+    let words = parts[at].text;
+    while (parts[at + 1]?.href === href) words += parts[++at].text;
+    text += safeHref(words.trim()) === href ? words : `${words} (${href})`;
+  }
+  return text.trim();
 };
 
 // What crosses a line, counted from what's sent, so a card can say exactly that: a bird's answer, in words and whether

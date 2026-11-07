@@ -227,6 +227,82 @@ test("rows picked in a card's table go to a new card, which runs once for each o
   for (const left of ["Lindqvist Data", "Kvarnsten", "Vinga"]) expect(sent.join("\n")).not.toContain(left);
 });
 
+// An answer like a real competitor scan: a heading, then a table whose names are bold links, wider than a card.
+const COMPETITORS = [
+  "## Bottom line",
+  "",
+  "Comet and Arc lead, and **Dia** is the one to watch.",
+  "",
+  "| Browser | What it does | Price | Who it sells to | Where |",
+  "|---|---|---|---|---|",
+  ...["Comet", "Arc Search", "Dia", "Neon", "Sigma", "Fellou", "Genspark"].map(
+    (name, index) =>
+      `| **[${name}](https://${name.toLowerCase().replace(" ", "")}.example/a_b)** | Agentic browsing for _research_ | $${index + 10} a month | Knowledge workers at large teams | ` + "`EU` |"
+  ),
+].join("\n");
+
+test("a card's answer and cells read as markdown, and a card made bigger from its corner shows more and keeps its size", async () => {
+  model.reset();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
+  app = await launchApp(profile, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  model.replyWith(COMPETITORS);
+  oneJob();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  await composer.fill("Find Strawberry Browser's competitors");
+  await composer.press("Enter");
+  const card = chrome.locator(".react-flow__node").first();
+  await expect(card.getByRole("status")).toHaveText("Done");
+
+  // No markdown shows as marks: the heading is a heading, and a name is a bold link.
+  await expect(card.getByRole("heading", { name: "Bottom line" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "Comet" })).toHaveAttribute("href", "https://comet.example/a_b");
+  await expect(card.locator("tbody tr").first().locator("strong")).toHaveText("Comet");
+  expect(await card.innerText()).not.toMatch(/\*\*|##|`/);
+  await expect(card.locator("tbody tr")).toHaveCount(5);
+  await expect(card.getByText("$0.")).toHaveCount(0);
+
+  // Dragging the corner makes it bigger, without moving it, panning the board or pulling a line out.
+  const before = (await card.boundingBox())!;
+  await card.hover();
+  const grip = (await card.locator(".react-flow__resize-control").boundingBox())!;
+  await chrome.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(grip.x + 300, grip.y + 200, { steps: 8 });
+  await chrome.mouse.up();
+  const after = (await card.boundingBox())!;
+  expect(after.x).toBeCloseTo(before.x, 0);
+  expect(after.y).toBeCloseTo(before.y, 0);
+  expect(after.width).toBeGreaterThan(before.width + 250);
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(1);
+  await expect(chrome.locator(".react-flow__edge")).toHaveCount(0);
+
+  // Bigger, it shows every row, in a table that scrolls both ways.
+  await expect(card.locator("tbody tr")).toHaveCount(7);
+  await expect(card.getByRole("button", { name: /more$/ })).toHaveCount(0);
+  const scroller = card.locator(".nowheel").filter({ has: chrome.locator("table") });
+  expect(await scroller.evaluate((element) => [getComputedStyle(element).overflowX, getComputedStyle(element).overflowY])).toEqual(["auto", "auto"]);
+
+  // Its size is saved with the card, and it comes back that size.
+  const nestId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).nests[0].id;
+  const savedSize = async () => (await chrome.evaluate((id) => window.chromeAPI.nests.board(id), nestId))?.cards[0].size;
+  await expect.poll(async () => (await savedSize())?.width ?? 0).toBeGreaterThan(before.width + 250);
+  const saved = (await savedSize())!;
+  await app.close();
+  app = await launchApp(profile, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const again = await findView(app, "view=chrome");
+  const nest = (await again.evaluate(() => window.chromeAPI.library.getLibrary())).nests[0];
+  await again.getByRole("button", { name: nest.title, exact: true }).click();
+  const reopened = again.locator(".react-flow__node").first();
+  await expect(reopened.locator("tbody tr")).toHaveCount(7);
+  const box = (await reopened.boundingBox())!;
+  expect(Math.round(box.width)).toBe(saved.width);
+  expect(Math.round(box.height)).toBe(saved.height);
+});
+
 const SHOTS = process.env.NEST_SHOTS;
 const THREE_COMPANIES = ["Three to start with.", "", "| Company | Leads sales |", "|---|---|", "| Lindqvist Data | Sara Holm |", "| Fjällbo | Omar Nilsson |", "| Brygga | Maja Lund |"].join("\n");
 
@@ -698,7 +774,7 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  // A model the price table knows, so the cards say what they cost: 30k tokens in at $1 a million is $0.03 a reply.
+  // A model the price table knows, so the estimate has a cost to go by: 30k tokens in at $1 a million is $0.03 a reply.
   model.usageWith({ input: 30_000, output: 0 });
   app = await launchApp(undefined, { modelEnv: { ...model.env, LLM_MODEL: "gpt-6.1-terra" } });
   await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
@@ -723,7 +799,8 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
     const cards = chrome.locator(".react-flow__node");
     const first = cards.first();
     await expect(first.getByRole("status")).toHaveText("Done");
-    await expect(first.getByLabel("What this card’s chat has cost: $0.03")).toBeVisible();
+    // What it cost is kept, but the card doesn't show it.
+    await expect(first.getByText("$0.03")).toHaveCount(0);
 
     // Before For each row sends, it says what the runs will likely cost, from what the card it reads from cost.
     await first.hover();
@@ -757,7 +834,6 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
     await writer.getByRole("button", { name: "Stop" }).click();
     const retry = writer.getByRole("button", { name: "Retry 1 that didn’t finish" });
     await expect(retry).toBeVisible();
-    await expect(writer.getByLabel(/^What its runs have cost so far: \$/)).toBeVisible();
     await retry.click();
     await expect(writer.getByRole("alert")).toContainText("may do it again");
     await shots("retry-warning");

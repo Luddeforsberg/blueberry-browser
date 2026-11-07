@@ -70,6 +70,7 @@ export const CHANNEL_REGIONS: {
   "nests:add-input": ["chrome"],
   "nests:retry-runs": ["chrome"],
   "nests:move-card": ["chrome"],
+  "nests:resize-card": ["chrome"],
   "nests:nudge-cards": ["chrome"],
   "nests:set-bird": ["chrome"],
   "nests:delete-card": ["chrome"],

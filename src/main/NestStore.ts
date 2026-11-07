@@ -129,6 +129,9 @@ const MIGRATIONS = [
   // The line a For-each card's runs took their rows from, and what a run's earlier tries cost before Retry replaced them.
   `ALTER TABLE cards ADD COLUMN each_line TEXT;
    ALTER TABLE runs ADD COLUMN spent REAL NOT NULL DEFAULT 0;`,
+  // The size the user made a card from its corner. None means the usual size.
+  `ALTER TABLE cards ADD COLUMN width REAL;
+   ALTER TABLE cards ADD COLUMN height REAL;`,
 ];
 
 // One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
@@ -189,6 +192,8 @@ interface CardRow {
   tableHeader: string | null;
   tableCount: number | null;
   tablePreview: string | null;
+  width: number | null;
+  height: number | null;
 }
 
 interface RunRow {
@@ -204,7 +209,7 @@ const CARD_COLUMNS =
   "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader, " +
   "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
   // Not a file's whole table, which is read only when it's needed.
-  "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview";
+  "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -299,7 +304,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -315,7 +320,8 @@ export class NestStore {
       tableName === null
         ? null
         : { name: tableName, header: JSON.parse(tableHeader ?? "[]") as string[], rows: JSON.parse(tablePreview ?? "[]") as string[][], count: tableCount ?? 0 };
-    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, each, plan: planned, table, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
+    const size = width !== null && height !== null ? { size: { width, height } } : {};
+    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -385,6 +391,10 @@ export class NestStore {
   // The user moved it, so from now on it stays where they leave it.
   moveCard(id: string, x: number, y: number): boolean {
     return this.db.prepare("UPDATE cards SET x = ?, y = ?, auto_placed = 0 WHERE id = ?").run(x, y, id).changes > 0;
+  }
+
+  resizeCard(id: string, width: number, height: number): boolean {
+    return this.db.prepare("UPDATE cards SET width = ?, height = ? WHERE id = ?").run(width, height, id).changes > 0;
   }
 
   // Cards of this Nest moved out of the way of one that grew, in one go. Only cards placed for the user and never moved by
