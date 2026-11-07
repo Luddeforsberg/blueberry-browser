@@ -115,11 +115,12 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     showNew = true
 }) => {
     const { tabs: allTabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
-    const { chats } = useLibrary()
+    const { chats, nests } = useLibrary()
     const vertical = mode === 'vertical'
-    // In the sidebar, a chat is its row under Chats, and a running job's tabs show under that chat. The tab row has
-    // no chats, so it shows them all.
-    const listedChat = (tab: TabInfo) => tab.page === 'chat' && chats.some(({ id }) => id === tab.pageParam)
+    // In the sidebar, a chat is its row under Chats, a Nest its row under Nests, and a running job's tabs show under
+    // that chat or Nest. The tab row has neither, so it shows them all.
+    const listedChat = (tab: TabInfo) =>
+        (tab.page === 'chat' && chats.some(({ id }) => id === tab.pageParam)) || (tab.page === 'nest' && nests.some(({ id }) => id === tab.pageParam))
     const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId && !listedChat(tab)) : allTabs
     // A drag counts places in this list, and the window in all of them.
     const moveShown = (tabId: string, toIndex: number) =>

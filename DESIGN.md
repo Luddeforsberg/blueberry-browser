@@ -7,7 +7,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 ## 1. Principles
 
 1. **The page comes first.** Web pages stay solid and get the space. The chrome stays quiet around them.
-2. **One colleague at a time.** Berry comes first and is enough on its own. You can grow a flock of birds for jobs you repeat, but you always talk to one, and it's always clear which. Small birds saying something on the art blueberry don't break this, even several Berrys beside the big one on the composer: they aren't more colleagues, only one way to draw each idea being said.
+2. **One colleague at a time.** Berry comes first and is enough on its own. You can grow a flock of birds for jobs you repeat, but you always talk to one, and it's always clear which. A Nest can have several birds working at once, one on each card, and this still holds: each card is one conversation with one bird, standing on it, and nothing on the board talks to you as a group. Small birds saying something on the art blueberry don't break this, even several Berrys beside the big one on the composer: they aren't more colleagues, only one way to draw each idea being said.
 3. **Calm by default.** Nothing moves, glows or asks for attention without a reason.
 4. **Trust you can see.** The UI always shows what Berry can see and what it is doing, and it asks before anything that matters.
 5. **A normal browser first.** Tabs, navigation and bookmarks must be excellent with no account and no AI.
@@ -15,7 +15,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 ### What we reject
 
-- Humanoid companions, or a team you have to manage. The flock is birds you made yourself, and none appears until you ask.
+- Humanoid companions, or a team you have to manage. The flock is birds you made yourself, and none appears until you ask. A Nest isn't a team either: every card runs only when you send it, a line only hands one card's answer to the next as data, and there's nothing to supervise, assign or keep busy.
 - Promo cards and upsells on the new tab. The ideas there only link to real features, and suggestions only come from what the user really did.
 - Stacks of identical rounded, shadowed cards with an avatar, a title, pill chips and pill buttons. Where a page lists birds, they stand on something real: a wire, a divider or the fruit.
 - Glass that makes text harder to read, or glass on web pages.
@@ -55,7 +55,7 @@ Sizes (*to tune*):
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **A crowded tab row:** tabs share the row evenly, and the active one gets room for its close button and the bird on top, so its title is never cut shorter than the others'. Below about 72px a tab shows only its icon, and its close button on hover or while active.
 - **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New tab, Needs you, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account lives in it. Collapsed, the toolbar shows the button that brings the sidebar back.
+- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New tab, Needs you, Routines and Flock, then Nests, then chats, then tabs. Settings stays at the bottom, and the account lives in it. Collapsed, the toolbar shows the button that brings the sidebar back.
 - **Sidebar rows:** every row starts with a 20px slot, so all their text starts at one straight edge. A chat's slot has its bird at rest, Berry's too, or a chat icon with Hide Berry on. Only one row is highlighted: when Needs you, Routines, Flock or Settings is open, its tab under Tabs has the highlight and its row only turns `foreground`. A chat is never under Tabs, only its row under Chats, highlighted while it's open. While its tab is open, hovering the row also shows a close ×, which closes the tab as any tab's does and keeps the chat. Collapsing Chats still leaves the open chat's row. The horizontal tab row has no chats list, so chats stay in it as tabs.
 - **Buttons on the sidebar and chat panel** sit on the toolbar's address row, the docked sidebar, the floating one and the panel alike, so every button along the top shares one line.
 - **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. A site keeps the icon its page named when it was saved, and one with no icon shows its first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. With nothing saved, the cluster and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
@@ -77,7 +77,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them. The one exception is the bird on the page.
 - **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **Internal pages** (new tab, main chat, Nest, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
 
 ## 3. Glass
 
@@ -319,6 +319,7 @@ Clicking a bird anywhere in the chrome gets a small reaction: a hop, a curious l
 | Browsing | Small, sitting on the active tab's lower edge with its legs hanging, in a slot the tab keeps free between its title and its close button, so it covers no text. On a narrow row of tabs, the active one stays wide enough for the slot |
 | Chat | Working and waiting states beside its replies |
 | Routines | Flies off when a routine runs and returns with the result |
+| Nest | Standing on each card's top edge, as that card's bird. See Nests |
 | Settings | Its own section |
 | Flock | Its own page, standing on a wire with the flock, and standing on the line over what it remembers |
 | Gallery | Standing on the line under each row, Asking on the review screen, Delivered once added |
@@ -527,6 +528,23 @@ You press **Show Berry how**, do a job once, press Stop, and Berry turns it into
 - When Berry can't go on without something only the user knows, it asks the same way, with a text box, Answer and Skip. It carries on with the answer, and a question waits like an approval, in any Ask before acting setting. Passwords, codes and card details are never asked for here.
 - When a page stops it with a sign-in, a code or a captcha, Berry hands the tab to the user the same way, saying "I need you to sign in on **github.com**" and "Your password or code goes in the page, and I never see it.", with Go to the tab, I'm done and Not now. See Needs you.
 - Using Berry needs no account. Only publishing a mascot does.
+
+### Nests
+
+A Nest is a board for working in several threads at once, over days. Each card is one bird's chat thread, and a line between two cards means "this one continues from that one". It never finishes: there's no Run again, no Done and no total for the Nest, only each card's own status.
+
+- **In the sidebar:** a Nests section between the top rows and Chats, with **+** at the end of its heading, which makes an untitled Nest and opens it. Rows work like chat rows: the Nest's icon, its name, the working berry while any card runs, and on hover or focus a button with Rename and Delete, also on right-click, plus a close × while it's open. Delete asks first in a native dialog, and takes every card's chat with it. A Nest's tab shows only as its row, never under Tabs, and the pages a card's job opens sit under the row while it works. Card chats belong to their Nest, so they aren't in Chats.
+- **The page:** an internal page on the `canvas` card. A top bar, 56px over a `border` line, has the name at 20px semibold, which looks like text until it's hovered or pressed, and then renames it. Beside it, in `muted-foreground`, "Scout is working", or "Scout and Writer are working", only while a card runs. The address row says only "Nest", since the name is right below it.
+- **The board** is a field of `muted-foreground` dots at 40% on a 20px grid, drawn with React Flow. Two fingers or a drag on empty space moves it. It doesn't zoom yet. The usual composer floats at the bottom, 640px at most, with the bird chip: sending there makes an unconnected card in the first free place in sight, as the chosen bird, and sends it. Clicking empty board makes an unconnected draft there instead, and an empty draft goes as soon as you start another, so the board never fills with them. With no cards, one muted line in the middle says how to start one.
+- **A card** is 440px wide, `surface` with a `border` line, the panel radius and the selected shadow, with its bird standing on its top edge at 44px, toes on the line. Its header has the bird's name in 14px semibold and its status at 12px: Working, Needs your OK, Has a question or Waiting for you while it runs, then Done in `success`, Stopped, or Didn’t finish in `destructive`. The header and the bird move the card, and where it's left is saved. Under them are what you asked last, in two muted 13px lines at most, then while it runs the status line or the step it's on, and any approval or question, in the same card and words as in a chat. Then the latest answer in the chat's own markdown at 14px, cut at 240px with a fade and **Show all of it**. A running card wears the reading ring.
+- **Opening a card** (the expand button, or Show all of it) shows its whole chat with the chat's own messages and trail, and a reply field under it that continues that card's thread. Clicking empty board closes it again. The open card stays above the others.
+- **Pulling a line out:** hovering a card with an answer shows a small round handle on its right edge. Dragging it to an empty place leaves a draft there, on a dashed line from the card. Clicking it puts the draft beside the card, level with it, or under one already there. **Continue in a new card** in the header does the same from the keyboard. A line is drawn only between two cards, in `accent-ink` at 60% with a small round end at each, and turns solid once the draft is sent.
+- **A draft card** has an `accent-ink` border, its bird on top, and the composer inside it with no box of its own: the prompt, the bird chip, which starts on Berry, and send. Its header says what it will get, "gets Scout’s latest answer", or "Scout hasn’t answered yet", when send waits. A sent card that continues another says "With Scout’s latest answer" under its header, and so does its reply field.
+- **What crosses a line:** only the source card's latest answer, read fresh each time the card sends, never copied once. It goes to the model before what you typed, tagged and labelled untrusted the way page text is, and is never saved in the chat or offered for remembering. It can't widen anything: each card keeps its own bird's tools, sites, Ask before acting and approvals, and only what you typed counts as asking for a site.
+- **Nothing runs by itself.** A card runs only when you send it. Each runs through the same path as any chat, so Needs you, the step limit, the status line and a job's tabs closing all work as there.
+- **Deleting a card** is the × in its header. A draft goes at once, and a card with a chat asks first, because its chat goes with it. Its lines go too.
+
+Not built yet: tables you can select rows from, Berry planning cards, files and notes on a card, the bird flying along a line, fit to screen and zoom, and turning a chat into a Nest. Needs you opens a card's chat as a chat tab for now.
 
 ### Routines
 

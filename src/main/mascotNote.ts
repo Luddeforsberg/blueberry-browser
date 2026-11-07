@@ -5,7 +5,7 @@ const inTags = (text: string) => text.replace(/<(?=\s*\/?\s*(?:user_instructions
 
 // A name can come from a stranger, and 24 characters is plenty for "Ignore your rules". So only letters and the like get
 // through, and it goes in a tag the prompt says is just a name, like the instructions below it.
-const nameForPrompt = (name: string) => name.replace(/[^\p{L}\p{N} '’.&-]/gu, " ").replace(/\s+/g, " ").trim() || "Mascot";
+export const nameForPrompt = (name: string) => name.replace(/[^\p{L}\p{N} '’.&-]/gu, " ").replace(/\s+/g, " ").trim() || "Mascot";
 
 // Goes after the system prompt. Whoever wrote these instructions, the user chose them, so they count as the user's,
 // but they come second to everything before them, and approvals and limits don't depend on the model anyway.

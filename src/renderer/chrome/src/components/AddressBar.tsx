@@ -22,6 +22,8 @@ const splitUrl = (url: string) => {
 const PAGE_LABELS: Record<InternalPage, string | null> = {
     'new-tab': null,
     chat: 'Chat',
+    // The page's own top bar has its name, so it isn't said twice.
+    nest: 'Nest',
     routines: 'Routines',
     settings: 'Settings',
     downloads: 'Downloads',

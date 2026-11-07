@@ -6,6 +6,7 @@ import { EventManager } from "./EventManager";
 import { SettingsStore } from "./SettingsStore";
 import { BookmarkStore } from "./BookmarkStore";
 import { ChatStore } from "./ChatStore";
+import { NestStore } from "./NestStore";
 import { RoutineStore } from "./RoutineStore";
 import { MascotStore } from "./MascotStore";
 import { Downloads } from "./Downloads";
@@ -38,6 +39,7 @@ let eventManager: EventManager | null = null;
 let menu: AppMenu | null = null;
 let settings: SettingsStore | null = null;
 let chatStore: ChatStore | null = null;
+let nestStore: NestStore | null = null;
 let routineStore: RoutineStore | null = null;
 let mascotStore: MascotStore | null = null;
 let downloads: Downloads | null = null;
@@ -72,6 +74,11 @@ const createWindow = (): Window => {
     (file) => new ChatStore(file),
     storeNotice("Your saved chats", "are")
   );
+  nestStore ??= openStore(
+    join(app.getPath("userData"), "nests.db"),
+    (file) => new NestStore(file),
+    storeNotice("Your nests", "are")
+  );
   historyStore ??= openStore(
     join(app.getPath("userData"), "history.db"),
     (file) => new HistoryStore(file),
@@ -97,7 +104,7 @@ const createWindow = (): Window => {
     installSessionHandlers(session.defaultSession, sitePermissions, downloads);
   }
   const sessionStore = new SessionStore(join(app.getPath("userData"), "session.json"));
-  const window = new Window(settings, chatStore, bookmarks, pinned, routineStore, mascotStore, downloads, sitePermissions, historyStore, sessionStore);
+  const window = new Window(settings, chatStore, nestStore, bookmarks, pinned, routineStore, mascotStore, downloads, sitePermissions, historyStore, sessionStore);
   cloud = window.cloud;
   showStoreNotices(window);
   menu = new AppMenu(window);

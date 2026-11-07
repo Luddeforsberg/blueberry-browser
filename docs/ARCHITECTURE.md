@@ -86,6 +86,10 @@ Cards show in the chat, on Routines and on the Needs you page, which lists every
 
 A sign-in, code or captcha is a handoff. `hand_to_user` gives the tab to the user, and no job can reach it until they press I'm done. A code sent from the phone is typed into the field by [src/main/codeEntry.ts](../src/main/codeEntry.ts), the only thing that can use a held tab. The model is only told that a code went in, and for an hour `Chats` takes the code out of anything it's told in case the page shows it again, and that tab gives no screenshots.
 
+## Nests
+
+A Nest is a board of cards, each one bird's chat ([src/main/Nests.ts](../src/main/Nests.ts)). The board, its cards with their chat id, place and bird, and the lines between them are in `nests.db` ([src/main/NestStore.ts](../src/main/NestStore.ts)); the chats themselves stay in `chats.db`. A card sends through `Chats.send`, so it is an ordinary chat with every limit and approval, and the sidebar's Chats list leaves card chats out. A line adds one thing: when the card it leads to sends, `Nests` reads the source card's latest answer at that moment and passes it to `Chats.send` as `cardAnswer`, which goes to the model with that one message only, tagged and labelled untrusted by [src/main/nestContext.ts](../src/main/nestContext.ts), and is never saved. The chrome draws the board with React Flow in [NestPage.tsx](../src/renderer/chrome/src/pages/NestPage.tsx) and [NestCard.tsx](../src/renderer/chrome/src/components/NestCard.tsx).
+
 ## Routines and Show Berry how
 
 A routine is a saved job with a schedule. [src/main/Routines.ts](../src/main/Routines.ts) checks what's due, keeps routines and their runs in `routines.db` ([src/main/RoutineStore.ts](../src/main/RoutineStore.ts)), and runs each through `Chats.runTask`, the same path as a chat with no page. [src/main/routineSchedule.ts](../src/main/routineSchedule.ts) holds the schedule rules. However many times were missed while the Mac was asleep, one run covers them. A routine can also run in the cloud instead (see The cloud path).
@@ -133,6 +137,7 @@ Everything is saved in the app's user data folder.
 | What | Where | Code |
 |---|---|---|
 | Chats | `chats.db` | [src/main/ChatStore.ts](../src/main/ChatStore.ts) |
+| Nests, their cards and lines | `nests.db` | [src/main/NestStore.ts](../src/main/NestStore.ts) |
 | History | `history.db` | [src/main/HistoryStore.ts](../src/main/HistoryStore.ts) |
 | Routines and their runs | `routines.db` | [src/main/RoutineStore.ts](../src/main/RoutineStore.ts) |
 | Settings | `settings.json` | [src/main/SettingsStore.ts](../src/main/SettingsStore.ts) |

@@ -408,10 +408,48 @@ export interface RecordedDraft {
 
 export type RecordedDraftResult = { ok: true; draft: RecordedDraft } | { ok: false; error: string };
 
+// A board where each card is one bird's chat thread, and a line means "this one continues from that one". It's for
+// working in several threads over time, so it never finishes.
+export interface NestSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  // The chats of its cards, which belong to the Nest and stay out of the sidebar's Chats list.
+  chatIds: string[];
+  // Who is working on one of its cards right now, by mascot id, once each.
+  working: string[];
+}
+
+export interface NestCard {
+  id: string;
+  // Null while it's a draft, which nothing has been sent from yet.
+  chatId: string | null;
+  // Who a draft will run as, null for Berry. A sent card is its chat's, which keeps its own.
+  mascotId: string | null;
+  x: number;
+  y: number;
+}
+
+// The card `to` gets the latest answer on `from` each time it sends.
+export interface NestLine {
+  id: string;
+  from: string;
+  to: string;
+}
+
+export interface NestBoard {
+  id: string;
+  title: string;
+  cards: NestCard[];
+  lines: NestLine[];
+}
+
 export interface LibrarySnapshot {
   pinned: PinnedSite[];
   bookmarks: Bookmark[];
+  // Without the Nests' card chats.
   chats: ChatThreadSummary[];
+  nests: NestSummary[];
   routines: Routine[];
   // Berry first, then the rest of the flock, including deleted mascots that chats still point at.
   mascots: MascotProfile[];
