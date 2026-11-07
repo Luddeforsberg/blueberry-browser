@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedBefore, armedStep, checkPlan, replyState, retryable, runsState, sourcesState, type PlanSource } from "./nestPlan";
+import { allowedBefore, armedStep, checkPlan, NO_CARDS, PROMISED, promisesWork, replyState, retryable, runsState, sourcesState, type PlanSource } from "./nestPlan";
 import { BERRY } from "../shared/mascots";
 
 const FLOCK = [BERRY.id, "scout", "writer"];
@@ -124,6 +124,39 @@ describe("checkPlan", () => {
     expect(check({ reply: "Which market?", ask: true, cards: [card("c1")] })).toEqual({ ok: true, reply: "Which market?", ask: true, cards: [] });
     const result = check(plan(card("c1", { waits_for_user: true })));
     expect(result.ok && result.cards[0].waits).toBe(false);
+  });
+
+  it("never lets a reply with no cards promise work: it's a question, an answer about the board, or refused", () => {
+    // What the user hit: a promise, with nothing laid out.
+    expect(check({ reply: "I'll set up a review of your research and its conclusions.", ask: false, cards: [] })).toEqual({ ok: false, problem: NO_CARDS });
+    expect(check({ reply: "Sure.", ask: false, answers_board: false, cards: [] })).toEqual({ ok: false, problem: NO_CARDS });
+    // An answer about the board is shown as it is, longer than a plan's reply, and never with cards.
+    const answer = `Scout's card found five rivals. ${"Comet is cheapest. ".repeat(50)}`;
+    expect(check({ reply: answer, ask: false, answers_board: true, cards: [] })).toEqual({ ok: true, reply: answer.trim(), ask: false, answer: true, cards: [] });
+    // Calling it an answer doesn't let it promise either.
+    for (const reply of [
+      "Good research. I'll set up a review card for it.",
+      "Let me create a comparison.",
+      "I’ve laid out a card above.",
+      "I will now make two cards.",
+      "I'll review your research and report back with my conclusions.",
+      "We'll look into it.",
+    ]) {
+      expect(check({ reply, ask: false, answers_board: true, cards: [] })).toEqual({ ok: false, problem: PROMISED });
+    }
+    expect(check({ reply: "  ", ask: false, answers_board: true, cards: [] })).toEqual({ ok: false, problem: NO_CARDS });
+    // With cards, it's a plan, whatever answers_board says, and its reply may say what's laid out.
+    const withCards = check({ reply: "I've laid out a review card.", ask: false, answers_board: true, cards: [card("c1", { from: ["e1", "e2"] })] });
+    expect(withCards).toMatchObject({ ok: true, ask: false, cards: [{ key: "c1" }] });
+    expect(withCards.ok && withCards.answer).toBeFalsy();
+  });
+
+  it("tells a promise from an answer that only reports what the cards say", () => {
+    expect(promisesWork("I'll set up a review of your research")).toBe(true);
+    expect(promisesWork("I have added a card")).toBe(true);
+    expect(promisesWork("Comet will add sync next year, per Scout's card.")).toBe(false);
+    expect(promisesWork("I'd pick Dia, from what Scout found.")).toBe(false);
+    expect(promisesWork("Strawberry is the only one that runs agents in the cloud.")).toBe(false);
   });
 });
 

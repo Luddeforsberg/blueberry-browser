@@ -24,7 +24,7 @@ import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
 import { addressToKeep, replyPointsTo } from "./jobTabs";
-import { withCardAnswers, type CardAnswer } from "./nestContext";
+import { mapCardText, withCardAnswers, type CardAnswer } from "./nestContext";
 import { attachmentBlocks, type SentAttachment } from "./nestFiles";
 import type { MemoryToOffer } from "./MemoryStore";
 import type { GrantKey } from "./cardGrant";
@@ -1360,7 +1360,7 @@ export class Chats {
     const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
     if ((!page && answers.length === 0 && attachments.length === 0) || !newest || typeof newest.content !== "string") return messages;
-    const text = withCardAnswers(newest.content, answers.map((answer) => ({ ...answer, text: this.withoutCodes(answer.text) })));
+    const text = withCardAnswers(newest.content, answers.map((answer) => mapCardText(answer, (said) => this.withoutCodes(said))));
     const content = page ? withPage(text, page) : text;
     if (attachments.length === 0) return [...messages.slice(0, -1), { role: "user", content }];
     const files = attachmentBlocks(attachments);

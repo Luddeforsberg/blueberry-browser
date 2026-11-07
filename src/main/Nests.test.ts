@@ -140,7 +140,7 @@ const release = async () => {
 };
 
 describe("Nests", () => {
-  it("gives a card the latest answer of the card it was pulled out of, read fresh each time, and never saves it", async () => {
+  it("gives a card the thread of the card it was pulled out of, read fresh each time, and never saves it", async () => {
     const { nests, chatStore, sendAndWait } = setup();
     const nest = nests.create();
     const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
@@ -151,18 +151,46 @@ describe("Nests", () => {
     replies.push("Two drafts");
     await sendAndWait(writer.id, "Write to each");
 
-    expect(newest(sent[1])).toMatch(/^<card_answer from="Scout">\nLindqvist Data and Fjällbo\n<\/card_answer>\n/);
+    expect(newest(sent[1])).toMatch(/^<card_thread from="Scout">\n<asked>\nFind two companies\n<\/asked>\n<answer>\nLindqvist Data and Fjällbo\n<\/answer>\n<\/card_thread>\n/);
     expect(newest(sent[1])).toContain("untrusted");
     expect(newest(sent[1]).endsWith("Write to each")).toBe(true);
     const writerChat = nests.board(nest)!.cards.find(({ id }) => id === writer.id)!.chatId!;
     expect(chatStore.chat(writerChat)?.messages[0]).toEqual({ role: "user", content: "Write to each" });
 
-    // Scout's answer changes, and the next message on the writer's card gets the new one, on that message only.
+    // Scout's thread goes on, and the next message on the writer's card gets all of it, in order, on that message only.
     replies.push("Brygga");
     await sendAndWait(scout.id, "One more");
     await sendAndWait(writer.id, "And this one");
-    expect(newest(sent[3])).toContain("<card_answer from=\"Scout\">\nBrygga\n</card_answer>");
-    expect(sent[3].map(({ content }) => content).filter((content) => String(content).includes("<card_answer"))).toHaveLength(1);
+    expect(newest(sent[3])).toContain(
+      "<asked>\nFind two companies\n</asked>\n<answer>\nLindqvist Data and Fjällbo\n</answer>\n<asked>\nOne more\n</asked>\n<answer>\nBrygga\n</answer>\n</card_thread>"
+    );
+    expect(sent[3].map(({ content }) => content).filter((content) => String(content).includes("<card_thread"))).toHaveLength(1);
+  });
+
+  it("gives a card at the end of a chain every card before it, so none of the first card's answer is lost", async () => {
+    // What the user hit: compare five browsers, ask two things about it on the next card, then a table on a third.
+    const { nests, chatStore, sendAndWait } = setup();
+    const nest = nests.create();
+    const compare = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push("| Browser | Price |\n|---|---|\n| Strawberry | $20 |\n| Comet | $0 |\n| Dia | $20 |\n| Arc | $0 |\n| Atlas | $0 |");
+    await sendAndWait(compare.id, "Compare Strawberry Browser with other competitors");
+    const recommend = nests.addCard(nest, { x: 500, y: 0, from: compare.id })!;
+    replies.push("Comet, for most people.", "Strawberry has no free plan, unlike Comet.");
+    await sendAndWait(recommend.id, "Which one would you recommend?");
+    await sendAndWait(recommend.id, "Which features does Strawberry not have?");
+    const table = nests.addCard(nest, { x: 1000, y: 0, from: recommend.id })!;
+    replies.push("A table");
+    await sendAndWait(table.id, "Create a table with a feature comparison");
+
+    const message = newest(sent.at(-1)!);
+    for (const browser of ["Strawberry", "Comet", "Dia", "Arc", "Atlas"]) expect(message).toContain(`| ${browser} |`);
+    expect(message.indexOf('<earlier_card from="Scout" via="Berry">')).toBe(0);
+    expect(message).toContain("<asked>\nWhich one would you recommend?\n</asked>\n<answer>\nComet, for most people.\n</answer>\n<asked>\nWhich features does Strawberry not have?");
+    expect(message.endsWith("Create a table with a feature comparison")).toBe(true);
+    // Only the user's own words are saved, and the line says what crossed.
+    const chat = nests.board(nest)!.cards.find(({ id }) => id === table.id)!.chatId!;
+    expect(chatStore.chat(chat)?.messages[0].content).toBe("Create a table with a feature comparison");
+    expect(nests.board(nest)!.lines.find((line) => line.to === table.id)!.crosses!.whole).toMatchObject({ kind: "thread", answers: 2, before: { cards: 1, leftOut: 0 } });
   });
 
   it("gives a card with no line, or whose source hasn't answered, nothing but what was typed", async () => {
@@ -622,7 +650,7 @@ describe("Nests", () => {
     ]);
   });
 
-  it("says exactly what crosses a line: an answer's words, cut or not, and a table's rows, with any left out", async () => {
+  it("says exactly what crosses a line: a thread's answers and words, what was left out, and a table's rows", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();
     const scout = nests.addCard(nest, { x: 0, y: 0 })!;
@@ -636,17 +664,18 @@ describe("Nests", () => {
     expect(crosses()).toBeNull();
     await release();
     held = null;
-    expect(crosses()).toEqual({ stale: false, whole: { kind: "answer", words: 4, cutTo: null }, each: null });
+    expect(crosses()).toEqual({ stale: false, whole: { kind: "thread", answers: 1, earlier: 0, words: 6, cut: false }, each: null });
 
-    replies.push("word ".repeat(3000));
+    // Too long for the room: the newest is cut, and the one before it left out.
+    replies.push("word ".repeat(6000));
     await sendAndWait(scout.id, "More");
-    expect(crosses()).toEqual({ stale: false, whole: { kind: "answer", words: 3000, cutTo: 12000 }, each: null });
+    expect(crosses()).toEqual({ stale: false, whole: { kind: "thread", answers: 1, earlier: 1, words: expect.any(Number), cut: true }, each: null });
 
     const rows = ["| Company | Note |", "|---|---|", ...Array.from({ length: 60 }, (_, index) => `| Company ${index} | ${"x".repeat(300)} |`)].join("\n");
     replies.push(rows);
     await sendAndWait(scout.id, "As a table");
-    const { whole } = crosses()!;
-    expect(whole).toMatchObject({ kind: "answer", cutTo: 12000 });
+    // The table goes whole, and what room is left goes to the answer before it.
+    expect(crosses()!.whole).toMatchObject({ kind: "thread", answers: 2, earlier: 1, cut: true });
     expect(crosses()!.each).toEqual({ rows: 60, columns: 2, cut: false });
     // A row too long to go whole is said to be cut.
     replies.push(["| Company | Note |", "|---|---|", `| Big | ${"y".repeat(13000)} |`].join("\n"));
@@ -819,6 +848,27 @@ describe("Berry planning in a Nest", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("answers a question about the board from its cards, and says so plainly when a reply came back with no cards", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push("Five rivals: Comet, Dia, Arc, Atlas and Strawberry.");
+    await sendAndWait(scout.id, "Find rivals");
+
+    // What the user hit: a promise and no cards. It's never shown, and nothing is made.
+    plans.push({ reply: "I'll set up a review of your research and its conclusions.", ask: false, cards: [] });
+    await nests.ask(nest, "What do you think about what I research here?", PLACE);
+    expect(planned[0].messages[0].content).toContain("<answer>Five rivals: Comet, Dia, Arc, Atlas and Strawberry.</answer>");
+    expect(nests.board(nest)!.talk[0].messages.at(-1)!.text).toBe("I didn’t make any cards for that, so nothing will run. Say what you’d like done, or ask me about what the cards found.");
+
+    // An answer from the cards is said, and makes nothing.
+    plans.push({ reply: "Scout found five rivals, and Comet is the one to watch.", ask: false, answers_board: true, cards: [] });
+    await nests.ask(nest, "Which rival matters most?", PLACE);
+    expect(nests.board(nest)!.talk[0].messages.at(-1)!.text).toBe("Scout found five rivals, and Comet is the one to watch.");
+    expect(nests.board(nest)!.cards).toHaveLength(1);
+    expect(sent).toHaveLength(1);
+  });
+
   it("won't change a planned card's prompt, bird or For each row, or pull another out, while Berry changes the plan, so nothing done then is lost", async () => {
     const { nests } = setup();
     const nest = nests.create();
@@ -839,7 +889,7 @@ describe("Berry planning in a Nest", () => {
     expect(nests.editPlanned(first.id, { prompt: "Find companies in Oslo" })).toBe(true);
   });
 
-  it("gives the planner the cards on the board with only the start of their answers, labelled untrusted", async () => {
+  it("gives the planner the cards on the board with their threads, labelled untrusted", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();
     const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
@@ -849,9 +899,8 @@ describe("Berry planning in a Nest", () => {
     await nests.ask(nest, "Now find each lead's latest post", PLACE);
 
     const request = planned[0].messages[0].content;
-    expect(request).toContain('<card key="e1" bird="Scout" status="Done">');
-    expect(request).toContain("Company 3");
-    expect(request).not.toContain("Company 4");
+    expect(request).toContain('<card key="e1" bird="Scout" status="Done">\n<asked>Find companies</asked>\n<answer>Found these.');
+    expect(request).toContain("| Company 8 | 17 |");
     expect(request).toContain("untrusted");
     // Reading from a card on the board, it waits for Run rather than starting.
     const [card] = plannedCards(nests, nest);
@@ -1530,7 +1579,7 @@ describe("Trust and real work in a Nest", () => {
     const nest = nests.create();
     const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
     const rival = nests.addCard(nest, { x: 0, y: 300 })!;
-    replies.push("Scout's list", "word ".repeat(4000));
+    replies.push("Scout's list", "word ".repeat(6000));
     await sendAndWait(scout.id, "Find companies");
     await sendAndWait(rival.id, "Find more");
     const compare = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
@@ -1545,14 +1594,17 @@ describe("Trust and real work in a Nest", () => {
     const lines = nests.board(nest)!.lines.filter((line) => line.to === compare.id);
     expect(lines.map((line) => line.from)).toEqual([scout.id, rival.id]);
     // The long one is cut to what the short one leaves, and its line says so.
-    expect(lines[0].crosses).toMatchObject({ whole: { kind: "answer", cutTo: null } });
-    expect(lines[1].crosses).toMatchObject({ whole: { kind: "answer", cutTo: 12000 - "Scout's list".length } });
+    expect(lines[0].crosses).toMatchObject({ whole: { kind: "thread", cut: false } });
+    expect(lines[1].crosses).toMatchObject({ whole: { kind: "thread", cut: true } });
 
     await sendAndWait(compare.id, "Compare them");
     const message = newest(sent.at(-1)!);
-    expect(message.indexOf('<card_answer from="Scout">\nScout\'s list')).toBe(0);
-    expect(message).toContain('<card_answer from="Berry">');
-    expect(message).toContain(`cut to the first ${(12000 - "Scout's list".length).toLocaleString("en-US")} characters`);
+    expect(message.indexOf('<card_thread from="Scout">\n<asked>\nFind companies\n</asked>\n<answer>\nScout\'s list')).toBe(0);
+    expect(message).toContain('<card_thread from="Berry">');
+    expect(message).toContain("[… cut to fit]\n</answer>");
+    expect(message).toContain("with some of it cut to fit, where it says so");
+    const words = [...message.matchAll(/<(asked|answer)>\n([^]*?)\n<\/\1>/g)].reduce((total, match) => total + match[2].length, 0);
+    expect(words).toBeLessThanOrEqual(24_000);
     expect(message.endsWith("Compare them")).toBe(true);
 
     // At most four.

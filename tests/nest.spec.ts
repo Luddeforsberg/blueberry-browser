@@ -33,7 +33,7 @@ const oneJob = () =>
     cards: [{ key: "c1", bird: "berry", prompt: "One job", from: [], for_each_row: false, waits_for_user: false, table_of: null }],
   });
 
-test("a card pulled out of another gets its latest answer, and the Nest keeps both", async () => {
+test("a card pulled out of another gets its thread, and the Nest keeps both", async () => {
   model.reset();
   const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
   app = await launchApp(profile, { modelEnv: model.env });
@@ -62,7 +62,7 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await first.hover();
   await first.getByLabel("Pull a new card out of Berry’s").click();
   const draft = chrome.locator(".react-flow__node").nth(1);
-  await expect(draft).toContainText("gets Berry’s latest answer");
+  await expect(draft).toContainText("gets Berry’s thread");
   await expect(chrome.locator(".react-flow__edge")).toHaveCount(1);
   const [firstBox, draftBox] = [await first.boundingBox(), await draft.boundingBox()];
   expect(draftBox!.x).toBeGreaterThan(firstBox!.x + firstBox!.width);
@@ -100,10 +100,11 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await pulled.getByRole("textbox", { name: "What should Berry do?" }).press("Escape");
   await expect(chrome.locator(".react-flow__node")).toHaveCount(2);
 
-  // The model got the first card's answer as tagged, untrusted data, and the user's words after it.
+  // The model got the first card's thread as tagged, untrusted data, and the user's words after it.
   expect(model.requests).toHaveLength(2);
   const sent = newestUserMessage(model.requests[1]);
-  expect(sent).toContain(`<card_answer from="Berry">\n${FIRST_ANSWER}\n</card_answer>`);
+  expect(sent).toContain(`<answer>\n${FIRST_ANSWER}\n</answer>\n</card_thread>`);
+  expect(sent.startsWith('<card_thread from="Berry">\n<asked>\n')).toBe(true);
   expect(sent).toContain("untrusted");
   expect(sent.endsWith("Write a first email to each")).toBe(true);
 
@@ -857,7 +858,7 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
     expect(shown).toBe(true);
     await chrome.keyboard.press("Escape");
 
-    // A card can read from two: Scout's answer and Berry's table, each tagged by name, in order.
+    // A card can read from two: Scout's thread and Berry's, each tagged by name, in order.
     const saved = await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find rivals.", sites: [], tools: [] })
     );
@@ -873,7 +874,7 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
     await chrome.getByRole("menuitem", { name: "Add an input: Scout" }).click();
     await compareCard.getByRole("button", { name: "Add a file, a note or an input" }).click();
     await chrome.getByRole("menuitem", { name: "Add an input: Berry" }).first().click();
-    await expect(compareCard).toContainText("gets Scout’s answer and Berry’s");
+    await expect(compareCard).toContainText("gets Scout’s thread and Berry’s");
     await shots("two-inputs");
     model.replyWith("Lindqvist Data is ahead of Kvarnsten.");
     const comparePrompt = compareCard.getByRole("textbox", { name: "What should Berry do?" });
@@ -881,8 +882,8 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
     await comparePrompt.press("Enter");
     await expect(compareCard.getByRole("status")).toHaveText("Done");
     const message = newestUserMessage(model.requests.at(-1)!);
-    expect(message.indexOf('<card_answer from="Scout">')).toBe(0);
-    expect(message.indexOf('<card_answer from="Berry">')).toBeGreaterThan(0);
+    expect(message.indexOf('<card_thread from="Scout">')).toBe(0);
+    expect(message.indexOf('<card_thread from="Berry">')).toBeGreaterThan(0);
     expect(message.endsWith("Compare each company with its rivals")).toBe(true);
   } finally {
     server.close();

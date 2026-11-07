@@ -195,11 +195,18 @@ describe("cellParts", () => {
 });
 
 describe("what crosses a line, in words", () => {
-  it("says a bird's answer in words, rounded, and when it was cut", () => {
-    expect(crossingWords({ kind: "answer", words: 1, cutTo: null }, "Scout")).toBe("Scout’s answer, 1 word");
-    expect(crossingWords({ kind: "answer", words: 19, cutTo: null }, "Scout")).toBe("Scout’s answer, 19 words");
-    expect(crossingWords({ kind: "answer", words: 904, cutTo: null }, "Scout")).toBe("Scout’s answer, about 900 words");
-    expect(crossingWords({ kind: "answer", words: 2437, cutTo: 12000 }, "Scout")).toBe("Scout’s answer, about 2,400 words, cut to the first 12,000 characters");
+  it("says a card's answer in words, rounded, and a thread by its answers, with what was left out or cut", () => {
+    const thread = (words: number, extra: object = {}) => ({ kind: "thread" as const, answers: 1, earlier: 0, words, cut: false, ...extra });
+    expect(crossingWords(thread(1), "Scout")).toBe("Scout’s answer, 1 word");
+    expect(crossingWords(thread(19), "Scout")).toBe("Scout’s answer, 19 words");
+    expect(crossingWords(thread(904), "Scout")).toBe("Scout’s answer, about 900 words");
+    expect(crossingWords(thread(2437, { cut: true }), "Scout")).toBe("Scout’s answer, about 2,400 words, with some of it cut to fit");
+    expect(crossingWords(thread(1200, { answers: 2, before: { cards: 1, words: 600, leftOut: 0, cut: false } }), "Berry")).toBe(
+      "Berry’s thread (2 answers) and 1 card before it, about 1,800 words"
+    );
+    expect(crossingWords(thread(5000, { answers: 2, earlier: 1, cut: true, before: { cards: 1, words: 900, leftOut: 2, cut: false } }), "Berry")).toBe(
+      "Berry’s thread (2 answers) and 1 card before it, about 5,900 words, with 1 earlier answer and 2 cards further up left out and some of it cut to fit"
+    );
   });
 
   it("says a table in rows and columns, and how many rows were left out", () => {
@@ -208,6 +215,10 @@ describe("what crosses a line, in words", () => {
     expect(crossingWords({ kind: "table", rows: 40, columns: 3, leftOut: 1 }, "Writer")).toBe("40 rows, 3 columns from Writer, with 1 more row left out to fit");
     expect(eachWords({ columns: 3 })).toBe("One row each, 3 columns");
     expect(eachWords({ columns: 3, cut: true })).toBe("One row each, 3 columns, a row too long to go whole cut to its first 12,000 characters");
+    expect(crossingWords({ kind: "table", rows: 3, columns: 2, leftOut: 0, before: { cards: 2, words: 640, leftOut: 0, cut: true } }, "Scout")).toBe(
+      "3 rows, 2 columns from Scout, and 2 cards before it, about 640 words, with some of it cut to fit"
+    );
+    expect(eachWords({ columns: 2, before: { cards: 1, words: 90, leftOut: 1, cut: false } })).toBe("One row each, 2 columns, and 1 card before it, about 90 words, with 1 card further up left out to fit");
     expect(rowTooLong(["A"], [["a".repeat(MAX_CROSSING_LENGTH - 18)]])).toBe(false);
     expect(rowTooLong(["A"], [["a".repeat(MAX_CROSSING_LENGTH - 17)]])).toBe(true);
     expect(rowTooLong(["A"], [])).toBe(false);

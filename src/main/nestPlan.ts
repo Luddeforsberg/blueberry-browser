@@ -10,6 +10,8 @@ import { MAX_INPUTS } from "../shared/nestTable";
 export const MAX_PLAN_CARDS = 6;
 const MAX_PROMPT_LENGTH = 2000;
 const MAX_REPLY_LENGTH = 600;
+// An answer about the board is a few short paragraphs.
+const MAX_ANSWER_LENGTH = 3000;
 const MAX_TABLE_OF_LENGTH = 60;
 
 // A card already on the board that a planned card may read from, by the short key the planner was given for it.
@@ -37,9 +39,19 @@ export interface PlanCard {
   attached: string[];
 }
 
-export type CheckedPlan = { ok: true; reply: string; ask: boolean; cards: PlanCard[] } | { ok: false; problem: string };
+// `answer` when the reply answers a question about the board from its cards, with no cards. It's shown and nothing else:
+// it can't run, start or change anything.
+export type CheckedPlan = { ok: true; reply: string; ask: boolean; answer?: boolean; cards: PlanCard[] } | { ok: false; problem: string };
 
 const NOT_A_PLAN = "what came back wasn’t shaped like a plan";
+export const NO_CARDS = "it came back with no cards";
+export const PROMISED = "it said it would set something up, and made no cards";
+
+// Words that say Berry will do something, anything, or has set something up. With no cards, nothing will happen, so a
+// reply like that is never shown: "I'll set up a review" with nothing set up is how a plan breaks a promise.
+const PROMISE =
+  /\b(?:(?:I|we)['’]ll|(?:I|we) will|(?:I|we)['’](?:m|re) going to|(?:I am|we are) going to|let me|let['’]s)\b|\b(?:I|we)['’]?(?:ve| have)\s+(?:\w+\s+){0,2}?(?:set(?:ting)? up|made|created|added|laid out|started|run|built|planned|queued|put together|asked|sent)\b/i;
+export const promisesWork = (reply: string): boolean => PROMISE.test(reply);
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -55,6 +67,12 @@ export const checkPlan = (
   const reply = raw.reply.trim().slice(0, MAX_REPLY_LENGTH);
   // A question plans nothing, whatever came with it.
   if (raw.ask) return reply ? { ok: true, reply, ask: true, cards: [] } : { ok: false, problem: NOT_A_PLAN };
+  // An answer about the board is only an answer with no cards. With cards, it's a plan like any other.
+  if (raw.cards.length === 0) {
+    const answer = raw.answers_board === true ? raw.reply.trim().slice(0, MAX_ANSWER_LENGTH) : "";
+    if (!answer) return { ok: false, problem: NO_CARDS };
+    return promisesWork(answer) ? { ok: false, problem: PROMISED } : { ok: true, reply: answer, ask: false, answer: true, cards: [] };
+  }
   if (raw.cards.length > MAX_PLAN_CARDS) return { ok: false, problem: `it came to more than ${MAX_PLAN_CARDS} cards` };
 
   const onBoard = new Map(sources.map((source) => [source.key, source]));

@@ -296,7 +296,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                         thread={thread}
                         mascot={mascot}
                         onSend={(text) => window.chromeAPI.nests.send(card.id, text)}
-                        note={inputs.length > 0 ? `Gets ${listed(inputs.map((input) => getsWhat(input, inputs.length > 1)))} when you send` : null}
+                        note={inputs.length > 0 ? `Gets ${listed(inputs.map((input) => getsWhat(input)))} when you send` : null}
                     />
                 ) : (
                     <div className={cn("nodrag select-text cursor-auto flex flex-col", box.fill && "flex-1 min-h-0 overflow-hidden rounded-b-panel")}>
@@ -413,10 +413,11 @@ const drivingInput = (inputs: readonly InputView[]) => inputs.find((input) => in
 const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`)
 
 // What a card on a line gets, in the words its header and reply field use.
-const getsWhat = ({ line, name, source }: InputView, short = false) =>
-    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : `${name}’s ${short ? 'answer' : 'latest answer'}`
+const getsWhat = ({ line, name, source }: InputView) =>
+    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : `${name}’s thread`
 
-// What a sent card got, exactly, as main counts what crosses: "With Scout’s answer, about 900 words".
+// What a sent card got, exactly, as main counts what crosses: "With Scout’s thread (2 answers) and 1 card before it,
+// about 1,800 words".
 const withWhat = (inputs: readonly InputView[]) =>
     `With ${inputs.map((input) => (input.line.crosses?.whole ? crossingWords(input.line.crosses.whole, input.name) : getsWhat(input))).join(' · ')}`
 
@@ -591,7 +592,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
               ? `every row of ${input.name}`
               : input.source.each
                 ? `${input.name}’s table`
-                : `${input.name}’s ${several ? 'answer' : 'latest answer'}`
+                : `${input.name}’s thread`
     const gets =
         inputs.length === 0
             ? 'New card'

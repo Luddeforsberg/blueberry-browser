@@ -20,6 +20,9 @@ export const STALE_ROWS = "The rows you picked aren’t in that card’s latest 
 // How much of a card's answer or table crosses a line: plenty for a list or a write-up, and short enough that one card
 // can't crowd out the job it's passed to.
 export const MAX_CROSSING_LENGTH = 12000;
+// One room for everything that crosses into a card when it's sent: its inputs' threads and tables, and what those cards
+// got from further up the chain. A run of For each row keeps the smaller room above, since a card can make 25 of them.
+export const MAX_CONTEXT_LENGTH = 24000;
 
 // A file's table goes with every board as its first rows only, each cell cut, enough for a closed card. The card asks
 // main for the whole table when it's shown.
@@ -97,11 +100,17 @@ const tablesIn = (markdown: string, streaming: boolean): (Table & { start: numbe
 // The table that's the card's result: the one with the most rows, and the first of those. A short summary table beside
 // a long list doesn't take its place. Null when there's no table with at least one row.
 export const findTable = (markdown: string, { streaming = false } = {}): Table | null => {
-  let best: Table | null = null;
-  for (const { header, rows, before } of tablesIn(markdown, streaming)) {
-    if (rows.length > 0 && (!best || rows.length > best.rows.length)) best = { header, rows, before };
+  const found = findTableLines(markdown, { streaming });
+  return found && { header: found.header, rows: found.rows, before: found.before };
+};
+
+// The same table, with the lines it takes in the text: `start` is its header's, and `end` is one past its last row's.
+export const findTableLines = (markdown: string, { streaming = false } = {}): (Table & { start: number; end: number }) | null => {
+  let best: (Table & { start: number }) | null = null;
+  for (const table of tablesIn(markdown, streaming)) {
+    if (table.rows.length > 0 && (!best || table.rows.length > best.rows.length)) best = table;
   }
-  return best;
+  return best && { ...best, end: best.start + 2 + best.rows.length };
 };
 
 // What a cell says as plain words: links become their words, emphasis and code marks go, and a line break is a space.
@@ -353,11 +362,21 @@ export const exportCellText = (cell: string): string => {
   return text.trim();
 };
 
-// What crosses a line, counted from what's sent, so a card can say exactly that: a bird's answer, in words and whether
-// it was cut, or a table, in rows and columns and how many rows were left out to fit.
+// What crosses a line, counted from what's sent, so a card can say exactly that: a card's thread, in answers and words
+// and what was left out, or a table, in rows and columns and how many rows were left out to fit. `before` is what came
+// with it from further up the chain: the cards the source itself read from, and theirs.
+export interface Before {
+  cards: number;
+  words: number;
+  // Cards further up with no room left for any of them.
+  leftOut: number;
+  // Whether any of what did go was cut.
+  cut: boolean;
+}
+
 export type Crossing =
-  | { kind: "answer"; words: number; cutTo: number | null }
-  | { kind: "table"; rows: number; columns: number; leftOut: number };
+  | { kind: "thread"; answers: number; earlier: number; words: number; cut: boolean; before?: Before }
+  | { kind: "table"; rows: number; columns: number; leftOut: number; before?: Before };
 
 // On every line: what crosses as it is, and what each run gets when For each row is on, or null where it can't be.
 export interface LineCrossing {
@@ -365,7 +384,7 @@ export interface LineCrossing {
   stale: boolean;
   whole: Crossing | null;
   // `cut` when a row is too long to go whole, so it's cut to the first characters that fit.
-  each: { rows: number; columns: number; cut?: boolean } | null;
+  each: { rows: number; columns: number; cut?: boolean; before?: Before } | null;
   // With several inputs and For each row on: this is the line the runs go row by row on.
   drives?: boolean;
   // With several inputs and For each row on, on every other line: what each run gets from it as shared context.
@@ -382,18 +401,34 @@ const aboutWords = (words: number) => {
   return `about ${count(Math.round(words / step) * step)} words`;
 };
 
-// "Scout’s answer, about 900 words", "12 rows, 3 columns from Writer", with anything cut said plainly.
+// ", with 1 earlier answer and 2 cards further up left out and some of it cut to fit", or nothing when all of it went.
+const lossWords = (leftOut: readonly string[], cut: boolean) => {
+  const said = [leftOut.length > 0 ? `${leftOut.join(" and ")} left out` : "", cut ? "some of it cut" : ""].filter(Boolean);
+  return said.length > 0 ? `, with ${said.join(" and ")} to fit` : "";
+};
+
+const beforeLost = (before: Before | undefined) => (before && before.leftOut > 0 ? [counted(before.leftOut, "card") + " further up"] : []);
+
+// "Scout’s answer, about 900 words", "Scout’s thread (2 answers) and 1 card before it, about 1,800 words", "12 rows,
+// 3 columns from Writer", with anything left out or cut said plainly.
 export const crossingWords = (crossing: Crossing, who: string): string => {
-  if (crossing.kind === "answer") {
-    return `${who}’s answer, ${aboutWords(crossing.words)}${crossing.cutTo !== null ? `, cut to the first ${count(crossing.cutTo)} characters` : ""}`;
+  const { before } = crossing;
+  const cardsBefore = before && before.cards > 0 ? counted(before.cards, "card") + " before it" : null;
+  if (crossing.kind === "thread") {
+    const own = crossing.answers === 1 ? `${who}’s answer` : `${who}’s thread (${counted(crossing.answers, "answer")})`;
+    const lost = [...(crossing.earlier > 0 ? [counted(crossing.earlier, "earlier answer")] : []), ...beforeLost(before)];
+    return `${own}${cardsBefore ? ` and ${cardsBefore}` : ""}, ${aboutWords(crossing.words + (before?.words ?? 0))}${lossWords(lost, crossing.cut || !!before?.cut)}`;
   }
   const shape = `${counted(crossing.rows, "row")}, ${counted(crossing.columns, "column")} from ${who}`;
-  return crossing.leftOut > 0 ? `${shape}, with ${counted(crossing.leftOut, "more row")} left out to fit` : shape;
+  const lost = [...(crossing.leftOut > 0 ? [counted(crossing.leftOut, "more row")] : []), ...beforeLost(before)];
+  return `${shape}${cardsBefore ? `, and ${cardsBefore}, ${aboutWords(before!.words)}` : ""}${lossWords(lost, !!before?.cut)}`;
 };
 
 // What each run of For each row gets.
-export const eachWords = ({ columns, cut = false }: { columns: number; cut?: boolean }): string =>
-  `One row each, ${counted(columns, "column")}${cut ? `, a row too long to go whole cut to its first ${count(MAX_CROSSING_LENGTH)} characters` : ""}`;
+export const eachWords = ({ columns, cut = false, before }: { columns: number; cut?: boolean; before?: Before }): string =>
+  `One row each, ${counted(columns, "column")}${cut ? `, a row too long to go whole cut to its first ${count(MAX_CROSSING_LENGTH)} characters` : ""}` +
+  (before && before.cards > 0 ? `, and ${counted(before.cards, "card")} before it, ${aboutWords(before.words)}` : "") +
+  lossWords(beforeLost(before), !!before?.cut);
 
 // Whether any of these rows is too long to go to a run whole.
 export const rowTooLong = (header: readonly string[], rows: readonly (readonly string[])[]): boolean =>
