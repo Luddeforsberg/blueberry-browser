@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
@@ -125,7 +126,10 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     // A drag counts places in this list, and the window in all of them.
     const moveShown = (tabId: string, toIndex: number) =>
         moveTab(tabId, toIndex < tabs.length ? allTabs.indexOf(tabs[toIndex]) : allTabs.length - 1)
-    const { start, itemProps } = useTabDrag(tabs.map(tab => tab.id), vertical ? 'y' : 'x', moveShown)
+    const { start, itemProps, carried } = useTabDrag(tabs.map(tab => tab.id), vertical ? 'y' : 'x', moveShown)
+    const carriedTab = carried && tabs.find((tab) => tab.id === carried.tabId)
+    // On a Nest's board, a press doesn't go to the tab, so the tab can be carried onto the board. A click still goes there.
+    const onBoard = allTabs.find((tab) => tab.isActive)?.page === 'nest'
     const order = tabs.map(tab => tab.id).join()
     const nudged = useRef<HTMLElement | null>(null)
 
@@ -153,7 +157,7 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                         onPress={(event) => {
                             if (event.button !== 0) return
                             // Like other browsers, a press selects the tab, so a drag moves the page you see.
-                            if (!tab.isActive) void switchTab(tab.id)
+                            if (!tab.isActive && !onBoard) void switchTab(tab.id)
                             start(event, tab.id)
                         }}
                         onNudge={(delta, button) => {
@@ -167,6 +171,18 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     />
                 ))}
             </ul>
+            {carriedTab &&
+                createPortal(
+                    <div
+                        aria-hidden
+                        className="fixed z-50 pointer-events-none max-w-56 h-[34px] px-3 flex items-center gap-2 rounded-card bg-surface shadow-float text-14"
+                        style={{ left: carried.x + 12, top: carried.y + 8 }}
+                    >
+                        <span className={LEADING_SLOT}><TabIcon tab={carriedTab} /></span>
+                        <span className="truncate">{carriedTab.title || 'New tab'}</span>
+                    </div>,
+                    document.body
+                )}
             {showNew && (
                 <button
                     type="button"

@@ -195,6 +195,12 @@ describe("cellParts", () => {
 });
 
 describe("what crosses a line, in words", () => {
+  it("names a page on its line: an open tab's page, or a link's address", () => {
+    expect(crossingWords({ kind: "page", name: "strawberrybrowser.com/pricing", read: true }, "")).toBe("1 page: strawberrybrowser.com/pricing");
+    expect(crossingWords({ kind: "page", name: "strawberrybrowser.com/pricing", read: false }, "")).toBe("1 link: strawberrybrowser.com/pricing");
+    expect(lineWords({ whole: { kind: "page", name: "example.com", read: true } }, "")).toBe("1 page: example.com");
+  });
+
   it("says a card's answer in words, rounded, and a thread by its answers, with what was left out or cut", () => {
     const thread = (words: number, extra: object = {}) => ({ kind: "thread" as const, answers: 1, earlier: 0, words, cut: false, ...extra });
     expect(crossingWords(thread(1), "Scout")).toBe("Scout’s answer, 1 word");

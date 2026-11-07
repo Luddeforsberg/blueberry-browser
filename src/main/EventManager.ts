@@ -253,6 +253,10 @@ export class EventManager {
     this.handle("nests:drop-file", (nestId, file, place) => this.mainWindow.dropFile(nestId, file, place));
     this.handle("nests:file-content", (cardId) => nests.fileContent(cardId));
     this.handle("nests:save-file", (cardId) => this.mainWindow.saveFile(cardId));
+    this.handle("nests:drop-page", (nestId, page, place) => nests.dropPage(nestId, page, place));
+    this.handle("nests:go-to-tab", (cardId) => this.mainWindow.goToPageTab(cardId));
+    this.handle("nests:show-tabs", (cardId, on) => nests.showTabs(cardId, on));
+    this.handle("nests:watch-pages", (nestId, pages) => this.mainWindow.nestPictures.watch(nestId, pages));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

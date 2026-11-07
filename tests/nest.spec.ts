@@ -1029,3 +1029,102 @@ test("a file dropped on the board goes to the card a line takes it to, and a car
   await expect.poll(() => existsSync(saveTo)).toBe(true);
   expect(readFileSync(saveTo, "utf8")).toBe("﻿Company,City\r\nBrygga Båt AB,Malmö\r\n'=1+1,Lund\r\n");
 });
+
+test("a tab dragged from the sidebar and a dropped link become cards, whose page goes to the card a line takes it to, which may open exactly that link unasked", async () => {
+  test.setTimeout(90_000);
+  model.reset();
+  const server = createServer((request, response) => {
+    response.setHeader("content-type", "text/html");
+    response.end(request.url === "/pricing" ? "<!doctype html><title>Pricing</title><h1>Pricing</h1><p>Pro is $20 a month.</p>" : "<!doctype html><title>Plans</title><p>Our plans</p>");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  app = await launchApp(undefined, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(300);
+      await chrome.screenshot({ path: join(SHOTS, `${name}-${appearance}.png`) });
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  };
+  try {
+    await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${origin}/pricing`);
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.url.endsWith("/pricing"))?.title).toBe("Pricing");
+    await chrome.getByRole("button", { name: "New nest" }).click();
+    const cards = chrome.locator(".react-flow__node");
+    const board = (await chrome.locator("[data-tab-drop]").boundingBox())!;
+
+    // The tab, carried out of the sidebar and let go on the board, is a card with the tab's own title. The Nest stays in front.
+    const pricingTab = (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.url.endsWith("/pricing"))!;
+    const row = (await chrome.locator(`[data-berry-tab="${pricingTab.id}"]`).boundingBox())!;
+    await chrome.mouse.move(row.x + 40, row.y + row.height / 2);
+    await chrome.mouse.down();
+    await chrome.mouse.move(board.x + 200, board.y + 160, { steps: 12 });
+    await chrome.mouse.up();
+    const tabCard = chrome.getByRole("group", { name: "The page 127.0.0.1/pricing" });
+    await expect(tabCard).toHaveCount(1);
+    await expect(tabCard).toContainText("127.0.0.1/pricing");
+    await expect(tabCard).toContainText("Tab");
+    expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page).toBe("nest");
+
+    // A link dropped from elsewhere, as a list of addresses with the words it was shown with, is a link card. A file
+    // address isn't taken.
+    const drop = (data: Record<string, string>, at: { x: number; y: number }) =>
+      chrome.evaluate(
+        ({ data, at }) => {
+          const target = document.querySelector("[data-tab-drop]")!;
+          const transfer = new DataTransfer();
+          Object.entries(data).forEach(([type, value]) => transfer.setData(type, value));
+          for (const type of ["dragenter", "dragover", "drop"]) target.dispatchEvent(new DragEvent(type, { dataTransfer: transfer, clientX: at.x, clientY: at.y, bubbles: true, cancelable: true }));
+        },
+        { data, at }
+      );
+    await drop({ "text/uri-list": "file:///etc/passwd" }, { x: board.x + 200, y: board.y + 520 });
+    await expect(chrome.getByRole("alert")).toContainText("Only web pages can go on the board");
+    await drop({ "text/uri-list": `${origin}/plans`, "text/html": `<a href="${origin}/plans">Our plans</a>` }, { x: board.x + 200, y: board.y + 520 });
+    const linkCard = chrome.getByRole("group", { name: "The page 127.0.0.1/plans" });
+    await expect(linkCard).toContainText("Our plans");
+    await expect(linkCard).toContainText(`${origin}/plans`);
+    await expect(linkCard).toContainText("Link");
+
+    // A line from the tab card names the page, and a second from the link card names the link.
+    await tabCard.hover();
+    await tabCard.getByLabel("Pull a new card out of 127.0.0.1/pricing").click();
+    const draftId = await cards.filter({ has: chrome.getByRole("textbox", { name: "What should Berry do?" }) }).getAttribute("data-id");
+    const draft = chrome.locator(`.react-flow__node[data-id="${draftId}"]`);
+    await expect(draft).toContainText("1 page: 127.0.0.1/pricing");
+    const linkId = await linkCard.getAttribute("data-id");
+    expect(await chrome.evaluate(({ draftId, linkId }) => window.chromeAPI.nests.addInput(draftId!, linkId!), { draftId, linkId })).toEqual({ ok: true });
+    await expect(draft).toContainText("1 page: 127.0.0.1/pricing · 1 link: 127.0.0.1/plans");
+    await shots("nest-tabs-board");
+
+    // Sent, the bird gets the tab's text and the link's address, untrusted, and opens exactly that link without asking.
+    model.callTools({ name: "open_tab", args: { url: `${origin}/plans` } });
+    model.replyWith("Pro is $20, and the plans page lists the rest.");
+    const prompt = draft.getByRole("textbox", { name: "What should Berry do?" });
+    await prompt.fill("What does Pro cost, and what other plans are there?");
+    await prompt.press("Enter");
+    await expect(draft.getByRole("status").first()).toHaveText("Done");
+    const sent = newestUserMessage(model.requests[0]);
+    expect(sent).toContain('<card_page from="127.0.0.1 pricing">');
+    expect(sent).toContain("Pro is $20 a month.");
+    expect(sent).toContain(`<card_link from="127.0.0.1 plans">\nAddress: ${origin}/plans\nTitle: Our plans\n</card_link>`);
+    expect(sent).toContain("untrusted");
+    expect(JSON.stringify(model.requests.at(-1)!.messages)).toContain("Plans");
+    await expect(draft.getByRole("button", { name: /^Allow/ })).toHaveCount(0);
+    await shots("nest-tabs-sent");
+
+    // Pressing the tab card goes to its tab, and taking it off the board leaves the tab open.
+    const tabCardId = await tabCard.getAttribute("data-id");
+    await tabCard.getByRole("button", { name: "Go to the tab on 127.0.0.1/pricing" }).click();
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.url).toBe(`${origin}/pricing`);
+    expect(await chrome.evaluate((id) => window.chromeAPI.nests.deleteCard(id!), tabCardId)).toBe(true);
+    expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).some((tab) => tab.url === `${origin}/pricing`)).toBe(true);
+  } finally {
+    server.close();
+  }
+});

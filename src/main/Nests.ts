@@ -5,7 +5,7 @@ import type { ChatThread, MascotProfile, NestBoard, NestCard, NestFileContent, N
 import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRetryResult, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_CONTEXT_LENGTH, MAX_CROSSING_LENGTH, MAX_INPUTS, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type FilesCrossing, type LineCrossing, type PickedRows } from "../shared/nestTable";
-import { CARD_GAP, CARD_HEIGHT, CARD_SIZE, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
+import { CARD_GAP, CARD_HEIGHT, CARD_SIZE, CARD_WIDTH, freeSpot, PAGE_CARD, type Rect } from "../shared/nestPlace";
 import { chainCrossings, fitChain, gatherChain, latestAnswer, MAX_EARLIER_CARDS, sentLength, threadOf, type CardAnswer, type ChainEdge, type RawInput } from "./nestContext";
 import { DEFAULT_COLUMN, fallbackCell, linkChecked, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
 import { tableFromFile } from "./nestCsv";
@@ -16,6 +16,8 @@ import { checkFile, filePreview, MAX_NOTE_LENGTH, roomProblem, sizeInWords, type
 import { CardGrants } from "./cardGrant";
 import { perRunEstimate } from "../shared/modelPrices";
 import type { CardGrantAccess } from "./Chats";
+import { checkAddress, cleanTitle, pageName } from "../shared/nestPages";
+import type { UsedPage, WorkTabState } from "../shared/library";
 
 const MAX_TITLE_LENGTH = 100;
 // What a Nest is called until its first request, whose first words then stand in until the cheap model names it.
@@ -80,6 +82,20 @@ type CardInput = { answers: CardAnswer[] } | { problem: string };
 // have gone from their source.
 type LineInput = RawInput | null | "stale";
 
+// The window's tabs, as a Nest's page cards need them: an open web tab's address and title, and the tabs a card's
+// running job is using. Tab ids start again each launch, so a card only ever holds one in memory.
+export interface NestTabs {
+  info: (tabId: string) => { url: string; title: string; favicon: string | null } | null;
+  // Null once the job has ended. Only tabs in this window, never a cloud page.
+  work: (chatId: string) => { tabs: { id: string; state: WorkTabState; current: boolean }[] } | null;
+}
+
+const NO_TABS: NestTabs = { info: () => null, work: () => null };
+
+// Where a card is taken to be in main, which never measures one: its own size, or the usual one for its kind.
+const rectOfCard = (card: NestCard): Rect =>
+  card.page ? { x: card.x, y: card.y, ...PAGE_CARD } : { x: card.x, y: card.y, width: card.size?.width ?? CARD_WIDTH, height: card.size?.height ?? CARD_HEIGHT };
+
 const coordinate = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_COORDINATE ? value : null;
 
@@ -108,6 +124,12 @@ export class Nests {
   private readonly grants = new CardGrants();
   // The files a For-each card's lines brought that it had no room for, said to each of its runs. Memory only.
   private readonly missingFiles = new Map<string, string[]>();
+  // Which open tab each page card shows, by card. Memory only, since tab ids start again each launch: after a restart,
+  // or once its tab has closed, a page card is a link.
+  private readonly tabOf = new Map<string, string>();
+  // Cards whose job's tabs show around them, while it runs, each with the tabs the user took off the board meanwhile,
+  // which don't come back while it runs. Memory only.
+  private readonly showing = new Map<string, Set<string>>();
 
   constructor(
     private readonly store: NestStore,
@@ -118,12 +140,15 @@ export class Nests {
     private readonly planner: NestPlanner = NO_PLANNER,
     private readonly namer: NestNamer = NO_NAMER,
     // The cheap model, writing a For-each card's column name and each row's value in it.
-    private readonly writer: NestWriter = NO_WRITER
+    private readonly writer: NestWriter = NO_WRITER,
+    private readonly tabs: NestTabs = NO_TABS
   ) {
     // Runs still waiting when the app last closed don't start by themselves now: the press that queued them was then.
     // Cards of a plan that hadn't started don't either.
     store.stopWaiting();
     store.holdAfter(null, CLOSED_BEFORE_START);
+    // A running job's tabs shown around its card were views of that job, which ended with the app.
+    store.deleteJobPages();
     // Runs that ended while a value was still being written, when the app last closed, get theirs once the window is up.
     setTimeout(() => store.endedRunsWithoutCell().forEach((runId) => !this.fills.has(runId) && this.fillCell(runId)), 0);
   }
@@ -153,7 +178,8 @@ export class Nests {
     const board = this.store.board(id);
     if (!board) return null;
     const cards = board.cards.map((card) => {
-      const withCost = { ...card, cost: this.costOf(card), perRun: this.perRunOf(card) };
+      if (card.page) return { ...card, page: this.livePage(card.id, card.page) };
+      const withCost = { ...card, cost: this.costOf(card), perRun: this.perRunOf(card), ...(this.showing.has(card.id) ? { showingTabs: true } : {}) };
       return card.each
         ? { ...withCost, each: { ...card.each, naming: this.columnNaming.has(card.id), runs: card.each.runs.map((run) => ({ ...run, filling: this.fills.has(run.id) })) } }
         : withCost;
@@ -202,9 +228,146 @@ export class Nests {
   // thread, which only grows, so its length and latest answer, or where a planned card is.
   private revisionOf(card: NestCard): string {
     if (card.table || card.file) return "file";
+    if (card.page) {
+      const input = this.pageInput(card);
+      return `page ${input?.part === "page" ? `${input.url} ${input.tabId ?? ""}` : ""}`;
+    }
     if (card.each) return JSON.stringify([card.each.column, card.each.runs.map((run) => [run.state, run.cell])]);
     if (card.chatId) return `thread ${this.chats.thread(card.chatId)?.messages.length ?? 0} ${this.answerOf(card.chatId) ?? ""}`;
     return `plan ${card.plan?.state ?? ""}`;
+  }
+
+  // A page card as it is now: the open tab it shows, if it's still open, and if it's one of a running card's tabs, how
+  // that job sees it.
+  private livePage(cardId: string, page: NonNullable<NestCard["page"]>): NonNullable<NestCard["page"]> {
+    const tabId = this.tabOf.get(cardId);
+    const info = tabId ? this.tabs.info(tabId) : null;
+    const tab = tabId && info ? { id: tabId, ...info } : null;
+    const owner = page.job?.cardId;
+    const ownerChat = owner ? this.store.card(owner)?.chatId : null;
+    const used = ownerChat && tabId ? this.tabs.work(ownerChat)?.tabs.find((each) => each.id === tabId) : null;
+    return { ...page, tab, job: owner ? { cardId: owner, state: used?.state ?? "none", current: used?.current ?? false } : null };
+  }
+
+  // The tab a page card shows, for going there. Null for a link, or once its tab has closed.
+  tabOfCard(cardId: unknown): string | null {
+    const tabId = typeof cardId === "string" ? this.tabOf.get(cardId) : undefined;
+    return tabId && this.tabs.info(tabId) ? tabId : null;
+  }
+
+  // A link the user dropped on the board, or a tab they dragged there, as a card of its own where they let go, or the
+  // first free place under it. A tab's address and title come from the tab itself, never the renderer, and only a web
+  // page's. Only http and https, of a sane length, with no name or password in it.
+  dropPage(nestId: string, drop: unknown, options: Pick<NestAskOptions, "at" | "taken">): NestTableResult {
+    if (!this.store.board(nestId)) return { ok: false, error: "That Nest isn’t there any more." };
+    const { url, title, tabId } = (typeof drop === "object" && drop !== null ? drop : {}) as { url?: unknown; title?: unknown; tabId?: unknown };
+    const tab = typeof tabId === "string" ? this.tabs.info(tabId) : null;
+    if (typeof tabId === "string" && !tab) return { ok: false, error: "That tab isn’t open any more." };
+    const checked = checkAddress(tab ? tab.url : url);
+    if (!checked.ok) return tab ? { ok: false, error: "Only a tab with a web page in it can go on the board." } : checked;
+    const place = this.placing(options);
+    const known = this.store.board(nestId)?.cards ?? [];
+    const taken = [...place.taken, ...known.filter((card) => !place.taken.some((rect) => rect.x === card.x && rect.y === card.y)).map(rectOfCard)];
+    const card = this.store.addPageCard(nestId, { ...freeSpot(taken, place.at, PAGE_CARD), url: checked.url, title: cleanTitle(tab ? tab.title : title), dropped: true });
+    if (!card) return { ok: false, error: "That Nest isn’t there any more." };
+    if (tab) this.tabOf.set(card.id, tabId as string);
+    this.changed(nestId);
+    return { ok: true, cardId: card.id };
+  }
+
+  // Shows a running card's tabs around it, or stops. Only a card's own chat, running here: never a For-each card, whose
+  // runs each have their own, or a job in the cloud, whose pages are never on this board.
+  showTabs(cardId: unknown, on: unknown): boolean {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    if (!card?.chatId || typeof on !== "boolean") return false;
+    if (!on) {
+      if (!this.showing.delete(card.id)) return false;
+      this.forgetPages(this.store.deleteJobPages(card.id));
+      this.changed(card.nestId);
+      return true;
+    }
+    if (!this.chats.isRunning(card.chatId) || this.chats.inCloud(card.chatId) || !this.tabs.work(card.chatId)) return false;
+    if (!this.showing.has(card.id)) this.showing.set(card.id, new Set());
+    this.syncJobTabs(card.id);
+    return true;
+  }
+
+  // The window's tabs changed: one opened, closed, moved or changed hands, or a job used another. Each card showing its
+  // tabs catches up, and every board with a page card hears what its tabs are now.
+  tabsChanged(): void {
+    for (const cardId of [...this.showing.keys()]) this.syncJobTabs(cardId);
+    const nests = new Set([...this.tabOf.keys()].flatMap((cardId) => this.store.card(cardId)?.nestId ?? []));
+    nests.forEach((nestId) => this.events.onBoard(this.board(nestId)!));
+  }
+
+  // One card's job's tabs as cards around it, each joined to it by a line: one appears as the job uses a tab, placed clear
+  // of every card, and goes when the tab closes or the job lets it go. Each is only a view, adding nothing to any send.
+  private syncJobTabs(cardId: string): void {
+    const card = this.store.card(cardId);
+    const work = card?.chatId ? this.tabs.work(card.chatId) : null;
+    if (!card || !work) return void this.showing.delete(cardId);
+    let changed = false;
+    const shown = this.store.jobPages(cardId);
+    for (const page of shown) {
+      const tabId = this.tabOf.get(page.id);
+      if (tabId && work.tabs.some((tab) => tab.id === tabId) && this.tabs.info(tabId)) continue;
+      this.forgetPages(this.store.deletePage(page.id) ? [page.id] : []);
+      changed = true;
+    }
+    for (const tab of work.tabs) {
+      const info = this.tabs.info(tab.id);
+      if (!info || this.showing.get(cardId)?.has(tab.id) || [...this.tabOf].some(([id, each]) => each === tab.id && shown.some((page) => page.id === id))) continue;
+      const checked = checkAddress(info.url);
+      if (!checked.ok) continue;
+      const rects = this.store.board(card.nestId)!.cards.map(rectOfCard);
+      const from = rectOfCard(card);
+      const spot = freeSpot(rects, { x: from.x + from.width + CARD_GAP, y: from.y }, PAGE_CARD);
+      const made = this.store.addPageCard(card.nestId, { ...spot, url: checked.url, title: cleanTitle(info.title), job: cardId });
+      if (made) {
+        this.tabOf.set(made.id, tab.id);
+        changed = true;
+      }
+    }
+    if (changed) this.changed(card.nestId);
+  }
+
+  // A card's job has ended. Its tabs that closed leave the board, ones still open stay as tab cards, and the pages its
+  // reply kept stay as link cards, joined to it, so the user can open any of them again.
+  private finishJobTabs(cardId: string, pages: readonly UsedPage[]): void {
+    if (!this.showing.delete(cardId)) return;
+    const card = this.store.card(cardId);
+    if (!card) return;
+    const kept = new Set<string>();
+    for (const page of this.store.jobPages(cardId)) {
+      const tabId = this.tabOf.get(page.id);
+      const info = tabId ? this.tabs.info(tabId) : null;
+      if (info) {
+        this.store.keepPage(page.id);
+        kept.add(page.url);
+      } else this.forgetPages(this.store.deletePage(page.id) ? [page.id] : []);
+    }
+    for (const page of pages) {
+      const checked = checkAddress(page.url);
+      if (!checked.ok || kept.has(checked.url)) continue;
+      kept.add(checked.url);
+      const rects = this.store.board(card.nestId)!.cards.map(rectOfCard);
+      const from = rectOfCard(card);
+      const spot = freeSpot(rects, { x: from.x + from.width + CARD_GAP, y: from.y }, PAGE_CARD);
+      this.store.addPageCard(card.nestId, { ...spot, url: checked.url, title: cleanTitle(page.title), from: cardId });
+    }
+    this.changed(card.nestId);
+  }
+
+  private forgetPages(cardIds: readonly string[]): void {
+    cardIds.forEach((id) => this.tabOf.delete(id));
+  }
+
+  // The addresses the user put on the board that a card reads from directly, each counting as one they named for that
+  // card's sends, that exact address and nothing else on its site. Only a page the user dropped there, never one of a
+  // job's tabs or a page a job kept, and never one further up the chain.
+  private givenAddresses(cardId: string): { givenAddresses?: string[] } {
+    const given = this.store.linesTo(cardId).flatMap(({ source }) => (source.page?.dropped ? [source.page.url] : []));
+    return given.length > 0 ? { givenAddresses: given } : {};
   }
 
   // A file's whole table, which the card asks for when it's shown, since boards carry only its first rows.
@@ -377,7 +540,7 @@ export class Nests {
     // of the plan, but not while Berry changes the plan, which would replace it.
     const source = from === null ? null : this.store.card(from);
     const planned = source?.plan?.state === "planned";
-    if (from !== null && !source?.chatId && !source?.each && !source?.table && !source?.file && !planned) return null;
+    if (from !== null && !source?.chatId && !source?.each && !source?.table && !source?.file && !source?.page && !planned) return null;
     if (source && this.replanned(source)) return null;
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
     const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
@@ -397,9 +560,11 @@ export class Nests {
     if (card.id === source.id) return { ok: false, error: "A card can’t read from itself." };
     const planned = card.plan?.state === "planned";
     if (card.file) return { ok: false, error: "A file’s card can’t read from another card." };
+    if (card.page) return { ok: false, error: "A page’s card can’t read from another card." };
+    if (source.page && card.plan && card.plan.state !== "held") return { ok: false, error: "A page can go to a card you send yourself, not to a card of the plan." };
     if (card.chatId || card.each || card.table || (card.plan && !planned && card.plan.state !== "held")) return { ok: false, error: "Only a card that hasn’t been sent can get another input." };
     if (this.replanned(card) || this.replanned(source)) return { ok: false, error: STILL_PLANNING };
-    const gives = !!source.chatId || !!source.each || !!source.table || !!source.file;
+    const gives = !!source.chatId || !!source.each || !!source.table || !!source.file || !!source.page;
     if (planned ? !gives && source.plan?.state !== "planned" : !gives) {
       return { ok: false, error: "That card has nothing to give yet." };
     }
@@ -467,9 +632,16 @@ export class Nests {
     if (!card) return false;
     // A card of a run plan that reads from it would otherwise start with nothing to read.
     this.store.holdAfter(cardId, "Didn’t start, because the card it reads from was deleted");
+    const views = this.store.jobPages(cardId).map((page) => page.id);
     if (!this.store.deleteCard(cardId)) return false;
+    this.forgetPages(views);
     this.grants.end(cardId);
     this.missingFiles.delete(cardId);
+    // One of a working card's tabs the user took off the board doesn't come back while that job runs.
+    const tabId = this.tabOf.get(cardId);
+    if (card.page?.job && tabId) this.showing.get(card.page.job.cardId)?.add(tabId);
+    this.tabOf.delete(cardId);
+    this.showing.delete(cardId);
     this.chatsOf(card).forEach((chatId) => this.deleteChat(chatId));
     // A deleted chat never says it ended, so the cards after the ones just held hear it from here.
     this.advance(card.nestId);
@@ -482,7 +654,7 @@ export class Nests {
   send(cardId: string, text: string): ChatThread | null {
     const card = this.store.card(cardId);
     // A planned card goes with its plan, by Run. One that was held is a draft, and the user may send it.
-    if (!card || card.each || card.table || card.file || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
+    if (!card || card.each || card.table || card.file || card.page || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
     const input = this.inputFor(cardId);
     if ("problem" in input) return null;
     const missing = this.takeFiles(cardId);
@@ -490,9 +662,10 @@ export class Nests {
     const options = {
       seePage: false,
       userPresent: true,
-      onEnd: () => this.advance(card.nestId),
+      onEnd: () => this.ended(cardId, card.nestId),
       ...(input.answers.length > 0 ? { cardAnswers: input.answers } : {}),
       ...this.userSaid(cardId, card.chatId, text),
+      ...this.givenAddresses(cardId),
       ...this.attachmentsFor(cardId, missing),
       saveFile: this.fileSink(cardId),
     };
@@ -513,6 +686,7 @@ export class Nests {
     const card = this.store.card(cardId);
     const prompt = typeof text === "string" ? text.trim() : "";
     if (card?.file) return { ok: false, error: "A file’s card has nothing to send." };
+    if (card?.page) return { ok: false, error: "A page’s card has nothing to send." };
     if (!card || card.chatId || card.each || card.table) return { ok: false, error: "This card has been sent already." };
     if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     if (!prompt) return { ok: false, error: "Write what to do with each row first." };
@@ -554,6 +728,7 @@ export class Nests {
       },
       cardGrant: this.grantFor(card.id),
       ...this.userSaid(card.id, run.chatId, text),
+      ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id),
     });
     if (!sent) return null;
@@ -574,6 +749,7 @@ export class Nests {
     if (card.each) return { ok: false, error: "Reply in one row’s run instead." };
     if (card.table) return { ok: false, error: "A table from a file has nothing to send." };
     if (card.file) return { ok: false, error: "A file’s card has nothing to send." };
+    if (card.page) return { ok: false, error: "A page’s card has nothing to send." };
     if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     const input = this.inputFor(card.id);
     if ("problem" in input) return { ok: false, error: input.problem };
@@ -849,6 +1025,8 @@ export class Nests {
           found.push({ lineId, card });
           continue;
         }
+        // A page card reads from nothing: a line into it only joins it to the card whose job it showed.
+        if (card.page) continue;
         if (!card.each && this.ownPart(card) === null) continue;
         for (const line of this.store.linesTo(card.id)) next.push({ lineId, card: line.source });
       }
@@ -939,7 +1117,7 @@ export class Nests {
   private stateOf(source: NestCard): SourceState {
     const name = this.labelOf(source);
     // A file's rows, or a file, are there from the start.
-    if (source.table || source.file) return { kind: "answered", name };
+    if (source.table || source.file || source.page) return { kind: "answered", name };
     if (source.plan?.state === "held") return { kind: "held", name };
     if (source.plan) return { kind: "planned", name };
     if (source.each) {
@@ -989,8 +1167,9 @@ export class Nests {
       mascotId: card.mascotId,
       ...(input.answers.length > 0 ? { cardAnswers: input.answers } : {}),
       started: (chatId) => this.store.setChat(card.id, chatId),
-      onEnd: () => this.advance(nestId),
+      onEnd: () => this.ended(card.id, nestId),
       ...this.userSaid(card.id, null, null),
+      ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id, missing),
       saveFile: this.fileSink(card.id),
     });
@@ -999,11 +1178,19 @@ export class Nests {
     return true;
   }
 
+  // A card's own reply ended: its job's tabs settle on the board, and a card of a run plan that reads from it may start.
+  private ended(cardId: string, nestId: string): void {
+    const chatId = this.store.card(cardId)?.chatId;
+    const pages = (chatId ? this.chats.thread(chatId)?.messages.at(-1)?.pages : undefined) ?? [];
+    this.finishJobTabs(cardId, pages);
+    this.advance(nestId);
+  }
+
   // Says a card just started with work from the card its line comes from. A card that reads from nothing has nobody to
   // carry it.
   private handedOff(cardId: string): void {
     // A file's card has no bird to carry it. With several inputs, the first bird carries it.
-    const line = this.store.linesTo(cardId).find((each) => !each.source.table && !each.source.file);
+    const line = this.store.linesTo(cardId).find((each) => !each.source.table && !each.source.file && !each.source.page);
     const nestId = this.store.card(cardId)?.nestId;
     if (line && nestId) this.events.handOff?.(nestId, line.source.id, cardId);
   }
@@ -1025,7 +1212,7 @@ export class Nests {
     return this.store.linesTo(cardId).some(({ source }) => {
       if (source.plan) return source.plan.each || source.plan.table !== null;
       if (source.table) return source.table.count > 0;
-      if (source.file) return false;
+      if (source.file || source.page) return false;
       return this.tableOf(source) !== null;
     });
   }
@@ -1331,11 +1518,23 @@ export class Nests {
     const name = this.labelOf(source);
     // A file goes as a file, with the card's own files, never as words here.
     if (source.file) return null;
+    if (source.page) return this.pageInput(source);
     if (source.table) return { name, fromFile: true, part: "table", table: this.tableOf(source)! };
     if (source.each) return source.each.runs.some((run) => run.cell !== null) ? { name, part: "table", table: combinedTable(source.each) } : null;
     const thread = source.chatId ? this.chats.thread(source.chatId) : null;
     const exchanges = thread ? threadOf(thread.messages) : [];
     return exchanges.length > 0 ? { name, part: "thread", exchanges } : null;
+  }
+
+  // A page card's input: the open tab it shows, whose text is read when the card sends, or once that tab has closed, the
+  // address it was put there with. Its name is where the page is now.
+  private pageInput(card: NestCard): RawInput | null {
+    if (!card.page) return null;
+    const tabId = this.tabOfCard(card.id);
+    const info = tabId ? this.tabs.info(tabId) : null;
+    const live = info && checkAddress(info.url);
+    const url = live && live.ok ? live.url : card.page.url;
+    return { name: pageName(url), part: "page", url, title: live && live.ok ? cleanTitle(info.title) : card.page.title, tabId: live && live.ok ? tabId : null };
   }
 
   // What a card got from further up the chain: what each line into it gave, read now. Picked rows are what the line
@@ -1344,6 +1543,8 @@ export class Nests {
   private chainOf(cardId: string, direct: Parameters<typeof gatherChain>[1]) {
     const edgesInto = (intoId: string): ChainEdge[] => {
       const into = this.store.card(intoId);
+      // A page card reads from nothing: a line into it only joins it to the card whose job it showed.
+      if (into?.page) return [];
       const lines = this.store.linesTo(intoId);
       const driving = into?.each ? (this.store.eachLine(intoId) ?? lines[0]?.lineId) : null;
       return lines.map((line) => ({
@@ -1403,6 +1604,7 @@ export class Nests {
 
   // What a card is called to the model and on screen: its bird's name, or a file's title.
   private labelOf(card: NestCard): string {
+    if (card.page) return pageName(card.page.url);
     return card.table ? card.table.name : card.file ? card.file.name : this.mascots.resolve(card.mascotId).name;
   }
 
@@ -1439,6 +1641,7 @@ export class Nests {
       },
       cardGrant: this.grantFor(card.id),
       ...this.userSaid(card.id, null, null),
+      ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id),
     });
     // Its bird has gone from the flock, rows picked on another input have gone, or the chat couldn't start. The others
@@ -1452,7 +1655,7 @@ export class Nests {
   // its own runs, or the card its rows come from, or a rough guess. Null on any other card.
   private perRunOf(card: NestCard): { cost: number; rough: boolean } | null {
     const costs = (chatIds: readonly (string | null)[]) => chatIds.flatMap((chatId) => (chatId ? [this.chats.costOf([chatId])] : [])).filter((cost): cost is number => cost !== null);
-    const draft = !card.chatId && !card.each && !card.table && !card.file && card.plan?.state !== "armed";
+    const draft = !card.chatId && !card.each && !card.table && !card.file && !card.page && card.plan?.state !== "armed";
     if (!card.each && !draft) return null;
     // A file's rows aren't read for this, since boards are sent often and a file costs nothing to read from.
     const source = card.each ? null : this.store.linesTo(card.id).find((line) => !!line.source.table || line.picked !== null || (this.tableOf(line.source)?.rows.length ?? 0) > 0)?.source;

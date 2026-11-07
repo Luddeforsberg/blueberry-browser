@@ -6,6 +6,9 @@ import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
+// What the migration for page cards added.
+const PAGE_COLUMNS = "ALTER TABLE cards DROP COLUMN page_url; ALTER TABLE cards DROP COLUMN page_title; ALTER TABLE cards DROP COLUMN page_dropped; ALTER TABLE cards DROP COLUMN page_job;";
+
 // What migrations after 9 added, so a file can be taken back to how an older version left it.
 const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN each_column; ALTER TABLE cards DROP COLUMN each_column_settled; ALTER TABLE runs DROP COLUMN cell; " +
@@ -13,7 +16,8 @@ const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN table_preview; ALTER TABLE cards DROP COLUMN table_rows; " +
   "ALTER TABLE cards DROP COLUMN each_line; ALTER TABLE runs DROP COLUMN spent; " +
   "ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; " +
-  "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made;";
+  "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
+  PAGE_COLUMNS;
 
 describe("NestStore", () => {
   it("keeps a nest's cards, their places and the lines between them across opening the file again", () => {
@@ -123,8 +127,9 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 2}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
-        "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made;"
+      `PRAGMA user_version = ${version - 3}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+        "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
+        PAGE_COLUMNS
     );
     db.close();
 

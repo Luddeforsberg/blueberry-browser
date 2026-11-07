@@ -174,6 +174,10 @@ const readText = async (tab: PageTarget, allowsFrame: (origin: string) => boolea
   }
 };
 
+// A page's text the way the tools read it, for a Nest's tab card as its card sends: the page and its frames, each frame
+// labelled with where it's from, and only frames `allowsFrame` lets through. Null if it couldn't be read in time.
+export const readPageText = (tab: PageTarget, allowsFrame: (origin: string) => boolean): Promise<string | null> => readText(tab, allowsFrame);
+
 // Whether a picture of this page could show a frame from a site outside `sites`. The browser's own frame tree says,
 // whether or not the frame looks to be on screen, since a page can hide one from any script, as in a shadow root.
 export const showsFrameOffLimits = (tab: PageTarget, sites: readonly string[]): boolean =>
@@ -354,6 +358,10 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   // What the user asked, in their own words, and the sites earlier replies in this chat were on. With the sites this job
   // goes to, they're where it may go without asking. Anywhere else asks in the default mode.
   asked?: string;
+  // Exact addresses the user put on a Nest's board and connected to this job's card. Each may be opened without asking,
+  // as if typed in `asked`, that address only: another path, query or subdomain of its site is asked about as before,
+  // and it gives no reason to be on the site. Limits still refuse what they refuse.
+  given?: readonly string[];
   beenTo?: Iterable<string>;
   // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
   stopped?: () => boolean;
@@ -383,6 +391,7 @@ export const createPageTools = <T extends PageTarget>({
   onUse,
   limits,
   asked = "",
+  given = [],
   beenTo = [],
   stopped = () => false,
   search = null,
@@ -464,6 +473,7 @@ export const createPageTools = <T extends PageTarget>({
     // A name and password in an address go to the site when it asks for them, whoever's site it is.
     if (address.username !== "" || address.password !== "") return true;
     if (asked.includes(url)) return false;
+    if (given.includes(address.href)) return false;
     if (address.search !== "" || address.hash !== "") {
       return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
     }

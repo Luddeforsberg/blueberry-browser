@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
 import type { SentAttachment } from "./nestFiles";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
@@ -140,6 +140,13 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN file_preview TEXT;
    ALTER TABLE attachments ADD COLUMN via_card TEXT;
    ALTER TABLE attachments ADD COLUMN made INTEGER NOT NULL DEFAULT 0;`,
+  // A page's card: a link or tab the user put on the board, with its address and title as they were then. Which tab it
+  // shows is never kept here, since tab ids start again each launch. page_dropped is 1 when the user dropped it, so its
+  // exact address counts as one they named. page_job is the card whose running job's tab it shows, only while it does.
+  `ALTER TABLE cards ADD COLUMN page_url TEXT;
+   ALTER TABLE cards ADD COLUMN page_title TEXT;
+   ALTER TABLE cards ADD COLUMN page_dropped INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE cards ADD COLUMN page_job TEXT;`,
 ];
 
 // One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
@@ -204,6 +211,10 @@ interface CardRow {
   height: number | null;
   fileMade: number | null;
   filePreview: string | null;
+  pageUrl: string | null;
+  pageTitle: string | null;
+  pageDropped: number;
+  pageJob: string | null;
 }
 
 interface RunRow {
@@ -220,7 +231,7 @@ const CARD_COLUMNS =
   "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
   // Not a file's whole table, which is read only when it's needed.
   "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height, " +
-  "file_made AS fileMade, file_preview AS filePreview";
+  "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -323,7 +334,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -340,6 +351,11 @@ export class NestStore {
         ? null
         : { name: tableName, header: JSON.parse(tableHeader ?? "[]") as string[], rows: JSON.parse(tablePreview ?? "[]") as string[][], count: tableCount ?? 0 };
     const size = width !== null && height !== null ? { size: { width, height } } : {};
+    if (pageUrl !== null) {
+      // Which tab it shows, and how a job sees it, are only known in memory, and `Nests` fills them in.
+      const page: NestPage = { url: pageUrl, title: pageTitle ?? "", dropped: pageDropped === 1, tab: null, job: pageJob === null ? null : { cardId: pageJob, state: "none", current: false } };
+      return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file: null, page, attachments: [] };
+    }
     if (fileMade !== null) {
       const own = this.attachmentRows({ cardId: id })[0];
       const file: NestFile = { name: own?.name ?? "", type: own?.type ?? "", size: own?.size ?? 0, pages: own?.pages ?? null, preview: filePreview, made: fileMade === 1 };
@@ -441,7 +457,7 @@ export class NestStore {
   setBird(id: string, mascotId: string | null): boolean {
     return (
       this.db
-        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL AND (plan IS NULL OR plan <> 'armed')")
+        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL AND page_url IS NULL AND (plan IS NULL OR plan <> 'armed')")
         .run(mascotId, id).changes > 0
     );
   }
@@ -451,7 +467,7 @@ export class NestStore {
     const card = this.card(id);
     // Once it starts, a planned card is an ordinary one.
     const done =
-      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL").run(chatId, id).changes > 0;
+      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL AND page_url IS NULL").run(chatId, id).changes > 0;
     if (done && card) this.touch(card.nestId);
     return done;
   }
@@ -489,7 +505,7 @@ export class NestStore {
     try {
       const changed = this.db
         .prepare(
-          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_line = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL"
+          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_line = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL AND page_url IS NULL"
         )
         .run(prompt, JSON.stringify(header), column, lineId, id).changes;
       if (changed === 0) throw new NotHere();
@@ -620,6 +636,7 @@ export class NestStore {
   // Lines to and from it go too.
   deleteCard(id: string): boolean {
     const card = this.card(id);
+    this.db.prepare("DELETE FROM cards WHERE page_job = ?").run(id);
     const done = this.db.prepare("DELETE FROM cards WHERE id = ?").run(id).changes > 0;
     if (done && card) this.touch(card.nestId);
     return this.forgetting(done);
@@ -832,6 +849,60 @@ export class NestStore {
       throw error;
     }
     return this.card(id);
+  }
+
+  // A page's card, with no chat and no bird, where it was put. `job` while it's one of that card's running job's tabs,
+  // joined to it by a line, and `from` for a page that card's job kept, joined to it the same way. In one go. Null if
+  // the Nest or that card isn't there.
+  addPageCard(
+    nestId: string,
+    { x, y, url, title, dropped = false, job = null, from = null }: { x: number; y: number; url: string; title: string; dropped?: boolean; job?: string | null; from?: string | null }
+  ): NestCard | null {
+    const id = randomUUID();
+    const joinedTo = job ?? from;
+    this.db.exec("BEGIN");
+    try {
+      if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
+      if (joinedTo !== null && this.card(joinedTo)?.nestId !== nestId) throw new NotHere();
+      this.db
+        .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, auto_placed, page_url, page_title, page_dropped, page_job) VALUES (?, ?, NULL, NULL, ?, ?, 1, ?, ?, ?, ?)")
+        .run(id, nestId, x, y, url, title, dropped ? 1 : 0, job);
+      if (joinedTo !== null) this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, NULL)").run(randomUUID(), nestId, joinedTo, id);
+      this.touch(nestId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      if (error instanceof NotHere) return null;
+      throw error;
+    }
+    return this.card(id);
+  }
+
+  // The page cards showing a card's running job's tabs.
+  jobPages(cardId: string): { id: string; url: string }[] {
+    return this.db.prepare("SELECT id, page_url AS url FROM cards WHERE page_job = ? ORDER BY rowid").all(cardId) as { id: string; url: string }[];
+  }
+
+  // Its job has ended and its tab is still open, so it stays as an ordinary tab card, still joined to that card.
+  keepPage(id: string): boolean {
+    return this.db.prepare("UPDATE cards SET page_job = NULL WHERE id = ? AND page_job IS NOT NULL").run(id).changes > 0;
+  }
+
+  deletePage(id: string): boolean {
+    const card = this.card(id);
+    const done = this.db.prepare("DELETE FROM cards WHERE id = ? AND page_url IS NOT NULL").run(id).changes > 0;
+    if (done && card) this.touch(card.nestId);
+    return done;
+  }
+
+  // A card's job's tabs shown around it, or every card's when no card is named, as at launch, when no job runs. Their ids.
+  deleteJobPages(cardId?: string): string[] {
+    const rows = (
+      cardId === undefined
+        ? this.db.prepare("DELETE FROM cards WHERE page_job IS NOT NULL RETURNING id").all()
+        : this.db.prepare("DELETE FROM cards WHERE page_job = ? RETURNING id").all(cardId)
+    ) as { id: string }[];
+    return rows.map((row) => row.id);
   }
 
   // A file's card's file with its bytes, or null for any other card.
