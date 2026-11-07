@@ -1,4 +1,4 @@
-import { plainCell, safeHref, tableMarkdown } from "../shared/nestTable";
+import { cellParts, plainCell, safeHref, tableMarkdown } from "../shared/nestTable";
 import { MAX_CARD_ANSWER_LENGTH } from "./nestContext";
 
 // A For-each card's own column: its name, from the job, and each row's short value in it, from that row's answer. The
@@ -55,6 +55,12 @@ const cut = (text: string, length: number) => {
   return `${kept}…`;
 };
 
+const KEPT = "\uE000";
+const MARKDOWN_LINK = /\[([^\]]*)\]\(([^)\s]+)\)/g;
+
+// Every address in it as only its site.
+const siteOnly = (text: string) => text.replace(/https?:\/\/[^\s<>|)\]]+/g, (address) => address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]);
+
 // Every web address in an answer, as a link's target or written out, without the full stop or comma after one.
 const addressesIn = (answer: string): Set<string> =>
   new Set([...answer.matchAll(/\]\(([^)\s]+)\)|(https?:\/\/[^\s<>|)\]]+)/g)].map(([, target, bare]) => (target ?? bare.replace(/[.,;:!?]+$/, ""))));
@@ -76,17 +82,27 @@ export const shortCell = (answer: string): string | null => {
 // The value the cheap model gave, checked: one line, no quotes or label, cut to fit, and a link only to an address the
 // answer itself gives, so the model can't add one of its own. Null when nothing's left.
 export const parseCell = (reply: string, answer: string): string | null => {
-  let text = unquote(firstLine(reply)).replace(/^(cell|value)\s*:\s*/i, "");
-  const given = addressesIn(answer);
-  text = text.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (whole, words: string, href: string) => (safeHref(href) && given.has(href) ? whole : words || href));
-  // A bare address is a link too on the card, so the same goes for one: kept only if the answer gives exactly it, and
-  // otherwise only its site, as words.
-  text = text.replace(/(?<!\]\()https?:\/\/[^\s<>|)\]]+/g, (found) => {
+  // Kept links wait behind this mark while the rest is checked, so nothing put back together can be checked twice.
+  let text = unquote(firstLine(reply)).replace(/^(cell|value)\s*:\s*/i, "").replaceAll(KEPT, "");
+  const allowed = new Set([...addressesIn(answer)].flatMap((address) => safeHref(address) ?? []));
+  const allows = (href: string) => allowed.has(safeHref(href) ?? "");
+  const kept: string[] = [];
+  // A link the answer gives is set aside, and any other becomes its words, again and again, since taking one away can
+  // leave the words around it shaped like another, as with a link inside a link.
+  for (let before = ""; before !== text; ) {
+    before = text;
+    text = text.replace(MARKDOWN_LINK, (whole, words: string, href: string) => (allows(href) ? `${KEPT}${kept.push(whole) - 1}${KEPT}` : words || href));
+  }
+  // A bare address is a link too on the card, so the same goes for one: kept only if the answer gives it, and otherwise
+  // only its site, as words.
+  text = text.replace(/https?:\/\/[^\s<>|)\]]+/g, (found) => {
     const address = found.replace(/[.,;:!?]+$/, "");
-    const after = found.slice(address.length);
-    return (given.has(address) ? address : address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]) + after;
+    return (allows(address) ? address : address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]) + found.slice(address.length);
   });
+  text = text.replace(new RegExp(`${KEPT}(\\d+)${KEPT}`, "g"), (_, index: string) => kept[Number(index)]);
   text = text.replace(/\s+/g, " ").trim();
+  // Read as the card reads it, it links only where the answer does, or it's words alone.
+  if (cellParts(text).some((part) => part.href && !allowed.has(part.href))) text = siteOnly(plainCell(text));
   if (!text || text.toUpperCase() === "NONE") return null;
   // Cut, it keeps only words, since a link cut short would go nowhere.
   return text.length > MAX_CELL_LENGTH ? cut(plainCell(text), MAX_CELL_LENGTH) : text;

@@ -242,6 +242,7 @@ export class EventManager {
     this.handle("nests:add-table-file", (nestId, place) => this.mainWindow.addTableFile(nestId, place));
     this.handle("nests:rename-column", (cardId, name) => nests.renameColumn(cardId, name));
     this.handle("nests:copy-table", (cardId) => this.mainWindow.copyTable(cardId));
+    this.handle("nests:table-rows", (cardId) => nests.tableRows(cardId));
     this.handle("nests:save-table", (cardId) => this.mainWindow.saveTable(cardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);

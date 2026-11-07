@@ -49,6 +49,9 @@ export const PLAN_SYSTEM_PROMPT =
 const ANSWER_START_LENGTH = 300;
 const ANSWER_START_LINES = 4;
 const TABLE_ROWS_SHOWN = 3;
+// A table's start is cut cell by cell and as a whole, so one huge cell, or a file's, can't fill the request.
+const PREVIEW_CELL_LENGTH = 100;
+export const MAX_PREVIEW_LENGTH = 1500;
 const ASKED_LENGTH = 300;
 const INSTRUCTIONS_LENGTH = 300;
 // The newest this many cards on the board, so a long-lived Nest doesn't make the request any longer.
@@ -94,10 +97,18 @@ export interface PlannedDigest {
   attached: string[];
 }
 
+const cutTo = (text: string, length: number) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
+
+// The start of a table: how many rows it has, its header and its first rows, each cell cut, and the whole cut.
+export const tableStart = (header: readonly string[], rows: readonly (readonly string[])[], count: number): string => {
+  const cells = (row: readonly string[]) => row.map((cell) => cutTo(cell, PREVIEW_CELL_LENGTH));
+  return cutTo(`A table with ${count} rows, starting:\n${tableMarkdown(cells(header), rows.slice(0, TABLE_ROWS_SHOWN).map(cells))}`, MAX_PREVIEW_LENGTH);
+};
+
 // The start of an answer: a table's header and first rows, or its first lines.
 export const answerStart = (answer: string): string => {
   const table = findTable(answer);
-  if (table) return `A table with ${table.rows.length} rows, starting:\n${tableMarkdown(table.header, table.rows.slice(0, TABLE_ROWS_SHOWN))}`;
+  if (table) return tableStart(table.header, table.rows, table.rows.length);
   const start = answer.split("\n").filter((line) => line.trim()).slice(0, ANSWER_START_LINES).join("\n");
   return start.length > ANSWER_START_LENGTH ? `${start.slice(0, ANSWER_START_LENGTH)}…` : start;
 };

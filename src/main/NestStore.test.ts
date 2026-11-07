@@ -4,11 +4,13 @@ import { join } from "path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
+import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
 // What migrations after 9 added, so a file can be taken back to how an older version left it.
 const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN each_column; ALTER TABLE cards DROP COLUMN each_column_settled; ALTER TABLE runs DROP COLUMN cell; " +
-  "ALTER TABLE cards DROP COLUMN table_name; ALTER TABLE cards DROP COLUMN table_rows;";
+  "ALTER TABLE cards DROP COLUMN table_name; ALTER TABLE cards DROP COLUMN table_header; ALTER TABLE cards DROP COLUMN table_count; " +
+  "ALTER TABLE cards DROP COLUMN table_preview; ALTER TABLE cards DROP COLUMN table_rows;";
 
 describe("NestStore", () => {
   it("keeps a nest's cards, their places and the lines between them across opening the file again", () => {
@@ -272,7 +274,14 @@ describe("NestStore", () => {
     expect(store.setBird(table.id, "scout")).toBe(false);
     const again = new NestStore(file);
     expect(again.card(card.id)!.each).toMatchObject({ column: "Mine", runs: [{ cell: "Hiring two SDRs" }] });
-    expect(again.card(table.id)).toMatchObject({ chatId: null, mascotId: null, autoPlaced: true, table: { name: "leads", header: ["Company"], rows: [["Brygga"]] } });
+    expect(again.card(table.id)).toMatchObject({ chatId: null, mascotId: null, autoPlaced: true, table: { name: "leads", header: ["Company"], rows: [["Brygga"]], count: 1 } });
+    expect(again.tableRows(table.id)).toEqual([["Brygga"]]);
+    // Only the first rows go with the card, each cell cut, and the whole table is read on its own.
+    const big = again.addTableCard(nest, { x: 0, y: 900, table: { name: "big", header: ["A"], rows: Array.from({ length: 9 }, (_, index) => [`${index}${"z".repeat(500)}`]) } })!;
+    expect(big.table!.count).toBe(9);
+    expect(big.table!.rows.map((row) => row[0].length)).toEqual(Array(TABLE_PREVIEW_ROWS).fill(PREVIEW_CELL_LENGTH));
+    expect(again.tableRows(big.id)![8][0]).toBe(`8${"z".repeat(500)}`);
+    expect(again.tableRows(card.id)).toBeNull();
     // A line can come out of it, as out of any card with something to give.
     const plan = { key: "p1", mascotId: null, prompt: "For each", from: { card: table.id }, each: true, waits: false, table: null, x: 0, y: 400, attached: [], keeps: null };
     expect(again.setPlan(nest, [plan], "Do it")).toHaveLength(1);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { cellParts } from "../shared/nestTable";
 import { CELL_PROMPT, cellData, cheapWriter, COLUMN_PROMPT, columnData, fallbackCell, MAX_CELL_LENGTH, parseCell, parseColumn, shortCell } from "./nestCells";
 
 const ANSWER = "Omar posted on LinkedIn on 3 November about hiring two SDRs: https://linkedin.com/posts/omar-1. Nothing newer.";
@@ -61,6 +62,17 @@ describe("parseCell", () => {
     expect(cut.length).toBeLessThanOrEqual(MAX_CELL_LENGTH);
     expect(cut.endsWith("word…")).toBe(true);
     expect(cut).not.toContain("](");
+  });
+
+  it("keeps no link the answer doesn't give, however the model nests or wraps them", () => {
+    const answer = "Nothing was found, see https://safe.example/about.";
+    // Where the card would link, reading the cell as it does.
+    const links = (cell: string | null) => cellParts(cell ?? "").flatMap((part) => (part.href ? [part.href] : []));
+    expect(parseCell("[[Go](https://inner.example)](https://outer.example)", "No addresses here.")).toBe("Go");
+    expect(links(parseCell("[[About](https://safe.example/about)](https://outer.example)", answer))).toEqual(["https://safe.example/about"]);
+    expect(links(parseCell("[x [y](https://a.example) z](https://b.example)", answer))).toEqual([]);
+    expect(links(parseCell("[[[Go](https://a.example)](https://b.example)](https://c.example) https://d.example", answer))).toEqual([]);
+    expect(parseCell("[](https://outer.example)", answer)).toBe("outer.example");
   });
 
   it("never leaves an address at the cut, where it would link somewhere the answer doesn't give", () => {

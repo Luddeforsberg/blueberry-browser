@@ -456,6 +456,31 @@ describe("Nests", () => {
     expect(nests.board(nest)!.cards.find((each) => each.plan)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry was stopped" });
   });
 
+  it("sends a big file's first rows with each board, not all of them, and moving a card builds no table again", () => {
+    const { nests, store } = setup();
+    const nest = nests.create();
+    const csv = `Company,Notes\n${Array.from({ length: 2000 }, (_, index) => `Company ${index},${"n".repeat(500)}`).join("\n")}`;
+    const added = nests.addTableFile(nest, "big.csv", new TextEncoder().encode(csv), { at: { x: 0, y: 0 }, taken: [] });
+    const tableId = (added as { cardId: string }).cardId;
+    for (let index = 0; index < 10; index++) nests.addCard(nest, { x: 600, y: index * 300, from: tableId });
+    const rows = vi.spyOn(store, "tableRows");
+
+    const board = nests.board(nest)!;
+    const card = board.cards.find((each) => each.id === tableId)!;
+    expect(card.table).toMatchObject({ name: "big", header: ["Company", "Notes"], count: 2000 });
+    expect(card.table!.rows).toHaveLength(5);
+    expect(JSON.stringify(board).length).toBeLessThan(20_000);
+    expect(board.lines.map((line) => line.crosses?.each?.rows)).toEqual(Array(10).fill(2000));
+    // What crosses was worked out once for each line, and moving a card works out nothing again.
+    rows.mockClear();
+    expect(nests.moveCard(tableId, 40, 40)).toBe(true);
+    nests.board(nest);
+    expect(rows).not.toHaveBeenCalled();
+    // The whole table is a call away, for the card opened and for export.
+    expect(nests.tableRows(tableId)).toHaveLength(2000);
+    expect(nests.exportOf(tableId)!.table.rows).toHaveLength(2000);
+  });
+
   it("makes a CSV file a table card, which For each row runs on with each run told its row came from the user's file", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();
@@ -467,7 +492,7 @@ describe("Nests", () => {
     const added = nests.addTableFile(nest, "leads.csv", csv, { at: { x: 0, y: 0 }, taken: [] });
     expect(added.ok).toBe(true);
     const tableCard = nests.card((added as { cardId: string }).cardId)!;
-    expect(tableCard).toMatchObject({ chatId: null, mascotId: null, table: { name: "leads", header: ["Company", "Site"], rows: [["Fjällbo", "fjallbo.se"], ["Brygga, AB", "brygga.se"]] } });
+    expect(tableCard).toMatchObject({ chatId: null, mascotId: null, table: { name: "leads", header: ["Company", "Site"], rows: [["Fjällbo", "fjallbo.se"], ["Brygga, AB", "brygga.se"]], count: 2 } });
     // It's no draft: nothing sends from it, and it takes no files.
     expect(nests.send(tableCard.id, "Hi")).toBeNull();
     expect(nests.changeable({ cardId: tableCard.id })).toBeNull();

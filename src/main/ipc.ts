@@ -87,6 +87,7 @@ export const CHANNEL_REGIONS: {
   "nests:add-table-file": ["chrome"],
   "nests:rename-column": ["chrome"],
   "nests:copy-table": ["chrome"],
+  "nests:table-rows": ["chrome"],
   "nests:save-table": ["chrome"],
   "page:text": ["chrome"],
   "chat:page-access": ["chrome"],

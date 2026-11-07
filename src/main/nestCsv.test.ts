@@ -59,6 +59,13 @@ describe("tableFromFile", () => {
     expect(long.ok && long.table.header[0]).toBe(`${"n".repeat(99)}…`);
   });
 
+  it("keeps a single empty quoted header as the header, and skips only lines with nothing on them", () => {
+    expect(tableFromFile("a.csv", bytes('""\r\nAcme\r\n\r\nBrygga\r\n'))).toEqual({
+      ok: true,
+      table: { name: "a", header: ["Column 1"], rows: [["Acme"], ["Brygga"]] },
+    });
+  });
+
   it("reads a TSV by its tabs, and a file saved by Excel in its Windows code page", () => {
     expect(tableFromFile("a.tsv", bytes("x\ty\n1,5\t2"))).toMatchObject({ ok: true, table: { header: ["x", "y"], rows: [["1,5", "2"]] } });
     const latin = Uint8Array.from([...bytes("Stad\nG"), 0xf6, ...bytes("teborg\n")]);
@@ -126,6 +133,13 @@ describe("exporting a table", () => {
     expect(toCsv(TABLE)).toBe(
       '\uFEFFCompany,Note\r\n"Fjällbo, AB","Said ""hej""\ntwice"\r\nBrygga (https://brygga.se),Hot lead\r\n"\'=HYPERLINK(""https://evil.example"")",-5\r\n'
     );
+  });
+
+  it("keeps every cell a spreadsheet would run as a formula as text, in CSV, TSV and HTML, and a plain number as it is", () => {
+    const risky = { header: ["Cell"], rows: [["=1+1"], ["+cmd"], ["-2+3"], ["@SUM(A1)"], ["\t=1"], ["\r=1"], ["-5"], ["+3.5%"]] };
+    expect(toCsv(risky).split("\r\n").slice(1, -1)).toEqual(["'=1+1", "'+cmd", "'-2+3", "'@SUM(A1)", "'=1", "'=1", "-5", "+3.5%"]);
+    expect(toTsv(risky).split("\n").slice(1)).toEqual(["'=1+1", "'+cmd", "'-2+3", "'@SUM(A1)", "'=1", "'=1", "-5", "+3.5%"]);
+    expect(toHtmlTable(risky)).toContain("<td>&#39;=1+1</td>".replace("&#39;", "'"));
   });
 
   it("puts tab-separated cells on one line each, so a spreadsheet pastes them as cells", () => {

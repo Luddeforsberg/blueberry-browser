@@ -500,11 +500,14 @@ export interface NestForEach {
   runs: NestRun[];
 }
 
-// The rows of a CSV or TSV file the user added, as they were then, and the card's title from the file's name.
+// A CSV or TSV file the user added, as it was then: the card's title from the file's name, its header, and how many rows
+// it has. `rows` is only the first few, each cell cut, since the whole table is too big to send with every board: the
+// card asks for it with `nests.tableRows`.
 export interface NestTableFile {
   name: string;
   header: string[];
   rows: string[][];
+  count: number;
 }
 
 // Waiting for its turn, started (its chat says how it's going), stopped before it started, or couldn't start.

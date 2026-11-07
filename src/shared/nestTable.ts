@@ -21,6 +21,11 @@ export const STALE_ROWS = "The rows you picked aren’t in that card’s latest 
 // can't crowd out the job it's passed to.
 export const MAX_CROSSING_LENGTH = 12000;
 
+// A file's table goes with every board as its first rows only, each cell cut, enough for a closed card. The card asks
+// main for the whole table when it's shown.
+export const TABLE_PREVIEW_ROWS = 5;
+export const PREVIEW_CELL_LENGTH = 200;
+
 // One past this many rows, For each row refuses to start.
 export const MAX_RUNS = 25;
 // How many runs of For each row go at once, everywhere, because the Mac and the sites can't take more.

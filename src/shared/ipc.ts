@@ -579,6 +579,8 @@ export interface InvokeChannels {
   "nests:rename-column": { region: "chrome"; args: [cardId: string, name: string]; result: boolean };
   // A card's table on the clipboard as cells, or saved as a CSV file where the user chooses in main's save dialog.
   "nests:copy-table": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // A file's whole table, which a board carries only the first rows of.
+  "nests:table-rows": { region: "chrome"; args: [cardId: string]; result: string[][] | null };
   "nests:save-table": { region: "chrome"; args: [cardId: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
@@ -829,6 +831,7 @@ export interface NestsAPI {
   addTableFile: (nestId: string, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
   renameColumn: (cardId: string, name: string) => Promise<boolean>;
   copyTable: (cardId: string) => Promise<boolean>;
+  tableRows: (cardId: string) => Promise<string[][] | null>;
   saveTable: (cardId: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;

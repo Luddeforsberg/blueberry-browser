@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useLayoutEffect, us
 import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import { ArrowLeft, GitFork, Maximize2, Minimize2, Table2, X } from 'lucide-react'
 import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
-import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
+import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
@@ -450,15 +450,17 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const sourceName = useSourceName(source)
     const sourceThread = useCardThread(source?.chatId ?? null)
     const sourceAnswer = savedAnswer(sourceThread)
-    // The table it reads from: a file's, a For-each card's with its column, or the one in the source's latest answer.
+    // The table it reads from: a For-each card's with its column, or the one in the source's latest answer. A file's
+    // never changes, and only its size is needed here.
     const sourceTable = useMemo<PickedRows | null>(
-        () => (source?.table ? source.table : source?.each ? combinedTable(source.each) : sourceAnswer ? findTable(sourceAnswer) : null),
-        [source?.table, source?.each, sourceAnswer]
+        () => (source?.each ? combinedTable(source.each) : sourceAnswer ? findTable(sourceAnswer) : null),
+        [source?.each, sourceAnswer]
     )
     const sourceAnswered = source?.table ? true : source?.each ? source.each.runs.some((run) => run.cell !== null) : !!sourceAnswer
-    const stale = !!picked && (!!sourceThread || !!source?.each || !!source?.table) && missingRows(picked, sourceTable).length > 0
-    const rowCount = picked ? picked.rows.length : (sourceTable?.rows.length ?? 0)
-    const canEach = !!source && (picked !== null || (sourceTable !== null && sourceTable.rows.length > 0))
+    const stale = !!picked && !source?.table && (!!sourceThread || !!source?.each) && missingRows(picked, sourceTable).length > 0
+    const sourceRows = source?.table ? source.table.count : (sourceTable?.rows.length ?? 0)
+    const rowCount = picked ? picked.rows.length : sourceRows
+    const canEach = !!source && (picked !== null || sourceRows > 0)
     const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? (picked !== null || !!card.plan?.each))
     const forEach = canEach && eachOn
     const tooMany = forEach && rowCount > MAX_RUNS
@@ -823,14 +825,38 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     )
 }
 
+// A file's whole table, asked of main once and kept, since it never changes. Until it comes, the board's first rows.
+const fileRows = new Map<string, string[][]>()
+const useFileRows = (cardId: string, file: NestTableFile): string[][] | null => {
+    const { samples } = useBoard()
+    const whole = file.rows.length === file.count && file.rows.every((row) => row.every((cell) => cell.length < PREVIEW_CELL_LENGTH))
+    const [rows, setRows] = useState(() => (samples || whole ? file.rows : (fileRows.get(cardId) ?? null)))
+    useEffect(() => {
+        if (rows) return undefined
+        let current = true
+        void window.chromeAPI.nests.tableRows(cardId).then((loaded) => {
+            if (!loaded) return
+            fileRows.set(cardId, loaded)
+            if (current) setRows(loaded)
+        })
+        return () => {
+            current = false
+        }
+    }, [cardId, rows])
+    return rows
+}
+
 // A table from a file the user added: its rows, owned by the user, with no chat and no bird. Its rows can be picked and a
 // line pulled out of them, and For each row works on it like any table.
 const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, file }) => {
     const board = useBoard()
-    const table = useMemo(() => ({ header: file.header, rows: file.rows }), [file])
-    const selected = useTablePick(card.id, 'file')
+    const rows = useFileRows(card.id, file)
+    const table = useMemo(() => ({ header: file.header, rows: rows ?? file.rows }), [file, rows])
+    // Rows can be picked once the whole table is here, so what's picked is what main has.
+    const picked = useTablePick(card.id, 'file')
+    const selected = rows ? picked : null
     const here = useWorkingRows(card.id, table)
-    const label = selected.length > 0 ? pullLabel('', selected.length) : `Pull a new card out of ${file.name}`
+    const label = picked.length > 0 ? pullLabel('', picked.length) : `Pull a new card out of ${file.name}`
     return (
         <div className={cn(CARD_SHELL, "shadow-selected")} style={{ width: CARD_WIDTH }}>
             <LineEnds canPull onPull={() => board.pullOut(card.id)} label={label} />
@@ -838,7 +864,7 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
                 <Table2 aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                 <span className="text-14 font-semibold truncate">{file.name}</span>
                 <span className="text-12 text-muted-foreground shrink-0">
-                    {plural(file.rows.length, 'row')}, {plural(file.header.length, 'column')}
+                    {plural(file.count, 'row')}, {plural(file.header.length, 'column')}
                 </span>
                 <span className="ml-auto flex items-center">
                     <TableMenu cardId={card.id} />

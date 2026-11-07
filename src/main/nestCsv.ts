@@ -3,8 +3,8 @@ import { safeHref, type PickedRows } from "../shared/nestTable";
 // Tables in and out of a Nest: a CSV or TSV file the user adds becomes a table card's rows, and any card's table goes out
 // as a CSV file or as cells on the clipboard. Pure, so main does all of it and a renderer never names a path.
 
-// Enough for a lead list or an export from a CRM, and few enough that the whole table can go with the board to the
-// screen each time it changes, and still be read through when it's opened. What crosses a line is cut to fit anyway.
+// Enough for a lead list or an export from a CRM, and few enough to read through when the card is opened. A board carries
+// only the first rows, and what crosses a line is cut to fit anyway.
 export const MAX_TABLE_ROWS = 2000;
 export const MAX_TABLE_COLUMNS = 30;
 // 2,000 rows of 30 columns at about 30 characters a cell, and nothing that big is a list someone made by hand.
@@ -17,12 +17,15 @@ export type TableFile = { ok: true; table: { name: string } & PickedRows } | { o
 const counted = (value: number) => value.toLocaleString("en-US");
 
 // The cells of a CSV or TSV text, as RFC 4180 has them: a quoted cell may hold the delimiter, a line break or a doubled
-// quote, and a line may end in CRLF or LF. A byte order mark at the start is ignored.
+// quote, and a line may end in CRLF or LF. A byte order mark at the start is ignored, and so is a line with nothing on
+// it at all, though not one with a quoted empty cell.
 export const parseDelimited = (text: string, delimiter: string): string[][] => {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let quoted = false;
+  // Whether anything, even a quote or a delimiter, is on the line so far.
+  let touched = false;
   let index = text.charCodeAt(0) === 0xfeff ? 1 : 0;
   const endCell = () => {
     row.push(cell);
@@ -30,11 +33,13 @@ export const parseDelimited = (text: string, delimiter: string): string[][] => {
   };
   const endRow = () => {
     endCell();
-    rows.push(row);
+    if (touched) rows.push(row);
     row = [];
+    touched = false;
   };
   for (; index < text.length; index++) {
     const char = text[index];
+    if (char !== "\n" && char !== "\r") touched = true;
     if (quoted) {
       if (char !== '"') cell += char;
       else if (text[index + 1] === '"') {
@@ -50,7 +55,7 @@ export const parseDelimited = (text: string, delimiter: string): string[][] => {
     } else cell += char;
   }
   // A last line with no line break still counts, and a file ending in one has no empty row after it.
-  if (cell !== "" || row.length > 0) endRow();
+  endRow();
   return rows;
 };
 
@@ -91,9 +96,8 @@ export const tableFromFile = (name: string, bytes: Uint8Array): TableFile => {
   if (bytes.length > MAX_TABLE_BYTES) return { ok: false, error: `${name} is more than the 2 MB a table can be.` };
   if (bytes.includes(0)) return { ok: false, error: `${name} doesn’t look like a ${kind.toUpperCase()} file.` };
   const text = decode(bytes);
-  // Blank lines go. A first line of empty cells is still the header, and a row of them is no row.
-  const records = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text)).filter((cells) => cells.length > 1 || cells[0].trim() !== "");
-  const lines = records.filter((cells, index) => index === 0 || cells.some((cell) => cell.trim() !== ""));
+  // The first line is the header, even with nothing in its cells, and a row with nothing in its cells is no row.
+  const lines = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text)).filter((cells, index) => index === 0 || cells.some((cell) => cell.trim() !== ""));
   if (lines.length < 2) return { ok: false, error: `${name} has no rows under its first line.` };
   // Counted without spreading, since a file far past the row limit can have more lines than a call takes arguments.
   const columns = lines.reduce((most, cells) => Math.max(most, cells.length), 0);

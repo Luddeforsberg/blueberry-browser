@@ -4,7 +4,7 @@ import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
 import type { NestAttachment, NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
 import type { SentAttachment } from "./nestFiles";
-import type { PickedRows } from "../shared/nestTable";
+import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
 
 const MIGRATIONS = [
@@ -106,6 +106,9 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN each_column_settled INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE runs ADD COLUMN cell TEXT;
    ALTER TABLE cards ADD COLUMN table_name TEXT;
+   ALTER TABLE cards ADD COLUMN table_header TEXT;
+   ALTER TABLE cards ADD COLUMN table_count INTEGER;
+   ALTER TABLE cards ADD COLUMN table_preview TEXT;
    ALTER TABLE cards ADD COLUMN table_rows TEXT;
    UPDATE cards SET each_column = 'Result' WHERE each_prompt IS NOT NULL;`,
 ];
@@ -158,7 +161,9 @@ interface CardRow {
   autoPlaced: number;
   eachColumn: string | null;
   tableName: string | null;
-  tableRows: string | null;
+  tableHeader: string | null;
+  tableCount: number | null;
+  tablePreview: string | null;
 }
 
 interface RunRow {
@@ -173,7 +178,8 @@ interface RunRow {
 const CARD_COLUMNS =
   "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader, " +
   "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
-  "each_column AS eachColumn, table_name AS tableName, table_rows AS tableRows";
+  // Not a file's whole table, which is read only when it's needed.
+  "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -264,7 +270,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableRows }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -276,7 +282,10 @@ export class NestStore {
           };
     const planned: NestPlanned | null =
       plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
-    const table: NestTableFile | null = tableName === null ? null : { name: tableName, ...(JSON.parse(tableRows ?? '{"header":[],"rows":[]}') as Omit<NestTableFile, "name">) };
+    const table: NestTableFile | null =
+      tableName === null
+        ? null
+        : { name: tableName, header: JSON.parse(tableHeader ?? "[]") as string[], rows: JSON.parse(tablePreview ?? "[]") as string[][], count: tableCount ?? 0 };
     return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, each, plan: planned, table, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
@@ -435,14 +444,23 @@ export class NestStore {
   }
 
   // A file's rows as a card of their own, with no chat and no bird. Null if the Nest isn't there.
-  addTableCard(nestId: string, { x, y, table }: { x: number; y: number; table: NestTableFile }): NestCard | null {
+  addTableCard(nestId: string, { x, y, table }: { x: number; y: number; table: { name: string } & PickedRows }): NestCard | null {
     if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) return null;
     const id = randomUUID();
+    const preview = table.rows.slice(0, TABLE_PREVIEW_ROWS).map((row) => row.map((cell) => cell.slice(0, PREVIEW_CELL_LENGTH)));
     this.db
-      .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, auto_placed, table_name, table_rows) VALUES (?, ?, NULL, NULL, ?, ?, 1, ?, ?)")
-      .run(id, nestId, x, y, table.name, JSON.stringify({ header: table.header, rows: table.rows }));
+      .prepare(
+        "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, auto_placed, table_name, table_header, table_count, table_preview, table_rows) VALUES (?, ?, NULL, NULL, ?, ?, 1, ?, ?, ?, ?, ?)"
+      )
+      .run(id, nestId, x, y, table.name, JSON.stringify(table.header), table.rows.length, JSON.stringify(preview), JSON.stringify(table.rows));
     this.touch(nestId);
     return this.card(id);
+  }
+
+  // A file's whole table, its rows as they were added. Null for any other card.
+  tableRows(id: string): string[][] | null {
+    const row = this.db.prepare("SELECT table_rows FROM cards WHERE id = ? AND table_name IS NOT NULL").get(id) as { table_rows: string } | undefined;
+    return row ? (JSON.parse(row.table_rows) as string[][]) : null;
   }
 
   run(id: string): (NestRun & { cardId: string }) | null {

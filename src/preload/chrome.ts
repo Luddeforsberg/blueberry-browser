@@ -127,6 +127,7 @@ const chromeAPI: ChromeAPI = {
     addTableFile: (nestId, place) => invoke("nests:add-table-file", nestId, place),
     renameColumn: (cardId, name) => invoke("nests:rename-column", cardId, name),
     copyTable: (cardId) => invoke("nests:copy-table", cardId),
+    tableRows: (cardId) => invoke("nests:table-rows", cardId),
     saveTable: (cardId) => invoke("nests:save-table", cardId),
     onUpdated: (callback) => subscribe("nests:updated", callback),
     onDeleted: (callback) => subscribe("nests:deleted", callback),
