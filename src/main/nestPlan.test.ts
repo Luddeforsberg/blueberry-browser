@@ -32,11 +32,22 @@ describe("checkPlan", () => {
       reply: "That's two jobs.",
       ask: false,
       cards: [
-        { key: "c1", mascotId: "scout", prompt: "Do c1", from: null, each: false, waits: false, table: "companies" },
-        { key: "c2", mascotId: "writer", prompt: "Do c2", from: { plan: "c1" }, each: true, waits: true, table: null },
-        { key: "c3", mascotId: null, prompt: "Do c3", from: { card: "card-with-table" }, each: false, waits: false, table: null },
+        { key: "c1", mascotId: "scout", prompt: "Do c1", from: null, each: false, waits: false, table: "companies", attached: [] },
+        { key: "c2", mascotId: "writer", prompt: "Do c2", from: { plan: "c1" }, each: true, waits: true, table: null, attached: [] },
+        { key: "c3", mascotId: null, prompt: "Do c3", from: { card: "card-with-table" }, each: false, waits: false, table: null, attached: [] },
       ],
     });
+  });
+
+  it("gives a card only files and notes the user attached to this request, each once", () => {
+    const withFiles = (attached: unknown) => checkPlan(plan(card("c1", { attached })), { flock: FLOCK, sources: SOURCES, attached: ["a1", "a2"] });
+    expect(withFiles(["a2", "a1"])).toMatchObject({ ok: true, cards: [{ attached: ["a2", "a1"] }] });
+    expect(withFiles([])).toMatchObject({ ok: true, cards: [{ attached: [] }] });
+    expect(withFiles(["a3"])).toEqual({ ok: false, problem: "it gave a card a file you didn’t attach" });
+    expect(withFiles(["a1", "a1"])).toEqual({ ok: false, problem: "it gave a card a file you didn’t attach" });
+    expect(withFiles([1])).toEqual({ ok: false, problem: "what came back wasn’t shaped like a plan" });
+    // Nothing attached, nothing to give.
+    expect(check(plan(card("c1", { attached: ["a1"] })))).toEqual({ ok: false, problem: "it gave a card a file you didn’t attach" });
   });
 
   it("refuses a bird that isn't in the flock, rather than making it Berry", () => {

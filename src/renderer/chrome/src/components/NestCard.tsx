@@ -12,7 +12,8 @@ import { useFlock } from '../contexts/LibraryContext'
 import { cardStatus, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunPhase } from '../nestBoard'
 import { Berry, useAssistantName } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
-import { ChatComposer, Composer } from './Composer'
+import { AddMenu, ChatComposer, Composer } from './Composer'
+import { Attachments, useAttaching } from './NestAttachments'
 import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
 import { TableResult, type PickMode } from './NestTable'
@@ -195,6 +196,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                 </span>
             </div>
             {source && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(board.lineInto(card.id), sourceName)}</p>}
+            <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {thread &&
                 (open ? (
                     <WholeChat
@@ -378,6 +380,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const [sending, setSending] = useState(false)
     const [problem, setProblem] = useState<string | null>(null)
     const switchId = useId()
+    const attaching = useAttaching({ cardId: card.id })
 
     const change = (value: string) => {
         setText(value)
@@ -439,7 +442,9 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                             void send()
                         }
                     }}
-                    noAdd
+                    addItems={attaching.items}
+                    addLabel="Add a file or note"
+                    attachment={<Attachments attachments={card.attachments} target={{ cardId: card.id }} attaching={attaching} className="px-2 pb-1" />}
                     canSend={canSend}
                     onSend={() => void send()}
                     mascot={mascot}
@@ -584,6 +589,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                 </span>
             </div>
             <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{from}</p>
+            <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {shownRun?.thread ? (
                 <div className="nodrag flex flex-col">
                     <div className="px-3 pb-1 flex items-center gap-1 border-t pt-2">
@@ -661,6 +667,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
     const getsTable = !!source && !source.each && (source.plan ? !source.plan.each && source.plan.table !== null : !!sourceAnswer && findTable(sourceAnswer) !== null)
     const [text, setText] = useState(plan.prompt)
     const [choosing, setChoosing] = useState(false)
+    const attaching = useAttaching(editable ? { cardId: card.id } : null)
     const editing = useRef(false)
     const saveTimer = useRef<number | undefined>(undefined)
     const switchId = useId()
@@ -714,6 +721,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
                 ) : (
                     <p className="text-13 whitespace-pre-wrap line-clamp-4">{plan.prompt}</p>
                 )}
+                <Attachments attachments={card.attachments} target={editable ? { cardId: card.id } : null} attaching={attaching} className="pt-1" />
             </div>
             {(details.length > 0 || (plan.waits && source)) && (
                 <div className="px-5 py-3 border-t flex flex-col gap-1 text-13 text-muted-foreground">
@@ -735,6 +743,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
                     )}
                     <div className="flex items-center gap-3">
                         <MascotChip mascot={mascot} open={choosing} onPress={() => setChoosing(!choosing)} />
+                        {attaching.items && <AddMenu items={attaching.items} label="Add a file or note" small />}
                         {getsTable && (
                             <span className="flex items-center gap-2">
                                 <Switch checked={plan.each} labelledBy={switchId} onChange={(on) => void api.editPlan(card.id, { each: on })} />

@@ -1,5 +1,5 @@
 import { expect, test, type ElectronApplication } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
@@ -282,4 +282,92 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
     expect(run, `a run for ${company}`).toBeDefined();
     expect(run!.endsWith("Draft a short first email to the person who leads sales")).toBe(true);
   }
+});
+
+const FIXTURES = join(__dirname, "fixtures");
+
+test("a file and a note on a card go to its bird with the message, and a Word file is refused with why", async () => {
+  test.setTimeout(60_000);
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(150);
+      await chrome.screenshot({ path: join(SHOTS, `${name}-${appearance}.png`) });
+    }
+  };
+  // The system's file picker answers with these, as if the user picked them.
+  const pick = (...names: string[]) =>
+    app.evaluate(({ dialog }, paths) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: paths })) as never;
+    }, names.map((name) => join(FIXTURES, name)));
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  // The Nest's own composer is at the bottom of the page, so its menu opens upward, in sight.
+  await chrome.getByRole("button", { name: "Add a file or note" }).click();
+  await expect(chrome.getByRole("menuitem", { name: "Add a note" })).toBeInViewport();
+  await chrome.keyboard.press("Escape");
+
+  // A click on the board makes a draft, and its + adds a file the picker gives, then a note written in place.
+  const pane = (await chrome.locator(".react-flow__pane").boundingBox())!;
+  await chrome.mouse.click(pane.x + 120, pane.y + 140);
+  const card = chrome.locator(".react-flow__node").first();
+  await pick("tallgren-one-pager.pdf");
+  await card.getByRole("button", { name: "Add a file or note" }).click();
+  await chrome.getByRole("menuitem", { name: "Add a file" }).click();
+  await expect(card.getByRole("button", { name: "With: tallgren-one-pager.pdf" })).toBeVisible();
+  await card.getByRole("button", { name: "Add a file or note" }).click();
+  await chrome.getByRole("menuitem", { name: "Add a note" }).click();
+  await card.getByRole("textbox", { name: "Note" }).fill("Write to Lina Berg at Kvarnsten. Keep it under 120 words.");
+  await card.getByRole("button", { name: "Add note" }).click();
+  const line = card.getByRole("button", { name: "With: tallgren-one-pager.pdf, your note" });
+  await expect(line).toBeVisible();
+  await expect(card.getByRole("textbox", { name: "Note" })).toHaveCount(0);
+
+  // A Word file is refused, saying why, and nothing is added.
+  await pick("brief.docx");
+  await card.getByRole("button", { name: "Add a file or note" }).click();
+  await chrome.getByRole("menuitem", { name: "Add a file" }).click();
+  await expect(card.getByRole("alert")).toHaveText("brief.docx is a Word file, which can’t be added yet. Save it as a PDF and add that.");
+  await expect(line).toBeVisible();
+  await shots("refused-type");
+
+  // The line opens the list: the file's name and size, the note, and a way to remove each before it's sent.
+  await line.click();
+  const list = card.getByRole("list", { name: "Files and notes" });
+  await expect(list).toContainText("tallgren-one-pager.pdf");
+  await expect(list).toContainText("1.9 KB");
+  await expect(list).toContainText("Write to Lina Berg at Kvarnsten");
+  await expect(list.getByRole("button", { name: "Remove tallgren-one-pager.pdf" })).toBeVisible();
+  await card.getByRole("textbox", { name: "What should Berry do?" }).fill("Draft a short first email from our one-pager");
+  await shots("attachment-list");
+  expect(model.requests).toHaveLength(0);
+
+  model.replyWith("Hej Lina, a short note about Tallgren.");
+  await card.getByRole("textbox", { name: "What should Berry do?" }).press("Enter");
+  await expect(card.getByRole("status")).toHaveText("Done");
+  await expect(card.getByRole("button", { name: "With: tallgren-one-pager.pdf, your note" })).toBeVisible();
+  await shots("card-with-pdf-and-note");
+
+  // The model got the PDF as a file, after a line saying the user attached it and that it's untrusted, the note as the
+  // user's words, and what they typed last.
+  expect(model.requests).toHaveLength(1);
+  const content = model.requests[0].messages.findLast(({ role }) => role === "user")!.content as Array<Record<string, unknown>>;
+  const pdf = readFileSync(join(FIXTURES, "tallgren-one-pager.pdf")).toString("base64");
+  const fileAt = content.findIndex((block) => block.type === "file");
+  expect(content[fileAt]).toEqual({ type: "file", file: { filename: "tallgren-one-pager.pdf", file_data: `data:application/pdf;base64,${pdf}` } });
+  expect(String(content[fileAt - 1].text)).toContain('The user attached the PDF "tallgren-one-pager.pdf" to this card.');
+  expect(String(content[fileAt - 1].text)).toContain("untrusted");
+  const words = content.filter((block) => block.type === "text").map((block) => String(block.text));
+  expect(words.join("\n")).toContain("<user_note>\nWrite to Lina Berg at Kvarnsten. Keep it under 120 words.\n</user_note>");
+  expect(words.at(-1)).toBe("Draft a short first email from our one-pager");
+
+  // Sent, they still show, and can't be removed or changed.
+  await card.getByRole("button", { name: "With: tallgren-one-pager.pdf, your note" }).click();
+  await expect(card.getByRole("list", { name: "Files and notes" })).toContainText("tallgren-one-pager.pdf");
+  await expect(card.getByRole("button", { name: /^Remove/ })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Your note", exact: true })).toBeDisabled();
 });

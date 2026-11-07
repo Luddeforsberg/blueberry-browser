@@ -233,6 +233,10 @@ export class EventManager {
     this.handle("nests:run-plan", (nestId) => nests.runPlan(nestId));
     this.handle("nests:discard-plan", (nestId) => nests.discardPlan(nestId));
     this.handle("nests:continue", (cardId) => nests.continueFrom(cardId));
+    this.handle("nests:attach-files", (target) => this.mainWindow.attachFiles(target));
+    this.handle("nests:add-note", (target, text) => nests.addNote(target, text));
+    this.handle("nests:edit-note", (attachmentId, text) => nests.editNote(attachmentId, text));
+    this.handle("nests:remove-attachment", (attachmentId, fromCardId) => nests.removeAttachment(attachmentId, fromCardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

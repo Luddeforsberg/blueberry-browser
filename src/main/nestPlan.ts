@@ -30,6 +30,8 @@ export interface PlanCard {
   waits: boolean;
   // What one row of the table in its answer will be, such as "companies", or null if its answer isn't a table.
   table: string | null;
+  // The keys of the files and notes on the composer that this card gets.
+  attached: string[];
 }
 
 export type CheckedPlan = { ok: true; reply: string; ask: boolean; cards: PlanCard[] } | { ok: false; problem: string };
@@ -39,10 +41,13 @@ const NOT_A_PLAN = "what came back wasn’t shaped like a plan";
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 // What the model laid out, checked in code: every bird is in the flock by id, lines only go between the plan's own cards
-// or to cards on this board, nothing goes round in a circle, there are at most six new cards, and For each row only runs
-// on a table. Anything else refuses the whole plan, so nothing invalid is ever shown, let alone run. The cards come back in
+// or to cards on this board, nothing goes round in a circle, there are at most six new cards, For each row only runs
+// on a table, and a card only gets files and notes the user attached to this request, each once. Anything else refuses the whole plan, so nothing invalid is ever shown, let alone run. The cards come back in
 // an order where each card's source comes before it.
-export const checkPlan = (raw: unknown, { flock, sources }: { flock: readonly string[]; sources: readonly PlanSource[] }): CheckedPlan => {
+export const checkPlan = (
+  raw: unknown,
+  { flock, sources, attached = [] }: { flock: readonly string[]; sources: readonly PlanSource[]; attached?: readonly string[] }
+): CheckedPlan => {
   if (!isRecord(raw) || typeof raw.reply !== "string" || typeof raw.ask !== "boolean" || !Array.isArray(raw.cards)) return { ok: false, problem: NOT_A_PLAN };
   const reply = raw.reply.trim().slice(0, MAX_REPLY_LENGTH);
   // A question plans nothing, whatever came with it.
@@ -54,7 +59,7 @@ export const checkPlan = (raw: unknown, { flock, sources }: { flock: readonly st
   const cards: (PlanCard & { fromKey: string | null })[] = [];
   for (const card of raw.cards) {
     if (!isRecord(card)) return { ok: false, problem: NOT_A_PLAN };
-    const { key, bird, prompt, from, for_each_row: each, waits_for_user: waits, table_of: tableOf } = card;
+    const { key, bird, prompt, from, for_each_row: each, waits_for_user: waits, table_of: tableOf, attached: given = [] } = card;
     if (typeof key !== "string" || !key || keys.has(key) || onBoard.has(key)) return { ok: false, problem: NOT_A_PLAN };
     if (typeof prompt !== "string" || typeof each !== "boolean" || typeof waits !== "boolean") return { ok: false, problem: NOT_A_PLAN };
     if ((from !== null && typeof from !== "string") || (tableOf !== null && typeof tableOf !== "string")) return { ok: false, problem: NOT_A_PLAN };
@@ -62,9 +67,13 @@ export const checkPlan = (raw: unknown, { flock, sources }: { flock: readonly st
     if (typeof bird !== "string" || !flock.includes(bird)) return { ok: false, problem: "it named a bird that isn’t in your flock" };
     const words = prompt.trim();
     if (!words || words.length > MAX_PROMPT_LENGTH) return { ok: false, problem: "a card had no clear job" };
+    if (!Array.isArray(given) || !given.every((each: unknown) => typeof each === "string")) return { ok: false, problem: NOT_A_PLAN };
+    if (given.some((each: string) => !attached.includes(each)) || new Set(given).size !== given.length) {
+      return { ok: false, problem: "it gave a card a file you didn’t attach" };
+    }
     keys.add(key);
     const table = tableOf?.trim().slice(0, MAX_TABLE_OF_LENGTH) || null;
-    cards.push({ key, mascotId: bird === BERRY.id ? null : bird, prompt: words, from: null, fromKey: from, each, waits: waits && from !== null, table });
+    cards.push({ key, mascotId: bird === BERRY.id ? null : bird, prompt: words, from: null, fromKey: from, each, waits: waits && from !== null, table, attached: given as string[] });
   }
 
   for (const card of cards) {

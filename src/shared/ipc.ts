@@ -363,6 +363,12 @@ export interface NestAskOptions {
 // Berry has it, and answers on the board, or it couldn't be sent, and why.
 export type NestAskResult = { ok: true } | { ok: false; error: string };
 
+// Where a file or note goes: a card that hasn't been sent, or the Nest's composer.
+export type NestAttachTarget = { cardId: string } | { nestId: string };
+
+// Added, or why not, such as a type that can't be read or no room left on the card.
+export type NestAttachResult = { ok: true } | { ok: false; error: string };
+
 // Run either starts the plan, or says why it can't yet, such as a card with nothing to do.
 export type NestRunPlanResult = { ok: true } | { ok: false; error: string };
 
@@ -536,6 +542,14 @@ export interface InvokeChannels {
   "nests:discard-plan": { region: "chrome"; args: [nestId: string]; result: boolean };
   // Looks right, continue: starts the cards of a run plan that wait for this card's answer to be checked.
   "nests:continue": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // Opens the system's file picker in main, which reads and copies in what's picked. A renderer never names a path. Says
+  // why for each file that couldn't be added.
+  "nests:attach-files": { region: "chrome"; args: [target: NestAttachTarget]; result: { problems: string[] } };
+  "nests:add-note": { region: "chrome"; args: [target: NestAttachTarget, text: string]; result: NestAttachResult };
+  // Only before its card is sent. Empty words remove it.
+  "nests:edit-note": { region: "chrome"; args: [attachmentId: string, text: string]; result: boolean };
+  // With a planned card's id, one of the composer's it points at stops being pointed at there, and stays on the composer.
+  "nests:remove-attachment": { region: "chrome"; args: [attachmentId: string, fromCardId?: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -772,6 +786,10 @@ export interface NestsAPI {
   runPlan: (nestId: string) => Promise<NestRunPlanResult>;
   discardPlan: (nestId: string) => Promise<boolean>;
   continueFrom: (cardId: string) => Promise<boolean>;
+  attachFiles: (target: NestAttachTarget) => Promise<{ problems: string[] }>;
+  addNote: (target: NestAttachTarget, text: string) => Promise<NestAttachResult>;
+  editNote: (attachmentId: string, text: string) => Promise<boolean>;
+  removeAttachment: (attachmentId: string, fromCardId?: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
 }

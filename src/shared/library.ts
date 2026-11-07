@@ -436,6 +436,24 @@ export interface NestCard {
   each: NestForEach | null;
   // Set while it's a card Berry planned that hasn't started.
   plan: NestPlanned | null;
+  // Its files and notes, which go to its bird with every message. They can change only before it's sent.
+  attachments: NestAttachment[];
+}
+
+// A file or note on a card or on a Nest's composer. A file's contents stay in main: only its name, type and size come here.
+export interface NestAttachment {
+  id: string;
+  kind: "file" | "note";
+  // A file's own name. A note has none.
+  name: string;
+  // Such as application/pdf. A note is text/plain.
+  type: string;
+  size: number;
+  // A note's words.
+  text?: string;
+  // On a planned card, one of the composer's it points at, which it gets a copy of at Run. Removing it there only stops
+  // pointing, and changing a note changes it for every card that points at it.
+  shared?: boolean;
 }
 
 // A card Berry planned. Planned until the user presses Run, when it's armed: it starts by itself once the card it reads
@@ -494,6 +512,9 @@ export interface NestBoard {
   talk: NestRequest[];
   // What the user just wrote, while Berry plans it.
   planning?: string | null;
+  // Files and notes on the Nest's composer, for the request being written or planned. A plan gives each card the ones it
+  // needs, and they go once the plan runs or goes.
+  attached: NestAttachment[];
 }
 
 export interface LibrarySnapshot {

@@ -2,7 +2,8 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState } from "../shared/library";
+import type { SentAttachment } from "./nestFiles";
 import type { PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
 
@@ -65,7 +66,64 @@ const MIGRATIONS = [
    CREATE INDEX talk_by_request ON talk(request_id);`,
   // What the user typed in the request a card was planned from. Berry wrote its prompt, so only these words are the user's.
   `ALTER TABLE cards ADD COLUMN said TEXT;`,
+  // Files and notes on a card, or on the Nest's composer when there's no card. A file's bytes are copied in when it's
+  // attached, so changing or moving it on disk changes nothing here.
+  `CREATE TABLE attachments (
+     id TEXT PRIMARY KEY,
+     nest_id TEXT NOT NULL REFERENCES nests(id) ON DELETE CASCADE,
+     card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('file', 'note')),
+     name TEXT NOT NULL,
+     type TEXT NOT NULL,
+     size INTEGER NOT NULL,
+     pages INTEGER,
+     data BLOB,
+     note TEXT
+   );
+   CREATE INDEX attachments_by_card ON attachments(card_id);
+   CREATE INDEX attachments_by_nest ON attachments(nest_id);`,
+  `ALTER TABLE attachments ADD COLUMN source_id TEXT;`,
+  // Every file or note has one owner, the composer or one card. A planned card only points at the composer's until Run,
+  // which gives it a copy of each as they are then, so planning never copies, moves or deletes one. source_id, from the
+  // step before, isn't needed for that. Anything already on a card is that card's own.
+  `CREATE TABLE plan_attachments (
+     card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+     attachment_id TEXT NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+     PRIMARY KEY (card_id, attachment_id)
+   );
+   CREATE INDEX plan_attachments_by_attachment ON plan_attachments(attachment_id);
+   ALTER TABLE attachments DROP COLUMN source_id;`,
 ];
+
+export interface AttachmentRow {
+  id: string;
+  kind: "file" | "note";
+  name: string;
+  type: string;
+  size: number;
+  pages: number | null;
+  note: string | null;
+}
+
+const ATTACHMENT_COLUMNS = "id, kind, name, type, size, pages, note";
+
+const toAttachment = ({ id, kind, name, type, size, note }: AttachmentRow, shared = false): NestAttachment => ({
+  id,
+  kind,
+  name,
+  type,
+  size,
+  ...(kind === "note" ? { text: note ?? "" } : {}),
+  ...(shared ? { shared } : {}),
+});
+
+// One file or note being added.
+export type NewAttachment =
+  | { kind: "file"; name: string; type: string; size: number; pages: number | null; data: Uint8Array }
+  | { kind: "note"; text: string };
+
+// Where a file or note goes: a card, or the Nest's composer.
+export type AttachTo = { cardId: string } | { nestId: string };
 
 interface CardRow {
   id: string;
@@ -110,6 +168,10 @@ export interface NewPlannedCard {
   table: string | null;
   x: number;
   y: number;
+  // The composer's files and notes this card points at until Run, by id.
+  attached: string[];
+  // The planned card it's a new version of, which gives it what the user added on that card.
+  keeps: string | null;
 }
 
 export interface StoredNest {
@@ -146,7 +208,7 @@ export class NestStore {
     const lines = (
       this.db.prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", picked FROM lines WHERE nest_id = ? ORDER BY rowid").all(id) as unknown as (Omit<NestLine, "picked"> & { picked: string | null })[]
     ).map((line) => ({ ...line, picked: line.picked ? (JSON.parse(line.picked) as PickedRows) : null }));
-    return { ...nest, cards, lines, talk: this.talk(id) };
+    return { ...nest, cards, lines, talk: this.talk(id), attached: this.attachmentsOf({ nestId: id }) };
   }
 
   createNest(title: string): string {
@@ -180,7 +242,7 @@ export class NestStore {
           };
     const planned: NestPlanned | null =
       plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
-    return { id, chatId, mascotId, x, y, each, plan: planned };
+    return { id, chatId, mascotId, x, y, each, plan: planned, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -357,11 +419,29 @@ export class NestStore {
     this.db.exec("BEGIN");
     try {
       if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
-      this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId);
+      // The old plan goes last, so what the user added on its cards goes to the new versions of them first, or back to the
+      // composer, never with them. Its pointers at the composer's go with it, and the composer's stay as they are.
+      const replaced = (this.db.prepare("SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned'").all(nestId) as { id: string }[]).map((row) => row.id);
+      if (cards.some((card) => card.keeps !== null && !replaced.includes(card.keeps))) throw new NotHere();
       const insert = this.db.prepare(
         "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?)"
       );
       for (const card of cards) insert.run(ids.get(card.key)!, nestId, card.mascotId, card.x, card.y, card.prompt, card.each ? 1 : 0, card.waits ? 1 : 0, card.table, said);
+      const point = this.db.prepare(
+        "INSERT INTO plan_attachments (card_id, attachment_id) SELECT ?, id FROM attachments WHERE id = ? AND nest_id = ? AND card_id IS NULL"
+      );
+      for (const card of cards) {
+        for (const attachmentId of card.attached) {
+          if (point.run(ids.get(card.key)!, attachmentId, nestId).changes === 0) throw new NotHere();
+        }
+      }
+      const move = this.db.prepare("UPDATE attachments SET card_id = ? WHERE card_id = ?");
+      for (const oldId of replaced) {
+        const kept = cards.find((card) => card.keeps === oldId);
+        move.run(kept ? ids.get(kept.key)! : null, oldId);
+      }
+      const remove = this.db.prepare("DELETE FROM cards WHERE id = ?");
+      for (const id of replaced) remove.run(id);
       const line = this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card) VALUES (?, ?, ?, ?)");
       for (const card of cards) {
         if (!card.from) continue;
@@ -392,14 +472,36 @@ export class NestStore {
     return true;
   }
 
-  // Run: every planned card in the Nest is armed. How many.
+  // Run: every planned card in the Nest is armed, and gets its own copy of each of the composer's it points at, as they
+  // are now. Those leave the composer, and the rest stay. In one go. How many.
   armPlan(nestId: string): number {
-    const armed = Number(this.db.prepare("UPDATE cards SET plan = 'armed' WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
-    if (armed > 0) this.touch(nestId);
-    return armed;
+    this.db.exec("BEGIN");
+    try {
+      const pointers = this.db
+        .prepare("SELECT p.card_id AS cardId, p.attachment_id AS attachmentId FROM plan_attachments p JOIN cards c ON c.id = p.card_id WHERE c.nest_id = ? AND c.plan = 'planned' ORDER BY p.rowid")
+        .all(nestId) as { cardId: string; attachmentId: string }[];
+      const copy = this.db.prepare(
+        `INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note)
+         SELECT ?, nest_id, ?, kind, name, type, size, pages, data, note FROM attachments WHERE id = ?`
+      );
+      for (const { cardId, attachmentId } of pointers) copy.run(randomUUID(), cardId, attachmentId);
+      const handedOut = [...new Set(pointers.map((pointer) => pointer.attachmentId))];
+      const remove = this.db.prepare("DELETE FROM attachments WHERE id = ? AND card_id IS NULL");
+      for (const id of handedOut) remove.run(id);
+      const armed = Number(this.db.prepare("UPDATE cards SET plan = 'armed' WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
+      if (armed > 0) this.touch(nestId);
+      this.db.exec("COMMIT");
+      return armed;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
+  // What the user added on the planned cards goes back to the composer rather than with them. Their pointers go with
+  // them, and the composer's own stay as they are.
   discardPlan(nestId: string): number {
+    this.db.prepare("UPDATE attachments SET card_id = NULL WHERE card_id IN (SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned')").run(nestId);
     return Number(this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
   }
 
@@ -456,6 +558,84 @@ export class NestStore {
   // Once the plan runs or goes, the request folds away, and the next message starts another.
   closeRequest(nestId: string): void {
     this.db.prepare("UPDATE requests SET open = 0 WHERE nest_id = ? AND open = 1").run(nestId);
+  }
+
+  // A card's files and notes, or the composer's, oldest first, without a file's contents.
+  attachmentsOf(to: AttachTo): NestAttachment[] {
+    return this.attachmentRows(to).map((row) => toAttachment(row));
+  }
+
+  // The same with their sizes and pages, for the limits.
+  attachmentRows(to: AttachTo): AttachmentRow[] {
+    return (
+      "cardId" in to
+        ? this.db.prepare(`SELECT ${ATTACHMENT_COLUMNS} FROM attachments WHERE card_id = ? ORDER BY rowid`).all(to.cardId)
+        : this.db.prepare(`SELECT ${ATTACHMENT_COLUMNS} FROM attachments WHERE nest_id = ? AND card_id IS NULL ORDER BY rowid`).all(to.nestId)
+    ) as unknown as AttachmentRow[];
+  }
+
+  // A card's files and notes as they go to its bird, with each file's bytes as they were copied in.
+  sentAttachments(cardId: string): SentAttachment[] {
+    const rows = this.db.prepare("SELECT kind, name, type, data, note FROM attachments WHERE card_id = ? ORDER BY rowid").all(cardId) as {
+      kind: "file" | "note";
+      name: string;
+      type: string;
+      data: Uint8Array | null;
+      note: string | null;
+    }[];
+    return rows.map((row) => (row.kind === "note" ? { kind: "note", text: row.note ?? "" } : { kind: "file", name: row.name, type: row.type, data: row.data ?? new Uint8Array() }));
+  }
+
+  // Where a file or note is: its Nest, and its card or null for the composer.
+  attachment(id: string): { nestId: string; cardId: string | null; kind: "file" | "note" } | null {
+    return (this.db.prepare("SELECT nest_id AS nestId, card_id AS cardId, kind FROM attachments WHERE id = ?").get(id) as { nestId: string; cardId: string | null; kind: "file" | "note" } | undefined) ?? null;
+  }
+
+  // Null if the card or Nest isn't there.
+  addAttachment(to: AttachTo, attachment: NewAttachment): string | null {
+    const nestId = "cardId" in to ? this.card(to.cardId)?.nestId : this.db.prepare("SELECT id FROM nests WHERE id = ?").get(to.nestId) ? to.nestId : undefined;
+    if (!nestId) return null;
+    const id = randomUUID();
+    const cardId = "cardId" in to ? to.cardId : null;
+    if (attachment.kind === "note") {
+      this.db
+        .prepare("INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note) VALUES (?, ?, ?, 'note', '', 'text/plain', ?, NULL, NULL, ?)")
+        .run(id, nestId, cardId, Buffer.byteLength(attachment.text), attachment.text);
+    } else {
+      this.db
+        .prepare("INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note) VALUES (?, ?, ?, 'file', ?, ?, ?, ?, ?, NULL)")
+        .run(id, nestId, cardId, attachment.name, attachment.type, attachment.size, attachment.pages, attachment.data);
+    }
+    return id;
+  }
+
+  // A composer note changed before Run reaches every card that points at it.
+  editNote(id: string, text: string): boolean {
+    return this.db.prepare("UPDATE attachments SET note = ?, size = ? WHERE id = ? AND kind = 'note'").run(text, Buffer.byteLength(text), id).changes > 0;
+  }
+
+  removeAttachment(id: string): boolean {
+    return this.db.prepare("DELETE FROM attachments WHERE id = ?").run(id).changes > 0;
+  }
+
+  // The composer's files and notes a planned card points at, oldest pointer first.
+  pointedAt(cardId: string): AttachmentRow[] {
+    return this.db
+      .prepare(
+        `SELECT ${ATTACHMENT_COLUMNS.split(", ").map((column) => `a.${column}`).join(", ")} FROM plan_attachments p JOIN attachments a ON a.id = p.attachment_id
+         WHERE p.card_id = ? ORDER BY p.rowid`
+      )
+      .all(cardId) as unknown as AttachmentRow[];
+  }
+
+  // A planned card stops pointing at one of the composer's, which stays where it is.
+  unpoint(cardId: string, attachmentId: string): boolean {
+    return this.db.prepare("DELETE FROM plan_attachments WHERE card_id = ? AND attachment_id = ?").run(cardId, attachmentId).changes > 0;
+  }
+
+  // The composer's files and notes all go onto one card.
+  moveComposerTo(nestId: string, cardId: string): void {
+    this.db.prepare("UPDATE attachments SET card_id = ? WHERE nest_id = ? AND card_id IS NULL").run(cardId, nestId);
   }
 
   // Something happened in it, so it moves up the list.

@@ -1,6 +1,7 @@
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 
@@ -13,17 +14,65 @@ describe("NestStore", () => {
     store.setChat(scout.id, "chat-1");
     const writer = store.addCard(nest, { x: 400, y: 20, from: scout.id })!;
     store.moveCard(writer.id, 420.5, 32);
+    const bytes = new Uint8Array([37, 80, 68, 70, 0, 255]);
+    store.addAttachment({ cardId: writer.id }, { kind: "file", name: "one-pager.pdf", type: "application/pdf", size: bytes.length, pages: 1, data: bytes });
+    store.addAttachment({ nestId: nest }, { kind: "note", text: "Only B2B" });
 
-    expect(new NestStore(file).board(nest)).toEqual({
+    const again = new NestStore(file);
+    expect(again.board(nest)).toEqual({
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null, plan: null },
-        { id: writer.id, chatId: null, mascotId: null, x: 420.5, y: 32, each: null, plan: null },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null, plan: null, attachments: [] },
+        {
+          id: writer.id,
+          chatId: null,
+          mascotId: null,
+          x: 420.5,
+          y: 32,
+          each: null,
+          plan: null,
+          attachments: [{ id: expect.any(String), kind: "file", name: "one-pager.pdf", type: "application/pdf", size: 6 }],
+        },
       ],
       lines: [{ id: expect.any(String), from: scout.id, to: writer.id, picked: null }],
       talk: [],
+      attached: [{ id: expect.any(String), kind: "note", name: "", type: "text/plain", size: 8, text: "Only B2B" }],
     });
+    // The bytes as they were copied in, whatever happens to the file on disk.
+    expect(again.sentAttachments(writer.id)).toEqual([{ kind: "file", name: "one-pager.pdf", type: "application/pdf", data: bytes }]);
+    // A card's go with it.
+    again.deleteCard(writer.id);
+    expect(again.sentAttachments(writer.id)).toEqual([]);
+  });
+
+  it("counts a file added on a planned card before the pointers as the card's own, even when the composer has the same one", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Find customers");
+    const scout = store.addCard(nest, { x: 0, y: 0, planned: true })!;
+    const writer = store.addCard(nest, { x: 500, y: 0, planned: true })!;
+    const pdf = { kind: "file" as const, name: "one-pager.pdf", type: "application/pdf", size: 4, pages: 1, data: new Uint8Array([37, 80, 68, 70]) };
+    store.addAttachment({ nestId: nest }, pdf);
+    store.addAttachment({ cardId: writer.id }, pdf);
+    // As a file from before migration 6 has it.
+    const db = new DatabaseSync(file);
+    db.exec("PRAGMA user_version = 5;");
+    for (const column of ["source_id"]) {
+      try {
+        db.exec(`ALTER TABLE attachments DROP COLUMN ${column}`);
+      } catch {
+        // Not there in this version.
+      }
+    }
+    db.exec("DROP TABLE IF EXISTS plan_attachments;");
+    db.close();
+
+    const again = new NestStore(file);
+    const plan = (key: string, keeps: string | null) => ({ key, mascotId: null, prompt: `Do ${key}`, from: null, each: false, waits: false, table: null, x: 0, y: 0, attached: [], keeps });
+    const [, kept] = again.setPlan(nest, [plan("p1", scout.id), plan("p2", writer.id)], "Find companies")!;
+    expect(again.card(kept)!.attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
+    expect(again.board(nest)!.attached.map((each) => each.name)).toEqual(["one-pager.pdf"]);
   });
 
   it("only draws a line from a card in the same nest", () => {

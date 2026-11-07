@@ -24,6 +24,7 @@ import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
 import { addressToKeep, replyPointsTo } from "./jobTabs";
 import { withCardAnswer, type CardAnswer } from "./nestContext";
+import { attachmentBlocks, type SentAttachment } from "./nestFiles";
 import type { MemoryToOffer } from "./MemoryStore";
 
 const MAX_TITLE_LENGTH = 40;
@@ -150,6 +151,9 @@ interface Run {
   cardAnswer?: CardAnswer;
   // What the user typed for this job, when the chat's messages aren't all their words, as on a card Berry planned.
   userSaid?: string;
+  // The files and notes on a Nest's card, which go with the newest message every time it's sent, and are never saved in
+  // the chat.
+  attachments?: readonly SentAttachment[];
 }
 
 // How one reply ended, for whoever started it.
@@ -802,6 +806,8 @@ export class Chats {
   // model with this message only, labelled untrusted, and is never saved. `started` hears a new chat's id before anything
   // about it is published, so a Nest can claim it first. `userSaid` is what the user typed for this job when the chat's
   // messages aren't all theirs, such as a prompt Berry planned: only these words then name sites it may go to unasked.
+  // `attachments` are a card's files and notes, which go to the model with this message. A note is the user's own words,
+  // so the sites it names count as theirs, and a file's never do.
   send(
     chatId: string | null,
     text: string,
@@ -819,6 +825,7 @@ export class Chats {
       cardAnswer,
       started,
       userSaid,
+      attachments,
     }: {
       seePage: boolean;
       mascotId?: string | null;
@@ -833,6 +840,7 @@ export class Chats {
       cardAnswer?: CardAnswer;
       started?: (chatId: string) => void;
       userSaid?: string;
+      attachments?: readonly SentAttachment[];
     }
   ): ChatThread | null {
     const message = text.trim();
@@ -859,7 +867,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswer, userSaid };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswer, userSaid, attachments };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -977,9 +985,10 @@ export class Chats {
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
       run.withPage = page !== null;
-      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswer);
+      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswer, run.attachments);
       const said = this.userWords(chatId).join("\n");
-      const tools = this.jobTools(chatId, run, page, run.userSaid ?? said);
+      const notes = (run.attachments ?? []).flatMap((attachment) => (attachment.kind === "note" ? [attachment.text] : []));
+      const tools = this.jobTools(chatId, run, page, [run.userSaid ?? said, ...notes].join("\n"));
       this.recall(chatId, run, said);
       await this.consume(chatId, run, messages, tools, (content) => {
         if (content) this.events.onChunk(chatId, content);
@@ -1259,13 +1268,17 @@ export class Chats {
   }
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.
-  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile, answer?: CardAnswer): Promise<ReplyMessage[]> {
+  // A Nest's card's files and notes go first, each labelled.
+  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile, answer?: CardAnswer, attachments: readonly SentAttachment[] = []): Promise<ReplyMessage[]> {
     const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
     const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
-    if ((!page && !answer) || !newest || typeof newest.content !== "string") return messages;
+    if ((!page && !answer && attachments.length === 0) || !newest || typeof newest.content !== "string") return messages;
     const text = answer ? withCardAnswer(newest.content, { ...answer, text: this.withoutCodes(answer.text) }) : newest.content;
-    return [...messages.slice(0, -1), { role: "user", content: page ? withPage(text, page) : text }];
+    const content = page ? withPage(text, page) : text;
+    if (attachments.length === 0) return [...messages.slice(0, -1), { role: "user", content }];
+    const files = attachmentBlocks(attachments);
+    return [...messages.slice(0, -1), { role: "user", content: [...files, ...(typeof content === "string" ? [{ type: "text" as const, text: content }] : content)] }];
   }
 
   private async readPage(mascot: MascotProfile): Promise<Page | null> {
