@@ -75,6 +75,17 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await expect(draft.getByRole("status")).toHaveText("Done");
   await expect(draft).toContainText("Two drafts written.");
 
+  // Opened, a card floats over the board, which dims behind it, so a press on another card only closes it.
+  await first.getByRole("button", { name: "Open the whole chat" }).click();
+  const reply = first.getByPlaceholder("Reply to Berry");
+  await expect(reply).toBeVisible();
+  const dim = chrome.locator("[data-open-dim]");
+  await expect(dim).toHaveCSS("opacity", "1");
+  const other = (await draft.boundingBox())!;
+  await chrome.mouse.click(other.x + other.width / 2, other.y + other.height / 2);
+  await expect(reply).toHaveCount(0);
+  await expect(dim).toHaveCSS("opacity", "0");
+
   // The model got the first card's answer as tagged, untrusted data, and the user's words after it.
   expect(model.requests).toHaveLength(2);
   const sent = newestUserMessage(model.requests[1]);
@@ -168,7 +179,7 @@ test("rows picked in a card's table go to a new card, which runs once for each o
   await expect(chrome.locator(".react-flow__edge path").first()).not.toHaveAttribute("style", /dasharray/);
   await expect(draft.getByRole("button", { name: /^(Fjällbo|Sjöström Labs|Brygga)/ })).toHaveCount(3);
   // The bird carried the rows along the line and is home again, even in a window that draws no frames off-screen.
-  await expect(chrome.locator(".react-flow__viewport-portal > *")).toHaveCount(0);
+  await expect(chrome.locator(".react-flow__viewport-portal > :not([data-open-dim])")).toHaveCount(0);
   // Pressing a run opens its own thread.
   await draft.getByRole("button", { name: /^Fjällbo/ }).click();
   await expect(draft.getByPlaceholder("Reply to Berry")).toBeVisible();

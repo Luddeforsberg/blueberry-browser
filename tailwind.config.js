@@ -92,6 +92,8 @@ module.exports = {
       page: "var(--shadow-page)",
       card: "var(--shadow-card)",
       reading: "var(--shadow-reading)",
+      // A running card opened over a Nest's board: the reading ring, floating.
+      "reading-raised": "var(--shadow-reading), var(--shadow-raised)",
       recording: "var(--shadow-recording)",
       float: "0 8px 24px rgb(0 0 0 / 0.16)",
     },

@@ -6,6 +6,7 @@ import {
     ReactFlow,
     ReactFlowProvider,
     useReactFlow,
+    useStore,
     useViewport,
     ViewportPortal,
     type FinalConnectionState,
@@ -59,6 +60,9 @@ const DOTS = { gap: 20, size: 1.2 }
 // How tall a planned card is taken to be, as main places a plan, for the shapes shown while Berry plans.
 const PLANNED_HEIGHT = 180
 const MOVE = { duration: 240 }
+// Where the open card sits, and the layer that dims the rest of the board under it.
+const OPEN_Z = 10
+const DIM_Z = 5
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
 
@@ -77,8 +81,8 @@ const toNodes = (board: NestBoard, openId: string | null, previous: CardNode[], 
             type: 'card',
             position: { x: card.x, y: card.y },
             dragHandle: '.nest-drag',
-            // The open card stays over the others, since it's the one being read.
-            zIndex: card.id === openId ? 10 : 0,
+            // The open card floats over the others and the layer that dims them, since it's the one being read.
+            zIndex: card.id === openId ? OPEN_Z : 0,
             ariaLabel: label(card),
             ariaRole: 'group',
             data: { card }
@@ -281,6 +285,24 @@ const ZoomControls: React.FC<{ onFit: () => void; onActualSize: () => void }> = 
                 <Scan className="size-4" />
             </button>
         </div>
+    )
+}
+
+// While a card is open, the rest of the board, its cards, lines and dots, fades a little behind it, so the open card
+// reads as a layer of its own rather than lying across the cards under it. A press on it closes the card. It sits in
+// the board's own layers, between the cards and the open one, and covers just what's on screen.
+const OpenDim: React.FC<{ shown: boolean; onClose: () => void }> = ({ shown, onClose }) => {
+    const { x, y, zoom } = useViewport()
+    const width = useStore((state) => state.width)
+    const height = useStore((state) => state.height)
+    return (
+        <div
+            aria-hidden
+            data-open-dim
+            onClick={shown ? onClose : undefined}
+            className={cn("absolute left-0 top-0 bg-canvas/60 transition-opacity duration-layout", shown ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")}
+            style={{ zIndex: DIM_Z, transform: `translate(${-x / zoom}px, ${-y / zoom}px)`, width: width / zoom, height: height / zoom }}
+        />
     )
 }
 
@@ -654,6 +676,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 >
                     <Background variant={BackgroundVariant.Dots} gap={DOTS.gap} size={DOTS.size} className="text-muted-foreground/40" color="currentColor" />
                     <ViewportPortal>
+                        <OpenDim
+                            shown={!!openId}
+                            onClose={() => {
+                                clearedByPress.current = false
+                                open(null)
+                            }}
+                        />
                         {ghostsAt && planning && <PlanGhosts at={ghostsAt} />}
                         {flights.map((flight) => (
                             <FlightView key={flight.id} flight={flight} onLanded={landed} onDone={doneFlying} />
