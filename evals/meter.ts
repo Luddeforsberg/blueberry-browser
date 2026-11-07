@@ -1,4 +1,5 @@
 import type { ElectronApplication } from "@playwright/test";
+import { priceOf } from "../src/shared/modelPrices";
 
 export interface ModelCall {
   model: string;
@@ -13,21 +14,12 @@ export interface ModelCall {
   error?: string;
 }
 
-// US$ per million tokens: [input, cached input, output], from developers.openai.com/api/docs/pricing on 2026-10-31.
-// A model not listed here is priced high, so the budget errs towards stopping.
-const PRICES: Record<string, [number, number, number]> = {
-  "gpt-6.1-sol": [2, 0.1, 10],
-  "gpt-6.1-terra": [1, 0.05, 5],
-  "gpt-6-luna": [0.1, 0.01, 0.5],
-};
-const FALLBACK_PRICE: [number, number, number] = [10, 1, 50];
+// A model the shared price table doesn't know is priced high, so the budget errs towards stopping.
+const FALLBACK_PRICE: readonly [number, number, number] = [10, 1, 50];
 
 export const costOf = (calls: ModelCall[]): number =>
   calls.reduce((total, call) => {
-    const match = Object.keys(PRICES).find((name) =>
-      call.model.startsWith(name),
-    );
-    const [input, cached, output] = match ? PRICES[match] : FALLBACK_PRICE;
+    const [input, cached, output] = priceOf(call.model) ?? FALLBACK_PRICE;
     const fresh = call.inputTokens - call.cachedTokens;
     return (
       total +

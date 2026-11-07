@@ -175,7 +175,7 @@ const withElement = (ref: string, body: string): string => `(() => {
   ${body}
 })()`;
 
-const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
+const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), secret: isSecret(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
 
 export const describeElement = (ref: string): string => withElement(ref, `return { ${DESCRIBE_FIELDS} };`);
 

@@ -79,7 +79,7 @@ describe("NestStore", () => {
     db.close();
 
     const again = new NestStore(file);
-    const plan = (key: string, keeps: string | null) => ({ key, mascotId: null, prompt: `Do ${key}`, from: null, each: false, waits: false, table: null, x: 0, y: 0, attached: [], keeps });
+    const plan = (key: string, keeps: string | null) => ({ key, mascotId: null, prompt: `Do ${key}`, from: [], each: false, waits: false, table: null, x: 0, y: 0, attached: [], keeps });
     const [, kept] = again.setPlan(nest, [plan("p1", scout.id), plan("p2", writer.id)], "Find companies")!;
     expect(again.card(kept)!.attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
     expect(again.board(nest)!.attached.map((each) => each.name)).toEqual(["one-pager.pdf"]);
@@ -147,8 +147,8 @@ describe("NestStore", () => {
     const source = store.addCard(nest, { x: 0, y: 0 })!;
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id })!;
 
-    expect(store.sourceOf(next.id)?.id).toBe(source.id);
-    expect(store.sourceOf(source.id)).toBeNull();
+    expect(store.linesTo(next.id).map((line) => line.source.id)).toEqual([source.id]);
+    expect(store.linesTo(source.id)).toEqual([]);
   });
 
   it("changes a card's bird only while it's a draft, and gives it a chat only once", () => {
@@ -203,7 +203,7 @@ describe("NestStore", () => {
     const picked = { header: ["Company"], rows: [["Fjällbo"], ["Brygga"]] };
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
 
-    expect(store.lineTo(next.id)).toEqual({ source: expect.objectContaining({ id: source.id }), picked });
+    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked }]);
     // The board carries only how many, and a line with none picked says so.
     expect(store.board(nest)?.lines[0].picked).toBe(2);
     store.addCard(nest, { x: 0, y: 0, from: source.id });
@@ -286,7 +286,7 @@ describe("NestStore", () => {
     expect(again.tableRows(big.id)![8][0]).toBe(`8${"z".repeat(500)}`);
     expect(again.tableRows(card.id)).toBeNull();
     // A line can come out of it, as out of any card with something to give.
-    const plan = { key: "p1", mascotId: null, prompt: "For each", from: { card: table.id }, each: true, waits: false, table: null, x: 0, y: 400, attached: [], keeps: null };
+    const plan = { key: "p1", mascotId: null, prompt: "For each", from: [{ card: table.id }], each: true, waits: false, table: null, x: 0, y: 400, attached: [], keeps: null };
     expect(again.setPlan(nest, [plan], "Do it")).toHaveLength(1);
   });
 });

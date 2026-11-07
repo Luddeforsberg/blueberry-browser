@@ -29,8 +29,20 @@ export const MascotSays: React.FC<{
   </section>
 );
 
+// The quiet second choice on a run of a For-each card, worded for exactly what it covers.
+export const AllowForCard: React.FC<{ covers: string; onAllow: () => void; className?: string }> = ({ covers, onAllow, className }) => (
+  <button
+    type="button"
+    onClick={onAllow}
+    className={cn("block text-left text-12 text-muted-foreground hover:text-foreground hover:underline underline-offset-2 rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring [overflow-wrap:anywhere]", className)}
+  >
+    Allow {covers} for this card’s runs
+  </button>
+);
+
 // What a mascot asks before anything that matters: what it would like to do, then exactly what will happen. With no
-// `exactly`, the question already says it word for word.
+// `exactly`, the question already says it word for word. `forCard` is what Allow for this card's runs would cover, on a
+// run of a For-each card.
 export const ApprovalCard: React.FC<{
   avatar: React.ReactNode;
   avatarOutside?: boolean;
@@ -38,7 +50,8 @@ export const ApprovalCard: React.FC<{
   exactly?: string;
   onConfirm: () => void;
   onDeny: () => void;
-}> = ({ avatar, avatarOutside, question, exactly, onConfirm, onDeny }) => (
+  forCard?: { covers: string; onAllow: () => void };
+}> = ({ avatar, avatarOutside, question, exactly, onConfirm, onDeny, forCard }) => (
   <MascotSays label="Approval needed" avatar={avatar} avatarOutside={avatarOutside} title={question} exactly={exactly}>
     <div className="flex items-center gap-2">
       <Button size="sm" onClick={onConfirm}>
@@ -48,5 +61,6 @@ export const ApprovalCard: React.FC<{
         Don’t allow
       </Button>
     </div>
+    {forCard && <AllowForCard covers={forCard.covers} onAllow={forCard.onAllow} className="mt-2" />}
   </MascotSays>
 );

@@ -236,6 +236,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
                             </span>
                             <span>
                                 <span className={step.done ? undefined : SHIMMER_TEXT}>{step.shown ?? step.text}</span>
+                                {step.allowed === 'card' && <span className="text-muted-foreground"> · Allowed for this card’s runs</span>}
                                 {!step.done && <span className="sr-only"> (in progress)</span>}
                             </span>
                         </li>
@@ -348,6 +349,7 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
             exactly={withSiteNames(approval.text) === approval.text ? undefined : approval.text}
             onConfirm={() => decide(true)}
             onDeny={() => decide(false)}
+            forCard={approval.grant ? { covers: approval.grant, onAllow: () => void window.chromeAPI.chat.allowForCard(chatId, approval.id) } : undefined}
         />
     )
 }

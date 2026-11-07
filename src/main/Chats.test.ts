@@ -191,8 +191,8 @@ describe("Chats", () => {
         toolNames = tools.map((tool) => tool.name);
         await tools.find((tool) => tool.name === "open_tab")!.run({ url: "https://example.com/" });
         listed = await tools.find((tool) => tool.name === "list_tabs")!.run({});
-        onUsage?.(120);
-        onUsage?.(30);
+        onUsage?.({ total: 120, input: 100, cached: 0, output: 20 });
+        onUsage?.({ total: 30, input: 20, cached: 0, output: 10 });
         yield "report";
       };
       const store = new ChatStore(":memory:");
@@ -1270,6 +1270,87 @@ describe("Chats", () => {
       expect(answers).toEqual([]);
       expect(chats.thread(id)).toMatchObject({ partial: null, approval: null, error: null });
       expect(chats.decide(id, approvalId, true)).toBe(false);
+    });
+  });
+
+  describe("Allow for this card's runs", () => {
+    const SAVE = { key: "save-key", words: "clicking the button “Save draft” on mail.example.com" };
+    const grantAsking =
+      (answers: boolean[], grant: typeof SAVE | null = SAVE): StreamReply =>
+      async function* (_, __, { approve, granted }) {
+        answers.push(granted?.(SAVE.key) ?? false);
+        answers.push(await approve("Click “Save draft” on mail.example.com", grant));
+        yield "done";
+      };
+    const granting = () => {
+      const added: string[] = [];
+      return { added, cardGrant: { covers: (key: string) => added.includes(key), add: (key: string) => void added.push(key) } };
+    };
+    const asked = async (context: ReturnType<typeof setup>, options: Parameters<Chats["send"]>[2]) => {
+      const ended = context.replyEnded();
+      const { id } = context.chats.send(null, "first", options)!;
+      await vi.waitFor(() => expect(context.threads.at(-1)?.approval).not.toBeNull());
+      return { id, approval: context.threads.at(-1)!.approval!, ended };
+    };
+
+    it("is offered with its words, and choosing it allows this one and adds the key", async () => {
+      const answers: boolean[] = [];
+      const context = setup(grantAsking(answers));
+      const { added, cardGrant } = granting();
+      const { id, approval, ended } = await asked(context, { seePage: false, cardGrant });
+      expect(approval.grant).toBe(SAVE.words);
+      expect(JSON.stringify(context.threads)).not.toContain(SAVE.key);
+
+      expect(context.chats.decide(id, approval.id, false, undefined, { forCard: true })).toBe(true);
+      await ended;
+      expect(answers).toEqual([false, true]);
+      expect(added).toEqual([SAVE.key]);
+    });
+
+    it("is never granted from the phone or another app, and leaves the approval waiting", async () => {
+      const answers: boolean[] = [];
+      const context = setup(grantAsking(answers));
+      const { added, cardGrant } = granting();
+      const { id, approval, ended } = await asked(context, { seePage: false, cardGrant });
+
+      expect(context.chats.decide(id, approval.id, true, undefined, { forCard: true, fromPhone: true })).toBe(false);
+      expect(context.chats.decide(id, approval.id, true, undefined, { forCard: true, fromApp: true })).toBe(false);
+      expect(context.chats.decide(id, "wrong", true, undefined, { forCard: true })).toBe(false);
+      expect(added).toEqual([]);
+      expect(context.threads.at(-1)?.approval?.id).toBe(approval.id);
+      context.chats.decide(id, approval.id, false);
+      await ended;
+      expect(answers).toEqual([false, false]);
+    });
+
+    it("isn't offered or granted without a card, for a job an app started, or for an action with no exact key", async () => {
+      for (const [options, grant] of [
+        [{ seePage: false }, SAVE],
+        [{ seePage: false, from: "Claude Code" }, SAVE],
+        [{ seePage: false }, null],
+      ] as const) {
+        const answers: boolean[] = [];
+        const context = setup(grantAsking(answers, grant));
+        const { added, cardGrant } = granting();
+        const withCard = "from" in options || grant === null ? { ...options, cardGrant } : options;
+        const { id, approval, ended } = await asked(context, withCard);
+        expect(approval.grant).toBeUndefined();
+        expect(context.chats.decide(id, approval.id, true, undefined, { forCard: true })).toBe(false);
+        context.chats.decide(id, approval.id, false);
+        await ended;
+        expect(added).toEqual([]);
+      }
+    });
+
+    it("lets a card's run skip asking only for what its card holds", async () => {
+      const answers: boolean[] = [];
+      const context = setup(grantAsking(answers));
+      const { added, cardGrant } = granting();
+      added.push(SAVE.key);
+      const { id, approval, ended } = await asked(context, { seePage: false, cardGrant });
+      context.chats.decide(id, approval.id, false);
+      await ended;
+      expect(answers[0]).toBe(true);
     });
   });
 

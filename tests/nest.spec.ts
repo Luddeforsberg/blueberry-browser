@@ -1,5 +1,7 @@
 import { expect, test, type ElectronApplication } from "@playwright/test";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findView, launchApp } from "./app";
@@ -28,7 +30,7 @@ const oneJob = () =>
   model.planWith({
     reply: "On it.",
     ask: false,
-    cards: [{ key: "c1", bird: "berry", prompt: "One job", from: null, for_each_row: false, waits_for_user: false, table_of: null }],
+    cards: [{ key: "c1", bird: "berry", prompt: "One job", from: [], for_each_row: false, waits_for_user: false, table_of: null }],
   });
 
 test("a card pulled out of another gets its latest answer, and the Nest keeps both", async () => {
@@ -248,8 +250,8 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
     reply: "That’s two jobs, so I’ve laid them out above. I’ll stop after the list so you can check it before any email is written.",
     ask: false,
     cards: [
-      { key: "c1", bird: saved.id, prompt: "Find three Swedish B2B SaaS companies and who leads sales at each, as a table", from: null, for_each_row: false, waits_for_user: false, table_of: "companies" },
-      { key: "c2", bird: "berry", prompt: "Draft a first email to each", from: "c1", for_each_row: false, waits_for_user: true, table_of: null },
+      { key: "c1", bird: saved.id, prompt: "Find three Swedish B2B SaaS companies and who leads sales at each, as a table", from: [], for_each_row: false, waits_for_user: false, table_of: "companies" },
+      { key: "c2", bird: "berry", prompt: "Draft a first email to each", from: ["c1"], for_each_row: false, waits_for_user: true, table_of: null },
     ],
   });
   const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
@@ -685,4 +687,128 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   await expect(card.getByPlaceholder("Reply to Berry")).toBeVisible();
   await card.getByRole("button", { name: "Don’t allow" }).click();
   await expect(card.getByRole("status").first()).toHaveText("Done");
+});
+
+test("Allow for this card's runs lets a For-each card's other runs do exactly that, a card reads from two, and runs go again", async () => {
+  test.setTimeout(120_000);
+  model.reset();
+  const server = createServer((_, response) => {
+    response.setHeader("content-type", "text/html");
+    response.end("<!doctype html><title>Draft</title><p>A draft</p>");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  // A model the price table knows, so the cards say what they cost: 30k tokens in at $1 a million is $0.03 a reply.
+  model.usageWith({ input: 30_000, output: 0 });
+  app = await launchApp(undefined, { modelEnv: { ...model.env, LLM_MODEL: "gpt-6.1-terra" } });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(150);
+      await chrome.screenshot({ path: join(SHOTS, `${name}-${appearance}.png`) });
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  };
+  try {
+    // Started on the board itself, since a model name the price table knows changes how LangChain asks for a plan.
+    await chrome.getByRole("button", { name: "New nest" }).click();
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).nests.length).toBe(1);
+    const nestId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).nests[0].id;
+    model.replyWith(THREE_COMPANIES);
+    const start = await chrome.evaluate((nest) => window.chromeAPI.nests.addCard(nest, { x: 0, y: 0 }), nestId);
+    await chrome.evaluate((id) => window.chromeAPI.nests.send(id, "Find three Swedish SaaS companies"), start!.id);
+    const cards = chrome.locator(".react-flow__node");
+    const first = cards.first();
+    await expect(first.getByRole("status")).toHaveText("Done");
+    await expect(first.getByLabel("What this card’s chat has cost: $0.03")).toBeVisible();
+
+    // Before For each row sends, it says what the runs will likely cost, from what the card it reads from cost.
+    await first.hover();
+    await first.getByLabel("Pull a new card out of Berry’s").click();
+    const writer = cards.nth(1);
+    if ((await writer.getByRole("switch").getAttribute("aria-checked")) !== "true") await writer.getByRole("switch").click();
+    await expect(writer).toContainText("3 runs, about $0.09");
+    await shots("estimate");
+
+    // Each run opens the same address, which asks, and then one run opens another.
+    const draftPage = `${origin}/draft?ref=nest`;
+    for (let run = 0; run < 3; run++) model.callTools({ name: "open_tab", args: { url: draftPage } });
+    model.callTools({ name: "open_tab", args: { url: `${origin}/other?ref=nest` } });
+    model.replyWith("Saved the draft.");
+    const prompt = writer.getByRole("textbox", { name: "What should Berry do?" });
+    await prompt.fill("Open the draft page for the company");
+    await prompt.press("Enter");
+
+    // The three going at once each ask, each offering the same exact choice next to Allow.
+    const forCard = writer.getByRole("button", { name: `Allow opening ${draftPage} for this card’s runs` });
+    await expect(forCard).toHaveCount(3);
+    await shots("allow-for-card");
+    await forCard.first().click();
+
+    // That allows the other two asking for exactly it. Another address still asks, with its own choice.
+    await expect(forCard).toHaveCount(0);
+    await expect(writer.getByRole("button", { name: `Allow opening ${origin}/other?ref=nest for this card’s runs` })).toHaveCount(1);
+    expect(model.requests.filter((request) => JSON.stringify(request.messages).includes("/other?ref=nest"))).toHaveLength(0);
+
+    // Stopped while that one asks, one run didn't finish, and it had done something allowed, so it says so first.
+    await writer.getByRole("button", { name: "Stop" }).click();
+    const retry = writer.getByRole("button", { name: "Retry 1 that didn’t finish" });
+    await expect(retry).toBeVisible();
+    await expect(writer.getByLabel(/^What its runs have cost so far: \$/)).toBeVisible();
+    await retry.click();
+    await expect(writer.getByRole("alert")).toContainText("may do it again");
+    await shots("retry-warning");
+    const before = model.requests.length;
+    await writer.getByRole("button", { name: "Retry anyway" }).click();
+    await expect(writer.getByRole("status").first()).toHaveText("Done");
+    expect(model.requests.length - before).toBe(1);
+    await expect(writer.getByRole("button", { name: /that didn’t finish/ })).toHaveCount(0);
+
+    // A run's steps say which actions went by what was allowed for the card's runs.
+    let shown = false;
+    for (const company of ["Lindqvist Data", "Fjällbo", "Brygga"]) {
+      await writer.getByRole("button", { name: `Open ${company}’s run` }).click();
+      if ((await writer.getByText("Allowed for this card’s runs").count()) > 0) {
+        shown = true;
+        await shots("run-step");
+        break;
+      }
+      await writer.getByRole("button", { name: "Every run" }).click();
+    }
+    expect(shown).toBe(true);
+    await chrome.keyboard.press("Escape");
+
+    // A card can read from two: Scout's answer and Berry's table, each tagged by name, in order.
+    const saved = await chrome.evaluate(() =>
+      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find rivals.", sites: [], tools: [] })
+    );
+    if (!saved.ok) throw new Error(saved.error);
+    const scout = await chrome.evaluate(([nest, bird]) => window.chromeAPI.nests.addCard(nest!, { x: 0, y: 700, mascotId: bird }), [nestId, saved.id]);
+    model.replyWith("Their rivals are Kvarnsten and Vinga.");
+    await chrome.evaluate((id) => window.chromeAPI.nests.send(id, "Find their rivals"), scout!.id);
+    const scoutCard = chrome.locator(`.react-flow__node[data-id="${scout!.id}"]`);
+    await expect(scoutCard.getByRole("status")).toHaveText("Done");
+    const compare = await chrome.evaluate((nest) => window.chromeAPI.nests.addCard(nest, { x: 900, y: 700 }), nestId);
+    const compareCard = chrome.locator(`.react-flow__node[data-id="${compare!.id}"]`);
+    await compareCard.getByRole("button", { name: "Add a file, a note or an input" }).click();
+    await chrome.getByRole("menuitem", { name: "Add an input: Scout" }).click();
+    await compareCard.getByRole("button", { name: "Add a file, a note or an input" }).click();
+    await chrome.getByRole("menuitem", { name: "Add an input: Berry" }).first().click();
+    await expect(compareCard).toContainText("gets Scout’s answer and Berry’s");
+    await shots("two-inputs");
+    model.replyWith("Lindqvist Data is ahead of Kvarnsten.");
+    const comparePrompt = compareCard.getByRole("textbox", { name: "What should Berry do?" });
+    await comparePrompt.fill("Compare each company with its rivals");
+    await comparePrompt.press("Enter");
+    await expect(compareCard.getByRole("status")).toHaveText("Done");
+    const message = newestUserMessage(model.requests.at(-1)!);
+    expect(message.indexOf('<card_answer from="Scout">')).toBe(0);
+    expect(message.indexOf('<card_answer from="Berry">')).toBeGreaterThan(0);
+    expect(message.endsWith("Compare each company with its rivals")).toBe(true);
+  } finally {
+    server.close();
+  }
 });

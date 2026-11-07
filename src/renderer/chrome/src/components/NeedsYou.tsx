@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import type { NeedsYouItem } from '@shared/library'
 import { Button } from '@common/components/Button'
-import { ExactWords } from '@common/components/ApprovalCard'
+import { AllowForCard, ExactWords } from '@common/components/ApprovalCard'
 import { BerryDot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
@@ -136,6 +136,16 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                     <h2 className="pt-0.5 text-16">{shortened}</h2>
                     {shortened !== approval.text && <ExactWords className="mt-2">{approval.text}</ExactWords>}
+                    {approval.grant && !question && !handoff && (
+                        <AllowForCard
+                            covers={approval.grant}
+                            className="mt-2"
+                            onAllow={() => {
+                                onAnswered(`Allowed for this card’s runs. ${name} carries on.`)
+                                void window.chromeAPI.chat.allowForCard(id, approval.id)
+                            }}
+                        />
+                    )}
                     {question && <QuestionBox name={name} onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)} />}
                     {/* One line, so the actions waiting unseen never leave an empty strip under it. */}
                     <div className="mt-1 h-7 flex items-center gap-x-1.5 text-12 text-muted-foreground">

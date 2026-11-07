@@ -28,6 +28,7 @@ import {
 import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { PageFrame, PageTarget } from "./pageTarget";
+import { addressGrant, clickGrant, typeGrant, type GrantKey } from "./cardGrant";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { NOWHERE, siteAllowed } from "../shared/mascots";
 import { cleanLine } from "../shared/publishing";
@@ -76,6 +77,9 @@ export interface PageTool {
   // What the chat always shows instead of `label`, when that's text the model wrote that the user should see, such as
   // what went out in a search. Like `allowedLabel`, it never goes back to the model.
   shownLabel?: (args: unknown) => string;
+  // Exactly the action this call is, for Allow for this card's runs (see `cardGrant.ts`). Null where it can't be matched
+  // that exactly, so nothing is offered and it always asks.
+  grantKey?: (args: unknown) => Promise<GrantKey | null>;
 }
 
 // What each tool needs from a mascot. "reading" and "asking" are every mascot's. A tool that isn't listed here is
@@ -125,8 +129,9 @@ const pageTool = <S extends z.ZodObject>(tool: {
   returnsImage?: boolean;
   allowedLabel?: (args: z.infer<S>) => string | null;
   shownLabel?: (args: z.infer<S>) => string;
+  grantKey?: (args: z.infer<S>) => Promise<GrantKey | null>;
 }): PageTool => {
-  const { describe, whileAsking, isRisky, allowedLabel, shownLabel } = tool;
+  const { describe, whileAsking, isRisky, allowedLabel, shownLabel, grantKey } = tool;
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
@@ -136,6 +141,7 @@ const pageTool = <S extends z.ZodObject>(tool: {
     isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
     allowedLabel: allowedLabel && ((args) => allowedLabel(tool.schema.parse(args))),
     shownLabel: shownLabel && ((args) => shownLabel(tool.schema.parse(args))),
+    grantKey: grantKey && ((args) => grantKey(tool.schema.parse(args))),
   };
 };
 
@@ -182,6 +188,8 @@ interface ElementInfo {
   target: string | null;
   riskyClick: boolean;
   safeToType: boolean;
+  // A password, a code or card details, which no grant ever covers.
+  secret?: boolean;
   // Set for a same-origin frame: where in the site this is.
   frameUrl: string | null;
   // Set for a frame from another origin, by the main process rather than the frame: the site it's really from.
@@ -864,6 +872,7 @@ export const createPageTools = <T extends PageTarget>({
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
+      grantKey: async ({ tabId: id, ref }) => clickGrant("click", find(id)?.url ?? "", await element(id, ref)),
       run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
     }),
     pageTool({
@@ -875,6 +884,7 @@ export const createPageTools = <T extends PageTarget>({
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Double-click the ${role} “${name}”`),
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
+      grantKey: async ({ tabId: id, ref }) => clickGrant("double_click", find(id)?.url ?? "", await element(id, ref)),
       run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 2)),
     }),
     pageTool({
@@ -1043,6 +1053,7 @@ export const createPageTools = <T extends PageTarget>({
         const info = await element(id, ref);
         return !!info && (!info.safeToType || text.length > MAX_SAFE_TYPED_LENGTH);
       },
+      grantKey: async ({ tabId: id, ref, submit = false }) => typeGrant(find(id)?.url ?? "", await element(id, ref), submit),
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
           const started = Date.now();
@@ -1176,6 +1187,7 @@ export const createPageTools = <T extends PageTarget>({
       label: ({ url }) => `Went to ${siteOf(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
       isRisky: async ({ tabId: id, url }) => needsCard(url, find(id)),
+      grantKey: async ({ url }) => addressGrant("go_to", url),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
@@ -1198,6 +1210,7 @@ export const createPageTools = <T extends PageTarget>({
       label: ({ url }) => `Opened ${siteOf(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
       isRisky: async ({ url }) => needsCard(url, find()),
+      grantKey: async ({ url }) => addressGrant("open_tab", url),
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;

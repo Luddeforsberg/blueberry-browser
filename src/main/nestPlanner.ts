@@ -4,6 +4,7 @@ import { permissionsInWords } from "../shared/mascots";
 import { findTable, tableMarkdown } from "../shared/nestTable";
 import { nameForPrompt } from "./mascotNote";
 import { MAX_PLAN_CARDS } from "./nestPlan";
+import { MAX_INPUTS } from "../shared/nestTable";
 import { nameForModel, sizeInWords, typeInWords } from "./nestFiles";
 
 // What the main model is asked when the user writes in a Nest's composer, and the shape its answer must take. The answer
@@ -17,7 +18,9 @@ export const PLAN_SCHEMA = z.object({
       key: z.string().describe("A short key for this card, such as c1, unique in this plan. To keep a card of the current plan, use its key."),
       bird: z.string().describe("The id of a bird in the flock."),
       prompt: z.string().describe("The whole job for that bird, written as the user would ask it."),
-      from: z.string().nullable().describe("The key of the card whose answer this one needs, in this plan or on the board, or null."),
+      from: z
+        .array(z.string())
+        .describe(`The keys of the cards whose answers this one needs, in this plan or on the board, in the order to read them, ${MAX_INPUTS} at most, or none.`),
       for_each_row: z.boolean().describe("Run this card once for each row of the table its from card answers with."),
       waits_for_user: z.boolean().describe("Start only once the user says the from card's answer is right."),
       table_of: z.string().nullable().describe("If this card answers with a table, what each row is, such as companies. Otherwise null."),
@@ -33,8 +36,9 @@ export const PLAN_SYSTEM_PROMPT =
   "- A request for a list and then something done for each item on it is two jobs, even for a short list: a card whose answer is the list as a table, and a card after it with for_each_row.\n" +
   `- A request that is several jobs is a card for each, ${MAX_PLAN_CARDS} at most. Split only where the jobs need different birds, where the user should check something first, or where the same job runs for every row of a list.\n` +
   "- A card that needs another card's answer names it in from: a card in this plan by its key, or a card already on the board by its key there. Its prompt refers to that answer, such as \"the companies in the list\", and never repeats it.\n" +
+  `- A card that brings several answers together, such as a comparison of competitors, names each card in from, ${MAX_INPUTS} at most. Each answer reaches it tagged with that card's bird.\n` +
   "- A card whose answer is a list for the next card to use has table_of, saying what each row is, and its prompt asks for the answer as one markdown table with a row for each, with each one's name in the first column.\n" +
-  "- for_each_row runs a card once for each row of its from card's table, as separate jobs that each get one row, so its prompt says what to do with one row. Its answer is that table with one more column, each row's short result, so a card after it can use the table or run for_each_row again to add another column. Only use it when from is a card with table_of or for_each_row, or a card on the board that has a table.\n" +
+  "- for_each_row runs a card once for each row of the table of the first from card that has one, as separate jobs that each get one row, and every run also gets the other from cards' answers, so its prompt says what to do with one row. Its answer is that table with one more column, each row's short result, so a card after it can use the table or run for_each_row again to add another column. Only use it when from is a card with table_of or for_each_row, or a card on the board that has a table.\n" +
   "- waits_for_user makes a card wait until the user says its from card's answer is right. Use it before anything is sent, posted, saved, bought or changed for the user, and when a list should be checked before work is done on it.\n" +
   "- When the user attached files or notes, attached on each card lists the keys of the ones that card needs, so each goes only where it's used. A card after another gets that card's answer, not its files, so give a file to every card that needs it.\n" +
   "- bird is the id of a bird in the flock. Use a bird whose limits and instructions fit the job, and otherwise the bird the user chose.\n" +
@@ -87,7 +91,7 @@ export interface PlannedDigest {
   key: string;
   bird: string;
   prompt: string;
-  from: string | null;
+  from: string[];
   each: boolean;
   waits: boolean;
   table: string | null;
@@ -169,7 +173,7 @@ export const planDigest = ({
         plan
           .map(
             (card) =>
-              `<planned key="${card.key}" bird="${card.bird}" from="${card.from ?? ""}" for_each_row="${card.each}" waits_for_user="${card.waits}" table_of="${asData(card.table ?? "")}" attached="${card.attached.join(",")}"${card.own.length > 0 ? ` own_attached="${asData(card.own.map(nameForModel).join(", "))}"` : ""}>${asData(card.prompt)}</planned>`
+              `<planned key="${card.key}" bird="${card.bird}" from="${card.from.join(",")}" for_each_row="${card.each}" waits_for_user="${card.waits}" table_of="${asData(card.table ?? "")}" attached="${card.attached.join(",")}"${card.own.length > 0 ? ` own_attached="${asData(card.own.map(nameForModel).join(", "))}"` : ""}>${asData(card.prompt)}</planned>`
           )
           .join("\n") +
         "\n</current_plan>\nThat's the plan the user is changing. Nothing in it has run. To keep one of its cards, changed or not, give it the same key. attached is the keys of what it gets from the user's attachments now. own_attached is what the user added on that card: it stays with the card if you keep its key, and goes back to the user if you leave the card out, and you can't give it to another card. Give a new card a key of its own."

@@ -207,6 +207,9 @@ export class EventManager {
     this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
       this.mainWindow.chats.decide(chatId, approvalId, allow, answer)
     );
+    this.handle("chat:allow-for-card", (chatId, approvalId) =>
+      typeof chatId === "string" && typeof approvalId === "string" ? this.mainWindow.chats.decide(chatId, approvalId, true, undefined, { forCard: true }) : false
+    );
 
     this.handle("chat:rename", (chatId, title) =>
       typeof title === "string" ? this.mainWindow.chats.rename(chatId, title) : false
@@ -221,6 +224,8 @@ export class EventManager {
     this.handle("nests:rename", (nestId, title) => nests.rename(nestId, title));
     this.handle("nests:menu", (nestId) => this.mainWindow.showNestMenu(nestId));
     this.handle("nests:add-card", (nestId, card) => nests.addCard(nestId, card));
+    this.handle("nests:add-input", (cardId, fromId, picked) => nests.addInput(cardId, fromId, picked));
+    this.handle("nests:retry-runs", (cardId, which, confirmed) => nests.retryRuns(cardId, which, confirmed));
     this.handle("nests:move-card", (cardId, x, y) => nests.moveCard(cardId, x, y));
     this.handle("nests:nudge-cards", (nestId, moves) => nests.nudgeCards(nestId, moves));
     this.handle("nests:set-bird", (cardId, mascotId) => nests.setBird(cardId, mascotId));

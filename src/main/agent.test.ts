@@ -107,7 +107,7 @@ describe("streamReply", () => {
       streamReply(
         [{ role: "user", content: "hi" }],
         new AbortController().signal,
-        { ...NO_TOOLS, onUsage: (tokens) => used.push(tokens) },
+        { ...NO_TOOLS, onUsage: (usage) => used.push(usage.total) },
         model as unknown as BaseChatModel
       )
     );
@@ -188,8 +188,95 @@ describe("a mascot's limits and approvals", () => {
     const run = vi.fn(async () => "clicked");
     const approve = vi.fn(async () => false);
     await reply(click({ refuses: async () => null }, run), approve);
-    expect(approve).toHaveBeenCalledWith("Click Delete");
+    expect(approve).toHaveBeenCalledWith("Click Delete", null);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  describe("Allow for this card's runs", () => {
+    // Clicks one button, then whichever the next calls name, as a run of a For-each card would.
+    const clicks = (...names: string[]) => {
+      const model = fakeModel();
+      names.forEach((name, index) => model.respond(new AIMessage({ content: "", tool_calls: [{ name: "click", args: { name }, id: `call-${index}` }] })));
+      return model.respond(new AIMessage({ content: "done" })) as unknown as BaseChatModel;
+    };
+    const button = (run = vi.fn(async () => "clicked"), lose?: () => boolean) =>
+      click({
+        schema: z.object({ name: z.string() }),
+        describe: async (args) => `Click the button “${(args as { name: string }).name}”`,
+        grantKey: async (args) => (lose?.() ? null : { key: `click ${(args as { name: string }).name}`, words: `clicking “${(args as { name: string }).name}”` }),
+        run,
+      });
+    const replyWith = (tool: PageTool, model: BaseChatModel, keys: Set<string> | null, approve: (text: string, grant?: { key: string } | null) => Promise<boolean>, steps: unknown[] = []) =>
+      collect(
+        streamReply(
+          [{ role: "user", content: "hi" }],
+          new AbortController().signal,
+          {
+            ...NO_TOOLS,
+            tools: [tool],
+            approve,
+            actionApproval: () => "risky",
+            ...(keys ? { granted: (key: string) => keys.has(key) } : {}),
+            onStep: (text, _shown, allowed) => {
+              steps.push([text, allowed]);
+              return () => {};
+            },
+          },
+          model
+        )
+      );
+
+    it("offers exactly the action asked about, and after it's granted the same action doesn't ask, while another does", async () => {
+      const keys = new Set<string>();
+      const run = vi.fn(async () => "clicked");
+      const steps: unknown[] = [];
+      const approve = vi.fn(async (text: string, grant?: { key: string } | null) => {
+        if (text.includes("Save draft") && grant) keys.add(grant.key);
+        return true;
+      });
+      await replyWith(button(run), clicks("Save draft", "Save draft", "Send"), keys, approve, steps);
+      expect(approve.mock.calls).toEqual([
+        ["Click the button “Save draft”", { key: "click Save draft", words: "clicking “Save draft”" }],
+        ["Click the button “Send”", { key: "click Send", words: "clicking “Send”" }],
+      ]);
+      expect(run).toHaveBeenCalledTimes(3);
+      // The first was allowed for the card's runs on its own card, and the second by that.
+      expect(steps).toEqual([
+        ["Clicked", "card"],
+        ["Clicked", "card"],
+        ["Clicked", "once"],
+      ]);
+    });
+
+    it("offers nothing outside a card's runs, or for an action with no exact key, and a grant never covers one", async () => {
+      const approve = vi.fn(async () => true);
+      await replyWith(button(), clicks("Save draft"), null, approve);
+      expect(approve).toHaveBeenCalledWith("Click the button “Save draft”", null);
+
+      const keys = new Set(["click Save draft"]);
+      const unmatched = vi.fn(async () => true);
+      await replyWith(button(undefined, () => true), clicks("Save draft"), keys, unmatched);
+      expect(unmatched).toHaveBeenCalledWith("Click the button “Save draft”", null);
+    });
+
+    it("asks again when the action stops matching between the check and the run", async () => {
+      // Covered when LangChain decided not to ask, then a different element by the time it runs: nothing happens.
+      let checks = 0;
+      const run = vi.fn(async () => "clicked");
+      const approve = vi.fn(async () => true);
+      await replyWith(button(run, () => checks++ > 0), clicks("Save draft"), new Set(["click Save draft"]), approve);
+      expect(approve).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it("doesn't widen a bird's limits: a refused action is refused even when granted", async () => {
+      const run = vi.fn(async () => "clicked");
+      const approve = vi.fn(async () => true);
+      const tool = { ...button(run), refuses: async () => ({ label: "Stayed off example.com", message: "Not allowed" }) };
+      await replyWith(tool, clicks("Save draft"), new Set(["click Save draft"]), approve);
+      expect(approve).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    });
   });
 
   it("refuses off its sites without a card, in every mode, and nothing runs", async () => {

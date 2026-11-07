@@ -1,6 +1,7 @@
 import type { ChatThread } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 import { latestAnswer } from "./nestContext";
+import { MAX_INPUTS } from "../shared/nestTable";
 
 // Berry plans a request in a Nest's composer as cards: this checks what the model laid out, and decides when each card of
 // a plan the user ran may start. It's pure, so the rules can be tested without a model or a window.
@@ -20,13 +21,14 @@ export interface PlanSource {
   table: boolean;
 }
 
-// One card of a valid plan. `from` is another card of the same plan, by its key, or a card on the board, by its id.
+// One card of a valid plan. `from` is what it reads from, in order, each another card of the same plan, by its key, or a
+// card on the board, by its id. For each row runs on the first of them with a table.
 export interface PlanCard {
   key: string;
   // Null for Berry, as on any card.
   mascotId: string | null;
   prompt: string;
-  from: { plan: string } | { card: string } | null;
+  from: ({ plan: string } | { card: string })[];
   each: boolean;
   waits: boolean;
   // What one row of the table in its answer will be, such as "companies", or null if its answer isn't a table.
@@ -57,13 +59,17 @@ export const checkPlan = (
 
   const onBoard = new Map(sources.map((source) => [source.key, source]));
   const keys = new Set<string>();
-  const cards: (PlanCard & { fromKey: string | null })[] = [];
+  const cards: (PlanCard & { fromKeys: string[] })[] = [];
   for (const card of raw.cards) {
     if (!isRecord(card)) return { ok: false, problem: NOT_A_PLAN };
     const { key, bird, prompt, from, for_each_row: each, waits_for_user: waits, table_of: tableOf, attached: given = [] } = card;
     if (typeof key !== "string" || !key || keys.has(key) || onBoard.has(key)) return { ok: false, problem: NOT_A_PLAN };
     if (typeof prompt !== "string" || typeof each !== "boolean" || typeof waits !== "boolean") return { ok: false, problem: NOT_A_PLAN };
-    if ((from !== null && typeof from !== "string") || (tableOf !== null && typeof tableOf !== "string")) return { ok: false, problem: NOT_A_PLAN };
+    // One card by its key, or several, or none.
+    const fromKeys = from === null ? [] : typeof from === "string" ? [from] : Array.isArray(from) && from.every((each: unknown) => typeof each === "string") ? (from as string[]) : null;
+    if (!fromKeys || (tableOf !== null && typeof tableOf !== "string")) return { ok: false, problem: NOT_A_PLAN };
+    if (fromKeys.length > MAX_INPUTS) return { ok: false, problem: `a card read from more than ${MAX_INPUTS} cards` };
+    if (new Set(fromKeys).size !== fromKeys.length) return { ok: false, problem: "a card read from the same card twice" };
     // Never Berry in place of a bird that isn't there, since Berry may do more than it.
     if (typeof bird !== "string" || !flock.includes(bird)) return { ok: false, problem: "it named a bird that isn’t in your flock" };
     const words = prompt.trim();
@@ -74,14 +80,15 @@ export const checkPlan = (
     }
     keys.add(key);
     const table = tableOf?.trim().slice(0, MAX_TABLE_OF_LENGTH) || null;
-    cards.push({ key, mascotId: bird === BERRY.id ? null : bird, prompt: words, from: null, fromKey: from, each, waits: waits && from !== null, table, attached: given as string[] });
+    cards.push({ key, mascotId: bird === BERRY.id ? null : bird, prompt: words, from: [], fromKeys, each, waits: waits && fromKeys.length > 0, table, attached: given as string[] });
   }
 
   for (const card of cards) {
-    if (card.fromKey === null) continue;
-    const source = onBoard.get(card.fromKey);
-    if (!keys.has(card.fromKey) && !source) return { ok: false, problem: "a line went to a card that isn’t there" };
-    card.from = source ? { card: source.cardId } : { plan: card.fromKey };
+    for (const fromKey of card.fromKeys) {
+      const source = onBoard.get(fromKey);
+      if (!keys.has(fromKey) && !source) return { ok: false, problem: "a line went to a card that isn’t there" };
+      card.from.push(source ? { card: source.cardId } : { plan: fromKey });
+    }
   }
 
   const ordered = inOrder(cards);
@@ -89,36 +96,46 @@ export const checkPlan = (
 
   for (const card of cards) {
     if (!card.each) continue;
-    const planned = card.fromKey === null ? undefined : cards.find((other) => other.key === card.fromKey);
     // A card that runs for each row answers with a table too: the one it ran on, with its own column added.
-    const table = card.fromKey !== null && (planned ? planned.each || planned.table !== null : onBoard.get(card.fromKey)?.table === true);
+    const table = card.fromKeys.some((fromKey) => {
+      const planned = cards.find((other) => other.key === fromKey);
+      return planned ? planned.each || planned.table !== null : onBoard.get(fromKey)?.table === true;
+    });
     if (!table) return { ok: false, problem: "For each row was on a card that doesn’t get a table" };
   }
 
-  return { ok: true, reply, ask: false, cards: ordered.map(({ fromKey: _, ...card }) => card) };
+  return { ok: true, reply, ask: false, cards: ordered.map(({ fromKeys: _, ...card }) => card) };
 };
 
-// Each card after the one it reads from, or null if they go round in a circle.
-const inOrder = <T extends { key: string; fromKey: string | null }>(cards: readonly T[]): T[] | null => {
+// Each card after every card it reads from, or null if they go round in a circle.
+const inOrder = <T extends { key: string; fromKeys: string[] }>(cards: readonly T[]): T[] | null => {
   const byKey = new Map(cards.map((card) => [card.key, card]));
   const done = new Set<string>();
+  const visiting = new Set<string>();
   const ordered: T[] = [];
-  for (const card of cards) {
-    const chain: T[] = [];
-    const seen = new Set<string>();
-    let at: T | undefined = card;
-    while (at && !done.has(at.key)) {
-      if (seen.has(at.key)) return null;
-      seen.add(at.key);
-      chain.unshift(at);
-      at = at.fromKey === null ? undefined : byKey.get(at.fromKey);
+  const visit = (card: T): boolean => {
+    if (done.has(card.key)) return true;
+    if (visiting.has(card.key)) return false;
+    visiting.add(card.key);
+    for (const fromKey of card.fromKeys) {
+      const source = byKey.get(fromKey);
+      if (source && !visit(source)) return false;
     }
-    for (const each of chain) {
-      done.add(each.key);
-      ordered.push(each);
-    }
-  }
-  return ordered;
+    visiting.delete(card.key);
+    done.add(card.key);
+    ordered.push(card);
+    return true;
+  };
+  return cards.every(visit) ? ordered : null;
+};
+
+// Where a card's sources stand together: it waits for every one, and doesn't start if any won't give an answer. The
+// first that won't says why.
+export const sourcesState = (states: readonly SourceState[]): SourceState => {
+  if (states.length === 0) return { kind: "none" };
+  const stopping = states.find((state) => state.kind === "held" || state.kind === "failed" || state.kind === "stopped" || state.kind === "silent");
+  if (stopping) return stopping;
+  return states.find((state) => state.kind === "planned" || state.kind === "running") ?? states[0];
 };
 
 // Where the card a planned card reads from is, once the plan has been run.
@@ -188,4 +205,27 @@ export const runsState = (
   if (each.includes("stopped")) return { kind: "stopped", name };
   if (each.some((kind) => kind !== "answered")) return { kind: "failed", name };
   return { kind: "answered", name };
+};
+
+// Which runs of a For-each card Retry and Start remaining go again, as the card names them: runs that started and
+// didn't finish, because they failed or were stopped, or couldn't start, and runs a stop or a restart kept from
+// starting. A run still going, or one that answered, is never in either.
+export const retryable = (
+  runs: readonly { id: string; state: "waiting" | "started" | "stopped" | "failed"; running: boolean; thread: Pick<ChatThread, "error" | "messages"> | null }[]
+): { unfinished: string[]; unstarted: string[] } => ({
+  unfinished: runs
+    .filter((run) => run.state === "failed" || (run.state === "started" && !run.running && run.thread !== null && ["failed", "stopped"].includes(replyState("", false, run.thread).kind)))
+    .map((run) => run.id),
+  unstarted: runs.filter((run) => run.state === "stopped").map((run) => run.id),
+});
+
+// Something the user allowed in one of these runs' threads, which going again may do again, as the step shows it.
+export const allowedBefore = (threads: readonly (Pick<ChatThread, "messages"> | null)[]): string | null => {
+  for (const thread of threads) {
+    for (const message of thread?.messages ?? []) {
+      const step = message.steps?.find((each) => each.allowed);
+      if (step) return step.shown ?? step.text;
+    }
+  }
+  return null;
 };
