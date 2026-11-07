@@ -467,6 +467,20 @@ test("a CSV file becomes a table card, For each row adds a column to it, a secon
       "\"Fjällbo, AB\",Omar Nilsson,Hiring post (https://linkedin.com/posts/fjallbo-1),\"Hej, a short note.\"\r\n" +
       "Brygga,Maja Lund,Hiring post (https://linkedin.com/posts/brygga-1),\"Hej, a short note.\"\r\n"
   );
+
+  // A longer file comes with the board as its first rows only, says how many more there are, and "2 more" brings the
+  // rest from main.
+  writeFileSync(join(folder, "seven.csv"), ["Company", ...Array.from({ length: 7 }, (_, index) => `Company ${index + 1}`)].join("\n"));
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [path] })) as never;
+  }, join(folder, "seven.csv"));
+  await chrome.getByRole("button", { name: "Add a file or note" }).last().click();
+  await chrome.getByRole("menuitem", { name: "Add a table from a file" }).click();
+  const seven = cards.filter({ hasText: "7 rows, 1 column" });
+  await expect(seven.locator("tbody tr")).toHaveCount(5);
+  await seven.getByRole("button", { name: "2 more" }).click();
+  await expect(seven.locator("tbody tr")).toHaveCount(7);
+  await expect(seven.locator("tbody tr").last()).toHaveText("Company 7");
 });
 
 test("a file and a note on a card go to its bird with the message, and a Word file is refused with why", async () => {

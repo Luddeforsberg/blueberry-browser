@@ -233,8 +233,11 @@ export class NestStore {
       (row) => this.toCard(row)
     );
     const lines = (
-      this.db.prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", picked FROM lines WHERE nest_id = ? ORDER BY rowid").all(id) as unknown as (Omit<NestLine, "picked"> & { picked: string | null })[]
-    ).map((line) => ({ ...line, picked: line.picked ? (JSON.parse(line.picked) as PickedRows) : null }));
+      // Only how many rows were picked, which could be a whole file's.
+      this.db
+        .prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", json_array_length(picked, '$.rows') AS picked FROM lines WHERE nest_id = ? ORDER BY rowid")
+        .all(id) as unknown as NestLine[]
+    ).map((line) => ({ ...line, picked: line.picked ?? null }));
     return { ...nest, cards, lines, talk: this.talk(id), attached: this.attachmentsOf({ nestId: id }) };
   }
 

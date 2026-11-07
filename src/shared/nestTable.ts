@@ -194,6 +194,8 @@ export type Crossing =
 
 // On every line: what crosses as it is, and what each run gets when For each row is on, or null where it can't be.
 export interface LineCrossing {
+  // The rows picked on it aren't all in its source's table any more, so it gives nothing.
+  stale: boolean;
   whole: Crossing | null;
   // `cut` when a row is too long to go whole, so it's cut to the first characters that fit.
   each: { rows: number; columns: number; cut?: boolean } | null;

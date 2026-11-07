@@ -213,6 +213,8 @@ describe("Nests", () => {
     replies.push(TABLE(2));
     await sendAndWait(scout.id, "Again");
     expect(nests.inputFor(writer.id)).toEqual({ problem: expect.stringContaining("aren’t in that card’s latest answer") });
+    // The board says so, since it no longer carries the rows for the card to check.
+    expect(nests.board(nest)!.lines[0]).toMatchObject({ picked: 2, crosses: { stale: true, whole: null, each: null } });
     expect(nests.send(writer.id, "Once more")).toBeNull();
     expect(sent).toHaveLength(3);
   });
@@ -334,6 +336,7 @@ describe("Nests", () => {
 
     const reader = nests.addCard(nest, { x: 1000, y: 0, from: writerCard.id })!;
     expect(nests.board(nest)!.lines.find((line) => line.to === reader.id)!.crosses).toEqual({
+      stale: false,
       whole: { kind: "table", rows: 2, columns: 3, leftOut: 0 },
       each: { rows: 2, columns: 3, cut: false },
     });
@@ -476,6 +479,11 @@ describe("Nests", () => {
     expect(nests.moveCard(tableId, 40, 40)).toBe(true);
     nests.board(nest);
     expect(rows).not.toHaveBeenCalled();
+    // Rows picked from it go with the board as how many there are, and whether they're still there, never the rows.
+    const picked = nests.addCard(nest, { x: 1200, y: 0, from: tableId, picked: { header: ["Company", "Notes"], rows: nests.tableRows(tableId)! } })!;
+    const withPick = nests.board(nest)!;
+    expect(withPick.lines.find((line) => line.to === picked.id)).toMatchObject({ picked: 2000, crosses: { stale: false } });
+    expect(JSON.stringify(withPick).length).toBeLessThan(20_000);
     // The whole table is a call away, for the card opened and for export.
     expect(nests.tableRows(tableId)).toHaveLength(2000);
     expect(nests.exportOf(tableId)!.table.rows).toHaveLength(2000);
@@ -500,9 +508,11 @@ describe("Nests", () => {
     // Rows picked from it go across as rows from a file, and For each row runs on its rows.
     const picked = nests.addCard(nest, { x: 500, y: 0, from: tableCard.id, picked: { header: ["Company", "Site"], rows: [["Brygga, AB", "brygga.se"]] } })!;
     expect(nests.board(nest)!.lines.find((line) => line.to === picked.id)!.crosses).toEqual({
+      stale: false,
       whole: { kind: "table", rows: 1, columns: 2, leftOut: 0 },
       each: { rows: 1, columns: 2, cut: false },
     });
+    expect(nests.board(nest)!.lines.find((line) => line.to === picked.id)!.picked).toBe(1);
     await sendAndWait(picked.id, "Who leads sales?");
     expect(newest(sent.at(-1)!)).toContain("the rows the user picked from the table in the file leads");
 
@@ -534,11 +544,11 @@ describe("Nests", () => {
     expect(crosses()).toBeNull();
     await release();
     held = null;
-    expect(crosses()).toEqual({ whole: { kind: "answer", words: 4, cutTo: null }, each: null });
+    expect(crosses()).toEqual({ stale: false, whole: { kind: "answer", words: 4, cutTo: null }, each: null });
 
     replies.push("word ".repeat(3000));
     await sendAndWait(scout.id, "More");
-    expect(crosses()).toEqual({ whole: { kind: "answer", words: 3000, cutTo: 12000 }, each: null });
+    expect(crosses()).toEqual({ stale: false, whole: { kind: "answer", words: 3000, cutTo: 12000 }, each: null });
 
     const rows = ["| Company | Note |", "|---|---|", ...Array.from({ length: 60 }, (_, index) => `| Company ${index} | ${"x".repeat(300)} |`)].join("\n");
     replies.push(rows);

@@ -96,8 +96,8 @@ export const tableFromFile = (name: string, bytes: Uint8Array): TableFile => {
   if (bytes.length > MAX_TABLE_BYTES) return { ok: false, error: `${name} is more than the 2 MB a table can be.` };
   if (bytes.includes(0)) return { ok: false, error: `${name} doesn’t look like a ${kind.toUpperCase()} file.` };
   const text = decode(bytes);
-  // The first line is the header, even with nothing in its cells, and a row with nothing in its cells is no row.
-  const lines = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text)).filter((cells, index) => index === 0 || cells.some((cell) => cell.trim() !== ""));
+  // The first line is the header, even with nothing in its cells, and every line after it with anything on it is a row.
+  const lines = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text));
   if (lines.length < 2) return { ok: false, error: `${name} has no rows under its first line.` };
   // Counted without spreading, since a file far past the row limit can have more lines than a call takes arguments.
   const columns = lines.reduce((most, cells) => Math.max(most, cells.length), 0);

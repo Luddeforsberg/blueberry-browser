@@ -177,13 +177,14 @@ export class Nests {
   // would, such as before the source has answered.
   private crossing(cardId: string): LineCrossing | null {
     const input = this.inputFor(cardId);
+    if ("problem" in input) return { stale: true, whole: null, each: null };
     const rows = this.rowsFor(cardId);
-    const whole = "answer" in input && input.answer ? crossingOf(input.answer) : null;
+    const whole = input.answer ? crossingOf(input.answer) : null;
     const each =
       "problem" in rows
         ? null
         : { rows: rows.rows.length, columns: rows.header.length, cut: rowTooLong(rows.header, rows.rows) };
-    return whole || each ? { whole, each } : null;
+    return whole || each ? { stale: false, whole, each } : null;
   }
 
   title(id: string): string | null {

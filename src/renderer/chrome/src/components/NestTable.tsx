@@ -36,6 +36,14 @@ export const CellText: React.FC<{ cell: string }> = ({ cell }) => (
     </>
 )
 
+// Rows a For-each card reading from this table is working on right now, by index, with who: "Writer is here". `outside`
+// is any being worked on that isn't among the rows here, when only the first rows are.
+export interface WorkingRows {
+    who: string
+    rows: ReadonlyMap<number, string>
+    outside?: { who: string; name: string }[]
+}
+
 // A table on a card: its last column drawn by the card, such as a For-each card's own, where each cell is a row's value
 // or how its run is going.
 export interface OwnColumn {
@@ -52,24 +60,27 @@ export const TableResult: React.FC<{
     onPick: (index: number, mode: PickMode) => void
     // Rows a For-each card is working on right now, by index, with who: "Writer is here". Its column is kept while any
     // For-each card reads from this table, so the table doesn't shift as runs start and end.
-    here?: { who: string; rows: ReadonlyMap<number, string> } | null
+    here?: WorkingRows | null
     own?: OwnColumn
     every?: boolean
-}> = ({ table, selected, onPick, here = null, own, every = false }) => {
+    // How many rows the whole table has, when only its first are here, and what asks for the rest once "N more" opens.
+    total?: number
+    onMore?: () => void
+}> = ({ table, selected, onPick, here = null, own, every = false, total, onMore }) => {
     const [more, setMore] = useState(false)
     const all = every || more
-    const hidden = every ? 0 : Math.max(0, table.rows.length - ROWS_SHOWN)
+    const hidden = every ? 0 : Math.max(0, (total ?? table.rows.length) - ROWS_SHOWN)
     const rows = all ? table.rows : table.rows.slice(0, ROWS_SHOWN)
     const last = table.header.length - 1
     const picked = selected?.length ?? 0
     // Rows being worked on out of sight, below "N more", are named in the footer instead.
-    const below = here ? [...here.rows.keys()].filter((index) => index >= rows.length) : []
-    const belowLine =
-        here && below.length > 0
-            ? below.length === 1
-                ? `${here.rows.get(below[0])} is on ${plainCell(table.rows[below[0]][0] ?? '')}`
-                : `${here.who} is on ${below.length} rows below`
-            : null
+    const below = here
+        ? [
+              ...[...here.rows].filter(([index]) => index >= rows.length).map(([index, who]) => ({ who, name: plainCell(table.rows[index][0] ?? '') })),
+              ...(here.outside ?? [])
+          ]
+        : []
+    const belowLine = here && below.length > 0 ? (below.length === 1 ? `${below[0].who} is on ${below[0].name}` : `${here.who} is on ${below.length} rows below`) : null
     return (
         <div className="flex flex-col">
             {table.before && <p className="px-5 pb-3 text-13 text-muted-foreground line-clamp-2">{plainCell(table.before)}</p>}
@@ -135,7 +146,10 @@ export const TableResult: React.FC<{
                     {hidden > 0 && (
                         <button
                             type="button"
-                            onClick={() => setMore(!more)}
+                            onClick={() => {
+                                if (!more) onMore?.()
+                                setMore(!more)
+                            }}
                             className="-mx-1 px-1 h-6 rounded-control text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             {all ? 'Show fewer' : `${hidden} more`}

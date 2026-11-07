@@ -73,6 +73,10 @@ describe("parseCell", () => {
     expect(links(parseCell("[x [y](https://a.example) z](https://b.example)", answer))).toEqual([]);
     expect(links(parseCell("[[[Go](https://a.example)](https://b.example)](https://c.example) https://d.example", answer))).toEqual([]);
     expect(parseCell("[](https://outer.example)", answer)).toBe("outer.example");
+    // Cut, a kept link becomes its words, which mustn't hold an address of their own.
+    const cut = parseCell(`[https://evil.example go](https://safe.example/about) ${"word ".repeat(30)}`, answer);
+    expect(links(cut)).toEqual([]);
+    expect(cut).toContain("evil.example go");
   });
 
   it("never leaves an address at the cut, where it would link somewhere the answer doesn't give", () => {

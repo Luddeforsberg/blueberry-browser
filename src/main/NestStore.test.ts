@@ -196,7 +196,7 @@ describe("NestStore", () => {
     expect(store.nests().map(({ title }) => title)).toEqual(["Renamed", "Newer"]);
   });
 
-  it("keeps the rows picked for a line as they were", () => {
+  it("keeps the rows picked for a line as they were, and sends only how many with the board", () => {
     const store = new NestStore(":memory:");
     const nest = store.createNest("Nest");
     const source = store.addCard(nest, { x: 0, y: 0 })!;
@@ -204,7 +204,10 @@ describe("NestStore", () => {
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
 
     expect(store.lineTo(next.id)).toEqual({ source: expect.objectContaining({ id: source.id }), picked });
-    expect(store.board(nest)?.lines[0].picked).toEqual(picked);
+    // The board carries only how many, and a line with none picked says so.
+    expect(store.board(nest)?.lines[0].picked).toBe(2);
+    store.addCard(nest, { x: 0, y: 0, from: source.id });
+    expect(store.board(nest)?.lines[1].picked).toBeNull();
   });
 
   it("makes a draft a For-each card once, with a waiting run for each row, and starts each run only once", () => {

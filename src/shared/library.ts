@@ -1,7 +1,7 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
 // All of it is saved locally.
 
-import type { LineCrossing, PickedRows } from "./nestTable";
+import type { LineCrossing } from "./nestTable";
 
 export interface Bookmark {
   id: string;
@@ -529,7 +529,8 @@ export interface NestLine {
   id: string;
   from: string;
   to: string;
-  picked: PickedRows | null;
+  // How many rows the user picked, or null for the whole answer. The rows stay in main, which checks them.
+  picked: number | null;
   // Exactly what crosses it now, counted from what would be sent. Null until the source has something to give.
   crosses?: LineCrossing | null;
 }

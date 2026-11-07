@@ -61,6 +61,16 @@ const MARKDOWN_LINK = /\[([^\]]*)\]\(([^)\s]+)\)/g;
 // Every address in it as only its site.
 const siteOnly = (text: string) => text.replace(/https?:\/\/[^\s<>|)\]]+/g, (address) => address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]);
 
+// No link of any kind: every markdown link its words, until none is left, and every address only its site.
+const wordsOnly = (text: string) => {
+  let words = text;
+  for (let before = ""; before !== words; ) {
+    before = words;
+    words = plainCell(words);
+  }
+  return siteOnly(words);
+};
+
 // Every web address in an answer, as a link's target or written out, without the full stop or comma after one.
 const addressesIn = (answer: string): Set<string> =>
   new Set([...answer.matchAll(/\]\(([^)\s]+)\)|(https?:\/\/[^\s<>|)\]]+)/g)].map(([, target, bare]) => (target ?? bare.replace(/[.,;:!?]+$/, ""))));
@@ -101,11 +111,12 @@ export const parseCell = (reply: string, answer: string): string | null => {
   });
   text = text.replace(new RegExp(`${KEPT}(\\d+)${KEPT}`, "g"), (_, index: string) => kept[Number(index)]);
   text = text.replace(/\s+/g, " ").trim();
-  // Read as the card reads it, it links only where the answer does, or it's words alone.
-  if (cellParts(text).some((part) => part.href && !allowed.has(part.href))) text = siteOnly(plainCell(text));
-  if (!text || text.toUpperCase() === "NONE") return null;
   // Cut, it keeps only words, since a link cut short would go nowhere.
-  return text.length > MAX_CELL_LENGTH ? cut(plainCell(text), MAX_CELL_LENGTH) : text;
+  if (text.length > MAX_CELL_LENGTH) text = cut(plainCell(text), MAX_CELL_LENGTH);
+  // Read as the card reads it, the value as it will be kept links only where the answer does, or it's words alone.
+  if (cellParts(text).some((part) => part.href && !allowed.has(part.href))) text = wordsOnly(text);
+  if (!text || text.toUpperCase() === "NONE") return null;
+  return text;
 };
 
 // Without the cheap model, or when it fails: the answer's first line with words, cut to fit.

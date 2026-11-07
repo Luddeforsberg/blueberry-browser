@@ -53,7 +53,7 @@ describe("tableFromFile", () => {
   it("keeps a first line of empty cells as the header, naming each column by its place, and cuts a name far too long", () => {
     expect(tableFromFile("a.csv", bytes(",,\nAcme,42,CEO\n,,\nBrygga,23,CFO"))).toEqual({
       ok: true,
-      table: { name: "a", header: ["Column 1", "Column 2", "Column 3"], rows: [["Acme", "42", "CEO"], ["Brygga", "23", "CFO"]] },
+      table: { name: "a", header: ["Column 1", "Column 2", "Column 3"], rows: [["Acme", "42", "CEO"], ["", "", ""], ["Brygga", "23", "CFO"]] },
     });
     const long = tableFromFile("a.csv", bytes(`${"n".repeat(13000)}\n1`));
     expect(long.ok && long.table.header[0]).toBe(`${"n".repeat(99)}…`);
@@ -64,6 +64,9 @@ describe("tableFromFile", () => {
       ok: true,
       table: { name: "a", header: ["Column 1"], rows: [["Acme"], ["Brygga"]] },
     });
+    // A quoted empty cell is a row too: only a line with nothing on it at all is skipped.
+    expect(tableFromFile("a.csv", bytes('Name\r\n""\r\nAcme\r\n'))).toMatchObject({ ok: true, table: { rows: [[""], ["Acme"]] } });
+    expect(tableFromFile("a.csv", bytes('Name\r\n""\r\n'))).toMatchObject({ ok: true, table: { rows: [[""]] } });
   });
 
   it("reads a TSV by its tabs, and a file saved by Excel in its Windows code page", () => {

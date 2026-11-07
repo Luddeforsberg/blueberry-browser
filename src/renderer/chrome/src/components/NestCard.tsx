@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useLayoutEffect, us
 import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import { ArrowLeft, GitFork, Maximize2, Minimize2, Table2, X } from 'lucide-react'
 import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
-import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
+import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
@@ -16,7 +16,7 @@ import { AddMenu, ChatComposer, Composer } from './Composer'
 import { Attachments, useAttaching } from './NestAttachments'
 import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
-import { CellText, TableMenu, TableResult, type PickMode } from './NestTable'
+import { CellText, TableMenu, TableResult, type PickMode, type WorkingRows } from './NestTable'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 export type LineEdge = Edge<{ draft: boolean }, 'line'>
@@ -312,7 +312,7 @@ const LooksRight: React.FC<{ cardId: string }> = ({ cardId }) => {
 
 // What a card on a line gets, in the words its header and reply field use.
 const getsWhat = (line: NestLine | null, sourceName: string, file = false) =>
-    line?.picked ? `${plural(line.picked.rows.length, 'row')} from ${sourceName}` : file ? `every row of ${sourceName}` : `${sourceName}’s latest answer`
+    line?.picked ? `${plural(line.picked, 'row')} from ${sourceName}` : file ? `every row of ${sourceName}` : `${sourceName}’s latest answer`
 
 // What a sent card got, exactly, as main counts what crosses: "With Scout’s answer, about 900 words".
 const withWhat = (line: NestLine | null, sourceName: string, file = false) =>
@@ -334,8 +334,9 @@ const Working: React.FC<{ thread: ChatThread }> = ({ thread }) => {
     return <p role="status" className="text-14 line-clamp-2"><span className={SHIMMER_TEXT}>{step.shown ?? step.text}</span></p>
 }
 
-// The rows of this card's table that For-each cards reading from it are working on right now, with who.
-const useWorkingRows = (cardId: string, table: PickedRows | null): { who: string; rows: Map<number, string> } | null => {
+// The rows of this card's table that For-each cards reading from it are working on right now, with who. With `some`,
+// the table is only its first rows, and a row being worked on past them is named as outside.
+const useWorkingRows = (cardId: string, table: PickedRows | null, some = false): WorkingRows | null => {
     const board = useBoard()
     const { find } = useFlock()
     const berryName = useAssistantName()
@@ -346,13 +347,16 @@ const useWorkingRows = (cardId: string, table: PickedRows | null): { who: string
     const keyOf = (row: readonly string[]) => JSON.stringify(row)
     const index = new Map(table.rows.map((row, at) => [keyOf(row), at]))
     const rows = new Map<number, string>()
+    const outside: WorkingRows['outside'] = []
     for (const card of cards) {
         for (const run of card.each?.runs ?? []) {
+            if (!run.chatId || threads[run.chatId]?.partial == null) continue
             const at = index.get(keyOf(run.row))
-            if (at !== undefined && run.chatId && threads[run.chatId]?.partial != null) rows.set(at, nameOf(card))
+            if (at !== undefined) rows.set(at, nameOf(card))
+            else if (some) outside.push({ who: nameOf(card), name: rowName(run.row) })
         }
     }
-    return { who: nameOf(cards[0]), rows }
+    return { who: nameOf(cards[0]), rows, outside }
 }
 
 // The latest answer in the chat's own markdown, cut to a height that keeps the board readable, with the rest a press away.
@@ -446,20 +450,19 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const [text, setText] = useState(() => draftText(card.id) || (card.plan?.prompt ?? ''))
     const source = board.sourceOf(card.id)
     const line = board.lineInto(card.id)
+    // How many rows were picked: the rows stay in main, which says when they've gone from the source.
     const picked = line?.picked ?? null
     const sourceName = useSourceName(source)
     const sourceThread = useCardThread(source?.chatId ?? null)
     const sourceAnswer = savedAnswer(sourceThread)
-    // The table it reads from: a For-each card's with its column, or the one in the source's latest answer. A file's
-    // never changes, and only its size is needed here.
-    const sourceTable = useMemo<PickedRows | null>(
-        () => (source?.each ? combinedTable(source.each) : sourceAnswer ? findTable(sourceAnswer) : null),
-        [source?.each, sourceAnswer]
+    // How many rows the table it reads from has: a file's, a For-each card's, or the one in the source's latest answer.
+    const sourceRows = useMemo(
+        () => (source?.table ? source.table.count : source?.each ? source.each.runs.length : sourceAnswer ? (findTable(sourceAnswer)?.rows.length ?? 0) : 0),
+        [source?.table, source?.each, sourceAnswer]
     )
     const sourceAnswered = source?.table ? true : source?.each ? source.each.runs.some((run) => run.cell !== null) : !!sourceAnswer
-    const stale = !!picked && !source?.table && (!!sourceThread || !!source?.each) && missingRows(picked, sourceTable).length > 0
-    const sourceRows = source?.table ? source.table.count : (sourceTable?.rows.length ?? 0)
-    const rowCount = picked ? picked.rows.length : sourceRows
+    const stale = picked !== null && !!line?.crosses?.stale
+    const rowCount = picked ?? sourceRows
     const canEach = !!source && (picked !== null || sourceRows > 0)
     const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? (picked !== null || !!card.plan?.each))
     const forEach = canEach && eachOn
@@ -492,7 +495,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
         : picked
           ? stale
               ? `${sourceName}’s rows have changed`
-              : `gets ${plural(picked.rows.length, 'row')} from ${sourceName}`
+              : `gets ${plural(picked, 'row')} from ${sourceName}`
           : source.table
             ? `gets every row of ${sourceName}`
             : source.each
@@ -730,7 +733,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     const key = useMemo(() => JSON.stringify(table), [table])
     const selected = useTablePick(card.id, key)
     const here = useWorkingRows(card.id, table)
-    const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${source.table ? sourceName : `${sourceName}’s table`}`) : 'For each row'
+    const from = source ? (line?.picked ? `For each of ${plural(line.picked, 'row')} from ${sourceName}` : `For each row of ${source.table ? sourceName : `${sourceName}’s table`}`) : 'For each row'
     const openRunOf = (id: string) => {
         setOpenRun(id)
         board.setOpen(card.id, id)
@@ -825,37 +828,23 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     )
 }
 
-// A file's whole table, asked of main once and kept, since it never changes. Until it comes, the board's first rows.
-const fileRows = new Map<string, string[][]>()
-const useFileRows = (cardId: string, file: NestTableFile): string[][] | null => {
-    const { samples } = useBoard()
-    const whole = file.rows.length === file.count && file.rows.every((row) => row.every((cell) => cell.length < PREVIEW_CELL_LENGTH))
-    const [rows, setRows] = useState(() => (samples || whole ? file.rows : (fileRows.get(cardId) ?? null)))
-    useEffect(() => {
-        if (rows) return undefined
-        let current = true
-        void window.chromeAPI.nests.tableRows(cardId).then((loaded) => {
-            if (!loaded) return
-            fileRows.set(cardId, loaded)
-            if (current) setRows(loaded)
-        })
-        return () => {
-            current = false
-        }
-    }, [cardId, rows])
-    return rows
-}
-
 // A table from a file the user added: its rows, owned by the user, with no chat and no bird. Its rows can be picked and a
 // line pulled out of them, and For each row works on it like any table.
 const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, file }) => {
     const board = useBoard()
-    const rows = useFileRows(card.id, file)
+    // A board carries only the first rows, each cell cut. The whole table is asked of main once, when "N more" opens it.
+    const [rows, setRows] = useState<string[][] | null>(null)
+    const loadRows = async () => {
+        if (rows) return
+        const loaded = await window.chromeAPI.nests.tableRows(card.id)
+        if (loaded) setRows(loaded)
+    }
     const table = useMemo(() => ({ header: file.header, rows: rows ?? file.rows }), [file, rows])
-    // Rows can be picked once the whole table is here, so what's picked is what main has.
     const picked = useTablePick(card.id, 'file')
-    const selected = rows ? picked : null
-    const here = useWorkingRows(card.id, table)
+    // Rows can be picked where they're whole, so what's picked is what main has.
+    const whole = rows !== null || file.rows.every((row) => row.every((cell) => cell.length < PREVIEW_CELL_LENGTH))
+    const selected = whole ? picked : null
+    const here = useWorkingRows(card.id, table, rows === null && file.count > file.rows.length)
     const label = picked.length > 0 ? pullLabel('', picked.length) : `Pull a new card out of ${file.name}`
     return (
         <div className={cn(CARD_SHELL, "shadow-selected")} style={{ width: CARD_WIDTH }}>
@@ -879,7 +868,14 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
                 </span>
             </div>
             <div className={cn("nodrag cursor-auto overflow-hidden", board.waitingOn(card.id).length === 0 && "rounded-b-panel")}>
-                <TableResult table={table} selected={selected} onPick={(index, mode) => board.pick(card.id, 'file', table, index, mode)} here={here} />
+                <TableResult
+                    table={table}
+                    total={file.count}
+                    onMore={() => void loadRows()}
+                    selected={selected}
+                    onPick={(index, mode) => board.pick(card.id, 'file', table, index, mode)}
+                    here={here}
+                />
             </div>
             <LooksRight cardId={card.id} />
         </div>
