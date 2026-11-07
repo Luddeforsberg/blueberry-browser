@@ -60,6 +60,12 @@ In Strawberry, work starts inside the browser, but most work happens in other ap
 
 https://github.com/user-attachments/assets/41e38ba9-bc74-4f5c-8847-5d0c17a92315
 
+### Next: Nests, instead of chat threads
+
+Work with AI agents still happens in chat threads. Each thread starts from zero, so you explain the job again every time you open a new one, and five jobs running at once means five threads to scroll through. I'm trying a different shape on the [`nest`](https://github.com/Luddeforsberg/blueberry-browser/tree/nest) branch. A Nest is a board where each card is one bird's chat. A line from one card to the next means the second continues from the first, with everything the cards before it found. Ask for something bigger and Berry lays it out as cards you can change before anything runs. A card with a table can run once for each row, and the board keeps growing over days rather than finishing. It's still being built, so it isn't on `main` yet.
+
+To try it: `git checkout nest`, then follow [Running it](#running-it).
+
 ### The rest
 
 The flock itself, routines on a schedule, jobs that work in tabs behind yours with a live picture of them beside the chat, and birds that keep a habit only when you say yes and show every word they keep. Strawberry has all of these, and they work much the same here. Blueberry needs them because everything above is built on them. The same goes for the safety rules below, which every AI browser needs.
