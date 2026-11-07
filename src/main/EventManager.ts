@@ -225,9 +225,9 @@ export class EventManager {
     this.handle("nests:nudge-cards", (nestId, moves) => nests.nudgeCards(nestId, moves));
     this.handle("nests:set-bird", (cardId, mascotId) => nests.setBird(cardId, mascotId));
     this.handle("nests:delete-card", (cardId) => this.mainWindow.confirmDeleteCard(cardId));
-    this.handle("nests:send", (cardId, text) => nests.send(cardId, text));
+    this.handle("nests:send", (cardId, text) => nests.sendCard(cardId, text));
     this.handle("nests:send-each", (cardId, text) => nests.sendEach(cardId, text));
-    this.handle("nests:send-run", (runId, text) => nests.sendRun(runId, text));
+    this.handle("nests:send-run", (runId, text) => nests.sendRunReply(runId, text));
     this.handle("nests:stop-card", (cardId) => nests.stopCard(cardId));
     this.handle("nests:ask", (nestId, text, options) => nests.ask(nestId, text, options));
     this.handle("nests:edit-plan", (cardId, change) => nests.editPlanned(cardId, change));

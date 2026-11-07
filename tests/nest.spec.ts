@@ -481,6 +481,24 @@ test("a CSV file becomes a table card, For each row adds a column to it, a secon
   await seven.getByRole("button", { name: "2 more" }).click();
   await expect(seven.locator("tbody tr")).toHaveCount(7);
   await expect(seven.locator("tbody tr").last()).toHaveText("Company 7");
+
+  // A short file with a cell too long for the board's first rows has no "N more", and its rows can still be picked: the
+  // first press brings the whole table, and the line takes the row as it really is.
+  const note = "n".repeat(300);
+  writeFileSync(join(folder, "long.csv"), `Company,Note\nFjällbo,${note}\nBrygga,short`);
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [path] })) as never;
+  }, join(folder, "long.csv"));
+  await chrome.getByRole("button", { name: "Add a file or note" }).last().click();
+  await chrome.getByRole("menuitem", { name: "Add a table from a file" }).click();
+  const long = cards.filter({ hasText: "2 rows, 2 columns" });
+  await expect(long.getByRole("button", { name: /more$/ })).toHaveCount(0);
+  await long.locator("tbody tr").first().click();
+  await expect(long.getByText("1 selected")).toBeVisible();
+  await expect(long.locator("tbody tr").first().locator("td").nth(1)).toHaveAttribute("title", note);
+  await long.hover();
+  await long.getByLabel("Pull a new card out of the 1 selected row").click();
+  await expect(cards.filter({ hasText: "gets 1 row from long" })).toHaveCount(1);
 });
 
 test("a file and a note on a card go to its bird with the message, and a Word file is refused with why", async () => {

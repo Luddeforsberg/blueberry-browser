@@ -8,6 +8,7 @@ import type { PageTool } from "./browserTools";
 import type { MascotProfile, NestBoard } from "../shared/library";
 import type { NestWriter } from "./nestCells";
 import { BERRY } from "../shared/mascots";
+import { STALE_ROWS } from "../shared/nestTable";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -434,6 +435,56 @@ describe("Nests", () => {
     writes[1]("Value for C");
     await settle();
     expect(store.run(runId)!.cell).toBe("Value for C");
+  });
+
+  it("keeps no link in a cell the answer doesn't give, whether the writer, the fallback or the answer itself made it", async () => {
+    let written: string | null = "[Post](https://evil.example/collect)";
+    const writer: NestWriter = { column: async () => null, cell: async () => written };
+    const { nests, sendAndWait, store, replyEnded } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("See https://example.com/foo_bar_baz first\nthen more");
+    nests.sendEach(card.id, "Find a post");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const runId = store.card(card.id)!.each!.runs[0].id;
+    expect(store.run(runId)!.cell).toBe("Post");
+
+    // With nothing from the writer, the answer's first line, without the address its underscores would have become.
+    written = null;
+    const ended = replyEnded();
+    replies.push("See https://example.com/foo_bar_baz first\nthen more");
+    nests.sendRun(runId, "Again");
+    await ended;
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(store.run(runId)!.cell).toBe("See example.com first");
+  });
+
+  it("tells the board as soon as a run's follow-up clears its value, and a refused send says why", async () => {
+    const { nests, sendAndWait, store, boards } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Hej one");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const picked = { header: ["Company", "People", "Result"], rows: [["Company 1", "10", "Hej one"]] };
+    const draft = nests.addCard(nest, { x: 1000, y: 0, from: card.id, picked })!;
+    expect(nests.sendCard(draft.id, "")).toEqual({ ok: false, error: "Write what to do first." });
+
+    held = [];
+    nests.sendRun(store.card(card.id)!.each!.runs[0].id, "Shorter");
+    // While the follow-up runs, the rows picked from its old value aren't there, and the board says so at once.
+    expect(boards.at(-1)!.lines.find((line) => line.to === draft.id)!.crosses).toMatchObject({ stale: true });
+    expect(nests.sendCard(draft.id, "Use these")).toEqual({ ok: false, error: STALE_ROWS });
+    expect(nests.sendCard("gone", "Use these")).toEqual({ ok: false, error: "This card isn’t there any more." });
+    expect(nests.sendRunReply("gone", "Again")).toEqual({ ok: false, error: "That run isn’t there any more." });
+    await release();
+    held = null;
   });
 
   it("starts no card of a run plan after a For-each card stopped while its values were still being written", async () => {

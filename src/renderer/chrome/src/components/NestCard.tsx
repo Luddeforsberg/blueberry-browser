@@ -4,6 +4,7 @@ import { ArrowLeft, GitFork, Maximize2, Minimize2, Table2, X } from 'lucide-reac
 import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
 import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
+import type { NestSendEachResult } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
@@ -254,7 +255,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     <WholeChat
                         thread={thread}
                         mascot={mascot}
-                        onSend={(text) => void window.chromeAPI.nests.send(card.id, text)}
+                        onSend={(text) => window.chromeAPI.nests.send(card.id, text)}
                         note={source ? `Gets ${getsWhat(board.lineInto(card.id), sourceName)} when you send` : null}
                     />
                 ) : (
@@ -390,8 +391,9 @@ const CutReply: React.FC<{ text: string; onMore: () => void }> = ({ text, onMore
     )
 }
 
-// The card opened: its whole chat, as the chat page draws it, and a field to reply in. `note` says what goes with a reply.
-const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => void; note: string | null; bordered?: boolean }> = ({
+// The card opened: its whole chat, as the chat page draws it, and a field to reply in. `note` says what goes with a reply,
+// and why a reply couldn't be sent shows in its place.
+const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => Promise<NestSendEachResult>; note: string | null; bordered?: boolean }> = ({
     thread,
     mascot,
     onSend,
@@ -399,6 +401,7 @@ const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (
     bordered = true
 }) => {
     const name = useAssistantName(mascot)
+    const [problem, setProblem] = useState<string | null>(null)
     const running = thread.partial != null
     const messages = running ? [...thread.messages, { role: 'assistant' as const, content: thread.partial ?? '', steps: thread.steps, memoryIds: thread.memoryIds }] : thread.messages
     return (
@@ -427,11 +430,21 @@ const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (
             </div>
             <div className="px-3 pb-3">
                 <ChatComposer
-                    onSend={onSend}
+                    onSend={async (text) => {
+                        setProblem(null)
+                        const result = await onSend(text)
+                        if (!result.ok) setProblem(result.error)
+                    }}
                     disabled={running}
                     onStop={running ? () => void window.chromeAPI.chat.stop(thread.id) : undefined}
                     placeholder={`Reply to ${name}`}
-                    attachment={note && <p className="px-2 text-12 text-muted-foreground">{note}</p>}
+                    attachment={
+                        problem ? (
+                            <p role="alert" className="px-2 text-12 text-destructive">{problem}</p>
+                        ) : (
+                            note && <p className="px-2 text-12 text-muted-foreground">{note}</p>
+                        )
+                    }
                     autoFocus
                 />
             </div>
@@ -482,12 +495,12 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
         setSending(true)
         setProblem(null)
         const api = window.chromeAPI.nests
-        const result = forEach ? await api.sendEach(card.id, text.trim()) : { ok: (await api.send(card.id, text.trim())) !== null, error: null }
+        const result = forEach ? await api.sendEach(card.id, text.trim()) : await api.send(card.id, text.trim())
         setSending(false)
         if (result.ok) {
             setDraftText(card.id, '')
             draftEach.delete(card.id)
-        } else if (result.error) setProblem(result.error)
+        } else setProblem(result.error)
     }
 
     const gets = !source
@@ -793,7 +806,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                         thread={shownRun.thread}
                         mascot={mascot}
                         bordered={false}
-                        onSend={(text) => void window.chromeAPI.nests.sendRun(shownRun.id, text)}
+                        onSend={(text) => window.chromeAPI.nests.sendRun(shownRun.id, text)}
                         note={`Gets its row${source ? ` from ${sourceName}` : ''} again when you send`}
                     />
                 </div>
@@ -832,20 +845,24 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
 // line pulled out of them, and For each row works on it like any table.
 const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, file }) => {
     const board = useBoard()
-    // A board carries only the first rows, each cell cut. The whole table is asked of main once, when "N more" opens it.
+    // A board carries only the first rows, each cell cut. The whole table is asked of main once, when "N more" opens it,
+    // or when a row is first pressed while one of the first rows was cut, so what's picked is what main has.
     const [rows, setRows] = useState<string[][] | null>(null)
-    const loadRows = async () => {
-        if (rows) return
+    const loadRows = async (): Promise<string[][] | null> => {
+        if (rows) return rows
         const loaded = await window.chromeAPI.nests.tableRows(card.id)
         if (loaded) setRows(loaded)
+        return loaded
     }
     const table = useMemo(() => ({ header: file.header, rows: rows ?? file.rows }), [file, rows])
-    const picked = useTablePick(card.id, 'file')
-    // Rows can be picked where they're whole, so what's picked is what main has.
+    const selected = useTablePick(card.id, 'file')
     const whole = rows !== null || file.rows.every((row) => row.every((cell) => cell.length < PREVIEW_CELL_LENGTH))
-    const selected = whole ? picked : null
+    const pick = async (index: number, mode: PickMode) => {
+        const loaded = whole ? null : await loadRows()
+        board.pick(card.id, 'file', loaded ? { header: file.header, rows: loaded } : table, index, mode)
+    }
     const here = useWorkingRows(card.id, table, rows === null && file.count > file.rows.length)
-    const label = picked.length > 0 ? pullLabel('', picked.length) : `Pull a new card out of ${file.name}`
+    const label = selected.length > 0 ? pullLabel('', selected.length) : `Pull a new card out of ${file.name}`
     return (
         <div className={cn(CARD_SHELL, "shadow-selected")} style={{ width: CARD_WIDTH }}>
             <LineEnds canPull onPull={() => board.pullOut(card.id)} label={label} />
@@ -873,7 +890,7 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
                     total={file.count}
                     onMore={() => void loadRows()}
                     selected={selected}
-                    onPick={(index, mode) => board.pick(card.id, 'file', table, index, mode)}
+                    onPick={(index, mode) => void pick(index, mode)}
                     here={here}
                 />
             </div>

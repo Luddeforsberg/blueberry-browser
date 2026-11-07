@@ -7,7 +7,7 @@ import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_RUNS, missingRows, rowTooLong, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type LineCrossing, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
 import { crossingOf, latestAnswer, rowAnswer, rowsAnswer, tableAnswer, type CardAnswer } from "./nestContext";
-import { DEFAULT_COLUMN, fallbackCell, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
+import { DEFAULT_COLUMN, fallbackCell, linkChecked, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
 import { tableFromFile } from "./nestCsv";
 import { armedStep, checkPlan, CLOSED_BEFORE_START, replyState, runsState, type PlanCard, type PlanSource, type SourceState } from "./nestPlan";
 import { answerStart, PLAN_SYSTEM_PROMPT, planDigest, tableStart, type BoardCardDigest, type PlannedDigest } from "./nestPlanner";
@@ -418,11 +418,36 @@ export class Nests {
     });
     if (!sent) return null;
     // Its value was the old answer's: it goes, and one being written for that answer never lands, so a restart before
-    // this reply's value is in still makes it.
+    // this reply's value is in still makes it. The board hears at once, since rows picked from it aren't there now.
     this.fills.delete(runId);
     this.store.setRunCell(runId, null);
     this.store.touch(card.nestId);
+    this.changed(card.nestId);
     return sent;
+  }
+
+  // Send from a card's own composer or reply field, saying why when it can't, so a press never does nothing.
+  sendCard(cardId: unknown, text: unknown): NestSendEachResult {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    if (!card) return { ok: false, error: "This card isn’t there any more." };
+    if (typeof text !== "string" || !text.trim()) return { ok: false, error: "Write what to do first." };
+    if (card.each) return { ok: false, error: "Reply in one row’s run instead." };
+    if (card.table) return { ok: false, error: "A table from a file has nothing to send." };
+    if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
+    const input = this.inputFor(card.id);
+    if ("problem" in input) return { ok: false, error: input.problem };
+    if (card.chatId && this.chats.isRunning(card.chatId)) return { ok: false, error: "Wait until it’s finished, or stop it first." };
+    if (!card.chatId && this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
+    return this.send(card.id, text) ? { ok: true } : { ok: false, error: "That couldn’t be sent. Try again." };
+  }
+
+  // The same for a reply in one run's thread.
+  sendRunReply(runId: unknown, text: unknown): NestSendEachResult {
+    const run = typeof runId === "string" ? this.store.run(runId) : null;
+    if (!run?.chatId) return { ok: false, error: "That run isn’t there any more." };
+    if (typeof text !== "string" || !text.trim()) return { ok: false, error: "Write your reply first." };
+    if (this.chats.isRunning(run.chatId)) return { ok: false, error: "Wait until it’s finished, or stop it first." };
+    return this.sendRun(run.id, text) ? { ok: true } : { ok: false, error: "That couldn’t be sent. Try again." };
   }
 
   // Stop on a card: nothing still waiting starts, every run going stops, and no card of a run plan after it starts, even
@@ -860,7 +885,8 @@ export class Nests {
       .then((cell) => {
         if (this.fills.get(runId) !== turn) return;
         this.fills.delete(runId);
-        this.store.setRunCell(runId, cell ?? fallbackCell(answer));
+        // Whoever wrote it, it links only where the answer does.
+        this.store.setRunCell(runId, linkChecked(cell ?? fallbackCell(answer), answer));
         const nestId = this.store.card(card.id)?.nestId;
         if (!nestId) return;
         this.changed(nestId);

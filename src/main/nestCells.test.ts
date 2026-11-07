@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cellParts } from "../shared/nestTable";
-import { CELL_PROMPT, cellData, cheapWriter, COLUMN_PROMPT, columnData, fallbackCell, MAX_CELL_LENGTH, parseCell, parseColumn, shortCell } from "./nestCells";
+import { CELL_PROMPT, cellData, cheapWriter, COLUMN_PROMPT, columnData, fallbackCell, linkChecked, MAX_CELL_LENGTH, parseCell, parseColumn, shortCell } from "./nestCells";
 
 const ANSWER = "Omar posted on LinkedIn on 3 November about hiring two SDRs: https://linkedin.com/posts/omar-1. Nothing newer.";
 
@@ -77,6 +77,18 @@ describe("parseCell", () => {
     const cut = parseCell(`[https://evil.example go](https://safe.example/about) ${"word ".repeat(30)}`, answer);
     expect(links(cut)).toEqual([]);
     expect(cut).toContain("evil.example go");
+  });
+
+  it("ends every way a value is made in the same link check, so none links where the answer doesn't", () => {
+    const answer = "See https://example.com/foo_bar_baz and more\nsecond line";
+    const links = (cell: string | null) => cellParts(cell ?? "").flatMap((part) => (part.href ? [part.href] : []));
+    // Its first line, with emphasis marks gone, would otherwise make an address the answer never gave.
+    expect(links(fallbackCell(answer))).toEqual([]);
+    expect(links(fallbackCell("See https://example.com/a and more\nnext"))).toEqual(["https://example.com/a"]);
+    expect(links(shortCell("Read https://example.com/a"))).toEqual(["https://example.com/a"]);
+    // A value from anywhere, such as a writer that didn't check, links only where the answer does.
+    expect(linkChecked("[Post](https://evil.example) https://example.com/a", "See https://example.com/a")).toBe("Post https://example.com/a");
+    expect(links(linkChecked("[[x](https://example.com/a)](https://evil.example)", "See https://example.com/a"))).toEqual(["https://example.com/a"]);
   });
 
   it("never leaves an address at the cut, where it would link somewhere the answer doesn't give", () => {

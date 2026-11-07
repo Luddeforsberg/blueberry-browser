@@ -546,11 +546,11 @@ export interface InvokeChannels {
   // Asks first in main when the card has a chat, which goes with it.
   "nests:delete-card": { region: "chrome"; args: [cardId: string]; result: boolean };
   // Sends from a card through the chat path, starting its chat if it's a draft. It runs only because the user sent it.
-  "nests:send": { region: "chrome"; args: [cardId: string, text: string]; result: ChatThread | null };
+  "nests:send": { region: "chrome"; args: [cardId: string, text: string]; result: NestSendEachResult };
   // Sends a draft once for each row its line brings, each run its own chat, a few at a time. Only because the user sent it.
   "nests:send-each": { region: "chrome"; args: [cardId: string, text: string]; result: NestSendEachResult };
   // A reply in one run's thread, which gets its row again.
-  "nests:send-run": { region: "chrome"; args: [runId: string, text: string]; result: ChatThread | null };
+  "nests:send-run": { region: "chrome"; args: [runId: string, text: string]; result: NestSendEachResult };
   // Stops every run on a card, and whatever is still waiting never starts.
   "nests:stop-card": { region: "chrome"; args: [cardId: string]; result: boolean };
   // The Nest's composer: Berry starts one card at once, plans several, or asks first. Only because the user sent it.
@@ -815,9 +815,10 @@ export interface NestsAPI {
   nudgeCards: (nestId: string, moves: { id: string; x: number; y: number }[]) => Promise<boolean>;
   setBird: (cardId: string, mascotId: string) => Promise<boolean>;
   deleteCard: (cardId: string) => Promise<boolean>;
-  send: (cardId: string, text: string) => Promise<ChatThread | null>;
+  // Each says why when it can't send, so a press never does nothing.
+  send: (cardId: string, text: string) => Promise<NestSendEachResult>;
   sendEach: (cardId: string, text: string) => Promise<NestSendEachResult>;
-  sendRun: (runId: string, text: string) => Promise<ChatThread | null>;
+  sendRun: (runId: string, text: string) => Promise<NestSendEachResult>;
   stopCard: (cardId: string) => Promise<boolean>;
   ask: (nestId: string, text: string, options: NestAskOptions) => Promise<NestAskResult>;
   editPlan: (cardId: string, change: { prompt?: string; each?: boolean }) => Promise<boolean>;

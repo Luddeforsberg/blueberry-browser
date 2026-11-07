@@ -86,43 +86,45 @@ export const parseColumn = (reply: string): string | null => {
 export const shortCell = (answer: string): string | null => {
   const text = answer.trim();
   if (!text || text.includes("\n") || text.length > MAX_CELL_LENGTH || /^([-*+>#|]|\d+\.)\s/.test(text)) return null;
-  return text;
+  return linkChecked(text, answer);
 };
 
 // The value the cheap model gave, checked: one line, no quotes or label, cut to fit, and a link only to an address the
 // answer itself gives, so the model can't add one of its own. Null when nothing's left.
 export const parseCell = (reply: string, answer: string): string | null => {
-  // Kept links wait behind this mark while the rest is checked, so nothing put back together can be checked twice.
-  let text = unquote(firstLine(reply)).replace(/^(cell|value)\s*:\s*/i, "").replaceAll(KEPT, "");
+  let text = linkChecked(unquote(firstLine(reply)).replace(/^(cell|value)\s*:\s*/i, ""), answer).replace(/\s+/g, " ").trim();
+  // Cut, it keeps only words, since a link cut short would go nowhere.
+  if (text.length > MAX_CELL_LENGTH) text = linkChecked(cut(plainCell(text), MAX_CELL_LENGTH), answer);
+  if (!text || text.toUpperCase() === "NONE") return null;
+  return text;
+};
+
+// The one check every value ends in, wherever it came from: it links only to an address the answer gives, read the way
+// the card reads it. A link the answer gives is set aside while the rest is checked, and any other becomes its words,
+// again and again, since taking one away can leave the words around it shaped like another, as with a link inside a
+// link. A bare address is a link on the card too, so one the answer doesn't give is only its site. If anything is still
+// left that links elsewhere, it's words alone.
+export const linkChecked = (cell: string, answer: string): string => {
   const allowed = new Set([...addressesIn(answer)].flatMap((address) => safeHref(address) ?? []));
   const allows = (href: string) => allowed.has(safeHref(href) ?? "");
   const kept: string[] = [];
-  // A link the answer gives is set aside, and any other becomes its words, again and again, since taking one away can
-  // leave the words around it shaped like another, as with a link inside a link.
+  let text = cell.replaceAll(KEPT, "");
   for (let before = ""; before !== text; ) {
     before = text;
     text = text.replace(MARKDOWN_LINK, (whole, words: string, href: string) => (allows(href) ? `${KEPT}${kept.push(whole) - 1}${KEPT}` : words || href));
   }
-  // A bare address is a link too on the card, so the same goes for one: kept only if the answer gives it, and otherwise
-  // only its site, as words.
   text = text.replace(/https?:\/\/[^\s<>|)\]]+/g, (found) => {
     const address = found.replace(/[.,;:!?]+$/, "");
     return (allows(address) ? address : address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]) + found.slice(address.length);
   });
   text = text.replace(new RegExp(`${KEPT}(\\d+)${KEPT}`, "g"), (_, index: string) => kept[Number(index)]);
-  text = text.replace(/\s+/g, " ").trim();
-  // Cut, it keeps only words, since a link cut short would go nowhere.
-  if (text.length > MAX_CELL_LENGTH) text = cut(plainCell(text), MAX_CELL_LENGTH);
-  // Read as the card reads it, the value as it will be kept links only where the answer does, or it's words alone.
-  if (cellParts(text).some((part) => part.href && !allowed.has(part.href))) text = wordsOnly(text);
-  if (!text || text.toUpperCase() === "NONE") return null;
-  return text;
+  return cellParts(text).some((part) => part.href && !allowed.has(part.href)) ? wordsOnly(text) : text;
 };
 
 // Without the cheap model, or when it fails: the answer's first line with words, cut to fit.
 export const fallbackCell = (answer: string): string => {
   const line = answer.split("\n").find((each) => each.replace(/[#>*\-|\s]/g, "") !== "") ?? "";
-  return cut(plainCell(line.replace(/^\s*(#+|>|[-*+]|\d+\.)\s*/, "")), MAX_CELL_LENGTH);
+  return linkChecked(cut(plainCell(line.replace(/^\s*(#+|>|[-*+]|\d+\.)\s*/, "")), MAX_CELL_LENGTH), answer);
 };
 
 // What writes a column's name and a cell's value. Each returns null when there's nothing to use, and the caller falls back.
