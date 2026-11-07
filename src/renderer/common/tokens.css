@@ -78,6 +78,19 @@
     --berry-gear-shade: 217 163 18;
   }
 
+  /* The quiet shimmer's sweep: muted-foreground a little lighter, toward the card in light mode and toward the text in dark. */
+  :root {
+    --shimmer-sweep: color-mix(in srgb, rgb(var(--muted-foreground)) 45%, rgb(var(--canvas)));
+    --ghost-line: rgb(var(--muted-foreground) / 0.3);
+    --ghost-sweep: rgb(var(--muted-foreground) / 0.08);
+  }
+
+  .dark {
+    --shimmer-sweep: color-mix(in srgb, rgb(var(--muted-foreground)) 45%, rgb(var(--foreground)));
+    --ghost-line: rgb(var(--muted-foreground) / 0.3);
+    --ghost-sweep: rgb(var(--muted-foreground) / 0.75);
+  }
+
   :root,
   .dark {
     --glass-tint: rgb(var(--background) / 0.88);

@@ -6,7 +6,7 @@ import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
 import type { NestStore } from "./NestStore";
-import { Nests } from "./Nests";
+import { Nests, type ChatInNest } from "./Nests";
 import type { HistoryStore } from "./HistoryStore";
 import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHistory";
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
@@ -63,6 +63,7 @@ import type {
   ImportSource,
   InternalPage,
   LayoutMode,
+  NestFromChatResult,
   ResizablePanel,
   MascotSaveResult,
   Settings,
@@ -345,12 +346,13 @@ export class Window {
       },
       onListChanged: () => this.publishLibrary(),
       chatDeleted: (chatId) => this.closeChatTabs(chatId),
+      handOff: (nestId, from, to) => sendToRenderer(this.chrome.view.webContents, "nests:hand-off", { nestId, from, to }),
     }, {
       available: hasModel,
       // Cards' answers can repeat a code typed from the phone, so they're taken out as anywhere else the model reads.
       plan: (system, messages) =>
         askInShape(system, messages.map((message) => ({ ...message, content: this.chats.withoutCodes(message.content) })), PLAN_SCHEMA, "nest_plan"),
-    });
+    }, async (words) => (hasModel() ? generateTitle([{ role: "user", content: this.chats.withoutCodes(words) }]) : null));
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -665,7 +667,9 @@ export class Window {
     const routines = this.routines.list();
     return this.chats.waiting().map(({ chatTitle, ...waiting }) => {
       const routine = routines.find(({ latestRun }) => latestRun?.id === waiting.id);
-      return { ...waiting, job: chatTitle ?? routine?.name ?? "A job", routineId: routine?.id ?? null };
+      const inNest = this.nests.chatInNest(waiting.id);
+      const nestTitle = inNest ? this.nests.title(inNest.nestId) : null;
+      return { ...waiting, job: nestTitle ?? chatTitle ?? routine?.name ?? "A job", routineId: routine?.id ?? null, ...(inNest ? { inNest: true } : {}) };
     });
   }
 
@@ -819,6 +823,13 @@ export class Window {
     if (saved.page === "cloud") return null;
     const chat = saved.page === "chat" && saved.param ? this.chatStore.summaries().find(({ id: chatId }) => chatId === saved.param) : null;
     if (saved.page === "chat" && saved.param && !chat) return null;
+    // A card's chat opens as its Nest, once.
+    const inNest = saved.page === "chat" && saved.param ? this.nests.chatInNest(saved.param) : null;
+    if (inNest) {
+      if (this.entries.some((tab) => tab instanceof InternalTab && tab.page === "nest" && tab.param === inNest.nestId)) return null;
+      this.tabsMap.set(id, new InternalTab(id, "nest", inNest.nestId, this.nests.title(inNest.nestId) ?? undefined));
+      return id;
+    }
     const nestTitle = saved.page === "nest" && saved.param ? this.nests.title(saved.param) : null;
     if (saved.page === "nest" && nestTitle === null) return null;
     this.tabsMap.set(id, new InternalTab(id, saved.page, saved.param, chat?.title ?? nestTitle ?? saved.title));
@@ -878,6 +889,9 @@ export class Window {
     const param = options.param ?? null;
     // A chat only starts from the new tab page, so a chat tab always has a chat.
     if (page === "chat" && param === null) return this.openPage("new-tab");
+    // A card's chat, from Needs you, a notification or anywhere else, opens its Nest at that card.
+    const inNest = page === "chat" && param !== null ? (this.nests?.chatInNest(param) ?? null) : null;
+    if (inNest) return this.openNestAt(inNest);
     if (page === "nest" && (param === null || this.nests.title(param) === null)) return this.openPage("new-tab");
     const existing = this.entries.find(
       (tab) =>
@@ -1168,12 +1182,20 @@ export class Window {
     else this.openFindBar();
   }
 
+  // A Nest's board zooms itself, and ⌘0 fits it to the screen.
+  private get onNest(): boolean {
+    const entry = this.activeEntry;
+    return entry instanceof InternalTab && entry.page === "nest";
+  }
+
   zoomActiveTab(direction: 1 | -1): void {
-    if (this.activeTab) this.siteZoom.step(this.activeTab, direction);
+    if (this.onNest) sendToRenderer(this.chrome.view.webContents, "nests:zoom", direction === 1 ? "in" : "out");
+    else if (this.activeTab) this.siteZoom.step(this.activeTab, direction);
   }
 
   resetActiveTabZoom(): void {
-    if (this.activeTab) this.siteZoom.reset(this.activeTab);
+    if (this.onNest) sendToRenderer(this.chrome.view.webContents, "nests:zoom", "fit");
+    else if (this.activeTab) this.siteZoom.reset(this.activeTab);
   }
 
   printActiveTab(): void {
@@ -1184,7 +1206,7 @@ export class Window {
     const menu = Menu.getApplicationMenu();
     WEB_PAGE_MENU_IDS.forEach((id) => {
       const item = menu?.getMenuItemById(id);
-      if (item) item.enabled = this.activeTab !== null;
+      if (item) item.enabled = this.activeTab !== null || (id !== "print" && this.onNest);
     });
   }
 
@@ -1254,6 +1276,33 @@ export class Window {
     const id = this.nests.create();
     this.openPage("nest", { param: id });
     return id;
+  }
+
+  // Opens a Nest with one card opened and in view. The page may not be drawn yet, so the renderer keeps the last one asked
+  // for each Nest until its board takes it.
+  private openNestAt({ nestId, cardId, runId }: ChatInNest): BrowserTab {
+    const tab = this.openPage("nest", { param: nestId });
+    sendToRenderer(this.chrome.view.webContents, "nests:focus", { nestId, cardId, runId });
+    return tab;
+  }
+
+  // Open as a Nest, from the chat's page: the chat becomes the first card of a new Nest, which takes the chat's tab.
+  openChatAsNest(chatId: string): NestFromChatResult {
+    const result = this.nests.fromChat(chatId);
+    if (!result.ok) return result;
+    const chatTabs = this.chatTabs(chatId);
+    if (chatTabs.length === 0) {
+      this.openPage("nest", { param: result.nestId });
+      return result;
+    }
+    const nestTab = new InternalTab(`tab-${++this.tabCounter}`, "nest", result.nestId, this.nests.title(result.nestId) ?? undefined);
+    const replaced = chatTabs[0];
+    const wasActive = this.activeEntry === replaced;
+    this.tabsMap = new Map(this.entries.map((existing) => [existing === replaced ? nestTab.id : existing.id, existing === replaced ? nestTab : existing]));
+    chatTabs.slice(1).forEach((tab) => this.closeTab(tab.id, false));
+    if (wasActive) this.switchActiveTab(nestTab.id);
+    else this.notifyTabs();
+    return result;
   }
 
   private syncNestTabTitle({ id, title }: NestBoard): void {

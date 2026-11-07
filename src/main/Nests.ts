@@ -2,7 +2,7 @@ import type { Chats } from "./Chats";
 import type { NestStore } from "./NestStore";
 import type { MascotStore } from "./MascotStore";
 import type { ChatThread, MascotProfile, NestBoard, NestCard, NestSummary } from "../shared/library";
-import type { NestAskOptions, NestAskResult, NestAttachResult, NestNewCard, NestRunPlanResult, NestSendEachResult } from "../shared/ipc";
+import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRunPlanResult, NestSendEachResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { findTable, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
@@ -13,7 +13,10 @@ import type { AttachmentRow, AttachTo, NewPlannedCard } from "./NestStore";
 import { checkFile, MAX_NOTE_LENGTH, roomProblem, type ModelInputs, type SentAttachment } from "./nestFiles";
 
 const MAX_TITLE_LENGTH = 100;
-const NEW_NEST_TITLE = "Untitled nest";
+// What a Nest is called until its first request, whose first words then stand in until the cheap model names it.
+export const NEW_NEST_TITLE = "New Nest";
+// Like a chat's, a name is only tried for a few requests, since one that says nothing yet gets none.
+const MAX_NAME_TRIES = 3;
 // Far past any board anyone would make, so a bad number can't put a card somewhere it can never be found.
 const MAX_COORDINATE = 1_000_000;
 
@@ -22,9 +25,29 @@ export interface NestEvents {
   onListChanged: () => void;
   // A card's chat is gone, so anything showing it closes.
   chatDeleted: (chatId: string) => void;
+  // A card started with work from the card its line comes from, without the user typing in it: a planned card after its
+  // source, or a For-each card. The board shows its bird carrying it along the line. Only for the screen.
+  handOff?: (nestId: string, from: string, to: string) => void;
 }
 
-type NestChats = Pick<Chats, "send" | "delete" | "thread" | "isRunning" | "stop">;
+type NestChats = Pick<Chats, "send" | "delete" | "thread" | "isRunning" | "stop" | "inCloud">;
+
+// The cheap model naming a Nest from a request's words, as chats are named. Null when it has no topic yet.
+export type NestNamer = (words: string) => Promise<string | null>;
+
+const NO_NAMER: NestNamer = async () => null;
+
+// Where a chat sits in a Nest: on a card, or one run of a For-each card.
+export interface ChatInNest {
+  nestId: string;
+  cardId: string;
+  runId: string | null;
+}
+
+const titleFrom = (text: string): string => {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length > MAX_TITLE_LENGTH ? `${line.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : line;
+};
 
 // The main model, asked for a plan in a set shape. Without one, the Nest's composer starts one card as it always has.
 export interface NestPlanner {
@@ -57,6 +80,9 @@ export class Nests {
   private closed = false;
   // What the user wrote in each Nest's composer, while Berry plans it.
   private readonly planning = new Map<string, string>();
+  // Nests the cheap model is naming right now, and how many times each has been tried since launch.
+  private readonly naming = new Set<string>();
+  private readonly nameTries = new Map<string, number>();
 
   constructor(
     private readonly store: NestStore,
@@ -64,7 +90,8 @@ export class Nests {
     // Who a card runs as. Only a mascot in the flock can start one.
     private readonly mascots: Pick<MascotStore, "resolve" | "all">,
     private readonly events: NestEvents,
-    private readonly planner: NestPlanner = NO_PLANNER
+    private readonly planner: NestPlanner = NO_PLANNER,
+    private readonly namer: NestNamer = NO_NAMER
   ) {
     // Runs still waiting when the app last closed don't start by themselves now: the press that queued them was then.
     // Cards of a plan that hadn't started don't either.
@@ -77,7 +104,13 @@ export class Nests {
       const cards = this.store.board(id)?.cards ?? [];
       const working = cards.filter((card) => this.chatsOf(card).some((chatId) => this.chats.isRunning(chatId))).map((card) => card.mascotId ?? BERRY.id);
       const planned = cards.some((card) => card.plan?.state === "planned");
-      return { id, title, updatedAt, chatIds: this.store.chatIds(id), working: [...new Set(working)], planned };
+      // For-each cards still going, counted together, as each card counts its own.
+      const going = cards.flatMap((card) => (card.each ? [card.each.runs.map((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)))] : []));
+      const active = going.filter((runs) => runs.some(Boolean));
+      const progress = active.length > 0 ? { done: active.flat().filter((still) => !still).length, total: active.flat().length } : null;
+      // Only a running chat can be waiting, so only those are read.
+      const waiting = cards.flatMap((card) => this.chatsOf(card)).find((chatId) => this.chats.isRunning(chatId) && !!this.chats.thread(chatId)?.approval) ?? null;
+      return { id, title, updatedAt, chatIds: this.store.chatIds(id), working: [...new Set(working)], planned, progress, waiting };
     });
   }
 
@@ -88,7 +121,7 @@ export class Nests {
 
   board(id: string): NestBoard | null {
     const board = this.store.board(id);
-    return board && { ...board, planning: this.planning.get(id) ?? null };
+    return board && { ...board, planning: this.planning.get(id) ?? null, naming: this.naming.has(id) };
   }
 
   title(id: string): string | null {
@@ -109,10 +142,64 @@ export class Nests {
     return this.store.runOfChat(chatId);
   }
 
+  // Which card a chat is, so whatever opens it can open its Nest at that card instead. Null for an ordinary chat.
+  chatInNest(chatId: string): ChatInNest | null {
+    const card = this.store.cardOfChat(chatId);
+    if (card) return { nestId: card.nestId, cardId: card.id, runId: null };
+    const run = this.store.runOfChat(chatId);
+    const owner = run && this.store.card(run.cardId);
+    return run && owner ? { nestId: owner.nestId, cardId: owner.id, runId: run.id } : null;
+  }
+
+  // Open as a Nest: a new Nest whose first card is this chat, with its thread and bird, named as the chat is. From then on
+  // it's a card like any other, so it leaves the Chats list. Only a chat the user started here, while nothing runs or
+  // waits on it, since its reply would otherwise end on a card it didn't start on.
+  fromChat(chatId: string): NestFromChatResult {
+    const thread = typeof chatId === "string" ? this.chats.thread(chatId) : null;
+    if (!thread || this.chatInNest(chatId)) return { ok: false, error: "That chat isn’t there any more." };
+    if (thread.from || thread.runner || this.chats.inCloud(chatId)) return { ok: false, error: "Only a chat you started here can become a Nest." };
+    // A question or an OK waits only while its reply runs.
+    if (this.chats.isRunning(chatId)) return { ok: false, error: "Wait until it’s finished, or stop it first." };
+    if (this.flockId(thread.mascotId) === undefined) return { ok: false, error: "That chat’s bird isn’t in your flock any more." };
+    const nestId = this.store.createNest(titleFrom(thread.title) || NEW_NEST_TITLE, true);
+    const card = this.store.addCard(nestId, { x: 0, y: 0, mascotId: thread.mascotId });
+    if (!card || !this.store.setChat(card.id, chatId)) {
+      this.store.deleteNest(nestId);
+      return { ok: false, error: "That chat couldn’t become a Nest." };
+    }
+    this.events.onListChanged();
+    return { ok: true, nestId };
+  }
+
   create(): string {
     const id = this.store.createNest(NEW_NEST_TITLE);
     this.events.onListChanged();
     return id;
+  }
+
+  // A Nest that isn't named yet takes the first words of its first request, as a chat takes its first message, and the
+  // cheap model names it from them in the background. Nothing waits for it, and a name the user chose is never replaced.
+  private nameFrom(nestId: string, words: string): void {
+    if (this.naming.has(nestId) || this.store.titleSettled(nestId)) return;
+    const placed = this.store.board(nestId)?.title === NEW_NEST_TITLE && this.store.nameNest(nestId, titleFrom(words), false);
+    const tries = this.nameTries.get(nestId) ?? 0;
+    if (tries >= MAX_NAME_TRIES) {
+      if (placed) this.changed(nestId);
+      return;
+    }
+    this.nameTries.set(nestId, tries + 1);
+    this.naming.add(nestId);
+    this.changed(nestId);
+    void this.namer(words)
+      .then((title) => {
+        const name = title ? titleFrom(title) : "";
+        if (name) this.store.nameNest(nestId, name, true);
+      })
+      .catch((error) => console.error("Couldn't name a Nest:", error instanceof Error ? error.message : "unknown error"))
+      .finally(() => {
+        this.naming.delete(nestId);
+        this.changed(nestId);
+      });
   }
 
   rename(id: string, title: string): boolean {
@@ -205,6 +292,7 @@ export class Nests {
       ? this.chats.send(card.chatId, text, options)
       : this.chats.send(null, text, { ...options, mascotId: card.mascotId, started: (chatId) => this.store.setChat(cardId, chatId) });
     if (!sent) return null;
+    this.nameFrom(card.nestId, text);
     this.store.touch(card.nestId);
     this.changed(card.nestId);
     return sent;
@@ -225,7 +313,9 @@ export class Nests {
     const problem = runCountProblem(rows.rows.length);
     if (problem) return { ok: false, error: problem };
     if (!this.store.startForEach(cardId, prompt, rows.header, rows.rows)) return { ok: false, error: "This card has been sent already." };
+    this.nameFrom(card.nestId, prompt);
     this.changed(card.nestId);
+    this.handedOff(cardId);
     this.pump();
     return { ok: true };
   }
@@ -273,6 +363,7 @@ export class Nests {
     const chosen = this.flockId(options?.mascotId);
     if (chosen === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
     const place = this.placing(options);
+    this.nameFrom(nestId, words);
     const open = this.store.openRequest(nestId);
     const pending = board.cards.filter((card) => card.plan?.state === "planned");
     // Without a model to plan with, it's one card, as before. Not while a plan waits, whose cards point at the composer's
@@ -529,6 +620,7 @@ export class Nests {
         return this.store.hold(card.id, `Didn’t start, because ${name}’s table has ${rows.rows.length} rows, and For each row runs at most ${MAX_RUNS} times`);
       }
       if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows)) return false;
+      this.handedOff(card.id);
       this.pump();
       return true;
     }
@@ -543,7 +635,17 @@ export class Nests {
       ...this.userSaid(card.id, null, null),
       ...this.attachmentsFor(card.id),
     });
-    return sent ? true : this.store.hold(card.id, "Didn’t start");
+    if (!sent) return this.store.hold(card.id, "Didn’t start");
+    this.handedOff(card.id);
+    return true;
+  }
+
+  // Says a card just started with work from the card its line comes from. A card that reads from nothing has nobody to
+  // carry it.
+  private handedOff(cardId: string): void {
+    const line = this.store.lineTo(cardId);
+    const nestId = this.store.card(cardId)?.nestId;
+    if (line && nestId) this.events.handOff?.(nestId, line.source.id, cardId);
   }
 
   // On a card Berry planned, what the user typed: the request it was planned from, and anything they've typed in its chat

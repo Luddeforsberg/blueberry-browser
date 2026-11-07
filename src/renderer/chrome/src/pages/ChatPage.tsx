@@ -57,6 +57,14 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         void window.chromeAPI.browser.openPage('routines')
     }
 
+    // Open as a Nest: this chat becomes the first card of a new Nest, which takes this tab. Main says why if it can't.
+    const [nestProblem, setNestProblem] = useState<string | null>(null)
+    const openAsNest = async () => {
+        if (!chatId) return
+        const result = await window.chromeAPI.nests.fromChat(chatId)
+        setNestProblem(result.ok ? null : result.error)
+    }
+
     // Chats begin on the new tab page, so this is only ever a moment while the chat loads, or one just deleted.
     if (!chatId || !thread) return <div ref={pageRef} className="h-full" />
 
@@ -106,14 +114,23 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
                         )}
                         {thread.error && <ChatError message={thread.error} />}
-                        {/* Only once Berry has done something in this chat: a reply that's just a question has nothing to repeat. */}
-                        {!running &&
-                            thread.messages.at(-1)?.role === 'assistant' &&
-                            thread.messages.some((message) => message.role === 'assistant' && (message.steps?.length ?? 0) > 0) && (
-                            <div>
-                                <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>
-                                    Save as routine
-                                </Button>
+                        {!running && !thread.approval && thread.messages.at(-1)?.role === 'assistant' && (
+                            <div className="-ml-3 flex flex-col items-start">
+                                <div className="flex items-center gap-1">
+                                    {/* Only once Berry has done something in this chat: a reply that's just a question has nothing to repeat. */}
+                                    {thread.messages.some((message) => message.role === 'assistant' && (message.steps?.length ?? 0) > 0) && (
+                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={saveAsRoutine}>
+                                            Save as routine
+                                        </Button>
+                                    )}
+                                    {/* Only a chat started here. One from another app or the cloud answers there. */}
+                                    {!thread.from && !thread.runner && !thread.cloud && (
+                                        <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => void openAsNest()}>
+                                            Open as a Nest
+                                        </Button>
+                                    )}
+                                </div>
+                                {nestProblem && <p role="alert" className="px-3 text-13 text-destructive">{nestProblem}</p>}
                             </div>
                         )}
                         {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}

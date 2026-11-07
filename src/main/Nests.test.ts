@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
 import { NestStore } from "./NestStore";
-import { Nests, type NestPlanner } from "./Nests";
+import { NEW_NEST_TITLE, Nests, type NestNamer, type NestPlanner } from "./Nests";
 import type { ReplyMessage, StreamReply } from "./agent";
 import type { PageTool } from "./browserTools";
 import type { MascotProfile } from "../shared/library";
@@ -49,7 +49,7 @@ const planner: NestPlanner = {
   },
 };
 
-const setup = () => {
+const setup = (namer?: NestNamer) => {
   const chatStore = new ChatStore(":memory:");
   const store = new NestStore(":memory:");
   let ended = () => {};
@@ -71,11 +71,14 @@ const setup = () => {
     onWorkingTabs: () => {},
   }, (id) => flock.find((mascot) => mascot.id === (id ?? BERRY.id)) ?? { ...BERRY, id: id ?? "", name: "A lost mascot" });
   const deleted: string[] = [];
+  // Each hand-off along a line, as "from>to".
+  const handOffs: string[] = [];
   const nests = new Nests(store, chats, { resolve: (id) => flock.find((mascot) => mascot.id === (id ?? BERRY.id))!, all: () => flock }, {
     onBoard: () => {},
     onListChanged: () => {},
     chatDeleted: (chatId) => deleted.push(chatId),
-  }, planner);
+    handOff: (_, from, to) => handOffs.push(`${from}>${to}`),
+  }, planner, namer);
   // Resolves once the reply that's running has been saved.
   const replyEnded = () => new Promise<void>((resolve) => (ended = resolve));
   const sendAndWait = async (cardId: string, text: string) => {
@@ -83,7 +86,7 @@ const setup = () => {
     expect(nests.send(cardId, text)).not.toBeNull();
     await done;
   };
-  return { nests, store, chats, chatStore, deleted, sendAndWait };
+  return { nests, store, chats, chatStore, deleted, sendAndWait, handOffs, replyEnded };
 };
 
 const newest = (messages: ReplyMessage[]) => messages.at(-1)?.content as string;
@@ -892,5 +895,174 @@ describe("Files and notes on a card", () => {
     expect(nests.board(nest)!.cards[0].attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
     expect(nests.board(nest)!.attached).toEqual([]);
     expect(blocksOf(sent[0])[1]).toMatchObject({ type: "file" });
+  });
+});
+
+describe("A Nest's polish", () => {
+  const plannedCards = (nests: Nests, nest: string) => nests.board(nest)!.cards.filter((card) => card.plan);
+  const settleAll = async () => {
+    for (let tries = 0; tries < 10; tries++) await settle();
+  };
+
+  it("says a card was handed work along its line only when it starts from its source without the user typing in it", async () => {
+    const { nests, handOffs, sendAndWait } = setup();
+    const nest = nests.create();
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const [scout, writer] = plannedCards(nests, nest);
+    replies.push(TABLE(2));
+    nests.runPlan(nest);
+    await settleAll();
+    // Scout read from nothing, so only the For-each card that started from its table was handed anything.
+    expect(handOffs).toEqual([`${scout.id}>${writer.id}`]);
+
+    // A draft the user writes and sends on a line is their own press on that card, and a reply is too.
+    const draft = nests.addCard(nest, { x: 0, y: 600, from: scout.id })!;
+    await sendAndWait(draft.id, "Which is biggest?");
+    await sendAndWait(draft.id, "And the smallest?");
+    expect(handOffs).toHaveLength(1);
+
+    // For each row sent from a draft starts many runs from the card's line.
+    const each = nests.addCard(nest, { x: 600, y: 600, from: scout.id })!;
+    expect(nests.sendEach(each.id, "Look each one up")).toEqual({ ok: true });
+    expect(handOffs.at(-1)).toBe(`${scout.id}>${each.id}`);
+  });
+
+  it("hands work on when the user says Looks right, continue", async () => {
+    const { nests, handOffs } = setup();
+    const nest = nests.create();
+    plans.push({ ...TWO_JOBS, cards: [planCard("c1", { prompt: "Find companies" }), planCard("c2", { prompt: "Draft emails", from: "c1", waits_for_user: true })] });
+    await nests.ask(nest, "Find companies and draft emails", PLACE);
+    const [scout, writer] = plannedCards(nests, nest);
+    replies.push("Found three.");
+    nests.runPlan(nest);
+    await settleAll();
+    expect(handOffs).toEqual([]);
+    nests.continueFrom(scout.id);
+    expect(handOffs).toEqual([`${scout.id}>${writer.id}`]);
+  });
+
+  it("names a new Nest from its first request: its first words at once, then the cheap model's name, never over the user's", async () => {
+    let name: (title: string | null) => void = () => {};
+    const asked: string[] = [];
+    const { nests } = setup((words) => {
+      asked.push(words);
+      return new Promise((resolve) => (name = resolve));
+    });
+    const nest = nests.create();
+    expect(nests.title(nest)).toBe(NEW_NEST_TITLE);
+    plans.push(TWO_JOBS);
+    const asking = nests.ask(nest, "Find  Swedish SaaS companies\nand write to each", PLACE);
+    expect(nests.title(nest)).toBe("Find Swedish SaaS companies and write to each");
+    expect(nests.board(nest)!.naming).toBe(true);
+    name("Swedish SaaS outreach");
+    await asking;
+    await settleAll();
+    expect(nests.title(nest)).toBe("Swedish SaaS outreach");
+    expect(nests.board(nest)!.naming).toBe(false);
+
+    // Named, it isn't asked again.
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Change the second card", PLACE);
+    expect(asked).toHaveLength(1);
+
+    // The user's name is final, even while the model is naming.
+    const mine = nests.create();
+    const card = nests.addCard(mine, { x: 0, y: 0 })!;
+    nests.send(card.id, "Find flights to Berlin");
+    nests.rename(mine, "Berlin trip");
+    name("Flights to Berlin");
+    await settleAll();
+    expect(nests.title(mine)).toBe("Berlin trip");
+  });
+
+  it("tries naming again on a later request when the first one had no topic, a few times at most", async () => {
+    const asked: string[] = [];
+    const { nests, sendAndWait } = setup(async (words) => {
+      asked.push(words);
+      return words.includes("Lisbon") ? "Lisbon weekend" : null;
+    });
+    const nest = nests.create();
+    const card = nests.addCard(nest, { x: 0, y: 0 })!;
+    await sendAndWait(card.id, "hi");
+    await settle();
+    expect(nests.title(nest)).toBe("hi");
+    await sendAndWait(card.id, "hello?");
+    await sendAndWait(card.id, "a weekend in Lisbon");
+    await settle();
+    expect(nests.title(nest)).toBe("Lisbon weekend");
+    // A fourth try never happens.
+    const other = nests.create();
+    const quiet = nests.addCard(other, { x: 0, y: 0 })!;
+    for (const words of ["hi", "hey", "yo", "a weekend in Lisbon"]) await sendAndWait(quiet.id, words);
+    await settle();
+    expect(nests.title(other)).toBe("hi");
+    expect(asked.slice(3)).toEqual(["hi", "hey", "yo"]);
+  });
+
+  it("turns a chat into a Nest's first card, with its thread and bird, out of the Chats list and named as it was", async () => {
+    const { nests, chats, chatStore, replyEnded, sendAndWait } = setup();
+    const done = replyEnded();
+    const thread = chats.send(null, "Find Swedish SaaS companies", { seePage: false, mascotId: "scout" })!;
+    await done;
+    chatStore.renameChat(thread.id, "Swedish SaaS");
+
+    const result = nests.fromChat(thread.id);
+    expect(result.ok).toBe(true);
+    const nest = (result as { nestId: string }).nestId;
+    const board = nests.board(nest)!;
+    expect(board.title).toBe("Swedish SaaS");
+    expect(board.cards).toEqual([expect.objectContaining({ chatId: thread.id, mascotId: "scout", plan: null, each: null })]);
+    expect(nests.cardChats().has(thread.id)).toBe(true);
+    expect(nests.chatInNest(thread.id)).toEqual({ nestId: nest, cardId: board.cards[0].id, runId: null });
+
+    // It carries the same thread on, and is named already.
+    await sendAndWait(board.cards[0].id, "Only the ones in Gothenburg");
+    expect(chatStore.chat(thread.id)!.messages.map((message) => message.role)).toEqual(["user", "assistant", "user", "assistant"]);
+    expect(nests.title(nest)).toBe("Swedish SaaS");
+    // Once on a card, it can't become another Nest.
+    expect(nests.fromChat(thread.id)).toEqual({ ok: false, error: expect.any(String) });
+  });
+
+  it("won't turn a chat into a Nest while it runs, or one another app started", async () => {
+    const { nests, chats, chatStore, replyEnded } = setup();
+    held = [];
+    const running = chats.send(null, "Find flights", { seePage: false })!;
+    expect(nests.fromChat(running.id)).toEqual({ ok: false, error: "Wait until it’s finished, or stop it first." });
+    const done = replyEnded();
+    for (let tries = 0; tries < 5 && held.length === 0; tries++) await settle();
+    await release();
+    await done;
+    held = null;
+    expect(nests.fromChat(running.id).ok).toBe(true);
+
+    const fromApp = chatStore.createChat("From Claude Code", null, "Claude Code");
+    expect(nests.fromChat(fromApp)).toEqual({ ok: false, error: "Only a chat you started here can become a Nest." });
+    expect(nests.fromChat("no-such-chat").ok).toBe(false);
+    expect(nests.list()).toHaveLength(1);
+  });
+
+  it("finds the card or run a chat belongs to, and counts a For-each card's runs for the sidebar", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(5));
+    await sendAndWait(scout.id, "Find companies");
+    expect(nests.list()[0].progress).toBeNull();
+
+    held = [];
+    const writer = nests.addCard(nest, { x: 600, y: 0, from: scout.id })!;
+    nests.sendEach(writer.id, "Write to each");
+    await settle();
+    expect(nests.list()[0].progress).toEqual({ done: 0, total: 5 });
+    const runs = nests.card(writer.id)!.each!.runs;
+    expect(nests.chatInNest(runs[0].chatId!)).toEqual({ nestId: nest, cardId: writer.id, runId: runs[0].id });
+    expect(nests.chatInNest(nests.card(scout.id)!.chatId!)).toEqual({ nestId: nest, cardId: scout.id, runId: null });
+
+    await release();
+    expect(nests.list()[0].progress).toEqual({ done: 3, total: 5 });
+    await release();
+    expect(nests.list()[0].progress).toBeNull();
+    held = null;
   });
 });

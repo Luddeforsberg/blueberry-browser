@@ -125,6 +125,10 @@ const chromeAPI: ChromeAPI = {
     removeAttachment: (attachmentId, fromCardId) => invoke("nests:remove-attachment", attachmentId, fromCardId),
     onUpdated: (callback) => subscribe("nests:updated", callback),
     onDeleted: (callback) => subscribe("nests:deleted", callback),
+    fromChat: (chatId) => invoke("nests:from-chat", chatId),
+    onFocus: (callback) => subscribe("nests:focus", callback),
+    onHandOff: (callback) => subscribe("nests:hand-off", callback),
+    onZoom: (callback) => subscribe("nests:zoom", callback),
   },
   work: {
     watch: (chatId, pictureWidth) => invoke("work:watch", chatId, pictureWidth),

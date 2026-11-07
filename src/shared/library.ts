@@ -52,6 +52,8 @@ export interface NeedsYouItem {
   job: string;
   // Set when it's a routine's run.
   routineId: string | null;
+  // Set when it's a card in a Nest, or a run of one, which opens there. The job is then the Nest's name.
+  inNest?: boolean;
   // The app that started it from outside Blueberry, such as "Claude Code".
   from: string | null;
   // What it did last, in its own words. Null if it hasn't done anything yet.
@@ -422,6 +424,10 @@ export interface NestSummary {
   working: string[];
   // Berry has planned cards in it that haven't been run.
   planned: boolean;
+  // Its For-each cards still going, counted together: how many runs have ended, of how many. Null when none is going.
+  progress: { done: number; total: number } | null;
+  // The chat of a card, or of a run, waiting for the user's OK or answer, which its row opens the Nest at. Null if none.
+  waiting: string | null;
 }
 
 export interface NestCard {
@@ -512,6 +518,8 @@ export interface NestBoard {
   talk: NestRequest[];
   // What the user just wrote, while Berry plans it.
   planning?: string | null;
+  // The cheap model is naming it right now.
+  naming?: boolean;
   // Files and notes on the Nest's composer, for the request being written or planned. A plan gives each card the ones it
   // needs, and they go once the plan runs or goes.
   attached: NestAttachment[];

@@ -92,6 +92,8 @@ export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
 
 // Words for work happening right now.
 export const SHIMMER_TEXT = 'bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer'
+// The same in grey, for a Nest waiting on the model. Still, it's plain muted text.
+export const SHIMMER_QUIET = 'bg-shimmer-quiet bg-[length:200%_100%] bg-[position:150%_0] bg-clip-text text-transparent animate-shimmer'
 
 const ThinkingWord: React.FC = () => <span className={SHIMMER_TEXT}>Thinking</span>
 

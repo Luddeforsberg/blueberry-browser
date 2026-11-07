@@ -18,11 +18,22 @@ export const TableResult: React.FC<{
     // Null while the answer is still being written, when nothing can be picked.
     selected: readonly number[] | null
     onPick: (index: number, mode: PickMode) => void
-}> = ({ table, selected, onPick }) => {
+    // Rows a For-each card is working on right now, by index, with who: "Writer is here". Its column is kept while any
+    // For-each card reads from this table, so the table doesn't shift as runs start and end.
+    here?: { who: string; rows: ReadonlyMap<number, string> } | null
+}> = ({ table, selected, onPick, here = null }) => {
     const [all, setAll] = useState(false)
     const hidden = Math.max(0, table.rows.length - ROWS_SHOWN)
     const rows = all ? table.rows : table.rows.slice(0, ROWS_SHOWN)
     const picked = selected?.length ?? 0
+    // Rows being worked on out of sight, below "N more", are named in the footer instead.
+    const below = here ? [...here.rows.keys()].filter((index) => index >= rows.length) : []
+    const belowLine =
+        here && below.length > 0
+            ? below.length === 1
+                ? `${here.rows.get(below[0])} is on ${plainCell(table.rows[below[0]][0] ?? '')}`
+                : `${here.who} is on ${below.length} rows below`
+            : null
     return (
         <div className="flex flex-col">
             {table.before && <p className="px-5 pb-3 text-13 text-muted-foreground line-clamp-2">{plainCell(table.before)}</p>}
@@ -35,6 +46,7 @@ export const TableResult: React.FC<{
                                     {plainCell(cell)}
                                 </th>
                             ))}
+                            {here && <th scope="col" className="pr-5"><span className="sr-only">Who is working here</span></th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -58,6 +70,7 @@ export const TableResult: React.FC<{
                                     className={cn(
                                         "h-[34px] border-t text-14 outline-none",
                                         selected && "cursor-pointer hover:bg-muted/60 focus-visible:bg-muted",
+                                        here?.rows.has(index) && "bg-muted/60",
                                         on && "bg-muted hover:bg-muted shadow-[inset_2px_0_0_rgb(var(--accent-ink))]"
                                     )}
                                 >
@@ -66,6 +79,7 @@ export const TableResult: React.FC<{
                                             {plainCell(row[column] ?? '')}
                                         </td>
                                     ))}
+                                    {here && <td className="pr-5 text-right text-12 text-accent-ink whitespace-nowrap">{here.rows.has(index) && `${here.rows.get(index)} is here`}</td>}
                                 </tr>
                             )
                         })}
@@ -74,6 +88,7 @@ export const TableResult: React.FC<{
             </div>
             {(picked > 0 || hidden > 0) && (
                 <div data-keep-selection className="h-9 px-5 border-t flex items-center gap-1 text-13">
+                    {belowLine && <span className="order-last ml-auto text-12 text-accent-ink truncate">{belowLine}</span>}
                     {picked > 0 && <span role="status" className="text-accent-ink">{picked} selected</span>}
                     {picked > 0 && hidden > 0 && <span className="text-muted-foreground" aria-hidden>·</span>}
                     {hidden > 0 && (

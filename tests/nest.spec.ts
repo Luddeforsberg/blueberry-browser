@@ -38,10 +38,13 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   const chrome = await findView(app, "view=chrome");
 
   await chrome.getByRole("button", { name: "New nest" }).click();
-  await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("Untitled nest");
+  const name = chrome.getByRole("textbox", { name: "Nest name" });
+  await expect(name).toHaveValue("New Nest");
 
-  // The composer at the bottom starts a card of its own, when Berry finds it's one job.
+  // The composer at the bottom starts a card of its own, when Berry finds it's one job, and the cheap model names the
+  // Nest from that first request.
   model.replyWith(FIRST_ANSWER);
+  model.titleWith("Swedish SaaS leads");
   oneJob();
   const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
   await composer.fill("Find two Swedish SaaS companies");
@@ -50,6 +53,8 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await expect(first.getByRole("status")).toHaveText("Done");
   await expect(first).toContainText(FIRST_ANSWER);
   await expect(first).toContainText("Find two Swedish SaaS companies");
+  await expect(name).toHaveValue("Swedish SaaS leads");
+  expect(model.titleRequests.some((request) => JSON.stringify(request.messages).includes("Find two Swedish SaaS companies"))).toBe(true);
 
   // Its handle's click puts a draft beside it, on a line, saying what it will get.
   await first.hover();
@@ -84,7 +89,7 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await app.close();
   app = await launchApp(profile, { modelEnv: model.env });
   const again = await findView(app, "view=chrome");
-  await again.getByRole("button", { name: "Untitled nest", exact: true }).click();
+  await again.getByRole("button", { name: "Swedish SaaS leads", exact: true }).click();
   await expect(again.locator(".react-flow__node")).toHaveCount(2);
   await expect(again.locator(".react-flow__edge")).toHaveCount(1);
   await expect(again.locator(".react-flow__node").nth(1)).toContainText("Two drafts written.");
@@ -215,12 +220,21 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
     ],
   });
   const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  const planned = model.holdPlan();
   await composer.fill("Find Swedish SaaS companies we could sell to and draft a first email to each");
   await composer.press("Enter");
+
+  // While Berry plans, quiet shapes stand where the cards will land and Thinking shimmers, until the plan comes.
+  const ghosts = chrome.locator("[data-plan-ghost]");
+  await expect(ghosts).toHaveCount(2);
+  await expect(chrome.getByLabel("Talking with Berry").getByRole("status")).toHaveText("Thinking");
+  await shot("0-planning");
+  planned();
 
   // The plan is on the board, dashed and not started, with the request and Berry's answer over the composer.
   const cards = chrome.locator(".react-flow__node");
   await expect(cards).toHaveCount(2);
+  await expect(ghosts).toHaveCount(0);
   const [scout, writer] = [cards.nth(0), cards.nth(1)];
   await expect(scout.getByRole("status")).toHaveText("Planned");
   await expect(scout).toContainText("Only goes to allabolag.se");
@@ -370,4 +384,74 @@ test("a file and a note on a card go to its bird with the message, and a Word fi
   await expect(card.getByRole("list", { name: "Files and notes" })).toContainText("tallgren-one-pager.pdf");
   await expect(card.getByRole("button", { name: /^Remove/ })).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Your note", exact: true })).toBeDisabled();
+});
+
+test("a chat becomes a Nest's first card, and Needs you opens the Nest at the card that's asking", async () => {
+  test.setTimeout(60_000);
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+
+  // An ordinary chat, finished.
+  model.replyWith("Three flights under €200, the cheapest at 05:40.");
+  model.titleWith("Flights to Berlin");
+  const sent = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Find flights to Berlin in May", { seePage: false }));
+  await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.title).toBe("Flights to Berlin");
+  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+
+  // Open as a Nest turns it into the first card of a new Nest, in the same tab, named as the chat was.
+  await chrome.getByRole("button", { name: "Open as a Nest" }).click();
+  await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("Flights to Berlin");
+  const card = chrome.locator(".react-flow__node");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("Three flights under €200");
+  await expect(card).toContainText("Find flights to Berlin in May");
+  // It left the Chats list for the Nest, and nothing ran to do it.
+  await expect(chrome.getByRole("heading", { name: "Chats" })).toHaveCount(0);
+  await expect(chrome.getByRole("region", { name: /^Nests/ }).getByRole("button", { name: "Flights to Berlin", exact: true })).toBeVisible();
+  const tabs = await chrome.evaluate(() => window.chromeAPI.browser.getTabs());
+  expect(tabs.filter((tab) => tab.page === "chat")).toHaveLength(0);
+  expect(model.requests).toHaveLength(1);
+
+  // From the keyboard, Enter opens the card and Esc closes it.
+  await card.focus();
+  await chrome.keyboard.press("Enter");
+  const reply = card.getByPlaceholder("Reply to Berry");
+  await expect(reply).toBeVisible();
+  await chrome.keyboard.press("Escape");
+  await expect(reply).toHaveCount(0);
+
+  // A reply on the card that asks before opening a page. It's waiting, so the sidebar's row says so.
+  await card.focus();
+  await chrome.keyboard.press("Enter");
+  model.callTools({ name: "open_tab", args: { url: "https://example.com/flights?from=ARN&to=BER" } });
+  model.replyWith("Opened it.");
+  await reply.fill("Open the cheapest one");
+  await reply.press("Enter");
+  await expect(card.getByRole("status").first()).toHaveText("Needs your OK");
+  await chrome.keyboard.press("Escape");
+  await expect(chrome.getByRole("region", { name: /^Nests/ }).getByText("Needs you")).toBeAttached();
+
+  // Away on the board, the card out of sight, the row in Needs you opens the Nest at that card, open and in view.
+  const pane = (await chrome.locator(".react-flow__pane").boundingBox())!;
+  await chrome.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
+  for (let tries = 0; tries < 20 && (await card.boundingBox())!.x < pane.x + pane.width; tries++) await chrome.mouse.wheel(400, 0);
+  await expect(card).not.toBeInViewport();
+  await chrome.getByRole("button", { name: /^Needs you/ }).click();
+  const row = chrome.getByRole("listitem", { name: "Berry is asking" });
+  await row.hover();
+  await expect(row).toContainText("Flights to Berlin");
+  await row.getByRole("button", { name: "Open the card" }).click();
+  await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("Flights to Berlin");
+  await expect(card.getByPlaceholder("Reply to Berry")).toBeVisible();
+  await expect(card).toBeInViewport({ ratio: 0.5 });
+  expect((await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).filter((tab) => tab.page === "chat")).toHaveLength(0);
+
+  // The sidebar's row does the same, from another tab.
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
+  await chrome.getByRole("region", { name: /^Nests/ }).getByRole("button", { name: /^Flights to Berlin/ }).click();
+  await expect(card.getByPlaceholder("Reply to Berry")).toBeVisible();
+  await card.getByRole("button", { name: "Don’t allow" }).click();
+  await expect(card.getByRole("status").first()).toHaveText("Done");
 });
