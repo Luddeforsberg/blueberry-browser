@@ -35,6 +35,10 @@ export const startFakeModel = async () => {
   let plans: object[] = [];
   let planHold: Promise<void> | null = null;
   const planRequests: FakeModelRequest[] = [];
+  // A For-each card's column name and each row's value, from what the cheap model was sent.
+  let cell: ((data: string) => string) | null = null;
+  let column = "NONE";
+  const cellRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -45,6 +49,15 @@ export const startFakeModel = async () => {
     let body = "";
     for await (const part of request) body += part;
     const parsed = JSON.parse(body);
+
+    if (parsed.model === TITLE_MODEL && /fill in one cell|name one column/.test(JSON.stringify(parsed.messages[0]))) {
+      cellRequests.push(parsed);
+      const data = String(parsed.messages.at(-1)?.content ?? "");
+      const content = JSON.stringify(parsed.messages[0]).includes("name one column") ? column : (cell?.(data) ?? "NONE");
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ id: "fake", object: "chat.completion", created: 0, model: TITLE_MODEL, choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }] }));
+      return;
+    }
 
     if (parsed.model === TITLE_MODEL) {
       const asksWhatToRemember = JSON.stringify(parsed.messages[0]).includes("offer to remember");
@@ -129,7 +142,11 @@ export const startFakeModel = async () => {
     memoryRequests,
     suggestionRequests,
     planRequests,
+    cellRequests,
     reset() {
+      cell = null;
+      column = "NONE";
+      cellRequests.length = 0;
       plans = [];
       planHold = null;
       planRequests.length = 0;
@@ -149,6 +166,14 @@ export const startFakeModel = async () => {
     // What the title model answers. NONE means the chat has no topic yet.
     titleWith(next: string) {
       title = next;
+    },
+    // What the cheap model writes in a For-each card's column for a row, worked out from what it was sent, and what it
+    // names the column.
+    cellsFrom(next: (data: string) => string) {
+      cell = next;
+    },
+    columnWith(next: string) {
+      column = next;
     },
     // What the cheap model proposes for the new tab, worked out from the digest it was sent.
     suggestFrom(next: (digest: string) => string) {

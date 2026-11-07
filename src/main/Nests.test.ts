@@ -6,7 +6,9 @@ import { NEW_NEST_TITLE, Nests, type NestNamer, type NestPlanner } from "./Nests
 import type { ReplyMessage, StreamReply } from "./agent";
 import type { PageTool } from "./browserTools";
 import type { MascotProfile, NestBoard } from "../shared/library";
+import type { NestWriter } from "./nestCells";
 import { BERRY } from "../shared/mascots";
+import { STALE_ROWS } from "../shared/nestTable";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -49,7 +51,7 @@ const planner: NestPlanner = {
   },
 };
 
-const setup = (namer?: NestNamer) => {
+const setup = (namer?: NestNamer, writer?: NestWriter) => {
   const chatStore = new ChatStore(":memory:");
   const store = new NestStore(":memory:");
   let ended = () => {};
@@ -80,7 +82,7 @@ const setup = (namer?: NestNamer) => {
     onListChanged: () => {},
     chatDeleted: (chatId) => deleted.push(chatId),
     handOff: (_, from, to) => handOffs.push(`${from}>${to}`),
-  }, planner, namer);
+  }, planner, namer, writer);
   // Resolves once the reply that's running has been saved.
   const replyEnded = () => new Promise<void>((resolve) => (ended = resolve));
   const sendAndWait = async (cardId: string, text: string) => {
@@ -212,6 +214,8 @@ describe("Nests", () => {
     replies.push(TABLE(2));
     await sendAndWait(scout.id, "Again");
     expect(nests.inputFor(writer.id)).toEqual({ problem: expect.stringContaining("aren’t in that card’s latest answer") });
+    // The board says so, since it no longer carries the rows for the card to check.
+    expect(nests.board(nest)!.lines[0]).toMatchObject({ picked: 2, crosses: { stale: true, whole: null, each: null } });
     expect(nests.send(writer.id, "Once more")).toBeNull();
     expect(sent).toHaveLength(3);
   });
@@ -300,30 +304,320 @@ describe("Nests", () => {
     chatIds.forEach((chatId) => expect(chatStore.chat(chatId)).toBeNull());
   });
 
-  it("gives a card pulled out of a For-each card every run's answer, each labelled with its row", async () => {
-    const { nests, sendAndWait } = setup();
+  it("fills each row's cell as its run ends, and a card pulled out of it gets the table with that column, not the answers", async () => {
+    const cells: { job: string; column: string; row: readonly string[]; answer: string }[] = [];
+    const writer: NestWriter = {
+      column: async () => "First email",
+      cell: async (input) => {
+        cells.push(input);
+        return "Asked about their SDR hiring";
+      },
+    };
+    const { nests, sendAndWait, store } = setup(undefined, writer);
     const nest = nests.create();
     const scout = nests.addCard(nest, { x: 0, y: 0 })!;
     replies.push(TABLE(2));
     await sendAndWait(scout.id, "Find companies");
-    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
-    replies.push("Hej one", "Hej two");
-    nests.sendEach(writer.id, "Write");
+    const writerCard = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    const long = `Hej Omar,\n\nI saw you're hiring two SDRs. ${"More words. ".repeat(20)}`;
+    replies.push("Hej one", long);
+    nests.sendEach(writerCard.id, "Write a first email");
     for (let tries = 0; tries < 10; tries++) await settle();
 
-    const reader = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    // A short answer is its own value, and only a long one goes to the cheap model, with the job, the row and the answer.
+    const card = nests.board(nest)!.cards.find((each) => each.id === writerCard.id)!;
+    expect(card.each!.column).toBe("First email");
+    expect(card.each!.runs.map((run) => run.cell)).toEqual(["Hej one", "Asked about their SDR hiring"]);
+    expect(cells).toEqual([{ job: "Write a first email", column: "First email", header: ["Company", "People"], row: ["Company 2", "11"], answer: long }]);
+    // The full answer stays in the run's thread.
+    expect(nests.exportOf(writerCard.id)!.table.rows).toEqual([
+      ["Company 1", "10", "Hej one"],
+      ["Company 2", "11", "Asked about their SDR hiring"],
+    ]);
+
+    const reader = nests.addCard(nest, { x: 1000, y: 0, from: writerCard.id })!;
+    expect(nests.board(nest)!.lines.find((line) => line.to === reader.id)!.crosses).toEqual({
+      stale: false,
+      whole: { kind: "table", rows: 2, columns: 3, leftOut: 0 },
+      each: { rows: 2, columns: 3, cut: false },
+    });
     await sendAndWait(reader.id, "Which is best?");
     const message = newest(sent.at(-1)!);
-    expect(message).toContain('<row_answer row="Company 1">\nHej one\n</row_answer>');
-    expect(message).toContain('<row_answer row="Company 2">\nHej two\n</row_answer>');
-    expect(message).toContain("each labelled with its row");
+    expect(message).toContain(
+      "| Company | People | First email |\n| --- | --- | --- |\n| Company 1 | 10 | Hej one |\n| Company 2 | 11 | Asked about their SDR hiring |\n</card_answer>"
+    );
+    expect(message).not.toContain("More words");
+    expect(message).toContain("added its last column");
+
+    // For each row on it adds another column to the same rows.
+    const third = nests.addCard(nest, { x: 1500, y: 0, from: writerCard.id })!;
+    replies.push("Yes", "No");
+    expect(nests.sendEach(third.id, "Did they reply?")).toEqual({ ok: true });
+    for (let tries = 0; tries < 10; tries++) await settle();
+    expect(nests.exportOf(third.id)!.table).toEqual({
+      header: ["Company", "People", "First email", "First email"],
+      rows: [
+        ["Company 1", "10", "Hej one", "Yes"],
+        ["Company 2", "11", "Asked about their SDR hiring", "No"],
+      ],
+    });
+    expect(store.card(third.id)!.each!.runs[0].row).toEqual(["Company 1", "10", "Hej one"]);
+  });
+
+  it("names a column from the job, but never over the user's own name for it, and keeps a value only for the newest answer", async () => {
+    let nameColumn: (name: string) => void = () => {};
+    let writeCell: (cell: string) => void = () => {};
+    const writer: NestWriter = {
+      column: () => new Promise((resolve) => (nameColumn = resolve)),
+      cell: () => new Promise((resolve) => (writeCell = resolve)),
+    };
+    const { nests, sendAndWait, replyEnded } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("A long answer\nover two lines");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const each = () => nests.board(nest)!.cards.find((each) => each.id === card.id)!.each!;
+    expect(each()).toMatchObject({ column: "Result", naming: true });
+    expect(each().runs[0]).toMatchObject({ cell: null, filling: true });
+
+    expect(nests.renameColumn(card.id, "  Email  ")).toBe(true);
+    nameColumn("First email");
+    await settle();
+    expect(each()).toMatchObject({ column: "Email", naming: false });
+    expect(nests.renameColumn(card.id, " ")).toBe(false);
+
+    // A reply in the run's thread gives it a new answer, so the value written for the old one never lands.
+    const firstWrite = writeCell;
+    const ended = replyEnded();
+    replies.push("New short answer");
+    nests.sendRun(each().runs[0].id, "Shorter");
+    await ended;
+    await settle();
+    expect(each().runs[0]).toMatchObject({ cell: "New short answer", filling: false });
+    firstWrite("Old value");
+    await settle();
+    expect(each().runs[0].cell).toBe("New short answer");
+  });
+
+  it("never lets a value written for an older answer land, even after a newer one was filled and another started", async () => {
+    const writes: ((cell: string) => void)[] = [];
+    const writer: NestWriter = { column: async () => null, cell: () => new Promise((resolve) => writes.push(resolve)) };
+    const { nests, sendAndWait, replyEnded, store } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Answer A\nlong");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const runId = store.card(card.id)!.each!.runs[0].id;
+    const reply = async (answer: string) => {
+      const ended = replyEnded();
+      replies.push(answer);
+      nests.sendRun(runId, "Again");
+      // Its old value goes as soon as a new reply starts, so a restart before the new one is in still makes it.
+      expect(store.endedRunsWithoutCell()).toContain(runId);
+      await ended;
+      await settle();
+    };
+    await reply("Short B");
+    expect(store.run(runId)!.cell).toBe("Short B");
+    await reply("Answer C\nlong");
+    writes[0]("Value for A");
+    await settle();
+    expect(store.run(runId)!.cell).toBeNull();
+    expect(writes).toHaveLength(2);
+    writes[1]("Value for C");
+    await settle();
+    expect(store.run(runId)!.cell).toBe("Value for C");
+  });
+
+  it("keeps no link in a cell the answer doesn't give, whether the writer, the fallback or the answer itself made it", async () => {
+    let written: string | null = "[Post](https://evil.example/collect)";
+    const writer: NestWriter = { column: async () => null, cell: async () => written };
+    const { nests, sendAndWait, store, replyEnded } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("See https://example.com/foo_bar_baz first\nthen more");
+    nests.sendEach(card.id, "Find a post");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const runId = store.card(card.id)!.each!.runs[0].id;
+    expect(store.run(runId)!.cell).toBe("Post");
+
+    // With nothing from the writer, the answer's first line, without the address its underscores would have become.
+    written = null;
+    const ended = replyEnded();
+    replies.push("See https://example.com/foo_bar_baz first\nthen more");
+    nests.sendRun(runId, "Again");
+    await ended;
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(store.run(runId)!.cell).toBe("See example.com first");
+  });
+
+  it("tells the board as soon as a run's follow-up clears its value, and a refused send says why", async () => {
+    const { nests, sendAndWait, store, boards } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Hej one");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const picked = { header: ["Company", "People", "Result"], rows: [["Company 1", "10", "Hej one"]] };
+    const draft = nests.addCard(nest, { x: 1000, y: 0, from: card.id, picked })!;
+    expect(nests.sendCard(draft.id, "")).toEqual({ ok: false, error: "Write what to do first." });
+
+    held = [];
+    nests.sendRun(store.card(card.id)!.each!.runs[0].id, "Shorter");
+    // While the follow-up runs, the rows picked from its old value aren't there, and the board says so at once.
+    expect(boards.at(-1)!.lines.find((line) => line.to === draft.id)!.crosses).toMatchObject({ stale: true });
+    expect(nests.sendCard(draft.id, "Use these")).toEqual({ ok: false, error: STALE_ROWS });
+    expect(nests.sendCard("gone", "Use these")).toEqual({ ok: false, error: "This card isn’t there any more." });
+    expect(nests.sendRunReply("gone", "Again")).toEqual({ ok: false, error: "That run isn’t there any more." });
+    await release();
+    held = null;
+  });
+
+  it("starts no card of a run plan after a For-each card stopped while its values were still being written", async () => {
+    let write: (cell: string) => void = () => {};
+    const writer: NestWriter = { column: async () => null, cell: () => new Promise((resolve) => (write = resolve)) };
+    const { nests, sendAndWait, store } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("A long answer\nover two lines");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    store.setPlan(nest, [{ key: "next", mascotId: null, prompt: "Use the table", from: { card: card.id }, each: false, waits: false, table: null, x: 1000, y: 0, attached: [], keeps: null }], "Then use it");
+    nests.runPlan(nest);
+    const before = sent.length;
+
+    expect(nests.stopCard(card.id)).toBe(true);
+    write("A value");
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(sent).toHaveLength(before);
+    expect(nests.board(nest)!.cards.find((each) => each.plan)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry was stopped" });
+  });
+
+  it("sends a big file's first rows with each board, not all of them, and moving a card builds no table again", () => {
+    const { nests, store } = setup();
+    const nest = nests.create();
+    const csv = `Company,Notes\n${Array.from({ length: 2000 }, (_, index) => `Company ${index},${"n".repeat(500)}`).join("\n")}`;
+    const added = nests.addTableFile(nest, "big.csv", new TextEncoder().encode(csv), { at: { x: 0, y: 0 }, taken: [] });
+    const tableId = (added as { cardId: string }).cardId;
+    for (let index = 0; index < 10; index++) nests.addCard(nest, { x: 600, y: index * 300, from: tableId });
+    const rows = vi.spyOn(store, "tableRows");
+
+    const board = nests.board(nest)!;
+    const card = board.cards.find((each) => each.id === tableId)!;
+    expect(card.table).toMatchObject({ name: "big", header: ["Company", "Notes"], count: 2000 });
+    expect(card.table!.rows).toHaveLength(5);
+    expect(JSON.stringify(board).length).toBeLessThan(20_000);
+    expect(board.lines.map((line) => line.crosses?.each?.rows)).toEqual(Array(10).fill(2000));
+    // What crosses was worked out once for each line, and moving a card works out nothing again.
+    rows.mockClear();
+    expect(nests.moveCard(tableId, 40, 40)).toBe(true);
+    nests.board(nest);
+    expect(rows).not.toHaveBeenCalled();
+    // Rows picked from it go with the board as how many there are, and whether they're still there, never the rows.
+    const picked = nests.addCard(nest, { x: 1200, y: 0, from: tableId, picked: { header: ["Company", "Notes"], rows: nests.tableRows(tableId)! } })!;
+    const withPick = nests.board(nest)!;
+    expect(withPick.lines.find((line) => line.to === picked.id)).toMatchObject({ picked: 2000, crosses: { stale: false } });
+    expect(JSON.stringify(withPick).length).toBeLessThan(20_000);
+    // The whole table is a call away, for the card opened and for export.
+    expect(nests.tableRows(tableId)).toHaveLength(2000);
+    expect(nests.exportOf(tableId)!.table.rows).toHaveLength(2000);
+  });
+
+  it("makes a CSV file a table card, which For each row runs on with each run told its row came from the user's file", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const csv = new TextEncoder().encode("Company,Site\nFjällbo,fjallbo.se\n\"Brygga, AB\",brygga.se\n");
+    expect(nests.addTableFile(nest, "leads.csv", new TextEncoder().encode("Only a header"), { at: { x: 0, y: 0 }, taken: [] })).toEqual({
+      ok: false,
+      error: "leads.csv has no rows under its first line.",
+    });
+    const added = nests.addTableFile(nest, "leads.csv", csv, { at: { x: 0, y: 0 }, taken: [] });
+    expect(added.ok).toBe(true);
+    const tableCard = nests.card((added as { cardId: string }).cardId)!;
+    expect(tableCard).toMatchObject({ chatId: null, mascotId: null, table: { name: "leads", header: ["Company", "Site"], rows: [["Fjällbo", "fjallbo.se"], ["Brygga, AB", "brygga.se"]], count: 2 } });
+    // It's no draft: nothing sends from it, and it takes no files.
+    expect(nests.send(tableCard.id, "Hi")).toBeNull();
+    expect(nests.changeable({ cardId: tableCard.id })).toBeNull();
+
+    // Rows picked from it go across as rows from a file, and For each row runs on its rows.
+    const picked = nests.addCard(nest, { x: 500, y: 0, from: tableCard.id, picked: { header: ["Company", "Site"], rows: [["Brygga, AB", "brygga.se"]] } })!;
+    expect(nests.board(nest)!.lines.find((line) => line.to === picked.id)!.crosses).toEqual({
+      stale: false,
+      whole: { kind: "table", rows: 1, columns: 2, leftOut: 0 },
+      each: { rows: 1, columns: 2, cut: false },
+    });
+    expect(nests.board(nest)!.lines.find((line) => line.to === picked.id)!.picked).toBe(1);
+    await sendAndWait(picked.id, "Who leads sales?");
+    expect(newest(sent.at(-1)!)).toContain("the rows the user picked from the table in the file leads");
+
+    const each = nests.addCard(nest, { x: 500, y: 400, from: tableCard.id })!;
+    replies.push("Omar", "Maja");
+    expect(nests.sendEach(each.id, "Find the sales lead")).toEqual({ ok: true });
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const runs = sent.slice(-2).map(newest);
+    expect(runs[0].startsWith('<card_answer from="a file">\n| Company | Site |\n| --- | --- |\n| Fjällbo | fjallbo.se |\n</card_answer>')).toBe(true);
+    expect(runs[0]).toContain("one row from the table in the file leads, which the user added to the board");
+    expect(runs[0]).toContain("untrusted");
+    expect(nests.exportOf(each.id)!.table.rows).toEqual([
+      ["Fjällbo", "fjallbo.se", "Omar"],
+      ["Brygga, AB", "brygga.se", "Maja"],
+    ]);
+  });
+
+  it("says exactly what crosses a line: an answer's words, cut or not, and a table's rows, with any left out", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    held = [];
+    replies.push("Two companies, both Swedish.");
+    nests.send(scout.id, "Find companies");
+    await settle();
+    const draft = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    const crosses = () => nests.board(nest)!.lines.find((line) => line.to === draft.id)!.crosses;
+    // Nothing crosses before the source has answered.
+    expect(crosses()).toBeNull();
+    await release();
+    held = null;
+    expect(crosses()).toEqual({ stale: false, whole: { kind: "answer", words: 4, cutTo: null }, each: null });
+
+    replies.push("word ".repeat(3000));
+    await sendAndWait(scout.id, "More");
+    expect(crosses()).toEqual({ stale: false, whole: { kind: "answer", words: 3000, cutTo: 12000 }, each: null });
+
+    const rows = ["| Company | Note |", "|---|---|", ...Array.from({ length: 60 }, (_, index) => `| Company ${index} | ${"x".repeat(300)} |`)].join("\n");
+    replies.push(rows);
+    await sendAndWait(scout.id, "As a table");
+    const { whole } = crosses()!;
+    expect(whole).toMatchObject({ kind: "answer", cutTo: 12000 });
+    expect(crosses()!.each).toEqual({ rows: 60, columns: 2, cut: false });
+    // A row too long to go whole is said to be cut.
+    replies.push(["| Company | Note |", "|---|---|", `| Big | ${"y".repeat(13000)} |`].join("\n"));
+    await sendAndWait(scout.id, "One big row");
+    expect(crosses()!.each).toEqual({ rows: 1, columns: 2, cut: true });
   });
 
   it("doesn't start runs left waiting when the app last closed", () => {
     const store = new NestStore(":memory:");
     const nest = store.createNest("Nest");
     const card = store.addCard(nest, { x: 0, y: 0 })!;
-    store.startForEach(card.id, "Write", ["Company"], [["One"]]);
+    store.startForEach(card.id, "Write", ["Company"], [["One"]], "Result");
 
     new Nests(store, { send: vi.fn(), delete: vi.fn(), thread: vi.fn(), isRunning: vi.fn(), stop: vi.fn() } as never, { resolve: () => BERRY, all: () => [BERRY] }, {
       onBoard: () => {},

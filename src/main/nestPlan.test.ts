@@ -68,13 +68,21 @@ describe("checkPlan", () => {
 
   it("refuses For each row on anything that doesn't give a table", () => {
     const refused = { ok: false, problem: "For each row was on a card that doesn’t get a table" };
-    // No line, a planned card with no table, a board card whose answer has none, and a planned For-each card.
+    // No line, a planned card with no table, and a board card whose answer has none.
     expect(check(plan(card("c1", { for_each_row: true })))).toEqual(refused);
     expect(check(plan(card("c1"), card("c2", { from: "c1", for_each_row: true })))).toEqual(refused);
     expect(check(plan(card("c1", { from: "e2", for_each_row: true })))).toEqual(refused);
-    expect(check(plan(card("c1", { table_of: "companies" }), card("c2", { from: "c1", for_each_row: true, table_of: "posts" }), card("c3", { from: "c2", for_each_row: true })))).toEqual(refused);
     // A board card whose answer has a table is fine.
     expect(check(plan(card("c1", { from: "e1", for_each_row: true }))).ok).toBe(true);
+  });
+
+  it("lets For each row run on a planned For-each card, whose table gets another column", () => {
+    const chained = check(plan(card("c1", { table_of: "companies" }), card("c2", { from: "c1", for_each_row: true }), card("c3", { from: "c2", for_each_row: true })));
+    expect(chained.ok && chained.cards.map((each) => [each.key, each.each])).toEqual([
+      ["c1", false],
+      ["c2", true],
+      ["c3", true],
+    ]);
   });
 
   it("refuses a line to a card that isn't in the plan or on the board", () => {

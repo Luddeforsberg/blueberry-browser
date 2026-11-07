@@ -34,7 +34,7 @@ export const PLAN_SYSTEM_PROMPT =
   `- A request that is several jobs is a card for each, ${MAX_PLAN_CARDS} at most. Split only where the jobs need different birds, where the user should check something first, or where the same job runs for every row of a list.\n` +
   "- A card that needs another card's answer names it in from: a card in this plan by its key, or a card already on the board by its key there. Its prompt refers to that answer, such as \"the companies in the list\", and never repeats it.\n" +
   "- A card whose answer is a list for the next card to use has table_of, saying what each row is, and its prompt asks for the answer as one markdown table with a row for each, with each one's name in the first column.\n" +
-  "- for_each_row runs a card once for each row of its from card's table, as separate jobs that each get one row, so its prompt says what to do with one row. Only use it when from is a card with table_of, or a card on the board that has a table.\n" +
+  "- for_each_row runs a card once for each row of its from card's table, as separate jobs that each get one row, so its prompt says what to do with one row. Its answer is that table with one more column, each row's short result, so a card after it can use the table or run for_each_row again to add another column. Only use it when from is a card with table_of or for_each_row, or a card on the board that has a table.\n" +
   "- waits_for_user makes a card wait until the user says its from card's answer is right. Use it before anything is sent, posted, saved, bought or changed for the user, and when a list should be checked before work is done on it.\n" +
   "- When the user attached files or notes, attached on each card lists the keys of the ones that card needs, so each goes only where it's used. A card after another gets that card's answer, not its files, so give a file to every card that needs it.\n" +
   "- bird is the id of a bird in the flock. Use a bird whose limits and instructions fit the job, and otherwise the bird the user chose.\n" +
@@ -49,6 +49,9 @@ export const PLAN_SYSTEM_PROMPT =
 const ANSWER_START_LENGTH = 300;
 const ANSWER_START_LINES = 4;
 const TABLE_ROWS_SHOWN = 3;
+// A table's start is cut cell by cell and as a whole, so one huge cell, or a file's, can't fill the request.
+const PREVIEW_CELL_LENGTH = 100;
+export const MAX_PREVIEW_LENGTH = 1500;
 const ASKED_LENGTH = 300;
 const INSTRUCTIONS_LENGTH = 300;
 // The newest this many cards on the board, so a long-lived Nest doesn't make the request any longer.
@@ -94,10 +97,18 @@ export interface PlannedDigest {
   attached: string[];
 }
 
+const cutTo = (text: string, length: number) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
+
+// The start of a table: how many rows it has, its header and its first rows, each cell cut, and the whole cut.
+export const tableStart = (header: readonly string[], rows: readonly (readonly string[])[], count: number): string => {
+  const cells = (row: readonly string[]) => row.map((cell) => cutTo(cell, PREVIEW_CELL_LENGTH));
+  return cutTo(`A table with ${count} rows, starting:\n${tableMarkdown(cells(header), rows.slice(0, TABLE_ROWS_SHOWN).map(cells))}`, MAX_PREVIEW_LENGTH);
+};
+
 // The start of an answer: a table's header and first rows, or its first lines.
 export const answerStart = (answer: string): string => {
   const table = findTable(answer);
-  if (table) return `A table with ${table.rows.length} rows, starting:\n${tableMarkdown(table.header, table.rows.slice(0, TABLE_ROWS_SHOWN))}`;
+  if (table) return tableStart(table.header, table.rows, table.rows.length);
   const start = answer.split("\n").filter((line) => line.trim()).slice(0, ANSWER_START_LINES).join("\n");
   return start.length > ANSWER_START_LENGTH ? `${start.slice(0, ANSWER_START_LENGTH)}…` : start;
 };

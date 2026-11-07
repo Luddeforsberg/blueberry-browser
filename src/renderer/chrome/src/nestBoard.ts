@@ -68,12 +68,13 @@ export const pickRows = (rows: readonly number[], anchor: number | null, index: 
 
 export type RunPhase = 'waiting' | 'working' | 'done' | 'failed' | 'stopped' | 'not-started'
 
-// Where one run of For each row is, from its state on the card and its chat.
-export const runPhase = (run: Pick<NestRun, 'state'>, thread: Pick<ChatThread, 'partial' | 'approval' | 'error' | 'messages'> | undefined): RunPhase => {
+// Where one run of For each row is, from its state on the card, its chat, and whether its value is still being written.
+export const runPhase = (run: Pick<NestRun, 'state' | 'filling'>, thread: Pick<ChatThread, 'partial' | 'approval' | 'error' | 'messages'> | undefined): RunPhase => {
     if (run.state === 'waiting') return 'waiting'
     if (run.state === 'stopped') return 'not-started'
     if (run.state === 'failed') return 'failed'
-    if (!thread || thread.partial !== null) return 'working'
+    // Its value is still being written from its answer, so its row isn't done yet.
+    if (!thread || thread.partial !== null || run.filling) return 'working'
     const { tone, text } = cardStatus(thread)
     if (tone === 'done') return 'done'
     if (tone === 'failed') return 'failed'

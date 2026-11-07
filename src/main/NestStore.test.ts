@@ -4,6 +4,13 @@ import { join } from "path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
+import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
+
+// What migrations after 9 added, so a file can be taken back to how an older version left it.
+const LATER_COLUMNS =
+  "ALTER TABLE cards DROP COLUMN each_column; ALTER TABLE cards DROP COLUMN each_column_settled; ALTER TABLE runs DROP COLUMN cell; " +
+  "ALTER TABLE cards DROP COLUMN table_name; ALTER TABLE cards DROP COLUMN table_header; ALTER TABLE cards DROP COLUMN table_count; " +
+  "ALTER TABLE cards DROP COLUMN table_preview; ALTER TABLE cards DROP COLUMN table_rows;";
 
 describe("NestStore", () => {
   it("keeps a nest's cards, their places and the lines between them across opening the file again", () => {
@@ -23,7 +30,7 @@ describe("NestStore", () => {
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, autoPlaced: false, each: null, plan: null, attachments: [] },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, autoPlaced: false, each: null, plan: null, table: null, attachments: [] },
         {
           id: writer.id,
           chatId: null,
@@ -33,6 +40,7 @@ describe("NestStore", () => {
           autoPlaced: false,
           each: null,
           plan: null,
+          table: null,
           attachments: [{ id: expect.any(String), kind: "file", name: "one-pager.pdf", type: "application/pdf", size: 6 }],
         },
       ],
@@ -67,7 +75,7 @@ describe("NestStore", () => {
       }
     }
     db.exec("DROP TABLE IF EXISTS plan_attachments;");
-    db.exec("ALTER TABLE nests DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN auto_placed;");
+    db.exec(`ALTER TABLE nests DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN auto_placed; ${LATER_COLUMNS}`);
     db.close();
 
     const again = new NestStore(file);
@@ -95,7 +103,7 @@ describe("NestStore", () => {
     // A Nest from before names were settled keeps its name, unless it's the old placeholder.
     const old = store.createNest("Untitled nest");
     const db = new DatabaseSync(file);
-    db.exec("PRAGMA user_version = 7; ALTER TABLE nests DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN auto_placed;");
+    db.exec(`PRAGMA user_version = 7; ALTER TABLE nests DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN auto_placed; ${LATER_COLUMNS}`);
     db.close();
     const again = new NestStore(file);
     expect(again.titleSettled(old)).toBe(false);
@@ -188,7 +196,7 @@ describe("NestStore", () => {
     expect(store.nests().map(({ title }) => title)).toEqual(["Renamed", "Newer"]);
   });
 
-  it("keeps the rows picked for a line as they were", () => {
+  it("keeps the rows picked for a line as they were, and sends only how many with the board", () => {
     const store = new NestStore(":memory:");
     const nest = store.createNest("Nest");
     const source = store.addCard(nest, { x: 0, y: 0 })!;
@@ -196,7 +204,10 @@ describe("NestStore", () => {
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
 
     expect(store.lineTo(next.id)).toEqual({ source: expect.objectContaining({ id: source.id }), picked });
-    expect(store.board(nest)?.lines[0].picked).toEqual(picked);
+    // The board carries only how many, and a line with none picked says so.
+    expect(store.board(nest)?.lines[0].picked).toBe(2);
+    store.addCard(nest, { x: 0, y: 0, from: source.id });
+    expect(store.board(nest)?.lines[1].picked).toBeNull();
   });
 
   it("makes a draft a For-each card once, with a waiting run for each row, and starts each run only once", () => {
@@ -205,8 +216,8 @@ describe("NestStore", () => {
     const nest = store.createNest("Nest");
     const card = store.addCard(nest, { x: 0, y: 0 })!;
 
-    expect(store.startForEach(card.id, "Write to each", ["Company"], [["Fjällbo"], ["Brygga"]])).toBe(true);
-    expect(store.startForEach(card.id, "Again", ["Company"], [["Kvarnsten"]])).toBe(false);
+    expect(store.startForEach(card.id, "Write to each", ["Company"], [["Fjällbo"], ["Brygga"]], "Result")).toBe(true);
+    expect(store.startForEach(card.id, "Again", ["Company"], [["Kvarnsten"]], "Result")).toBe(false);
     expect(store.setChat(card.id, "chat-1")).toBe(false);
     expect(store.setBird(card.id, "scout")).toBe(false);
     const [first, second] = store.waitingRuns();
@@ -218,9 +229,10 @@ describe("NestStore", () => {
     expect(new NestStore(file).card(card.id)?.each).toEqual({
       prompt: "Write to each",
       header: ["Company"],
+      column: "Result",
       runs: [
-        { id: first.id, row: ["Fjällbo"], chatId: "run-chat-1", state: "started" },
-        { id: second.id, row: ["Brygga"], chatId: null, state: "stopped" },
+        { id: first.id, row: ["Fjällbo"], chatId: "run-chat-1", state: "started", cell: null },
+        { id: second.id, row: ["Brygga"], chatId: null, state: "stopped", cell: null },
       ],
     });
     expect(store.runOfChat("run-chat-1")?.cardId).toBe(card.id);
@@ -230,5 +242,51 @@ describe("NestStore", () => {
     expect(store.deleteCard(card.id)).toBe(true);
     expect(store.run(first.id)).toBeNull();
     expect(store.chatIds()).toEqual([]);
+  });
+
+  it("names the column of a For-each card from before columns, so none is left blank", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Nest");
+    const card = store.addCard(nest, { x: 0, y: 0 })!;
+    store.startForEach(card.id, "Find posts", ["Company"], [["Fjällbo"]], "Latest post");
+    const db = new DatabaseSync(file);
+    db.exec(`PRAGMA user_version = 9; ${LATER_COLUMNS}`);
+    db.close();
+    expect(new NestStore(file).card(card.id)!.each!.column).toBe("Result");
+  });
+
+  it("keeps a column's name the user gave over a generated one, a run's value, and a file's rows as a card nothing can send from", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Nest");
+    const card = store.addCard(nest, { x: 0, y: 0 })!;
+    store.startForEach(card.id, "Find posts", ["Company"], [["Fjällbo"]], "Result");
+    expect(store.nameColumn(card.id, "Latest post", false)).toBe(true);
+    expect(store.nameColumn(card.id, "Mine", true)).toBe(true);
+    expect(store.nameColumn(card.id, "Generated later", false)).toBe(false);
+    const [run] = store.card(card.id)!.each!.runs;
+    store.setRunChat(run.id, "run-chat");
+    expect(store.endedRunsWithoutCell()).toEqual([run.id]);
+    store.setRunCell(run.id, "Hiring two SDRs");
+    expect(store.endedRunsWithoutCell()).toEqual([]);
+
+    const table = store.addTableCard(nest, { x: 500, y: 0, table: { name: "leads", header: ["Company"], rows: [["Brygga"]] } })!;
+    expect(store.setChat(table.id, "chat")).toBe(false);
+    expect(store.startForEach(table.id, "Go", ["Company"], [["Brygga"]], "Result")).toBe(false);
+    expect(store.setBird(table.id, "scout")).toBe(false);
+    const again = new NestStore(file);
+    expect(again.card(card.id)!.each).toMatchObject({ column: "Mine", runs: [{ cell: "Hiring two SDRs" }] });
+    expect(again.card(table.id)).toMatchObject({ chatId: null, mascotId: null, autoPlaced: true, table: { name: "leads", header: ["Company"], rows: [["Brygga"]], count: 1 } });
+    expect(again.tableRows(table.id)).toEqual([["Brygga"]]);
+    // Only the first rows go with the card, each cell cut, and the whole table is read on its own.
+    const big = again.addTableCard(nest, { x: 0, y: 900, table: { name: "big", header: ["A"], rows: Array.from({ length: 9 }, (_, index) => [`${index}${"z".repeat(500)}`]) } })!;
+    expect(big.table!.count).toBe(9);
+    expect(big.table!.rows.map((row) => row[0].length)).toEqual(Array(TABLE_PREVIEW_ROWS).fill(PREVIEW_CELL_LENGTH));
+    expect(again.tableRows(big.id)![8][0]).toBe(`8${"z".repeat(500)}`);
+    expect(again.tableRows(card.id)).toBeNull();
+    // A line can come out of it, as out of any card with something to give.
+    const plan = { key: "p1", mascotId: null, prompt: "For each", from: { card: table.id }, each: true, waits: false, table: null, x: 0, y: 400, attached: [], keeps: null };
+    expect(again.setPlan(nest, [plan], "Do it")).toHaveLength(1);
   });
 });
