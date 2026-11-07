@@ -6,7 +6,7 @@ import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResul
 import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, tableMarkdown, type LineCrossing, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
-import { crossingOf, latestAnswer, rowAnswer, rowsAnswer, tableAnswer, type CardAnswer } from "./nestContext";
+import { crossingOf, latestAnswer, MAX_CARD_ANSWER_LENGTH, rowAnswer, rowsAnswer, tableAnswer, type CardAnswer } from "./nestContext";
 import { DEFAULT_COLUMN, fallbackCell, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
 import { tableFromFile } from "./nestCsv";
 import { armedStep, checkPlan, CLOSED_BEFORE_START, replyState, runsState, type PlanCard, type PlanSource, type SourceState } from "./nestPlan";
@@ -88,6 +88,7 @@ export class Nests {
   // Runs whose value is being written from their answer, each with the newest request for it, so an older one that comes
   // back late never replaces a newer answer's value.
   private readonly fills = new Map<string, number>();
+  private fillTurn = 0;
   // For-each cards whose column the cheap model is naming.
   private readonly columnNaming = new Set<string>();
 
@@ -107,7 +108,7 @@ export class Nests {
     store.stopWaiting();
     store.holdAfter(null, CLOSED_BEFORE_START);
     // Runs that ended while a value was still being written, when the app last closed, get theirs once the window is up.
-    setTimeout(() => store.endedRunsWithoutCell().forEach((runId) => this.fillCell(runId)), 0);
+    setTimeout(() => store.endedRunsWithoutCell().forEach((runId) => !this.fills.has(runId) && this.fillCell(runId)), 0);
   }
 
   list(): NestSummary[] {
@@ -149,7 +150,10 @@ export class Nests {
     const input = this.inputFor(cardId);
     const rows = this.rowsFor(cardId);
     const whole = "answer" in input && input.answer ? crossingOf(input.answer) : null;
-    const each = "problem" in rows ? null : { rows: rows.rows.length, columns: rows.header.length };
+    const each =
+      "problem" in rows
+        ? null
+        : { rows: rows.rows.length, columns: rows.header.length, cut: rows.rows.some((row) => rowAnswer("", rows.header, row).text.length > MAX_CARD_ANSWER_LENGTH) };
     return whole || each ? { whole, each } : null;
   }
 
@@ -382,15 +386,22 @@ export class Nests {
       ...this.userSaid(card.id, run.chatId, text),
       ...this.attachmentsFor(card.id),
     });
-    if (sent) this.store.touch(card.nestId);
+    if (!sent) return null;
+    // Its value was the old answer's: it goes, and one being written for that answer never lands, so a restart before
+    // this reply's value is in still makes it.
+    this.fills.delete(runId);
+    this.store.setRunCell(runId, null);
+    this.store.touch(card.nestId);
     return sent;
   }
 
-  // Stop on a card: nothing still waiting starts, and every run going stops.
+  // Stop on a card: nothing still waiting starts, every run going stops, and no card of a run plan after it starts, even
+  // when its runs had ended and only their values were still being written.
   stopCard(cardId: string): boolean {
     const card = this.store.card(cardId);
     if (!card) return false;
     this.store.stopWaiting(cardId);
+    this.store.holdAfter(cardId, `Didn’t start, because ${this.labelOf(card)} was stopped`);
     this.chatsOf(card).forEach((chatId) => this.chats.stop(chatId));
     this.changed(card.nestId);
     return true;
@@ -798,7 +809,7 @@ export class Nests {
     if (!run?.chatId || !card?.each || this.chats.isRunning(run.chatId)) return;
     const answer = this.answerOf(run.chatId);
     const ready = answer === null ? null : shortCell(answer);
-    const turn = (this.fills.get(runId) ?? 0) + 1;
+    const turn = ++this.fillTurn;
     if (answer === null || ready !== null) {
       const was = this.fills.delete(runId);
       if (!was && ready === run.cell) return;

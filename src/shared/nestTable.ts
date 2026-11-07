@@ -186,7 +186,8 @@ export type Crossing =
 // On every line: what crosses as it is, and what each run gets when For each row is on, or null where it can't be.
 export interface LineCrossing {
   whole: Crossing | null;
-  each: { rows: number; columns: number } | null;
+  // `cut` when a row is too long to go whole, so it's cut to the first characters that fit.
+  each: { rows: number; columns: number; cut?: boolean } | null;
 }
 
 const count = (value: number) => value.toLocaleString("en-US");
@@ -209,4 +210,5 @@ export const crossingWords = (crossing: Crossing, who: string): string => {
 };
 
 // What each run of For each row gets.
-export const eachWords = ({ columns }: { columns: number }): string => `One row each, ${counted(columns, "column")}`;
+export const eachWords = ({ columns, cut = false }: { columns: number; cut?: boolean }, cutTo = 12000): string =>
+  `One row each, ${counted(columns, "column")}${cut ? `, a row too long to go whole cut to its first ${count(cutTo)} characters` : ""}`;

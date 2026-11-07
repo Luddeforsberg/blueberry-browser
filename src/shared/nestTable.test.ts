@@ -147,5 +147,6 @@ describe("what crosses a line, in words", () => {
     expect(crossingWords({ kind: "table", rows: 1, columns: 1, leftOut: 0 }, "leads")).toBe("1 row, 1 column from leads");
     expect(crossingWords({ kind: "table", rows: 40, columns: 3, leftOut: 1 }, "Writer")).toBe("40 rows, 3 columns from Writer, with 1 more row left out to fit");
     expect(eachWords({ columns: 3 })).toBe("One row each, 3 columns");
+    expect(eachWords({ columns: 3, cut: true })).toBe("One row each, 3 columns, a row too long to go whole cut to its first 12,000 characters");
   });
 });

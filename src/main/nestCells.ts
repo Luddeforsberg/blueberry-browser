@@ -73,6 +73,9 @@ export const parseCell = (reply: string, answer: string): string | null => {
     const safe = safeHref(href);
     return safe && answer.includes(href) ? whole : words || href;
   });
+  // A bare address is a link too on the card, so the same goes for one: kept only if the answer gives it, and otherwise
+  // only its site, as words.
+  text = text.replace(/(?<!\]\()https?:\/\/[^\s<>|)\]]+/g, (address) => (answer.includes(address) ? address : address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]));
   text = text.replace(/\s+/g, " ").trim();
   if (!text || text.toUpperCase() === "NONE") return null;
   // Cut, it keeps only words, since a link cut short would go nowhere.

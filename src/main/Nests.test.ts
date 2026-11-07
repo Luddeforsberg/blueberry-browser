@@ -335,7 +335,7 @@ describe("Nests", () => {
     const reader = nests.addCard(nest, { x: 1000, y: 0, from: writerCard.id })!;
     expect(nests.board(nest)!.lines.find((line) => line.to === reader.id)!.crosses).toEqual({
       whole: { kind: "table", rows: 2, columns: 3, leftOut: 0 },
-      each: { rows: 2, columns: 3 },
+      each: { rows: 2, columns: 3, cut: false },
     });
     await sendAndWait(reader.id, "Which is best?");
     const message = newest(sent.at(-1)!);
@@ -399,6 +399,63 @@ describe("Nests", () => {
     expect(each().runs[0].cell).toBe("New short answer");
   });
 
+  it("never lets a value written for an older answer land, even after a newer one was filled and another started", async () => {
+    const writes: ((cell: string) => void)[] = [];
+    const writer: NestWriter = { column: async () => null, cell: () => new Promise((resolve) => writes.push(resolve)) };
+    const { nests, sendAndWait, replyEnded, store } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Answer A\nlong");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    const runId = store.card(card.id)!.each!.runs[0].id;
+    const reply = async (answer: string) => {
+      const ended = replyEnded();
+      replies.push(answer);
+      nests.sendRun(runId, "Again");
+      // Its old value goes as soon as a new reply starts, so a restart before the new one is in still makes it.
+      expect(store.endedRunsWithoutCell()).toContain(runId);
+      await ended;
+      await settle();
+    };
+    await reply("Short B");
+    expect(store.run(runId)!.cell).toBe("Short B");
+    await reply("Answer C\nlong");
+    writes[0]("Value for A");
+    await settle();
+    expect(store.run(runId)!.cell).toBeNull();
+    expect(writes).toHaveLength(2);
+    writes[1]("Value for C");
+    await settle();
+    expect(store.run(runId)!.cell).toBe("Value for C");
+  });
+
+  it("starts no card of a run plan after a For-each card stopped while its values were still being written", async () => {
+    let write: (cell: string) => void = () => {};
+    const writer: NestWriter = { column: async () => null, cell: () => new Promise((resolve) => (write = resolve)) };
+    const { nests, sendAndWait, store } = setup(undefined, writer);
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const card = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("A long answer\nover two lines");
+    nests.sendEach(card.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+    store.setPlan(nest, [{ key: "next", mascotId: null, prompt: "Use the table", from: { card: card.id }, each: false, waits: false, table: null, x: 1000, y: 0, attached: [], keeps: null }], "Then use it");
+    nests.runPlan(nest);
+    const before = sent.length;
+
+    expect(nests.stopCard(card.id)).toBe(true);
+    write("A value");
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(sent).toHaveLength(before);
+    expect(nests.board(nest)!.cards.find((each) => each.plan)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry was stopped" });
+  });
+
   it("makes a CSV file a table card, which For each row runs on with each run told its row came from the user's file", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();
@@ -419,7 +476,7 @@ describe("Nests", () => {
     const picked = nests.addCard(nest, { x: 500, y: 0, from: tableCard.id, picked: { header: ["Company", "Site"], rows: [["Brygga, AB", "brygga.se"]] } })!;
     expect(nests.board(nest)!.lines.find((line) => line.to === picked.id)!.crosses).toEqual({
       whole: { kind: "table", rows: 1, columns: 2, leftOut: 0 },
-      each: { rows: 1, columns: 2 },
+      each: { rows: 1, columns: 2, cut: false },
     });
     await sendAndWait(picked.id, "Who leads sales?");
     expect(newest(sent.at(-1)!)).toContain("the rows the user picked from the table in the file leads");
@@ -463,7 +520,11 @@ describe("Nests", () => {
     await sendAndWait(scout.id, "As a table");
     const { whole } = crosses()!;
     expect(whole).toMatchObject({ kind: "answer", cutTo: 12000 });
-    expect(crosses()!.each).toEqual({ rows: 60, columns: 2 });
+    expect(crosses()!.each).toEqual({ rows: 60, columns: 2, cut: false });
+    // A row too long to go whole is said to be cut.
+    replies.push(["| Company | Note |", "|---|---|", `| Big | ${"y".repeat(13000)} |`].join("\n"));
+    await sendAndWait(scout.id, "One big row");
+    expect(crosses()!.each).toEqual({ rows: 1, columns: 2, cut: true });
   });
 
   it("doesn't start runs left waiting when the app last closed", () => {

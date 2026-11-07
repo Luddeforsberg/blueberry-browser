@@ -92,7 +92,8 @@ export const tableFromFile = (name: string, bytes: Uint8Array): TableFile => {
   const text = decode(bytes);
   const lines = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text)).filter((cells) => cells.some((cell) => cell.trim() !== ""));
   if (lines.length < 2) return { ok: false, error: `${name} has no rows under its first line.` };
-  const columns = Math.max(...lines.map((cells) => cells.length));
+  // Counted without spreading, since a file far past the row limit can have more lines than a call takes arguments.
+  const columns = lines.reduce((most, cells) => Math.max(most, cells.length), 0);
   if (columns > MAX_TABLE_COLUMNS) return { ok: false, error: `${name} has ${columns} columns, and a table can have ${MAX_TABLE_COLUMNS} at most.` };
   const rows = lines.length - 1;
   if (rows > MAX_TABLE_ROWS) {

@@ -74,6 +74,13 @@ describe("tableFromFile", () => {
     });
   });
 
+  it("refuses a file far past the row limit with why, rather than failing on its size", () => {
+    expect(tableFromFile("a.csv", bytes(`Name\n${"x\n".repeat(150_000)}`))).toEqual({
+      ok: false,
+      error: "a.csv has 150,000 rows, and a table can have 2,000 at most. Split it and add each part.",
+    });
+  });
+
   it("takes the most columns, and refuses one past that", () => {
     const columns = (count: number) => bytes(`${Array.from({ length: count }, (_, index) => `C${index}`).join(",")}\n1`);
     expect(tableFromFile("a.csv", columns(MAX_TABLE_COLUMNS))).toMatchObject({ ok: true });

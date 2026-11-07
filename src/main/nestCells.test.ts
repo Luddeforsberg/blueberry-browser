@@ -43,6 +43,9 @@ describe("parseCell", () => {
     expect(parseCell("[Hiring two SDRs](https://linkedin.com/posts/omar-1)", ANSWER)).toBe("[Hiring two SDRs](https://linkedin.com/posts/omar-1)");
     expect(parseCell("[Hiring](https://evil.example/steal)", ANSWER)).toBe("Hiring");
     expect(parseCell("[Hiring](javascript:alert)", "javascript:alert")).toBe("Hiring");
+    // A bare address links on the card too, so one the answer doesn't give is only its site, as words.
+    expect(parseCell("See https://invented.example/collect?id=1 now", ANSWER)).toBe("See invented.example now");
+    expect(parseCell("https://linkedin.com/posts/omar-1", ANSWER)).toBe("https://linkedin.com/posts/omar-1");
   });
 
   it("keeps a value at the limit whole, and cuts one past it on a word, as words only", () => {
