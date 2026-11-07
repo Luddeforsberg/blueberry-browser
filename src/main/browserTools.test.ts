@@ -610,7 +610,7 @@ describe("the fetch_page tool", () => {
 describe("a click allowed for a card's runs", () => {
   // A page whose one element can change at any moment, with no bird drawn, and every input written down. `lands` is what
   // the page says about the press: landed, or nothing, as when something else took it.
-  const page = (change: "start" | "mouseMove" | null, then: { name?: string }, lands = true) => {
+  const page = (change: "start" | "mouseMove" | null, then: { name?: string }, lands = true, limited = false) => {
     let changed = change === "start";
     const inputs: string[] = [];
     const scripts: string[] = [];
@@ -626,8 +626,18 @@ describe("a click allowed for a card's runs", () => {
       inputs.push(event.type);
       if (event.type === "mouseMove" && change === "mouseMove") changed = true;
     });
-    const tab = { id: "tab-1", url: "https://mail.example/compose", zoomFactor: 1, foreignFrames: [], frames: [], runInPage, sendAgentInput, actor: null } as unknown as Tab;
-    const tools = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} });
+    const withNavigationLimit = async (_: unknown, act: () => Promise<string>) => ({ result: await act(), refused: [] });
+    const tab = { id: "tab-1", url: "https://mail.example/compose", zoomFactor: 1, foreignFrames: [], frames: [], runInPage, sendAgentInput, withNavigationLimit, actor: null } as unknown as Tab;
+    const tools = createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+      ...(limited ? { limits: { name: "Scout", sites: [], tools: ["click" as MascotTool] } } : {}),
+    });
     const click = tools.find((tool) => tool.name === "click")!;
     return { tools, click, inputs, scripts };
   };
@@ -637,6 +647,12 @@ describe("a click allowed for a card's runs", () => {
     const { click, inputs } = page("start", { name: "Send" });
     expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/changed from what the user allowed/);
     expect(inputs).toEqual([]);
+  });
+
+  it("is held to the key for a bird with limits too, whose tools wrap each run", async () => {
+    const { click, inputs } = page("mouseMove", { name: "Send" }, true, true);
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/changed from what the user allowed/);
+    expect(inputs).not.toContain("mouseDown");
   });
 
   it("checks again after the pointer moves, just before the press", async () => {

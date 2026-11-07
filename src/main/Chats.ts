@@ -481,8 +481,9 @@ export class Chats {
     // A picture can't be gone through, so `Tab` refuses to take one instead. A refusal goes straight to the model too.
     return tools.map((tool) => ({
       ...tool,
-      run: async (args) => {
-        const result = await tool.run(args);
+      // `granted` is the key a call allowed for its card's runs matched, which the tool holds the action to.
+      run: async (args, granted) => {
+        const result = await tool.run(args, granted);
         return tool.returnsImage && result.startsWith("data:image/") ? result : this.withoutCodes(result);
       },
       refuses: async (args) => {

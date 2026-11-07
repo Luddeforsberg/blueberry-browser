@@ -1287,11 +1287,11 @@ export const createPageTools = <T extends PageTarget>({
         ...tool,
         refuses: refused,
         // `agent.ts` asks this too, but only `run` can't be got around: whatever calls a tool, this is what acts.
-        run: async (args: unknown) => {
+        run: async (args: unknown, granted?: string) => {
           const refusal = await refused(args);
           if (refusal) return refusal.message;
           const tab = ANY_TAB.includes(tool.name) ? null : find((args as { tabId?: string } | null)?.tabId);
-          return tab ? limitedRun(tab, () => tool.run(args)) : tool.run(args);
+          return tab ? limitedRun(tab, () => tool.run(args, granted)) : tool.run(args, granted);
         },
       };
     });

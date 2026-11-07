@@ -7,6 +7,7 @@ import type { GenerateTitle, ReplyMessage, ReplyOptions, StreamReply } from "./a
 import type { PageTool } from "./browserTools";
 import type { Tab } from "./Tab";
 import type { ChatThread } from "../shared/library";
+import { clickGrant } from "./cardGrant";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -1340,6 +1341,37 @@ describe("Chats", () => {
         await ended;
         expect(added).toEqual([]);
       }
+    });
+
+    it("hands a granted click's key on to the tool, which holds the press to it", async () => {
+      const inputs: string[] = [];
+      const page = {
+        ...tab(),
+        id: "tab-1",
+        url: "https://mail.example/compose",
+        zoomFactor: 1,
+        foreignFrames: [],
+        frames: [],
+        actor: null,
+        settled: async () => {},
+        sendAgentInput: async (event: { type: string }) => void inputs.push(event.type),
+        runInPage: async (script: string) =>
+          script.includes("safeToType: safeToType(el)")
+            ? { role: "button", name: "Send", target: null, riskyClick: true, safeToType: false, frameUrl: null }
+            : { status: "aimed", x: 10, y: 10 },
+      } as unknown as Tab;
+      const saveDraft = clickGrant("https://mail.example/compose", { role: "button", name: "Save draft", target: null, frameUrl: null })!.key;
+      const results: string[] = [];
+      const pressing: StreamReply = async function* (_, __, { tools }) {
+        results.push(await tools.find((tool) => tool.name === "click")!.run({ ref: "e1" }, saveDraft));
+        yield "done";
+      };
+      const context = setup(pressing, page);
+      const ended = context.replyEnded();
+      context.chats.send(null, "first", { seePage: true });
+      await ended;
+      expect(results[0]).toMatch(/changed from what the user allowed/);
+      expect(inputs).toEqual([]);
     });
 
     it("lets a card's run skip asking only for what its card holds", async () => {
