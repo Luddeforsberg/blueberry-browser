@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, PERCH, pickRows, runPhase, showViewport, workingLine, ZOOM } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, PERCH, pickRows, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -23,6 +23,70 @@ describe('besideSpot', () => {
     it('goes below a card already beside it', () => {
         const taken = card(CARD_WIDTH + CARD_GAP, 100)
         expect(besideSpot(card(0, 100), [card(0, 100), taken]).y).toBeGreaterThan(100 + CARD_HEIGHT)
+    })
+})
+
+describe('settle', () => {
+    const placed = (id: string, y: number, height: number, movable = true, x = 0): PlacedCard => ({ id, x, y, width: CARD_WIDTH, height, movable })
+    // Applies the nudges, as the board does.
+    const after = (cards: PlacedCard[]) => {
+        const nudges = settle(cards)
+        return cards.map((card) => ({ ...card, ...nudges.find((nudge) => nudge.id === card.id) }))
+    }
+    const covering = (cards: PlacedCard[]) =>
+        cards.flatMap((a, index) => cards.slice(index + 1).filter((b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height).map((b) => [a.id, b.id]))
+
+    it('leaves a board where nothing covers anything', () => {
+        expect(settle([])).toEqual([])
+        expect(settle([placed('a', 0, 200), placed('b', 300, 200), placed('c', 0, 200, true, CARD_WIDTH + CARD_GAP)])).toEqual([])
+    })
+
+    it('moves the cards placed for the user down, once one above them grows, so nothing overlaps', () => {
+        // A table card's answer arrived: it grew from 200 to 520, over the two placed under it.
+        const cards = after([placed('table', 0, 520), placed('next', 260, 200), placed('last', 500, 300)])
+        expect(covering(cards)).toEqual([])
+        expect(cards.find((card) => card.id === 'table')!.y).toBe(0)
+        // Only down, and only as far as needed.
+        const next = cards.find((card) => card.id === 'next')!
+        expect(next.y).toBeGreaterThanOrEqual(520)
+        expect(next.y).toBeLessThan(600)
+        expect(cards.find((card) => card.id === 'last')!.y).toBeGreaterThanOrEqual(next.y + 200)
+    })
+
+    it('never moves a card the user placed or moved, and moves the others past it', () => {
+        const nudges = settle([placed('table', 0, 520), placed('dragged', 400, 200, false), placed('auto', 300, 200)])
+        expect(nudges.map((nudge) => nudge.id)).toEqual(['auto'])
+        expect(nudges[0].y).toBeGreaterThanOrEqual(600)
+    })
+
+    it('leaves a card that grew over one the user placed, rather than jump it past', () => {
+        expect(settle([placed('grew', 0, 520), placed('dragged', 300, 200, false)])).toEqual([])
+    })
+
+    it('leaves cards beside the one that grew', () => {
+        expect(settle([placed('table', 0, 900), placed('beside', 100, 200, true, CARD_WIDTH + CARD_GAP)])).toEqual([])
+    })
+})
+
+describe('settleHeight', () => {
+    it('counts an open card, and one just closed, at its closed height until it is measured closed again', () => {
+        const heights = { closed: new Map<string, number>(), open: new Map<string, number>() }
+        expect(settleHeight(heights, 'a', 200, false)).toBe(200)
+        // Opened, it measures 800, and still counts as 200.
+        expect(settleHeight(heights, 'a', 200, true)).toBe(200)
+        expect(settleHeight(heights, 'a', 800, true)).toBe(200)
+        // Closed, before it's measured again, the 800 is the open one.
+        expect(settleHeight(heights, 'a', 800, false)).toBe(200)
+        // Measured closed again, and then grown with an answer.
+        expect(settleHeight(heights, 'a', 210, false)).toBe(210)
+        expect(settleHeight(heights, 'a', 480, false)).toBe(480)
+    })
+
+    it('counts a card opened before it was ever measured closed at the size a card is taken to be', () => {
+        const heights = { closed: new Map<string, number>(), open: new Map<string, number>() }
+        expect(settleHeight(heights, 'a', 800, true)).toBe(CARD_HEIGHT)
+        expect(settleHeight(heights, 'a', 800, false)).toBe(CARD_HEIGHT)
+        expect(settleHeight(heights, 'a', 260, false)).toBe(260)
     })
 })
 

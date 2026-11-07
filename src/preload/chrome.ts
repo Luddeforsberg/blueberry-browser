@@ -108,6 +108,7 @@ const chromeAPI: ChromeAPI = {
     showMenu: (nestId) => invoke("nests:menu", nestId),
     addCard: (nestId, card) => invoke("nests:add-card", nestId, card),
     moveCard: (cardId, x, y) => invoke("nests:move-card", cardId, x, y),
+    nudgeCards: (nestId, moves) => invoke("nests:nudge-cards", nestId, moves),
     setBird: (cardId, mascotId) => invoke("nests:set-bird", cardId, mascotId),
     deleteCard: (cardId) => invoke("nests:delete-card", cardId),
     send: (cardId, text) => invoke("nests:send", cardId, text),

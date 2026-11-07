@@ -222,6 +222,7 @@ export class EventManager {
     this.handle("nests:menu", (nestId) => this.mainWindow.showNestMenu(nestId));
     this.handle("nests:add-card", (nestId, card) => nests.addCard(nestId, card));
     this.handle("nests:move-card", (cardId, x, y) => nests.moveCard(cardId, x, y));
+    this.handle("nests:nudge-cards", (nestId, moves) => nests.nudgeCards(nestId, moves));
     this.handle("nests:set-bird", (cardId, mascotId) => nests.setBird(cardId, mascotId));
     this.handle("nests:delete-card", (cardId) => this.mainWindow.confirmDeleteCard(cardId));
     this.handle("nests:send", (cardId, text) => nests.send(cardId, text));

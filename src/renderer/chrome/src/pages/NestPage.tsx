@@ -6,6 +6,7 @@ import {
     ReactFlow,
     ReactFlowProvider,
     useReactFlow,
+    useStore,
     useViewport,
     ViewportPortal,
     type FinalConnectionState,
@@ -37,9 +38,12 @@ import {
     flightPath,
     freeSpot,
     pickRows,
+    settle,
+    settleHeight,
     showViewport,
     workingLine,
     ZOOM,
+    type CardHeights,
     type FlightMode,
     type FlightPoint,
     type Insets,
@@ -59,6 +63,9 @@ const DOTS = { gap: 20, size: 1.2 }
 // How tall a planned card is taken to be, as main places a plan, for the shapes shown while Berry plans.
 const PLANNED_HEIGHT = 180
 const MOVE = { duration: 240 }
+// Where the open card sits, and the layer that dims the rest of the board under it.
+const OPEN_Z = 10
+const DIM_Z = 5
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
 
@@ -77,8 +84,8 @@ const toNodes = (board: NestBoard, openId: string | null, previous: CardNode[], 
             type: 'card',
             position: { x: card.x, y: card.y },
             dragHandle: '.nest-drag',
-            // The open card stays over the others, since it's the one being read.
-            zIndex: card.id === openId ? 10 : 0,
+            // The open card floats over the others and the layer that dims them, since it's the one being read.
+            zIndex: card.id === openId ? OPEN_Z : 0,
             ariaLabel: label(card),
             ariaRole: 'group',
             data: { card }
@@ -284,6 +291,24 @@ const ZoomControls: React.FC<{ onFit: () => void; onActualSize: () => void }> = 
     )
 }
 
+// While a card is open, the rest of the board, its cards, lines and dots, fades a little behind it, so the open card
+// reads as a layer of its own rather than lying across the cards under it. A press on it closes the card. It sits in
+// the board's own layers, between the cards and the open one, and covers just what's on screen.
+const OpenDim: React.FC<{ shown: boolean; onClose: () => void }> = ({ shown, onClose }) => {
+    const { x, y, zoom } = useViewport()
+    const width = useStore((state) => state.width)
+    const height = useStore((state) => state.height)
+    return (
+        <div
+            aria-hidden
+            data-open-dim
+            onClick={shown ? onClose : undefined}
+            className={cn("absolute left-0 top-0 bg-canvas/60 transition-opacity duration-layout", shown ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")}
+            style={{ zIndex: DIM_Z, transform: `translate(${-x / zoom}px, ${-y / zoom}px)`, width: width / zoom, height: height / zoom }}
+        />
+    )
+}
+
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
@@ -354,6 +379,30 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         const next = size && fitViewport(rects(), size, VIEW_INSETS)
         if (next) void flow.setViewport(next, MOVE)
     }, [flow, rects])
+
+    // Cards grow once they're drawn, such as when an answer or a table arrives, or runs come in. Whenever one does, the
+    // cards placed for the user that it now covers move down out of its way, and the ones the user placed stay. The open
+    // card counts at its closed size, since it floats over the others. Not while a card is being dragged.
+    const heights = useRef<CardHeights>({ closed: new Map(), open: new Map() })
+    useEffect(() => {
+        if (nodes.some((node) => node.dragging || !node.measured?.height)) return
+        const cards = nodes.map((node) => ({
+            id: node.id,
+            ...node.position,
+            width: node.measured!.width ?? CARD_WIDTH,
+            height: settleHeight(heights.current, node.id, node.measured!.height!, node.id === openId),
+            movable: node.data.card.autoPlaced
+        }))
+        const nudges = settle(cards)
+        if (nudges.length === 0) return
+        setNodes((current) =>
+            current.map((node) => {
+                const nudge = nudges.find(({ id }) => id === node.id)
+                return nudge ? { ...node, position: { x: nudge.x, y: nudge.y } } : node
+            })
+        )
+        void api.nudgeCards(board.id, nudges)
+    }, [nodes, openId, api, board.id])
 
     // ⌘+, ⌘− and ⌘0 come from the View menu, since they're its accelerators.
     useEffect(
@@ -475,8 +524,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     }, [])
     const doneFlying = useCallback((id: number) => setFlights((current) => current.filter((flight) => flight.id !== id)), [])
 
+    // A new card closes the open one, so it never lands behind the layer that dims the board.
     const add = useCallback(
-        async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string; picked?: PickedRows } = {}) => {
+        async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string; picked?: PickedRows; auto?: boolean } = {}) => {
+            open(null)
             const card = await api.addCard(board.id, { ...spot, ...extra })
             if (card) {
                 setFocusId(card.id)
@@ -484,7 +535,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             }
             return card
         },
-        [api, board.id, reveal]
+        [api, board.id, reveal, open]
     )
 
     // Empty drafts go when the user starts something else, so the board never fills with them. A plan's cards stay, and
@@ -515,7 +566,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 dropEmptyDrafts()
                 const picked = pickedOf(selection, cardId)
                 setSelection(null)
-                void add(besideSpot(rectOf(source), rects()), { from: cardId, picked })
+                void add(besideSpot(rectOf(source), rects()), { from: cardId, picked, auto: true })
             },
             remove: (cardId) => {
                 setDraftText(cardId, '')
@@ -607,6 +658,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         const at = flow.screenToFlowPosition({ x: box.left + EDGE_INSET.x, y: box.top + EDGE_INSET.y })
         setPrompt('')
         setProblem(null)
+        open(null)
         dropEmptyDrafts()
         const taken = rects()
         if (!pending) setGhostsAt(freeSpot(taken, at, { width: CARD_WIDTH * 2 + CARD_GAP, height: PLANNED_HEIGHT }))
@@ -627,7 +679,11 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     nodeTypes={NODE_TYPES}
                     edgeTypes={EDGE_TYPES}
                     onNodesChange={(changes: NodeChange<CardNode>[]) => setNodes((current) => applyNodeChanges(changes, current))}
-                    onNodeDragStop={(_, node) => void api.moveCard(node.id, node.position.x, node.position.y)}
+                    onNodeDragStop={(_, node) => {
+                        // Moved by hand, it stays where it's left, even before main says so.
+                        setNodes((current) => current.map((each) => (each.id === node.id ? { ...each, data: { card: { ...each.data.card, autoPlaced: false } } } : each)))
+                        void api.moveCard(node.id, node.position.x, node.position.y)
+                    }}
                     onConnectStart={(_, { nodeId }) => (pulling.current = nodeId)}
                     onConnectEnd={connectEnd}
                     connectionLineComponent={PullingLine}
@@ -654,6 +710,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 >
                     <Background variant={BackgroundVariant.Dots} gap={DOTS.gap} size={DOTS.size} className="text-muted-foreground/40" color="currentColor" />
                     <ViewportPortal>
+                        <OpenDim
+                            shown={!!openId}
+                            onClose={() => {
+                                clearedByPress.current = false
+                                open(null)
+                            }}
+                        />
                         {ghostsAt && planning && <PlanGhosts at={ghostsAt} />}
                         {flights.map((flight) => (
                             <FlightView key={flight.id} flight={flight} onLanded={landed} onDone={doneFlying} />

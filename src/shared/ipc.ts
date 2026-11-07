@@ -347,6 +347,8 @@ export interface NestNewCard {
   from?: string | null;
   // The rows selected in that card's table, which are then all it gets. Main checks they're in its latest answer.
   picked?: PickedRows | null;
+  // Placed beside its source by a click on the handle, rather than where the user pressed or dropped the line.
+  auto?: boolean;
 }
 
 // For each row either starts, or says why it can't, such as more rows than the cap.
@@ -535,6 +537,7 @@ export interface InvokeChannels {
   // A draft card, unconnected or pulled out of `from`, which it then gets the latest answer of whenever it sends.
   "nests:add-card": { region: "chrome"; args: [nestId: string, card: NestNewCard]; result: NestCard | null };
   "nests:move-card": { region: "chrome"; args: [cardId: string, x: number, y: number]; result: boolean };
+  "nests:nudge-cards": { region: "chrome"; args: [nestId: string, moves: { id: string; x: number; y: number }[]]; result: boolean };
   // Only a draft's bird can change. A sent card keeps its chat's.
   "nests:set-bird": { region: "chrome"; args: [cardId: string, mascotId: string]; result: boolean };
   // Asks first in main when the card has a chat, which goes with it.
@@ -795,6 +798,8 @@ export interface NestsAPI {
   showMenu: (nestId: string) => Promise<"rename" | null>;
   addCard: (nestId: string, card: NestNewCard) => Promise<NestCard | null>;
   moveCard: (cardId: string, x: number, y: number) => Promise<boolean>;
+  // Cards placed for the user, moved out of the way of one that grew. Main moves no card the user placed or dragged.
+  nudgeCards: (nestId: string, moves: { id: string; x: number; y: number }[]) => Promise<boolean>;
   setBird: (cardId: string, mascotId: string) => Promise<boolean>;
   deleteCard: (cardId: string) => Promise<boolean>;
   send: (cardId: string, text: string) => Promise<ChatThread | null>;

@@ -23,13 +23,14 @@ describe("NestStore", () => {
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null, plan: null, attachments: [] },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, autoPlaced: false, each: null, plan: null, attachments: [] },
         {
           id: writer.id,
           chatId: null,
           mascotId: null,
           x: 420.5,
           y: 32,
+          autoPlaced: false,
           each: null,
           plan: null,
           attachments: [{ id: expect.any(String), kind: "file", name: "one-pager.pdf", type: "application/pdf", size: 6 }],
@@ -66,7 +67,7 @@ describe("NestStore", () => {
       }
     }
     db.exec("DROP TABLE IF EXISTS plan_attachments;");
-    db.exec("ALTER TABLE nests DROP COLUMN title_settled;");
+    db.exec("ALTER TABLE nests DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN auto_placed;");
     db.close();
 
     const again = new NestStore(file);
@@ -94,11 +95,29 @@ describe("NestStore", () => {
     // A Nest from before names were settled keeps its name, unless it's the old placeholder.
     const old = store.createNest("Untitled nest");
     const db = new DatabaseSync(file);
-    db.exec("PRAGMA user_version = 7; ALTER TABLE nests DROP COLUMN title_settled;");
+    db.exec("PRAGMA user_version = 7; ALTER TABLE nests DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN auto_placed;");
     db.close();
     const again = new NestStore(file);
     expect(again.titleSettled(old)).toBe(false);
     expect(again.titleSettled(mine)).toBe(true);
+  });
+
+  it("nudges only cards placed for the user, in their own nest, until the user moves one by hand", () => {
+    const store = new NestStore(":memory:");
+    const nest = store.createNest("Leads");
+    const other = store.createNest("Other");
+    const placed = store.addCard(nest, { x: 0, y: 300, auto: true })!;
+    const pressed = store.addCard(nest, { x: 0, y: 600 })!;
+    const elsewhere = store.addCard(other, { x: 0, y: 300, auto: true })!;
+    expect([placed.autoPlaced, pressed.autoPlaced]).toEqual([true, false]);
+    const moves = [placed, pressed, elsewhere].map(({ id }) => ({ id, x: 0, y: 900 }));
+    expect(store.nudgeCards(nest, moves)).toBe(1);
+    expect([store.card(placed.id)!.y, store.card(pressed.id)!.y, store.card(elsewhere.id)!.y]).toEqual([900, 600, 300]);
+    // Dragged once, it stays where the user left it.
+    store.moveCard(placed.id, 40, 120);
+    expect(store.card(placed.id)!.autoPlaced).toBe(false);
+    expect(store.nudgeCards(nest, [{ id: placed.id, x: 0, y: 900 }])).toBe(0);
+    expect(store.card(placed.id)).toMatchObject({ x: 40, y: 120 });
   });
 
   it("only draws a line from a card in the same nest", () => {

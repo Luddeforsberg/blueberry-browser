@@ -1,7 +1,25 @@
 import type { ChatThread, NestRun } from '@shared/library'
-import type { Rect } from '@shared/nestPlace'
+import { CARD_HEIGHT, type Rect } from '@shared/nestPlace'
 
-export { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from '@shared/nestPlace'
+export { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, settle, type Nudge, type PlacedCard, type Rect } from '@shared/nestPlace'
+
+// What the board remembers of each card's measured height: the last one while closed, and the one while open.
+export interface CardHeights {
+    closed: Map<string, number>
+    open: Map<string, number>
+}
+
+// The height a card counts as when the board settles cards. An open card floats over the others, so it counts at its
+// last closed height, and so does one just closed until it's measured again, since until then its measurement is still
+// the open one. Remembers what it's given.
+export const settleHeight = (heights: CardHeights, id: string, measured: number, isOpen: boolean): number => {
+    if (isOpen) heights.open.set(id, measured)
+    else if (heights.open.get(id) !== measured) {
+        heights.open.delete(id)
+        heights.closed.set(id, measured)
+    }
+    return heights.closed.get(id) ?? (heights.open.has(id) ? CARD_HEIGHT : measured)
+}
 
 export type CardTone = 'muted' | 'working' | 'done' | 'failed'
 

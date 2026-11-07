@@ -75,6 +75,29 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await expect(draft.getByRole("status")).toHaveText("Done");
   await expect(draft).toContainText("Two drafts written.");
 
+  // Opened, a card floats over the board, which dims behind it: the card takes the pointer, and a press on another card
+  // only closes it.
+  await first.getByRole("button", { name: "Open the whole chat" }).click();
+  const reply = first.getByPlaceholder("Reply to Berry");
+  const dim = chrome.locator("[data-open-dim]");
+  await expect(dim).toHaveCSS("opacity", "1");
+  await reply.click();
+  await expect(reply).toBeFocused();
+  const other = (await draft.boundingBox())!;
+  await chrome.mouse.click(other.x + other.width / 2, other.y + other.height / 2);
+  await expect(reply).toHaveCount(0);
+  await expect(dim).toHaveCSS("opacity", "0");
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(2);
+
+  // A new card pulled out of an open one closes it, so the draft isn't left behind the dim.
+  await first.getByRole("button", { name: "Open the whole chat" }).click();
+  await first.getByRole("button", { name: "Continue in a new card" }).click();
+  await expect(reply).toHaveCount(0);
+  await expect(dim).toHaveCSS("opacity", "0");
+  const pulled = chrome.locator(".react-flow__node").nth(2);
+  await pulled.getByRole("textbox", { name: "What should Berry do?" }).press("Escape");
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(2);
+
   // The model got the first card's answer as tagged, untrusted data, and the user's words after it.
   expect(model.requests).toHaveLength(2);
   const sent = newestUserMessage(model.requests[1]);
@@ -168,7 +191,7 @@ test("rows picked in a card's table go to a new card, which runs once for each o
   await expect(chrome.locator(".react-flow__edge path").first()).not.toHaveAttribute("style", /dasharray/);
   await expect(draft.getByRole("button", { name: /^(Fjällbo|Sjöström Labs|Brygga)/ })).toHaveCount(3);
   // The bird carried the rows along the line and is home again, even in a window that draws no frames off-screen.
-  await expect(chrome.locator(".react-flow__viewport-portal > *")).toHaveCount(0);
+  await expect(chrome.locator(".react-flow__viewport-portal > :not([data-open-dim])")).toHaveCount(0);
   // Pressing a run opens its own thread.
   await draft.getByRole("button", { name: /^Fjällbo/ }).click();
   await expect(draft.getByPlaceholder("Reply to Berry")).toBeVisible();
@@ -411,8 +434,9 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   // Open as a Nest turns it into the first card of a new Nest, in the same tab, named as the chat was.
   await chrome.getByRole("button", { name: "Open as a Nest" }).click();
   await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("Flights to Berlin");
-  const card = chrome.locator(".react-flow__node");
-  await expect(card).toHaveCount(1);
+  const cards = chrome.locator(".react-flow__node");
+  const card = cards.first();
+  await expect(cards).toHaveCount(1);
   await expect(card).toContainText("Three flights under €200");
   await expect(card).toContainText("Find flights to Berlin in May");
   // It left the Chats list for the Nest, and nothing ran to do it.
@@ -430,6 +454,18 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   await chrome.keyboard.press("Escape");
   await expect(reply).toHaveCount(0);
 
+  // The composer places a card in the first free place, under this one.
+  oneJob();
+  model.replyWith("Two hotels by Alexanderplatz under €120.");
+  await chrome.getByRole("textbox", { name: "Ask in this Nest" }).fill("Find a hotel near Alexanderplatz");
+  await chrome.getByRole("textbox", { name: "Ask in this Nest" }).press("Enter");
+  const hotels = cards.nth(1);
+  await expect(hotels.getByRole("status")).toHaveText("Done");
+  const below = async () => [(await card.boundingBox())!, (await hotels.boundingBox())!];
+  const [firstAt, hotelsAt] = await below();
+  expect(hotelsAt.y).toBeGreaterThan(firstAt.y + firstAt.height);
+  expect(hotelsAt.x).toBeLessThan(firstAt.x + firstAt.width);
+
   // A reply on the card that asks before opening a page. It's waiting, so the sidebar's row says so.
   await card.focus();
   await chrome.keyboard.press("Enter");
@@ -439,6 +475,11 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   await reply.press("Enter");
   await expect(card.getByRole("status").first()).toHaveText("Needs your OK");
   await chrome.keyboard.press("Escape");
+  // The card grew with the question, so the card placed under it moved down out of its way.
+  await expect.poll(async () => {
+    const [grown, moved] = await below();
+    return moved.y - (grown.y + grown.height);
+  }).toBeGreaterThan(0);
   await expect(chrome.getByRole("region", { name: /^Nests/ }).getByText("Needs you")).toBeAttached();
 
   // Away on the board, the card out of sight, the row in Needs you opens the Nest at that card, open and in view.

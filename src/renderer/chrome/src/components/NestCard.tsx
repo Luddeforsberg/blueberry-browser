@@ -186,7 +186,12 @@ const LineEnds: React.FC<{ canPull: boolean; onPull: () => void; label: string }
 
 const pullLabel = (name: string, picked: number) => (picked > 0 ? `Pull a new card out of the ${plural(picked, 'selected row')}` : `Pull a new card out of ${name}’s`)
 
-const CARD_SHELL = "group/card relative rounded-panel border bg-surface text-foreground"
+const CARD_SHELL = "group/card relative rounded-panel border bg-surface text-foreground transition-shadow duration-layout"
+
+// A sent card's shadow: the reading ring while it runs, and once it's opened, the raised shadow of something floating
+// over the board, under the ring if it runs.
+const cardShadow = (running: boolean, open: boolean) =>
+    cn(running && "border-transparent", running ? (open ? "shadow-reading-raised" : "shadow-reading") : open ? "shadow-raised" : "shadow-selected")
 
 // A card that has been sent: one bird's chat. Closed, it shows what was asked and the latest answer, or its table, whose
 // rows can be selected. Open, the whole chat and a reply field that carries the thread on.
@@ -217,7 +222,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const waitingOnModel = running && !thread.partial && !thread.approval && !thread.statusLine && !thread.steps.some((step) => !step.done)
 
     return (
-        <div className={cn(CARD_SHELL, running ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
+        <div className={cn(CARD_SHELL, cardShadow(running, open))} style={{ width: CARD_WIDTH }}>
             <Perched cardId={card.id} mascot={mascot} mood={moodOf(thread)} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
@@ -636,7 +641,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     }
 
     return (
-        <div className={cn(CARD_SHELL, running ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
+        <div className={cn(CARD_SHELL, cardShadow(running, open))} style={{ width: CARD_WIDTH }}>
             <Perched cardId={card.id} mascot={mascot} mood={asking.length > 0 ? 'asking' : running ? 'thinking' : 'rest'} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, 0)} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">

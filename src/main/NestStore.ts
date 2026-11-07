@@ -97,6 +97,9 @@ const MIGRATIONS = [
   // "New Nest", then that request's first words. Nests from before this keep theirs, except the old placeholder.
   `ALTER TABLE nests ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 1;
    UPDATE nests SET title_settled = 0 WHERE title = 'Untitled nest';`,
+  // Placed for the user, by a plan, the composer or a line's handle, and never moved by hand since, so the board may nudge
+  // it out of the way of a card that grew. Cards from before this count as placed by hand, so they never move.
+  `ALTER TABLE cards ADD COLUMN auto_placed INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export interface AttachmentRow {
@@ -144,6 +147,7 @@ interface CardRow {
   planWaits: number;
   planTable: string | null;
   planNote: string | null;
+  autoPlaced: number;
 }
 
 interface RunRow {
@@ -156,7 +160,7 @@ interface RunRow {
 
 const CARD_COLUMNS =
   "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader, " +
-  "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote";
+  "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state";
 
 const toRun = ({ id, row, chatId, state }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state });
@@ -247,7 +251,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -258,7 +262,7 @@ export class NestStore {
           };
     const planned: NestPlanned | null =
       plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
-    return { id, chatId, mascotId, x, y, each, plan: planned, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
+    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, each, plan: planned, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -288,7 +292,8 @@ export class NestStore {
 
   // A draft, and the line from the card it was pulled out of if there is one, in one go. Null if the nest or that card
   // isn't there, or the card is in another nest.
-  // With `planned`, it's a card of the plan instead, with no prompt yet.
+  // With `planned`, it's a card of the plan instead, with no prompt yet. `auto` when it was placed for the user, not where
+  // they pressed.
   addCard(
     nestId: string,
     {
@@ -298,7 +303,8 @@ export class NestStore {
       from = null,
       picked = null,
       planned = false,
-    }: { x: number; y: number; mascotId?: string | null; from?: string | null; picked?: PickedRows | null; planned?: boolean }
+      auto = false,
+    }: { x: number; y: number; mascotId?: string | null; from?: string | null; picked?: PickedRows | null; planned?: boolean; auto?: boolean }
   ): NestCard | null {
     const id = randomUUID();
     this.db.exec("BEGIN");
@@ -306,8 +312,8 @@ export class NestStore {
       if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
       if (from !== null && this.card(from)?.nestId !== nestId) throw new NotHere();
       this.db
-        .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)")
-        .run(id, nestId, mascotId, x, y, planned ? "planned" : null, planned ? "" : null);
+        .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, auto_placed) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)")
+        .run(id, nestId, mascotId, x, y, planned ? "planned" : null, planned ? "" : null, auto ? 1 : 0);
       if (from !== null) {
         this.db
           .prepare("INSERT INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, ?)")
@@ -323,8 +329,24 @@ export class NestStore {
     return this.card(id);
   }
 
+  // The user moved it, so from now on it stays where they leave it.
   moveCard(id: string, x: number, y: number): boolean {
-    return this.db.prepare("UPDATE cards SET x = ?, y = ? WHERE id = ?").run(x, y, id).changes > 0;
+    return this.db.prepare("UPDATE cards SET x = ?, y = ?, auto_placed = 0 WHERE id = ?").run(x, y, id).changes > 0;
+  }
+
+  // Cards of this Nest moved out of the way of one that grew, in one go. Only cards placed for the user and never moved by
+  // hand: any other is left where it is. How many moved.
+  nudgeCards(nestId: string, moves: readonly { id: string; x: number; y: number }[]): number {
+    const nudge = this.db.prepare("UPDATE cards SET x = ?, y = ? WHERE id = ? AND nest_id = ? AND auto_placed = 1");
+    this.db.exec("BEGIN");
+    try {
+      const moved = moves.reduce((count, move) => count + Number(nudge.run(move.x, move.y, move.id, nestId).changes), 0);
+      this.db.exec("COMMIT");
+      return moved;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   // Only while it's a draft, or planned and not yet run. A sent card belongs to its chat's bird, and one of a plan the user
@@ -440,7 +462,7 @@ export class NestStore {
       const replaced = (this.db.prepare("SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned'").all(nestId) as { id: string }[]).map((row) => row.id);
       if (cards.some((card) => card.keeps !== null && !replaced.includes(card.keeps))) throw new NotHere();
       const insert = this.db.prepare(
-        "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?)"
+        "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said, auto_placed) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?, 1)"
       );
       for (const card of cards) insert.run(ids.get(card.key)!, nestId, card.mascotId, card.x, card.y, card.prompt, card.each ? 1 : 0, card.waits ? 1 : 0, card.table, said);
       const point = this.db.prepare(

@@ -67,6 +67,7 @@ export const CHANNEL_REGIONS: {
   "nests:menu": BOTH,
   "nests:add-card": ["chrome"],
   "nests:move-card": ["chrome"],
+  "nests:nudge-cards": ["chrome"],
   "nests:set-bird": ["chrome"],
   "nests:delete-card": ["chrome"],
   "nests:send": ["chrome"],

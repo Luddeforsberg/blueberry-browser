@@ -5,7 +5,7 @@ import { NestStore } from "./NestStore";
 import { NEW_NEST_TITLE, Nests, type NestNamer, type NestPlanner } from "./Nests";
 import type { ReplyMessage, StreamReply } from "./agent";
 import type { PageTool } from "./browserTools";
-import type { MascotProfile } from "../shared/library";
+import type { MascotProfile, NestBoard } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 vi.mock("./agent", async (importOriginal) => {
@@ -73,8 +73,10 @@ const setup = (namer?: NestNamer) => {
   const deleted: string[] = [];
   // Each hand-off along a line, as "from>to".
   const handOffs: string[] = [];
+  // Each board sent to the page.
+  const boards: NestBoard[] = [];
   const nests = new Nests(store, chats, { resolve: (id) => flock.find((mascot) => mascot.id === (id ?? BERRY.id))!, all: () => flock }, {
-    onBoard: () => {},
+    onBoard: (board) => boards.push(board),
     onListChanged: () => {},
     chatDeleted: (chatId) => deleted.push(chatId),
     handOff: (_, from, to) => handOffs.push(`${from}>${to}`),
@@ -86,7 +88,7 @@ const setup = (namer?: NestNamer) => {
     expect(nests.send(cardId, text)).not.toBeNull();
     await done;
   };
-  return { nests, store, chats, chatStore, deleted, sendAndWait, handOffs, replyEnded };
+  return { nests, store, chats, chatStore, deleted, sendAndWait, handOffs, replyEnded, boards };
 };
 
 const newest = (messages: ReplyMessage[]) => messages.at(-1)?.content as string;
@@ -433,6 +435,20 @@ describe("Berry planning in a Nest", () => {
     ]);
     expect(nests.list()[0].planned).toBe(true);
     expect(sent).toHaveLength(0);
+  });
+
+  it("still says Berry is planning on the board it sends after a card was nudged out of the way", async () => {
+    const { nests, store, boards } = setup();
+    const nest = nests.create();
+    const card = store.addCard(nest, { x: 0, y: 300, auto: true })!;
+    let release = () => {};
+    plans.push(new Promise((resolve) => (release = () => resolve(TWO_JOBS))));
+    const asking = nests.ask(nest, "Find companies and write to each", PLACE);
+    await vi.waitFor(() => expect(nests.board(nest)!.planning).toBeTruthy());
+    expect(nests.nudgeCards(nest, [{ id: card.id, x: 0, y: 600 }])).toBe(true);
+    expect(boards.at(-1)).toMatchObject({ planning: "Find companies and write to each", cards: [expect.objectContaining({ id: card.id, y: 600 })] });
+    release();
+    await asking;
   });
 
   it("refuses an invalid plan and runs nothing, never putting Berry in for a bird that isn't there", async () => {
