@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Check, Copy, Download, Sheet } from 'lucide-react'
-import { cellParts, plainCell, type PickedRows } from '@shared/nestTable'
+import { cellParts, plainCell, type CellPart, type PickedRows } from '@shared/nestTable'
 import { cn } from '@common/lib/utils'
+import { Markdown } from './ChatMessage'
 
 // How many rows a closed card shows before "N more".
 const ROWS_SHOWN = 5
@@ -12,8 +13,23 @@ export type PickMode = 'one' | 'range' | 'toggle'
 const pickMode = (event: React.MouseEvent | React.KeyboardEvent): PickMode =>
     event.shiftKey ? 'range' : event.metaKey || event.ctrlKey ? 'toggle' : 'one'
 
-// What a cell says, with its links: each opens in a new tab, as any link in the chrome does, and only a web address can
-// be one. A press on it doesn't pick the row.
+// A card's markdown, as the chat draws it, but compact: headings at the text's own size, and less room between blocks.
+export const CARD_PROSE = cn(
+    "prose-headings:text-[1em] prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 [&>:first-child]:mt-0",
+    "prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2 prose-hr:my-3 prose-table:my-2"
+)
+
+// A cell's words in their look: bold, italic and code from its markdown.
+const Marked: React.FC<{ part: CellPart }> = ({ part }) => {
+    let words: React.ReactNode = part.text
+    if (part.code) words = <code className="px-1 py-0.5 rounded-control bg-muted text-[0.9em]">{words}</code>
+    if (part.em) words = <em>{words}</em>
+    if (part.strong) words = <strong className="font-semibold">{words}</strong>
+    return <>{words}</>
+}
+
+// What a cell says, with its markdown and its links: each link opens in a new tab, as any link in the chrome does, and
+// only a web address can be one. A press on it doesn't pick the row.
 export const CellText: React.FC<{ cell: string }> = ({ cell }) => (
     <>
         {cellParts(cell).map((part, index) =>
@@ -27,14 +43,47 @@ export const CellText: React.FC<{ cell: string }> = ({ cell }) => (
                     onKeyDown={(event) => event.stopPropagation()}
                     className="text-accent-ink hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"
                 >
-                    {part.text}
+                    <Marked part={part} />
                 </a>
             ) : (
-                <React.Fragment key={index}>{part.text}</React.Fragment>
+                <Marked key={index} part={part} />
             )
         )}
     </>
 )
+
+// Whether a box with a height it can't pass shows less than its content, for the fade that says there's more.
+export const useCut = <T extends HTMLElement>(content: unknown) => {
+    const box = useRef<T>(null)
+    const [cut, setCut] = useState(false)
+    useLayoutEffect(() => {
+        const element = box.current
+        if (!element) return undefined
+        const check = () => setCut(element.scrollHeight > element.clientHeight + 1)
+        check()
+        const observer = new ResizeObserver(check)
+        observer.observe(element)
+        if (element.firstElementChild) observer.observe(element.firstElementChild)
+        return () => observer.disconnect()
+    }, [content])
+    return { box, cut }
+}
+
+const CUT_FADE = "[mask-image:linear-gradient(to_bottom,black_calc(100%-32px),transparent)]"
+
+// The words before a table, in muted markdown, set tight: three lines on a card of the usual size, such as a heading and
+// two lines under it, and more on one made bigger.
+const BeforeTable: React.FC<{ text: string; fill: boolean }> = ({ text, fill }) => {
+    const { box, cut } = useCut<HTMLDivElement>(text)
+    return (
+        <div ref={box} className={cn("mx-5 mb-3 overflow-hidden", fill ? "shrink min-h-5 max-h-40" : "shrink-0 max-h-16", cut && CUT_FADE)}>
+            <Markdown
+                content={text}
+                className={cn("text-13 leading-5 text-muted-foreground prose-headings:text-inherit prose-strong:text-inherit", CARD_PROSE, "prose-headings:mb-0.5 prose-p:my-0.5")}
+            />
+        </div>
+    )
+}
 
 // Rows a For-each card reading from this table is working on right now, by index, with who: "Writer is here". `outside`
 // is any being worked on that isn't among the rows here, when only the first rows are.
@@ -66,10 +115,17 @@ export const TableResult: React.FC<{
     // How many rows the whole table has, when only its first are here, and what asks for the rest once "N more" opens.
     total?: number
     onMore?: () => void
-}> = ({ table, selected, onPick, here = null, own, every = false, total, onMore }) => {
+    // The card was made a size of its own, so the table takes what's left of it, with every row, scrolling both ways.
+    fill?: boolean
+}> = ({ table, selected, onPick, here = null, own, every = false, total, onMore, fill = false }) => {
     const [more, setMore] = useState(false)
-    const all = every || more
-    const hidden = every ? 0 : Math.max(0, (total ?? table.rows.length) - ROWS_SHOWN)
+    const all = every || more || fill
+    const hidden = every || fill ? 0 : Math.max(0, (total ?? table.rows.length) - ROWS_SHOWN)
+    // A card made bigger shows every row, so it asks for the ones it doesn't have yet.
+    const missing = fill && (total ?? 0) > table.rows.length
+    useEffect(() => {
+        if (missing) onMore?.()
+    }, [missing, onMore])
     const rows = all ? table.rows : table.rows.slice(0, ROWS_SHOWN)
     const last = table.header.length - 1
     const picked = selected?.length ?? 0
@@ -82,9 +138,15 @@ export const TableResult: React.FC<{
         : []
     const belowLine = here && below.length > 0 ? (below.length === 1 ? `${below[0].who} is on ${below[0].name}` : `${here.who} is on ${below.length} rows below`) : null
     return (
-        <div className="flex flex-col">
-            {table.before && <p className="px-5 pb-3 text-13 text-muted-foreground line-clamp-2">{plainCell(table.before)}</p>}
-            <div data-keep-selection className={cn("nowheel overflow-x-auto border-t", all && (every ? "max-h-[520px] overflow-y-auto" : "max-h-[400px] overflow-y-auto"))}>
+        <div className={cn("flex flex-col", fill && "flex-1 min-h-0")}>
+            {table.before && <BeforeTable text={table.before} fill={fill} />}
+            <div
+                data-keep-selection
+                className={cn(
+                    "nowheel overflow-x-auto border-t",
+                    fill ? "flex-1 min-h-[68px] overflow-y-auto" : all && (every ? "max-h-[520px] overflow-y-auto" : "max-h-[400px] overflow-y-auto")
+                )}
+            >
                 <table aria-label="Result" aria-multiselectable={selected ? true : undefined} className="w-full border-collapse text-left select-none">
                     <thead>
                         <tr className="h-8 text-12 text-muted-foreground">
@@ -138,8 +200,8 @@ export const TableResult: React.FC<{
                     </tbody>
                 </table>
             </div>
-            {(picked > 0 || hidden > 0) && (
-                <div data-keep-selection className="h-9 px-5 border-t flex items-center gap-1 text-13">
+            {(picked > 0 || hidden > 0 || (fill && belowLine)) && (
+                <div data-keep-selection className="h-9 shrink-0 px-5 border-t flex items-center gap-1 text-13">
                     {belowLine && <span className="order-last ml-auto text-12 text-accent-ink truncate">{belowLine}</span>}
                     {picked > 0 && <span role="status" className="text-accent-ink">{picked} selected</span>}
                     {picked > 0 && hidden > 0 && <span className="text-muted-foreground" aria-hidden>·</span>}

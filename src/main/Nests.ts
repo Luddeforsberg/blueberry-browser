@@ -5,7 +5,7 @@ import type { ChatThread, MascotProfile, NestBoard, NestCard, NestLine, NestSumm
 import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRetryResult, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_CONTEXT_LENGTH, MAX_CROSSING_LENGTH, MAX_INPUTS, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type LineCrossing, type PickedRows } from "../shared/nestTable";
-import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
+import { CARD_GAP, CARD_HEIGHT, CARD_SIZE, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
 import { chainCrossings, fitChain, gatherChain, latestAnswer, sentLength, threadOf, type CardAnswer, type ChainEdge, type RawInput } from "./nestContext";
 import { DEFAULT_COLUMN, fallbackCell, linkChecked, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
 import { tableFromFile } from "./nestCsv";
@@ -424,6 +424,16 @@ export class Nests {
   moveCard(cardId: string, x: unknown, y: unknown): boolean {
     const to = { x: coordinate(x), y: coordinate(y) };
     if (to.x === null || to.y === null || !this.store.moveCard(cardId, to.x, to.y)) return false;
+    const nestId = this.store.card(cardId)?.nestId;
+    if (nestId) this.events.onBoard(this.board(nestId)!);
+    return true;
+  }
+
+  // The size the user made a card from its corner, kept within what the corner allows.
+  resizeCard(cardId: string, width: unknown, height: unknown): boolean {
+    const fits = (value: unknown, min: number, max: number) => (typeof value === "number" && Number.isFinite(value) ? Math.round(Math.min(max, Math.max(min, value))) : null);
+    const size = { width: fits(width, CARD_SIZE.minWidth, CARD_SIZE.maxWidth), height: fits(height, CARD_SIZE.minHeight, CARD_SIZE.maxHeight) };
+    if (size.width === null || size.height === null || !this.store.resizeCard(cardId, size.width, size.height)) return false;
     const nestId = this.store.card(cardId)?.nestId;
     if (nestId) this.events.onBoard(this.board(nestId)!);
     return true;

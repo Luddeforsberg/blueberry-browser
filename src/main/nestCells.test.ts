@@ -82,8 +82,8 @@ describe("parseCell", () => {
   it("ends every way a value is made in the same link check, so none links where the answer doesn't", () => {
     const answer = "See https://example.com/foo_bar_baz and more\nsecond line";
     const links = (cell: string | null) => cellParts(cell ?? "").flatMap((part) => (part.href ? [part.href] : []));
-    // Its first line, with emphasis marks gone, would otherwise make an address the answer never gave.
-    expect(links(fallbackCell(answer))).toEqual([]);
+    // Its first line keeps an address whole, underscores and all, so it links only where the answer does.
+    expect(links(fallbackCell(answer))).toEqual(["https://example.com/foo_bar_baz"]);
     expect(links(fallbackCell("See https://example.com/a and more\nnext"))).toEqual(["https://example.com/a"]);
     expect(links(shortCell("Read https://example.com/a"))).toEqual(["https://example.com/a"]);
     // A value from anywhere, such as a writer that didn't check, links only where the answer does.

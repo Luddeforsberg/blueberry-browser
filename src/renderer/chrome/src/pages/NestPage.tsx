@@ -76,14 +76,25 @@ const CARD_KEYS = {
     'node.a11yDescription.keyboardDisabled': 'Press Enter to open this card, Escape to close it, or Delete to delete it.'
 }
 
-const toNodes = (board: NestBoard, openId: string | null, previous: CardNode[], label: (card: NestBoard['cards'][number]) => string): CardNode[] =>
+const toNodes = (
+    board: NestBoard,
+    openId: string | null,
+    previous: CardNode[],
+    label: (card: NestBoard['cards'][number]) => string,
+    resizingId: string | null = null
+): CardNode[] =>
     board.cards.map((card) => {
         const before = previous.find((node) => node.id === card.id)
+        // A card the user made a size of its own keeps it, except while open, when it grows with its whole chat. The one
+        // being resized keeps the size its corner has given it so far.
+        const size = card.id === resizingId && before ? { width: before.width, height: before.height } : card.size
         return {
             ...before,
             id: card.id,
             type: 'card',
             position: { x: card.x, y: card.y },
+            width: size?.width,
+            height: card.id === openId ? undefined : size?.height,
             dragHandle: '.nest-drag',
             // The open card floats over the others and the layer that dims them, since it's the one being read.
             zIndex: card.id === openId ? OPEN_Z : 0,
@@ -373,7 +384,9 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const pulling = useRef<string | null>(null)
     const api = window.chromeAPI.nests
 
-    useEffect(() => setNodes((previous) => toNodes(board, openId, previous, label)), [board, openId, label])
+    // The card whose corner is being dragged, which neither the board's updates nor settling may move or size meanwhile.
+    const resizing = useRef<string | null>(null)
+    useEffect(() => setNodes((previous) => toNodes(board, openId, previous, label, resizing.current)), [board, openId, label])
 
     const open = useCallback((cardId: string | null, runId: string | null = null) => {
         setOpenId(cardId)
@@ -427,7 +440,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // card counts at its closed size, since it floats over the others. Not while a card is being dragged.
     const heights = useRef<CardHeights>({ closed: new Map(), open: new Map() })
     useEffect(() => {
-        if (nodes.some((node) => node.dragging || !node.measured?.height)) return
+        if (resizing.current || nodes.some((node) => node.dragging || !node.measured?.height)) return
         const cards = nodes.map((node) => ({
             id: node.id,
             ...node.position,
@@ -632,7 +645,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 board.cards.filter((card) => card.plan?.state === 'armed' && card.plan.waits && board.lines.some((line) => line.from === cardId && line.to === card.id)),
             forEachFrom: (cardId) => board.cards.filter((card) => card.each && board.lines.some((line) => line.from === cardId && line.to === card.id)),
             away: (cardId) => away.has(cardId),
-            replanning: !!planning && pending
+            replanning: !!planning && pending,
+            resizeStart: (cardId) => (resizing.current = cardId),
+            // Kept on the card at once, so nothing puts it back before main says so.
+            resizeEnd: (cardId, size) => {
+                resizing.current = null
+                setNodes((current) => current.map((each) => (each.id === cardId ? { ...each, ...size, data: { card: { ...each.data.card, size } } } : each)))
+                void api.resizeCard(cardId, Math.round(size.width), Math.round(size.height))
+            }
         }),
         [openId, openRunId, open, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection, away, planning, pending]
     )

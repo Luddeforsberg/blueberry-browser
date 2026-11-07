@@ -67,6 +67,8 @@ describe("cells and rows", () => {
   it("draws a cell without its markdown", () => {
     expect(plainCell("[Lindqvist Data](https://lindqvist.se)")).toBe("Lindqvist Data");
     expect(plainCell("**84** and `x`")).toBe("84 and x");
+    expect(plainCell("**[Strawberry Browser](https://strawberrybrowser.com)**")).toBe("Strawberry Browser");
+    expect(plainCell("Line one<br>line two")).toBe("Line one line two");
   });
 
   it("names a row by its first cell with words in it", () => {
@@ -117,14 +119,72 @@ describe("combinedTable", () => {
 });
 
 describe("cellParts", () => {
-  it("keeps a cell's links, as words linking to a web address, and drops emphasis from the rest", () => {
+  it("keeps a cell's links, as words linking to a web address, and its bold, italic and code", () => {
     expect(cellParts("Read **this**: [Omar's post](https://linkedin.com/p/1) or https://brygga.se/jobs.")).toEqual([
-      { text: "Read this: " },
+      { text: "Read " },
+      { text: "this", strong: true },
+      { text: ": " },
       { text: "Omar's post", href: "https://linkedin.com/p/1" },
       { text: " or " },
       { text: "https://brygga.se/jobs", href: "https://brygga.se/jobs" },
       { text: "." },
     ]);
+    expect(cellParts("_new_ and *fast*, `v2`")).toEqual([
+      { text: "new", em: true },
+      { text: " and " },
+      { text: "fast", em: true },
+      { text: ", " },
+      { text: "v2", code: true },
+    ]);
+  });
+
+  it("reads emphasis around a link, inside one, and inside other emphasis", () => {
+    expect(cellParts("**[Strawberry Browser](https://strawberrybrowser.com)**")).toEqual([
+      { text: "Strawberry Browser", strong: true, href: "https://strawberrybrowser.com/" },
+    ]);
+    expect(cellParts("**https://comet.ai/a_b**")).toEqual([{ text: "https://comet.ai/a_b", strong: true, href: "https://comet.ai/a_b" }]);
+    expect(cellParts("[**Arc** Search](https://arc.net)")).toEqual([
+      { text: "Arc", strong: true, href: "https://arc.net/" },
+      { text: " Search", href: "https://arc.net/" },
+    ]);
+    expect(cellParts("*a **b** c*")).toEqual([
+      { text: "a ", em: true },
+      { text: "b", em: true, strong: true },
+      { text: " c", em: true },
+    ]);
+  });
+
+  it("leaves marks that aren't emphasis as they are", () => {
+    // Inside a word, after a space, unclosed, escaped or in code.
+    expect(cellParts("snake_case_name")).toEqual([{ text: "snake_case_name" }]);
+    expect(cellParts("2 * 3 * 4")).toEqual([{ text: "2 * 3 * 4" }]);
+    expect(cellParts("**unclosed")).toEqual([{ text: "**unclosed" }]);
+    expect(cellParts("\\*not\\*")).toEqual([{ text: "*not*" }]);
+    expect(cellParts("`a**b**`")).toEqual([{ text: "a**b**", code: true }]);
+    expect(cellParts("**")).toEqual([{ text: "**" }]);
+  });
+
+  it("reads bold around italic, and italic ending inside bold", () => {
+    expect(cellParts("***both***")).toEqual([{ text: "both", strong: true, em: true }]);
+    expect(cellParts("**bold *italic***")).toEqual([
+      { text: "bold ", strong: true },
+      { text: "italic", strong: true, em: true },
+    ]);
+  });
+
+  it("keeps a bare address whole, and never links one inside an image's words or a link that goes nowhere", () => {
+    expect(cellParts("https://example.com/a_")).toEqual([{ text: "https://example.com/a_", href: "https://example.com/a_" }]);
+    expect(cellParts("![https://evil.example](https://image.example) [https://evil.example](mailto:x@y)")).toEqual([
+      { text: "https://evil.example https://evil.example" },
+    ]);
+  });
+
+  it("reads a long cell of marks that never close in time that grows with its length, not its square", () => {
+    for (const unit of ["*a ", "**a ", "_a ", "`a ", "``a `", "*`a ", "[a](", "[a ", "![a](", " https://", "a*", "**a*"]) {
+      const started = performance.now();
+      expect(plainCell(unit.repeat(20_000)).length).toBeGreaterThan(0);
+      expect(performance.now() - started, unit).toBeLessThan(500);
+    }
   });
 
   it("never links anything but a web address, and shows an image only as its words", () => {

@@ -2,6 +2,9 @@
 // the user makes, and main, which places the cards of a plan.
 
 export const CARD_WIDTH = 440;
+// How small and how big a card can be made from its corner: room for its header, what was asked and a table's first
+// row, and no more than a screen.
+export const CARD_SIZE = { minWidth: 360, maxWidth: 1200, minHeight: 240, maxHeight: 1200 };
 // What a card is assumed to take before it has been drawn and measured.
 export const CARD_HEIGHT = 200;
 // Between a card and the one pulled out of it, so the line between them has room to read as one.

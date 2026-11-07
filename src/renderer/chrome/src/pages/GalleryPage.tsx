@@ -253,6 +253,8 @@ const SAMPLE_BOARD: NestBoardActions = {
     forEachFrom: (cardId) => (cardId === 'scout' ? [SAMPLE_NODES[1].data.card] : []),
     away: () => false,
     replanning: true,
+    resizeStart: () => undefined,
+    resizeEnd: () => undefined,
     samples: SAMPLE_THREADS
 }
 

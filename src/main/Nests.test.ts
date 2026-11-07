@@ -9,6 +9,7 @@ import type { MascotProfile, NestBoard } from "../shared/library";
 import type { NestWriter } from "./nestCells";
 import { BERRY } from "../shared/mascots";
 import { STALE_ROWS } from "../shared/nestTable";
+import { CARD_SIZE } from "../shared/nestPlace";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -503,14 +504,14 @@ describe("Nests", () => {
     const runId = store.card(card.id)!.each!.runs[0].id;
     expect(store.run(runId)!.cell).toBe("Post");
 
-    // With nothing from the writer, the answer's first line, without the address its underscores would have become.
+    // With nothing from the writer, the answer's first line, with the address it gives kept whole.
     written = null;
     const ended = replyEnded();
     replies.push("See https://example.com/foo_bar_baz first\nthen more");
     nests.sendRun(runId, "Again");
     await ended;
     for (let tries = 0; tries < 5; tries++) await settle();
-    expect(store.run(runId)!.cell).toBe("See example.com first");
+    expect(store.run(runId)!.cell).toBe("See https://example.com/foo_bar_baz first");
   });
 
   it("tells the board as soon as a run's follow-up clears its value, and a refused send says why", async () => {
@@ -559,6 +560,23 @@ describe("Nests", () => {
     for (let tries = 0; tries < 5; tries++) await settle();
     expect(sent).toHaveLength(before);
     expect(nests.board(nest)!.cards.find((each) => each.plan)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry was stopped" });
+  });
+
+  it("keeps a card's size within what its corner allows, and refuses one that isn't a size", () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    const card = nests.addCard(nest, { x: 0, y: 0 })!;
+    const sizeOf = () => nests.board(nest)!.cards[0].size;
+    expect(sizeOf()).toBeUndefined();
+    expect(nests.resizeCard(card.id, CARD_SIZE.minWidth, CARD_SIZE.maxHeight)).toBe(true);
+    expect(sizeOf()).toEqual({ width: CARD_SIZE.minWidth, height: CARD_SIZE.maxHeight });
+    expect(nests.resizeCard(card.id, 0, CARD_SIZE.maxHeight + 1)).toBe(true);
+    expect(sizeOf()).toEqual({ width: CARD_SIZE.minWidth, height: CARD_SIZE.maxHeight });
+    expect(nests.resizeCard(card.id, 640.4, 519.6)).toBe(true);
+    expect(sizeOf()).toEqual({ width: 640, height: 520 });
+    for (const bad of [Number.NaN, Infinity, "640", null]) expect(nests.resizeCard(card.id, bad, 400)).toBe(false);
+    expect(nests.resizeCard("missing", 640, 400)).toBe(false);
+    expect(sizeOf()).toEqual({ width: 640, height: 520 });
   });
 
   it("sends a big file's first rows with each board, not all of them, and moving a card builds no table again", () => {
