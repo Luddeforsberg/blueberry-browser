@@ -191,7 +191,13 @@ export class Nests {
     if ("problem" in input) return null;
     const cardAnswer = input.answer;
     // When its reply ends, a card of a run plan that reads from it may start.
-    const options = { seePage: false, userPresent: true, onEnd: () => this.advance(card.nestId), ...(cardAnswer ? { cardAnswer } : {}) };
+    const options = {
+      seePage: false,
+      userPresent: true,
+      onEnd: () => this.advance(card.nestId),
+      ...(cardAnswer ? { cardAnswer } : {}),
+      ...this.userSaid(cardId, card.chatId, text),
+    };
     const sent = card.chatId
       ? this.chats.send(card.chatId, text, options)
       : this.chats.send(null, text, { ...options, mascotId: card.mascotId, started: (chatId) => this.store.setChat(cardId, chatId) });
@@ -235,6 +241,7 @@ export class Nests {
         this.pump();
         this.advance(card.nestId);
       },
+      ...this.userSaid(card.id, run.chatId, text),
     });
     if (sent) this.store.touch(card.nestId);
     return sent;
@@ -297,7 +304,8 @@ export class Nests {
     if (!checked) this.store.say(nestId, "berry", PLAN_FAILED);
     else if (!checked.ok) this.store.say(nestId, "berry", planRefused(checked.problem));
     else if (checked.ask || checked.cards.length === 0) this.store.say(nestId, "berry", checked.reply || PLAN_FAILED);
-    else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place))) this.store.say(nestId, "berry", planRefused("a line went to a card that isn’t there"));
+    else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place), this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n")))
+      this.store.say(nestId, "berry", planRefused("a line went to a card that isn’t there"));
     else this.store.say(nestId, "berry", checked.reply || "I’ve laid it out above. Press Run when it looks right.");
     this.changed(nestId);
     return { ok: true };
@@ -415,8 +423,20 @@ export class Nests {
       ...(input.answer ? { cardAnswer: input.answer } : {}),
       started: (chatId) => this.store.setChat(card.id, chatId),
       onEnd: () => this.advance(nestId),
+      ...this.userSaid(card.id, null, null),
     });
     return sent ? true : this.store.hold(card.id, "Didn’t start");
+  }
+
+  // On a card Berry planned, what the user typed: the request it was planned from, and anything they've typed in its chat
+  // since its first message, which is Berry's prompt, and `typed` if they're sending it now. Only these words name sites
+  // its job may go to without asking. Nothing on a card whose prompt the user typed themselves.
+  private userSaid(cardId: string, chatId: string | null, typed: string | null): { userSaid?: string } {
+    const said = this.store.said(cardId);
+    if (said === null) return {};
+    const since = (chatId ? this.chats.thread(chatId)?.messages ?? [] : []).filter((message) => message.role === "user").slice(1).map((message) => message.content);
+    // The first send carries Berry's prompt, even from a held card the user sends themselves.
+    return { userSaid: [said, ...since, ...(chatId && typed !== null ? [typed] : [])].join("\n") };
   }
 
   // Whether For each row can run on what a planned card reads from: a planned card that will answer with a table, or a
@@ -573,6 +593,7 @@ export class Nests {
         this.pump();
         this.advance(card.nestId);
       },
+      ...this.userSaid(card.id, null, null),
     });
     // Its bird has gone from the flock, or the chat couldn't start. The others still try.
     if (!sent) this.store.setRunState(run.id, "failed");

@@ -63,6 +63,8 @@ const MIGRATIONS = [
      text TEXT NOT NULL
    );
    CREATE INDEX talk_by_request ON talk(request_id);`,
+  // What the user typed in the request a card was planned from. Berry wrote its prompt, so only these words are the user's.
+  `ALTER TABLE cards ADD COLUMN said TEXT;`,
 ];
 
 interface CardRow {
@@ -350,16 +352,16 @@ export class NestStore {
 
   // Puts a plan on the board in place of the one there, if any, with the lines into its cards, in one go. A line from the
   // board only comes from a card in this Nest that has been sent. Null if anything doesn't fit, and then nothing changes.
-  setPlan(nestId: string, cards: readonly NewPlannedCard[]): string[] | null {
+  setPlan(nestId: string, cards: readonly NewPlannedCard[], said: string): string[] | null {
     const ids = new Map(cards.map((card) => [card.key, randomUUID()]));
     this.db.exec("BEGIN");
     try {
       if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
       this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId);
       const insert = this.db.prepare(
-        "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?)"
+        "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?)"
       );
-      for (const card of cards) insert.run(ids.get(card.key)!, nestId, card.mascotId, card.x, card.y, card.prompt, card.each ? 1 : 0, card.waits ? 1 : 0, card.table);
+      for (const card of cards) insert.run(ids.get(card.key)!, nestId, card.mascotId, card.x, card.y, card.prompt, card.each ? 1 : 0, card.waits ? 1 : 0, card.table, said);
       const line = this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card) VALUES (?, ?, ?, ?)");
       for (const card of cards) {
         if (!card.from) continue;
@@ -376,6 +378,11 @@ export class NestStore {
       throw error;
     }
     return cards.map((card) => ids.get(card.key)!);
+  }
+
+  // What the user typed in the request a planned card came from, or null for a card whose prompt they typed themselves.
+  said(id: string): string | null {
+    return (this.db.prepare("SELECT said FROM cards WHERE id = ?").get(id) as { said: string | null } | undefined)?.said ?? null;
   }
 
   // A planned card's prompt or For each row, only before the plan runs.

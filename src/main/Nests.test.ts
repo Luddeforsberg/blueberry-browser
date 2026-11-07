@@ -4,6 +4,7 @@ import { ChatStore } from "./ChatStore";
 import { NestStore } from "./NestStore";
 import { Nests, type NestPlanner } from "./Nests";
 import type { ReplyMessage, StreamReply } from "./agent";
+import type { PageTool } from "./browserTools";
 import type { MascotProfile } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
@@ -20,9 +21,13 @@ let replies: string[];
 // While set, each reply waits until it's let go, so a test can see how many are going at once.
 let held: (() => void)[] | null;
 
+// The tools the newest reply was given, which decide what asks first.
+let tools: PageTool[];
+
 // Each reply is the next of `replies`, and what the model got is kept in `sent`.
-const model: StreamReply = async function* (messages, signal) {
+const model: StreamReply = async function* (messages, signal, options) {
   sent.push(messages);
+  tools = options.tools;
   if (held) {
     const waiting = held;
     await new Promise<void>((resolve) => {
@@ -548,6 +553,35 @@ describe("Berry planning in a Nest", () => {
     expect(nests.card(second.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because the card it reads from was deleted" });
     expect(nests.card(third.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry’s card didn’t start" });
     expect(sent).toHaveLength(1);
+  });
+
+  it("counts a site as the user's only when they typed it, not when only Berry's plan named it", async () => {
+    const { nests } = setup();
+    // Whether opening this address would ask first in the default mode, for the newest reply.
+    const asks = (url: string) => tools.find((tool) => tool.name === "open_tab")!.isRisky!({ url });
+    const plan = { ...TWO_JOBS, cards: [planCard("c1", { prompt: "Find companies on allabolag.se" }), planCard("c2", { from: "c1", waits_for_user: true })] };
+
+    const theirs = nests.create();
+    plans.push(plan);
+    await nests.ask(theirs, "Find Swedish companies on allabolag.se and write to each", PLACE);
+    nests.runPlan(theirs);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(await asks("https://allabolag.se/")).toBe(false);
+
+    const berrys = nests.create();
+    plans.push(plan);
+    await nests.ask(berrys, "Find Swedish companies and write to each", PLACE);
+    nests.runPlan(berrys);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(await asks("https://allabolag.se/")).toBe(true);
+
+    // What they type on the card afterwards is theirs, and Berry's prompt still isn't.
+    const [card] = nests.board(berrys)!.cards;
+    const ended = new Promise((resolve) => setTimeout(resolve, 20));
+    nests.send(card.id, "Also look at ratsit.se");
+    await ended;
+    expect(await asks("https://ratsit.se/")).toBe(false);
+    expect(await asks("https://allabolag.se/")).toBe(true);
   });
 
   it("won't run a planned card with nothing to do, and doesn't start a run plan's cards after a restart", async () => {
