@@ -1394,9 +1394,11 @@ export class Chats {
     if (!siteAllowed(tab.url, mascot.sites)) return without(`${mascot.name} isn't allowed on ${siteOf(tab.url)}, so its text wasn't read.`);
     if (!mayRead(tab)) return without("The user has that tab right now, so its text wasn't read.");
     if (page.room <= 0) return without("There was no room left for its text.");
+    const { holds } = tab;
     const text = await readPageText(tab, (origin) => siteAllowed(origin, mascot.sites));
-    // Checked again, since any of it can change while the page is read.
-    if (text === null || !mayRead(tab)) return without("Its text couldn't be read.");
+    // Checked again, since any of it can change while the page is read, and the user may have had the tab and given it
+    // back meanwhile, when what was read could be theirs.
+    if (text === null || !mayRead(tab) || tab.holds !== holds) return without("Its text couldn't be read.");
     const clean = this.withoutCodes(text).trim();
     const cut = clean.length > page.room;
     const mark = " [… cut to fit]";

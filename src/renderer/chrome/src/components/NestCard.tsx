@@ -1256,13 +1256,9 @@ const usePagePicture = (cardId: string, width: number, element: React.RefObject<
         return () => {
             observer.disconnect()
             watchPage(cardId, 0)
+            pictures.delete(cardId)
         }
     }, [cardId, width, element, watchPage, samples])
-    useEffect(() => {
-        if (width > 0) return undefined
-        pictures.delete(cardId)
-        return undefined
-    }, [cardId, width])
     const picture = useSyncExternalStore(subscribePictures, () => pictures.get(cardId))
     return width > 0 ? picture : undefined
 }

@@ -29,6 +29,7 @@ interface FakeTab {
   text: string;
   existingView: object | null;
   heldForUser: boolean;
+  holds: number;
   mayShowCode: boolean;
   foreignFrames: never[];
   getTextWithFrames: () => Promise<string>;
@@ -37,7 +38,7 @@ let openTabs: FakeTab[];
 // The tabs each running job is using, by its chat.
 let jobTabs: Map<string, string[]>;
 const fakeTab = (id: string, url: string, text: string): FakeTab => {
-  const tab: FakeTab = { id, url, title: "Pricing", favicon: null, text, existingView: {}, heldForUser: false, mayShowCode: false, foreignFrames: [], getTextWithFrames: async () => tab.text };
+  const tab: FakeTab = { id, url, title: "Pricing", favicon: null, text, existingView: {}, heldForUser: false, holds: 0, mayShowCode: false, foreignFrames: [], getTextWithFrames: async () => tab.text };
   return tab;
 };
 const GONE: MascotProfile = { ...BERRY, id: "gone", name: "Gone", deletedAt: 1 };
@@ -2101,6 +2102,24 @@ describe("Tabs and links on the board", () => {
     expect(newest(sent[0])).not.toContain("Pro is $20");
     const open = tools.find((tool) => tool.name === "open_tab")!;
     expect((await open.refuses!({ url: PRICING }))?.message).toContain("isn't allowed on strawberrybrowser.com");
+  });
+
+  it("drops what was read while the user had the tab, even if they gave it back before the read came", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const tab = fakeTab("tab-1", PRICING, "Their half-typed message");
+    // The user is handed the tab and gives it back while the read is on its way.
+    tab.getTextWithFrames = async () => {
+      tab.holds++;
+      return tab.text;
+    };
+    openTabs = [tab];
+    const page = dropped(nests.dropPage(nest, { tabId: "tab-1" }, PLACE));
+    const writer = nests.addCard(nest, { x: 700, y: 100, from: page })!;
+    await sendAndWait(writer.id, "Sum it up");
+    expect(newest(sent[0])).toContain("<card_link");
+    expect(newest(sent[0])).toContain("Its text couldn't be read.");
+    expect(newest(sent[0])).not.toContain("half-typed");
   });
 
   it("deletes a page's card without touching its tab, and can't send from one or give it an input", () => {

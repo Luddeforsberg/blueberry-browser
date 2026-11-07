@@ -230,6 +230,8 @@ export const withCardAnswers = (message: string, answers: readonly CardAnswer[])
 // The same answer with every piece of text in it changed, such as codes the user typed taken out.
 export const mapCardText = (answer: CardAnswer, change: (text: string) => string): CardAnswer => ({
   ...answer,
+  // A page's name is its address, which can have a code in it like any.
+  ...(answer.part === "page" ? { name: change(answer.name) } : {}),
   text: change(answer.text),
   ...(answer.page ? { page: { ...answer.page, url: change(answer.page.url), title: change(answer.page.title), ...(answer.page.text !== undefined ? { text: change(answer.page.text) } : {}) } } : {}),
   ...(answer.exchanges ? { exchanges: answer.exchanges.map(({ asked, answer: said }) => ({ asked: change(asked), answer: change(said) })) } : {}),

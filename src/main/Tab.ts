@@ -549,6 +549,11 @@ export class Tab implements PageTarget {
   private _heldForUser = false;
   private holdsStarted = 0;
 
+  // How many times the user has been handed this tab. A read that sees it change was on its way while they had it.
+  get holds(): number {
+    return this.holdsStarted;
+  }
+
   get heldForUser(): boolean {
     return this._heldForUser;
   }
