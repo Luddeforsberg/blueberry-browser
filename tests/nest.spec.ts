@@ -812,3 +812,46 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
     server.close();
   }
 });
+
+test("a starter only fills an empty Nest's composer, and a chat that's several jobs offers its request as a Nest", async () => {
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
+  const chrome = await findView(app, "view=chrome");
+
+  // Pressing a starter fills the composer with its first blank selected, so typing replaces it, and sends nothing.
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  await chrome.getByRole("button", { name: "Find customers" }).click();
+  await expect(composer).toBeFocused();
+  await chrome.keyboard.type("SaaS companies");
+  await expect(composer).toHaveValue(/^Find 10 SaaS companies in \[place\]/);
+  expect(model.planRequests).toHaveLength(0);
+
+  // Sent, it's the user's words, planned as any request is, and the starters go once there's a card.
+  oneJob();
+  model.replyWith("Ten found.");
+  await composer.press("Enter");
+  await expect.poll(() => model.planRequests.length).toBe(1);
+  expect(newestUserMessage(model.planRequests[0])).toContain("Find 10 SaaS companies in [place]");
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(1);
+  await expect(chrome.getByRole("group", { name: "Start from" })).toHaveCount(0);
+
+  // A chat asked to compare three things suggests a Nest under its reply.
+  model.replyWith("Here's how they compare.");
+  const request = "Compare Notion, Coda and Slite for a small team";
+  const sent = await chrome.evaluate((text) => window.chromeAPI.chat.send(null, text, { seePage: false }), request);
+  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+  await expect(chrome.getByText("That’s several jobs, which a Nest does side by side.")).toBeVisible();
+  const requestsBefore = model.requests.length;
+
+  // Pressing it opens a new Nest with the request in its composer, unsent, and it doesn't come back for this chat.
+  await chrome.getByRole("button", { name: "Open as a Nest" }).click();
+  await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("New Nest");
+  await expect(composer).toHaveValue(request);
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(0);
+  expect(model.planRequests).toHaveLength(1);
+  expect(model.requests).toHaveLength(requestsBefore);
+  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
+  await expect(chrome.getByRole("button", { name: "Open as a Nest" })).toBeVisible();
+  await expect(chrome.getByText("That’s several jobs, which a Nest does side by side.")).toHaveCount(0);
+});
