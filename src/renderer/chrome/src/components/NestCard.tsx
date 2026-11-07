@@ -717,7 +717,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                                 onClick={() => board.setOpen(card.id)}
                                 className="w-full h-9 px-5 border-t text-left text-13 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:bg-muted"
                             >
-                                {ended.length > RUNS_SHOWN ? `${ended.length - RUNS_SHOWN} more` : 'Every run'}
+                                {ended.length > RUNS_SHOWN ? `${ended.length - RUNS_SHOWN} more` : 'Show every run'}
                             </button>
                         )}
                     </div>
