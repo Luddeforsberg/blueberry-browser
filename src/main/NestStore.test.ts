@@ -18,10 +18,11 @@ describe("NestStore", () => {
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null },
-        { id: writer.id, chatId: null, mascotId: null, x: 420.5, y: 32, each: null },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null, plan: null },
+        { id: writer.id, chatId: null, mascotId: null, x: 420.5, y: 32, each: null, plan: null },
       ],
       lines: [{ id: expect.any(String), from: scout.id, to: writer.id, picked: null }],
+      talk: [],
     });
   });
 

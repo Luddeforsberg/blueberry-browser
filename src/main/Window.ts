@@ -23,7 +23,8 @@ import { Account } from "./Account";
 import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
-import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
+import { askInShape, generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
+import { PLAN_SCHEMA } from "./nestPlanner";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
 import { MemoryStore } from "./MemoryStore";
@@ -342,6 +343,11 @@ export class Window {
       },
       onListChanged: () => this.publishLibrary(),
       chatDeleted: (chatId) => this.closeChatTabs(chatId),
+    }, {
+      available: hasModel,
+      // Cards' answers can repeat a code typed from the phone, so they're taken out as anywhere else the model reads.
+      plan: (system, messages) =>
+        askInShape(system, messages.map((message) => ({ ...message, content: this.chats.withoutCodes(message.content) })), PLAN_SCHEMA, "nest_plan"),
     });
 
     this.workViews = new WorkViews({

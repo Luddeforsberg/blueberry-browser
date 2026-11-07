@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chats } from "./Chats";
 import { ChatStore } from "./ChatStore";
 import { NestStore } from "./NestStore";
-import { Nests } from "./Nests";
+import { Nests, type NestPlanner } from "./Nests";
 import type { ReplyMessage, StreamReply } from "./agent";
+import type { PageTool } from "./browserTools";
 import type { MascotProfile } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
@@ -20,9 +21,13 @@ let replies: string[];
 // While set, each reply waits until it's let go, so a test can see how many are going at once.
 let held: (() => void)[] | null;
 
+// The tools the newest reply was given, which decide what asks first.
+let tools: PageTool[];
+
 // Each reply is the next of `replies`, and what the model got is kept in `sent`.
-const model: StreamReply = async function* (messages, signal) {
+const model: StreamReply = async function* (messages, signal, options) {
   sent.push(messages);
+  tools = options.tools;
   if (held) {
     const waiting = held;
     await new Promise<void>((resolve) => {
@@ -31,6 +36,17 @@ const model: StreamReply = async function* (messages, signal) {
     });
   }
   yield replies.shift() ?? "ok";
+};
+
+// What the planner answers next, and what it was asked.
+let plans: unknown[];
+let planned: { system: string; messages: { role: string; content: string }[] }[];
+const planner: NestPlanner = {
+  available: () => true,
+  plan: async (system, messages) => {
+    planned.push({ system, messages });
+    return plans.shift();
+  },
 };
 
 const setup = () => {
@@ -59,7 +75,7 @@ const setup = () => {
     onBoard: () => {},
     onListChanged: () => {},
     chatDeleted: (chatId) => deleted.push(chatId),
-  });
+  }, planner);
   // Resolves once the reply that's running has been saved.
   const replyEnded = () => new Promise<void>((resolve) => (ended = resolve));
   const sendAndWait = async (cardId: string, text: string) => {
@@ -73,6 +89,8 @@ const setup = () => {
 const newest = (messages: ReplyMessage[]) => messages.at(-1)?.content as string;
 
 beforeEach(() => {
+  plans = [];
+  planned = [];
   sent = [];
   replies = [];
   held = null;
@@ -353,5 +371,245 @@ describe("Nests", () => {
     for (let tries = 0; tries < 5; tries++) await settle();
     expect(nests.card(writer.id)!.each!.runs.map(({ state }) => state)).toEqual(["started", "started", "started", "waiting", "waiting"]);
     expect(sent).toHaveLength(4);
+  });
+});
+
+const PLACE = { at: { x: 0, y: 0 }, taken: [] };
+const planCard = (key: string, extra: Record<string, unknown> = {}) => ({
+  key,
+  bird: BERRY.id,
+  prompt: `Do ${key}`,
+  from: null,
+  for_each_row: false,
+  waits_for_user: false,
+  table_of: null,
+  ...extra,
+});
+const TWO_JOBS = {
+  reply: "That's two jobs, so I've laid them out above.",
+  ask: false,
+  cards: [planCard("c1", { bird: "scout", prompt: "Find companies", table_of: "companies" }), planCard("c2", { prompt: "Write to each", from: "c1", for_each_row: true })],
+};
+
+describe("Berry planning in a Nest", () => {
+  const plannedCards = (nests: Nests, nest: string) => nests.board(nest)!.cards.filter((card) => card.plan);
+
+  it("starts one job at once as one card with the user's own words, and plans nothing", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push({ reply: "On it.", ask: false, cards: [planCard("c1", { prompt: "Find Swedish SaaS companies, rewritten" })] });
+    expect(await nests.ask(nest, "Find Swedish SaaS companies", PLACE)).toEqual({ ok: true });
+    await settle();
+    const [card] = nests.board(nest)!.cards;
+    expect(card.chatId).not.toBeNull();
+    expect(card.plan).toBeNull();
+    expect(newest(sent[0])).toBe("Find Swedish SaaS companies");
+    expect(nests.board(nest)!.talk).toEqual([]);
+  });
+
+  it("lays out several jobs as planned cards that run nothing, with the request and Berry's answer kept", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const [scout, writer] = plannedCards(nests, nest);
+    expect(scout.plan).toMatchObject({ state: "planned", prompt: "Find companies", table: "companies", each: false });
+    expect(scout.mascotId).toBe("scout");
+    expect(writer.plan).toMatchObject({ state: "planned", prompt: "Write to each", each: true });
+    expect(nests.board(nest)!.lines).toMatchObject([{ from: scout.id, to: writer.id }]);
+    expect(writer.x).toBeGreaterThan(scout.x);
+    expect(nests.board(nest)!.talk).toEqual([
+      {
+        id: expect.any(String),
+        open: true,
+        messages: [
+          { role: "user", text: "Find companies and write to each" },
+          { role: "berry", text: "That's two jobs, so I've laid them out above." },
+        ],
+      },
+    ]);
+    expect(nests.list()[0].planned).toBe(true);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("refuses an invalid plan and runs nothing, never putting Berry in for a bird that isn't there", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push({ ...TWO_JOBS, cards: [planCard("c1", { bird: "gone" })] });
+    await nests.ask(nest, "Find companies", PLACE);
+    expect(nests.board(nest)!.cards).toEqual([]);
+    expect(nests.board(nest)!.talk[0].messages[1].text).toBe(
+      "I couldn’t lay that out as cards, because it named a bird that isn’t in your flock. Try asking another way."
+    );
+    expect(sent).toHaveLength(0);
+  });
+
+  it("asks first, then plans with the answer, and a message while a plan waits changes it", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push({ reply: "Which market?", ask: true, cards: [] });
+    await nests.ask(nest, "Find leads", PLACE);
+    expect(nests.board(nest)!.cards).toEqual([]);
+
+    // After a question, even one job is a plan, since its words are Berry's.
+    plans.push({ reply: "One job.", ask: false, cards: [planCard("c1", { prompt: "Find leads in Sweden" })] });
+    await nests.ask(nest, "Sweden", PLACE);
+    expect(planned[1].messages.map(({ role }) => role)).toEqual(["user", "assistant", "user"]);
+    expect(planned[1].messages[0].content).toContain("<request>\nFind leads\n</request>");
+    expect(plannedCards(nests, nest).map((card) => card.plan!.prompt)).toEqual(["Find leads in Sweden"]);
+
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "And write to each", PLACE);
+    expect(planned[2].messages[0].content).toContain('<planned key="p1"');
+    expect(plannedCards(nests, nest).map((card) => card.plan!.prompt)).toEqual(["Find companies", "Write to each"]);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("gives the planner the cards on the board with only the start of their answers, labelled untrusted", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push(TABLE(8));
+    await sendAndWait(scout.id, "Find companies");
+    plans.push({ reply: "One more card.", ask: false, cards: [planCard("c1", { from: "e1", for_each_row: true })] });
+    await nests.ask(nest, "Now find each lead's latest post", PLACE);
+
+    const request = planned[0].messages[0].content;
+    expect(request).toContain('<card key="e1" bird="Scout" status="Done">');
+    expect(request).toContain("Company 3");
+    expect(request).not.toContain("Company 4");
+    expect(request).toContain("untrusted");
+    // Reading from a card on the board, it waits for Run rather than starting.
+    const [card] = plannedCards(nests, nest);
+    expect(nests.board(nest)!.lines).toMatchObject([{ from: scout.id, to: card.id }]);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("starts each card once Run is pressed and the card it reads from has answered, with that fresh answer, once per row", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const [scout, writer] = plannedCards(nests, nest);
+
+    replies.push(TABLE(3));
+    expect(nests.runPlan(nest)).toEqual({ ok: true });
+    expect(nests.board(nest)!.talk[0].open).toBe(false);
+    for (let tries = 0; tries < 10; tries++) await settle();
+
+    expect(nests.card(scout.id)!.chatId).not.toBeNull();
+    const runs = nests.card(writer.id)!.each!.runs;
+    expect(runs).toHaveLength(3);
+    expect(sent).toHaveLength(4);
+    expect(newest(sent[1])).toContain("| Company 1 | 10 |");
+    expect(newest(sent[1]).endsWith("Write to each")).toBe(true);
+  });
+
+  it("waits for the user when a card waits for them, and starts it only on Looks right, continue", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push({ ...TWO_JOBS, cards: [planCard("c1", { prompt: "Find companies" }), planCard("c2", { prompt: "Draft emails", from: "c1", waits_for_user: true })] });
+    await nests.ask(nest, "Find companies and draft emails", PLACE);
+    const [scout, writer] = plannedCards(nests, nest);
+    replies.push("Found three.");
+    nests.runPlan(nest);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(nests.card(writer.id)!.plan!.state).toBe("armed");
+    expect(sent).toHaveLength(1);
+
+    expect(nests.continueFrom(scout.id)).toBe(true);
+    await settle();
+    expect(nests.card(writer.id)!.plan).toBeNull();
+    expect(newest(sent[1])).toContain("Found three.");
+  });
+
+  it("doesn't start the cards after one that was stopped, and says why", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push({ ...TWO_JOBS, cards: [planCard("c1"), planCard("c2", { from: "c1" }), planCard("c3", { from: "c2" })] });
+    await nests.ask(nest, "Three steps", PLACE);
+    const [first, second, third] = plannedCards(nests, nest);
+    held = [];
+    nests.runPlan(nest);
+    await settle();
+    nests.stopCard(first.id);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(nests.card(second.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry was stopped" });
+    expect(nests.card(third.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry’s card didn’t start" });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("doesn't start a card whose source was deleted while it waited", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push({ ...TWO_JOBS, cards: [planCard("c1"), planCard("c2", { from: "c1" }), planCard("c3", { from: "c2" })] });
+    await nests.ask(nest, "Three steps", PLACE);
+    const [first, second, third] = plannedCards(nests, nest);
+    held = [];
+    nests.runPlan(nest);
+    await settle();
+    nests.deleteCard(first.id);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(nests.card(second.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because the card it reads from was deleted" });
+    expect(nests.card(third.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Berry’s card didn’t start" });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("counts a site as the user's only when they typed it, not when only Berry's plan named it", async () => {
+    const { nests } = setup();
+    // Whether opening this address would ask first in the default mode, for the newest reply.
+    const asks = (url: string) => tools.find((tool) => tool.name === "open_tab")!.isRisky!({ url });
+    const plan = { ...TWO_JOBS, cards: [planCard("c1", { prompt: "Find companies on allabolag.se" }), planCard("c2", { from: "c1", waits_for_user: true })] };
+
+    const theirs = nests.create();
+    plans.push(plan);
+    await nests.ask(theirs, "Find Swedish companies on allabolag.se and write to each", PLACE);
+    nests.runPlan(theirs);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(await asks("https://allabolag.se/")).toBe(false);
+
+    const berrys = nests.create();
+    plans.push(plan);
+    await nests.ask(berrys, "Find Swedish companies and write to each", PLACE);
+    nests.runPlan(berrys);
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(await asks("https://allabolag.se/")).toBe(true);
+
+    // What they type on the card afterwards is theirs, and Berry's prompt still isn't.
+    const [card] = nests.board(berrys)!.cards;
+    const ended = new Promise((resolve) => setTimeout(resolve, 20));
+    nests.send(card.id, "Also look at ratsit.se");
+    await ended;
+    expect(await asks("https://ratsit.se/")).toBe(false);
+    expect(await asks("https://allabolag.se/")).toBe(true);
+  });
+
+  it("won't run a planned card with nothing to do, and doesn't start a run plan's cards after a restart", async () => {
+    const { nests, store } = setup();
+    const nest = nests.create();
+    const lone = store.addCard(nest, { x: 0, y: 0, planned: true })!;
+    expect(nests.runPlan(nest)).toEqual({ ok: false, error: "Write what Berry should do first, or delete that card." });
+    expect(nests.editPlanned(lone.id, { prompt: "Find companies" })).toBe(true);
+    const after = store.addCard(nest, { x: 500, y: 0, from: lone.id, planned: true })!;
+    store.editPlanned(after.id, { prompt: "Write" });
+    store.armPlan(nest);
+
+    new Nests(store, { send: vi.fn(), delete: vi.fn(), thread: vi.fn(), isRunning: vi.fn(), stop: vi.fn() } as never, { resolve: () => BERRY, all: () => [BERRY] }, {
+      onBoard: () => {},
+      onListChanged: () => {},
+      chatDeleted: () => {},
+    });
+    expect(store.card(lone.id)!.plan).toMatchObject({ state: "held", note: "Didn’t start, because Blueberry closed before it could" });
+    expect(store.card(after.id)!.plan!.state).toBe("held");
+  });
+
+  it("discards a plan that hasn't run, and folds the request away", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    expect(nests.discardPlan(nest)).toBe(true);
+    expect(nests.board(nest)!.cards).toEqual([]);
+    expect(nests.board(nest)!.talk[0].open).toBe(false);
   });
 });

@@ -23,6 +23,14 @@ test.afterEach(async () => {
 const newestUserMessage = (request: FakeModel["requests"][number]) =>
   String(request.messages.findLast(({ role }) => role === "user")?.content ?? "");
 
+// What the planner answers for one job: one card, which starts at once with the user's own words.
+const oneJob = () =>
+  model.planWith({
+    reply: "On it.",
+    ask: false,
+    cards: [{ key: "c1", bird: "berry", prompt: "One job", from: null, for_each_row: false, waits_for_user: false, table_of: null }],
+  });
+
 test("a card pulled out of another gets its latest answer, and the Nest keeps both", async () => {
   model.reset();
   const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
@@ -32,9 +40,10 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await chrome.getByRole("button", { name: "New nest" }).click();
   await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("Untitled nest");
 
-  // The composer at the bottom starts a card of its own.
+  // The composer at the bottom starts a card of its own, when Berry finds it's one job.
   model.replyWith(FIRST_ANSWER);
-  const composer = chrome.getByRole("textbox", { name: "New card" });
+  oneJob();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
   await composer.fill("Find two Swedish SaaS companies");
   await composer.press("Enter");
   const first = chrome.locator(".react-flow__node").first();
@@ -101,7 +110,8 @@ test("rows picked in a card's table go to a new card, which runs once for each o
   await chrome.getByRole("button", { name: "New nest" }).click();
 
   model.replyWith(COMPANIES);
-  const composer = chrome.getByRole("textbox", { name: "New card" });
+  oneJob();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
   await composer.fill("Find six Swedish SaaS companies");
   await composer.press("Enter");
   const first = chrome.locator(".react-flow__node").first();
@@ -175,4 +185,101 @@ test("rows picked in a card's table go to a new card, which runs once for each o
     expect(sent.filter((message) => message.includes(`| ${company} |`)), `${index}`).toHaveLength(1);
   }
   for (const left of ["Lindqvist Data", "Kvarnsten", "Vinga"]) expect(sent.join("\n")).not.toContain(left);
+});
+
+const SHOTS = process.env.NEST_SHOTS;
+const THREE_COMPANIES = ["Three to start with.", "", "| Company | Leads sales |", "|---|---|", "| Lindqvist Data | Sara Holm |", "| Fjällbo | Omar Nilsson |", "| Brygga | Maja Lund |"].join("\n");
+
+test("Berry lays two jobs out as a plan, which runs only on Run, and the second waits for Looks right, continue", async () => {
+  test.setTimeout(60_000);
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  const shot = async (name: string) => {
+    if (SHOTS) await chrome.screenshot({ path: join(SHOTS, `${name}.png`) });
+  };
+  const saved = await chrome.evaluate(() =>
+    window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find companies.", sites: ["allabolag.se"], tools: ["visit", "click", "type"] })
+  );
+  if (!saved.ok) throw new Error(saved.error);
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  await chrome.getByRole("button", { name: "New nest" }).click();
+
+  model.planWith({
+    reply: "That’s two jobs, so I’ve laid them out above. I’ll stop after the list so you can check it before any email is written.",
+    ask: false,
+    cards: [
+      { key: "c1", bird: saved.id, prompt: "Find three Swedish B2B SaaS companies and who leads sales at each, as a table", from: null, for_each_row: false, waits_for_user: false, table_of: "companies" },
+      { key: "c2", bird: "berry", prompt: "Draft a first email to each", from: "c1", for_each_row: false, waits_for_user: true, table_of: null },
+    ],
+  });
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  await composer.fill("Find Swedish SaaS companies we could sell to and draft a first email to each");
+  await composer.press("Enter");
+
+  // The plan is on the board, dashed and not started, with the request and Berry's answer over the composer.
+  const cards = chrome.locator(".react-flow__node");
+  await expect(cards).toHaveCount(2);
+  const [scout, writer] = [cards.nth(0), cards.nth(1)];
+  await expect(scout.getByRole("status")).toHaveText("Planned");
+  await expect(scout).toContainText("Only goes to allabolag.se");
+  await expect(scout).toContainText("A table of companies lands here");
+  await expect(writer).toContainText("Starts when you say Scout’s answer is right");
+  const talk = chrome.getByLabel("Talking with Berry");
+  await expect(talk).toContainText("Find Swedish SaaS companies we could sell to");
+  await expect(talk).toContainText("That’s two jobs");
+  await expect(chrome.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+  await expect(chrome.getByRole("textbox", { name: "Ask in this Nest" })).toHaveAttribute("placeholder", "Change the plan, or press Run");
+  expect(model.planRequests).toHaveLength(1);
+  expect(model.requests).toHaveLength(0);
+  await shot("1-plan");
+
+  // Before Run, a card's prompt edits in place, For each row turns on, and a line pulled out adds a card, which goes again.
+  const prompt = writer.getByRole("textbox", { name: "What Berry will do" });
+  await prompt.fill("Draft a short first email to the person who leads sales");
+  await writer.getByRole("switch").click();
+  await expect(writer.getByRole("status")).toHaveText("Planned · for each row");
+  await writer.hover();
+  await writer.getByLabel("Pull a new card out of Berry’s").click();
+  await expect(cards).toHaveCount(3);
+  await cards.nth(2).hover();
+  await cards.nth(2).getByRole("button", { name: "Delete card" }).click();
+  await expect(cards).toHaveCount(2);
+  // The new card moved the board to show it, so it goes back to where both cards are in sight.
+  const pane = (await chrome.locator(".react-flow__pane").boundingBox())!;
+  await chrome.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
+  for (let tries = 0; tries < 10 && (await scout.boundingBox())!.x < pane.x + 60; tries++) await chrome.mouse.wheel(-120, 0);
+  await expect.poll(async () => (await scout.boundingBox())!.x).toBeGreaterThanOrEqual(pane.x + 60);
+  await prompt.click();
+  await shot("2-editing");
+  expect(model.requests).toHaveLength(0);
+
+  // Run sends every planned card. The first starts at once, and the second waits for the user to check its answer.
+  model.replyWith(THREE_COMPANIES);
+  await chrome.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(scout.getByRole("status")).toHaveText("Done");
+  await expect(writer.getByRole("status")).toHaveText("Waits for you");
+  const looksRight = scout.getByRole("button", { name: "Looks right, continue" });
+  await expect(looksRight).toBeVisible();
+  await expect(chrome.getByRole("button", { name: "Run", exact: true })).toHaveCount(0);
+  // The request has folded to one line, which opens.
+  await expect(talk.getByRole("button", { expanded: false })).toContainText("Find Swedish SaaS companies");
+  expect(model.requests).toHaveLength(1);
+  expect(newestUserMessage(model.requests[0])).toBe("Find three Swedish B2B SaaS companies and who leads sales at each, as a table");
+  await shot("3-waits-light");
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "dark" }));
+  await shot("4-waits-dark");
+
+  // Looks right, continue runs the edited card once for each row of the fresh table, each with only its row.
+  model.replyWith("A short note.");
+  await looksRight.click();
+  await expect(writer.getByRole("status").first()).toHaveText("Done");
+  expect(model.requests).toHaveLength(4);
+  const runs = model.requests.slice(1).map(newestUserMessage);
+  for (const company of ["Lindqvist Data", "Fjällbo", "Brygga"]) {
+    const run = runs.find((message) => message.includes(`| ${company} |`));
+    expect(run, `a run for ${company}`).toBeDefined();
+    expect(run!.endsWith("Draft a short first email to the person who leads sales")).toBe(true);
+  }
 });

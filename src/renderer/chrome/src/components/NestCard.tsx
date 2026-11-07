@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import { ArrowLeft, GitFork, Maximize2, Minimize2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine } from '@shared/library'
+import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned } from '@shared/library'
 import { findTable, MAX_RUNS, missingRows, plainCell, rowName, STALE_ROWS, type Table } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
+import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { useChatThread, useChatThreads } from '../contexts/ChatContext'
@@ -12,6 +13,7 @@ import { cardStatus, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunP
 import { Berry, useAssistantName } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
 import { ChatComposer, Composer } from './Composer'
+import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
 import { TableResult, type PickMode } from './NestTable'
 
@@ -40,6 +42,8 @@ export interface NestBoardActions {
     selection: RowSelection | null
     clearSelection: () => void
     pick: (cardId: string, text: string, table: Table, index: number, mode: PickMode) => void
+    // The cards of a run plan that wait for the user to say this card's answer is right.
+    waitingOn: (cardId: string) => NestCard[]
 }
 
 export const NestBoardContext = createContext<NestBoardActions | null>(null)
@@ -209,7 +213,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                             {thread.error && <ChatError message={thread.error} />}
                         </div>
                         {reply && table && (
-                            <div className="rounded-b-panel overflow-hidden">
+                            <div className={cn("overflow-hidden", !(!running && answered && board.waitingOn(card.id).length > 0) && "rounded-b-panel")}>
                                 <TableResult
                                     table={table}
                                     selected={running ? null : selected}
@@ -219,6 +223,34 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                         )}
                     </div>
                 ))}
+            {!running && answered && <LooksRight cardId={card.id} />}
+        </div>
+    )
+}
+
+// Under a card whose answer a card of a run plan waits for the user to check: who waits, and the press that starts them.
+const LooksRight: React.FC<{ cardId: string }> = ({ cardId }) => {
+    const board = useBoard()
+    const { find } = useFlock()
+    const [busy, setBusy] = useState(false)
+    const waiting = board.waitingOn(cardId)
+    if (waiting.length === 0) return null
+    const names = [...new Set(waiting.map((card) => find(card.mascotId).name))]
+    const who = names.length === 1 ? `${names[0]} starts` : `${names.slice(0, -1).join(', ')} and ${names.at(-1)} start`
+    return (
+        <div className="nodrag cursor-auto px-5 py-3 border-t flex items-center gap-3">
+            <p className="flex-1 min-w-0 text-13 text-muted-foreground">{who} when you say this is right.</p>
+            <Button
+                size="sm"
+                disabled={busy}
+                onClick={async () => {
+                    setBusy(true)
+                    await window.chromeAPI.nests.continueFrom(cardId)
+                    setBusy(false)
+                }}
+            >
+                Looks right, continue
+            </Button>
         </div>
     )
 }
@@ -325,7 +357,8 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const { find } = useFlock()
     const mascot = find(card.mascotId)
     const name = useAssistantName(mascot)
-    const [text, setText] = useState(() => draftText(card.id))
+    // A card of a plan that didn't start is a draft with its prompt, which the user can still send.
+    const [text, setText] = useState(() => draftText(card.id) || (card.plan?.prompt ?? ''))
     const source = board.sourceOf(card.id)
     const picked = board.lineInto(card.id)?.picked ?? null
     const sourceMascot = source ? find(source.mascotId) : undefined
@@ -339,7 +372,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const stale = !!picked && !!sourceThread && missingRows(picked, sourceTable).length > 0
     const rowCount = picked ? picked.rows.length : (sourceTable?.rows.length ?? 0)
     const canEach = !!source && !source.each && (picked !== null || sourceTable !== null)
-    const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? picked !== null)
+    const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? (picked !== null || !!card.plan?.each))
     const forEach = canEach && eachOn
     const tooMany = forEach && rowCount > MAX_RUNS
     const [sending, setSending] = useState(false)
@@ -440,6 +473,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                         {problem ?? (stale ? STALE_ROWS : `For each row runs at most ${MAX_RUNS} times. Select ${MAX_RUNS} rows or fewer, or turn it off.`)}
                     </p>
                 )}
+                {card.plan?.note && <p role="status" className="px-2 pt-1 text-12 text-muted-foreground">{card.plan.note}. You can still send it yourself.</p>}
             </div>
         </div>
     )
@@ -606,12 +640,154 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                     </div>
                 </div>
             )}
+            {!active && answered && <LooksRight cardId={card.id} />}
         </div>
     )
 }
 
+// A card Berry planned, dashed until it starts. Before Run, its prompt edits in place, its bird and For each row change,
+// and a line pulls out of it to add another. Once the plan runs, it only says what it's waiting for.
+const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, plan }) => {
+    const board = useBoard()
+    const { find } = useFlock()
+    const mascot = find(card.mascotId)
+    const name = useAssistantName(mascot)
+    const source = board.sourceOf(card.id)
+    const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
+    const sourceThread = useChatThread(source?.chatId ?? null)
+    const sourceAnswer = savedAnswer(sourceThread)
+    const editable = plan.state === 'planned'
+    // For each row needs a table to run on: one the card it reads from will answer with, or one already in its answer.
+    const getsTable = !!source && !source.each && (source.plan ? !source.plan.each && source.plan.table !== null : !!sourceAnswer && findTable(sourceAnswer) !== null)
+    const [text, setText] = useState(plan.prompt)
+    const [choosing, setChoosing] = useState(false)
+    const editing = useRef(false)
+    const saveTimer = useRef<number | undefined>(undefined)
+    const switchId = useId()
+    const api = window.chromeAPI.nests
+    // A changed plan brings new words, unless the user is the one changing them.
+    useEffect(() => {
+        if (!editing.current) setText(plan.prompt)
+    }, [plan.prompt])
+    useEffect(() => () => window.clearTimeout(saveTimer.current), [])
+    const change = (value: string) => {
+        setText(value)
+        window.clearTimeout(saveTimer.current)
+        saveTimer.current = window.setTimeout(() => void api.editPlan(card.id, { prompt: value }), 400)
+    }
+    const waitsForYou = plan.state === 'armed' && plan.waits && !!sourceAnswer && sourceThread?.partial == null
+    const status = editable ? `Planned${plan.each ? ' · for each row' : ''}` : waitsForYou ? 'Waits for you' : source ? `Waiting for ${sourceName}` : 'Starting'
+    const gets = source ? (plan.each ? `For each row of ${sourceName}’s table` : `Gets ${sourceName}’s answer`) : null
+    const details = [mascot.sites.length > 0 ? `Only goes to ${mascot.sites.join(', ')}` : null, plan.table ? `A table of ${plan.table} lands here` : null].filter(
+        (line): line is string => line !== null
+    )
+
+    return (
+        <div className={cn(CARD_SHELL, "border-dashed border-accent-ink/50")} style={{ width: CARD_WIDTH }}>
+            <Perched mascot={mascot} mood="rest" />
+            <LineEnds canPull={editable} onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${name}’s`} />
+            <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
+                <span className="text-14 font-semibold truncate">{name}</span>
+                <span role="status" className="text-12 text-muted-foreground truncate">{status}</span>
+                {editable && (
+                    <span className="ml-auto flex items-center">
+                        <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                            <X className="size-4" />
+                        </CardButton>
+                    </span>
+                )}
+            </div>
+            {gets && <p className="px-5 -mt-1 mb-1 text-12 text-muted-foreground">{gets}</p>}
+            <div className="nodrag cursor-auto px-5 pb-3">
+                {editable ? (
+                    <PlanPrompt
+                        label={`What ${name} will do`}
+                        value={text}
+                        onChange={change}
+                        onFocus={() => (editing.current = true)}
+                        onBlur={() => {
+                            editing.current = false
+                            window.clearTimeout(saveTimer.current)
+                            if (text !== plan.prompt) void api.editPlan(card.id, { prompt: text })
+                        }}
+                    />
+                ) : (
+                    <p className="text-13 whitespace-pre-wrap line-clamp-4">{plan.prompt}</p>
+                )}
+            </div>
+            {(details.length > 0 || (plan.waits && source)) && (
+                <div className="px-5 py-3 border-t flex flex-col gap-1 text-13 text-muted-foreground">
+                    {details.map((line) => <p key={line}>{line}</p>)}
+                    {plan.waits && source && <p className="text-accent-ink">Starts when you say {sourceName}’s answer is right</p>}
+                </div>
+            )}
+            {editable && (
+                <div className="nodrag cursor-auto px-3 pb-3 flex flex-col gap-2">
+                    {choosing && (
+                        <MascotPerch
+                            selectedId={mascot.id}
+                            onChoose={(id) => {
+                                setChoosing(false)
+                                void api.setBird(card.id, id)
+                            }}
+                            onClose={() => setChoosing(false)}
+                        />
+                    )}
+                    <div className="flex items-center gap-3">
+                        <MascotChip mascot={mascot} open={choosing} onPress={() => setChoosing(!choosing)} />
+                        {getsTable && (
+                            <span className="flex items-center gap-2">
+                                <Switch checked={plan.each} labelledBy={switchId} onChange={(on) => void api.editPlan(card.id, { each: on })} />
+                                <span id={switchId} className="text-13">For each row</span>
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// A planned card's prompt, edited in place: it reads as text until it's pressed, and grows with what's written.
+const PlanPrompt: React.FC<{ label: string; value: string; onChange: (value: string) => void; onFocus: () => void; onBlur: () => void }> = ({
+    label,
+    value,
+    onChange,
+    onFocus,
+    onBlur
+}) => {
+    const box = useRef<HTMLTextAreaElement>(null)
+    useLayoutEffect(() => {
+        const element = box.current
+        if (!element) return
+        element.style.height = 'auto'
+        element.style.height = `${element.scrollHeight}px`
+    }, [value])
+    return (
+        <textarea
+            ref={box}
+            aria-label={label}
+            placeholder={label}
+            value={value}
+            rows={1}
+            onChange={(event) => onChange(event.target.value)}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            className="nowheel block w-[calc(100%+12px)] -mx-1.5 px-1.5 py-1 resize-none overflow-hidden rounded-control bg-transparent text-13 outline-none transition-colors hover:bg-muted focus:bg-muted focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+        />
+    )
+}
+
 export const CardView: React.FC<NodeProps<CardNode>> = ({ data: { card } }) =>
-    card.each ? <ForEachCard card={card} each={card.each} /> : card.chatId ? <SentCard card={card} /> : <DraftCard card={card} />
+    card.each ? (
+        <ForEachCard card={card} each={card.each} />
+    ) : card.chatId ? (
+        <SentCard card={card} />
+    ) : card.plan && card.plan.state !== 'held' ? (
+        <PlannedCard card={card} plan={card.plan} />
+    ) : (
+        <DraftCard card={card} />
+    )
 
 const LINE = "stroke-accent-ink/60"
 // The round ends sit just outside the cards, touching their edges, since a line is drawn under the cards.

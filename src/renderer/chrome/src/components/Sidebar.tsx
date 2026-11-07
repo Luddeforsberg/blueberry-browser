@@ -226,11 +226,13 @@ const NestRow: React.FC<{ nest: NestSummary; selected: boolean; onOpen: () => vo
                     <GitFork className={cn(ICON, "text-muted-foreground")} />
                 </span>
                 <span className="flex-1 truncate">{nest.title}</span>
-                {working.length > 0 && (
+                {working.length > 0 ? (
                     <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
                         <BerryDot working />
                         <span className="sr-only">{working.join(', ')} working</span>
                     </span>
+                ) : (
+                    nest.planned && <span className="shrink-0 -mr-6 text-12 text-muted-foreground group-hover/chat:invisible group-focus-within/chat:invisible">Plan</span>
                 )}
             </button>
             <button

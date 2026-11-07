@@ -228,6 +228,11 @@ export class EventManager {
     this.handle("nests:send-each", (cardId, text) => nests.sendEach(cardId, text));
     this.handle("nests:send-run", (runId, text) => nests.sendRun(runId, text));
     this.handle("nests:stop-card", (cardId) => nests.stopCard(cardId));
+    this.handle("nests:ask", (nestId, text, options) => nests.ask(nestId, text, options));
+    this.handle("nests:edit-plan", (cardId, change) => nests.editPlanned(cardId, change));
+    this.handle("nests:run-plan", (nestId) => nests.runPlan(nestId));
+    this.handle("nests:discard-plan", (nestId) => nests.discardPlan(nestId));
+    this.handle("nests:continue", (cardId) => nests.continueFrom(cardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

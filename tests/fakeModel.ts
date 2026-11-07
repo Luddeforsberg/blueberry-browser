@@ -32,6 +32,8 @@ export const startFakeModel = async () => {
   const memoryRequests: FakeModelRequest[] = [];
   let suggest: ((digest: string) => string) | null = null;
   const suggestionRequests: FakeModelRequest[] = [];
+  let plans: object[] = [];
+  const planRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -56,6 +58,23 @@ export const startFakeModel = async () => {
           created: 0,
           model: TITLE_MODEL,
           choices: [{ index: 0, message: { role: "assistant", content: asksWhatToRemember ? memory : asksForSuggestions ? (suggest?.(human) ?? '{"cards":[]}') : title }, finish_reason: "stop" }],
+        })
+      );
+      return;
+    }
+
+    // A Nest's planner asks the main model for an answer in a set shape, all at once.
+    if (parsed.response_format?.json_schema?.name === "nest_plan") {
+      planRequests.push(parsed);
+      const plan = plans.shift() ?? { reply: "I couldn't plan that.", ask: true, cards: [] };
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          id: "fake",
+          object: "chat.completion",
+          created: 0,
+          model: parsed.model,
+          choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify(plan) }, finish_reason: "stop" }],
         })
       );
       return;
@@ -105,7 +124,10 @@ export const startFakeModel = async () => {
     titleRequests,
     memoryRequests,
     suggestionRequests,
+    planRequests,
     reset() {
+      plans = [];
+      planRequests.length = 0;
       memory = '{"facts":[]}';
       memoryRequests.length = 0;
       tokens = DEFAULT_TOKENS;
@@ -126,6 +148,10 @@ export const startFakeModel = async () => {
     // What the cheap model proposes for the new tab, worked out from the digest it was sent.
     suggestFrom(next: (digest: string) => string) {
       suggest = next;
+    },
+    // What the planner answers next, as the model would in the plan's shape. Call again for the one after.
+    planWith(next: object) {
+      plans.push(next);
     },
     // What the cheap model proposes for a bird to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {

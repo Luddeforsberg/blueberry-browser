@@ -148,6 +148,8 @@ interface Run {
   userPresent: boolean;
   // The answer on the card a Nest's line comes from, read when this was sent. Only the model gets it, with the newest message.
   cardAnswer?: CardAnswer;
+  // What the user typed for this job, when the chat's messages aren't all their words, as on a card Berry planned.
+  userSaid?: string;
 }
 
 // How one reply ended, for whoever started it.
@@ -798,7 +800,8 @@ export class Chats {
   // `onEnd` hears how this reply ended, and nothing of a later one. `userPresent` is only for a message the user typed in
   // one of Blueberry's own composers, where they're there to answer a question before it starts. `cardAnswer` goes to the
   // model with this message only, labelled untrusted, and is never saved. `started` hears a new chat's id before anything
-  // about it is published, so a Nest can claim it first.
+  // about it is published, so a Nest can claim it first. `userSaid` is what the user typed for this job when the chat's
+  // messages aren't all theirs, such as a prompt Berry planned: only these words then name sites it may go to unasked.
   send(
     chatId: string | null,
     text: string,
@@ -815,6 +818,7 @@ export class Chats {
       userPresent = false,
       cardAnswer,
       started,
+      userSaid,
     }: {
       seePage: boolean;
       mascotId?: string | null;
@@ -828,6 +832,7 @@ export class Chats {
       userPresent?: boolean;
       cardAnswer?: CardAnswer;
       started?: (chatId: string) => void;
+      userSaid?: string;
     }
   ): ChatThread | null {
     const message = text.trim();
@@ -854,7 +859,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswer };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswer, userSaid };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -974,7 +979,7 @@ export class Chats {
       run.withPage = page !== null;
       const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswer);
       const said = this.userWords(chatId).join("\n");
-      const tools = this.jobTools(chatId, run, page, said);
+      const tools = this.jobTools(chatId, run, page, run.userSaid ?? said);
       this.recall(chatId, run, said);
       await this.consume(chatId, run, messages, tools, (content) => {
         if (content) this.events.onChunk(chatId, content);

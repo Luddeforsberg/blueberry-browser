@@ -1,11 +1,15 @@
 import type { Chats } from "./Chats";
 import type { NestStore } from "./NestStore";
 import type { MascotStore } from "./MascotStore";
-import type { ChatThread, NestBoard, NestCard, NestSummary } from "../shared/library";
-import type { NestNewCard, NestSendEachResult } from "../shared/ipc";
+import type { ChatThread, MascotProfile, NestBoard, NestCard, NestSummary } from "../shared/library";
+import type { NestAskOptions, NestAskResult, NestNewCard, NestRunPlanResult, NestSendEachResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
-import { findTable, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type PickedRows } from "../shared/nestTable";
+import { findTable, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type PickedRows } from "../shared/nestTable";
+import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
 import { latestAnswer, rowAnswer, rowsAnswer, runsAnswer, type CardAnswer } from "./nestContext";
+import { armedStep, checkPlan, CLOSED_BEFORE_START, replyState, runsState, type PlanCard, type PlanSource, type SourceState } from "./nestPlan";
+import { answerStart, PLAN_SYSTEM_PROMPT, planDigest, type BoardCardDigest, type PlannedDigest } from "./nestPlanner";
+import type { NewPlannedCard } from "./NestStore";
 
 const MAX_TITLE_LENGTH = 100;
 const NEW_NEST_TITLE = "Untitled nest";
@@ -21,6 +25,20 @@ export interface NestEvents {
 
 type NestChats = Pick<Chats, "send" | "delete" | "thread" | "isRunning" | "stop">;
 
+// The main model, asked for a plan in a set shape. Without one, the Nest's composer starts one card as it always has.
+export interface NestPlanner {
+  available: () => boolean;
+  plan: (system: string, messages: { role: "user" | "assistant"; content: string }[]) => Promise<unknown>;
+}
+
+const NO_PLANNER: NestPlanner = { available: () => false, plan: async () => null };
+
+// How tall a planned card is taken to be when placing a plan, and how many cards a request may say are already there.
+const PLANNED_HEIGHT = 180;
+const MAX_TAKEN = 500;
+const PLAN_FAILED = "I couldn’t plan that just now. Try again, or click the board to start a card yourself.";
+const planRefused = (why: string) => `I couldn’t lay that out as cards, because ${why}. Try asking another way.`;
+
 // What a card gets when it sends: an answer, or nothing when there's no line or the source hasn't answered, or a reason
 // it can't send at all.
 type CardInput = { answer: CardAnswer | null } | { problem: string };
@@ -35,23 +53,29 @@ const coordinate = (value: unknown): number | null =>
 export class Nests {
   // Set as the window closes, when stopping every chat would otherwise let waiting runs take their places.
   private closed = false;
+  // What the user wrote in each Nest's composer, while Berry plans it.
+  private readonly planning = new Map<string, string>();
 
   constructor(
     private readonly store: NestStore,
     private readonly chats: NestChats,
     // Who a card runs as. Only a mascot in the flock can start one.
     private readonly mascots: Pick<MascotStore, "resolve" | "all">,
-    private readonly events: NestEvents
+    private readonly events: NestEvents,
+    private readonly planner: NestPlanner = NO_PLANNER
   ) {
     // Runs still waiting when the app last closed don't start by themselves now: the press that queued them was then.
+    // Cards of a plan that hadn't started don't either.
     store.stopWaiting();
+    store.holdAfter(null, CLOSED_BEFORE_START);
   }
 
   list(): NestSummary[] {
     return this.store.nests().map(({ id, title, updatedAt }) => {
       const cards = this.store.board(id)?.cards ?? [];
       const working = cards.filter((card) => this.chatsOf(card).some((chatId) => this.chats.isRunning(chatId))).map((card) => card.mascotId ?? BERRY.id);
-      return { id, title, updatedAt, chatIds: this.store.chatIds(id), working: [...new Set(working)] };
+      const planned = cards.some((card) => card.plan?.state === "planned");
+      return { id, title, updatedAt, chatIds: this.store.chatIds(id), working: [...new Set(working)], planned };
     });
   }
 
@@ -61,7 +85,8 @@ export class Nests {
   }
 
   board(id: string): NestBoard | null {
-    return this.store.board(id);
+    const board = this.store.board(id);
+    return board && { ...board, planning: this.planning.get(id) ?? null };
   }
 
   title(id: string): string | null {
@@ -113,13 +138,15 @@ export class Nests {
     const from = typeof input.from === "string" ? input.from : null;
     const mascotId = this.flockId(input.mascotId);
     if (mascotId === undefined) return null;
-    // A line comes out of a card with an answer to give, so never out of a draft.
+    // A line comes out of a card with an answer to give, so never out of a draft. Out of a planned card, it's another card
+    // of the plan.
     const source = from === null ? null : this.store.card(from);
-    if (from !== null && !source?.chatId && !source?.each) return null;
+    const planned = source?.plan?.state === "planned";
+    if (from !== null && !source?.chatId && !source?.each && !planned) return null;
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
-    const picked = input.picked === undefined || input.picked === null ? null : this.pickedFrom(source, input.picked);
+    const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
     if (picked === undefined) return null;
-    const card = this.store.addCard(nestId, { x, y, from, mascotId, picked });
+    const card = this.store.addCard(nestId, { x, y, from, mascotId, picked, planned });
     if (card) this.changed(nestId);
     return card;
   }
@@ -143,9 +170,13 @@ export class Nests {
   // Its chat goes with it, or every run's.
   deleteCard(cardId: string): boolean {
     const card = this.store.card(cardId);
-    if (!card || !this.store.deleteCard(cardId)) return false;
+    if (!card) return false;
+    // A card of a run plan that reads from it would otherwise start with nothing to read.
+    this.store.holdAfter(cardId, "Didn’t start, because the card it reads from was deleted");
+    if (!this.store.deleteCard(cardId)) return false;
     this.chatsOf(card).forEach((chatId) => this.deleteChat(chatId));
-    this.changed(card.nestId);
+    // A deleted chat never says it ended, so the cards after the ones just held hear it from here.
+    this.advance(card.nestId);
     this.pump();
     return true;
   }
@@ -154,11 +185,19 @@ export class Nests {
   // answer is read now, every time, so a card always works from what its source says at the moment it's sent.
   send(cardId: string, text: string): ChatThread | null {
     const card = this.store.card(cardId);
-    if (!card || card.each || typeof text !== "string") return null;
+    // A planned card goes with its plan, by Run. One that was held is a draft, and the user may send it.
+    if (!card || card.each || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
     const input = this.inputFor(cardId);
     if ("problem" in input) return null;
     const cardAnswer = input.answer;
-    const options = { seePage: false, userPresent: true, ...(cardAnswer ? { cardAnswer } : {}) };
+    // When its reply ends, a card of a run plan that reads from it may start.
+    const options = {
+      seePage: false,
+      userPresent: true,
+      onEnd: () => this.advance(card.nestId),
+      ...(cardAnswer ? { cardAnswer } : {}),
+      ...this.userSaid(cardId, card.chatId, text),
+    };
     const sent = card.chatId
       ? this.chats.send(card.chatId, text, options)
       : this.chats.send(null, text, { ...options, mascotId: card.mascotId, started: (chatId) => this.store.setChat(cardId, chatId) });
@@ -175,6 +214,7 @@ export class Nests {
     const card = this.store.card(cardId);
     const prompt = typeof text === "string" ? text.trim() : "";
     if (!card || card.chatId || card.each) return { ok: false, error: "This card has been sent already." };
+    if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     if (!prompt) return { ok: false, error: "Write what to do with each row first." };
     if (this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
     const rows = this.rowsFor(cardId);
@@ -197,7 +237,11 @@ export class Nests {
       seePage: false,
       userPresent: true,
       cardAnswer: rowAnswer(this.sourceName(card.id), card.each.header, run.row),
-      onEnd: () => this.pump(),
+      onEnd: () => {
+        this.pump();
+        this.advance(card.nestId);
+      },
+      ...this.userSaid(card.id, run.chatId, text),
     });
     if (sent) this.store.touch(card.nestId);
     return sent;
@@ -211,6 +255,285 @@ export class Nests {
     this.chatsOf(card).forEach((chatId) => this.chats.stop(chatId));
     this.changed(card.nestId);
     return true;
+  }
+
+  // What the user wrote in the Nest's composer, which goes to Berry first. One job with nothing to read becomes a card as
+  // the bird the user chose, with their own words, and starts at once, as it always has. Several jobs, or one that reads
+  // from a card, become a plan of cards that waits for Run, and Berry says what it laid out. When it's unclear, Berry
+  // asks, and plans once it has the answer. While a plan is waiting, a message changes it.
+  async ask(nestId: string, text: string, options: NestAskOptions): Promise<NestAskResult> {
+    const words = typeof text === "string" ? text.trim() : "";
+    const board = this.store.board(nestId);
+    if (!board || !words) return { ok: false, error: "Write what you’d like done first." };
+    if (this.planning.has(nestId)) return { ok: false, error: "Berry is still reading your last message." };
+    const chosen = this.flockId(options?.mascotId);
+    if (chosen === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
+    const place = this.placing(options);
+    const open = this.store.openRequest(nestId);
+    const pending = board.cards.filter((card) => card.plan?.state === "planned");
+    // Without a model to plan with, it's one card, as before.
+    if (!this.planner.available()) return this.oneCard(nestId, words, chosen, place) ? { ok: true } : { ok: false, error: "That couldn’t start." };
+
+    const { digest, sources } = this.digestOf(board, chosen, pending);
+    const earlier = (open?.messages ?? []).map(({ role, text: said }) => ({ role: role === "user" ? ("user" as const) : ("assistant" as const), content: said }));
+    const messages = [...earlier, { role: "user" as const, content: words }];
+    messages[0] = { ...messages[0], content: `${digest}\n\n<request>\n${messages[0].content}\n</request>` };
+    this.planning.set(nestId, words);
+    this.changed(nestId);
+    let raw: unknown;
+    try {
+      raw = await this.planner.plan(PLAN_SYSTEM_PROMPT, messages);
+    } catch (error) {
+      console.error("Couldn't plan in a Nest:", error instanceof Error ? error.message : "unknown error");
+      raw = undefined;
+    } finally {
+      this.planning.delete(nestId);
+    }
+    if (!this.store.board(nestId)) return { ok: true };
+
+    const flock = [BERRY.id, ...this.mascots.all().filter((mascot) => mascot.deletedAt === null && mascot.id !== BERRY.id).map((mascot) => mascot.id)];
+    const checked = raw === undefined ? null : checkPlan(raw, { flock, sources });
+    // One job, asked fresh, as the bird the user chose and reading from nothing, starts at once with their own words.
+    const one = checked?.ok && !checked.ask && checked.cards.length === 1 ? checked.cards[0] : null;
+    if (one && !open && pending.length === 0 && !one.from && !one.each && one.mascotId === chosen) {
+      this.oneCard(nestId, words, chosen, place);
+      return { ok: true };
+    }
+
+    this.store.say(nestId, "user", words);
+    if (!checked) this.store.say(nestId, "berry", PLAN_FAILED);
+    else if (!checked.ok) this.store.say(nestId, "berry", planRefused(checked.problem));
+    else if (checked.ask || checked.cards.length === 0) this.store.say(nestId, "berry", checked.reply || PLAN_FAILED);
+    else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place), this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n")))
+      this.store.say(nestId, "berry", planRefused("a line went to a card that isn’t there"));
+    else this.store.say(nestId, "berry", checked.reply || "I’ve laid it out above. Press Run when it looks right.");
+    this.changed(nestId);
+    return { ok: true };
+  }
+
+  // A planned card's prompt or For each row, before the plan runs. For each row only where the card gets a table.
+  editPlanned(cardId: string, change: { prompt?: unknown; each?: unknown }): boolean {
+    const card = this.store.card(cardId);
+    if (card?.plan?.state !== "planned" || typeof change !== "object" || change === null) return false;
+    const prompt = typeof change.prompt === "string" ? change.prompt.slice(0, 2000) : undefined;
+    const each = typeof change.each === "boolean" ? change.each : undefined;
+    if (prompt === undefined && each === undefined) return false;
+    if (each && !this.getsTable(cardId)) return false;
+    if (!this.store.editPlanned(cardId, { prompt, each })) return false;
+    this.changed(card.nestId);
+    return true;
+  }
+
+  // Run: the user's one press that sends every planned card in the Nest. Each starts now if it reads from nothing, and
+  // otherwise once the card it reads from has answered, or once the user says that answer is right if it waits for them.
+  runPlan(nestId: string): NestRunPlanResult {
+    const planned = this.store.board(nestId)?.cards.filter((card) => card.plan?.state === "planned") ?? [];
+    if (planned.length === 0) return { ok: false, error: "There’s no plan to run." };
+    if (this.planning.has(nestId)) return { ok: false, error: "Berry is still changing the plan." };
+    for (const card of planned) {
+      const name = this.mascots.resolve(card.mascotId).name;
+      if (!card.plan!.prompt.trim()) return { ok: false, error: `Write what ${name} should do first, or delete that card.` };
+      if (this.flockId(card.mascotId) === undefined) return { ok: false, error: `${name} isn’t in your flock any more. Choose another bird for that card.` };
+      if (card.plan!.each && !this.getsTable(card.id)) return { ok: false, error: `For each row on ${name}’s card needs a card that answers with a table.` };
+    }
+    this.store.armPlan(nestId);
+    this.store.closeRequest(nestId);
+    this.advance(nestId);
+    return { ok: true };
+  }
+
+  discardPlan(nestId: string): boolean {
+    if (this.store.discardPlan(nestId) === 0) return false;
+    this.store.closeRequest(nestId);
+    this.changed(nestId);
+    return true;
+  }
+
+  // Looks right, continue: the user says this card's answer is right, so the cards of a run plan waiting on it start now.
+  continueFrom(cardId: string): boolean {
+    const card = this.store.card(cardId);
+    if (!card || this.closed) return false;
+    const waiting = this.store.armedCards(card.nestId).filter((armed) => this.store.lineTo(armed.id)?.source.id === cardId && armed.plan!.waits);
+    let started = false;
+    for (const armed of waiting) {
+      if (armedStep(this.sourceState(armed.id), true, true).do === "start") started = this.startPlanned(armed) || started;
+    }
+    this.advance(card.nestId);
+    return started;
+  }
+
+  // Moves a run plan along: every armed card starts, holds with why, or keeps waiting, until nothing changes. Called after
+  // Run and whenever a card's reply ends, and it only ever starts what Run armed.
+  private advance(nestId: string): void {
+    if (this.closed) return;
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const card of this.store.armedCards(nestId)) {
+        const step = armedStep(this.sourceState(card.id), card.plan!.waits);
+        if (step.do === "start") moved = this.startPlanned(card) || moved;
+        else if (step.do === "hold") moved = this.store.hold(card.id, step.note) || moved;
+      }
+    }
+    this.changed(nestId);
+  }
+
+  // Where the card a planned card reads from stands.
+  private sourceState(cardId: string): SourceState {
+    const line = this.store.lineTo(cardId);
+    if (!line) return { kind: "none" };
+    const { source } = line;
+    const name = this.mascots.resolve(source.mascotId).name;
+    if (source.plan?.state === "held") return { kind: "held", name };
+    if (source.plan) return { kind: "planned", name };
+    if (source.each) {
+      return runsState(
+        name,
+        source.each.runs.map((run) => ({ state: run.state, running: !!run.chatId && this.chats.isRunning(run.chatId), thread: run.chatId ? this.chats.thread(run.chatId) : null }))
+      );
+    }
+    if (!source.chatId) return { kind: "silent", name };
+    return replyState(name, this.chats.isRunning(source.chatId), this.chats.thread(source.chatId));
+  }
+
+  // Starts one armed card as its bird, with what its line brings now: the source's fresh answer, or one run for each row
+  // of its table. If it can't, it holds and says why. Each goes through `Chats.send` like any card, with every limit and
+  // approval, and nobody is asked first, since the plan was what the user ran.
+  private startPlanned(card: NestCard): boolean {
+    const plan = card.plan!;
+    const nestId = this.store.card(card.id)?.nestId;
+    if (!nestId) return false;
+    if (this.flockId(card.mascotId) === undefined) return this.store.hold(card.id, "Didn’t start, because its bird isn’t in your flock any more");
+    if (plan.each) {
+      const rows = this.rowsFor(card.id);
+      const name = this.sourceName(card.id);
+      if ("problem" in rows) return this.store.hold(card.id, `Didn’t start, because ${name}’s answer has no table`);
+      if (runCountProblem(rows.rows.length)) {
+        return this.store.hold(card.id, `Didn’t start, because ${name}’s table has ${rows.rows.length} rows, and For each row runs at most ${MAX_RUNS} times`);
+      }
+      if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows)) return false;
+      this.pump();
+      return true;
+    }
+    const input = this.inputFor(card.id);
+    if ("problem" in input) return this.store.hold(card.id, "Didn’t start, because what it reads from has changed");
+    const sent = this.chats.send(null, plan.prompt, {
+      seePage: false,
+      mascotId: card.mascotId,
+      ...(input.answer ? { cardAnswer: input.answer } : {}),
+      started: (chatId) => this.store.setChat(card.id, chatId),
+      onEnd: () => this.advance(nestId),
+      ...this.userSaid(card.id, null, null),
+    });
+    return sent ? true : this.store.hold(card.id, "Didn’t start");
+  }
+
+  // On a card Berry planned, what the user typed: the request it was planned from, and anything they've typed in its chat
+  // since its first message, which is Berry's prompt, and `typed` if they're sending it now. Only these words name sites
+  // its job may go to without asking. Nothing on a card whose prompt the user typed themselves.
+  private userSaid(cardId: string, chatId: string | null, typed: string | null): { userSaid?: string } {
+    const said = this.store.said(cardId);
+    if (said === null) return {};
+    const since = (chatId ? this.chats.thread(chatId)?.messages ?? [] : []).filter((message) => message.role === "user").slice(1).map((message) => message.content);
+    // The first send carries Berry's prompt, even from a held card the user sends themselves.
+    return { userSaid: [said, ...since, ...(chatId && typed !== null ? [typed] : [])].join("\n") };
+  }
+
+  // Whether For each row can run on what a planned card reads from: a planned card that will answer with a table, or a
+  // sent card whose latest answer has one.
+  private getsTable(cardId: string): boolean {
+    const source = this.store.lineTo(cardId)?.source;
+    if (!source || source.each) return false;
+    if (source.plan) return !source.plan.each && source.plan.table !== null;
+    const answer = source.chatId ? this.answerOf(source.chatId) : null;
+    return !!answer && findTable(answer) !== null;
+  }
+
+  // One card as the chosen bird, in the first free place in sight, sent with the user's own words.
+  private oneCard(nestId: string, words: string, mascotId: string | null, place: { at: { x: number; y: number }; taken: Rect[] }): boolean {
+    const spot = freeSpot(place.taken, place.at);
+    const card = this.store.addCard(nestId, { ...spot, mascotId });
+    if (!card) return false;
+    this.changed(nestId);
+    return this.send(card.id, words) !== null;
+  }
+
+  // What the renderer says about where a plan can go, checked: numbers on the board, and not too many of them.
+  private placing(options: NestAskOptions | undefined): { at: { x: number; y: number }; taken: Rect[] } {
+    const x = coordinate(options?.at?.x);
+    const y = coordinate(options?.at?.y);
+    const taken = (Array.isArray(options?.taken) ? options.taken.slice(0, MAX_TAKEN) : []).flatMap((rect) => {
+      const box = { x: coordinate(rect?.x), y: coordinate(rect?.y), width: coordinate(rect?.width), height: coordinate(rect?.height) };
+      return box.x === null || box.y === null || box.width === null || box.height === null ? [] : [box as Rect];
+    });
+    return { at: { x: x ?? 0, y: y ?? 0 }, taken };
+  }
+
+  // A plan's cards in place: each card beside the one it reads from, level with it, and the rest in a column where the
+  // plan it replaces was, or else at the top left in sight. None lands on another card.
+  private placePlan(
+    cards: readonly PlanCard[],
+    board: NestBoard,
+    pending: readonly NestCard[],
+    place: { at: { x: number; y: number }; taken: Rect[] }
+  ): NewPlannedCard[] {
+    const replaced = new Set(pending.map((card) => card.id));
+    const taken = place.taken.filter((rect) => !pending.some((card) => card.x === rect.x && card.y === rect.y));
+    const rectOf = (card: NestCard) => taken.find((rect) => rect.x === card.x && rect.y === card.y) ?? { x: card.x, y: card.y, width: CARD_WIDTH, height: CARD_HEIGHT };
+    const start = pending.length > 0 ? { x: Math.min(...pending.map((card) => card.x)), y: Math.min(...pending.map((card) => card.y)) } : place.at;
+    const placed = new Map<string, Rect>();
+    return cards.map((card) => {
+      const from = card.from && ("plan" in card.from ? placed.get(card.from.plan) : board.cards.find((each) => each.id === (card.from as { card: string }).card && !replaced.has(each.id)));
+      const source = from && ("width" in from ? from : rectOf(from));
+      const spot = freeSpot(taken, source ? { x: source.x + source.width + CARD_GAP, y: source.y } : start, { width: CARD_WIDTH, height: PLANNED_HEIGHT });
+      const rect = { ...spot, width: CARD_WIDTH, height: PLANNED_HEIGHT };
+      taken.push(rect);
+      placed.set(card.key, rect);
+      return { ...card, ...spot };
+    });
+  }
+
+  // What the planner reads besides the conversation: the flock, the bird chosen, every sent card on the board, each with
+  // only the start of its answer, and the plan being changed. And the keys it may draw a line from.
+  private digestOf(board: NestBoard, chosen: string | null, pending: readonly NestCard[]): { digest: string; sources: PlanSource[] } {
+    const sent = board.cards.filter((card) => card.chatId || card.each);
+    const keyOf = new Map(sent.map((card, index) => [card.id, `e${index + 1}`]));
+    const sources: PlanSource[] = [];
+    const cards: BoardCardDigest[] = sent.map((card) => {
+      const key = keyOf.get(card.id)!;
+      const bird = this.mascots.resolve(card.mascotId).name;
+      if (card.each) {
+        const answered = card.each.runs.filter((run) => run.chatId && this.answerOf(run.chatId)).length;
+        sources.push({ key, cardId: card.id, table: false });
+        return { key, bird, status: `${answered} of ${card.each.runs.length} answered`, asked: card.each.prompt, answer: null, runs: card.each.runs.length };
+      }
+      const thread = card.chatId ? this.chats.thread(card.chatId) : null;
+      const answer = thread ? latestAnswer(thread.messages) : null;
+      const running = !!card.chatId && this.chats.isRunning(card.chatId);
+      sources.push({ key, cardId: card.id, table: !!answer && findTable(answer) !== null });
+      return {
+        key,
+        bird,
+        status: running ? "Working" : answer ? "Done" : "No answer",
+        asked: thread?.messages.findLast((message) => message.role === "user")?.content ?? null,
+        answer: answer ? answerStart(answer) : null,
+      };
+    });
+    const planKeys = new Map(pending.map((card, index) => [card.id, `p${index + 1}`]));
+    const plan: PlannedDigest[] = pending.map((card) => {
+      const from = this.store.lineTo(card.id)?.source.id;
+      return {
+        key: planKeys.get(card.id)!,
+        bird: card.mascotId ?? BERRY.id,
+        prompt: card.plan!.prompt,
+        from: from ? (planKeys.get(from) ?? keyOf.get(from) ?? null) : null,
+        each: card.plan!.each,
+        waits: card.plan!.waits,
+        table: card.plan!.table,
+      };
+    });
+    const flock: MascotProfile[] = this.mascots.all().filter((mascot) => mascot.deletedAt === null);
+    return { digest: planDigest({ flock, chosen: this.mascots.resolve(chosen), board: cards, plan }), sources };
   }
 
   // What a card gets from the card its line comes from: that card's latest answer, the rows the user picked from it as
@@ -266,7 +589,11 @@ export class Nests {
       mascotId: card.mascotId,
       cardAnswer: rowAnswer(this.sourceName(card.id), card.each.header, run.row),
       started: (chatId) => this.store.setRunChat(run.id, chatId),
-      onEnd: () => this.pump(),
+      onEnd: () => {
+        this.pump();
+        this.advance(card.nestId);
+      },
+      ...this.userSaid(card.id, null, null),
     });
     // Its bird has gone from the flock, or the chat couldn't start. The others still try.
     if (!sent) this.store.setRunState(run.id, "failed");
@@ -312,7 +639,7 @@ export class Nests {
   }
 
   private changed(nestId: string): void {
-    const board = this.store.board(nestId);
+    const board = this.board(nestId);
     if (board) this.events.onBoard(board);
     this.events.onListChanged();
   }

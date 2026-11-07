@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestBoard, NestCard, NestForEach, NestLine, NestRun, NestRunState } from "../shared/library";
+import type { NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState } from "../shared/library";
 import type { PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
 
@@ -43,6 +43,28 @@ const MIGRATIONS = [
      state TEXT NOT NULL CHECK (state IN ('waiting', 'started', 'stopped', 'failed'))
    );
    CREATE INDEX runs_by_card ON runs(card_id, position);`,
+  // A card Berry planned: planned until the user runs the plan, then armed until it starts, or held, saying why it didn't.
+  // It stops being a planned card once it starts. The Nest's conversation with Berry is its requests, each a few messages.
+  `ALTER TABLE cards ADD COLUMN plan TEXT CHECK (plan IN ('planned', 'armed', 'held'));
+   ALTER TABLE cards ADD COLUMN plan_prompt TEXT;
+   ALTER TABLE cards ADD COLUMN plan_each INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE cards ADD COLUMN plan_waits INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE cards ADD COLUMN plan_table TEXT;
+   ALTER TABLE cards ADD COLUMN plan_note TEXT;
+   CREATE TABLE requests (
+     id TEXT PRIMARY KEY,
+     nest_id TEXT NOT NULL REFERENCES nests(id) ON DELETE CASCADE,
+     open INTEGER NOT NULL
+   );
+   CREATE INDEX requests_by_nest ON requests(nest_id);
+   CREATE TABLE talk (
+     request_id TEXT NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+     role TEXT NOT NULL CHECK (role IN ('user', 'berry')),
+     text TEXT NOT NULL
+   );
+   CREATE INDEX talk_by_request ON talk(request_id);`,
+  // What the user typed in the request a card was planned from. Berry wrote its prompt, so only these words are the user's.
+  `ALTER TABLE cards ADD COLUMN said TEXT;`,
 ];
 
 interface CardRow {
@@ -54,6 +76,12 @@ interface CardRow {
   y: number;
   eachPrompt: string | null;
   eachHeader: string | null;
+  plan: NestPlanned["state"] | null;
+  planPrompt: string | null;
+  planEach: number;
+  planWaits: number;
+  planTable: string | null;
+  planNote: string | null;
 }
 
 interface RunRow {
@@ -64,10 +92,25 @@ interface RunRow {
   state: NestRunState;
 }
 
-const CARD_COLUMNS = "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader";
+const CARD_COLUMNS =
+  "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader, " +
+  "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state";
 
 const toRun = ({ id, row, chatId, state }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state });
+
+// One card of a plan, placed, with the line into it: from another card of the same plan by its key, or a card on the board.
+export interface NewPlannedCard {
+  key: string;
+  mascotId: string | null;
+  prompt: string;
+  from: { plan: string } | { card: string } | null;
+  each: boolean;
+  waits: boolean;
+  table: string | null;
+  x: number;
+  y: number;
+}
 
 export interface StoredNest {
   id: string;
@@ -103,7 +146,7 @@ export class NestStore {
     const lines = (
       this.db.prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", picked FROM lines WHERE nest_id = ? ORDER BY rowid").all(id) as unknown as (Omit<NestLine, "picked"> & { picked: string | null })[]
     ).map((line) => ({ ...line, picked: line.picked ? (JSON.parse(line.picked) as PickedRows) : null }));
-    return { ...nest, cards, lines };
+    return { ...nest, cards, lines, talk: this.talk(id) };
   }
 
   createNest(title: string): string {
@@ -126,7 +169,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -135,7 +178,9 @@ export class NestStore {
             header: JSON.parse(eachHeader ?? "[]") as string[],
             runs: (this.db.prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE card_id = ? ORDER BY position`).all(id) as unknown as RunRow[]).map(toRun),
           };
-    return { id, chatId, mascotId, x, y, each };
+    const planned: NestPlanned | null =
+      plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
+    return { id, chatId, mascotId, x, y, each, plan: planned };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -165,16 +210,26 @@ export class NestStore {
 
   // A draft, and the line from the card it was pulled out of if there is one, in one go. Null if the nest or that card
   // isn't there, or the card is in another nest.
+  // With `planned`, it's a card of the plan instead, with no prompt yet.
   addCard(
     nestId: string,
-    { x, y, mascotId = null, from = null, picked = null }: { x: number; y: number; mascotId?: string | null; from?: string | null; picked?: PickedRows | null }
+    {
+      x,
+      y,
+      mascotId = null,
+      from = null,
+      picked = null,
+      planned = false,
+    }: { x: number; y: number; mascotId?: string | null; from?: string | null; picked?: PickedRows | null; planned?: boolean }
   ): NestCard | null {
     const id = randomUUID();
     this.db.exec("BEGIN");
     try {
       if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
       if (from !== null && this.card(from)?.nestId !== nestId) throw new NotHere();
-      this.db.prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y) VALUES (?, ?, NULL, ?, ?, ?)").run(id, nestId, mascotId, x, y);
+      this.db
+        .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)")
+        .run(id, nestId, mascotId, x, y, planned ? "planned" : null, planned ? "" : null);
       if (from !== null) {
         this.db
           .prepare("INSERT INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, ?)")
@@ -187,22 +242,29 @@ export class NestStore {
       if (error instanceof NotHere) return null;
       throw error;
     }
-    return { id, chatId: null, mascotId, x, y, each: null };
+    return this.card(id);
   }
 
   moveCard(id: string, x: number, y: number): boolean {
     return this.db.prepare("UPDATE cards SET x = ?, y = ? WHERE id = ?").run(x, y, id).changes > 0;
   }
 
-  // Only while it's a draft. A sent card belongs to its chat's bird.
+  // Only while it's a draft, or planned and not yet run. A sent card belongs to its chat's bird, and one of a plan the user
+  // ran keeps the bird it was run with.
   setBird(id: string, mascotId: string | null): boolean {
-    return this.db.prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL").run(mascotId, id).changes > 0;
+    return (
+      this.db
+        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND (plan IS NULL OR plan <> 'armed')")
+        .run(mascotId, id).changes > 0
+    );
   }
 
   // Once, when the draft is first sent.
   setChat(id: string, chatId: string): boolean {
     const card = this.card(id);
-    const done = this.db.prepare("UPDATE cards SET chat_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL").run(chatId, id).changes > 0;
+    // Once it starts, a planned card is an ordinary one.
+    const done =
+      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL").run(chatId, id).changes > 0;
     if (done && card) this.touch(card.nestId);
     return done;
   }
@@ -226,7 +288,7 @@ export class NestStore {
     this.db.exec("BEGIN");
     try {
       const changed = this.db
-        .prepare("UPDATE cards SET each_prompt = ?, each_header = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL")
+        .prepare("UPDATE cards SET each_prompt = ?, each_header = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL")
         .run(prompt, JSON.stringify(header), id).changes;
       if (changed === 0) throw new NotHere();
       const insert = this.db.prepare("INSERT INTO runs (id, card_id, position, row, chat_id, state) VALUES (?, ?, ?, ?, NULL, 'waiting')");
@@ -286,6 +348,114 @@ export class NestStore {
     const done = this.db.prepare("DELETE FROM cards WHERE id = ?").run(id).changes > 0;
     if (done && card) this.touch(card.nestId);
     return done;
+  }
+
+  // Puts a plan on the board in place of the one there, if any, with the lines into its cards, in one go. A line from the
+  // board only comes from a card in this Nest that has been sent. Null if anything doesn't fit, and then nothing changes.
+  setPlan(nestId: string, cards: readonly NewPlannedCard[], said: string): string[] | null {
+    const ids = new Map(cards.map((card) => [card.key, randomUUID()]));
+    this.db.exec("BEGIN");
+    try {
+      if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
+      this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId);
+      const insert = this.db.prepare(
+        "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?)"
+      );
+      for (const card of cards) insert.run(ids.get(card.key)!, nestId, card.mascotId, card.x, card.y, card.prompt, card.each ? 1 : 0, card.waits ? 1 : 0, card.table, said);
+      const line = this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card) VALUES (?, ?, ?, ?)");
+      for (const card of cards) {
+        if (!card.from) continue;
+        const from = "plan" in card.from ? ids.get(card.from.plan) : card.from.card;
+        const source = from === undefined ? null : this.card(from);
+        if (!source || source.nestId !== nestId || (!("plan" in card.from) && !source.chatId && !source.each)) throw new NotHere();
+        line.run(randomUUID(), nestId, from!, ids.get(card.key)!);
+      }
+      this.touch(nestId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      if (error instanceof NotHere) return null;
+      throw error;
+    }
+    return cards.map((card) => ids.get(card.key)!);
+  }
+
+  // What the user typed in the request a planned card came from, or null for a card whose prompt they typed themselves.
+  said(id: string): string | null {
+    return (this.db.prepare("SELECT said FROM cards WHERE id = ?").get(id) as { said: string | null } | undefined)?.said ?? null;
+  }
+
+  // A planned card's prompt or For each row, only before the plan runs.
+  editPlanned(id: string, { prompt, each }: { prompt?: string; each?: boolean }): boolean {
+    if (prompt !== undefined && !this.db.prepare("UPDATE cards SET plan_prompt = ? WHERE id = ? AND plan = 'planned'").run(prompt, id).changes) return false;
+    if (each !== undefined && !this.db.prepare("UPDATE cards SET plan_each = ? WHERE id = ? AND plan = 'planned'").run(each ? 1 : 0, id).changes) return false;
+    return true;
+  }
+
+  // Run: every planned card in the Nest is armed. How many.
+  armPlan(nestId: string): number {
+    const armed = Number(this.db.prepare("UPDATE cards SET plan = 'armed' WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
+    if (armed > 0) this.touch(nestId);
+    return armed;
+  }
+
+  discardPlan(nestId: string): number {
+    return Number(this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
+  }
+
+  // The armed cards of one Nest, oldest first.
+  armedCards(nestId: string): NestCard[] {
+    return (this.db.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE nest_id = ? AND plan = 'armed' ORDER BY rowid`).all(nestId) as unknown as CardRow[]).map((row) =>
+      this.toCard(row)
+    );
+  }
+
+  // An armed card won't start, and says why. It's a draft from then on, which the user can still send.
+  hold(id: string, note: string): boolean {
+    return this.db.prepare("UPDATE cards SET plan = 'held', plan_note = ? WHERE id = ? AND plan = 'armed'").run(note, id).changes > 0;
+  }
+
+  // Every armed card that reads from this one, or every armed card anywhere.
+  holdAfter(cardId: string | null, note: string): number {
+    return cardId === null
+      ? Number(this.db.prepare("UPDATE cards SET plan = 'held', plan_note = ? WHERE plan = 'armed'").run(note).changes)
+      : Number(
+          this.db
+            .prepare("UPDATE cards SET plan = 'held', plan_note = ? WHERE plan = 'armed' AND id IN (SELECT to_card FROM lines WHERE from_card = ?)")
+            .run(note, cardId).changes
+        );
+  }
+
+  // The Nest's newest request, if it's still open, and the one before it, folded, as the composer shows them.
+  talk(nestId: string): NestRequest[] {
+    const requests = this.db.prepare("SELECT id, open FROM requests WHERE nest_id = ? ORDER BY rowid DESC LIMIT 2").all(nestId) as { id: string; open: number }[];
+    const shown = requests[0]?.open === 1 ? requests : requests.slice(0, 1);
+    return shown.reverse().map(({ id, open }) => ({
+      id,
+      open: open === 1,
+      messages: this.db.prepare("SELECT role, text FROM talk WHERE request_id = ? ORDER BY rowid").all(id) as unknown as NestRequest["messages"],
+    }));
+  }
+
+  // The open request's messages, which the planner reads, or none.
+  openRequest(nestId: string): NestRequest | null {
+    const open = this.talk(nestId).find((request) => request.open);
+    return open ?? null;
+  }
+
+  // Adds to the open request, or starts one.
+  say(nestId: string, role: "user" | "berry", text: string): void {
+    let open = this.db.prepare("SELECT id FROM requests WHERE nest_id = ? AND open = 1").get(nestId) as { id: string } | undefined;
+    if (!open) {
+      open = { id: randomUUID() };
+      this.db.prepare("INSERT INTO requests (id, nest_id, open) VALUES (?, ?, 1)").run(open.id, nestId);
+    }
+    this.db.prepare("INSERT INTO talk (request_id, role, text) VALUES (?, ?, ?)").run(open.id, role, text);
+  }
+
+  // Once the plan runs or goes, the request folds away, and the next message starts another.
+  closeRequest(nestId: string): void {
+    this.db.prepare("UPDATE requests SET open = 0 WHERE nest_id = ? AND open = 1").run(nestId);
   }
 
   // Something happened in it, so it moves up the list.
