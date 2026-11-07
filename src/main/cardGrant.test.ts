@@ -35,6 +35,8 @@ describe("the key Allow for this card's runs matches on", () => {
     expect(clickGrant("click", "file:///Users/me/a.html", SAVE)).toBeNull();
     expect(clickGrant("click", "https://me:secret@mail.example.com/", SAVE)).toBeNull();
     expect(clickGrant("click", PAGE, null)).toBeNull();
+    // Named by what's in it, so typing would change its name.
+    expect(typeGrant(PAGE, { role: "textbox", name: "Hello there", target: null, namedByContent: true, frameUrl: null }, false)).toBeNull();
   });
 
   it("lets what's typed differ, but not where it goes or whether it's submitted", () => {

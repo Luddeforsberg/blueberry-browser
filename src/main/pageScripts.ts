@@ -82,6 +82,12 @@ const ASSESS = `
   const isSearch = (el) =>
     el.type === "search" || el.getAttribute("role") === "searchbox" || !!el.closest?.("[role=search]") ||
     /search|sök/i.test(nameOf(el));
+  // A field with no label of its own is named by what's in it, so typing in it changes its name.
+  const namedByContent = (el) => {
+    if (el.getAttribute("aria-label") || el.getAttribute("aria-labelledby") || labelOf(el)) return false;
+    if (el.isContentEditable || el.tagName === "TEXTAREA") return !!clip(el.innerText) || !!clip(el.value ?? "");
+    return el.tagName === "INPUT" && !["submit", "button", "reset", "image"].includes(el.type) && !!el.value && nameOf(el) === clip(el.value);
+  };
   const safeToType = (el) => !isSecret(el) && !isTransparent(el) && !el.isContentEditable && isSearch(el) && !sendsForm(el.form);
 `;
 
@@ -175,7 +181,7 @@ const withElement = (ref: string, body: string): string => `(() => {
   ${body}
 })()`;
 
-const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), secret: isSecret(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
+const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), secret: isSecret(el), namedByContent: namedByContent(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
 
 export const describeElement = (ref: string): string => withElement(ref, `return { ${DESCRIBE_FIELDS} };`);
 

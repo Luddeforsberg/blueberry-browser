@@ -28,7 +28,7 @@ import {
 import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { PageFrame, PageTarget } from "./pageTarget";
-import { addressGrant, clickGrant, typeGrant, type GrantKey } from "./cardGrant";
+import { addressGrant, clickGrant, typeGrant, type GrantElement, type GrantKey } from "./cardGrant";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { NOWHERE, siteAllowed } from "../shared/mascots";
 import { cleanLine } from "../shared/publishing";
@@ -59,7 +59,9 @@ export interface PageTool {
   // What the chat shows for this call. It goes back to the model in later messages as Berry's own words,
   // so nothing a page could have written goes in it: no titles, and no search text.
   label: (args: unknown) => string;
-  run: (args: unknown) => Promise<string>;
+  // `granted` is set only for a call that didn't ask because the user allowed exactly it for a card's runs: the key it
+  // matched, which the element must still have as input goes in.
+  run: (args: unknown, granted?: string) => Promise<string>;
   // Set on anything that changes something. Says exactly what will happen, for the user to allow. It's worked
   // out again just before the tool runs, and a different answer means nothing happens.
   describe?: (args: unknown) => Promise<string>;
@@ -122,7 +124,7 @@ const pageTool = <S extends z.ZodObject>(tool: {
   description: string;
   schema: S;
   label: (args: z.infer<S>) => string;
-  run: (args: z.infer<S>) => Promise<string>;
+  run: (args: z.infer<S>, granted?: string) => Promise<string>;
   describe?: (args: z.infer<S>) => Promise<string>;
   whileAsking?: (args: z.infer<S>) => void;
   isRisky?: (args: z.infer<S>) => Promise<boolean>;
@@ -135,7 +137,7 @@ const pageTool = <S extends z.ZodObject>(tool: {
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
-    run: (args) => tool.run(tool.schema.parse(args)),
+    run: (args, granted) => tool.run(tool.schema.parse(args), granted),
     describe: describe && ((args) => describe(tool.schema.parse(args))),
     whileAsking: whileAsking && ((args) => whileAsking(tool.schema.parse(args))),
     isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
@@ -190,6 +192,8 @@ interface ElementInfo {
   safeToType: boolean;
   // A password, a code or card details, which no grant ever covers.
   secret?: boolean;
+  // Its name is its own text or value, so typing changes it, and no grant covers it.
+  namedByContent?: boolean;
   // Set for a same-origin frame: where in the site this is.
   frameUrl: string | null;
   // Set for a frame from another origin, by the main process rather than the frame: the site it's really from.
@@ -524,29 +528,13 @@ export const createPageTools = <T extends PageTarget>({
   };
   // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
   // or the tab taken over while it flew, and an action must not follow that.
-  // The element must still be what it was when the action began, or before the flight, since what was allowed, or
-  // allowed for a card's runs, was that element.
-  const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing, pinned?: string): Promise<boolean> => {
+  const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
     const actor = actorOn(tab);
     if (!actor) return true;
-    const before = pinned ?? (await identityOf(tab, ref));
     const found = await spotOfRef(tab, actor, ref);
     if (found) await actor.goTo(found.spot, words(found.name), kind, found.ref);
-    if (!carryOn(tab)) return false;
-    return stillSame(tab, ref, before);
+    return carryOn(tab);
   };
-  const identityOf = async (tab: T, ref: string) => {
-    const info = await describeRef(tab, ref).catch(() => null);
-    return JSON.stringify(info && [info.role, info.name, info.target, info.secret ?? false, info.frameUrl, info.frameOrigin ?? null, info.safeToType, info.riskyClick]);
-  };
-  // Checked again just before input goes in, after anything that waits.
-  const stillSame = async (tab: T, ref: string, pinned: string): Promise<boolean> => {
-    if ((await identityOf(tab, ref)) === pinned) return true;
-    changedInFlight.add(tab.id);
-    return false;
-  };
-  // Tabs where the element changed before the action happened, so it stopped.
-  const changedInFlight = new Set<string>();
   // While the card waits, it stands on what the card is about, then and whenever the user comes to look. Nothing waits
   // for this, so the card goes out as it always did.
   const standOnRef = ({ tabId: id, ref }: { tabId?: string; ref: string }) => {
@@ -556,12 +544,11 @@ export const createPageTools = <T extends PageTarget>({
   };
   const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
-  const CHANGED_IN_FLIGHT = "What's there changed before the action happened, so it didn't. Look at the page again.";
-  const CHANGED_BEFORE = "changed-before";
-  const leftOff = (tab: T) => {
-    if (changedInFlight.delete(tab.id)) return CHANGED_IN_FLIGHT;
-    return tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
-  };
+  const GRANT_CHANGED = "Nothing happened, because what's there changed from what the user allowed for this card's runs. Look at the page again.";
+  // Whether the element still has the key a card's runs were allowed, as the page is now.
+  const stillGranted = (tab: T, ref: string, key: (element: GrantElement | null) => GrantKey | null, granted: string) => async () =>
+    key(await describeRef(tab, ref).catch(() => null))?.key === granted;
+  const leftOff = (tab: T) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
   const usersFields = new Set<string>();
@@ -571,7 +558,39 @@ export const createPageTools = <T extends PageTarget>({
   // At a pace, one piece at a time, with the same result as all at once. Only where someone is watching, and never in a
   // secret field, where it's over as quickly as it can be. The user clicking or typing in the page ends it there, and
   // what's in the field is then theirs: nothing here goes back to fill it in.
-  const typeInField = async (tab: T, ref: string, text: string, started: number): Promise<string | null> => {
+  const typeChecked = async (
+    tab: T,
+    ref: string,
+    text: string,
+    granted: () => Promise<boolean>,
+    touched: () => boolean,
+    stepAside: () => string,
+    whole: () => Promise<string | null>
+  ): Promise<string | null> => {
+    const begun = await tab.runInPage<string | null>(beginTyping(ref));
+    if (begun !== "ready") return begun;
+    const actor = actorOn(tab);
+    actor?.typing();
+    try {
+      for (const chunk of typingChunks(text)) {
+        if (!carryOn(tab)) return "stopped";
+        if (touched()) return stepAside();
+        if (!(await granted())) return "granted-changed";
+        if (!(await tab.runInPage<boolean | null>(typeChunk(ref, chunk)))) break;
+        if (actor?.moving) await pause(typingPauseMs(chunk));
+      }
+    } finally {
+      actor?.doneTyping();
+    }
+    if (!carryOn(tab)) return "stopped";
+    if (touched()) return stepAside();
+    const finished = await tab.runInPage<string | null>(finishTyping(ref, text));
+    if (finished !== "again") return finished;
+    return (await granted()) ? whole() : "granted-changed";
+  };
+  // `granted` is only for a call that went through Allow for this card's runs: it's then typed a piece at a time, watched
+  // or not, with the field checked before each piece, since focusing it or typing can change it.
+  const typeInField = async (tab: T, ref: string, text: string, started: number, granted?: () => Promise<boolean>): Promise<string | null> => {
     const field = `${tab.id}/${ref}`;
     const stepAside = () => {
       usersFields.add(field);
@@ -583,6 +602,7 @@ export const createPageTools = <T extends PageTarget>({
     const touched = () => !!tab.actor?.touchedSince(started);
     const actor = actorOn(tab);
     const whole = () => onRef<string>(tab, ref, (inner) => typeIntoElement(inner, text));
+    if (granted) return typeChecked(tab, ref, text, granted, touched, stepAside, whole);
     if (!actor?.moving || frameOf(tab, ref) || !text) return whole();
     const spot = await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
     if (!spot || spot.secret) return whole();
@@ -637,19 +657,27 @@ export const createPageTools = <T extends PageTarget>({
 
   // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
   // something covering it gets the scripted click sent straight to the element, not the real one.
-  const clickRef = async (tab: T, ref: string, clicks: 1 | 2) => {
+  // `granted` is only for a call that went through Allow for this card's runs: whether the element still has the key
+  // that was allowed, checked as the action begins and again just before each press.
+  const clickRef = async (tab: T, ref: string, clicks: 1 | 2, granted?: () => Promise<boolean>) => {
     const doing = clicks === 2 ? "Double-clicking" : "Clicking";
-    // What the element is as the action begins, which every later wait checks against.
-    const pinned = await identityOf(tab, ref);
-    const scripted = async () => ((await stillSame(tab, ref, pinned)) ? onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks)) : CHANGED_BEFORE);
+    if (granted && !(await granted())) return GRANT_CHANGED;
+    const scripted = async () => (!granted || (await granted()) ? onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks)) : GRANT_CHANGED);
+    let changed = false;
+    const goOn = async () => {
+      if (!carryOn(tab)) return false;
+      if (!granted || (await granted())) return true;
+      changed = true;
+      return false;
+    };
     const finish = (result: string | null, note = "") => {
-      if (result === CHANGED_BEFORE) return leftOff(tab);
+      if (result === GRANT_CHANGED) return GRANT_CHANGED;
       if (result === null) return STALE_ELEMENT;
       if (result === "disabled") return "That element is disabled, so nothing happened.";
       return whereNow(tab).then((where) => (note ? `${where} ${note}` : where));
     };
     if (frameOf(tab, ref)) {
-      if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look", pinned))) return leftOff(tab);
+      if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look"))) return leftOff(tab);
       return finish(await scripted(), SCRIPTED);
     }
     // With a bird on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
@@ -663,15 +691,15 @@ export const createPageTools = <T extends PageTarget>({
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
     if (!arm) {
-      if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land", pinned))) return leftOff(tab);
+      if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
       // Where it is now, as the page may have moved while the bird flew, and now the watch goes on.
       if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
       if (aim === null) return STALE_ELEMENT;
     }
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
-      if (!carryOn(tab) || !(await stillSame(tab, ref, pinned))) return leftOff(tab);
-      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
+      if (!carryOn(tab)) return leftOff(tab);
+      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, goOn))) return changed ? GRANT_CHANGED : leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
@@ -897,7 +925,8 @@ export const createPageTools = <T extends PageTarget>({
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
       grantKey: async ({ tabId: id, ref }) => clickGrant("click", find(id)?.url ?? "", await element(id, ref)),
-      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
+      run: ({ tabId: id, ref }, granted) =>
+        withTab(id, (tab) => clickRef(tab, ref, 1, granted ? stillGranted(tab, ref, (element) => clickGrant("click", tab.url, element), granted) : undefined)),
     }),
     pageTool({
       name: "double_click",
@@ -909,7 +938,8 @@ export const createPageTools = <T extends PageTarget>({
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
       grantKey: async ({ tabId: id, ref }) => clickGrant("double_click", find(id)?.url ?? "", await element(id, ref)),
-      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 2)),
+      run: ({ tabId: id, ref }, granted) =>
+        withTab(id, (tab) => clickRef(tab, ref, 2, granted ? stillGranted(tab, ref, (element) => clickGrant("double_click", tab.url, element), granted) : undefined)),
     }),
     pageTool({
       name: "hover",
@@ -1078,14 +1108,15 @@ export const createPageTools = <T extends PageTarget>({
         return !!info && (!info.safeToType || text.length > MAX_SAFE_TYPED_LENGTH);
       },
       grantKey: async ({ tabId: id, ref, submit = false }) => typeGrant(find(id)?.url ?? "", await element(id, ref), submit),
-      run: ({ tabId: id, ref, text, submit = false }) =>
+      run: ({ tabId: id, ref, text, submit = false }, granted) =>
         withTab(id, async (tab) => {
           const started = Date.now();
-          const pinned = await identityOf(tab, ref);
+          const still = granted ? stillGranted(tab, ref, (element) => typeGrant(tab.url, element, submit), granted) : undefined;
+          if (still && !(await still())) return GRANT_CHANGED;
           // What's typed is never in these words, only where it's going.
-          if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch", pinned))) return leftOff(tab);
-          if (!(await stillSame(tab, ref, pinned))) return leftOff(tab);
-          const result = await typeInField(tab, ref, text, started);
+          if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch"))) return leftOff(tab);
+          const result = await typeInField(tab, ref, text, started, still);
+          if (result === "granted-changed") return GRANT_CHANGED;
           if (result === "stopped") return leftOff(tab);
           if (result === "user-in-field") return USER_IN_FIELD;
           if (result === null) return STALE_ELEMENT;
@@ -1096,7 +1127,8 @@ export const createPageTools = <T extends PageTarget>({
           if (result !== "done") return "That element can't be typed into, so nothing happened.";
           if (submit) {
             await actorOn(tab)?.hop("Submitting");
-            if (!carryOn(tab) || !(await stillSame(tab, ref, pinned))) return leftOff(tab);
+            if (!carryOn(tab)) return leftOff(tab);
+            if (still && !(await still())) return GRANT_CHANGED;
             if (tab.actor?.touchedSince(started)) {
               usersFields.add(`${tab.id}/${ref}`);
               return USER_IN_FIELD;

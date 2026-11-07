@@ -8,8 +8,8 @@
 // - type_text: the tool, the page's origin, the field's role and name, where its form goes, and whether it presses Enter
 //   after. What's typed may differ from row to row.
 // - open_tab and go_to: the tool and the whole address, since the address is what goes out to the site.
-// Nothing else ever gets a key: no secret field, nothing in a frame, no element without a name or with a clipped one, and
-// no other tool, so those always ask.
+// Nothing else ever gets a key: no secret field, nothing in a frame, no element without a name or with a clipped one, no
+// field named by what's typed in it, and no other tool, so those always ask.
 
 export interface GrantKey {
   key: string;
@@ -24,6 +24,7 @@ export interface GrantElement {
   name: string;
   target: string | null;
   secret?: boolean;
+  namedByContent?: boolean;
   frameUrl: string | null;
   frameOrigin?: string;
 }
@@ -45,7 +46,7 @@ const named = (element: GrantElement): string | null => {
   const name = element.name.replace(/\s+/g, " ").trim();
   // The page script clips a long name with "…", and two names clipped alike would share a key.
   if (!name || name === "unnamed" || name.length > MAX_NAME_LENGTH || name.endsWith("…")) return null;
-  if (element.secret || element.frameUrl || element.frameOrigin) return null;
+  if (element.secret || element.namedByContent || element.frameUrl || element.frameOrigin) return null;
   return name;
 };
 

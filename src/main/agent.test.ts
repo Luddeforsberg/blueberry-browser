@@ -240,6 +240,8 @@ describe("a mascot's limits and approvals", () => {
         ["Click the button “Send”", { key: "click Send", words: "clicking “Send”" }],
       ]);
       expect(run).toHaveBeenCalledTimes(3);
+      // Only the call that didn't ask is held to the key that matched; the others act as any approved call does.
+      expect((run.mock.calls as unknown[][]).map((call) => call[1] ?? null)).toEqual([null, "click Save draft", null]);
       // The first was allowed for the card's runs on its own card, and the second by that.
       expect(steps).toEqual([
         ["Clicked", "card"],

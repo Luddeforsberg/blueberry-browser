@@ -286,11 +286,11 @@ export async function* streamReply(
     if (mode === "always") return true;
     return mode === "risky" && (!isRisky || (await isRisky(args)));
   };
-  // Exactly this action was allowed for the card's runs. Its key is worked out from the page as it is now.
-  const coveredByGrant = async ({ grantKey }: PageTool, args: unknown): Promise<boolean> => {
-    if (!granted || !grantKey) return false;
+  // The key of exactly this action, if it was allowed for the card's runs, worked out from the page as it is now.
+  const grantMatched = async ({ grantKey }: PageTool, args: unknown): Promise<string | null> => {
+    if (!granted || !grantKey) return null;
     const key = await grantKey(args).catch(() => null);
-    return key !== null && granted(key.key);
+    return key !== null && granted(key.key) ? key.key : null;
   };
   // What each paused call's card offers for Allow for this card's runs, by its call's id.
   const offered = new Map<string, GrantKey | null>();
@@ -315,7 +315,7 @@ export async function* streamReply(
                   return words;
                 },
                 when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
-                  !(await refusedOutright(pageTool, toolCall.args)) && (await needsAsking(pageTool, toolCall.args)) && !(await coveredByGrant(pageTool, toolCall.args)),
+                  !(await refusedOutright(pageTool, toolCall.args)) && (await needsAsking(pageTool, toolCall.args)) && (await grantMatched(pageTool, toolCall.args)) === null,
               },
             ],
           ]
@@ -342,21 +342,22 @@ export async function* streamReply(
           // Allowed, it must still be the same action. Not asked about, it must still not need asking.
           const allowedAs = allowed.get(config.toolCall?.id ?? "");
           if (describe && allowedAs !== undefined && (await describe(args)) !== allowedAs) return CHANGED;
-          // Not asked about because the user allowed it for the card's runs, it must still be exactly that action.
-          let byGrant = false;
+          // Not asked about because the user allowed it for the card's runs, it must still be exactly that action, and the
+          // tool holds it to the key that matched until the input goes in.
+          let pinned: string | null = null;
           if (describe && allowedAs === undefined && (await needsAsking(pageTool, args))) {
-            byGrant = await coveredByGrant(pageTool, args);
-            if (!byGrant) return CHANGED;
+            pinned = await grantMatched(pageTool, args);
+            if (pinned === null) return CHANGED;
             // So the step can name what was allowed, as it does for an approval.
             await describe(args);
           }
-          // Allowed on its card, it may have been by Allow for this card's runs, which then covers it.
-          if (allowedAs !== undefined) byGrant = await coveredByGrant(pageTool, args);
+          // Allowed on its card, it may have been by choosing Allow for this card's runs there, which the step then says.
+          const byGrant = pinned !== null || (allowedAs !== undefined && (await grantMatched(pageTool, args)) !== null);
           const wasAllowed = allowedAs !== undefined || byGrant;
           const shown = (wasAllowed && pageTool.allowedLabel?.(args)) || pageTool.shownLabel?.(args) || undefined;
           const finish = onStep(label(args), shown, byGrant ? "card" : allowedAs !== undefined ? "once" : undefined);
           try {
-            const result = await run(args);
+            const result = await (pinned !== null ? run(args, pinned) : run(args));
             // A failure is words. The image goes with a reminder, because it can have instructions drawn in it too.
             return returnsImage && result.startsWith("data:image/")
               ? [
