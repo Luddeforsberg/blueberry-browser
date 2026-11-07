@@ -80,3 +80,89 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await expect(again.locator(".react-flow__edge")).toHaveCount(1);
   await expect(again.locator(".react-flow__node").nth(1)).toContainText("Two drafts written.");
 });
+
+const COMPANIES = [
+  "Here are six.",
+  "",
+  "| Company | People | Leads sales |",
+  "|---|---|---|",
+  "| Lindqvist Data | 84 | Sara Holm |",
+  "| Fjällbo | 41 | Omar Nilsson |",
+  "| Kvarnsten | 130 | Lina Berg |",
+  "| Sjöström Labs | 62 | Elias Ek |",
+  "| Brygga | 23 | Maja Lund |",
+  "| Vinga | 55 | Ida Ström |",
+].join("\n");
+
+test("rows picked in a card's table go to a new card, which runs once for each of them", async () => {
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
+  const chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("button", { name: "New nest" }).click();
+
+  model.replyWith(COMPANIES);
+  const composer = chrome.getByRole("textbox", { name: "New card" });
+  await composer.fill("Find six Swedish SaaS companies");
+  await composer.press("Enter");
+  const first = chrome.locator(".react-flow__node").first();
+  await expect(first.getByRole("status")).toHaveText("Done");
+
+  // The answer's table is the card's result: five rows, then the rest a press away.
+  const rows = first.locator("tbody tr");
+  await expect(rows).toHaveCount(5);
+  await expect(first.getByRole("button", { name: "1 more" })).toBeVisible();
+
+  // A click picks one, Shift picks a range, Cmd takes one away and adds it back, and Esc lets them all go.
+  await rows.nth(0).click();
+  await rows.nth(2).click({ modifiers: ["Shift"] });
+  await expect(first.getByText("3 selected")).toBeVisible();
+  await rows.nth(1).click({ modifiers: ["ControlOrMeta"] });
+  await expect(first.getByText("2 selected")).toBeVisible();
+  await chrome.keyboard.press("Escape");
+  await expect(first.getByText("selected")).toHaveCount(0);
+  await rows.nth(1).click();
+  await rows.nth(3).click({ modifiers: ["ControlOrMeta"] });
+  await rows.nth(4).click({ modifiers: ["ControlOrMeta"] });
+  await expect(first.getByText("3 selected")).toBeVisible();
+  await expect(rows.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(rows.nth(0)).toHaveAttribute("aria-selected", "false");
+
+  // The line's round end touches the card's edge, rather than floating beside it.
+  await first.hover();
+  const handle = first.getByLabel("Pull a new card out of the 3 selected rows");
+  await handle.click();
+  const draft = chrome.locator(".react-flow__node").nth(1);
+  await expect(draft).toContainText("gets 3 rows from Berry");
+  // Read in one frame, since the board may still be moving to show the new card.
+  const gap = await chrome.evaluate(
+    () => document.querySelector(".react-flow__edge circle")!.getBoundingClientRect().left - document.querySelector(".react-flow__node")!.getBoundingClientRect().right
+  );
+  expect(Math.abs(gap)).toBeLessThanOrEqual(1);
+
+  // For each row is on, since rows were picked, and says how many runs it will make.
+  await expect(draft.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+  await expect(draft).toContainText("3 runs");
+  expect(model.requests).toHaveLength(1);
+
+  model.replyWith("Hej, a short note.");
+  const prompt = draft.getByRole("textbox", { name: "What should Berry do?" });
+  await prompt.fill("Find a recent post by the sales lead");
+  await prompt.press("Enter");
+  await expect(draft.getByRole("status").first()).toHaveText("Done");
+  // Sent, its line is solid.
+  await expect(chrome.locator(".react-flow__edge path").first()).not.toHaveAttribute("style", /dasharray/);
+  await expect(draft.getByRole("button", { name: /^(Fjällbo|Sjöström Labs|Brygga)/ })).toHaveCount(3);
+
+  // One run for each picked row, each with that row and no other.
+  expect(model.requests).toHaveLength(4);
+  const sent = model.requests.slice(1).map(newestUserMessage);
+  for (const [index, company] of ["Fjällbo", "Sjöström Labs", "Brygga"].entries()) {
+    const run = sent.find((message) => message.includes(`| ${company} |`));
+    expect(run, `a run for ${company}`).toBeDefined();
+    expect(run!.match(/\| \d+ \|/g)).toHaveLength(1);
+    expect(run).toContain("work on this row only");
+    expect(run!.endsWith("Find a recent post by the sales lead")).toBe(true);
+    expect(sent.filter((message) => message.includes(`| ${company} |`)), `${index}`).toHaveLength(1);
+  }
+  for (const left of ["Lindqvist Data", "Kvarnsten", "Vinga"]) expect(sent.join("\n")).not.toContain(left);
+});

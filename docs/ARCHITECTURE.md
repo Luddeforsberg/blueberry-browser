@@ -90,6 +90,8 @@ A sign-in, code or captcha is a handoff. `hand_to_user` gives the tab to the use
 
 A Nest is a board of cards, each one bird's chat ([src/main/Nests.ts](../src/main/Nests.ts)). The board, its cards with their chat id, place and bird, and the lines between them are in `nests.db` ([src/main/NestStore.ts](../src/main/NestStore.ts)); the chats themselves stay in `chats.db`. A card sends through `Chats.send`, so it is an ordinary chat with every limit and approval, and the sidebar's Chats list leaves card chats out. A line adds one thing: when the card it leads to sends, `Nests` reads the source card's latest answer at that moment and passes it to `Chats.send` as `cardAnswer`, which goes to the model with that one message only, tagged and labelled untrusted by [src/main/nestContext.ts](../src/main/nestContext.ts), and is never saved. The chrome draws the board with React Flow in [NestPage.tsx](../src/renderer/chrome/src/pages/NestPage.tsx) and [NestCard.tsx](../src/renderer/chrome/src/components/NestCard.tsx).
 
+A line can instead carry rows the user selected in the source card's table. [src/shared/nestTable.ts](../src/shared/nestTable.ts) finds the table in an answer and is shared by main and the chrome; the rows are kept on the line as they were, `Nests.addCard` accepts only rows that are in the source's latest answer, and every send checks they still are, refusing rather than sending rows that have gone. A draft sent with For each row becomes a For-each card: its prompt, its table's header and one `runs` row per table row in `nests.db`. `Nests.pump` starts waiting runs oldest first while fewer than three are running everywhere, each through `Chats.send` with only its row as `cardAnswer`, and runs again from each run's `onEnd` and after a delete. There are at most 25 runs per card, and runs left waiting at launch are stopped, never started.
+
 ## Routines and Show Berry how
 
 A routine is a saved job with a schedule. [src/main/Routines.ts](../src/main/Routines.ts) checks what's due, keeps routines and their runs in `routines.db` ([src/main/RoutineStore.ts](../src/main/RoutineStore.ts)), and runs each through `Chats.runTask`, the same path as a chat with no page. [src/main/routineSchedule.ts](../src/main/routineSchedule.ts) holds the schedule rules. However many times were missed while the Mac was asleep, one run covers them. A routine can also run in the cloud instead (see The cloud path).
@@ -137,7 +139,7 @@ Everything is saved in the app's user data folder.
 | What | Where | Code |
 |---|---|---|
 | Chats | `chats.db` | [src/main/ChatStore.ts](../src/main/ChatStore.ts) |
-| Nests, their cards and lines | `nests.db` | [src/main/NestStore.ts](../src/main/NestStore.ts) |
+| Nests, their cards, lines, picked rows and For-each runs | `nests.db` | [src/main/NestStore.ts](../src/main/NestStore.ts) |
 | History | `history.db` | [src/main/HistoryStore.ts](../src/main/HistoryStore.ts) |
 | Routines and their runs | `routines.db` | [src/main/RoutineStore.ts](../src/main/RoutineStore.ts) |
 | Settings | `settings.json` | [src/main/SettingsStore.ts](../src/main/SettingsStore.ts) |

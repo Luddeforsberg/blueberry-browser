@@ -58,6 +58,32 @@ export const useChatThread = (chatId: string | null): ChatThread | null => {
     return thread?.id === chatId ? thread : null
 }
 
+// Several saved chats at once, by id, each kept current as `useChatThread` keeps one. One that hasn't loaded is missing.
+export const useChatThreads = (chatIds: readonly string[]): Record<string, ChatThread> => {
+    const key = chatIds.join(' ')
+    const [threads, setThreads] = useState<Record<string, ChatThread>>({})
+
+    useEffect(() => {
+        const ids = new Set(key ? key.split(' ') : [])
+        if (ids.size === 0) return undefined
+        const { chat, library } = window.chromeAPI
+        const unsubscribeThread = chat.onChatUpdated((updated) => {
+            if (ids.has(updated.id)) setThreads((current) => ({ ...current, [updated.id]: updated }))
+        })
+        const unsubscribeChunks = chat.onChatChunk(({ chatId, content }) => {
+            if (!ids.has(chatId)) return
+            setThreads((current) => (current[chatId] ? { ...current, [chatId]: { ...current[chatId], partial: (current[chatId].partial ?? '') + content } } : current))
+        })
+        ids.forEach((id) => void library.getChat(id).then((thread) => thread && setThreads((current) => ({ ...current, [id]: thread }))))
+        return () => {
+            unsubscribeThread()
+            unsubscribeChunks()
+        }
+    }, [key])
+
+    return threads
+}
+
 const toMessages = (thread: ChatThread | null): Message[] => {
     if (!thread) return []
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))

@@ -1,19 +1,31 @@
-import React, { createContext, useContext, useLayoutEffect, useRef, useState } from 'react'
+import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
-import { GitFork, Maximize2, Minimize2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard } from '@shared/library'
+import { ArrowLeft, GitFork, Maximize2, Minimize2, X } from 'lucide-react'
+import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine } from '@shared/library'
+import { findTable, MAX_RUNS, missingRows, plainCell, rowName, STALE_ROWS, type Table } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
+import { Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
-import { useChatThread } from '../contexts/ChatContext'
+import { useChatThread, useChatThreads } from '../contexts/ChatContext'
 import { useFlock } from '../contexts/LibraryContext'
-import { cardStatus, CARD_WIDTH, latestReply } from '../nestBoard'
+import { cardStatus, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunPhase } from '../nestBoard'
 import { Berry, useAssistantName } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
 import { ChatComposer, Composer } from './Composer'
 import { MemoryOffers } from './MemoryInChat'
+import { TableResult, type PickMode } from './NestTable'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 export type LineEdge = Edge<{ draft: boolean }, 'line'>
+
+// Rows selected in one card's table, for the answer they were picked from.
+export interface RowSelection {
+    cardId: string
+    text: string
+    table: Table
+    rows: number[]
+    anchor: number | null
+}
 
 // What a card can ask of the board it's on.
 export interface NestBoardActions {
@@ -22,8 +34,12 @@ export interface NestBoardActions {
     // The draft that was just made, whose prompt takes the keyboard.
     focusId: string | null
     sourceOf: (cardId: string) => NestCard | null
+    lineInto: (cardId: string) => NestLine | null
     pullOut: (cardId: string) => void
     remove: (cardId: string) => void
+    selection: RowSelection | null
+    clearSelection: () => void
+    pick: (cardId: string, text: string, table: Table, index: number, mode: PickMode) => void
 }
 
 export const NestBoardContext = createContext<NestBoardActions | null>(null)
@@ -38,6 +54,16 @@ const useBoard = () => {
 const draftTexts = new Map<string, string>()
 export const draftText = (cardId: string) => draftTexts.get(cardId) ?? ''
 export const setDraftText = (cardId: string, text: string) => (text ? draftTexts.set(cardId, text) : draftTexts.delete(cardId))
+// Whether a draft's For each row is on, once the user has touched it. Memory only, like its text.
+const draftEach = new Map<string, boolean>()
+
+// The newest saved answer, not one still being written.
+const savedAnswer = (thread: ChatThread | null | undefined) => (thread ? latestReply({ ...thread, partial: null }) : null)
+
+// The first line of an answer with words in it, for a run's one-line result.
+const answerStart = (text: string) => plainCell(text.split('\n').find((line) => line.replace(/[#>*\-|\s]/g, '') !== '')?.replace(/^\s*(#+|>|[-*]|\d+\.)\s*/, '') ?? '')
+
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
 
 const BIRD_SIZE = 44
 // How far down the standing drawing its feet reach, so its toes grip the card's top edge.
@@ -82,10 +108,14 @@ const CardButton: React.FC<{ label: string; onClick: () => void; children: React
     </button>
 )
 
+// A handle one pixel square, centred on the card's edge, so a line starts and ends right on the edge: React Flow puts a
+// line's end on the handle's outer side. What's pressed is the larger round target inside it.
+const ON_EDGE = "!w-px !h-px !min-w-0 !min-h-0 !border-0 !bg-transparent"
+
 // Where a line comes in, which nobody drags to, and where one is pulled out, which only shows on a card with an answer.
-const LineEnds: React.FC<{ canPull: boolean; onPull: () => void; name: string }> = ({ canPull, onPull, name }) => (
+const LineEnds: React.FC<{ canPull: boolean; onPull: () => void; label: string }> = ({ canPull, onPull, label }) => (
     <>
-        <Handle type="target" position={Position.Left} id="in" isConnectable={false} style={{ top: LINE_AT }} className="!size-1 !min-w-0 !min-h-0 !border-0 !bg-transparent" />
+        <Handle type="target" position={Position.Left} id="in" isConnectable={false} style={{ top: LINE_AT }} className={ON_EDGE} />
         {/* Always there, so the board knows where a line leaves from, and only usable once there's an answer to pass on. */}
         <Handle
             type="source"
@@ -94,24 +124,26 @@ const LineEnds: React.FC<{ canPull: boolean; onPull: () => void; name: string }>
             isConnectableStart={canPull}
             isConnectableEnd={false}
             onClick={canPull ? onPull : undefined}
-            title={canPull ? `Pull a new card out of ${name}’s` : undefined}
-            aria-label={canPull ? `Pull a new card out of ${name}’s` : undefined}
+            title={canPull ? label : undefined}
+            aria-label={canPull ? label : undefined}
             aria-hidden={!canPull || undefined}
+            data-keep-selection
             style={{ top: LINE_AT }}
-            className={cn(
-                "!size-6 !border-0 !bg-transparent flex items-center justify-center transition-opacity",
-                canPull ? "cursor-crosshair opacity-0 group-hover/card:opacity-100" : "invisible"
-            )}
+            className={cn(ON_EDGE, "transition-opacity", canPull ? "cursor-crosshair opacity-0 group-hover/card:opacity-100" : "invisible")}
         >
-            <span className="pointer-events-none size-3.5 rounded-full border-[1.5px] border-accent-ink bg-canvas" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 size-6 flex items-center justify-center">
+                <span className="pointer-events-none size-3.5 rounded-full border-[1.5px] border-accent-ink bg-canvas" />
+            </span>
         </Handle>
     </>
 )
 
+const pullLabel = (name: string, picked: number) => (picked > 0 ? `Pull a new card out of the ${plural(picked, 'selected row')}` : `Pull a new card out of ${name}’s`)
+
 const CARD_SHELL = "group/card relative rounded-panel border bg-surface text-foreground"
 
-// A card that has been sent: one bird's chat. Closed, it shows what was asked and the latest answer. Open, the whole chat
-// and a reply field that carries the thread on.
+// A card that has been sent: one bird's chat. Closed, it shows what was asked and the latest answer, or its table, whose
+// rows can be selected. Open, the whole chat and a reply field that carries the thread on.
 const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const board = useBoard()
     const thread = useChatThread(card.chatId)
@@ -125,20 +157,30 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const status = thread && cardStatus(thread)
     const asked = thread?.messages.findLast((message) => message.role === 'user')?.content
     const reply = thread && latestReply(thread)
-    const answered = !!thread && thread.messages.some((message) => message.role === 'assistant' && message.content.trim() !== '')
+    const answered = !!savedAnswer(thread)
+    const table = useMemo(() => (reply ? findTable(reply, { streaming: running }) : null), [reply, running])
+    // A selection is for the answer it was made in, so a new one lets it go.
+    const selectedHere = board.selection?.cardId === card.id
+    const selected = selectedHere && board.selection?.text === reply ? board.selection.rows : []
+    const { clearSelection } = board
+    useEffect(() => {
+        if (selectedHere && board.selection?.text !== reply) clearSelection()
+    }, [selectedHere, board.selection?.text, reply, clearSelection])
 
     return (
         <div className={cn(CARD_SHELL, running ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
             <Perched mascot={mascot} mood={moodOf(thread)} />
-            <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} name={name} />
+            <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
                 {status && <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>}
                 <span className="ml-auto flex items-center">
                     {answered && (
-                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
-                            <GitFork className="size-4" />
-                        </CardButton>
+                        <span data-keep-selection>
+                            <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                                <GitFork className="size-4" />
+                            </CardButton>
+                        </span>
                     )}
                     <CardButton label={open ? 'Close the chat' : 'Open the whole chat'} onClick={() => board.setOpen(open ? null : card.id)}>
                         {open ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
@@ -148,19 +190,45 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     </CardButton>
                 </span>
             </div>
-            {source && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">With {sourceName}’s latest answer</p>}
-            {thread && (open ? <WholeChat thread={thread} mascot={mascot} card={card} sourceName={source ? sourceName : null} /> : (
-                <div className="nodrag select-text cursor-auto px-5 pb-4 flex flex-col gap-3">
-                    {asked && <p className="text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{asked}</p>}
-                    {running && !thread.partial && <Working thread={thread} />}
-                    {thread.approval && <ChatApprovalCard chatId={thread.id} approval={thread.approval} mascot={mascot} />}
-                    {reply && <CutReply text={reply} onMore={() => board.setOpen(card.id)} />}
-                    {thread.error && <ChatError message={thread.error} />}
-                </div>
-            ))}
+            {source && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(board.lineInto(card.id), sourceName)}</p>}
+            {thread &&
+                (open ? (
+                    <WholeChat
+                        thread={thread}
+                        mascot={mascot}
+                        onSend={(text) => void window.chromeAPI.nests.send(card.id, text)}
+                        note={source ? `Gets ${getsWhat(board.lineInto(card.id), sourceName)} when you send` : null}
+                    />
+                ) : (
+                    <div className="nodrag select-text cursor-auto flex flex-col">
+                        <div className={cn("px-5 flex flex-col gap-3", table ? "pb-3 empty:hidden" : "pb-4")}>
+                            {asked && <p className="text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{asked}</p>}
+                            {running && !thread.partial && <Working thread={thread} />}
+                            {thread.approval && <ChatApprovalCard chatId={thread.id} approval={thread.approval} mascot={mascot} />}
+                            {reply && !table && <CutReply text={reply} onMore={() => board.setOpen(card.id)} />}
+                            {thread.error && <ChatError message={thread.error} />}
+                        </div>
+                        {reply && table && (
+                            <div className="rounded-b-panel overflow-hidden">
+                                <TableResult
+                                    table={table}
+                                    selected={running ? null : selected}
+                                    onPick={(index, mode) => board.pick(card.id, reply, table, index, mode)}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ))}
         </div>
     )
 }
+
+// What a card on a line gets, in the words its header and reply field use.
+const getsWhat = (line: NestLine | null, sourceName: string) =>
+    line?.picked ? `${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `${sourceName}’s latest answer`
+
+const withWhat = (line: NestLine | null, sourceName: string) =>
+    line?.picked ? `With ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `With ${sourceName}’s latest answer`
 
 // What a running card is doing: the bird's own words if it said any, or the step it's on.
 const Working: React.FC<{ thread: ChatThread }> = ({ thread }) => {
@@ -201,14 +269,20 @@ const CutReply: React.FC<{ text: string; onMore: () => void }> = ({ text, onMore
     )
 }
 
-// The card opened: its whole chat, as the chat page draws it, and a field to reply in.
-const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; card: NestCard; sourceName: string | null }> = ({ thread, mascot, card, sourceName }) => {
+// The card opened: its whole chat, as the chat page draws it, and a field to reply in. `note` says what goes with a reply.
+const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => void; note: string | null; bordered?: boolean }> = ({
+    thread,
+    mascot,
+    onSend,
+    note,
+    bordered = true
+}) => {
     const name = useAssistantName(mascot)
     const running = thread.partial != null
     const messages = running ? [...thread.messages, { role: 'assistant' as const, content: thread.partial ?? '', steps: thread.steps, memoryIds: thread.memoryIds }] : thread.messages
     return (
         <div className="nodrag select-text cursor-auto flex flex-col">
-            <div className="nowheel max-h-[520px] overflow-y-auto px-5 pb-4 flex flex-col gap-5 border-t pt-4">
+            <div className={cn("nowheel max-h-[520px] overflow-y-auto px-5 pb-4 flex flex-col gap-5 pt-4", bordered && "border-t")}>
                 {messages.map((message, index) =>
                     message.role === 'user' ? (
                         <UserMessage key={index} content={message.content} />
@@ -232,11 +306,11 @@ const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; card: Nes
             </div>
             <div className="px-3 pb-3">
                 <ChatComposer
-                    onSend={(text) => void window.chromeAPI.nests.send(card.id, text)}
+                    onSend={onSend}
                     disabled={running}
                     onStop={running ? () => void window.chromeAPI.chat.stop(thread.id) : undefined}
                     placeholder={`Reply to ${name}`}
-                    attachment={sourceName && <p className="px-2 text-12 text-muted-foreground">Gets {sourceName}’s latest answer when you send</p>}
+                    attachment={note && <p className="px-2 text-12 text-muted-foreground">{note}</p>}
                     autoFocus
                 />
             </div>
@@ -245,6 +319,7 @@ const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; card: Nes
 }
 
 // A card nothing has been sent from yet: who it goes to, what it gets from the card its line comes from, and the prompt.
+// When that's a table or rows picked from one, For each row sends it once per row instead.
 const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const board = useBoard()
     const { find } = useFlock()
@@ -252,34 +327,64 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const name = useAssistantName(mascot)
     const [text, setText] = useState(() => draftText(card.id))
     const source = board.sourceOf(card.id)
+    const picked = board.lineInto(card.id)?.picked ?? null
     const sourceMascot = source ? find(source.mascotId) : undefined
     const sourceName = useAssistantName(sourceMascot)
     const sourceThread = useChatThread(source?.chatId ?? null)
-    const sourceAnswered = !!sourceThread && latestReply({ ...sourceThread, partial: null }) !== null
+    const runThreads = useChatThreads(source?.each?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])
+    const runAnswers = Object.values(runThreads).filter((thread) => savedAnswer(thread)).length
+    const sourceAnswer = savedAnswer(sourceThread)
+    const sourceTable = useMemo(() => (sourceAnswer ? findTable(sourceAnswer) : null), [sourceAnswer])
+    const sourceAnswered = source?.each ? runAnswers > 0 : !!sourceAnswer
+    const stale = !!picked && !!sourceThread && missingRows(picked, sourceTable).length > 0
+    const rowCount = picked ? picked.rows.length : (sourceTable?.rows.length ?? 0)
+    const canEach = !!source && !source.each && (picked !== null || sourceTable !== null)
+    const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? picked !== null)
+    const forEach = canEach && eachOn
+    const tooMany = forEach && rowCount > MAX_RUNS
     const [sending, setSending] = useState(false)
+    const [problem, setProblem] = useState<string | null>(null)
+    const switchId = useId()
 
     const change = (value: string) => {
         setText(value)
         setDraftText(card.id, value)
     }
-    const canSend = text.trim() !== '' && !sending && (!source || sourceAnswered)
+    const canSend = text.trim() !== '' && !sending && (!source || sourceAnswered) && !stale && !tooMany
     const send = async () => {
         if (!canSend) return
         setSending(true)
-        const sent = await window.chromeAPI.nests.send(card.id, text.trim())
+        setProblem(null)
+        const api = window.chromeAPI.nests
+        const result = forEach ? await api.sendEach(card.id, text.trim()) : { ok: (await api.send(card.id, text.trim())) !== null, error: null }
         setSending(false)
-        if (sent) setDraftText(card.id, '')
+        if (result.ok) {
+            setDraftText(card.id, '')
+            draftEach.delete(card.id)
+        } else if (result.error) setProblem(result.error)
     }
+
+    const gets = !source
+        ? 'New card'
+        : picked
+          ? stale
+              ? `${sourceName}’s rows have changed`
+              : `gets ${plural(picked.rows.length, 'row')} from ${sourceName}`
+          : source.each
+            ? sourceAnswered
+                ? `gets ${sourceName}’s ${plural(runAnswers, 'answer')}`
+                : `${sourceName} hasn’t answered yet`
+            : sourceAnswered
+              ? `gets ${sourceName}’s latest answer`
+              : `${sourceName} hasn’t answered yet`
 
     return (
         <div className={cn(CARD_SHELL, "border-accent-ink shadow-raised")} style={{ width: CARD_WIDTH }}>
             <Perched mascot={mascot} mood="rest" />
-            <LineEnds canPull={false} onPull={() => undefined} name={name} />
+            <LineEnds canPull={false} onPull={() => undefined} label="" />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
-                <span className="text-12 text-muted-foreground truncate">
-                    {source ? (sourceAnswered ? `gets ${sourceName}’s latest answer` : `${sourceName} hasn’t answered yet`) : 'New card'}
-                </span>
+                <span className="text-12 text-muted-foreground truncate">{gets}</span>
                 <span className="ml-auto flex items-center">
                     <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
                         <X className="size-4" />
@@ -290,7 +395,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                 <Composer
                     bare
                     label={`What should ${name} do?`}
-                    placeholder={`What should ${name} do?`}
+                    placeholder={forEach ? `What should ${name} do with each row?` : `What should ${name} do?`}
                     value={text}
                     onChange={change}
                     rows={2}
@@ -306,35 +411,234 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     onSend={() => void send()}
                     mascot={mascot}
                     onChooseMascot={(id) => void window.chromeAPI.nests.setBird(card.id, id)}
+                    footer={
+                        canEach && (
+                            <>
+                                <span className="flex items-center gap-2 pl-2">
+                                    <Switch
+                                        checked={forEach}
+                                        labelledBy={switchId}
+                                        onChange={(on) => {
+                                            setEachOn(on)
+                                            draftEach.set(card.id, on)
+                                            setProblem(null)
+                                        }}
+                                    />
+                                    <span id={switchId} className="text-13">For each row</span>
+                                </span>
+                                {forEach && (
+                                    <span className={cn("ml-auto pr-1 text-13 truncate", tooMany ? "text-destructive" : "text-muted-foreground")}>
+                                        {tooMany ? `${rowCount} rows, ${MAX_RUNS} at most` : plural(rowCount, 'run')}
+                                    </span>
+                                )}
+                            </>
+                        )
+                    }
                 />
+                {(stale || problem || tooMany) && (
+                    <p role="alert" className={cn("px-2 pt-1 text-12", problem || tooMany ? "text-destructive" : "text-muted-foreground")}>
+                        {problem ?? (stale ? STALE_ROWS : `For each row runs at most ${MAX_RUNS} times. Select ${MAX_RUNS} rows or fewer, or turn it off.`)}
+                    </p>
+                )}
             </div>
         </div>
     )
 }
 
-export const CardView: React.FC<NodeProps<CardNode>> = ({ data: { card } }) => (card.chatId ? <SentCard card={card} /> : <DraftCard card={card} />)
+interface RunView {
+    id: string
+    name: string
+    phase: RunPhase
+    thread: ChatThread | undefined
+}
+
+const RUN_WORDS: Record<RunPhase, string> = {
+    waiting: 'Waiting its turn',
+    working: 'Working',
+    done: '',
+    failed: 'Didn’t finish',
+    stopped: 'Stopped',
+    'not-started': 'Didn’t start'
+}
+
+// How many finished runs a closed card lists before "N more".
+const RUNS_SHOWN = 5
+
+// One run on a For-each card: its row's name, then the start of its answer, or where it is. Pressing it opens its thread.
+const RunRow: React.FC<{ view: RunView; onOpen: () => void }> = ({ view, onOpen }) => {
+    const answer = savedAnswer(view.thread)
+    const step = view.thread?.steps.findLast((each) => !each.done)
+    const line = view.phase === 'done' && answer ? answerStart(answer) : view.phase === 'working' && step ? (step.shown ?? step.text) : RUN_WORDS[view.phase]
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            disabled={!view.thread}
+            className="w-full px-5 py-2 border-t flex flex-col text-left outline-none transition-colors enabled:hover:bg-muted/60 focus-visible:bg-muted disabled:cursor-default"
+        >
+            <span className="text-13 font-semibold truncate w-full">{view.name}</span>
+            <span className={cn("text-13 truncate w-full", view.phase === 'failed' ? "text-destructive" : "text-muted-foreground")}>{line}</span>
+        </button>
+    )
+}
+
+// A card sent with For each row: the same prompt once for each row, each run its own chat. Closed, it shows how many
+// have ended, which rows are being worked on, any approval a run is waiting on, and each finished run's result. There's
+// no reply field on the card: a reply goes in one run's thread, which opening the run shows.
+const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, each }) => {
+    const board = useBoard()
+    const { find } = useFlock()
+    const mascot = find(card.mascotId)
+    const name = useAssistantName(mascot)
+    const source = board.sourceOf(card.id)
+    const line = board.lineInto(card.id)
+    const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
+    const threads = useChatThreads(each.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])))
+    const [openRun, setOpenRun] = useState<string | null>(null)
+    const open = board.openId === card.id
+    // Closing the card goes back to every run for next time.
+    useEffect(() => {
+        if (!open) setOpenRun(null)
+    }, [open])
+
+    const views: RunView[] = each.runs.map((run) => {
+        const thread = run.chatId ? threads[run.chatId] : undefined
+        return { id: run.id, name: rowName(run.row), phase: runPhase(run, thread), thread }
+    })
+    const status = forEachStatus(views.map((view) => view.phase))
+    const active = views.some((view) => view.phase === 'waiting' || view.phase === 'working')
+    const asking = views.filter((view) => view.thread?.approval)
+    const working = views.filter((view) => view.phase === 'working' && !view.thread?.approval)
+    const ended = views.filter((view) => view.thread && (view.phase === 'done' || view.phase === 'failed' || view.phase === 'stopped'))
+    const answered = views.some((view) => savedAnswer(view.thread))
+    const running = working.length + asking.length > 0
+    const shownRun = open && openRun ? views.find((view) => view.id === openRun && view.thread) : undefined
+    const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${sourceName}’s table`) : 'For each row'
+    const openRunOf = (id: string) => {
+        setOpenRun(id)
+        board.setOpen(card.id)
+    }
+
+    return (
+        <div className={cn(CARD_SHELL, running ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
+            <Perched mascot={mascot} mood={asking.length > 0 ? 'asking' : running ? 'thinking' : 'rest'} />
+            <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, 0)} />
+            <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
+                <span className="text-14 font-semibold truncate">{name}</span>
+                <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>
+                <span className="ml-auto flex items-center">
+                    {active && (
+                        <button
+                            type="button"
+                            onClick={() => void window.chromeAPI.nests.stopCard(card.id)}
+                            className="nodrag mr-1 h-7 px-2.5 rounded-control border text-13 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            Stop
+                        </button>
+                    )}
+                    {answered && (
+                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                            <GitFork className="size-4" />
+                        </CardButton>
+                    )}
+                    <CardButton label={open ? 'Close the runs' : 'Open every run'} onClick={() => board.setOpen(open ? null : card.id)}>
+                        {open ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                    </CardButton>
+                    <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                        <X className="size-4" />
+                    </CardButton>
+                </span>
+            </div>
+            <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{from}</p>
+            {shownRun?.thread ? (
+                <div className="nodrag flex flex-col">
+                    <div className="px-3 pb-1 flex items-center gap-1 border-t pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setOpenRun(null)}
+                            className="h-7 px-2 rounded-control flex items-center gap-1.5 text-13 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <ArrowLeft className="size-4" />
+                            Every run
+                        </button>
+                        <span className="text-13 font-semibold truncate">{shownRun.name}</span>
+                    </div>
+                    <WholeChat
+                        thread={shownRun.thread}
+                        mascot={mascot}
+                        bordered={false}
+                        onSend={(text) => void window.chromeAPI.nests.sendRun(shownRun.id, text)}
+                        note={`Gets its row${source ? ` from ${sourceName}` : ''} again when you send`}
+                    />
+                </div>
+            ) : (
+                <div className="nodrag select-text cursor-auto flex flex-col">
+                    <div className="px-5 pb-3 flex flex-col gap-3">
+                        <p className="text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{each.prompt}</p>
+                        {!open &&
+                            working.map((view) => (
+                                <p key={view.id} role="status" className="text-14 line-clamp-1">
+                                    <span className="font-semibold">{view.name}</span>{' '}
+                                    <span className={SHIMMER_TEXT}>{view.thread?.statusLine ?? view.thread?.steps.findLast((step) => !step.done)?.text ?? 'Working'}</span>
+                                </p>
+                            ))}
+                        {!open &&
+                            asking.map((view) => (
+                                <div key={view.id} className="flex flex-col gap-1">
+                                    <p className="text-12 text-muted-foreground">{view.name}</p>
+                                    <ChatApprovalCard chatId={view.thread!.id} approval={view.thread!.approval!} mascot={mascot} />
+                                </div>
+                            ))}
+                    </div>
+                    <div className={cn("rounded-b-panel overflow-hidden", open && "nowheel max-h-[520px] overflow-y-auto")}>
+                        {(open ? views : ended.slice(0, RUNS_SHOWN)).map((view) => (
+                            <RunRow key={view.id} view={view} onOpen={() => openRunOf(view.id)} />
+                        ))}
+                        {!open && views.length > Math.min(ended.length, RUNS_SHOWN) && (
+                            <button
+                                type="button"
+                                onClick={() => board.setOpen(card.id)}
+                                className="w-full h-9 px-5 border-t text-left text-13 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:bg-muted"
+                            >
+                                {ended.length > RUNS_SHOWN ? `${ended.length - RUNS_SHOWN} more` : 'Every run'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+export const CardView: React.FC<NodeProps<CardNode>> = ({ data: { card } }) =>
+    card.each ? <ForEachCard card={card} each={card.each} /> : card.chatId ? <SentCard card={card} /> : <DraftCard card={card} />
 
 const LINE = "stroke-accent-ink/60"
+// The round ends sit just outside the cards, touching their edges, since a line is drawn under the cards.
+const END = 3.5
+const STROKE = 1.5
 
 // A line between two cards, dashed while the card it goes to hasn't been sent, with a small round end at each card.
 export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) => {
-    const [path] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+    const from = sourceX + END + STROKE / 2
+    const to = targetX - END
+    const [path] = getBezierPath({ sourceX: from, sourceY, sourcePosition, targetX: to, targetY, targetPosition })
     return (
         <>
-            <BaseEdge id={id} path={path} className={LINE} style={{ strokeWidth: 1.5, strokeDasharray: data?.draft ? '5 5' : undefined }} />
-            <circle cx={sourceX} cy={sourceY} r={3.5} className={cn(LINE, "fill-canvas")} strokeWidth={1.5} />
-            <circle cx={targetX} cy={targetY} r={3.5} className="fill-accent-ink/60" />
+            <BaseEdge id={id} path={path} className={LINE} style={{ strokeWidth: STROKE, strokeDasharray: data?.draft ? '5 5' : undefined }} />
+            <circle cx={from} cy={sourceY} r={END} className={cn(LINE, "fill-canvas")} strokeWidth={STROKE} />
+            <circle cx={to} cy={targetY} r={END} className="fill-accent-ink/60" />
         </>
     )
 }
 
 // The line while it's being pulled out, before there's a card at its end.
 export const PullingLine: React.FC<ConnectionLineComponentProps> = ({ fromX, fromY, toX, toY, fromPosition, toPosition }) => {
-    const [path] = getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })
+    const [path] = getBezierPath({ sourceX: fromX + END + STROKE / 2, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })
     return (
         <g>
-            <path d={path} fill="none" className={LINE} strokeWidth={1.5} strokeDasharray="5 5" />
-            <circle cx={toX} cy={toY} r={3.5} className="fill-accent-ink/60" />
+            <path d={path} fill="none" className={LINE} strokeWidth={STROKE} strokeDasharray="5 5" />
+            <circle cx={toX} cy={toY} r={END} className="fill-accent-ink/60" />
         </g>
     )
 }

@@ -1285,11 +1285,12 @@ export class Window {
   async confirmDeleteCard(cardId: string): Promise<boolean> {
     const card = this.nests.card(cardId);
     if (!card) return false;
-    if (card.chatId) {
+    const runs = card.each?.runs.filter((run) => run.chatId).length ?? 0;
+    if (card.chatId || runs > 0) {
       const { response } = await dialog.showMessageBox(this._baseWindow, {
         type: "warning",
         message: "Delete this card?",
-        detail: "Its chat will be permanently removed from this computer.",
+        detail: runs > 1 ? `Its ${runs} chats, one for each row, will be permanently removed from this computer.` : "Its chat will be permanently removed from this computer.",
         buttons: ["Delete", "Cancel"],
         defaultId: 1,
         cancelId: 1,

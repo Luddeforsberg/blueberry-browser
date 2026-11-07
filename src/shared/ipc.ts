@@ -1,6 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
+import type { PickedRows } from "./nestTable";
 import type { ChatThread, GalleryLinked, NestBoard, NestCard, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
@@ -344,7 +345,12 @@ export interface NestNewCard {
   mascotId?: string | null;
   // The card it's pulled out of.
   from?: string | null;
+  // The rows selected in that card's table, which are then all it gets. Main checks they're in its latest answer.
+  picked?: PickedRows | null;
 }
+
+// For each row either starts, or says why it can't, such as more rows than the cap.
+export type NestSendEachResult = { ok: true } | { ok: false; error: string };
 
 export interface ChatSendOptions {
   seePage: boolean;
@@ -501,6 +507,12 @@ export interface InvokeChannels {
   "nests:delete-card": { region: "chrome"; args: [cardId: string]; result: boolean };
   // Sends from a card through the chat path, starting its chat if it's a draft. It runs only because the user sent it.
   "nests:send": { region: "chrome"; args: [cardId: string, text: string]; result: ChatThread | null };
+  // Sends a draft once for each row its line brings, each run its own chat, a few at a time. Only because the user sent it.
+  "nests:send-each": { region: "chrome"; args: [cardId: string, text: string]; result: NestSendEachResult };
+  // A reply in one run's thread, which gets its row again.
+  "nests:send-run": { region: "chrome"; args: [runId: string, text: string]; result: ChatThread | null };
+  // Stops every run on a card, and whatever is still waiting never starts.
+  "nests:stop-card": { region: "chrome"; args: [cardId: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -729,6 +741,9 @@ export interface NestsAPI {
   setBird: (cardId: string, mascotId: string) => Promise<boolean>;
   deleteCard: (cardId: string) => Promise<boolean>;
   send: (cardId: string, text: string) => Promise<ChatThread | null>;
+  sendEach: (cardId: string, text: string) => Promise<NestSendEachResult>;
+  sendRun: (runId: string, text: string) => Promise<ChatThread | null>;
+  stopCard: (cardId: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
 }
