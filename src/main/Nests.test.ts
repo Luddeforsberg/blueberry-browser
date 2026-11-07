@@ -738,23 +738,79 @@ describe("Files and notes on a card", () => {
     expect(nests.card(writer.id)!.attachments).toHaveLength(2);
   });
 
-  it("keeps a file added straight onto a planned card when a message changes the plan", async () => {
+  // Two planned cards, Scout's and Berry's, with a file added straight onto Berry's, the second.
+  const planWithFileOnSecond = async () => {
     const { nests } = setup();
     const nest = nests.create();
     plans.push(TWO_JOBS);
     await nests.ask(nest, "Find companies and write to each", PLACE);
     const writer = nests.board(nest)!.cards[1];
     expect(nests.attachFile({ cardId: writer.id }, "one-pager.pdf", PDF, READS_ALL)).toEqual({ ok: true });
+    return { nests, nest, writer };
+  };
+  const named = (attachments: { name: string }[]) => attachments.map((each) => each.name);
 
-    plans.push({ ...TWO_JOBS, cards: [TWO_JOBS.cards[0], { ...TWO_JOBS.cards[1], prompt: "Write a shorter email to each", attached: ["a1"] }] });
+  it("keeps a file added on a planned card with that card when a new plan keeps its key, and never lets the plan give it to another", async () => {
+    const { nests, nest, writer } = await planWithFileOnSecond();
+
+    // The file is the card's, not the planner's: giving it out is giving out something that isn't attached.
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a1"] }, TWO_JOBS.cards[1]] });
+    await nests.ask(nest, "Use the one-pager when finding companies", PLACE);
+    expect(nests.board(nest)!.talk[0].messages.at(-1)!.text).toBe("I couldn’t lay that out as cards, because it gave a card a file you didn’t attach. Try asking another way.");
+    expect(named(nests.card(writer.id)!.attachments)).toEqual(["one-pager.pdf"]);
+
+    // Kept under its key, the card keeps its file. While Berry changes the plan, its cards wait.
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1" }, { ...TWO_JOBS.cards[1], key: "p2", from: "p1", prompt: "Write a shorter email to each" }] });
     const changing = nests.ask(nest, "Make the emails shorter", PLACE);
-    // While Berry changes the plan, its cards wait, since the new plan replaces them.
     expect(nests.addNote({ cardId: writer.id }, "Too late")).toEqual({ ok: false, error: "Berry is still changing the plan. Try again in a moment." });
     await changing;
-    expect(planned[1].messages[0].content).toContain('<file key="a1" name="one-pager.pdf" type="PDF"');
+    expect(planned.at(-1)!.messages[0].content).toContain('own_attached="one-pager.pdf"');
     const cards = nests.board(nest)!.cards;
     expect(cards.map((card) => card.plan?.prompt)).toEqual(["Find companies", "Write a shorter email to each"]);
-    expect(cards[1].attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
+    expect(cards.map((card) => named(card.attachments))).toEqual([[], ["one-pager.pdf"]]);
+    expect(nests.board(nest)!.attached).toEqual([]);
+  });
+
+  it("puts a file added on a planned card back on the composer when a new plan drops that card", async () => {
+    const { nests, nest } = await planWithFileOnSecond();
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1" }] });
+    await nests.ask(nest, "Only find the companies", PLACE);
+    const board = nests.board(nest)!;
+    expect(board.cards.map((card) => named(card.attachments))).toEqual([[]]);
+    expect(named(board.attached)).toEqual(["one-pager.pdf"]);
+    // It's the user's again, to hand out on the next request.
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1", attached: ["a1"] }] });
+    await nests.ask(nest, "Use the one-pager for it", PLACE);
+    expect(nests.board(nest)!.cards.map((card) => named(card.attachments))).toEqual([["one-pager.pdf"]]);
+  });
+
+  it("puts a planned card's own file back on the composer when the plan is discarded, and Run keeps a composer file no card got", async () => {
+    const { nests, nest } = await planWithFileOnSecond();
+    expect(nests.discardPlan(nest)).toBe(true);
+    expect(named(nests.board(nest)!.attached)).toEqual(["one-pager.pdf"]);
+
+    nests.addNote({ nestId: nest }, "Only B2B");
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a2"] }, TWO_JOBS.cards[1]] });
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    nests.runPlan(nest);
+    // The note went to a card, so it's done with. The file went nowhere, so it stays where the user can see it.
+    expect(named(nests.board(nest)!.attached)).toEqual(["one-pager.pdf"]);
+  });
+
+  it("keeps a note the user changed on a planned card, even one the plan copied from the composer", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    nests.addNote({ nestId: nest }, "Only B2B");
+    plans.push({ ...TWO_JOBS, cards: [TWO_JOBS.cards[0], { ...TWO_JOBS.cards[1], attached: ["a1"] }] });
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const [note] = nests.board(nest)!.cards[1].attachments;
+    expect(nests.editNote(note.id, "Only B2B, and only in Sweden")).toBe(true);
+
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1" }, { ...TWO_JOBS.cards[1], key: "p2", from: "p1" }] });
+    await nests.ask(nest, "Make the emails shorter", PLACE);
+    expect(nests.board(nest)!.cards[1].attachments.map((each) => each.text)).toEqual(["Only B2B, and only in Sweden"]);
+    nests.discardPlan(nest);
+    expect(nests.board(nest)!.attached.map((each) => each.text)).toEqual(["Only B2B", "Only B2B, and only in Sweden"]);
   });
 
   it("refuses a plan that gives a card a file the user didn't attach", async () => {

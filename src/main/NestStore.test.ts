@@ -1,6 +1,7 @@
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 
@@ -43,6 +44,25 @@ describe("NestStore", () => {
     // A card's go with it.
     again.deleteCard(writer.id);
     expect(again.sentAttachments(writer.id)).toEqual([]);
+  });
+
+  it("links a plan's copies made before copies named their original, so they aren't taken for the card's own", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Find customers");
+    const card = store.addCard(nest, { x: 0, y: 0, planned: true })!;
+    const bytes = new Uint8Array([37, 80, 68, 70]);
+    const pdf = { kind: "file" as const, name: "one-pager.pdf", type: "application/pdf", size: 4, pages: 1, data: bytes };
+    store.addAttachment({ nestId: nest }, pdf);
+    store.addAttachment({ cardId: card.id }, pdf);
+    store.addAttachment({ cardId: card.id }, { kind: "note", text: "Added here" });
+    // As a file from before migration 6 has them: no source on anything.
+    const db = new DatabaseSync(file);
+    db.exec("ALTER TABLE attachments DROP COLUMN source_id; PRAGMA user_version = 5;");
+    db.close();
+
+    const again = new NestStore(file);
+    expect(again.ownAttachmentRows(card.id).map((row) => row.kind)).toEqual(["note"]);
   });
 
   it("only draws a line from a card in the same nest", () => {

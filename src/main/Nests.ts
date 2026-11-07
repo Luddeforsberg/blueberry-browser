@@ -278,11 +278,12 @@ export class Nests {
     // Without a model to plan with, it's one card, as before.
     if (!this.planner.available()) return this.oneCard(nestId, words, chosen, place) ? { ok: true } : { ok: false, error: "That couldn’t start." };
 
-    // The composer's files and notes, and any added straight onto the planned cards this would replace, as short keys the
-    // plan gives to cards.
-    const attachable = [...this.store.attachmentRows({ nestId }), ...this.store.plannedExtras(nestId)].map((row, index) => ({ ...row, key: `a${index + 1}` }));
+    // Only the composer's files and notes are the planner's to give to cards, as short keys. What the user added on a
+    // planned card stays that card's: it goes with the card if the new plan keeps its key, and back to the composer if not.
+    const attachable = this.store.attachmentRows({ nestId }).map((row, index) => ({ ...row, key: `a${index + 1}` }));
     const attachedKeys = new Map(attachable.map((row) => [row.key, row.id]));
-    const { digest, sources } = this.digestOf(board, chosen, pending, attachable);
+    const planKeys = new Map(pending.map((card, index) => [`p${index + 1}`, card.id]));
+    const { digest, sources } = this.digestOf(board, chosen, pending, attachable, planKeys);
     const earlier = (open?.messages ?? []).map(({ role, text: said }) => ({ role: role === "user" ? ("user" as const) : ("assistant" as const), content: said }));
     const messages = [...earlier, { role: "user" as const, content: words }];
     messages[0] = { ...messages[0], content: `${digest}\n\n<request>\n${messages[0].content}\n</request>` };
@@ -311,10 +312,15 @@ export class Nests {
     this.store.say(nestId, "user", words);
     if (!checked) this.store.say(nestId, "berry", PLAN_FAILED);
     else if (!checked.ok) this.store.say(nestId, "berry", planRefused(checked.problem));
-    else if (checked.cards.some((card) => this.overfull(card.attached.map((key) => attachable.find((row) => row.key === key)!))))
+    else if (
+      checked.cards.some((card) => {
+        const kept = planKeys.get(card.key);
+        return this.overfull([...(kept ? this.store.ownAttachmentRows(kept) : []), ...card.attached.map((key) => attachable.find((row) => row.key === key)!)]);
+      })
+    )
       this.store.say(nestId, "berry", planRefused("a card would get more files than one card can take"));
     else if (checked.ask || checked.cards.length === 0) this.store.say(nestId, "berry", checked.reply || PLAN_FAILED);
-    else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place, attachedKeys), this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n")))
+    else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place, attachedKeys, planKeys), this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n")))
       this.store.say(nestId, "berry", planRefused("a line went to a card that isn’t there"));
     else this.store.say(nestId, "berry", checked.reply || "I’ve laid it out above. Press Run when it looks right.");
     this.changed(nestId);
@@ -576,7 +582,8 @@ export class Nests {
     board: NestBoard,
     pending: readonly NestCard[],
     place: { at: { x: number; y: number }; taken: Rect[] },
-    attachedKeys: ReadonlyMap<string, string>
+    attachedKeys: ReadonlyMap<string, string>,
+    planKeys: ReadonlyMap<string, string>
   ): NewPlannedCard[] {
     const replaced = new Set(pending.map((card) => card.id));
     const taken = place.taken.filter((rect) => !pending.some((card) => card.x === rect.x && card.y === rect.y));
@@ -590,7 +597,7 @@ export class Nests {
       const rect = { ...spot, width: CARD_WIDTH, height: PLANNED_HEIGHT };
       taken.push(rect);
       placed.set(card.key, rect);
-      return { ...card, ...spot, attached: card.attached.map((key) => attachedKeys.get(key)!) };
+      return { ...card, ...spot, attached: card.attached.map((key) => attachedKeys.get(key)!), keeps: planKeys.get(card.key) ?? null };
     });
   }
 
@@ -600,7 +607,8 @@ export class Nests {
     board: NestBoard,
     chosen: string | null,
     pending: readonly NestCard[],
-    attachable: readonly (AttachmentRow & { key: string })[]
+    attachable: readonly (AttachmentRow & { key: string })[],
+    planKeys: ReadonlyMap<string, string>
   ): { digest: string; sources: PlanSource[] } {
     const sent = board.cards.filter((card) => card.chatId || card.each);
     const keyOf = new Map(sent.map((card, index) => [card.id, `e${index + 1}`]));
@@ -625,17 +633,18 @@ export class Nests {
         answer: answer ? answerStart(answer) : null,
       };
     });
-    const planKeys = new Map(pending.map((card, index) => [card.id, `p${index + 1}`]));
+    const keyOfPlanned = new Map([...planKeys].map(([key, id]) => [id, key]));
     const plan: PlannedDigest[] = pending.map((card) => {
       const from = this.store.lineTo(card.id)?.source.id;
       return {
-        key: planKeys.get(card.id)!,
+        key: keyOfPlanned.get(card.id)!,
         bird: card.mascotId ?? BERRY.id,
         prompt: card.plan!.prompt,
-        from: from ? (planKeys.get(from) ?? keyOf.get(from) ?? null) : null,
+        from: from ? (keyOfPlanned.get(from) ?? keyOf.get(from) ?? null) : null,
         each: card.plan!.each,
         waits: card.plan!.waits,
         table: card.plan!.table,
+        own: this.store.ownAttachmentRows(card.id).map((row) => (row.kind === "note" ? "a note" : row.name)),
       };
     });
     const flock: MascotProfile[] = this.mascots.all().filter((mascot) => mascot.deletedAt === null);

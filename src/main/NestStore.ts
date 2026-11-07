@@ -82,6 +82,15 @@ const MIGRATIONS = [
    );
    CREATE INDEX attachments_by_card ON attachments(card_id);
    CREATE INDEX attachments_by_nest ON attachments(nest_id);`,
+  // A copy a plan gave a card names the composer's original, so a new plan can tell what it may hand out again from what
+  // the user added on the card. Copies made before this find theirs by being the same.
+  `ALTER TABLE attachments ADD COLUMN source_id TEXT;
+   UPDATE attachments SET source_id = (
+     SELECT b.id FROM attachments b
+     WHERE b.nest_id = attachments.nest_id AND b.card_id IS NULL AND b.kind = attachments.kind AND b.name = attachments.name
+       AND b.type = attachments.type AND b.size = attachments.size AND b.data IS attachments.data AND b.note IS attachments.note
+     ORDER BY b.rowid LIMIT 1
+   ) WHERE card_id IS NOT NULL;`,
 ];
 
 export interface AttachmentRow {
@@ -152,6 +161,8 @@ export interface NewPlannedCard {
   y: number;
   // The composer's files and notes this card gets, by id.
   attached: string[];
+  // The planned card it's a new version of, which gives it what the user added on that card.
+  keeps: string | null;
 }
 
 export interface StoredNest {
@@ -399,8 +410,11 @@ export class NestStore {
     this.db.exec("BEGIN");
     try {
       if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
-      // The old plan goes last, so what was added on its cards can be copied onto the new ones first.
+      // The old plan goes last, so what the user added on its cards goes to the new versions of them first, or back to the
+      // composer, never with them.
       const replaced = (this.db.prepare("SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned'").all(nestId) as { id: string }[]).map((row) => row.id);
+      const own = new Map(replaced.map((id) => [id, this.ownAttachmentRows(id).map((row) => row.id)]));
+      if (cards.some((card) => card.keeps !== null && !own.has(card.keeps))) throw new NotHere();
       const insert = this.db.prepare(
         "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?)"
       );
@@ -409,6 +423,11 @@ export class NestStore {
         for (const attachmentId of card.attached) {
           if (!this.copyAttachment(attachmentId, nestId, ids.get(card.key)!)) throw new NotHere();
         }
+      }
+      const move = this.db.prepare("UPDATE attachments SET card_id = ?, source_id = NULL WHERE id = ?");
+      for (const [oldId, attachmentIds] of own) {
+        const kept = cards.find((card) => card.keeps === oldId);
+        for (const attachmentId of attachmentIds) move.run(kept ? ids.get(kept.key)! : null, attachmentId);
       }
       const remove = this.db.prepare("DELETE FROM cards WHERE id = ?");
       for (const id of replaced) remove.run(id);
@@ -449,7 +468,11 @@ export class NestStore {
     return armed;
   }
 
+  // What the user added on the planned cards goes back to the composer rather than with them.
   discardPlan(nestId: string): number {
+    const cards = (this.db.prepare("SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned'").all(nestId) as { id: string }[]).map((row) => row.id);
+    const back = this.db.prepare("UPDATE attachments SET card_id = NULL, source_id = NULL WHERE id = ?");
+    for (const id of cards.flatMap((cardId) => this.ownAttachmentRows(cardId).map((row) => row.id))) back.run(id);
     return Number(this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
   }
 
@@ -557,36 +580,34 @@ export class NestStore {
     return id;
   }
 
+  // A note the user changed is theirs, even one a plan copied onto a card.
   editNote(id: string, text: string): boolean {
-    return this.db.prepare("UPDATE attachments SET note = ?, size = ? WHERE id = ? AND kind = 'note'").run(text, Buffer.byteLength(text), id).changes > 0;
+    return this.db.prepare("UPDATE attachments SET note = ?, size = ?, source_id = NULL WHERE id = ? AND kind = 'note'").run(text, Buffer.byteLength(text), id).changes > 0;
   }
 
   removeAttachment(id: string): boolean {
     return this.db.prepare("DELETE FROM attachments WHERE id = ?").run(id).changes > 0;
   }
 
-  // What was added straight onto the Nest's planned cards, which a new plan would otherwise take away with them: each once,
-  // and none that's the same as one on the composer.
-  plannedExtras(nestId: string): AttachmentRow[] {
-    const SAME = "b.kind = a.kind AND b.name = a.name AND b.type = a.type AND b.size = a.size AND b.data IS a.data AND b.note IS a.note";
+  // What on a planned card is its own: added there, or copied from the composer by a plan when the original isn't on the
+  // composer any more. The rest are the planner's to hand out again.
+  ownAttachmentRows(cardId: string): AttachmentRow[] {
     return this.db
       .prepare(
-        `SELECT ${ATTACHMENT_COLUMNS.split(", ").map((column) => `a.${column}`).join(", ")} FROM attachments a JOIN cards c ON c.id = a.card_id
-         WHERE c.nest_id = ? AND c.plan = 'planned'
-           AND NOT EXISTS (SELECT 1 FROM attachments b WHERE b.nest_id = a.nest_id AND b.card_id IS NULL AND ${SAME})
-           AND NOT EXISTS (SELECT 1 FROM attachments b JOIN cards d ON d.id = b.card_id WHERE d.nest_id = a.nest_id AND d.plan = 'planned' AND b.rowid < a.rowid AND ${SAME})
-         ORDER BY a.rowid`
+        `SELECT ${ATTACHMENT_COLUMNS} FROM attachments a WHERE card_id = ?
+           AND (source_id IS NULL OR NOT EXISTS (SELECT 1 FROM attachments b WHERE b.id = a.source_id AND b.card_id IS NULL))
+         ORDER BY rowid`
       )
-      .all(nestId) as unknown as AttachmentRow[];
+      .all(cardId) as unknown as AttachmentRow[];
   }
 
-  // A copy of one of the composer's, or of one on a planned card, onto a card of the same Nest.
+  // A copy of one of the composer's onto a card of the same Nest, which names where it came from.
   private copyAttachment(id: string, nestId: string, cardId: string): boolean {
     return (
       this.db
         .prepare(
-          `INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note)
-           SELECT ?, nest_id, ?, kind, name, type, size, pages, data, note FROM attachments WHERE id = ? AND nest_id = ?`
+          `INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note, source_id)
+           SELECT ?, nest_id, ?, kind, name, type, size, pages, data, note, id FROM attachments WHERE id = ? AND nest_id = ? AND card_id IS NULL`
         )
         .run(randomUUID(), cardId, id, nestId).changes > 0
     );
@@ -597,9 +618,12 @@ export class NestStore {
     this.db.prepare("UPDATE attachments SET card_id = ? WHERE nest_id = ? AND card_id IS NULL").run(cardId, nestId);
   }
 
-  // The request they were for is over.
+  // The request they were for is over, so what a card got a copy of goes. What no card got stays, so nothing the user
+  // added is lost without them seeing it.
   clearComposer(nestId: string): void {
-    this.db.prepare("DELETE FROM attachments WHERE nest_id = ? AND card_id IS NULL").run(nestId);
+    this.db
+      .prepare("DELETE FROM attachments WHERE nest_id = ? AND card_id IS NULL AND id IN (SELECT source_id FROM attachments WHERE source_id IS NOT NULL AND card_id IS NOT NULL)")
+      .run(nestId);
   }
 
   // Something happened in it, so it moves up the list.

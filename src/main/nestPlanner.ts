@@ -14,7 +14,7 @@ export const PLAN_SCHEMA = z.object({
   ask: z.boolean().describe("True to ask the user first, with no cards."),
   cards: z.array(
     z.object({
-      key: z.string().describe("A short key for this card, such as c1, unique in this plan."),
+      key: z.string().describe("A short key for this card, such as c1, unique in this plan. To keep a card of the current plan, use its key."),
       bird: z.string().describe("The id of a bird in the flock."),
       prompt: z.string().describe("The whole job for that bird, written as the user would ask it."),
       from: z.string().nullable().describe("The key of the card whose answer this one needs, in this plan or on the board, or null."),
@@ -88,6 +88,8 @@ export interface PlannedDigest {
   each: boolean;
   waits: boolean;
   table: string | null;
+  // What the user added on it, by name, which stays with it.
+  own: string[];
 }
 
 // The start of an answer: a table's header and first rows, or its first lines.
@@ -154,10 +156,10 @@ export const planDigest = ({
         plan
           .map(
             (card) =>
-              `<planned key="${card.key}" bird="${card.bird}" from="${card.from ?? ""}" for_each_row="${card.each}" waits_for_user="${card.waits}" table_of="${asData(card.table ?? "")}">${asData(card.prompt)}</planned>`
+              `<planned key="${card.key}" bird="${card.bird}" from="${card.from ?? ""}" for_each_row="${card.each}" waits_for_user="${card.waits}" table_of="${asData(card.table ?? "")}"${card.own.length > 0 ? ` own_attached="${asData(card.own.map(nameForModel).join(", "))}"` : ""}>${asData(card.prompt)}</planned>`
           )
           .join("\n") +
-        "\n</current_plan>\nThat's the plan the user is changing. Nothing in it has run. Its keys are only for reading it: give every card of the new plan a key of its own."
+        "\n</current_plan>\nThat's the plan the user is changing. Nothing in it has run. To keep one of its cards, changed or not, give it the same key. own_attached is what the user added on that card: it stays with the card if you keep its key, and goes back to the user if you leave the card out, and you can't give it to another card. Give a new card a key of its own."
     );
   }
   return parts.join("\n\n");
