@@ -24,6 +24,7 @@ import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from '../components/Berry'
 import { SHIMMER_QUIET, UserMessage } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
+import { firstBlank, NEST_STARTERS, onLeftInComposer, takeFromComposer } from '../nestStart'
 import { Attachments, useAttaching } from '../components/NestAttachments'
 import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
 import { CardView, draftText, GhostSweep, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
@@ -354,6 +355,20 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
     const edges = useMemo(() => toEdges(board), [board])
     const [prompt, setPrompt] = useState('')
+    // A starter or a chat's request fills the composer and moves the keyboard there, never sending.
+    const [composerFocus, setComposerFocus] = useState<{ key: number; range?: [number, number] }>({ key: 0 })
+    const fillComposer = useCallback((text: string, range?: [number, number]) => {
+        setPrompt(text)
+        setComposerFocus((current) => ({ key: current.key + 1, range }))
+    }, [])
+    useEffect(() => {
+        const take = () => {
+            const text = takeFromComposer(board.id)
+            if (text) fillComposer(text)
+        }
+        take()
+        return onLeftInComposer(take)
+    }, [board.id, fillComposer])
     const wrapper = useRef<HTMLDivElement>(null)
     const pulling = useRef<string | null>(null)
     const api = window.chromeAPI.nests
@@ -775,9 +790,18 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 </ReactFlow>
                 {board.cards.length > 0 && <ZoomControls onFit={fit} onActualSize={() => void flow.zoomTo(1, MOVE)} />}
                 {board.cards.length === 0 && !planning && board.talk.length === 0 && (
-                    <p className="pointer-events-none absolute inset-x-0 top-[38%] text-center text-14 text-muted-foreground">
-                        Each card is one bird’s chat. Write below to start one, or click anywhere on the board.
-                    </p>
+                    <div className="pointer-events-none absolute inset-x-0 top-[38%] px-4 flex flex-col items-center gap-4">
+                        <p className="text-center text-14 text-muted-foreground">
+                            Each card is one bird’s chat. Write below to start one, or click anywhere on the board.
+                        </p>
+                        <div role="group" aria-label="Start from" className="pointer-events-auto flex flex-wrap justify-center gap-2">
+                            {NEST_STARTERS.map((starter) => (
+                                <Button key={starter.label} variant="outline" size="sm" onClick={() => fillComposer(starter.text, firstBlank(starter.text))}>
+                                    {starter.label}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
                 )}
                 <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 w-[min(640px,calc(100%-32px))] flex flex-col gap-4 [&>*]:pointer-events-auto">
                     <Talk talk={board.talk} planning={planning} />
@@ -787,6 +811,8 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         placeholder={pending ? 'Change the plan, or press Run' : talking ? `Reply to ${berryName}` : `Ask ${chosenName}, or ask for a plan`}
                         value={prompt}
                         onChange={setPrompt}
+                        focusKey={composerFocus.key}
+                        focusRange={composerFocus.range}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter' && !event.shiftKey) {
                                 event.preventDefault()

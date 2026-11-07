@@ -11,12 +11,34 @@ import { cn } from '@common/lib/utils'
 import { blankForm, setRoutinesView } from '../routinesView'
 import { useWorkView, WorkingStrip, WorkingView } from '../components/WorkingView'
 import { RunnerView } from '../components/RunnerView'
+import { X } from 'lucide-react'
+import { isSeveralJobs, leaveInComposer } from '../nestStart'
 
 // The chat keeps its width, so the working view only goes beside it when it can have this much of the page.
 const ROOM_FOR_WORK = 960
 const PICTURE_WIDTH = { min: 300, share: 0.38, max: 600 }
 const WORK_GUTTER = 48
 const COLUMN_WITH_BIRD = 888
+
+// Chats whose suggestion to open a request as a Nest was pressed or put away, so it never comes back for them. Kept by
+// the chrome itself, and if it can't keep them, only for this launch.
+const NEST_SUGGESTED_KEY = 'blueberry.nest-suggested'
+const nestSuggested = new Set<string>((() => {
+    try {
+        const saved = JSON.parse(localStorage.getItem(NEST_SUGGESTED_KEY) ?? '[]')
+        return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : []
+    } catch {
+        return []
+    }
+})())
+const doneSuggesting = (chatId: string) => {
+    nestSuggested.add(chatId)
+    try {
+        localStorage.setItem(NEST_SUGGESTED_KEY, JSON.stringify([...nestSuggested].slice(-500)))
+    } catch {
+        // Then it's only for this launch.
+    }
+}
 
 // A full page for talking to Berry about anything, not about a web page.
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
@@ -63,6 +85,24 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         if (!chatId) return
         const result = await window.chromeAPI.nests.fromChat(chatId)
         setNestProblem(result.ok ? null : result.error)
+    }
+
+    // A request that's plainly several jobs: offered once, under its own reply, as a new Nest with the request in its
+    // composer, unsent, so Berry plans it when the user sends it there. Only the chat's first such request, so once the
+    // user has gone on, it's gone.
+    const [, setSuggestionGone] = useState(0)
+    const userIndexes = thread?.messages.flatMap((message, index) => (message.role === 'user' ? [index] : [])) ?? []
+    const severalAt = userIndexes.find((index) => isSeveralJobs(thread?.messages[index].content ?? ''))
+    const request = severalAt !== undefined && severalAt === userIndexes.at(-1) && chatId && !nestSuggested.has(chatId) ? thread?.messages[severalAt].content : undefined
+    const putAwaySuggestion = () => {
+        if (chatId) doneSuggesting(chatId)
+        setSuggestionGone((count) => count + 1)
+    }
+    const startedHere = !!thread && !thread.from && !thread.runner && !thread.cloud
+    const openRequestAsNest = async () => {
+        if (!request) return
+        putAwaySuggestion()
+        leaveInComposer(await window.chromeAPI.nests.create(), request)
     }
 
     // Chats begin on the new tab page, so this is only ever a moment while the chat loads, or one just deleted.
@@ -124,12 +164,23 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         </Button>
                                     )}
                                     {/* Only a chat started here. One from another app or the cloud answers there. */}
-                                    {!thread.from && !thread.runner && !thread.cloud && (
+                                    {startedHere && !request && (
                                         <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => void openAsNest()}>
                                             Open as a Nest
                                         </Button>
                                     )}
                                 </div>
+                                {startedHere && request && (
+                                    <div className="flex items-center gap-1">
+                                        <p className="px-3 text-13 text-muted-foreground">That’s several jobs, which a Nest does side by side.</p>
+                                        <Button size="sm" variant="ghost" onClick={() => void openRequestAsNest()}>
+                                            Open as a Nest
+                                        </Button>
+                                        <Button size="icon-xs" variant="ghost" className="text-muted-foreground" aria-label="Not now" title="Not now" onClick={putAwaySuggestion}>
+                                            <X />
+                                        </Button>
+                                    </div>
+                                )}
                                 {nestProblem && <p role="alert" className="px-3 text-13 text-destructive">{nestProblem}</p>}
                             </div>
                         )}

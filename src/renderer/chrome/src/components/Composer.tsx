@@ -13,8 +13,9 @@ export const Composer: React.FC<{
     onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
     rows?: number
     autoFocus?: boolean
-    // Moves the keyboard here each time this changes.
+    // Moves the keyboard here each time this changes, with this part of the text selected, or the cursor at its end.
     focusKey?: number
+    focusRange?: [number, number]
     spellCheck?: boolean
     // Shown above the text, such as the page Berry can see.
     attachment?: React.ReactNode
@@ -40,7 +41,7 @@ export const Composer: React.FC<{
     menuUp?: boolean
     // Options for how it's sent, on a line of their own under the text, with the buttons at its end.
     footer?: React.ReactNode
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer, addItems, menuUp }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, focusRange, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer, addItems, menuUp }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
     // The + menu holds what can be added and the cloud option, so it's there only where the + has nothing else to do.
@@ -57,7 +58,9 @@ export const Composer: React.FC<{
         const textarea = textareaRef.current
         if (!focusKey || !textarea) return
         textarea.focus()
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+        textarea.setSelectionRange(...(focusRange ?? [textarea.value.length, textarea.value.length]))
+        // Only a new focusKey moves the keyboard.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [focusKey])
 
     return (
