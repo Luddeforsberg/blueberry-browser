@@ -23,6 +23,8 @@ describe('isSeveralJobs', () => {
         expect(isSeveralJobs('Compare Notion, Coda and Slite')).toBe(true)
         expect(isSeveralJobs('compare Notion, Coda, Slite and Confluence')).toBe(true)
         expect(isSeveralJobs('Compare these two laptops and tell me which one is better')).toBe(false)
+        expect(isSeveralJobs('Compare Notion and Coda on price, features and integrations')).toBe(false)
+        expect(isSeveralJobs('Compare acme.com, globex.com and initech.com')).toBe(true)
     })
 
     it('counts a pasted list it is asked to go through', () => {

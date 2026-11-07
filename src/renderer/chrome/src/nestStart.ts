@@ -32,7 +32,10 @@ const COUNTED_EACH = new RegExp(`\\b(?:each|every|all)\\s+(?:one\\s+)?of\\s+(?:t
 // Words that go through a list one by one, rather than doing one thing with it, as translating it would.
 const OVER_A_LIST = /\b(each|every|compare|research|look (?:up|into))\b/i
 const LIST_LINE = /^\s*(?:[-*•–]|\d{1,2}[.)])\s+\S/
-const COMPARE = /\bcompare\s+([^.?!\n]+)/i
+// What's compared runs to the end of the sentence, where a dot is followed by a space, so acme.com stays whole.
+const COMPARE = /\bcompare\s+(.+?)(?=[.?!](?:\s|$)|\n|$)/i
+// From here on it's how they're compared, not more of them: "on price, features and integrations".
+const COMPARED_ON = /\s(?:on|by|for|across|in terms of|based on|regarding|when it comes to)\s.*$/i
 // Each part of a list is a name or a short phrase, never a clause of its own.
 const ITEM_WORDS = 5
 
@@ -69,7 +72,7 @@ export const isSeveralJobs = (message: string): boolean => {
     const counted = COUNTED_EACH.exec(text)
     if (counted && countOf(counted[1]) >= SEVERAL_AT) return true
     const compared = COMPARE.exec(text)
-    if (compared && listItems(compared[1]) >= SEVERAL_AT) return true
+    if (compared && listItems(compared[1].replace(COMPARED_ON, '')) >= SEVERAL_AT) return true
     if (!OVER_A_LIST.test(text)) return false
     return listedLines(text) >= SEVERAL_AT || listAfterColon(text) >= SEVERAL_AT
 }
