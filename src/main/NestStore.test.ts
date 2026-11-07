@@ -1,4 +1,4 @@
-import { mkdtempSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseSync } from "node:sqlite";
@@ -319,9 +319,9 @@ describe("NestStore", () => {
     const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
     const store = new NestStore(file);
     const nest = store.createNest("Files");
-    const bytes = new TextEncoder().encode("Lindqvist Data, Fjällbo");
-    const pitch = store.addFileCard(nest, { x: 0, y: 0, file: { name: "pitch.txt", type: "text/plain", size: bytes.length, pages: null, data: bytes }, preview: "Lindqvist Data, Fjällbo" })!;
-    expect(pitch).toMatchObject({ chatId: null, mascotId: null, autoPlaced: true, table: null, attachments: [], file: { name: "pitch.txt", type: "text/plain", size: bytes.length, made: false, preview: "Lindqvist Data, Fjällbo" } });
+    const bytes = new TextEncoder().encode("Lindqvist Data, Fjällbo, SECRET-PITCH-7731");
+    const pitch = store.addFileCard(nest, { x: 0, y: 0, file: { name: "pitch.txt", type: "text/plain", size: bytes.length, pages: null, data: bytes }, preview: "SECRET-PITCH-7731" })!;
+    expect(pitch).toMatchObject({ chatId: null, mascotId: null, autoPlaced: true, table: null, attachments: [], file: { name: "pitch.txt", type: "text/plain", size: bytes.length, made: false, preview: "SECRET-PITCH-7731" } });
     expect(store.fileOf(pitch.id)).toMatchObject({ name: "pitch.txt", data: bytes, made: false });
     // It never becomes a chat, a For-each card or anyone's bird's.
     expect(store.setChat(pitch.id, "chat")).toBe(false);
@@ -350,6 +350,8 @@ describe("NestStore", () => {
     // Deleting the card that sent deletes its copy too, so nothing is left behind.
     store.deleteCard(writer.id);
     expect(new DatabaseSync(file).prepare("SELECT COUNT(*) AS count FROM attachments").get()).toEqual({ count: 0 });
+    // Nor anywhere on disk: not in the file's free pages, and not in its write-ahead log.
+    for (const part of [file, `${file}-wal`]) if (existsSync(part)) expect(readFileSync(part).includes("SECRET-PITCH-7731")).toBe(false);
   });
 
   it("joins a file a card's bird made to that card, and never copies a file's card from another Nest", () => {

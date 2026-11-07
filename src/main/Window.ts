@@ -27,7 +27,7 @@ import { askInShape, generateTitle, hasModel, modelInputs, streamReply, writeWit
 import { downloadName, maxBytesFor, sizeInWords, typeInWords } from "./nestFiles";
 import { readFile, stat, writeFile } from "fs/promises";
 import { cheapWriter } from "./nestCells";
-import { csvFileName, MAX_TABLE_BYTES, parseDelimited, sniffDelimiter, toCsv, toHtmlTable, toTsv } from "./nestCsv";
+import { csvFileName, fileCsv, MAX_TABLE_BYTES, parseDelimited, sniffDelimiter, toCsv, toHtmlTable, toTsv } from "./nestCsv";
 import { PLAN_SCHEMA } from "./nestPlanner";
 import { basename, join } from "path";
 import { Suggestions } from "./Suggestions";
@@ -1470,7 +1470,7 @@ export class Window {
       if (found.type === "text/csv") {
         const text = Buffer.from(found.data).toString("utf8");
         const [header = [], ...rows] = parseDelimited(text, sniffDelimiter(text));
-        await writeFile(filePath, toCsv({ header, rows }), "utf8");
+        await writeFile(filePath, fileCsv({ header, rows }), "utf8");
       } else await writeFile(filePath, found.data);
       return true;
     } catch {

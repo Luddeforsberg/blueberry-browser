@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvFileName, exportCell, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, parseDelimited, sniffDelimiter, tableFromFile, tableTitle, toCsv, toHtmlTable, toTsv } from "./nestCsv";
+import { csvFileName, exportCell, fileCsv, MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, parseDelimited, sniffDelimiter, tableFromFile, tableTitle, toCsv, toHtmlTable, toTsv } from "./nestCsv";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
@@ -165,5 +165,13 @@ describe("exporting a table", () => {
     expect(html).toContain("<td>&lt;script&gt;x&lt;/script&gt;</td>");
     expect(html).toContain("<td>bad</td>");
     expect(html).not.toContain("javascript:");
+  });
+});
+
+describe("fileCsv", () => {
+  it("writes a file a bird made with every cell as it was, and a formula kept as text", () => {
+    expect(fileCsv({ header: ["Name", "Note"], rows: [["**Brygga**", "`code`, [site](https://brygga.example)"], ["=HYPERLINK(1)", "-5"], ["@sum", 'a "quote"']] })).toBe(
+      '﻿Name,Note\r\n**Brygga**,"`code`, [site](https://brygga.example)"\r\n\'=HYPERLINK(1),-5\r\n\'@sum,"a ""quote"""\r\n'
+    );
   });
 });

@@ -257,7 +257,7 @@ export class NestStore {
   constructor(file: string) {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
-    // Files are kept in here, so what's deleted is overwritten rather than left in the file's free pages.
+    // Files are kept in here, so what's deleted is overwritten rather than left in the file's free pages. See `forgetting`.
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON;");
     migrate(this.db, MIGRATIONS);
   }
@@ -308,7 +308,14 @@ export class NestStore {
 
   // Its cards and lines go with it. Their chats are the caller's to delete, so it gets their ids first.
   deleteNest(id: string): boolean {
-    return this.db.prepare("DELETE FROM nests WHERE id = ?").run(id).changes > 0;
+    return this.forgetting(this.db.prepare("DELETE FROM nests WHERE id = ?").run(id).changes > 0);
+  }
+
+  // After anything with files in it is deleted: the pages it was on are overwritten already, and this empties the
+  // write-ahead log too, which still holds the file as it was written, so nothing of it stays on disk.
+  private forgetting(deleted: boolean): boolean {
+    if (deleted) this.db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+    return deleted;
   }
 
   card(id: string): (NestCard & { nestId: string }) | null {
@@ -615,7 +622,7 @@ export class NestStore {
     const card = this.card(id);
     const done = this.db.prepare("DELETE FROM cards WHERE id = ?").run(id).changes > 0;
     if (done && card) this.touch(card.nestId);
-    return done;
+    return this.forgetting(done);
   }
 
   // Puts a plan on the board in place of the one there, if any, with the lines into its cards, in one go. A line from the
@@ -884,7 +891,7 @@ export class NestStore {
   }
 
   removeAttachment(id: string): boolean {
-    return this.db.prepare("DELETE FROM attachments WHERE id = ?").run(id).changes > 0;
+    return this.forgetting(this.db.prepare("DELETE FROM attachments WHERE id = ?").run(id).changes > 0);
   }
 
   // The composer's files and notes a planned card points at, oldest pointer first.
