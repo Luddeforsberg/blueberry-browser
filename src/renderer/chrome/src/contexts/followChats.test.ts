@@ -16,12 +16,12 @@ const setup = (ids: string[]) => {
         getChat: (id) => new Promise((resolve) => fetches.set(id, resolve))
     }
     const shown: Record<string, ChatThread | undefined> = {}
-    followChats(new Set(ids), feed, (id, change) => (shown[id] = change(shown[id])))
+    const stop = followChats(new Set(ids), feed, (id, change) => (shown[id] = change(shown[id])))
     const fetched = async (id: string, saved: ChatThread | null) => {
         fetches.get(id)!(saved)
         await Promise.resolve()
     }
-    return { shown, fetched, update: (next: ChatThread) => updated(next), chunk: (chatId: string, content: string) => chunk({ chatId, content }) }
+    return { shown, fetched, stop, update: (next: ChatThread) => updated(next), chunk: (chatId: string, content: string) => chunk({ chatId, content }) }
 }
 
 describe('followChats', () => {
@@ -43,6 +43,14 @@ describe('followChats', () => {
         // Another chat's fetch still goes in.
         await fetched('b', thread('b', 'Saved'))
         expect(shown.b?.messages[0].content).toBe('Saved')
+    })
+
+    it('drops a fetch that comes back after it stopped, since a newer thread may have reached what followed on', async () => {
+        const { shown, fetched, stop } = setup(['a'])
+        stop()
+        shown.a = thread('a', 'Newer, from the next subscription')
+        await fetched('a', thread('a', 'Older'))
+        expect(shown.a?.messages[0].content).toBe('Newer, from the next subscription')
     })
 
     it('ignores chats it was not asked to follow', async () => {

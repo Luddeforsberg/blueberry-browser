@@ -12,9 +12,10 @@ export type ThreadChange = (current: ChatThread | undefined) => ChatThread | und
 
 // Keeps each of `ids` current: the whole thread whenever main sends it, the words of a reply as they stream, and the
 // saved thread fetched once to start from. The fetch can come back after a whole thread that's newer than it, so it only
-// goes in while none has come.
+// goes in while none has come, and never once this has stopped, since a newer one may have reached whatever followed on.
 export const followChats = (ids: ReadonlySet<string>, feed: ChatFeed, apply: (id: string, change: ThreadChange) => void): (() => void) => {
     const updated = new Set<string>()
+    let stopped = false
     const unsubscribeThread = feed.onChatUpdated((thread) => {
         if (!ids.has(thread.id)) return
         updated.add(thread.id)
@@ -25,10 +26,11 @@ export const followChats = (ids: ReadonlySet<string>, feed: ChatFeed, apply: (id
     })
     ids.forEach((id) =>
         void feed.getChat(id).then((thread) => {
-            if (!updated.has(id)) apply(id, () => thread ?? undefined)
+            if (!stopped && !updated.has(id)) apply(id, () => thread ?? undefined)
         })
     )
     return () => {
+        stopped = true
         unsubscribeThread()
         unsubscribeChunks()
     }
