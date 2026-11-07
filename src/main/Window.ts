@@ -23,9 +23,11 @@ import { Account } from "./Account";
 import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
-import { askInShape, generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
+import { askInShape, generateTitle, hasModel, modelInputs, streamReply, writeWithCheapModel } from "./agent";
+import { maxBytesFor, sizeInWords } from "./nestFiles";
+import { readFile, stat } from "fs/promises";
 import { PLAN_SCHEMA } from "./nestPlanner";
-import { join } from "path";
+import { basename, join } from "path";
 import { Suggestions } from "./Suggestions";
 import { MemoryStore } from "./MemoryStore";
 import { PATTERN_WINDOW_MS } from "./suggestionPatterns";
@@ -1305,6 +1307,43 @@ export class Window {
       if (response !== 0) return false;
     }
     return this.nests.deleteCard(cardId);
+  }
+
+  // The system's file picker, for a card that hasn't been sent or the Nest's composer. What's picked is read here and
+  // copied into the Nest, so the renderer never names a path and nothing is read from disk again later.
+  async attachFiles(target: unknown): Promise<{ problems: string[] }> {
+    if (!this.nests.changeable(target)) return { problems: ["Files can only be added before a card is sent."] };
+    const { canceled, filePaths } = await dialog.showOpenDialog(this._baseWindow, {
+      title: "Add a file",
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "PDFs, images and text", extensions: ["pdf", "png", "jpg", "jpeg", "webp", "gif", "txt", "md", "markdown", "csv"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+    if (canceled) return { problems: [] };
+    const inputs = await modelInputs();
+    const problems: string[] = [];
+    for (const path of filePaths) {
+      const name = basename(path);
+      // A file far past any limit is refused before it's read into memory, and one of a type that's refused isn't read.
+      const most = maxBytesFor(name);
+      let bytes: Uint8Array = new Uint8Array();
+      try {
+        const { size } = await stat(path);
+        if (most !== null && size > most) {
+          problems.push(`${name} is ${sizeInWords(size)}, more than the ${sizeInWords(most)} a file like it can be.`);
+          continue;
+        }
+        if (most !== null) bytes = await readFile(path);
+      } catch {
+        problems.push(`${name} couldn’t be read.`);
+        continue;
+      }
+      const result = this.nests.attachFile(target, name, bytes, inputs);
+      if (!result.ok) problems.push(result.error);
+    }
+    return { problems };
   }
 
   // In the app already, or somewhere a notification would interrupt: fullscreen, or anything playing sound.

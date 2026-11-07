@@ -21,6 +21,7 @@ import { cn } from '@common/lib/utils'
 import { useAssistantName } from '../components/Berry'
 import { SHIMMER_TEXT, UserMessage } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
+import { Attachments, useAttaching } from '../components/NestAttachments'
 import type { PickedRows } from '@shared/nestTable'
 import { CardView, draftText, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
 import { besideSpot, CARD_HEIGHT, CARD_WIDTH, pickRows, workingLine, type Rect } from '../nestBoard'
@@ -176,9 +177,12 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [api, board.id, reveal]
     )
 
-    // Empty drafts go when the user starts something else, so the board never fills with them. A plan's cards stay.
+    // Empty drafts go when the user starts something else, so the board never fills with them. A plan's cards stay, and
+    // so does a draft with a file or note on it.
     const dropEmptyDrafts = useCallback(() => {
-        board.cards.filter((card) => !card.chatId && !card.each && !card.plan && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
+        board.cards
+            .filter((card) => !card.chatId && !card.each && !card.plan && !draftText(card.id).trim() && card.attachments.length === 0)
+            .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
     const actions = useMemo<NestBoardActions>(
@@ -255,6 +259,8 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const open = board.talk.find((request) => request.open)
     const planning = board.planning ?? null
     const [problem, setProblem] = useState<string | null>(null)
+    // What's attached here goes with the request: to its one card, or to the cards Berry's plan gives it to.
+    const attaching = useAttaching(planning ? null : { nestId: board.id })
     const sendNew = async () => {
         const text = prompt.trim()
         const box = wrapper.current?.getBoundingClientRect()
@@ -323,7 +329,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                                 void sendNew()
                             }
                         }}
-                        noAdd
+                        addItems={attaching.items}
+                        addLabel="Add a file or note"
+                        menuUp
+                        attachment={<Attachments attachments={board.attached} target={planning ? null : { nestId: board.id }} attaching={attaching} className="px-1 pb-1" />}
                         canSend={prompt.trim() !== '' && !planning}
                         onSend={() => void sendNew()}
                         mascot={chosen}

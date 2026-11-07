@@ -2,7 +2,8 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState } from "../shared/library";
+import type { SentAttachment } from "./nestFiles";
 import type { PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
 
@@ -65,7 +66,46 @@ const MIGRATIONS = [
    CREATE INDEX talk_by_request ON talk(request_id);`,
   // What the user typed in the request a card was planned from. Berry wrote its prompt, so only these words are the user's.
   `ALTER TABLE cards ADD COLUMN said TEXT;`,
+  // Files and notes on a card, or on the Nest's composer when there's no card. A file's bytes are copied in when it's
+  // attached, so changing or moving it on disk changes nothing here.
+  `CREATE TABLE attachments (
+     id TEXT PRIMARY KEY,
+     nest_id TEXT NOT NULL REFERENCES nests(id) ON DELETE CASCADE,
+     card_id TEXT REFERENCES cards(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('file', 'note')),
+     name TEXT NOT NULL,
+     type TEXT NOT NULL,
+     size INTEGER NOT NULL,
+     pages INTEGER,
+     data BLOB,
+     note TEXT
+   );
+   CREATE INDEX attachments_by_card ON attachments(card_id);
+   CREATE INDEX attachments_by_nest ON attachments(nest_id);`,
 ];
+
+export interface AttachmentRow {
+  id: string;
+  kind: "file" | "note";
+  name: string;
+  type: string;
+  size: number;
+  pages: number | null;
+  note: string | null;
+}
+
+const ATTACHMENT_COLUMNS = "id, kind, name, type, size, pages, note";
+
+const toAttachment = ({ id, kind, name, type, size, note }: AttachmentRow): NestAttachment =>
+  kind === "note" ? { id, kind, name, type, size, text: note ?? "" } : { id, kind, name, type, size };
+
+// One file or note being added.
+export type NewAttachment =
+  | { kind: "file"; name: string; type: string; size: number; pages: number | null; data: Uint8Array }
+  | { kind: "note"; text: string };
+
+// Where a file or note goes: a card, or the Nest's composer.
+export type AttachTo = { cardId: string } | { nestId: string };
 
 interface CardRow {
   id: string;
@@ -110,6 +150,8 @@ export interface NewPlannedCard {
   table: string | null;
   x: number;
   y: number;
+  // The composer's files and notes this card gets, by id.
+  attached: string[];
 }
 
 export interface StoredNest {
@@ -146,7 +188,7 @@ export class NestStore {
     const lines = (
       this.db.prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", picked FROM lines WHERE nest_id = ? ORDER BY rowid").all(id) as unknown as (Omit<NestLine, "picked"> & { picked: string | null })[]
     ).map((line) => ({ ...line, picked: line.picked ? (JSON.parse(line.picked) as PickedRows) : null }));
-    return { ...nest, cards, lines, talk: this.talk(id) };
+    return { ...nest, cards, lines, talk: this.talk(id), attached: this.attachmentsOf({ nestId: id }) };
   }
 
   createNest(title: string): string {
@@ -180,7 +222,7 @@ export class NestStore {
           };
     const planned: NestPlanned | null =
       plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
-    return { id, chatId, mascotId, x, y, each, plan: planned };
+    return { id, chatId, mascotId, x, y, each, plan: planned, attachments: this.attachmentsOf({ cardId: id }) };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -357,11 +399,19 @@ export class NestStore {
     this.db.exec("BEGIN");
     try {
       if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
-      this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId);
+      // The old plan goes last, so what was added on its cards can be copied onto the new ones first.
+      const replaced = (this.db.prepare("SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned'").all(nestId) as { id: string }[]).map((row) => row.id);
       const insert = this.db.prepare(
         "INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, plan, plan_prompt, plan_each, plan_waits, plan_table, said) VALUES (?, ?, NULL, ?, ?, ?, 'planned', ?, ?, ?, ?, ?)"
       );
       for (const card of cards) insert.run(ids.get(card.key)!, nestId, card.mascotId, card.x, card.y, card.prompt, card.each ? 1 : 0, card.waits ? 1 : 0, card.table, said);
+      for (const card of cards) {
+        for (const attachmentId of card.attached) {
+          if (!this.copyAttachment(attachmentId, nestId, ids.get(card.key)!)) throw new NotHere();
+        }
+      }
+      const remove = this.db.prepare("DELETE FROM cards WHERE id = ?");
+      for (const id of replaced) remove.run(id);
       const line = this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card) VALUES (?, ?, ?, ?)");
       for (const card of cards) {
         if (!card.from) continue;
@@ -456,6 +506,100 @@ export class NestStore {
   // Once the plan runs or goes, the request folds away, and the next message starts another.
   closeRequest(nestId: string): void {
     this.db.prepare("UPDATE requests SET open = 0 WHERE nest_id = ? AND open = 1").run(nestId);
+  }
+
+  // A card's files and notes, or the composer's, oldest first, without a file's contents.
+  attachmentsOf(to: AttachTo): NestAttachment[] {
+    return this.attachmentRows(to).map(toAttachment);
+  }
+
+  // The same with their sizes and pages, for the limits.
+  attachmentRows(to: AttachTo): AttachmentRow[] {
+    return (
+      "cardId" in to
+        ? this.db.prepare(`SELECT ${ATTACHMENT_COLUMNS} FROM attachments WHERE card_id = ? ORDER BY rowid`).all(to.cardId)
+        : this.db.prepare(`SELECT ${ATTACHMENT_COLUMNS} FROM attachments WHERE nest_id = ? AND card_id IS NULL ORDER BY rowid`).all(to.nestId)
+    ) as unknown as AttachmentRow[];
+  }
+
+  // A card's files and notes as they go to its bird, with each file's bytes as they were copied in.
+  sentAttachments(cardId: string): SentAttachment[] {
+    const rows = this.db.prepare("SELECT kind, name, type, data, note FROM attachments WHERE card_id = ? ORDER BY rowid").all(cardId) as {
+      kind: "file" | "note";
+      name: string;
+      type: string;
+      data: Uint8Array | null;
+      note: string | null;
+    }[];
+    return rows.map((row) => (row.kind === "note" ? { kind: "note", text: row.note ?? "" } : { kind: "file", name: row.name, type: row.type, data: row.data ?? new Uint8Array() }));
+  }
+
+  // Where a file or note is: its Nest, and its card or null for the composer.
+  attachment(id: string): { nestId: string; cardId: string | null; kind: "file" | "note" } | null {
+    return (this.db.prepare("SELECT nest_id AS nestId, card_id AS cardId, kind FROM attachments WHERE id = ?").get(id) as { nestId: string; cardId: string | null; kind: "file" | "note" } | undefined) ?? null;
+  }
+
+  // Null if the card or Nest isn't there.
+  addAttachment(to: AttachTo, attachment: NewAttachment): string | null {
+    const nestId = "cardId" in to ? this.card(to.cardId)?.nestId : this.db.prepare("SELECT id FROM nests WHERE id = ?").get(to.nestId) ? to.nestId : undefined;
+    if (!nestId) return null;
+    const id = randomUUID();
+    const cardId = "cardId" in to ? to.cardId : null;
+    if (attachment.kind === "note") {
+      this.db
+        .prepare("INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note) VALUES (?, ?, ?, 'note', '', 'text/plain', ?, NULL, NULL, ?)")
+        .run(id, nestId, cardId, Buffer.byteLength(attachment.text), attachment.text);
+    } else {
+      this.db
+        .prepare("INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note) VALUES (?, ?, ?, 'file', ?, ?, ?, ?, ?, NULL)")
+        .run(id, nestId, cardId, attachment.name, attachment.type, attachment.size, attachment.pages, attachment.data);
+    }
+    return id;
+  }
+
+  editNote(id: string, text: string): boolean {
+    return this.db.prepare("UPDATE attachments SET note = ?, size = ? WHERE id = ? AND kind = 'note'").run(text, Buffer.byteLength(text), id).changes > 0;
+  }
+
+  removeAttachment(id: string): boolean {
+    return this.db.prepare("DELETE FROM attachments WHERE id = ?").run(id).changes > 0;
+  }
+
+  // What was added straight onto the Nest's planned cards, which a new plan would otherwise take away with them: each once,
+  // and none that's the same as one on the composer.
+  plannedExtras(nestId: string): AttachmentRow[] {
+    const SAME = "b.kind = a.kind AND b.name = a.name AND b.type = a.type AND b.size = a.size AND b.data IS a.data AND b.note IS a.note";
+    return this.db
+      .prepare(
+        `SELECT ${ATTACHMENT_COLUMNS.split(", ").map((column) => `a.${column}`).join(", ")} FROM attachments a JOIN cards c ON c.id = a.card_id
+         WHERE c.nest_id = ? AND c.plan = 'planned'
+           AND NOT EXISTS (SELECT 1 FROM attachments b WHERE b.nest_id = a.nest_id AND b.card_id IS NULL AND ${SAME})
+           AND NOT EXISTS (SELECT 1 FROM attachments b JOIN cards d ON d.id = b.card_id WHERE d.nest_id = a.nest_id AND d.plan = 'planned' AND b.rowid < a.rowid AND ${SAME})
+         ORDER BY a.rowid`
+      )
+      .all(nestId) as unknown as AttachmentRow[];
+  }
+
+  // A copy of one of the composer's, or of one on a planned card, onto a card of the same Nest.
+  private copyAttachment(id: string, nestId: string, cardId: string): boolean {
+    return (
+      this.db
+        .prepare(
+          `INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note)
+           SELECT ?, nest_id, ?, kind, name, type, size, pages, data, note FROM attachments WHERE id = ? AND nest_id = ?`
+        )
+        .run(randomUUID(), cardId, id, nestId).changes > 0
+    );
+  }
+
+  // The composer's files and notes all go onto one card.
+  moveComposerTo(nestId: string, cardId: string): void {
+    this.db.prepare("UPDATE attachments SET card_id = ? WHERE nest_id = ? AND card_id IS NULL").run(cardId, nestId);
+  }
+
+  // The request they were for is over.
+  clearComposer(nestId: string): void {
+    this.db.prepare("DELETE FROM attachments WHERE nest_id = ? AND card_id IS NULL").run(nestId);
   }
 
   // Something happened in it, so it moves up the list.

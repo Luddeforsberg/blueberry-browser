@@ -150,8 +150,9 @@ export const startFakeModel = async () => {
       suggest = next;
     },
     // What the planner answers next, as the model would in the plan's shape. Call again for the one after.
-    planWith(next: object) {
-      plans.push(next);
+    // A card that names no files gets none, as the real model says with an empty list.
+    planWith(next: { cards?: object[]; [key: string]: unknown }) {
+      plans.push({ ...next, ...(next.cards ? { cards: next.cards.map((card) => ({ attached: [], ...card })) } : {}) });
     },
     // What the cheap model proposes for a bird to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {

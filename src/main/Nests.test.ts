@@ -613,3 +613,169 @@ describe("Berry planning in a Nest", () => {
     expect(nests.board(nest)!.talk[0].open).toBe(false);
   });
 });
+
+describe("Files and notes on a card", () => {
+  const READS_ALL = { model: "gpt-test", pdf: true, image: true };
+  const PDF = Buffer.from("%PDF-1.4\n1 0 obj << /Type /Page >> endobj\n%%EOF\n", "latin1");
+  // The newest message's blocks, as the model got them.
+  const blocksOf = (messages: ReplyMessage[]) => messages.at(-1)!.content as Exclude<ReplyMessage["content"], string>;
+  const textOf = (messages: ReplyMessage[]) =>
+    blocksOf(messages)
+      .map((block) => (block.type === "text" ? block.text : `[${block.type}]`))
+      .join("\n");
+
+  it("sends a card's files and notes with every message, before what was typed, and never saves them in its chat", async () => {
+    const { nests, chats, sendAndWait } = setup();
+    const nest = nests.create();
+    const card = nests.addCard(nest, { x: 0, y: 0 })!;
+    expect(nests.attachFile({ cardId: card.id }, "one-pager.pdf", PDF, READS_ALL)).toEqual({ ok: true });
+    expect(nests.addNote({ cardId: card.id }, "  Keep it short  ")).toEqual({ ok: true });
+    expect(nests.card(card.id)!.attachments).toMatchObject([
+      { kind: "file", name: "one-pager.pdf", type: "application/pdf", size: PDF.length },
+      { kind: "note", text: "Keep it short" },
+    ]);
+    // The renderer never gets a file's contents.
+    expect(JSON.stringify(nests.board(nest))).not.toContain(PDF.toString("base64"));
+
+    await sendAndWait(card.id, "Draft an email from this");
+    const blocks = blocksOf(sent[0]);
+    expect(blocks.map((block) => block.type)).toEqual(["text", "file", "text", "text"]);
+    expect(blocks[1]).toMatchObject({ source_type: "base64", mime_type: "application/pdf", data: PDF.toString("base64"), metadata: { filename: "one-pager.pdf" } });
+    expect(textOf(sent[0])).toContain('The user attached the PDF "one-pager.pdf" to this card.');
+    expect(textOf(sent[0])).toContain("<user_note>\nKeep it short\n</user_note>");
+    expect(textOf(sent[0]).endsWith("Draft an email from this")).toBe(true);
+
+    // A reply on the card sends them again. The chat keeps only the words.
+    await sendAndWait(card.id, "Shorter");
+    expect(blocksOf(sent[1])[1]).toMatchObject({ type: "file" });
+    expect(chats.thread(nests.card(card.id)!.chatId!)!.messages.filter((message) => message.role === "user").map((message) => message.content)).toEqual([
+      "Draft an email from this",
+      "Shorter",
+    ]);
+  });
+
+  it("counts a site named in a note as the user's, and never one named in a file", async () => {
+    const { nests, sendAndWait } = setup();
+    const asks = (url: string) => tools.find((tool) => tool.name === "open_tab")!.isRisky!({ url });
+    const nest = nests.create();
+
+    const withFile = nests.addCard(nest, { x: 0, y: 0 })!;
+    nests.attachFile({ cardId: withFile.id }, "leads.txt", Buffer.from("Our leads are all on ratsit.se"), READS_ALL);
+    await sendAndWait(withFile.id, "Find the leads");
+    expect(textOf(sent[0])).toContain("Our leads are all on ratsit.se");
+    expect(await asks("https://ratsit.se/")).toBe(true);
+
+    const withNote = nests.addCard(nest, { x: 500, y: 0 })!;
+    nests.addNote({ cardId: withNote.id }, "Our leads are all on ratsit.se");
+    await sendAndWait(withNote.id, "Find the leads");
+    expect(await asks("https://ratsit.se/")).toBe(false);
+  });
+
+  it("only changes them before the card is sent, and keeps to five on a card", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const card = nests.addCard(nest, { x: 0, y: 0 })!;
+    for (let count = 1; count <= 5; count++) expect(nests.addNote({ cardId: card.id }, `Note ${count}`)).toEqual({ ok: true });
+    expect(nests.addNote({ cardId: card.id }, "Note 6")).toEqual({ ok: false, error: "A card can have 5 files and notes at most." });
+    expect(nests.attachFile({ cardId: card.id }, "one-pager.pdf", PDF, READS_ALL)).toEqual({ ok: false, error: "A card can have 5 files and notes at most." });
+    expect(nests.attachFile({ cardId: card.id }, "brief.docx", Buffer.from("PK"), READS_ALL)).toEqual({
+      ok: false,
+      error: "brief.docx is a Word file, which can’t be added yet. Save it as a PDF and add that.",
+    });
+    expect(nests.addNote({ cardId: card.id }, "   ")).toEqual({ ok: false, error: "Write the note first." });
+
+    const [first, second] = nests.card(card.id)!.attachments;
+    expect(nests.editNote(first.id, "Changed")).toBe(true);
+    expect(nests.removeAttachment(second.id)).toBe(true);
+    expect(nests.card(card.id)!.attachments.map((each) => each.text)).toEqual(["Changed", "Note 3", "Note 4", "Note 5"]);
+
+    await sendAndWait(card.id, "Go");
+    expect(nests.addNote({ cardId: card.id }, "Late")).toEqual({ ok: false, error: "Notes can only be added before a card is sent." });
+    expect(nests.attachFile({ cardId: card.id }, "one-pager.pdf", PDF, READS_ALL)).toMatchObject({ ok: false });
+    expect(nests.editNote(first.id, "Again")).toBe(false);
+    expect(nests.removeAttachment(first.id)).toBe(false);
+    expect(nests.card(card.id)!.attachments).toHaveLength(4);
+  });
+
+  it("doesn't pass files along a line, and gives every run of For each row the card's own", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    nests.attachFile({ cardId: scout.id }, "scouts-only.pdf", PDF, READS_ALL);
+    replies.push(TABLE(2));
+    await sendAndWait(scout.id, "Find companies");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    nests.addNote({ cardId: writer.id }, "Sign as Åsa");
+    expect(nests.sendEach(writer.id, "Write to the company")).toEqual({ ok: true });
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(sent).toHaveLength(3);
+    for (const run of sent.slice(1)) {
+      expect(textOf(run)).toContain("<user_note>\nSign as Åsa\n</user_note>");
+      expect(textOf(run)).not.toContain("scouts-only.pdf");
+      expect(blocksOf(run).some((block) => block.type === "file")).toBe(false);
+    }
+  });
+
+  it("shows the planner only each file's name, type and size, and gives each planned card only the files the plan named", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    expect(nests.attachFile({ nestId: nest }, "one-pager.pdf", PDF, READS_ALL)).toEqual({ ok: true });
+    expect(nests.addNote({ nestId: nest }, "Only B2B")).toEqual({ ok: true });
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a2"] }, { ...TWO_JOBS.cards[1], attached: ["a1", "a2"] }] });
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+
+    const asked = planned[0].messages[0].content;
+    expect(asked).toContain(`<file key="a1" name="one-pager.pdf" type="PDF" size="${PDF.length} B"/>`);
+    expect(asked).toContain('<note key="a2">Only B2B</note>');
+    expect(asked).not.toContain("/Type /Page");
+    const [scout, writer] = nests.board(nest)!.cards;
+    expect(scout.attachments.map((each) => each.kind)).toEqual(["note"]);
+    expect(writer.attachments.map((each) => each.kind)).toEqual(["file", "note"]);
+    // They stay on the composer while the request is open, and go once the plan runs, each card keeping its own copy.
+    expect(nests.board(nest)!.attached).toHaveLength(2);
+    nests.runPlan(nest);
+    expect(nests.board(nest)!.attached).toEqual([]);
+    expect(nests.card(writer.id)!.attachments).toHaveLength(2);
+  });
+
+  it("keeps a file added straight onto a planned card when a message changes the plan", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const writer = nests.board(nest)!.cards[1];
+    expect(nests.attachFile({ cardId: writer.id }, "one-pager.pdf", PDF, READS_ALL)).toEqual({ ok: true });
+
+    plans.push({ ...TWO_JOBS, cards: [TWO_JOBS.cards[0], { ...TWO_JOBS.cards[1], prompt: "Write a shorter email to each", attached: ["a1"] }] });
+    const changing = nests.ask(nest, "Make the emails shorter", PLACE);
+    // While Berry changes the plan, its cards wait, since the new plan replaces them.
+    expect(nests.addNote({ cardId: writer.id }, "Too late")).toEqual({ ok: false, error: "Berry is still changing the plan. Try again in a moment." });
+    await changing;
+    expect(planned[1].messages[0].content).toContain('<file key="a1" name="one-pager.pdf" type="PDF"');
+    const cards = nests.board(nest)!.cards;
+    expect(cards.map((card) => card.plan?.prompt)).toEqual(["Find companies", "Write a shorter email to each"]);
+    expect(cards[1].attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
+  });
+
+  it("refuses a plan that gives a card a file the user didn't attach", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    nests.addNote({ nestId: nest }, "Only B2B");
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a1", "a2"] }, TWO_JOBS.cards[1]] });
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    expect(nests.board(nest)!.cards).toEqual([]);
+    expect(nests.board(nest)!.talk[0].messages.at(-1)!.text).toBe("I couldn’t lay that out as cards, because it gave a card a file you didn’t attach. Try asking another way.");
+  });
+
+  it("gives one job everything on the composer", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    nests.attachFile({ nestId: nest }, "one-pager.pdf", PDF, READS_ALL);
+    plans.push({ reply: "On it.", ask: false, cards: [planCard("c1")] });
+    await nests.ask(nest, "Draft an email from this", PLACE);
+    await settle();
+    expect(nests.board(nest)!.cards[0].attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
+    expect(nests.board(nest)!.attached).toEqual([]);
+    expect(blocksOf(sent[0])[1]).toMatchObject({ type: "file" });
+  });
+});

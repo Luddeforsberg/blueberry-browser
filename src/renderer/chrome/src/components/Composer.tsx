@@ -34,34 +34,17 @@ export const Composer: React.FC<{
     onChooseMascot?: (id: string) => void
     // Whether this job is done in the cloud, where that's set up. It's an item in the + menu, and a mark on Send while on.
     cloud?: { on: boolean; onToggle: () => void }
+    // What the + menu adds, such as a file or a note on a Nest's card.
+    addItems?: AddItem[]
+    // The + menu opens upward, for a composer at the bottom of its page.
+    menuUp?: boolean
     // Options for how it's sent, on a line of their own under the text, with the buttons at its end.
     footer?: React.ReactNode
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer, addItems, menuUp }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
-    const [menuOpen, setMenuOpen] = useState(false)
-    const menuRef = useRef<HTMLDivElement>(null)
-    const addRef = useRef<HTMLButtonElement>(null)
-    // The + menu only holds the cloud option, so it's there only where the + has nothing else to do.
-    const menu = !onAdd && cloud ? cloud : null
-
-    useEffect(() => {
-        if (!menuOpen) return
-        const close = (event: Event) => {
-            if (event instanceof KeyboardEvent) {
-                if (event.key !== 'Escape') return
-                setMenuOpen(false)
-                // The item that had focus goes with the menu, so it comes back to the button that opened it.
-                addRef.current?.focus()
-            } else if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
-        }
-        window.addEventListener('pointerdown', close)
-        window.addEventListener('keydown', close)
-        return () => {
-            window.removeEventListener('pointerdown', close)
-            window.removeEventListener('keydown', close)
-        }
-    }, [menuOpen])
+    // The + menu holds what can be added and the cloud option, so it's there only where the + has nothing else to do.
+    const hasMenu = !onAdd && (!!cloud || (addItems?.length ?? 0) > 0)
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current
@@ -80,7 +63,8 @@ export const Composer: React.FC<{
     return (
         <div
             onClick={(event) => {
-                if (!(event.target as Element).closest('button')) textareaRef.current?.focus()
+                // A field of its own, such as a note being written above the text, keeps the keyboard.
+                if (!(event.target as Element).closest('button, textarea, input')) textareaRef.current?.focus()
             }}
             className={cn(
                 "relative w-full cursor-text",
@@ -100,7 +84,7 @@ export const Composer: React.FC<{
                     />
                 </div>
             )}
-            {attachment && <div className="mb-1 cursor-default">{attachment}</div>}
+            {attachment && <div className="mb-1 cursor-default empty:hidden">{attachment}</div>}
             <div className={footer ? "flex flex-col" : "flex items-end gap-1"}>
                 <textarea
                     ref={textareaRef}
@@ -118,45 +102,25 @@ export const Composer: React.FC<{
                     {mascot && (
                         <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
                     )}
-                    {!noAdd && (onAdd || menu) && (
-                        <div ref={menuRef} className="relative">
-                            <button
-                                ref={addRef}
-                                type="button"
-                                aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
-                                title={menu ? undefined : addLabel}
-                                aria-haspopup={menu ? 'menu' : undefined}
-                                aria-expanded={menu ? menuOpen : undefined}
-                                onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
-                                className={cn(
-                                    "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
-                                    "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                                    menuOpen && "bg-muted"
-                                )}
-                            >
-                                <Plus className="size-5" />
-                            </button>
-                            {menu && menuOpen && (
-                                <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default">
-                                    <button
-                                        type="button"
-                                        role="menuitemcheckbox"
-                                        aria-checked={menu.on}
-                                        autoFocus
-                                        onClick={() => {
-                                            menu.onToggle()
-                                            setMenuOpen(false)
-                                            textareaRef.current?.focus()
-                                        }}
-                                        className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
-                                    >
-                                        <Cloud className="size-4 shrink-0 text-muted-foreground" />
-                                        <span className="flex-1">Do this in the cloud</span>
-                                        {menu.on && <Check className="size-4 shrink-0 text-accent-ink" />}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                    {!noAdd && hasMenu && (
+                        <AddMenu
+                            items={addItems ?? []}
+                            cloud={cloud}
+                            label={addItems?.length ? (addLabel ?? 'Add') : 'More options'}
+                            onDone={() => textareaRef.current?.focus()}
+                            up={menuUp}
+                        />
+                    )}
+                    {!noAdd && onAdd && (
+                        <button
+                            type="button"
+                            aria-label={addLabel ?? 'Add to chat'}
+                            title={addLabel}
+                            onClick={onAdd}
+                            className="size-9 rounded-full flex items-center justify-center outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <Plus className="size-5" />
+                        </button>
                     )}
                     <button
                         type="button"
@@ -181,6 +145,96 @@ export const Composer: React.FC<{
                     </button>
                 </FooterRow>
             </div>
+        </div>
+    )
+}
+
+export interface AddItem {
+    label: string
+    icon: React.ReactNode
+    onSelect: () => void
+}
+
+// The + and its menu: things to add, then the cloud option where there is one. `onDone` is told once an item is chosen.
+export const AddMenu: React.FC<{ items: AddItem[]; cloud?: { on: boolean; onToggle: () => void }; label: string; onDone?: () => void; small?: boolean; up?: boolean }> = ({
+    items,
+    cloud,
+    label,
+    onDone,
+    small,
+    up
+}) => {
+    const [open, setOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
+    const addRef = useRef<HTMLButtonElement>(null)
+
+    useEffect(() => {
+        if (!open) return
+        const close = (event: Event) => {
+            if (event instanceof KeyboardEvent) {
+                if (event.key !== 'Escape') return
+                setOpen(false)
+                // The item that had focus goes with the menu, so it comes back to the button that opened it.
+                addRef.current?.focus()
+            } else if (!menuRef.current?.contains(event.target as Node)) setOpen(false)
+        }
+        window.addEventListener('pointerdown', close)
+        window.addEventListener('keydown', close)
+        return () => {
+            window.removeEventListener('pointerdown', close)
+            window.removeEventListener('keydown', close)
+        }
+    }, [open])
+
+    const choose = (action: () => void) => {
+        setOpen(false)
+        action()
+        onDone?.()
+    }
+    const ITEM = "w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+
+    return (
+        <div ref={menuRef} className="relative">
+            <button
+                ref={addRef}
+                type="button"
+                aria-label={label}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+                className={cn(
+                    small ? "size-8" : "size-9",
+                    "rounded-full flex items-center justify-center outline-none transition-colors",
+                    "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                    open && "bg-muted"
+                )}
+            >
+                <Plus className={small ? "size-4" : "size-5"} />
+            </button>
+            {open && (
+                <div role="menu" aria-label={label} className={cn("absolute right-0 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default", up ? "bottom-full mb-2" : "top-full mt-2")}>
+                    {items.map((item, index) => (
+                        <button key={item.label} type="button" role="menuitem" autoFocus={index === 0} onClick={() => choose(item.onSelect)} className={ITEM}>
+                            <span className="size-4 shrink-0 text-muted-foreground [&>svg]:size-4">{item.icon}</span>
+                            <span className="flex-1">{item.label}</span>
+                        </button>
+                    ))}
+                    {cloud && (
+                        <button
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={cloud.on}
+                            autoFocus={items.length === 0}
+                            onClick={() => choose(cloud.onToggle)}
+                            className={ITEM}
+                        >
+                            <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="flex-1">Do this in the cloud</span>
+                            {cloud.on && <Check className="size-4 shrink-0 text-accent-ink" />}
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     )
 }

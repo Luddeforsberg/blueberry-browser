@@ -10,9 +10,15 @@ import type { ChatThreadMessage } from "../shared/library";
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
 
+// A file goes as LangChain's base64 data block, which the OpenAI converters send as `input_file` or `file` and the
+// Anthropic one as a document block. Images go as a data address, as a page's screenshot does.
 export type ReplyContent =
   | string
-  | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+      | { type: "file"; source_type: "base64"; mime_type: string; data: string; metadata: { filename: string } }
+    >;
 
 export interface ReplyMessage {
   role: "user" | "assistant";
@@ -189,6 +195,18 @@ const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseC
   // Newer models only take tools through the Responses API. A custom address, such as the tests' fake model,
   // may only speak the older one.
   return new ChatOpenAI({ apiKey, model, maxRetries: MAX_RETRIES, useResponsesApi: !process.env.OPENAI_BASE_URL });
+};
+
+// Whether the model in .env reads PDFs and images, from LangChain's profile of it. Null where the profile doesn't say, or
+// there's no model yet.
+export const modelInputs = async (): Promise<{ model: string; pdf: boolean | null; image: boolean | null }> => {
+  try {
+    const { model } = modelConfig();
+    const { profile } = await createModel();
+    return { model, pdf: profile.pdfInputs ?? null, image: profile.imageInputs ?? null };
+  } catch {
+    return { model: "the model", pdf: null, image: null };
+  }
 };
 
 export const systemPrompt = (withTools: boolean, userPresent: boolean): string =>

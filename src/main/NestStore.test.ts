@@ -13,17 +13,36 @@ describe("NestStore", () => {
     store.setChat(scout.id, "chat-1");
     const writer = store.addCard(nest, { x: 400, y: 20, from: scout.id })!;
     store.moveCard(writer.id, 420.5, 32);
+    const bytes = new Uint8Array([37, 80, 68, 70, 0, 255]);
+    store.addAttachment({ cardId: writer.id }, { kind: "file", name: "one-pager.pdf", type: "application/pdf", size: bytes.length, pages: 1, data: bytes });
+    store.addAttachment({ nestId: nest }, { kind: "note", text: "Only B2B" });
 
-    expect(new NestStore(file).board(nest)).toEqual({
+    const again = new NestStore(file);
+    expect(again.board(nest)).toEqual({
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null, plan: null },
-        { id: writer.id, chatId: null, mascotId: null, x: 420.5, y: 32, each: null, plan: null },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null, plan: null, attachments: [] },
+        {
+          id: writer.id,
+          chatId: null,
+          mascotId: null,
+          x: 420.5,
+          y: 32,
+          each: null,
+          plan: null,
+          attachments: [{ id: expect.any(String), kind: "file", name: "one-pager.pdf", type: "application/pdf", size: 6 }],
+        },
       ],
       lines: [{ id: expect.any(String), from: scout.id, to: writer.id, picked: null }],
       talk: [],
+      attached: [{ id: expect.any(String), kind: "note", name: "", type: "text/plain", size: 8, text: "Only B2B" }],
     });
+    // The bytes as they were copied in, whatever happens to the file on disk.
+    expect(again.sentAttachments(writer.id)).toEqual([{ kind: "file", name: "one-pager.pdf", type: "application/pdf", data: bytes }]);
+    // A card's go with it.
+    again.deleteCard(writer.id);
+    expect(again.sentAttachments(writer.id)).toEqual([]);
   });
 
   it("only draws a line from a card in the same nest", () => {
