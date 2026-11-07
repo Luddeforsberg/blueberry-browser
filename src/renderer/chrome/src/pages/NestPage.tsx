@@ -578,11 +578,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             },
             selection,
             clearSelection: () => setSelection(null),
-            pick: (cardId, text, table, index, mode) => {
-                const same = selection?.cardId === cardId && selection.text === text
-                const next = pickRows(same ? selection.rows : [], same ? selection.anchor : null, index, mode)
-                setSelection(next.rows.length > 0 ? { cardId, text, table, ...next } : null)
-            },
+            // Against the selection as it is when the pick lands, so presses that waited, such as for a file's whole table,
+            // each count, in order.
+            pick: (cardId, text, table, index, mode) =>
+                setSelection((current) => {
+                    const same = current?.cardId === cardId && current.text === text
+                    const next = pickRows(same ? current.rows : [], same ? current.anchor : null, index, mode)
+                    return next.rows.length > 0 ? { cardId, text, table, ...next } : null
+                }),
             waitingOn: (cardId) =>
                 board.cards.filter((card) => card.plan?.state === 'armed' && card.plan.waits && board.lines.some((line) => line.from === cardId && line.to === card.id)),
             forEachFrom: (cardId) => board.cards.filter((card) => card.each && board.lines.some((line) => line.from === cardId && line.to === card.id)),

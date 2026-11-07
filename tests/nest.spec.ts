@@ -493,7 +493,19 @@ test("a CSV file becomes a table card, For each row adds a column to it, a secon
   await chrome.getByRole("menuitem", { name: "Add a table from a file" }).click();
   const long = cards.filter({ hasText: "2 rows, 2 columns" });
   await expect(long.getByRole("button", { name: /more$/ })).toHaveCount(0);
+  // Presses made while the whole table is on its way all count, in order: a click, then Shift-click, picks both rows.
+  await app.evaluate(({ ipcMain }) => {
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: unknown[]) => unknown> })._invokeHandlers;
+    const real = handlers.get("nests:table-rows")!;
+    handlers.set("nests:table-rows", async (...args: unknown[]) => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return real(...args);
+    });
+  });
   await long.locator("tbody tr").first().click();
+  await long.locator("tbody tr").nth(1).click({ modifiers: ["Shift"] });
+  await expect(long.getByText("2 selected")).toBeVisible();
+  await long.locator("tbody tr").nth(1).click({ modifiers: ["ControlOrMeta"] });
   await expect(long.getByText("1 selected")).toBeVisible();
   await expect(long.locator("tbody tr").first().locator("td").nth(1)).toHaveAttribute("title", note);
   await long.hover();

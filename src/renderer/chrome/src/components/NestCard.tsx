@@ -848,17 +848,22 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
     // A board carries only the first rows, each cell cut. The whole table is asked of main once, when "N more" opens it,
     // or when a row is first pressed while one of the first rows was cut, so what's picked is what main has.
     const [rows, setRows] = useState<string[][] | null>(null)
-    const loadRows = async (): Promise<string[][] | null> => {
-        if (rows) return rows
-        const loaded = await window.chromeAPI.nests.tableRows(card.id)
-        if (loaded) setRows(loaded)
-        return loaded
+    // One ask for every press made while it's on its way, so they land in the order they were made.
+    const loading = useRef<Promise<string[][] | null> | null>(null)
+    const loadRows = (): Promise<string[][] | null> => {
+        if (rows) return Promise.resolve(rows)
+        loading.current ??= window.chromeAPI.nests.tableRows(card.id).then((loaded) => {
+            if (loaded) setRows(loaded)
+            else loading.current = null
+            return loaded
+        })
+        return loading.current
     }
     const table = useMemo(() => ({ header: file.header, rows: rows ?? file.rows }), [file, rows])
     const selected = useTablePick(card.id, 'file')
     const whole = rows !== null || file.rows.every((row) => row.every((cell) => cell.length < PREVIEW_CELL_LENGTH))
     const pick = async (index: number, mode: PickMode) => {
-        const loaded = whole ? null : await loadRows()
+        const loaded = whole && !loading.current ? null : await loadRows()
         board.pick(card.id, 'file', loaded ? { header: file.header, rows: loaded } : table, index, mode)
     }
     const here = useWorkingRows(card.id, table, rows === null && file.count > file.rows.length)
