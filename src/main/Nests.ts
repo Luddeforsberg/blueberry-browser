@@ -33,6 +33,9 @@ const coordinate = (value: unknown): number | null =>
 // data, when the user sends. A card sent with For each row is one chat per row, each also an ordinary chat through
 // `Chats`, started a few at a time from the one press.
 export class Nests {
+  // Set as the window closes, when stopping every chat would otherwise let waiting runs take their places.
+  private closed = false;
+
   constructor(
     private readonly store: NestStore,
     private readonly chats: NestChats,
@@ -189,7 +192,13 @@ export class Nests {
     const run = this.store.run(runId);
     const card = run && this.store.card(run.cardId);
     if (!run?.chatId || !card?.each || typeof text !== "string") return null;
-    const sent = this.chats.send(run.chatId, text, { seePage: false, userPresent: true, cardAnswer: rowAnswer(this.sourceName(card.id), card.each.header, run.row) });
+    // It's the user's own press on one thread, so it doesn't wait for a place, but it holds one, and gives it back.
+    const sent = this.chats.send(run.chatId, text, {
+      seePage: false,
+      userPresent: true,
+      cardAnswer: rowAnswer(this.sourceName(card.id), card.each.header, run.row),
+      onEnd: () => this.pump(),
+    });
     if (sent) this.store.touch(card.nestId);
     return sent;
   }
@@ -236,11 +245,17 @@ export class Nests {
   // Starts waiting runs, oldest first, while fewer than `RUNS_AT_ONCE` are going on every card together. A run waiting
   // for the user's OK still counts, since it holds its tabs and its place. Called whenever one may have ended.
   pump(): void {
+    if (this.closed) return;
     let free = RUNS_AT_ONCE - this.store.startedRunChats().filter((chatId) => this.chats.isRunning(chatId)).length;
     for (const run of this.store.waitingRuns()) {
       if (free <= 0) return;
       if (this.startRun(run)) free--;
     }
+  }
+
+  // Before the window stops every chat, so nothing waiting starts as they end. What's still waiting stays stopped.
+  close(): void {
+    this.closed = true;
   }
 
   private startRun(run: { id: string; cardId: string; row: string[] }): boolean {

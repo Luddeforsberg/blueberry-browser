@@ -173,7 +173,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
 
     // Empty drafts go when the user starts something else, so the board never fills with them.
     const dropEmptyDrafts = useCallback(() => {
-        board.cards.filter((card) => !card.chatId && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
+        board.cards.filter((card) => !card.chatId && !card.each && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
     const actions = useMemo<NestBoardActions>(

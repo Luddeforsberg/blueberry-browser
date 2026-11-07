@@ -521,6 +521,7 @@ export class Window {
       session.defaultSession.off("will-download", onDownload);
       offDownloads();
       offSaved();
+      this.nests.close();
       this.chats.stopAll();
       this.settingsStore.flush();
       // Before the tabs close below, and nothing after this, which would save a window with none.

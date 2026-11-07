@@ -153,6 +153,16 @@ test("rows picked in a card's table go to a new card, which runs once for each o
   await expect(chrome.locator(".react-flow__edge path").first()).not.toHaveAttribute("style", /dasharray/);
   await expect(draft.getByRole("button", { name: /^(Fjällbo|Sjöström Labs|Brygga)/ })).toHaveCount(3);
 
+  // A click on empty board makes a new draft, and never takes a sent For-each card for an empty one, even with Delete
+  // answered for it.
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
+  });
+  const board = await chrome.locator(".react-flow__pane").boundingBox();
+  await chrome.mouse.click(board!.x + board!.width - 60, board!.y + board!.height - 160);
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(3);
+  await expect(draft).toContainText("For each of 3 rows from Berry");
+
   // One run for each picked row, each with that row and no other.
   expect(model.requests).toHaveLength(4);
   const sent = model.requests.slice(1).map(newestUserMessage);

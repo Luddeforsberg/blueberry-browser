@@ -310,4 +310,48 @@ describe("Nests", () => {
 
     expect(store.card(card.id)?.each?.runs[0].state).toBe("stopped");
   });
+
+  it("gives a reply's place back when it ends, so a run waiting for it starts", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(3));
+    await sendAndWait(scout.id, "Find companies");
+    const one = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    nests.sendEach(one.id, "Write");
+    for (let tries = 0; tries < 10; tries++) await settle();
+
+    // A reply in a finished run holds a place, so the next card's third run waits for it.
+    held = [];
+    const [firstRun] = nests.card(one.id)!.each!.runs;
+    expect(nests.sendRun(firstRun.id, "Shorter")).not.toBeNull();
+    const two = nests.addCard(nest, { x: 1000, y: 0, from: scout.id })!;
+    nests.sendEach(two.id, "Call");
+    await settle();
+    expect(nests.card(two.id)!.each!.runs.map(({ state }) => state)).toEqual(["started", "started", "waiting"]);
+
+    held.shift()!();
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(nests.card(two.id)!.each!.runs.map(({ state }) => state)).toEqual(["started", "started", "started"]);
+    await release();
+    await release();
+  });
+
+  it("starts nothing waiting once the window is closing and every chat stops", async () => {
+    const { nests, chats, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(5));
+    await sendAndWait(scout.id, "Find companies");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    held = [];
+    nests.sendEach(writer.id, "Write");
+    await settle();
+
+    nests.close();
+    chats.stopAll();
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(nests.card(writer.id)!.each!.runs.map(({ state }) => state)).toEqual(["started", "started", "started", "waiting", "waiting"]);
+    expect(sent).toHaveLength(4);
+  });
 });
