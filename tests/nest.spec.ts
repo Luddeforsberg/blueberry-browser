@@ -167,6 +167,14 @@ test("rows picked in a card's table go to a new card, which runs once for each o
   // Sent, its line is solid.
   await expect(chrome.locator(".react-flow__edge path").first()).not.toHaveAttribute("style", /dasharray/);
   await expect(draft.getByRole("button", { name: /^(Fjällbo|Sjöström Labs|Brygga)/ })).toHaveCount(3);
+  // The bird carried the rows along the line and is home again, even in a window that draws no frames off-screen.
+  await expect(chrome.locator(".react-flow__viewport-portal > *")).toHaveCount(0);
+  // Pressing a run opens its own thread.
+  await draft.getByRole("button", { name: /^Fjällbo/ }).click();
+  await expect(draft.getByPlaceholder("Reply to Berry")).toBeVisible();
+  await draft.getByRole("button", { name: "Every run" }).click();
+  await chrome.keyboard.press("Escape");
+  await expect(draft.getByPlaceholder("Reply to Berry")).toHaveCount(0);
 
   // A click on empty board makes a new draft, and never takes a sent For-each card for an empty one, even with Delete
   // answered for it.

@@ -185,6 +185,10 @@ interface Flight {
     flipped: boolean
 }
 
+// How long a still bird's fade takes, and how long a bird that landed beside another waits and fades.
+const FADE_MS = 560
+const LEAVE_MS = 160
+
 // The bird in flight, in board coordinates so it moves with the board. It only draws: the job started before it took
 // off, and nothing waits for it to land.
 const FlightView: React.FC<{ flight: Flight; onLanded: (flight: Flight) => void; onDone: (id: number) => void }> = ({ flight, onLanded, onDone }) => {
@@ -196,37 +200,49 @@ const FlightView: React.FC<{ flight: Flight; onLanded: (flight: Flight) => void;
         if (!element) return undefined
         const turn = flight.flipped ? ' scaleX(-1)' : ''
         const land = flight.path.at(-1)!
+        const duration = flight.mode === 'fly' ? flightDuration(flight.path) : FADE_MS
         let stopped = false
+        let landed = false
         const animations: Animation[] = []
+        const home = () => {
+            if (landed || stopped) return
+            landed = true
+            ends.current.onLanded(flight)
+        }
+        const finish = () => {
+            home()
+            if (!stopped) ends.current.onDone(flight.id)
+        }
+        // A window out of sight draws no frames, so its animations stand still. The birds come home by the clock anyway,
+        // so no perch stays empty and no flight plays late.
+        const deadline = window.setTimeout(finish, duration + LEAVE_MS * 2 + 200)
         const run = async () => {
             if (flight.mode === 'fly') {
                 const flying = element.animate(
                     flight.path.map((point) => ({ transform: `translate(${point.x}px, ${point.y}px)${turn}`, offset: point.offset })),
-                    { duration: flightDuration(flight.path), easing: 'cubic-bezier(.45, 0, .25, 1)', fill: 'forwards' }
+                    { duration, easing: 'cubic-bezier(.45, 0, .25, 1)', fill: 'forwards' }
                 )
                 animations.push(flying)
                 await flying.finished
-                if (stopped) return
-                ends.current.onLanded(flight)
+                home()
                 // On its own perch it's simply home. Beside another bird it hands the berry over and goes.
-                if (!flight.sameBird) {
-                    const leaving = element.animate([{ opacity: 1 }, { opacity: 0 }], { delay: 160, duration: 160, fill: 'forwards' })
+                if (!flight.sameBird && !stopped) {
+                    const leaving = element.animate([{ opacity: 1 }, { opacity: 0 }], { delay: LEAVE_MS, duration: LEAVE_MS, fill: 'forwards' })
                     animations.push(leaving)
                     await leaving.finished
                 }
             } else {
                 element.style.transform = `translate(${land.x}px, ${land.y}px)`
-                const fading = element.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 1, offset: 0.7 }, { opacity: flight.sameBird ? 1 : 0 }], { duration: 560, fill: 'forwards' })
+                const fading = element.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 1, offset: 0.7 }, { opacity: flight.sameBird ? 1 : 0 }], { duration, fill: 'forwards' })
                 animations.push(fading)
                 await fading.finished
-                if (stopped) return
-                ends.current.onLanded(flight)
             }
-            if (!stopped) ends.current.onDone(flight.id)
+            finish()
         }
         run().catch(() => undefined)
         return () => {
             stopped = true
+            window.clearTimeout(deadline)
             animations.forEach((animation) => animation.cancel())
         }
     }, [flight])
@@ -356,16 +372,31 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         reveal([focus.cardId])
     })
 
-    // A new plan's cards come into view when Berry lays them out somewhere out of sight.
-    const seenPlanned = useRef<Set<string> | null>(null)
+    // A card that appears out of sight comes into view, such as one the composer started below the others, and a new
+    // plan's cards come into view together.
+    const seen = useRef<Set<string> | null>(null)
     useEffect(() => {
-        const planned = board.cards.filter((card) => card.plan?.state === 'planned').map((card) => card.id)
-        const before = seenPlanned.current
-        seenPlanned.current = new Set(planned)
+        const before = seen.current
+        seen.current = new Set(board.cards.map((card) => card.id))
         if (!before) return
-        const fresh = planned.filter((id) => !before.has(id))
-        if (fresh.length > 0) reveal(planned)
+        const fresh = board.cards.filter((card) => !before.has(card.id))
+        if (fresh.length === 0) return
+        reveal(fresh.some((card) => card.plan?.state === 'planned') ? board.cards.filter((card) => card.plan?.state === 'planned').map((card) => card.id) : fresh.map((card) => card.id))
     }, [board.cards, reveal])
+
+    // Esc closes the open card from anywhere on the page, unless something else already took it, such as a draft's prompt.
+    useEffect(() => {
+        if (!openId) return undefined
+        const close = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || event.defaultPrevented) return
+            const target = event.target as Element | null
+            if (target && target !== document.body && !wrapper.current?.contains(target)) return
+            open(null)
+            wrapper.current?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(openId)}"]`)?.focus()
+        }
+        window.addEventListener('keydown', close)
+        return () => window.removeEventListener('keydown', close)
+    }, [openId, open])
 
     // Esc, or a press anywhere but the rows and what pulls a line out of them, lets the selection go.
     useEffect(() => {
@@ -540,16 +571,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     )
 
     // From the keyboard, Tab goes from card to card. On a card itself, Enter opens it and ⌫ deletes it, asking first as
-    // the × does. Esc closes the open card, from anywhere on the board.
+    // the × does.
     const onKeyDown = (event: React.KeyboardEvent) => {
         const target = event.target as HTMLElement
         const node = target.closest<HTMLElement>('.react-flow__node')
-        if (event.key === 'Escape' && openId && !event.defaultPrevented) {
-            const card = wrapper.current?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(openId)}"]`)
-            open(null)
-            card?.focus()
-            return
-        }
         if (!node || target !== node) return
         const cardId = node.dataset.id
         if (!cardId) return

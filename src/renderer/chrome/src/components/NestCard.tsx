@@ -632,7 +632,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${sourceName}’s table`) : 'For each row'
     const openRunOf = (id: string) => {
         setOpenRun(id)
-        board.setOpen(card.id)
+        board.setOpen(card.id, id)
     }
 
     return (
