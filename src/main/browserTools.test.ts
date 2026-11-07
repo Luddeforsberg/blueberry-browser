@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPageTools } from "./browserTools";
+import { PRESS_RULE } from "./pageScripts";
 import type { Tab } from "./Tab";
 import type { MascotTool } from "../shared/library";
 
@@ -607,10 +608,36 @@ describe("the fetch_page tool", () => {
   });
 });
 
+// The page's own rule for what a granted press may land on, run on a few stand-in elements.
+type Node = { tagName: string; parentElement: Node | null; attrs: Record<string, string>; getRootNode: () => object; matches: (selector: string) => boolean };
+const node = (tag: string, parentElement: Node | null, attrs: Record<string, string> = {}): Node => ({
+  tagName: tag.toUpperCase(),
+  parentElement,
+  attrs,
+  getRootNode: () => ({}),
+  matches: (selector) =>
+    selector.split(",").some((part) => {
+      const attribute = part.trim().match(/^\[(\w+)(?:=(\w+))?\]$/);
+      if (!attribute) return part.trim() === tag;
+      return attribute[1] in attrs && (attribute[2] === undefined || attrs[attribute[1]] === attribute[2]);
+    }),
+});
+const onlyIt = new Function(`const parentOf = (el) => el.parentElement ?? el.getRootNode().host ?? null; ${PRESS_RULE} return onlyIt;`)() as (hit: Node, el: Node) => boolean;
+const BODY = node("body", null);
+const BUTTON = node("button", BODY);
+const AT_POINT = {
+  button: BUTTON,
+  span: node("span", BUTTON),
+  link: node("a", BUTTON, { href: "/send" }),
+  frame: node("iframe", BODY),
+  around: BODY,
+};
+
 describe("a click allowed for a card's runs", () => {
   // A page whose one element can change at any moment, with no bird drawn, and every input written down. `lands` is what
-  // the page says about the press: landed, or nothing, as when something else took it.
-  const page = (change: "start" | "mouseMove" | null, then: { name?: string }, lands = true, limited = false) => {
+  // the page says about the press: landed, or nothing, as when something else took it. `hit` is what's at the press's
+  // point, judged by the page's own rule.
+  const page = (change: "start" | "mouseMove" | null, then: { name?: string }, lands = true, limited = false, hit: keyof typeof AT_POINT = "button") => {
     let changed = change === "start";
     const inputs: string[] = [];
     const scripts: string[] = [];
@@ -619,6 +646,7 @@ describe("a click allowed for a card's runs", () => {
       if (script.includes("safeToType: safeToType(el)")) {
         return { role: "button", name: "Save draft", target: null, riskyClick: true, safeToType: false, secret: false, frameUrl: null, ...(changed ? then : {}) };
       }
+      if (script.includes("onlyIt(hitAt(")) return onlyIt(AT_POINT[hit], BUTTON);
       if (inputs.includes("mouseDown")) return lands ? true : false;
       return { status: "aimed", x: 10, y: 10 };
     });
@@ -666,6 +694,35 @@ describe("a click allowed for a card's runs", () => {
     const { click, scripts } = page(null, {}, false);
     expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/didn't reach it as a real press/);
     expect(scripts.some((script) => script.includes(".click()") || script.includes("MouseEvent"))).toBe(false);
+  });
+
+  it("isn't pressed when a link inside the button is what's under the pointer", async () => {
+    const { click, inputs } = page(null, {}, true, false, "link");
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/something other than what the user allowed/);
+    expect(inputs).not.toContain("mouseDown");
+  });
+
+  it("isn't pressed when a frame is over the spot", async () => {
+    const { click, inputs } = page(null, {}, true, false, "frame");
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/something other than what the user allowed/);
+    expect(inputs).not.toContain("mouseDown");
+  });
+
+  it("is pressed when what's under the pointer is plain text inside the button", async () => {
+    const { click, inputs } = page(null, {}, true, false, "span");
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).not.toMatch(/Nothing happened/);
+    expect(inputs).toContain("mouseDown");
+  });
+
+  it("guards the press on the page by the same rule, only when granted", async () => {
+    const granted = page(null, {});
+    await granted.click.run({ ref: "e1" }, await SAVE_KEY());
+    expect(granted.scripts.some((script) => script.includes("expectPressOn(el, { strict: true })"))).toBe(true);
+    const ungranted = page(null, {});
+    await ungranted.click.run({ ref: "e1" });
+    expect(ungranted.scripts.some((script) => script.includes("strict: true"))).toBe(false);
+    // The rule itself: the element or plain text in it, never a link in it, a frame, or what's around it.
+    expect([AT_POINT.button, AT_POINT.span, AT_POINT.link, AT_POINT.frame, AT_POINT.around].map((hit) => onlyIt(hit, BUTTON))).toEqual([true, true, false, false, false]);
   });
 
   it("acts as before when nothing was granted, even if the element changes", async () => {

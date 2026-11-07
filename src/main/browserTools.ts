@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   aimClick,
+  pressLandsOn,
   aimHover,
   aimKey,
   beginTyping,
@@ -543,6 +544,8 @@ export const createPageTools = <T extends PageTarget>({
   const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
   const GRANT_CHANGED = "Nothing happened, because what's there changed from what the user allowed for this card's runs. Look at the page again.";
+  const GRANT_ELSEWHERE =
+    "Nothing happened, because something other than what the user allowed for this card's runs was under the pointer there, such as a link inside it or a frame over it. Look at the page again.";
   const GRANT_NO_PRESS =
     "Nothing happened, because the click didn't reach it as a real press, and what's allowed for this card's runs is only that. Look at the page again.";
   const leftOff = (tab: T) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
@@ -622,18 +625,19 @@ export const createPageTools = <T extends PageTarget>({
   // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
   // something covering it gets the scripted click sent straight to the element, not the real one.
   // `granted` is only for a single click that went through Allow for this card's runs: whether the element still has the
-  // key that was allowed. It's checked as the click begins and just before the press, and the click goes only as real
-  // input, never as a scripted one.
+  // key that was allowed. It's checked as the click begins and just before the press, along with what's under the pointer,
+  // which must be the element itself, and the click goes only as real input, never as a scripted one.
   const clickRef = async (tab: T, ref: string, clicks: 1 | 2, granted?: () => Promise<boolean>) => {
     const doing = clicks === 2 ? "Double-clicking" : "Clicking";
     if (granted && !(await granted())) return GRANT_CHANGED;
     const scripted = () => (granted ? Promise.resolve(GRANT_NO_PRESS) : onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks)));
-    let changed = false;
-    const goOn = async () => {
+    let refused: string | null = null;
+    const goOn = (x: number, y: number) => async () => {
       if (!carryOn(tab)) return false;
-      if (!granted || (await granted())) return true;
-      changed = true;
-      return false;
+      if (!granted) return true;
+      if (!(await granted())) refused = GRANT_CHANGED;
+      else if ((await tab.runInPage<boolean | null>(pressLandsOn(ref, x, y)).catch(() => null)) !== true) refused = GRANT_ELSEWHERE;
+      return refused === null;
     };
     const finish = (result: string | null, note = "") => {
       if (result === GRANT_NO_PRESS) return GRANT_NO_PRESS;
@@ -649,27 +653,27 @@ export const createPageTools = <T extends PageTarget>({
     const arm = !actorOn(tab);
     const aimAgain = async () => {
       await pause(SCROLL_SETTLE_MS);
-      return tab.runInPage<Aim | null>(aimClick(ref, false, arm));
+      return tab.runInPage<Aim | null>(aimClick(ref, false, arm, !!granted));
     };
-    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm));
+    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm, !!granted));
     if (aim?.status === "scrolled") aim = await aimAgain();
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
     if (!arm) {
       if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
       // Where it is now, as the page may have moved while the bird flew, and now the watch goes on.
-      if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
+      if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false, true, !!granted));
       if (aim === null) return STALE_ELEMENT;
     }
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
       if (!carryOn(tab)) return leftOff(tab);
-      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, goOn))) return changed ? GRANT_CHANGED : leftOff(tab);
+      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, goOn(aim.x!, aim.y!)))) return refused ?? leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
       await pause(SCROLL_SETTLE_MS);
-      aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
+      aim = await tab.runInPage<Aim | null>(aimClick(ref, false, true, !!granted));
     }
     if (aim === null) return STALE_ELEMENT;
     if (!carryOn(tab)) return leftOff(tab);
