@@ -222,11 +222,12 @@ describe("files a card's bird makes", () => {
     expect(madeFileName("x".repeat(300), "md")).toBe(`${"x".repeat(80)}.md`);
   });
 
-  it("takes md, csv, txt and json, and nothing else", () => {
+  it("takes md, csv, txt, json and html, and nothing else", () => {
     for (const kind of ["md", "csv", "txt"]) expect(checkMadeFile({ name: "a", kind, content: "words" }, 0)).toMatchObject({ ok: true });
     expect(checkMadeFile({ name: "a", kind: "json", content: '{"a":1}' }, 0)).toMatchObject({ ok: true, file: { name: "a.json", type: "application/json" } });
-    for (const kind of ["html", "svg", "exe", "sh", "MD", "", null, undefined]) {
-      expect(checkMadeFile({ name: "a", kind, content: "<script>alert(1)</script>" }, 0)).toEqual({ ok: false, error: "Nothing was saved: a file can only be md, csv, txt, json." });
+    expect(checkMadeFile({ name: "chart.html", kind: "html", content: "<canvas></canvas>" }, 0)).toMatchObject({ ok: true, file: { name: "chart.html", type: "text/html" } });
+    for (const kind of ["svg", "htm", "xhtml", "exe", "sh", "MD", "HTML", "", null, undefined]) {
+      expect(checkMadeFile({ name: "a", kind, content: "<script>alert(1)</script>" }, 0)).toEqual({ ok: false, error: "Nothing was saved: a file can only be md, csv, txt, json, html." });
     }
     expect(checkMadeFile({ name: "a", kind: "json", content: "{not json" }, 0)).toEqual({ ok: false, error: "Nothing was saved: that isn't valid JSON." });
     expect(checkMadeFile({ name: "a", kind: "txt", content: "   " }, 0)).toMatchObject({ ok: false });

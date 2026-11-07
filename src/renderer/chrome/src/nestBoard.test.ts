@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, PERCH, pickRows, roomToGrow, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, livePages, PERCH, pickRows, roomToGrow, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -284,5 +284,17 @@ describe('roomToGrow', () => {
         const under = { x: 100, y: 100, width: 200, height: 200 }
         expect(roomToGrow(card, [under], { width: 900, height: 900 })).toEqual({ width: 900, height: 900 })
         expect(roomToGrow(card, [right], { width: 380, height: 260 })).toEqual({ width: 380, height: 260 })
+    })
+})
+
+describe('livePages', () => {
+    it('runs the most recently shown pages up to the cap, and the open one always', () => {
+        expect(livePages([], null)).toEqual(new Set())
+        expect(livePages(['a'], null, 1)).toEqual(new Set(['a']))
+        expect(livePages(['a', 'b', 'c'], null, 2)).toEqual(new Set(['b', 'c']))
+        expect(livePages(['a', 'b', 'c'], 'a', 2)).toEqual(new Set(['a', 'c']))
+        // An open card that isn't on screen runs nothing.
+        expect(livePages(['b', 'c'], 'a', 2)).toEqual(new Set(['b', 'c']))
+        expect(livePages(['a', 'b'], null, 0)).toEqual(new Set())
     })
 })

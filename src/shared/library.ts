@@ -537,10 +537,12 @@ export interface NestFile {
   made: boolean;
 }
 
-// What a file's card shows when it's opened, read in main: a Markdown, text or JSON file's words, a CSV file's rows, or
-// an image as a data address. A PDF shows only its pages and size.
+// What a file's card shows when it's opened, read in main: a Markdown, text or JSON file's words, a CSV file's rows, an
+// HTML card's page, or an image as a data address. A PDF shows only its pages and size.
 export interface NestFileContent {
   text?: string;
+  // An HTML card's whole page, to run only in its sandboxed frame (see `src/shared/nestHtml.ts`).
+  html?: string;
   table?: { header: string[]; rows: string[][] };
   image?: string;
 }

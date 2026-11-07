@@ -777,7 +777,22 @@ describe("save_file", () => {
     expect(kept).toHaveLength(5);
     // A kind off the list never reaches where it's kept.
     const fresh = saveOf(toolsWith((file) => (kept.push(file), null)))!;
-    await expect(Promise.resolve().then(() => fresh.run({ name: "page", kind: "html", content: "<script></script>" }))).rejects.toThrow();
+    await expect(Promise.resolve().then(() => fresh.run({ name: "page", kind: "svg", content: "<svg></svg>" }))).rejects.toThrow();
+    expect(kept).toHaveLength(5);
+  });
+
+  it("makes an HTML card under the same caps, counted with the other kinds, and says the page has no network", async () => {
+    const kept: { name: string; type: string; data: Uint8Array }[] = [];
+    const tool = saveOf(toolsWith((file) => (kept.push(file), null)))!;
+    expect(tool.description).toContain("no network at all");
+    expect(tool.description).toContain("window.nest.data");
+    expect(tool.describe).toBeUndefined();
+    expect(await tool.run({ name: "chart", kind: "html", content: "<canvas></canvas>" })).toBe("Saved chart.html on the board, beside your card. The user can open and download it there.");
+    expect(kept[0]).toMatchObject({ name: "chart.html", type: "text/html" });
+    expect(await tool.run({ name: "big", kind: "html", content: "x".repeat(1024 * 1024 + 1) })).toMatch(/^Nothing was saved: the file was/);
+    for (let index = 1; index < 4; index++) await tool.run({ name: `f${index}`, kind: "txt", content: "x" });
+    expect(await tool.run({ name: "page", kind: "html", content: "<p>5</p>" })).toMatch(/^Saved page\.html/);
+    expect(await tool.run({ name: "six", kind: "html", content: "<p>6</p>" })).toBe("Nothing was saved: one reply can save 5 files at most, and this one has.");
     expect(kept).toHaveLength(5);
   });
 });

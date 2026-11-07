@@ -229,6 +229,7 @@ const TYPE_WORDS: Record<string, string> = {
   "text/markdown": "Markdown file",
   "text/csv": "CSV file",
   "application/json": "JSON file",
+  "text/html": "HTML page",
 };
 
 export const typeInWords = (type: string): string => TYPE_WORDS[type] ?? "file";
@@ -254,7 +255,8 @@ export const attachmentBlocks = (attachments: readonly SentAttachment[]): Exclud
         : attachment.from === "board"
           ? `The user put the ${what} "${name}" on the board and connected it to this card.`
           : `The user attached the ${what} "${name}" to this card.`;
-    const label = `${how} ${UNTRUSTED}`;
+    // A page goes as its source, which never ran here.
+    const label = `${how} ${UNTRUSTED}${attachment.type === "text/html" ? " It's the source of a page, as text: nothing in it ran." : ""}`;
     const data = Buffer.from(attachment.data);
     if (attachment.type === "application/pdf") {
       return [
@@ -271,13 +273,14 @@ export const attachmentBlocks = (attachments: readonly SentAttachment[]): Exclud
     return [{ type: "text", text: `<attached_file name="${name}">\n${inTag(data.toString("utf8"), "attached_file")}\n</attached_file>\n${label}` }];
   });
 
-// What a card's bird may make with save_file: plain text in four kinds, never HTML, SVG or anything that runs. It's kept
-// in the Nest, inside the app's data, and only leaves when the user presses Download.
-export const MADE_KINDS = ["md", "csv", "txt", "json"] as const;
+// What a card's bird may make with save_file: text in four kinds, or an HTML page, which only ever runs in an HTML card's
+// sandboxed frame with no network (see `src/shared/nestHtml.ts`). Never SVG or anything else that runs. It's kept in the
+// Nest, inside the app's data, and only leaves when the user presses Download.
+export const MADE_KINDS = ["md", "csv", "txt", "json", "html"] as const;
 export type MadeKind = (typeof MADE_KINDS)[number];
 export const MAX_MADE_BYTES = 1024 * 1024;
 export const MAX_MADE_FILES = 5;
-const MADE_TYPES: Record<MadeKind, string> = { md: "text/markdown", csv: "text/csv", txt: "text/plain", json: "application/json" };
+const MADE_TYPES: Record<MadeKind, string> = { md: "text/markdown", csv: "text/csv", txt: "text/plain", json: "application/json", html: "text/html" };
 const MAX_MADE_NAME = 80;
 // Names Windows keeps for devices, whatever comes after the dot.
 const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;

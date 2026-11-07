@@ -33,7 +33,7 @@ import { basename, join } from "path";
 import { Suggestions } from "./Suggestions";
 import { MemoryStore } from "./MemoryStore";
 import { PATTERN_WINDOW_MS } from "./suggestionPatterns";
-import { createChromeView, type ChromeView } from "./chromeView";
+import { createChromeView, inHtmlCard, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
 import { attachPageMenu, printPage } from "./pageMenu";
 import { SiteZoom } from "./siteZoom";
@@ -557,7 +557,9 @@ export class Window {
     webContents.setWindowOpenHandler(({ url }) => {
       if (!/^https?:/i.test(url)) return { action: "deny" };
       const opener = this.allTabs.find((tab) => tab.existingView?.webContents === webContents);
-      // The chrome's own links open as plain tabs, so no page is ever a child of the chrome.
+      // The chrome's own links open as plain tabs, so no page is ever a child of the chrome. Never one from an HTML card,
+      // whose sandbox already refuses popups: Electron doesn't say which frame asked, so the frame with focus stands in.
+      if (!opener && inHtmlCard(webContents.focusedFrame)) return { action: "deny" };
       if (!opener) {
         this.createTab(url);
         return { action: "deny" };
