@@ -11,15 +11,19 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/base.css'
 import type { TabInfo } from '@shared/ipc'
-import type { NestBoard } from '@shared/library'
+import type { NestBoard, NestRequest } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
+import { ChevronRight } from 'lucide-react'
+import { Button } from '@common/components/Button'
+import { cn } from '@common/lib/utils'
 import { useAssistantName } from '../components/Berry'
+import { SHIMMER_TEXT, UserMessage } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
 import type { PickedRows } from '@shared/nestTable'
 import { CardView, draftText, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
-import { besideSpot, CARD_HEIGHT, CARD_WIDTH, freeSpot, pickRows, workingLine, type Rect } from '../nestBoard'
+import { besideSpot, CARD_HEIGHT, CARD_WIDTH, pickRows, workingLine, type Rect } from '../nestBoard'
 
 const NODE_TYPES = { card: CardView }
 const EDGE_TYPES = { line: LineView }
@@ -97,6 +101,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const { theme } = useShell()
     const { chosen, choose } = useFlock()
     const chosenName = useAssistantName(chosen)
+    const berryName = useAssistantName()
     const [openId, setOpenId] = useState<string | null>(null)
     const [focusId, setFocusId] = useState<string | null>(null)
     const [selection, setSelection] = useState<RowSelection | null>(null)
@@ -171,9 +176,9 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [api, board.id, reveal]
     )
 
-    // Empty drafts go when the user starts something else, so the board never fills with them.
+    // Empty drafts go when the user starts something else, so the board never fills with them. A plan's cards stay.
     const dropEmptyDrafts = useCallback(() => {
-        board.cards.filter((card) => !card.chatId && !card.each && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
+        board.cards.filter((card) => !card.chatId && !card.each && !card.plan && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
     const actions = useMemo<NestBoardActions>(
@@ -205,7 +210,9 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 const same = selection?.cardId === cardId && selection.text === text
                 const next = pickRows(same ? selection.rows : [], same ? selection.anchor : null, index, mode)
                 setSelection(next.rows.length > 0 ? { cardId, text, table, ...next } : null)
-            }
+            },
+            waitingOn: (cardId) =>
+                board.cards.filter((card) => card.plan?.state === 'armed' && card.plan.waits && board.lines.some((line) => line.from === cardId && line.to === card.id))
         }),
         [openId, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection]
     )
@@ -242,17 +249,25 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [openId, flow, add, dropEmptyDrafts]
     )
 
-    // The composer at the bottom starts a card of its own, in the first free place in sight, and sends it.
+    // The composer at the bottom goes to Berry first, which starts one card in the first free place in sight, lays out a
+    // plan from there, or asks. If it can't go, the words come back.
+    const pending = board.cards.some((card) => card.plan?.state === 'planned')
+    const open = board.talk.find((request) => request.open)
+    const planning = board.planning ?? null
+    const [problem, setProblem] = useState<string | null>(null)
     const sendNew = async () => {
         const text = prompt.trim()
         const box = wrapper.current?.getBoundingClientRect()
-        if (!text || !box) return
-        const corner = flow.screenToFlowPosition({ x: box.left + EDGE_INSET.x, y: box.top + EDGE_INSET.y })
+        if (!text || !box || planning) return
+        const at = flow.screenToFlowPosition({ x: box.left + EDGE_INSET.x, y: box.top + EDGE_INSET.y })
         setPrompt('')
-        const card = await add(freeSpot(rects(), corner), chosen.id === BERRY_ID ? {} : { mascotId: chosen.id })
-        if (!card) return setPrompt(text)
-        // If it can't go, the words wait in the card rather than being lost.
-        if (!(await api.send(card.id, text))) setDraftText(card.id, text)
+        setProblem(null)
+        dropEmptyDrafts()
+        const result = await api.ask(board.id, text, { mascotId: chosen.id === BERRY_ID ? null : chosen.id, at, taken: rects() })
+        if (!result.ok) {
+            setPrompt(text)
+            setProblem(result.error)
+        }
         setFocusId(null)
     }
 
@@ -289,15 +304,17 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 >
                     <Background variant={BackgroundVariant.Dots} gap={DOTS.gap} size={DOTS.size} className="text-muted-foreground/40" color="currentColor" />
                 </ReactFlow>
-                {board.cards.length === 0 && (
+                {board.cards.length === 0 && !planning && board.talk.length === 0 && (
                     <p className="pointer-events-none absolute inset-x-0 top-[38%] text-center text-14 text-muted-foreground">
                         Each card is one bird’s chat. Write below to start one, or click anywhere on the board.
                     </p>
                 )}
-                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-[min(640px,calc(100%-32px))]">
+                <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 w-[min(640px,calc(100%-32px))] flex flex-col gap-4 [&>*]:pointer-events-auto">
+                    <Talk talk={board.talk} planning={planning} />
+                    {problem && <p role="alert" className="px-3 text-13 text-destructive">{problem}</p>}
                     <Composer
-                        label="New card"
-                        placeholder={`Ask ${chosenName} in a new card`}
+                        label="Ask in this Nest"
+                        placeholder={pending ? 'Change the plan, or press Run' : open ? `Reply to ${berryName}` : `Ask ${chosenName}, or ask for a plan`}
                         value={prompt}
                         onChange={setPrompt}
                         onKeyDown={(event) => {
@@ -307,7 +324,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                             }
                         }}
                         noAdd
-                        canSend={prompt.trim() !== ''}
+                        canSend={prompt.trim() !== '' && !planning}
                         onSend={() => void sendNew()}
                         mascot={chosen}
                         onChooseMascot={choose}
@@ -318,7 +335,81 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     )
 }
 
-// A board where each card is one bird's chat thread. Cards run only when the user sends them.
+// What the user wrote in the composer and Berry's answers, over it. The request that's open shows whole, and the one before
+// it folds to one line that opens. While Berry reads a message, it says Thinking under it.
+const Talk: React.FC<{ talk: NestRequest[]; planning: string | null }> = ({ talk, planning }) => {
+    const berryName = useAssistantName()
+    const [unfolded, setUnfolded] = useState<string | null>(null)
+    const folded = talk.filter((request) => !request.open)
+    const open = talk.find((request) => request.open)
+    if (talk.length === 0 && !planning) return null
+    const messages = (request: NestRequest) =>
+        request.messages.map((message, index) =>
+            message.role === 'user' ? (
+                <UserMessage key={index} content={message.text} />
+            ) : (
+                <p key={index} className="max-w-[85%] text-16 whitespace-pre-wrap">{message.text}</p>
+            )
+        )
+    return (
+        <div aria-label={`Talking with ${berryName}`} className="nowheel max-h-[40vh] overflow-y-auto flex flex-col gap-3">
+            {folded.map((request) => {
+                const shown = unfolded === request.id
+                return (
+                    <div key={request.id} className="flex flex-col gap-3">
+                        <button
+                            type="button"
+                            aria-expanded={shown}
+                            onClick={() => setUnfolded(shown ? null : request.id)}
+                            className="self-start max-w-full h-7 -ml-1.5 px-1.5 rounded-control flex items-center gap-1 text-13 text-muted-foreground outline-none transition-colors hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <ChevronRight className={cn("size-4 shrink-0 transition-transform", shown && "rotate-90")} />
+                            <span className="truncate">{request.messages[0]?.text}</span>
+                        </button>
+                        {shown && messages(request)}
+                    </div>
+                )
+            })}
+            {open && messages(open)}
+            {planning && (
+                <>
+                    <UserMessage content={planning} />
+                    <p role="status" className="text-16"><span className={SHIMMER_TEXT}>Thinking</span></p>
+                </>
+            )}
+        </div>
+    )
+}
+
+// The top bar's end while a plan hasn't run: Discard plan, quiet, and Run, the one decision.
+// Run waits while Berry is changing the plan, so the plan that runs is the one on the board.
+const PlanControls: React.FC<{ nestId: string; planning: boolean }> = ({ nestId, planning }) => {
+    const [problem, setProblem] = useState<string | null>(null)
+    const [busy, setBusy] = useState(false)
+    const api = window.chromeAPI.nests
+    return (
+        <div className="ml-auto shrink-0 flex items-center gap-2">
+            {problem && <p role="alert" className="text-13 text-destructive truncate max-w-80">{problem}</p>}
+            <Button variant="ghost" size="sm" onClick={() => void api.discardPlan(nestId)}>
+                Discard plan
+            </Button>
+            <Button
+                size="sm"
+                disabled={busy || planning}
+                onClick={async () => {
+                    setBusy(true)
+                    const result = await api.runPlan(nestId)
+                    setBusy(false)
+                    setProblem(result.ok ? null : result.error)
+                }}
+            >
+                Run
+            </Button>
+        </div>
+    )
+}
+
+// A board where each card is one bird's chat thread. Cards run only when the user sends them, or runs a plan.
 export const NestPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const nestId = tab.pageParam
     const [board, setBoard] = useState<NestBoard | null>(null)
@@ -326,6 +417,7 @@ export const NestPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { find } = useFlock()
     const summary = nests.find((nest) => nest.id === nestId)
     const working = workingLine((summary?.working ?? []).map((id) => find(id).name))
+    const berryName = useAssistantName()
 
     useEffect(() => {
         if (!nestId) return undefined
@@ -338,12 +430,15 @@ export const NestPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }, [nestId])
 
     if (!nestId || !board) return <div className="h-full" />
+    const pending = board.cards.some((card) => card.plan?.state === 'planned')
 
     return (
         <div className="h-full flex flex-col">
             <header className="shrink-0 h-14 px-6 flex items-center gap-3 border-b">
                 <TitleField nestId={board.id} title={board.title} />
+                {pending && <span className="shrink-0 text-14 text-muted-foreground">{berryName}’s plan</span>}
                 {working && <p role="status" className="text-14 text-muted-foreground truncate">{working}</p>}
+                {pending && <PlanControls nestId={board.id} planning={!!board.planning} />}
             </header>
             <ReactFlowProvider>
                 <Board board={board} />

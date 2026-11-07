@@ -388,6 +388,22 @@ export const writeWithCheapModel = async (system: string, data: string, model?: 
   return reply.text;
 };
 
+// One call to the main model for an answer in the shape of `schema`, such as a Nest's plan. What comes back is only the
+// model's: whoever asked checks it in code before anything uses it.
+export const askInShape = async (
+  system: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  schema: import("zod").ZodType,
+  name: string,
+  model?: BaseChatModel
+): Promise<unknown> => {
+  const mainModel = model ?? (await createModel());
+  return mainModel.withStructuredOutput(schema, { name }).invoke([
+    ["system", system],
+    ...messages.map(({ role, content }): [string, string] => [role === "user" ? "human" : "ai", content]),
+  ]);
+};
+
 // Null until the conversation has a topic worth naming.
 export const generateTitle = async (
   messages: ChatThreadMessage[],

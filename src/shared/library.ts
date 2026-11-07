@@ -420,6 +420,8 @@ export interface NestSummary {
   chatIds: string[];
   // Who is working on one of its cards right now, by mascot id, once each.
   working: string[];
+  // Berry has planned cards in it that haven't been run.
+  planned: boolean;
 }
 
 export interface NestCard {
@@ -432,6 +434,30 @@ export interface NestCard {
   y: number;
   // Set once it was sent with For each row on.
   each: NestForEach | null;
+  // Set while it's a card Berry planned that hasn't started.
+  plan: NestPlanned | null;
+}
+
+// A card Berry planned. Planned until the user presses Run, when it's armed: it starts by itself once the card it reads
+// from has answered, or once the user says that answer is right if it waits for them. Held if it couldn't start, with
+// why, and then it's a draft the user can send. Once it starts it's an ordinary card, and this is gone.
+export interface NestPlanned {
+  state: "planned" | "armed" | "held";
+  prompt: string;
+  each: boolean;
+  waits: boolean;
+  // What each row of the table in its answer will be, such as "companies", when Berry planned it to answer with one.
+  table: string | null;
+  // Why a held card didn't start.
+  note: string | null;
+}
+
+// What the user wrote in a Nest's composer and Berry's answers, one request at a time. A request is open until its plan
+// runs or goes, and then it folds away.
+export interface NestRequest {
+  id: string;
+  open: boolean;
+  messages: { role: "user" | "berry"; text: string }[];
 }
 
 // A card sent with For each row: the same prompt, run once for each row, each run its own chat.
@@ -464,6 +490,10 @@ export interface NestBoard {
   title: string;
   cards: NestCard[];
   lines: NestLine[];
+  // The newest request, and the one before it while the newest is open.
+  talk: NestRequest[];
+  // What the user just wrote, while Berry plans it.
+  planning?: string | null;
 }
 
 export interface LibrarySnapshot {

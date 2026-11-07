@@ -352,6 +352,20 @@ export interface NestNewCard {
 // For each row either starts, or says why it can't, such as more rows than the cap.
 export type NestSendEachResult = { ok: true } | { ok: false; error: string };
 
+// What the Nest's composer sends with its words: the bird the user chose, and where a plan's cards can go, as the top
+// left of the board in sight and the cards already on it, measured.
+export interface NestAskOptions {
+  mascotId?: string | null;
+  at: { x: number; y: number };
+  taken: { x: number; y: number; width: number; height: number }[];
+}
+
+// Berry has it, and answers on the board, or it couldn't be sent, and why.
+export type NestAskResult = { ok: true } | { ok: false; error: string };
+
+// Run either starts the plan, or says why it can't yet, such as a card with nothing to do.
+export type NestRunPlanResult = { ok: true } | { ok: false; error: string };
+
 export interface ChatSendOptions {
   seePage: boolean;
   mascotId?: string | null;
@@ -513,6 +527,15 @@ export interface InvokeChannels {
   "nests:send-run": { region: "chrome"; args: [runId: string, text: string]; result: ChatThread | null };
   // Stops every run on a card, and whatever is still waiting never starts.
   "nests:stop-card": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // The Nest's composer: Berry starts one card at once, plans several, or asks first. Only because the user sent it.
+  "nests:ask": { region: "chrome"; args: [nestId: string, text: string, options: NestAskOptions]; result: NestAskResult };
+  // A planned card's prompt or For each row, only before the plan runs.
+  "nests:edit-plan": { region: "chrome"; args: [cardId: string, change: { prompt?: string; each?: boolean }]; result: boolean };
+  // Run: sends every planned card. Each starts once the card it reads from has answered, or once the user says so.
+  "nests:run-plan": { region: "chrome"; args: [nestId: string]; result: NestRunPlanResult };
+  "nests:discard-plan": { region: "chrome"; args: [nestId: string]; result: boolean };
+  // Looks right, continue: starts the cards of a run plan that wait for this card's answer to be checked.
+  "nests:continue": { region: "chrome"; args: [cardId: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -744,6 +767,11 @@ export interface NestsAPI {
   sendEach: (cardId: string, text: string) => Promise<NestSendEachResult>;
   sendRun: (runId: string, text: string) => Promise<ChatThread | null>;
   stopCard: (cardId: string) => Promise<boolean>;
+  ask: (nestId: string, text: string, options: NestAskOptions) => Promise<NestAskResult>;
+  editPlan: (cardId: string, change: { prompt?: string; each?: boolean }) => Promise<boolean>;
+  runPlan: (nestId: string) => Promise<NestRunPlanResult>;
+  discardPlan: (nestId: string) => Promise<boolean>;
+  continueFrom: (cardId: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
 }
