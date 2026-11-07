@@ -12,6 +12,7 @@ import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHisto
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
 import { WorkViews } from "./WorkViews";
+import { NestPictures } from "./NestPictures";
 import { Recordings } from "./Recordings";
 import { Phone } from "./Phone";
 import { TelegramChannel } from "./TelegramChannel";
@@ -146,6 +147,9 @@ export class Window {
   readonly chats: Chats;
   readonly nests: Nests;
   readonly workViews: WorkViews;
+  readonly nestPictures: NestPictures;
+  // Boards with page cards hear about the window's tabs soon after they change, once for a burst of changes.
+  private nestTabsTimer: NodeJS.Timeout | null = null;
   readonly recordings: Recordings;
   readonly routines: Routines;
   readonly suggestions: Suggestions;
@@ -339,6 +343,7 @@ export class Window {
         });
         this.notifyTabs();
         this.workViews.sync();
+        this.nestTabsSoon();
       },
     }, (id) => this.mascotStore.resolve(id), this.memory, this.cloud, this.runnerJobs);
 
@@ -358,7 +363,45 @@ export class Window {
     }, async (words) => (hasModel() ? generateTitle([{ role: "user", content: this.chats.withoutCodes(words) }]) : null),
     // A For-each card's column name and each row's value, from the cheap model. Answers can repeat a code typed from the
     // phone, so they're taken out first, as anywhere else the model reads.
-    cheapWriter(async (system, data) => (hasModel() ? writeWithCheapModel(system, this.chats.withoutCodes(data)) : "")));
+    cheapWriter(async (system, data) => (hasModel() ? writeWithCheapModel(system, this.chats.withoutCodes(data)) : "")),
+    {
+      // Only a web page in this window, as it is now.
+      info: (tabId) => {
+        const tab = this.allTabs.find((each) => each.id === tabId);
+        return tab ? { url: tab.url, title: tab.title, favicon: tab.favicon } : null;
+      },
+      keep: (tabId) => {
+        const tab = this.allTabs.find((each) => each.id === tabId);
+        return tab ? this.chats.pageToKeep(tab) : null;
+      },
+      // Only this window's tabs, never a cloud page, which is never on a board.
+      work: (chatId) => {
+        const job = this.chats.work(chatId);
+        if (!job || job.outcome !== null) return null;
+        return { tabs: job.tabs.flatMap((entry) => (entry.cloud ? [] : [{ id: entry.tab.id, state: entry.state, current: entry.tab.id === job.currentId }])) };
+      },
+    });
+
+    this.nestPictures = new NestPictures({
+      chrome: () => this.chrome.view.webContents,
+      resolve: (nestId, cardId) => {
+        const card = this.nests.card(cardId);
+        const tabId = card?.nestId === nestId && card.page ? this.nests.tabOfCard(cardId) : null;
+        const tab = tabId ? this.allTabs.find((each) => each.id === tabId) : undefined;
+        if (!card?.page || !tab) return null;
+        // One of a working card's tabs is pictured only as the working view would picture it.
+        const owner = card.page.job ? this.nests.card(card.page.job.cardId)?.chatId : null;
+        if (!card.page.job || !owner) return { tab, job: null };
+        const job = this.chats.work(owner);
+        const used = job?.outcome === null ? job.tabs.find((entry) => entry.tab === tab) : undefined;
+        return used?.state === "picture" ? { tab, job: { current: job!.currentId === tab.id } } : null;
+      },
+      onScreen: (nestId) => {
+        const entry = this.activeEntry;
+        return entry instanceof InternalTab && entry.page === "nest" && entry.param === nestId && this.windowShowing;
+      },
+      pageWidth: () => this.layout.page.width,
+    });
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -369,7 +412,10 @@ export class Window {
       },
       pageWidth: () => this.layout.page.width,
     });
-    const syncWork = () => this.workViews.sync();
+    const syncWork = () => {
+      this.workViews.sync();
+      this.nestPictures.sync();
+    };
     this._baseWindow.on("minimize", syncWork);
     this._baseWindow.on("restore", syncWork);
     this._baseWindow.on("hide", syncWork);
@@ -524,6 +570,8 @@ export class Window {
     this._baseWindow.on("closed", () => {
       this.desktopBerry.destroy();
       this.workViews.destroy();
+      this.nestPictures.destroy();
+      if (this.nestTabsTimer) clearTimeout(this.nestTabsTimer);
       this.recordings.destroy();
       nativeTheme.off("updated", onThemeUpdated);
       this.routines.shutdown();
@@ -1346,6 +1394,23 @@ export class Window {
   }
 
   // A draft goes at once. A card with a chat asks first, because the chat goes with it.
+  private nestTabsSoon(): void {
+    if (this.nestTabsTimer) return;
+    this.nestTabsTimer = setTimeout(() => {
+      this.nestTabsTimer = null;
+      if (this._baseWindow.isDestroyed()) return;
+      this.nests.tabsChanged();
+      this.nestPictures.sync();
+    }, 150);
+  }
+
+  // A tab card pressed on the board: the user goes to its tab, as from the working view. Nothing else changes: as
+  // anywhere, a job loses a tab once the user clicks, types or goes somewhere in it.
+  goToPageTab(cardId: unknown): boolean {
+    const tabId = this.nests.tabOfCard(cardId);
+    return tabId !== null && this.switchActiveTab(tabId);
+  }
+
   async confirmDeleteCard(cardId: string): Promise<boolean> {
     const card = this.nests.card(cardId);
     if (!card) return false;
@@ -1834,6 +1899,7 @@ export class Window {
 
   private notifyTabs(): void {
     this.recordings.sync();
+    this.nestTabsSoon();
     const active = this.activeEntry;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
     this.syncMenu();

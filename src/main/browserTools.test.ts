@@ -17,10 +17,10 @@ const screenshotTool = (tab: Tab, canSee: () => boolean) =>
     onUse: () => {},
   }).find((tool) => tool.name === "screenshot")!;
 
-type Asking = { open?: string; linked?: boolean; asked?: string; beenTo?: string[]; sites?: string[]; tool?: "open_tab" | "go_to" };
+type Asking = { open?: string; linked?: boolean; asked?: string; given?: string[]; beenTo?: string[]; sites?: string[]; tool?: "open_tab" | "go_to" };
 
 // Whether going to `url` from a job on `open` asks in the default mode. `linked` is whether that page links to it.
-const asks = (url: string, { open = "https://page.example/", linked = false, asked, beenTo, sites, tool = "open_tab" }: Asking = {}) => {
+const asks = (url: string, { open = "https://page.example/", linked = false, asked, given, beenTo, sites, tool = "open_tab" }: Asking = {}) => {
   const tab = { id: "tab-1", url: open, foreignFrames: [], runInPage: async () => linked } as unknown as Tab;
   return createPageTools({
     activeTab: () => tab,
@@ -31,12 +31,57 @@ const asks = (url: string, { open = "https://page.example/", linked = false, ask
     canSee: () => true,
     onUse: () => {},
     asked,
+    given,
     beenTo,
     limits: sites && { name: "Scout", sites, tools: ["visit"] },
   })
     .find(({ name }) => name === tool)!
     .isRisky!({ url });
 };
+
+describe("an address the user put on a Nest's board", () => {
+  const PRICING = "https://strawberrybrowser.com/pricing";
+  const given = [PRICING];
+
+  it.each<[string, string, Asking, boolean]>([
+    ["that exact address, to open", PRICING, { given }, false],
+    ["that exact address, to go to", PRICING, { given, tool: "go_to" }, false],
+    ["the same address written another way", "https://StrawberryBrowser.com/pricing", { given }, false],
+    ["another path on its site", "https://strawberrybrowser.com/about", { given }, true],
+    ["its site's front page", "https://strawberrybrowser.com/", { given }, true],
+    ["the same path with a query", `${PRICING}?ref=nest`, { given }, true],
+    ["the same path with a hash", `${PRICING}#plans`, { given }, true],
+    ["another subdomain of its site", "https://app.strawberrybrowser.com/pricing", { given }, true],
+    ["a lookalike site", "https://strawberrybrowser.com.evil.example/pricing", { given }, true],
+    ["that address with a name and password in it", "https://alice:pw@strawberrybrowser.com/pricing", { given }, true],
+    ["a given address with a query, exactly", "https://shop.example/item?id=7", { given: ["https://shop.example/item?id=7"] }, false],
+    ["that address with another query", "https://shop.example/item?id=8", { given: ["https://shop.example/item?id=7"] }, true],
+  ])("%s", async (_, url, options, expected) => {
+    expect(await asks(url, options)).toBe(expected);
+  });
+
+  it("still leaves a bird limited to sites off every other site", async () => {
+    const tab = { id: "tab-1", url: "https://github.com/", foreignFrames: [], runInPage: async () => false } as unknown as Tab;
+    const tools = createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+      given,
+      limits: { name: "Scout", sites: ["github.com"], tools: ["visit"] },
+    });
+    for (const name of ["open_tab", "go_to", "fetch_page"]) {
+      const tool = tools.find((each) => each.name === name);
+      if (!tool) continue;
+      const refused = await tool.refuses!({ tabId: "tab-1", url: PRICING });
+      expect(refused?.message, name).toContain("isn't allowed on strawberrybrowser.com");
+      expect(await tool.run({ tabId: "tab-1", url: PRICING }), name).toContain("isn't allowed on strawberrybrowser.com");
+    }
+  });
+});
 
 describe("whether an address with a query asks in the default mode", () => {
   // Counts the "?" too, so this query and hash come to exactly `length`.

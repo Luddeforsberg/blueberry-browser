@@ -7,6 +7,8 @@ export const CARD_WIDTH = 440;
 export const CARD_SIZE = { minWidth: 360, maxWidth: 1200, minHeight: 240, maxHeight: 1200 };
 // What a card is assumed to take before it has been drawn and measured.
 export const CARD_HEIGHT = 200;
+// A page's card, a tab or a link, is narrower, so a working card's tabs fit around it. Its height is what it takes.
+export const PAGE_CARD = { width: 280, height: 220 };
 // Between a card and the one pulled out of it, so the line between them has room to read as one.
 export const CARD_GAP = 120;
 const ROW_STEP = 48;

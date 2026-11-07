@@ -456,6 +456,10 @@ export interface NestCard {
   table: NestTableFile | null;
   // Set on a file's card: a file the user put on the board, or one a card's bird made, with no chat and no bird.
   file: NestFile | null;
+  // Set on a page's card: a link or tab the user put on the board, or one of a working card's tabs shown around it.
+  page?: NestPage | null;
+  // On a card whose job is running: its job's tabs show around it as page cards.
+  showingTabs?: boolean;
   // Its files and notes, which go to its bird with every message. They can change only before it's sent.
   attachments: NestAttachment[];
   // The size the user made it from its corner, or none for the usual width and a height that follows what it shows.
@@ -535,6 +539,21 @@ export interface NestFile {
   pages: number | null;
   preview: string | null;
   made: boolean;
+}
+
+// A page on a card of its own, with no chat and no bird. Its address and title are kept as they were when it went on the
+// board. Which tab it shows is kept in main's memory only, since tab ids start again each launch, so after a restart,
+// or once its tab has closed, it's a link: only its address goes across a line.
+export interface NestPage {
+  url: string;
+  title: string;
+  // The user dropped it on the board, so its exact address counts as one they named for the card a line takes it to.
+  // Not one of a card's job's tabs, or a page that job kept.
+  dropped: boolean;
+  // The open tab it shows, as it is now. Null for a link, or a tab that has closed.
+  tab: { id: string; title: string; url: string; favicon: string | null } | null;
+  // Set while it's one of a running card's tabs, shown around that card: that card, and whether it may be pictured.
+  job: { cardId: string; state: WorkTabState; current: boolean } | null;
 }
 
 // What a file's card shows when it's opened, read in main: a Markdown, text or JSON file's words, a CSV file's rows, or

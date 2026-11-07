@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chainCrossings,
+  mapCardText,
   crossingOf,
   cutAnswer,
   fitChain,
@@ -461,5 +462,22 @@ describe("the chain into a card", () => {
     // The one past the cap is named, and the chain stops there.
     expect(chain.filter((each) => each.input === null)).toHaveLength(1);
     expect(withCardAnswers("Go", fitChain(chain).map(({ answer }) => answer))).toMatch(/^Left out to fit, further up the chain: C13's card\./);
+  });
+});
+
+describe("a page passed across a line", () => {
+  it("takes a code out of its name as well as its address, title and text", () => {
+    const page = { name: "example.com/verify/481516", text: "", part: "page" as const, page: { url: "https://example.com/verify/481516", title: "Code 481516", tabId: "tab-1", room: 100, text: "Your code is 481516" } };
+    const clean = mapCardText(page, (text) => text.replaceAll("481516", "[code removed]"));
+    expect(JSON.stringify(clean)).not.toContain("481516");
+    expect(withCardAnswer("Go on", clean)).not.toContain("481516");
+  });
+
+  it("takes a code out of a page left out to fit, and out of why its text didn't come", () => {
+    const code = (text: string) => text.replaceAll("481516", "[code removed]");
+    const dropped = mapCardText({ name: "example.com/verify/481516", text: "", part: "thread", dropped: true }, code);
+    expect(withCardAnswers("Go on", [dropped])).not.toContain("481516");
+    const refused = mapCardText({ name: "481516.example.com", text: "", part: "page", page: { url: "https://481516.example.com/", title: "", tabId: null, room: 0, why: "Hub isn't allowed on 481516.example.com." } }, code);
+    expect(withCardAnswer("Go on", refused)).not.toContain("481516");
   });
 });

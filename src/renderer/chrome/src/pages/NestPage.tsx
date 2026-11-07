@@ -27,6 +27,8 @@ import { Composer } from '../components/Composer'
 import { firstBlank, NEST_STARTERS, onLeftInComposer, takeFromComposer } from '../nestStart'
 import { Attachments, useAttaching } from '../components/NestAttachments'
 import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
+import { droppedAddress, pageName } from '@shared/nestPages'
+import { TAB_DROP_EVENT } from '../components/useTabDrag'
 import { CardView, draftText, GhostSweep, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
 import {
     besideSpot,
@@ -70,6 +72,15 @@ const OPEN_Z = 10
 const DIM_Z = 5
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
+
+// The words a dragged link was shown with, from the HTML a drag carries with it, read as text only: a parsed document
+// that's never shown runs nothing and loads nothing.
+const linkWords = (html: string, url: string): string => {
+    if (!html) return ''
+    const anchors = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('a[href]')]
+    const anchor = anchors.find((each) => (each as HTMLAnchorElement).href === url) ?? (anchors.length === 1 ? anchors[0] : undefined)
+    return anchor?.textContent?.trim() ?? ''
+}
 
 // The largest file a drop reads into the chrome, the biggest any kind of file can be. Main says why a bigger one can't go.
 const MAX_DROP_READ = 10 * 1024 * 1024
@@ -115,7 +126,7 @@ const toNodes = (
 const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
     const card = board.cards.find((each) => each.id === cardId)
     const into = board.lines.filter((line) => line.to === cardId)
-    if (!card || card.chatId || card.each || card.table || card.file || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
+    if (!card || card.chatId || card.each || card.table || card.file || card.page || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
     const after = new Set<string>([cardId])
     for (let grew = true; grew; ) {
         grew = false
@@ -130,7 +141,7 @@ const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
         (each) =>
             !after.has(each.id) &&
             !into.some((line) => line.from === each.id) &&
-            (!!each.chatId || !!each.each || !!each.table || !!each.file || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
+            (!!each.chatId || !!each.each || !!each.table || !!each.file || (!!each.page && (!card.plan || card.plan.state === 'held')) || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
     )
 }
 
@@ -149,7 +160,10 @@ const toEdges = (board: NestBoard): LineEdge[] =>
         targetHandle: 'in',
         type: 'line',
         focusable: false,
-        data: { draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each || card.file)) }
+        data: {
+            draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each || card.file || card.page)),
+            view: board.cards.some((card) => card.id === line.to && card.page)
+        }
     }))
 
 // Where each Nest was last looked at, so going to another tab and back keeps the place. Memory only.
@@ -367,7 +381,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const clearedByPress = useRef(false)
     const label = useCallback(
         (card: NestBoard['cards'][number]) =>
-            card.table ? `The table ${card.table.name}` : card.file ? `The file ${card.file.name}` : `${card.mascotId ? find(card.mascotId).name : berryName}’s card`,
+            card.page
+                ? `The page ${pageName(card.page.tab?.url ?? card.page.url)}`
+                : card.table
+                  ? `The table ${card.table.name}`
+                  : card.file
+                    ? `The file ${card.file.name}`
+                    : `${card.mascotId ? find(card.mascotId).name : berryName}’s card`,
         [find, berryName]
     )
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
@@ -615,7 +635,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // so does a draft with a file or note on it.
     const dropEmptyDrafts = useCallback(() => {
         board.cards
-            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !card.file && !draftText(card.id).trim() && card.attachments.length === 0)
+            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !card.file && !card.page && !draftText(card.id).trim() && card.attachments.length === 0)
             .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
@@ -623,6 +643,30 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const [problem, setProblem] = useState<string | null>(null)
     const planning = board.planning ?? null
     const pending = board.cards.some((card) => card.plan?.state === 'planned')
+
+    // The page cards on screen, each with the width its picture is drawn at, told to main once a frame, which pictures
+    // only those, and nothing at all once the board has gone.
+    const watched = useRef(new Map<string, number>())
+    const watchSent = useRef<number | null>(null)
+    const watchPage = useCallback(
+        (cardId: string, width: number) => {
+            if (width > 0) watched.current.set(cardId, width)
+            else if (!watched.current.delete(cardId)) return
+            if (watchSent.current !== null) return
+            watchSent.current = requestAnimationFrame(() => {
+                watchSent.current = null
+                void api.watchPages(board.id, [...watched.current].map(([id, each]) => ({ cardId: id, width: each })))
+            })
+        },
+        [api, board.id]
+    )
+    useEffect(
+        () => () => {
+            if (watchSent.current !== null) cancelAnimationFrame(watchSent.current)
+            void api.watchPages(board.id, [])
+        },
+        [api, board.id]
+    )
 
     const actions = useMemo<NestBoardActions>(
         () => ({
@@ -677,9 +721,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 resizing.current = null
                 setNodes((current) => current.map((each) => (each.id === cardId ? { ...each, ...size, data: { card: { ...each.data.card, size } } } : each)))
                 void api.resizeCard(cardId, Math.round(size.width), Math.round(size.height))
-            }
+            },
+            watchPage
         }),
-        [openId, openRunId, open, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection, away, planning, pending]
+        [openId, openRunId, open, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection, away, planning, pending, watchPage]
     )
 
     // A line pulled out to an empty spot leaves a new card there. A click on the handle never gets here: it's under the
@@ -732,7 +777,8 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         if (event.key === 'Enter') {
             event.preventDefault()
             const card = board.cards.find((each) => each.id === cardId)
-            if (card?.chatId || card?.each || (card?.file && card.file.type !== 'application/pdf')) open(openId === cardId ? null : cardId)
+            if (card?.page) void api.goToTab(cardId)
+            else if (card?.chatId || card?.each || (card?.file && card.file.type !== 'application/pdf')) open(openId === cardId ? null : cardId)
             else node.querySelector<HTMLElement>('textarea')?.focus()
         } else if (event.key === 'Backspace' || event.key === 'Delete') {
             event.preventDefault()
@@ -766,8 +812,39 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // chrome only reads what was dropped and hands main the bytes, never a path, and main checks each as + does.
     const [dropping, setDropping] = useState(false)
     const dragDepth = useRef(0)
+    // A link, from a page or another app, as a list of addresses or one plain one. Files come first, since a dragged file
+    // can carry its address too.
     const hasFiles = (event: React.DragEvent) => event.dataTransfer.types.includes('Files')
+    const hasLink = (event: React.DragEvent) => !hasFiles(event) && (event.dataTransfer.types.includes('text/uri-list') || event.dataTransfer.types.includes('text/plain'))
+    const droppable = (event: React.DragEvent) => hasFiles(event) || hasLink(event)
+    const dropPage = async (at: { x: number; y: number }, page: Parameters<typeof api.dropPage>[1]) => {
+        setProblem(null)
+        open(null)
+        const result = await api.dropPage(board.id, page, { at: { x: at.x - 32, y: at.y - 24 }, taken: rects() })
+        if (!result.ok) setProblem(result.error)
+        else setFocusId(result.cardId)
+    }
+    const dropLink = (event: React.DragEvent) => {
+        event.preventDefault()
+        dragDepth.current = 0
+        setDropping(false)
+        const url = droppedAddress({ uriList: event.dataTransfer.getData('text/uri-list'), text: event.dataTransfer.getData('text/plain') })
+        if (!url) return setProblem('Only a link to a web page can go on the board.')
+        void dropPage(flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }), { url, title: linkWords(event.dataTransfer.getData('text/html'), url) })
+    }
+    // A tab dragged out of the sidebar or the tab row and let go over the board. Main reads the tab's own address.
+    useEffect(() => {
+        const element = wrapper.current
+        if (!element) return undefined
+        const onTab = (event: Event) => {
+            const { tabId, x, y } = (event as CustomEvent<{ tabId: string; x: number; y: number }>).detail
+            void dropPage(flow.screenToFlowPosition({ x, y }), { tabId })
+        }
+        element.addEventListener(TAB_DROP_EVENT, onTab)
+        return () => element.removeEventListener(TAB_DROP_EVENT, onTab)
+    })
     const dropFiles = async (event: React.DragEvent) => {
+        if (hasLink(event)) return dropLink(event)
         if (!hasFiles(event)) return
         event.preventDefault()
         dragDepth.current = 0
@@ -816,20 +893,21 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         <NestBoardContext.Provider value={actions}>
             <div
                 ref={wrapper}
+                data-tab-drop
                 className={cn("relative flex-1 min-h-0", dropping && "after:pointer-events-none after:absolute after:inset-2 after:rounded-panel after:border-2 after:border-dashed after:border-accent-ink/50")}
                 onKeyDown={onKeyDown}
                 onDragEnter={(event) => {
-                    if (!hasFiles(event)) return
+                    if (!droppable(event)) return
                     dragDepth.current++
                     setDropping(true)
                 }}
                 onDragOver={(event) => {
-                    if (!hasFiles(event)) return
+                    if (!droppable(event)) return
                     event.preventDefault()
                     event.dataTransfer.dropEffect = 'copy'
                 }}
                 onDragLeave={(event) => {
-                    if (!hasFiles(event)) return
+                    if (!droppable(event)) return
                     dragDepth.current = Math.max(0, dragDepth.current - 1)
                     if (dragDepth.current === 0) setDropping(false)
                 }}

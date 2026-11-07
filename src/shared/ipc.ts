@@ -377,6 +377,23 @@ export interface NestDroppedFile {
   bytes: Uint8Array | null;
 }
 
+// A page put on a Nest's board: a link dropped there, with the words it was shown with if there were any, or a tab
+// dragged there by its id, whose address and title main reads from the tab itself.
+export type NestDroppedPage = { url: string; title?: string } | { tabId: string };
+
+// One page card on screen, and how wide its picture is drawn.
+export interface NestWatchedPage {
+  cardId: string;
+  width: number;
+}
+
+// A small picture of a page card's tab, for the board on screen only.
+export interface NestFrame {
+  nestId: string;
+  cardId: string;
+  picture: string;
+}
+
 // Added, or why not, such as a type that can't be read or no room left on the card.
 export type NestAttachResult = { ok: true } | { ok: false; error: string };
 
@@ -606,6 +623,14 @@ export interface InvokeChannels {
   "nests:file-content": { region: "chrome"; args: [cardId: string]; result: NestFileContent | null };
   // A file's card's file, written only where the user chooses in main's save dialog.
   "nests:save-file": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // A link or tab put on the board, as a page's card where it was let go. Main checks the address, and reads a tab's.
+  "nests:drop-page": { region: "chrome"; args: [nestId: string, page: NestDroppedPage, place: Pick<NestAskOptions, "at" | "taken">]; result: NestTableResult };
+  // Goes to the tab a page's card shows. False for a link, or a tab that has closed.
+  "nests:go-to-tab": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // Shows a working card's job's tabs around it as page cards, or stops.
+  "nests:show-tabs": { region: "chrome"; args: [cardId: string, on: boolean]; result: boolean };
+  // The page cards on screen now, whose small pictures come after it as `nests:frame`, to the chrome and nowhere else.
+  "nests:watch-pages": { region: "chrome"; args: [nestId: string, pages: NestWatchedPage[]]; result: void };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -748,6 +773,7 @@ export interface EventChannels {
   "nests:deleted": string;
   "nests:focus": NestFocus;
   "nests:hand-off": NestHandOff;
+  "nests:frame": NestFrame;
   // ⌘+, ⌘− and ⌘0 on a Nest's board, from the View menu.
   "nests:zoom": "in" | "out" | "fit";
   // Text the user chose to ask about. It waits in the composer and is never sent by itself.
@@ -866,6 +892,11 @@ export interface NestsAPI {
   dropFile: (nestId: string, file: NestDroppedFile, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
   fileContent: (cardId: string) => Promise<NestFileContent | null>;
   saveFile: (cardId: string) => Promise<boolean>;
+  dropPage: (nestId: string, page: NestDroppedPage, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
+  goToTab: (cardId: string) => Promise<boolean>;
+  showTabs: (cardId: string, on: boolean) => Promise<boolean>;
+  watchPages: (nestId: string, pages: NestWatchedPage[]) => Promise<void>;
+  onFrame: (callback: (frame: NestFrame) => void) => Unsubscribe;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
   fromChat: (chatId: string) => Promise<NestFromChatResult>;

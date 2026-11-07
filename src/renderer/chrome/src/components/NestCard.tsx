@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { BaseEdge, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
-import { ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, Table2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
+import { AppWindow, ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, Table2, X } from 'lucide-react'
+import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestPage, NestPlanned, NestTableFile } from '@shared/library'
+import { pageName } from '@shared/nestPages'
+import { PAGE_CARD } from '@shared/nestPlace'
+import { Favicon } from './Favicon'
 import { combinedTable, eachWords, findTable, lineWords, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import { BERRY_ID } from '@shared/mascots'
 import { costWords } from '@shared/modelPrices'
@@ -24,7 +27,8 @@ import { CARD_PROSE, CellText, TableMenu, TableResult, useCut, type PickMode, ty
 import { formatBytes } from './downloadStatus'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
-export type LineEdge = Edge<{ draft: boolean }, 'line'>
+// `view` on a line into one of a working card's tabs, or a page its job kept: it only joins them, and carries nothing.
+export type LineEdge = Edge<{ draft: boolean; view?: boolean }, 'line'>
 
 // Rows selected in one card's table, for the table they were picked from: `text` is what that table was made from, such as
 // the answer, so a new one lets them go.
@@ -65,6 +69,8 @@ export interface NestBoardActions {
     // The user is making a card bigger or smaller from its corner, and where they left it, which is saved.
     resizeStart: (cardId: string) => void
     resizeEnd: (cardId: string, size: { width: number; height: number }) => void
+    // A page card is on screen and wants its small picture this wide, or isn't any more with 0.
+    watchPage: (cardId: string, width: number) => void
     // Threads to show instead of loading them, for the component gallery.
     samples?: Readonly<Record<string, ChatThread>>
 }
@@ -147,15 +153,18 @@ export const GhostSweep: React.FC<{ delay?: number }> = ({ delay = 0 }) => (
     />
 )
 
-const CardButton: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
+// `pressed` for one that's on, which stays in sight while it is.
+const CardButton: React.FC<{ label: string; onClick: () => void; pressed?: boolean; children: React.ReactNode }> = ({ label, onClick, pressed, children }) => (
     <button
         type="button"
         aria-label={label}
         title={label}
+        aria-pressed={pressed}
         onClick={onClick}
         className={cn(
             "nodrag size-7 flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors",
-            "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 group-focus-within/card:opacity-100 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 group-focus-within/card:opacity-100 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+            pressed && "opacity-100 text-accent-ink"
         )}
     >
         {children}
@@ -276,6 +285,15 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                     </span>
                 )}
                 <span className="ml-auto flex items-center">
+                    {(running || card.showingTabs) && !thread?.runner && (
+                        <CardButton
+                            label={card.showingTabs ? 'Hide its tabs' : 'Show its tabs'}
+                            pressed={!!card.showingTabs}
+                            onClick={() => void window.chromeAPI.nests.showTabs(card.id, !card.showingTabs)}
+                        >
+                            <AppWindow className="size-4" />
+                        </CardButton>
+                    )}
                     {table && !running && <TableMenu cardId={card.id} />}
                     {answered && (
                         <span data-keep-selection>
@@ -389,7 +407,7 @@ interface InputView {
 
 // What a card goes by on a line: its bird's name, as Show Berry has it, or a file's title.
 const nameOn = (source: NestCard, mascot: MascotProfile, showBerry: boolean) =>
-    source.table ? source.table.name : source.file ? source.file.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
+    source.page ? pageName(source.page.tab?.url ?? source.page.url) : source.table ? source.table.name : source.file ? source.file.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
 
 const useInputs = (cardId: string): InputView[] => {
     const board = useBoard()
@@ -404,7 +422,7 @@ const useInputs = (cardId: string): InputView[] => {
             line,
             source,
             name: nameOn(source, find(source.mascotId), showBerry),
-            answered: source.table || source.file ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
+            answered: source.table || source.file || source.page ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
             running: thread?.partial != null,
             rows: source.table ? source.table.count : source.each ? source.each.runs.length : answer ? (findTable(answer)?.rows.length ?? 0) : 0
         }
@@ -419,7 +437,7 @@ const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? ''
 
 // What a card on a line gets, in the words its header and reply field use.
 const getsWhat = ({ line, name, source }: InputView) =>
-    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : source.file ? name : `${name}’s thread`
+    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : source.file || source.page ? name : `${name}’s thread`
 
 // What a sent card got, exactly, as main counts what crosses: "With Scout’s thread (2 answers) and 1 card before it,
 // about 1,800 words".
@@ -599,7 +617,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
             ? `${plural(input.line.picked, 'row')} from ${input.name}`
             : input.source.table
               ? `every row of ${input.name}`
-              : input.source.file
+              : input.source.file || input.source.page
                 ? input.name
                 : input.source.each
                 ? `${input.name}’s table`
@@ -1214,6 +1232,114 @@ const FileCard: React.FC<{ card: NestCard; file: NestFile }> = ({ card, file }) 
     )
 }
 
+// The small pictures of page cards' tabs, as main sends them for the board on screen. They go straight to the picture
+// showing them and are never kept: a card that stops being pictured drops its own.
+const pictures = new Map<string, string>()
+const pictureListeners = new Set<() => void>()
+window.chromeAPI.nests.onFrame(({ cardId, picture }) => {
+    pictures.set(cardId, picture)
+    pictureListeners.forEach((listener) => listener())
+})
+const subscribePictures = (listener: () => void) => {
+    pictureListeners.add(listener)
+    return () => void pictureListeners.delete(listener)
+}
+
+// A page card's picture while it's on screen, and only then. Main is told what's on screen, and pictures nothing else.
+const usePagePicture = (cardId: string, width: number, element: React.RefObject<HTMLElement | null>): string | undefined => {
+    const { watchPage, samples } = useBoard()
+    useEffect(() => {
+        const box = element.current
+        if (!box || width <= 0 || samples) return undefined
+        const observer = new IntersectionObserver(([entry]) => watchPage(cardId, entry.isIntersecting ? width : 0))
+        observer.observe(box)
+        return () => {
+            observer.disconnect()
+            watchPage(cardId, 0)
+            pictures.delete(cardId)
+        }
+    }, [cardId, width, element, watchPage, samples])
+    const picture = useSyncExternalStore(subscribePictures, () => pictures.get(cardId))
+    return width > 0 ? picture : undefined
+}
+
+const PAGE_PICTURE_WIDTH = PAGE_CARD.width - 2
+// Where a working job's tab can't be pictured, why, as the working view says it.
+const WITHOUT_PICTURE: Partial<Record<NonNullable<NestPage['job']>['state'], string>> = {
+    held: 'You have this tab',
+    yours: 'You have this tab',
+    'off-limits': 'Not allowed on this site',
+    'no-access': 'Can’t see this page',
+    none: 'No picture of this page'
+}
+
+// A page on a card of its own: a tab or link the user put on the board, or one of a working card's tabs shown around it.
+// No bird stands on it. A tab shows a small live picture while it's on screen, and pressing it goes to the tab. A link
+// shows its address and words. A line pulled out of it gives the next card the page: a tab's text, read when that card
+// sends, or a link's address.
+const PageCard: React.FC<{ card: NestCard; page: NestPage }> = ({ card, page }) => {
+    const board = useBoard()
+    const box = useRef<HTMLDivElement>(null)
+    const { tab, job } = page
+    const url = tab?.url ?? page.url
+    const name = pageName(url)
+    const title = tab?.title || page.title || name
+    const pictured = !!tab && (!job || job.state === 'picture')
+    const picture = usePagePicture(card.id, pictured ? PAGE_PICTURE_WIDTH : 0, box)
+    const kind = tab ? (job?.current ? 'Working here' : 'Tab') : 'Link'
+    return (
+        <div ref={box} className={cn(CARD_SHELL, job?.current ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: PAGE_CARD.width }}>
+            <LineEnds canPull onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${name}`} />
+            <div className="nest-drag cursor-grab h-11 pl-4 pr-2 flex items-center gap-2">
+                <Favicon src={tab?.favicon ?? null} site={url} className="size-4 shrink-0" />
+                <span className="flex-1 min-w-0 text-14 font-semibold truncate" title={title}>{title}</span>
+                <span className="flex items-center">
+                    <span data-keep-selection>
+                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                            <GitFork className="size-4" />
+                        </CardButton>
+                    </span>
+                    <CardButton label="Take it off the board" onClick={() => board.remove(card.id)}>
+                        <X className="size-4" />
+                    </CardButton>
+                </span>
+            </div>
+            {tab ? (
+                <button
+                    type="button"
+                    onClick={() => void window.chromeAPI.nests.goToTab(card.id)}
+                    aria-label={`Go to the tab on ${name}`}
+                    className="nodrag relative block w-full aspect-[16/10] overflow-hidden border-y bg-tray outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                >
+                    {picture ? (
+                        <img src={picture} alt="" decoding="sync" draggable={false} className="absolute inset-0 size-full object-cover object-top" />
+                    ) : (
+                        <span className="absolute inset-0 flex items-center justify-center p-3 text-center text-13 text-muted-foreground">
+                            {job && job.state !== 'picture' ? WITHOUT_PICTURE[job.state] : ''}
+                        </span>
+                    )}
+                </button>
+            ) : (
+                <div className="nodrag cursor-auto select-text px-4 pb-1">
+                    <a
+                        href={page.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-13 text-accent-ink break-all line-clamp-3 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"
+                    >
+                        {page.url}
+                    </a>
+                </div>
+            )}
+            <p className="px-4 py-2.5 flex items-center gap-1.5 text-12 text-muted-foreground">
+                <span className="truncate">{name}</span>
+                <span aria-hidden>·</span>
+                <span className={cn("shrink-0", job?.current && SHIMMER_QUIET)}>{kind}</span>
+            </p>
+        </div>
+    )
+}
+
 // A card Berry planned, dashed until it starts. Before Run, its prompt edits in place, its bird and For each row change,
 // and a line pulls out of it to add another. Once the plan runs, it only says what it's waiting for.
 const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, plan }) => {
@@ -1373,7 +1499,9 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
     const width = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.width)
     const height = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.height)
     const box: CardBox = { width: width ?? CARD_WIDTH, fill: height != null }
-    return card.file ? (
+    return card.page ? (
+        <PageCard card={card} page={card.page} />
+    ) : card.file ? (
         <FileCard card={card} file={card.file} />
     ) : card.table ? (
         <TableCard card={card} file={card.table} box={box} />
@@ -1400,7 +1528,7 @@ export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, 
     const [path] = getBezierPath({ sourceX: from, sourceY, sourcePosition, targetX: to, targetY, targetPosition })
     return (
         <>
-            <BaseEdge id={id} path={path} className={LINE} style={{ strokeWidth: STROKE, strokeDasharray: data?.draft ? '5 5' : undefined }} />
+            <BaseEdge id={id} path={path} className={LINE} style={{ strokeWidth: STROKE, strokeDasharray: data?.view ? '1 4' : data?.draft ? '5 5' : undefined, strokeLinecap: data?.view ? 'round' : undefined }} />
             <circle cx={from} cy={sourceY} r={END} className={cn(LINE, "fill-canvas")} strokeWidth={STROKE} />
             <circle cx={to} cy={targetY} r={END} className="fill-accent-ink/60" />
         </>
