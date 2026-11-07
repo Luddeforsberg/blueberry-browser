@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, PERCH, pickRows, runPhase, settle, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, PERCH, pickRows, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -65,6 +65,28 @@ describe('settle', () => {
 
     it('leaves cards beside the one that grew', () => {
         expect(settle([placed('table', 0, 900), placed('beside', 100, 200, true, CARD_WIDTH + CARD_GAP)])).toEqual([])
+    })
+})
+
+describe('settleHeight', () => {
+    it('counts an open card, and one just closed, at its closed height until it is measured closed again', () => {
+        const heights = { closed: new Map<string, number>(), open: new Map<string, number>() }
+        expect(settleHeight(heights, 'a', 200, false)).toBe(200)
+        // Opened, it measures 800, and still counts as 200.
+        expect(settleHeight(heights, 'a', 200, true)).toBe(200)
+        expect(settleHeight(heights, 'a', 800, true)).toBe(200)
+        // Closed, before it's measured again, the 800 is the open one.
+        expect(settleHeight(heights, 'a', 800, false)).toBe(200)
+        // Measured closed again, and then grown with an answer.
+        expect(settleHeight(heights, 'a', 210, false)).toBe(210)
+        expect(settleHeight(heights, 'a', 480, false)).toBe(480)
+    })
+
+    it('counts a card opened before it was ever measured closed at the size a card is taken to be', () => {
+        const heights = { closed: new Map<string, number>(), open: new Map<string, number>() }
+        expect(settleHeight(heights, 'a', 800, true)).toBe(CARD_HEIGHT)
+        expect(settleHeight(heights, 'a', 800, false)).toBe(CARD_HEIGHT)
+        expect(settleHeight(heights, 'a', 260, false)).toBe(260)
     })
 })
 

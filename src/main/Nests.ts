@@ -249,7 +249,7 @@ export class Nests {
       return typeof move?.id === "string" && to.x !== null && to.y !== null ? [{ id: move.id as string, x: to.x, y: to.y }] : [];
     });
     if (valid.length === 0 || this.store.nudgeCards(nestId, valid) === 0) return false;
-    this.events.onBoard(this.store.board(nestId)!);
+    this.events.onBoard(this.board(nestId)!);
     return true;
   }
 
@@ -257,7 +257,7 @@ export class Nests {
     const to = { x: coordinate(x), y: coordinate(y) };
     if (to.x === null || to.y === null || !this.store.moveCard(cardId, to.x, to.y)) return false;
     const nestId = this.store.card(cardId)?.nestId;
-    if (nestId) this.events.onBoard(this.store.board(nestId)!);
+    if (nestId) this.events.onBoard(this.board(nestId)!);
     return true;
   }
 

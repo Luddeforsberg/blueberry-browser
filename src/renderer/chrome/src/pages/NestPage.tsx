@@ -39,9 +39,11 @@ import {
     freeSpot,
     pickRows,
     settle,
+    settleHeight,
     showViewport,
     workingLine,
     ZOOM,
+    type CardHeights,
     type FlightMode,
     type FlightPoint,
     type Insets,
@@ -381,15 +383,16 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // Cards grow once they're drawn, such as when an answer or a table arrives, or runs come in. Whenever one does, the
     // cards placed for the user that it now covers move down out of its way, and the ones the user placed stay. The open
     // card counts at its closed size, since it floats over the others. Not while a card is being dragged.
-    const closedHeights = useRef(new Map<string, number>())
+    const heights = useRef<CardHeights>({ closed: new Map(), open: new Map() })
     useEffect(() => {
         if (nodes.some((node) => node.dragging || !node.measured?.height)) return
-        const cards = nodes.map((node) => {
-            const measured = node.measured!.height!
-            if (node.id !== openId) closedHeights.current.set(node.id, measured)
-            const height = node.id === openId ? closedHeights.current.get(node.id) ?? CARD_HEIGHT : measured
-            return { id: node.id, ...node.position, width: node.measured!.width ?? CARD_WIDTH, height, movable: node.data.card.autoPlaced }
-        })
+        const cards = nodes.map((node) => ({
+            id: node.id,
+            ...node.position,
+            width: node.measured!.width ?? CARD_WIDTH,
+            height: settleHeight(heights.current, node.id, node.measured!.height!, node.id === openId),
+            movable: node.data.card.autoPlaced
+        }))
         const nudges = settle(cards)
         if (nudges.length === 0) return
         setNodes((current) =>
