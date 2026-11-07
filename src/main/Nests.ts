@@ -228,10 +228,11 @@ export class Nests {
     const mascotId = this.flockId(input.mascotId);
     if (mascotId === undefined) return null;
     // A line comes out of a card with an answer to give, so never out of a draft. Out of a planned card, it's another card
-    // of the plan.
+    // of the plan, but not while Berry changes the plan, which would replace it.
     const source = from === null ? null : this.store.card(from);
     const planned = source?.plan?.state === "planned";
     if (from !== null && !source?.chatId && !source?.each && !planned) return null;
+    if (source && this.replanned(source)) return null;
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
     const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
     if (picked === undefined) return null;
@@ -264,7 +265,7 @@ export class Nests {
   setBird(cardId: string, mascotId: unknown): boolean {
     const card = this.store.card(cardId);
     const bird = this.flockId(mascotId);
-    if (!card || bird === undefined || !this.store.setBird(cardId, bird)) return false;
+    if (!card || bird === undefined || this.replanned(card) || !this.store.setBird(cardId, bird)) return false;
     this.changed(card.nestId);
     return true;
   }
@@ -438,7 +439,7 @@ export class Nests {
   // A planned card's prompt or For each row, before the plan runs. For each row only where the card gets a table.
   editPlanned(cardId: string, change: { prompt?: unknown; each?: unknown }): boolean {
     const card = this.store.card(cardId);
-    if (card?.plan?.state !== "planned" || typeof change !== "object" || change === null) return false;
+    if (card?.plan?.state !== "planned" || this.replanned(card) || typeof change !== "object" || change === null) return false;
     const prompt = typeof change.prompt === "string" ? change.prompt.slice(0, 2000) : undefined;
     const each = typeof change.each === "boolean" ? change.each : undefined;
     if (prompt === undefined && each === undefined) return false;
@@ -529,17 +530,23 @@ export class Nests {
 
   // Where files and notes may still change: the composer, while Berry isn't reading it, or a card nothing has been sent from
   // and that a run plan isn't about to start. Null anywhere else. Once sent, they're what its messages went with. A planned
-  // card waits while Berry changes the plan, which would otherwise replace it without what was just added.
+  // card waits while Berry changes the plan.
   changeable(target: unknown): AttachTo | null {
     if (typeof target !== "object" || target === null) return null;
     const { cardId, nestId } = target as { cardId?: unknown; nestId?: unknown };
     if (typeof cardId === "string") {
       const card = this.store.card(cardId);
       if (!card || card.chatId || card.each || card.plan?.state === "armed") return null;
-      return card.plan?.state === "planned" && this.planning.has(card.nestId) ? null : { cardId };
+      return this.replanned(card) ? null : { cardId };
     }
     if (typeof nestId === "string") return this.store.board(nestId) && !this.planning.has(nestId) ? { nestId } : null;
     return null;
+  }
+
+  // A planned card while Berry changes its plan, which will replace it from what it was when Berry started reading. Its
+  // prompt, bird, For each row, files and notes wait until then, so nothing the user changes meanwhile is lost.
+  private replanned(card: Pick<NestCard, "plan"> & { nestId: string }): boolean {
+    return card.plan?.state === "planned" && this.planning.has(card.nestId);
   }
 
   // Whether Berry is changing the plan the target is part of, or reading the composer it is.

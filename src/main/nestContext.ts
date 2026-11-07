@@ -13,9 +13,13 @@ export interface CardAnswer {
   part?: "answer" | "rows" | "row" | "runs";
 }
 
-// The newest reply with words in it. Steps aren't part of an answer, and a reply still being written isn't saved yet.
+// The newest reply with words in it since the user last wrote, or nothing, so a card whose newest reply came back empty
+// never passes on an older answer as if it were current. Steps aren't part of an answer, and a reply still being written
+// isn't saved yet.
 export const latestAnswer = (messages: readonly Pick<ChatThreadMessage, "role" | "content">[]): string | null =>
-  messages.findLast((message) => message.role === "assistant" && message.content.trim() !== "")?.content ?? null;
+  messages
+    .slice(messages.findLastIndex((message) => message.role === "user") + 1)
+    .findLast((message) => message.role === "assistant" && message.content.trim() !== "")?.content ?? null;
 
 // So the answer can't close the tag that marks it. Nothing is removed, because removing can put a tag back together.
 const inTag = (text: string, tag = "card_answer") => text.replace(new RegExp(`<(?=\\s*\\/?\\s*${tag})`, "gi"), "&lt;");

@@ -745,6 +745,8 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
     const sourceThread = useCardThread(source?.chatId ?? null)
     const sourceAnswer = savedAnswer(sourceThread)
     const editable = plan.state === 'planned'
+    // While Berry changes the plan, which replaces this card from what it was when Berry started, nothing on it changes.
+    const waiting = editable && board.replanning
     // For each row needs a table to run on: one the card it reads from will answer with, or one already in its answer.
     const getsTable = !!source && !source.each && (source.plan ? !source.plan.each && source.plan.table !== null : !!sourceAnswer && findTable(sourceAnswer) !== null)
     const [text, setText] = useState(plan.prompt)
@@ -765,17 +767,17 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
         saveTimer.current = window.setTimeout(() => void api.editPlan(card.id, { prompt: value }), 400)
     }
     const waitsForYou = plan.state === 'armed' && plan.waits && !!sourceAnswer && sourceThread?.partial == null
-    const status = editable ? `Planned${plan.each ? ' · for each row' : ''}` : waitsForYou ? 'Waits for you' : source ? `Waiting for ${sourceName}` : 'Starting'
+    const status = waiting ? 'Can’t change while Berry changes the plan' : editable ? `Planned${plan.each ? ' · for each row' : ''}` : waitsForYou ? 'Waits for you' : source ? `Waiting for ${sourceName}` : 'Starting'
     const gets = source ? (plan.each ? `For each row of ${sourceName}’s table` : `Gets ${sourceName}’s answer`) : null
     const details = [mascot.sites.length > 0 ? `Only goes to ${mascot.sites.join(', ')}` : null, plan.table ? `A table of ${plan.table} lands here` : null].filter(
         (line): line is string => line !== null
     )
 
     return (
-        <div className={cn(CARD_SHELL, "border-dashed border-accent-ink/50 transition-opacity duration-layout", editable && board.replanning && "opacity-60")} style={{ width: CARD_WIDTH }}>
-            {editable && board.replanning && <GhostSweep />}
+        <div className={cn(CARD_SHELL, "border-dashed border-accent-ink/50 transition-opacity duration-layout", waiting && "opacity-60")} style={{ width: CARD_WIDTH }}>
+            {waiting && <GhostSweep />}
             <Perched cardId={card.id} mascot={mascot} mood="rest" />
-            <LineEnds canPull={editable} onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${name}’s`} />
+            <LineEnds canPull={editable && !waiting} onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${name}’s`} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
                 <span role="status" className="text-12 text-muted-foreground truncate">{status}</span>
@@ -793,6 +795,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
                     <PlanPrompt
                         label={`What ${name} will do`}
                         value={text}
+                        readOnly={waiting}
                         onChange={change}
                         onFocus={() => (editing.current = true)}
                         onBlur={() => {
@@ -814,7 +817,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
             )}
             {editable && (
                 <div className="nodrag cursor-auto px-3 pb-3 flex flex-col gap-2">
-                    {choosing && (
+                    {choosing && !waiting && (
                         <MascotPerch
                             selectedId={mascot.id}
                             onChoose={(id) => {
@@ -825,11 +828,11 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
                         />
                     )}
                     <div className="flex items-center gap-3">
-                        <MascotChip mascot={mascot} open={choosing} onPress={() => setChoosing(!choosing)} />
+                        <MascotChip mascot={mascot} open={choosing} onPress={waiting ? undefined : () => setChoosing(!choosing)} />
                         {attaching.items && <AddMenu items={attaching.items} label="Add a file or note" small />}
                         {getsTable && (
                             <span className="flex items-center gap-2">
-                                <Switch checked={plan.each} labelledBy={switchId} onChange={(on) => void api.editPlan(card.id, { each: on })} />
+                                <Switch checked={plan.each} labelledBy={switchId} disabled={waiting} onChange={(on) => void api.editPlan(card.id, { each: on })} />
                                 <span id={switchId} className="text-13">For each row</span>
                             </span>
                         )}
@@ -841,9 +844,10 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
 }
 
 // A planned card's prompt, edited in place: it reads as text until it's pressed, and grows with what's written.
-const PlanPrompt: React.FC<{ label: string; value: string; onChange: (value: string) => void; onFocus: () => void; onBlur: () => void }> = ({
+const PlanPrompt: React.FC<{ label: string; value: string; readOnly: boolean; onChange: (value: string) => void; onFocus: () => void; onBlur: () => void }> = ({
     label,
     value,
+    readOnly,
     onChange,
     onFocus,
     onBlur
@@ -861,11 +865,15 @@ const PlanPrompt: React.FC<{ label: string; value: string; onChange: (value: str
             aria-label={label}
             placeholder={label}
             value={value}
+            readOnly={readOnly}
             rows={1}
             onChange={(event) => onChange(event.target.value)}
             onFocus={onFocus}
             onBlur={onBlur}
-            className="nowheel block w-[calc(100%+12px)] -mx-1.5 px-1.5 py-1 resize-none overflow-hidden rounded-control bg-transparent text-13 outline-none transition-colors hover:bg-muted focus:bg-muted focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground"
+            className={cn(
+                "nowheel block w-[calc(100%+12px)] -mx-1.5 px-1.5 py-1 resize-none overflow-hidden rounded-control bg-transparent text-13 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring placeholder:text-muted-foreground",
+                !readOnly && "hover:bg-muted focus:bg-muted"
+            )}
         />
     )
 }

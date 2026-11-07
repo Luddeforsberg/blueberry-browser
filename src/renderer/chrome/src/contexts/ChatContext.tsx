@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { ChatApproval, ChatStep, ChatThread, UsedPage } from '@shared/library'
+import { followChats, type ChatFeed } from './followChats'
 
 export interface Message {
     id: string
@@ -35,24 +36,18 @@ interface ChatContextType {
     takeDraft: () => void
 }
 
+const chatFeed = (): ChatFeed => {
+    const { chat, library } = window.chromeAPI
+    return { onChatUpdated: chat.onChatUpdated, onChatChunk: chat.onChatChunk, getChat: library.getChat }
+}
+
 // One saved chat, kept current while its reply streams.
 export const useChatThread = (chatId: string | null): ChatThread | null => {
     const [thread, setThread] = useState<ChatThread | null>(null)
 
     useEffect(() => {
         if (!chatId) return undefined
-        const { chat, library } = window.chromeAPI
-        const unsubscribeThread = chat.onChatUpdated((updated) => {
-            if (updated.id === chatId) setThread(updated)
-        })
-        const unsubscribeChunks = chat.onChatChunk(({ chatId: id, content }) => {
-            if (id === chatId) setThread((current) => current && { ...current, partial: (current.partial ?? '') + content })
-        })
-        library.getChat(chatId).then(setThread)
-        return () => {
-            unsubscribeThread()
-            unsubscribeChunks()
-        }
+        return followChats(new Set([chatId]), chatFeed(), (_, change) => setThread((current) => change(current ?? undefined) ?? null))
     }, [chatId])
 
     return thread?.id === chatId ? thread : null
@@ -66,19 +61,12 @@ export const useChatThreads = (chatIds: readonly string[]): Record<string, ChatT
     useEffect(() => {
         const ids = new Set(key ? key.split(' ') : [])
         if (ids.size === 0) return undefined
-        const { chat, library } = window.chromeAPI
-        const unsubscribeThread = chat.onChatUpdated((updated) => {
-            if (ids.has(updated.id)) setThreads((current) => ({ ...current, [updated.id]: updated }))
-        })
-        const unsubscribeChunks = chat.onChatChunk(({ chatId, content }) => {
-            if (!ids.has(chatId)) return
-            setThreads((current) => (current[chatId] ? { ...current, [chatId]: { ...current[chatId], partial: (current[chatId].partial ?? '') + content } } : current))
-        })
-        ids.forEach((id) => void library.getChat(id).then((thread) => thread && setThreads((current) => ({ ...current, [id]: thread }))))
-        return () => {
-            unsubscribeThread()
-            unsubscribeChunks()
-        }
+        return followChats(ids, chatFeed(), (id, change) =>
+            setThreads((current) => {
+                const next = change(current[id])
+                return next === undefined ? current : { ...current, [id]: next }
+            })
+        )
     }, [key])
 
     return threads

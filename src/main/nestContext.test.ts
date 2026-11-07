@@ -2,17 +2,26 @@ import { describe, expect, it } from "vitest";
 import { latestAnswer, MAX_CARD_ANSWER_LENGTH, rowAnswer, rowsAnswer, runsAnswer, withCardAnswer } from "./nestContext";
 
 describe("latestAnswer", () => {
-  it("is the newest reply with words, past one with only steps", () => {
+  it("is the newest reply with words since the user last wrote, past one with only steps", () => {
     expect(
       latestAnswer([
         { role: "user", content: "Find companies" },
         { role: "assistant", content: "Twelve companies" },
         { role: "user", content: "Only Swedish ones" },
         { role: "assistant", content: "Five Swedish companies" },
-        { role: "user", content: "Again" },
         { role: "assistant", content: "  " },
       ])
     ).toBe("Five Swedish companies");
+  });
+
+  it("is nothing when the newest exchange has no words, rather than an older answer", () => {
+    const earlier = [
+      { role: "user" as const, content: "Find companies" },
+      { role: "assistant" as const, content: "Twelve companies" },
+      { role: "user" as const, content: "Only Swedish ones" },
+    ];
+    expect(latestAnswer([...earlier, { role: "assistant", content: "  " }])).toBeNull();
+    expect(latestAnswer(earlier)).toBeNull();
   });
 
   it("is nothing before the card has answered", () => {

@@ -136,6 +136,19 @@ describe("how a card stands for the cards after it", () => {
     expect(replyState("Scout", false, { error: null, messages: [] }).kind).toBe("silent");
   });
 
+  it("doesn't count an older answer when the newest reply came back empty", () => {
+    const empty = {
+      error: null,
+      messages: [
+        { role: "user" as const, content: "Find companies" },
+        { role: "assistant" as const, content: "Twelve companies" },
+        { role: "user" as const, content: "Only Swedish ones" },
+        { role: "assistant" as const, content: "" },
+      ],
+    };
+    expect(replyState("Scout", false, empty).kind).toBe("silent");
+  });
+
   it("reads a For-each card's runs: going while any is, and answered only once every run has an answer", () => {
     const run = (state: "waiting" | "started" | "stopped" | "failed", thread: typeof answered | null = null, running = false) => ({ state, thread, running });
     expect(runsState("Scout", [run("started", answered), run("waiting")]).kind).toBe("running");

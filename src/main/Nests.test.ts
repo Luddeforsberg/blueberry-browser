@@ -484,6 +484,26 @@ describe("Berry planning in a Nest", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("won't change a planned card's prompt, bird or For each row, or pull another out, while Berry changes the plan, so nothing done then is lost", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    plans.push(TWO_JOBS);
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const [scout, writer] = plannedCards(nests, nest);
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1" }, { ...TWO_JOBS.cards[1], key: "p2", from: "p1", prompt: "Write a shorter email to each" }] });
+    const changing = nests.ask(nest, "Make the emails shorter", PLACE);
+    expect(nests.editPlanned(scout.id, { prompt: "Find companies in Oslo" })).toBe(false);
+    expect(nests.editPlanned(writer.id, { each: false })).toBe(false);
+    expect(nests.setBird(scout.id, BERRY.id)).toBe(false);
+    expect(nests.addCard(nest, { x: 0, y: 600, from: writer.id })).toBeNull();
+    await changing;
+    const [first, second] = plannedCards(nests, nest);
+    expect(first.plan!.prompt).toBe("Find companies");
+    expect(first.mascotId).toBe("scout");
+    expect(second.plan!.each).toBe(true);
+    expect(nests.editPlanned(first.id, { prompt: "Find companies in Oslo" })).toBe(true);
+  });
+
   it("gives the planner the cards on the board with only the start of their answers, labelled untrusted", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();

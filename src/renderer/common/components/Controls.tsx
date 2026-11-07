@@ -6,16 +6,18 @@ export const Switch: React.FC<{
     onChange: (checked: boolean) => void
     labelledBy?: string
     label?: string
-}> = ({ checked, onChange, labelledBy, label }) => (
+    disabled?: boolean
+}> = ({ checked, onChange, labelledBy, label, disabled }) => (
     <button
         type="button"
         role="switch"
         aria-checked={checked}
         aria-labelledby={labelledBy}
         aria-label={label}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
-            "relative w-9 h-5 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "relative w-9 h-5 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
             checked ? "bg-primary" : "bg-border"
         )}
     >
