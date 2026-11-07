@@ -548,7 +548,8 @@ export interface InvokeChannels {
   "nests:add-note": { region: "chrome"; args: [target: NestAttachTarget, text: string]; result: NestAttachResult };
   // Only before its card is sent. Empty words remove it.
   "nests:edit-note": { region: "chrome"; args: [attachmentId: string, text: string]; result: boolean };
-  "nests:remove-attachment": { region: "chrome"; args: [attachmentId: string]; result: boolean };
+  // With a planned card's id, one of the composer's it points at stops being pointed at there, and stays on the composer.
+  "nests:remove-attachment": { region: "chrome"; args: [attachmentId: string, fromCardId?: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -788,7 +789,7 @@ export interface NestsAPI {
   attachFiles: (target: NestAttachTarget) => Promise<{ problems: string[] }>;
   addNote: (target: NestAttachTarget, text: string) => Promise<NestAttachResult>;
   editNote: (attachmentId: string, text: string) => Promise<boolean>;
-  removeAttachment: (attachmentId: string) => Promise<boolean>;
+  removeAttachment: (attachmentId: string, fromCardId?: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
 }

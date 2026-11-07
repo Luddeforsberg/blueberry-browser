@@ -275,10 +275,14 @@ export class Nests {
     const place = this.placing(options);
     const open = this.store.openRequest(nestId);
     const pending = board.cards.filter((card) => card.plan?.state === "planned");
-    // Without a model to plan with, it's one card, as before.
-    if (!this.planner.available()) return this.oneCard(nestId, words, chosen, place) ? { ok: true } : { ok: false, error: "That couldn’t start." };
+    // Without a model to plan with, it's one card, as before. Not while a plan waits, whose cards point at the composer's
+    // files, which that card would take.
+    if (!this.planner.available()) {
+      if (pending.length > 0) return { ok: false, error: "Run or discard the plan first, since Berry needs a model to change it." };
+      return this.oneCard(nestId, words, chosen, place) ? { ok: true } : { ok: false, error: "That couldn’t start." };
+    }
 
-    // Only the composer's files and notes are the planner's to give to cards, as short keys. What the user added on a
+    // Only the composer's files and notes are the planner's to point cards at, as short keys. What the user added on a
     // planned card stays that card's: it goes with the card if the new plan keeps its key, and back to the composer if not.
     const attachable = this.store.attachmentRows({ nestId }).map((row, index) => ({ ...row, key: `a${index + 1}` }));
     const attachedKeys = new Map(attachable.map((row) => [row.key, row.id]));
@@ -315,7 +319,7 @@ export class Nests {
     else if (
       checked.cards.some((card) => {
         const kept = planKeys.get(card.key);
-        return this.overfull([...(kept ? this.store.ownAttachmentRows(kept) : []), ...card.attached.map((key) => attachable.find((row) => row.key === key)!)]);
+        return this.overfull([...(kept ? this.store.attachmentRows({ cardId: kept }) : []), ...card.attached.map((key) => attachable.find((row) => row.key === key)!)]);
       })
     )
       this.store.say(nestId, "berry", planRefused("a card would get more files than one card can take"));
@@ -352,10 +356,9 @@ export class Nests {
       if (this.flockId(card.mascotId) === undefined) return { ok: false, error: `${name} isn’t in your flock any more. Choose another bird for that card.` };
       if (card.plan!.each && !this.getsTable(card.id)) return { ok: false, error: `For each row on ${name}’s card needs a card that answers with a table.` };
     }
+    // Each card gets its own copy of the composer's it points at, as they are now.
     this.store.armPlan(nestId);
     this.store.closeRequest(nestId);
-    // Each planned card has its own copy of what it was given.
-    this.store.clearComposer(nestId);
     this.advance(nestId);
     return { ok: true };
   }
@@ -363,7 +366,6 @@ export class Nests {
   discardPlan(nestId: string): boolean {
     if (this.store.discardPlan(nestId) === 0) return false;
     this.store.closeRequest(nestId);
-    this.store.clearComposer(nestId);
     this.changed(nestId);
     return true;
   }
@@ -376,7 +378,7 @@ export class Nests {
     const checked = checkFile(name, bytes, inputs);
     if (!checked.ok) return checked;
     const { type, size, pages } = checked.file;
-    const problem = roomProblem(this.store.attachmentRows(to), { kind: "file", name, size, pages });
+    const problem = roomProblem(this.roomOf(to), { kind: "file", name, size, pages });
     if (problem) return { ok: false, error: problem };
     if (!this.store.addAttachment(to, { kind: "file", name, type, size, pages, data: bytes })) return { ok: false, error: "That card isn’t there any more." };
     this.changedAt(to);
@@ -389,7 +391,7 @@ export class Nests {
     if (!to) return { ok: false, error: this.replanning(target) ? STILL_PLANNING : "Notes can only be added before a card is sent." };
     if (!words) return { ok: false, error: "Write the note first." };
     if (words.length > MAX_NOTE_LENGTH) return { ok: false, error: `A note can be ${MAX_NOTE_LENGTH} characters at most.` };
-    const problem = roomProblem(this.store.attachmentRows(to), { kind: "note", size: 0, pages: null });
+    const problem = roomProblem(this.roomOf(to), { kind: "note", size: 0, pages: null });
     if (problem) return { ok: false, error: problem };
     if (!this.store.addAttachment(to, { kind: "note", text: words })) return { ok: false, error: "That card isn’t there any more." };
     this.changedAt(to);
@@ -406,7 +408,14 @@ export class Nests {
     return true;
   }
 
-  removeAttachment(id: unknown): boolean {
+  // From a planned card, one of the composer's it points at only stops being pointed at.
+  removeAttachment(id: unknown, fromCardId?: unknown): boolean {
+    if (typeof id === "string" && typeof fromCardId === "string") {
+      const card = this.store.card(fromCardId);
+      if (!card || !this.changeable({ cardId: fromCardId }) || !this.store.unpoint(fromCardId, id)) return false;
+      this.changed(card.nestId);
+      return true;
+    }
     const at = typeof id === "string" ? this.store.attachment(id) : null;
     if (!at || !this.changeable(at.cardId ? { cardId: at.cardId } : { nestId: at.nestId })) return false;
     if (!this.store.removeAttachment(id as string)) return false;
@@ -440,6 +449,11 @@ export class Nests {
   private attachmentsFor(cardId: string): { attachments?: SentAttachment[] } {
     const attachments = this.store.sentAttachments(cardId);
     return attachments.length > 0 ? { attachments } : {};
+  }
+
+  // What already takes room: the composer's, or a card's own and those it points at.
+  private roomOf(to: AttachTo): AttachmentRow[] {
+    return [...this.store.attachmentRows(to), ...("cardId" in to ? this.store.pointedAt(to.cardId) : [])];
   }
 
   // Whether these would break a card's limits together, given to it by a plan.
@@ -644,7 +658,8 @@ export class Nests {
         each: card.plan!.each,
         waits: card.plan!.waits,
         table: card.plan!.table,
-        own: this.store.ownAttachmentRows(card.id).map((row) => (row.kind === "note" ? "a note" : row.name)),
+        own: this.store.attachmentRows({ cardId: card.id }).map((row) => (row.kind === "note" ? "a note" : row.name)),
+        attached: this.store.pointedAt(card.id).flatMap((row) => attachable.find((each) => each.id === row.id)?.key ?? []),
       };
     });
     const flock: MascotProfile[] = this.mascots.all().filter((mascot) => mascot.deletedAt === null);

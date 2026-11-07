@@ -46,23 +46,33 @@ describe("NestStore", () => {
     expect(again.sentAttachments(writer.id)).toEqual([]);
   });
 
-  it("links a plan's copies made before copies named their original, so they aren't taken for the card's own", () => {
+  it("counts a file added on a planned card before the pointers as the card's own, even when the composer has the same one", () => {
     const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
     const store = new NestStore(file);
     const nest = store.createNest("Find customers");
-    const card = store.addCard(nest, { x: 0, y: 0, planned: true })!;
-    const bytes = new Uint8Array([37, 80, 68, 70]);
-    const pdf = { kind: "file" as const, name: "one-pager.pdf", type: "application/pdf", size: 4, pages: 1, data: bytes };
+    const scout = store.addCard(nest, { x: 0, y: 0, planned: true })!;
+    const writer = store.addCard(nest, { x: 500, y: 0, planned: true })!;
+    const pdf = { kind: "file" as const, name: "one-pager.pdf", type: "application/pdf", size: 4, pages: 1, data: new Uint8Array([37, 80, 68, 70]) };
     store.addAttachment({ nestId: nest }, pdf);
-    store.addAttachment({ cardId: card.id }, pdf);
-    store.addAttachment({ cardId: card.id }, { kind: "note", text: "Added here" });
-    // As a file from before migration 6 has them: no source on anything.
+    store.addAttachment({ cardId: writer.id }, pdf);
+    // As a file from before migration 6 has it.
     const db = new DatabaseSync(file);
-    db.exec("ALTER TABLE attachments DROP COLUMN source_id; PRAGMA user_version = 5;");
+    db.exec("PRAGMA user_version = 5;");
+    for (const column of ["source_id"]) {
+      try {
+        db.exec(`ALTER TABLE attachments DROP COLUMN ${column}`);
+      } catch {
+        // Not there in this version.
+      }
+    }
+    db.exec("DROP TABLE IF EXISTS plan_attachments;");
     db.close();
 
     const again = new NestStore(file);
-    expect(again.ownAttachmentRows(card.id).map((row) => row.kind)).toEqual(["note"]);
+    const plan = (key: string, keeps: string | null) => ({ key, mascotId: null, prompt: `Do ${key}`, from: null, each: false, waits: false, table: null, x: 0, y: 0, attached: [], keeps });
+    const [, kept] = again.setPlan(nest, [plan("p1", scout.id), plan("p2", writer.id)], "Find companies")!;
+    expect(again.card(kept)!.attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
+    expect(again.board(nest)!.attached.map((each) => each.name)).toEqual(["one-pager.pdf"]);
   });
 
   it("only draws a line from a card in the same nest", () => {

@@ -114,6 +114,9 @@ export const Attachments: React.FC<{ attachments: NestAttachment[]; target: Nest
     if (attachments.length === 0 && !writing && problems.length === 0) return null
     const editable = !!target
     const shown = open || writing
+    // From a planned card, one of the composer's it points at is only taken off this card.
+    const remove = (each: NestAttachment) =>
+        void api.removeAttachment(each.id, each.shared && target && 'cardId' in target ? target.cardId : undefined)
 
     return (
         <div className={cn("nodrag cursor-auto flex flex-col gap-1.5", className)}>
@@ -159,7 +162,7 @@ export const Attachments: React.FC<{ attachments: NestAttachment[]; target: Nest
                                             <span className="block text-12 text-muted-foreground">Your note</span>
                                             <span className="nowheel block max-h-48 overflow-y-auto whitespace-pre-wrap">{each.text}</span>
                                         </button>
-                                        {editable && <RemoveButton label="Remove your note" onClick={() => void api.removeAttachment(each.id)} />}
+                                        {editable && <RemoveButton label="Remove your note" onClick={() => remove(each)} />}
                                     </>
                                 )}
                             </li>
@@ -172,7 +175,7 @@ export const Attachments: React.FC<{ attachments: NestAttachment[]; target: Nest
                                 )}
                                 <span className="flex-1 min-w-0 truncate text-13">{each.name}</span>
                                 <span className="shrink-0 text-12 text-muted-foreground">{formatBytes(each.size)}</span>
-                                {editable && <RemoveButton label={`Remove ${each.name}`} onClick={() => void api.removeAttachment(each.id)} />}
+                                {editable && <RemoveButton label={`Remove ${each.name}`} onClick={() => remove(each)} />}
                             </li>
                         )
                     )}

@@ -451,6 +451,9 @@ export interface NestAttachment {
   size: number;
   // A note's words.
   text?: string;
+  // On a planned card, one of the composer's it points at, which it gets a copy of at Run. Removing it there only stops
+  // pointing, and changing a note changes it for every card that points at it.
+  shared?: boolean;
 }
 
 // A card Berry planned. Planned until the user presses Run, when it's armed: it starts by itself once the card it reads

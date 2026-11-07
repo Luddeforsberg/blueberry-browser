@@ -236,7 +236,7 @@ export class EventManager {
     this.handle("nests:attach-files", (target) => this.mainWindow.attachFiles(target));
     this.handle("nests:add-note", (target, text) => nests.addNote(target, text));
     this.handle("nests:edit-note", (attachmentId, text) => nests.editNote(attachmentId, text));
-    this.handle("nests:remove-attachment", (attachmentId) => nests.removeAttachment(attachmentId));
+    this.handle("nests:remove-attachment", (attachmentId, fromCardId) => nests.removeAttachment(attachmentId, fromCardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

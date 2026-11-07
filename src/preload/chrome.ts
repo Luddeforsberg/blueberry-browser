@@ -122,7 +122,7 @@ const chromeAPI: ChromeAPI = {
     attachFiles: (target) => invoke("nests:attach-files", target),
     addNote: (target, text) => invoke("nests:add-note", target, text),
     editNote: (attachmentId, text) => invoke("nests:edit-note", attachmentId, text),
-    removeAttachment: (attachmentId) => invoke("nests:remove-attachment", attachmentId),
+    removeAttachment: (attachmentId, fromCardId) => invoke("nests:remove-attachment", attachmentId, fromCardId),
     onUpdated: (callback) => subscribe("nests:updated", callback),
     onDeleted: (callback) => subscribe("nests:deleted", callback),
   },

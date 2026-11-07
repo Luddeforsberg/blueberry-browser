@@ -797,20 +797,79 @@ describe("Files and notes on a card", () => {
     expect(named(nests.board(nest)!.attached)).toEqual(["one-pager.pdf"]);
   });
 
-  it("keeps a note the user changed on a planned card, even one the plan copied from the composer", async () => {
-    const { nests } = setup();
+  it("only points planned cards at the composer's files and notes, so a changed plan, a removal on a card, an edit and Discard leave them where they are", async () => {
+    const { nests, store } = setup();
     const nest = nests.create();
     nests.addNote({ nestId: nest }, "Only B2B");
-    plans.push({ ...TWO_JOBS, cards: [TWO_JOBS.cards[0], { ...TWO_JOBS.cards[1], attached: ["a1"] }] });
+    nests.attachFile({ nestId: nest }, "one-pager.pdf", PDF, READS_ALL);
+    const [note, pdf] = nests.board(nest)!.attached;
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a1"] }, { ...TWO_JOBS.cards[1], attached: ["a1", "a2"] }] });
     await nests.ask(nest, "Find companies and write to each", PLACE);
-    const [note] = nests.board(nest)!.cards[1].attachments;
-    expect(nests.editNote(note.id, "Only B2B, and only in Sweden")).toBe(true);
+    // One of each, on the composer, which both cards point at. Nothing was copied.
+    const [scout, writer] = nests.board(nest)!.cards;
+    expect(scout.attachments).toEqual([{ ...note, shared: true }]);
+    expect(writer.attachments).toEqual([{ ...note, shared: true }, { ...pdf, shared: true }]);
+    expect(store.attachmentRows({ cardId: scout.id })).toEqual([]);
+    expect(nests.board(nest)!.attached).toEqual([note, pdf]);
 
-    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1" }, { ...TWO_JOBS.cards[1], key: "p2", from: "p1" }] });
-    await nests.ask(nest, "Make the emails shorter", PLACE);
-    expect(nests.board(nest)!.cards[1].attachments.map((each) => each.text)).toEqual(["Only B2B, and only in Sweden"]);
+    // Changed from a card, the note is the composer's, so every card pointing at it sees the change.
+    expect(nests.editNote(note.id, "Only B2B, in Sweden")).toBe(true);
+    expect(nests.board(nest)!.cards.map((card) => card.attachments[0].text)).toEqual(["Only B2B, in Sweden", "Only B2B, in Sweden"]);
+    // Removed from one card, it only stops pointing there.
+    expect(nests.removeAttachment(note.id, writer.id)).toBe(true);
+    expect(nests.board(nest)!.cards.map((card) => card.attachments.map((each) => each.id))).toEqual([[note.id], [pdf.id]]);
+    expect(nests.board(nest)!.attached.map((each) => each.id)).toEqual([note.id, pdf.id]);
+
+    // A changed plan only points again.
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], key: "p1", attached: ["a2"] }, { ...TWO_JOBS.cards[1], key: "p2", from: "p1" }] });
+    await nests.ask(nest, "Swap them", PLACE);
+    expect(planned.at(-1)!.messages[0].content).toContain('<planned key="p2" bird="berry" from="p1" for_each_row="true" waits_for_user="false" table_of="" attached="a2"');
+    expect(nests.board(nest)!.cards.map((card) => card.attachments.map((each) => each.id))).toEqual([[pdf.id], []]);
+    expect(nests.board(nest)!.attached.map((each) => each.id)).toEqual([note.id, pdf.id]);
+
+    // Discard only takes the pointers away.
     nests.discardPlan(nest);
-    expect(nests.board(nest)!.attached.map((each) => each.text)).toEqual(["Only B2B", "Only B2B, and only in Sweden"]);
+    expect(nests.board(nest)!.attached).toEqual([{ ...note, text: "Only B2B, in Sweden", size: 19 }, pdf]);
+  });
+
+  it("gives a card at Run the composer's note as it is then, edited after planning", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    nests.addNote({ nestId: nest }, "Original");
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a1"] }, TWO_JOBS.cards[1]] });
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+    const [note] = nests.board(nest)!.attached;
+    expect(nests.editNote(note.id, "Revised")).toBe(true);
+    held = [];
+    expect(nests.runPlan(nest)).toEqual({ ok: true });
+    const scout = nests.board(nest)!.cards[0];
+    // Its own copy now, and a copy only goes with the press that made it: the composer had nothing else.
+    expect(scout.attachments).toEqual([expect.objectContaining({ kind: "note", text: "Revised" })]);
+    expect(scout.attachments[0].shared).toBeUndefined();
+    expect(scout.attachments[0].id).not.toBe(note.id);
+    expect(nests.board(nest)!.attached).toEqual([]);
+    await settle();
+    expect(textOf(sent[0])).toContain("<user_note>\nRevised\n</user_note>");
+    await release();
+  });
+
+  it("won't start a card from the composer without a model while a plan that points at its files waits", async () => {
+    const { nests, store, chats } = setup();
+    const nest = nests.create();
+    nests.attachFile({ nestId: nest }, "one-pager.pdf", PDF, READS_ALL);
+    plans.push({ ...TWO_JOBS, cards: [{ ...TWO_JOBS.cards[0], attached: ["a1"] }, TWO_JOBS.cards[1]] });
+    await nests.ask(nest, "Find companies and write to each", PLACE);
+
+    // As after a launch with no model.
+    const flock = [BERRY, SCOUT];
+    const without = new Nests(store, chats, { resolve: (id) => flock.find((mascot) => mascot.id === (id ?? BERRY.id))!, all: () => flock }, {
+      onBoard: () => {},
+      onListChanged: () => {},
+      chatDeleted: () => {},
+    });
+    expect(await without.ask(nest, "Just write one email", PLACE)).toEqual({ ok: false, error: "Run or discard the plan first, since Berry needs a model to change it." });
+    expect(without.board(nest)!.cards.map((card) => card.attachments.length)).toEqual([1, 0]);
+    expect(without.board(nest)!.attached.map((each) => each.name)).toEqual(["one-pager.pdf"]);
   });
 
   it("refuses a plan that gives a card a file the user didn't attach", async () => {
