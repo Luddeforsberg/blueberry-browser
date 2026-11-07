@@ -497,8 +497,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     }, [])
     const doneFlying = useCallback((id: number) => setFlights((current) => current.filter((flight) => flight.id !== id)), [])
 
+    // A new card closes the open one, so it never lands behind the layer that dims the board.
     const add = useCallback(
         async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string; picked?: PickedRows } = {}) => {
+            open(null)
             const card = await api.addCard(board.id, { ...spot, ...extra })
             if (card) {
                 setFocusId(card.id)
@@ -506,7 +508,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             }
             return card
         },
-        [api, board.id, reveal]
+        [api, board.id, reveal, open]
     )
 
     // Empty drafts go when the user starts something else, so the board never fills with them. A plan's cards stay, and
@@ -629,6 +631,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         const at = flow.screenToFlowPosition({ x: box.left + EDGE_INSET.x, y: box.top + EDGE_INSET.y })
         setPrompt('')
         setProblem(null)
+        open(null)
         dropEmptyDrafts()
         const taken = rects()
         if (!pending) setGhostsAt(freeSpot(taken, at, { width: CARD_WIDTH * 2 + CARD_GAP, height: PLANNED_HEIGHT }))

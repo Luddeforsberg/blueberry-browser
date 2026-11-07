@@ -75,16 +75,28 @@ test("a card pulled out of another gets its latest answer, and the Nest keeps bo
   await expect(draft.getByRole("status")).toHaveText("Done");
   await expect(draft).toContainText("Two drafts written.");
 
-  // Opened, a card floats over the board, which dims behind it, so a press on another card only closes it.
+  // Opened, a card floats over the board, which dims behind it: the card takes the pointer, and a press on another card
+  // only closes it.
   await first.getByRole("button", { name: "Open the whole chat" }).click();
   const reply = first.getByPlaceholder("Reply to Berry");
-  await expect(reply).toBeVisible();
   const dim = chrome.locator("[data-open-dim]");
   await expect(dim).toHaveCSS("opacity", "1");
+  await reply.click();
+  await expect(reply).toBeFocused();
   const other = (await draft.boundingBox())!;
   await chrome.mouse.click(other.x + other.width / 2, other.y + other.height / 2);
   await expect(reply).toHaveCount(0);
   await expect(dim).toHaveCSS("opacity", "0");
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(2);
+
+  // A new card pulled out of an open one closes it, so the draft isn't left behind the dim.
+  await first.getByRole("button", { name: "Open the whole chat" }).click();
+  await first.getByRole("button", { name: "Continue in a new card" }).click();
+  await expect(reply).toHaveCount(0);
+  await expect(dim).toHaveCSS("opacity", "0");
+  const pulled = chrome.locator(".react-flow__node").nth(2);
+  await pulled.getByRole("textbox", { name: "What should Berry do?" }).press("Escape");
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(2);
 
   // The model got the first card's answer as tagged, untrusted data, and the user's words after it.
   expect(model.requests).toHaveLength(2);
