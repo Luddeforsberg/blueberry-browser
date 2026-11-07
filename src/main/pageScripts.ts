@@ -175,12 +175,26 @@ const withElement = (ref: string, body: string): string => `(() => {
   ${body}
 })()`;
 
-const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
+const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), secret: isSecret(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
 
 export const describeElement = (ref: string): string => withElement(ref, `return { ${DESCRIBE_FIELDS} };`);
 
 // Where real input should go for this element, in the top page's pixels, or null if it can't go there: it's off
 // screen, or inside a frame from another origin, where the top page can't measure it and real input doesn't reach.
+// For a click allowed for a card's runs, only the element itself counts, or something inside it with nothing a person
+// could click on its own in between: never a link or button inside it, anything around it, or a frame. Exported so the
+// rule can be tested on its own.
+export const PRESS_RULE = `
+  const INTERACTIVE = "a, button, input, select, textarea, [role=button], [role=link], [onclick], [tabindex], iframe, frame";
+  const onlyIt = (hit, el) => {
+    for (let at = hit; at; at = parentOf(at)) {
+      if (at === el) return true;
+      if (at.matches?.(INTERACTIVE)) return false;
+    }
+    return false;
+  };
+`;
+
 const AIM = `
   const isFrame = (el) => el?.tagName === "IFRAME" || el?.tagName === "FRAME";
   const pointOn = (el) => {
@@ -226,6 +240,7 @@ const AIM = `
     if (!hit || hit === hit.ownerDocument.body || hit === hit.ownerDocument.documentElement) return false;
     return isInside(hit, el) || isInside(el, hit) || [...(el.labels ?? [])].some((label) => isInside(hit, label));
   };
+  ${PRESS_RULE}
   // Real input is checked by whether it arrives, because nothing says when it goes astray.
   const expect = (win, type) => {
     state.landed = false;
@@ -234,14 +249,14 @@ const AIM = `
   // A page can move between aiming and pressing, or put something new under the pointer once pressed, and the card
   // named this element and nothing else. So whatever arrives on anything else is stopped before the page's own
   // listeners, for the whole click. A drag only guards its press, because it's meant to let go somewhere else.
-  const expectPressOn = (el, { pressOnly = false } = {}) => {
+  const expectPressOn = (el, { pressOnly = false, strict = false } = {}) => {
     state.stopWatching?.();
     state.landed = false;
     const targets = new Set([window, el.ownerDocument.defaultView]);
     const types = ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "dblclick"];
     const watch = (event) => {
       if (!event.isTrusted) return;
-      const onIt = reaches(event.composedPath()[0], el);
+      const onIt = strict ? onlyIt(event.composedPath()[0], el) : reaches(event.composedPath()[0], el);
       if (state.landed === false) state.landed = onIt ? true : "missed";
       // The press arrived but the rest of the click is about to be stopped, so it didn't happen.
       else if (state.landed === true && !onIt && !pressOnly) state.landed = "missed";
@@ -272,7 +287,8 @@ export interface Aim {
 // picker, which nobody here can answer, so those are never really clicked.
 // Pages often move when they're scrolled, so it only scrolls if it has to, and never in the same step as aiming.
 // `arm: false` is only for finding out where it is, with no watch set on the page.
-export const aimClick = (ref: string, mayScroll: boolean, arm = true): string =>
+// `strict` is only for a click allowed for a card's runs: the press then counts only on the element itself (`onlyIt`).
+export const aimClick = (ref: string, mayScroll: boolean, arm = true, strict = false): string =>
   withElement(
     ref,
     `${AIM}
@@ -288,8 +304,17 @@ export const aimClick = (ref: string, mayScroll: boolean, arm = true): string =>
        if (!point) return { status: "scripted" };
        return { status: "covered", by: (hit && nameOf(hit)) || hit?.tagName.toLowerCase() || "nothing" };
      }
-     ${arm ? "expectPressOn(el);" : ""}
+     ${arm ? `expectPressOn(el${strict ? ", { strict: true }" : ""});` : ""}
      return { status: "aimed", ...point };`
+  );
+
+// Whether a press at this point, as a person's would, lands on the element itself, by the same rule as a strict aim. For a
+// click allowed for a card's runs, just before it's pressed.
+export const pressLandsOn = (ref: string, x: number, y: number): string =>
+  withElement(
+    ref,
+    `${AIM}
+     return onlyIt(hitAt({ x: ${Number(x)}, y: ${Number(y)} }), el);`
   );
 
 // False until the input arrives, then true, or "missed" for a press that was stopped. A new page has no record, so

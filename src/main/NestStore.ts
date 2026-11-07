@@ -111,7 +111,32 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN table_preview TEXT;
    ALTER TABLE cards ADD COLUMN table_rows TEXT;
    UPDATE cards SET each_column = 'Result' WHERE each_prompt IS NOT NULL;`,
+  // A card can read from several cards now, each line once, in the order they were drawn, which is the order the card
+  // lists them and the model gets them.
+  `CREATE TABLE lines_many (
+     id TEXT PRIMARY KEY,
+     nest_id TEXT NOT NULL REFERENCES nests(id) ON DELETE CASCADE,
+     from_card TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+     to_card TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+     picked TEXT,
+     CHECK (from_card <> to_card),
+     UNIQUE (from_card, to_card)
+   );
+   INSERT INTO lines_many (id, nest_id, from_card, to_card, picked) SELECT id, nest_id, from_card, to_card, picked FROM lines ORDER BY rowid;
+   DROP TABLE lines;
+   ALTER TABLE lines_many RENAME TO lines;
+   CREATE INDEX lines_by_to ON lines(to_card);`,
+  // The line a For-each card's runs took their rows from, and what a run's earlier tries cost before Retry replaced them.
+  `ALTER TABLE cards ADD COLUMN each_line TEXT;
+   ALTER TABLE runs ADD COLUMN spent REAL NOT NULL DEFAULT 0;`,
 ];
+
+// One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
+export interface CardLine {
+  lineId: string;
+  source: NestCard;
+  picked: PickedRows | null;
+}
 
 export interface AttachmentRow {
   id: string;
@@ -189,7 +214,8 @@ export interface NewPlannedCard {
   key: string;
   mascotId: string | null;
   prompt: string;
-  from: { plan: string } | { card: string } | null;
+  // What it reads from, in order: other cards of the same plan by their key, or cards on the board.
+  from: ({ plan: string } | { card: string })[];
   each: boolean;
   waits: boolean;
   table: string | null;
@@ -396,29 +422,42 @@ export class NestStore {
     return done;
   }
 
-  // The card it continues from, if any.
-  sourceOf(id: string): NestCard | null {
-    return this.lineTo(id)?.source ?? null;
+  // Every line into a card, in the order they were drawn.
+  linesTo(id: string): CardLine[] {
+    const rows = this.db.prepare("SELECT id, from_card, picked FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as { id: string; from_card: string; picked: string | null }[];
+    return rows.flatMap((row) => {
+      const source = this.card(row.from_card);
+      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null }] : [];
+    });
   }
 
-  // The line into a card: where it comes from, and the rows picked from it if any.
-  lineTo(id: string): { source: NestCard; picked: PickedRows | null } | null {
-    const row = this.db.prepare("SELECT from_card, picked FROM lines WHERE to_card = ?").get(id) as { from_card: string; picked: string | null } | undefined;
-    const source = row && this.card(row.from_card);
-    return source ? { source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null } : null;
+  // The cards that read from this one.
+  cardsAfter(id: string): string[] {
+    return (this.db.prepare("SELECT to_card FROM lines WHERE from_card = ? ORDER BY rowid").all(id) as { to_card: string }[]).map((row) => row.to_card);
+  }
+
+  // Another input on a card, after the ones it has. The caller checks it's allowed. False if it's there already, the
+  // cards aren't both in this Nest, or it would be a line from a card to itself.
+  addLine(nestId: string, from: string, to: string, picked: PickedRows | null): boolean {
+    if (from === to || this.card(from)?.nestId !== nestId || this.card(to)?.nestId !== nestId) return false;
+    const done =
+      this.db.prepare("INSERT OR IGNORE INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, ?)").run(randomUUID(), nestId, from, to, picked ? JSON.stringify(picked) : null)
+        .changes > 0;
+    if (done) this.touch(nestId);
+    return done;
   }
 
   // A draft becomes a For-each card, with one waiting run for each row, in one go. False if it isn't a draft.
-  startForEach(id: string, prompt: string, header: string[], rows: string[][], column: string): boolean {
+  startForEach(id: string, prompt: string, header: string[], rows: string[][], column: string, lineId: string): boolean {
     const card = this.card(id);
     if (!card) return false;
     this.db.exec("BEGIN");
     try {
       const changed = this.db
         .prepare(
-          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL"
+          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_line = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL"
         )
-        .run(prompt, JSON.stringify(header), column, id).changes;
+        .run(prompt, JSON.stringify(header), column, lineId, id).changes;
       if (changed === 0) throw new NotHere();
       const insert = this.db.prepare("INSERT INTO runs (id, card_id, position, row, chat_id, state) VALUES (?, ?, ?, ?, NULL, 'waiting')");
       rows.forEach((row, position) => insert.run(randomUUID(), id, position, JSON.stringify(row)));
@@ -499,6 +538,40 @@ export class NestStore {
     return this.db.prepare("UPDATE runs SET chat_id = ?, state = 'started' WHERE id = ? AND state = 'waiting'").run(chatId, id).changes > 0;
   }
 
+  // Runs of one card go back to waiting their turn, each with no chat and no value, for Retry and Start remaining. Only
+  // runs that had stopped or failed, or started, so one waiting or about to start is left alone. The chats they had, for
+  // the caller to delete.
+  // `costOf` is what a run's chat cost, which the run keeps, since the chat goes.
+  restartRuns(cardId: string, ids: readonly string[], costOf: (chatId: string) => number): string[] {
+    const chats: string[] = [];
+    this.db.exec("BEGIN");
+    try {
+      const old = this.db.prepare("SELECT chat_id FROM runs WHERE id = ? AND card_id = ? AND state <> 'waiting'");
+      const restart = this.db.prepare("UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL, spent = spent + ? WHERE id = ? AND card_id = ? AND state <> 'waiting'");
+      for (const id of ids) {
+        const row = old.get(id, cardId) as { chat_id: string | null } | undefined;
+        if (row && restart.run(row.chat_id ? costOf(row.chat_id) : 0, id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);
+      }
+      const card = this.card(cardId);
+      if (card) this.touch(card.nestId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return chats;
+  }
+  // What a For-each card's runs cost on tries Retry replaced.
+  spentOn(cardId: string): number {
+    return (this.db.prepare("SELECT COALESCE(SUM(spent), 0) AS spent FROM runs WHERE card_id = ?").get(cardId) as { spent: number }).spent;
+  }
+
+  // The line a For-each card's runs took their rows from, null for one sent before that was kept.
+  eachLine(cardId: string): string | null {
+    return (this.db.prepare("SELECT each_line FROM cards WHERE id = ?").get(cardId) as { each_line: string | null } | undefined)?.each_line ?? null;
+  }
+
+
   setRunState(id: string, state: "stopped" | "failed"): boolean {
     return this.db.prepare("UPDATE runs SET state = ? WHERE id = ? AND state = 'waiting'").run(state, id).changes > 0;
   }
@@ -550,11 +623,12 @@ export class NestStore {
       for (const id of replaced) remove.run(id);
       const line = this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card) VALUES (?, ?, ?, ?)");
       for (const card of cards) {
-        if (!card.from) continue;
-        const from = "plan" in card.from ? ids.get(card.from.plan) : card.from.card;
-        const source = from === undefined ? null : this.card(from);
-        if (!source || source.nestId !== nestId || (!("plan" in card.from) && !source.chatId && !source.each && !source.table)) throw new NotHere();
-        line.run(randomUUID(), nestId, from!, ids.get(card.key)!);
+        for (const each of card.from) {
+          const from = "plan" in each ? ids.get(each.plan) : each.card;
+          const source = from === undefined ? null : this.card(from);
+          if (!source || source.nestId !== nestId || (!("plan" in each) && !source.chatId && !source.each && !source.table)) throw new NotHere();
+          line.run(randomUUID(), nestId, from!, ids.get(card.key)!);
+        }
       }
       this.touch(nestId);
       this.db.exec("COMMIT");

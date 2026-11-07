@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   aimClick,
+  pressLandsOn,
   aimHover,
   aimKey,
   beginTyping,
@@ -28,6 +29,7 @@ import {
 import { clickAt, DRAG_MS, dragBetween, isHarmlessKey, isKnownKey, KEY_NAMES, landed, moveTo, pause, pressKey } from "./pageInput";
 import { typingChunks, typingPauseMs, type Landing, type PageActor, type Spot } from "./PageActor";
 import type { PageFrame, PageTarget } from "./pageTarget";
+import { addressGrant, clickGrant, type GrantKey } from "./cardGrant";
 import type { HandoffNeed, MascotProfile, MascotTool } from "../shared/library";
 import { NOWHERE, siteAllowed } from "../shared/mascots";
 import { cleanLine } from "../shared/publishing";
@@ -58,7 +60,9 @@ export interface PageTool {
   // What the chat shows for this call. It goes back to the model in later messages as Berry's own words,
   // so nothing a page could have written goes in it: no titles, and no search text.
   label: (args: unknown) => string;
-  run: (args: unknown) => Promise<string>;
+  // `granted` is set only for a call that didn't ask because the user allowed exactly it for a card's runs: the key it
+  // matched, which the element must still have as the press goes in.
+  run: (args: unknown, granted?: string) => Promise<string>;
   // Set on anything that changes something. Says exactly what will happen, for the user to allow. It's worked
   // out again just before the tool runs, and a different answer means nothing happens.
   describe?: (args: unknown) => Promise<string>;
@@ -76,6 +80,9 @@ export interface PageTool {
   // What the chat always shows instead of `label`, when that's text the model wrote that the user should see, such as
   // what went out in a search. Like `allowedLabel`, it never goes back to the model.
   shownLabel?: (args: unknown) => string;
+  // Exactly the action this call is, for Allow for this card's runs (see `cardGrant.ts`). Only click, go_to and open_tab
+  // have one, and it's null where the action can't be matched that exactly, so nothing is offered and it always asks.
+  grantKey?: (args: unknown) => Promise<GrantKey | null>;
 }
 
 // What each tool needs from a mascot. "reading" and "asking" are every mascot's. A tool that isn't listed here is
@@ -118,24 +125,26 @@ const pageTool = <S extends z.ZodObject>(tool: {
   description: string;
   schema: S;
   label: (args: z.infer<S>) => string;
-  run: (args: z.infer<S>) => Promise<string>;
+  run: (args: z.infer<S>, granted?: string) => Promise<string>;
   describe?: (args: z.infer<S>) => Promise<string>;
   whileAsking?: (args: z.infer<S>) => void;
   isRisky?: (args: z.infer<S>) => Promise<boolean>;
   returnsImage?: boolean;
   allowedLabel?: (args: z.infer<S>) => string | null;
   shownLabel?: (args: z.infer<S>) => string;
+  grantKey?: (args: z.infer<S>) => Promise<GrantKey | null>;
 }): PageTool => {
-  const { describe, whileAsking, isRisky, allowedLabel, shownLabel } = tool;
+  const { describe, whileAsking, isRisky, allowedLabel, shownLabel, grantKey } = tool;
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
-    run: (args) => tool.run(tool.schema.parse(args)),
+    run: (args, granted) => tool.run(tool.schema.parse(args), granted),
     describe: describe && ((args) => describe(tool.schema.parse(args))),
     whileAsking: whileAsking && ((args) => whileAsking(tool.schema.parse(args))),
     isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
     allowedLabel: allowedLabel && ((args) => allowedLabel(tool.schema.parse(args))),
     shownLabel: shownLabel && ((args) => shownLabel(tool.schema.parse(args))),
+    grantKey: grantKey && ((args) => grantKey(tool.schema.parse(args))),
   };
 };
 
@@ -182,6 +191,8 @@ interface ElementInfo {
   target: string | null;
   riskyClick: boolean;
   safeToType: boolean;
+  // A password, a code or card details, which no grant ever covers.
+  secret?: boolean;
   // Set for a same-origin frame: where in the site this is.
   frameUrl: string | null;
   // Set for a frame from another origin, by the main process rather than the frame: the site it's really from.
@@ -532,6 +543,11 @@ export const createPageTools = <T extends PageTarget>({
   };
   const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
+  const GRANT_CHANGED = "Nothing happened, because what's there changed from what the user allowed for this card's runs. Look at the page again.";
+  const GRANT_ELSEWHERE =
+    "Nothing happened, because something other than what the user allowed for this card's runs was under the pointer there, such as a link inside it or a frame over it. Look at the page again.";
+  const GRANT_NO_PRESS =
+    "Nothing happened, because the click didn't reach it as a real press, and what's allowed for this card's runs is only that. Look at the page again.";
   const leftOff = (tab: T) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
@@ -608,10 +624,23 @@ export const createPageTools = <T extends PageTarget>({
 
   // Real input where it can go, and a scripted click where it can't. Either way it's the element the card named:
   // something covering it gets the scripted click sent straight to the element, not the real one.
-  const clickRef = async (tab: T, ref: string, clicks: 1 | 2) => {
+  // `granted` is only for a single click that went through Allow for this card's runs: whether the element still has the
+  // key that was allowed. It's checked as the click begins and just before the press, along with what's under the pointer,
+  // which must be the element itself, and the click goes only as real input, never as a scripted one.
+  const clickRef = async (tab: T, ref: string, clicks: 1 | 2, granted?: () => Promise<boolean>) => {
     const doing = clicks === 2 ? "Double-clicking" : "Clicking";
-    const scripted = () => onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks));
+    if (granted && !(await granted())) return GRANT_CHANGED;
+    const scripted = () => (granted ? Promise.resolve(GRANT_NO_PRESS) : onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks)));
+    let refused: string | null = null;
+    const goOn = (x: number, y: number) => async () => {
+      if (!carryOn(tab)) return false;
+      if (!granted) return true;
+      if (!(await granted())) refused = GRANT_CHANGED;
+      else if ((await tab.runInPage<boolean | null>(pressLandsOn(ref, x, y)).catch(() => null)) !== true) refused = GRANT_ELSEWHERE;
+      return refused === null;
+    };
     const finish = (result: string | null, note = "") => {
+      if (result === GRANT_NO_PRESS) return GRANT_NO_PRESS;
       if (result === null) return STALE_ELEMENT;
       if (result === "disabled") return "That element is disabled, so nothing happened.";
       return whereNow(tab).then((where) => (note ? `${where} ${note}` : where));
@@ -624,27 +653,27 @@ export const createPageTools = <T extends PageTarget>({
     const arm = !actorOn(tab);
     const aimAgain = async () => {
       await pause(SCROLL_SETTLE_MS);
-      return tab.runInPage<Aim | null>(aimClick(ref, false, arm));
+      return tab.runInPage<Aim | null>(aimClick(ref, false, arm, !!granted));
     };
-    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm));
+    let aim = await tab.runInPage<Aim | null>(aimClick(ref, true, arm, !!granted));
     if (aim?.status === "scrolled") aim = await aimAgain();
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
     if (!arm) {
       if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
       // Where it is now, as the page may have moved while the bird flew, and now the watch goes on.
-      if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
+      if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false, true, !!granted));
       if (aim === null) return STALE_ELEMENT;
     }
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
       if (!carryOn(tab)) return leftOff(tab);
-      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
+      if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, goOn(aim.x!, aim.y!)))) return refused ?? leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
       if (arrived === "lost") return carryOn(tab) ? finish(await scripted(), SCRIPTED) : leftOff(tab);
       await pause(SCROLL_SETTLE_MS);
-      aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
+      aim = await tab.runInPage<Aim | null>(aimClick(ref, false, true, !!granted));
     }
     if (aim === null) return STALE_ELEMENT;
     if (!carryOn(tab)) return leftOff(tab);
@@ -864,7 +893,11 @@ export const createPageTools = <T extends PageTarget>({
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
       whileAsking: standOnRef,
       isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
-      run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
+      grantKey: async ({ tabId: id, ref }) => clickGrant(find(id)?.url ?? "", await element(id, ref)),
+      run: ({ tabId: id, ref }, granted) =>
+        withTab(id, (tab) =>
+          clickRef(tab, ref, 1, granted ? async () => clickGrant(tab.url, await describeRef(tab, ref).catch(() => null))?.key === granted : undefined)
+        ),
     }),
     pageTool({
       name: "double_click",
@@ -1176,6 +1209,7 @@ export const createPageTools = <T extends PageTarget>({
       label: ({ url }) => `Went to ${siteOf(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
       isRisky: async ({ tabId: id, url }) => needsCard(url, find(id)),
+      grantKey: async ({ url }) => addressGrant("go_to", url),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
@@ -1198,6 +1232,7 @@ export const createPageTools = <T extends PageTarget>({
       label: ({ url }) => `Opened ${siteOf(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
       isRisky: async ({ url }) => needsCard(url, find()),
+      grantKey: async ({ url }) => addressGrant("open_tab", url),
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
@@ -1256,11 +1291,11 @@ export const createPageTools = <T extends PageTarget>({
         ...tool,
         refuses: refused,
         // `agent.ts` asks this too, but only `run` can't be got around: whatever calls a tool, this is what acts.
-        run: async (args: unknown) => {
+        run: async (args: unknown, granted?: string) => {
           const refusal = await refused(args);
           if (refusal) return refusal.message;
           const tab = ANY_TAB.includes(tool.name) ? null : find((args as { tabId?: string } | null)?.tabId);
-          return tab ? limitedRun(tab, () => tool.run(args)) : tool.run(args);
+          return tab ? limitedRun(tab, () => tool.run(args, granted)) : tool.run(args, granted);
         },
       };
     });

@@ -28,6 +28,8 @@ export const PREVIEW_CELL_LENGTH = 200;
 
 // One past this many rows, For each row refuses to start.
 export const MAX_RUNS = 25;
+// A card reads from this many cards at most, so their answers still fit in one room together.
+export const MAX_INPUTS = 4;
 // How many runs of For each row go at once, everywhere, because the Mac and the sites can't take more.
 export const RUNS_AT_ONCE = 3;
 
@@ -199,6 +201,10 @@ export interface LineCrossing {
   whole: Crossing | null;
   // `cut` when a row is too long to go whole, so it's cut to the first characters that fit.
   each: { rows: number; columns: number; cut?: boolean } | null;
+  // With several inputs and For each row on: this is the line the runs go row by row on.
+  drives?: boolean;
+  // With several inputs and For each row on, on every other line: what each run gets from it as shared context.
+  shared?: Crossing | null;
 }
 
 const count = (value: number) => value.toLocaleString("en-US");

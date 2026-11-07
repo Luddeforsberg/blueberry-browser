@@ -21,6 +21,8 @@ export interface ChatStep {
   // What the chat shows in its place, naming what the user allowed, such as a button. It has page text in it, so it's
   // only ever drawn here: history, the cloud and other apps get `text`.
   shown?: string;
+  // The user allowed it: on its own card, or for every run of a For-each card with Allow for this card's runs.
+  allowed?: "once" | "card";
 }
 
 // An action waiting for the user to allow it.
@@ -31,6 +33,9 @@ export interface ChatApproval {
   question?: boolean;
   // Berry has handed a tab to the user, and is waiting for them to say they're done with it.
   handoff?: ChatHandoff;
+  // On a run of a For-each card, what Allow for this card's runs would cover, such as "clicking the button “Save draft”
+  // on example.com". Only the chrome can choose it.
+  grant?: string;
 }
 
 // What only the user can do on a page. Berry can't see the tab while they do it.
@@ -71,6 +76,8 @@ export interface ChatThreadMessage {
   memoryIds?: string[];
   // The pages its job opened, which close when it ends, so the user can open any of them again.
   pages?: UsedPage[];
+  // What a reply's model calls cost, in US dollars, with the model in .env. Only a Nest's card shows it.
+  cost?: number;
 }
 
 export interface UsedPage {
@@ -449,6 +456,10 @@ export interface NestCard {
   table: NestTableFile | null;
   // Its files and notes, which go to its bird with every message. They can change only before it's sent.
   attachments: NestAttachment[];
+  // What its chats have cost so far, every run's on a For-each card, or null when nothing says. Never totalled for a Nest.
+  cost?: number | null;
+  // On a draft that could run For each row, and on a For-each card for its runs again: what one run will likely cost.
+  perRun?: { cost: number; rough: boolean } | null;
 }
 
 // A file or note on a card or on a Nest's composer. A file's contents stay in main: only its name, type and size come here.

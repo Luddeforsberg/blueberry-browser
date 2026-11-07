@@ -42,12 +42,12 @@ const release = async (tab: PageTarget, at: Point, clickCount: number) => {
   await tab.sendAgentInput({ type: "mouseUp", button: "left", clickCount, ...at });
 };
 
-// False if `goOn` said no just before a press, so nothing was clicked.
-export const clickAt = async (tab: PageTarget, point: Point, clicks: 1 | 2, goOn: () => boolean = () => true): Promise<boolean> => {
+// False if `goOn` said no just before a press, after the pointer has moved there, so nothing was clicked.
+export const clickAt = async (tab: PageTarget, point: Point, clicks: 1 | 2, goOn: () => boolean | Promise<boolean> = () => true): Promise<boolean> => {
   await moveTo(tab, point);
   const at = inView(tab, point);
   for (let count = 1; count <= clicks; count++) {
-    if (!goOn()) return false;
+    if (!(await goOn())) return false;
     await press(tab, at, count);
     await pause(STEP_MS);
     await release(tab, at, count);

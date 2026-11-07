@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crossingOf, fitTable, latestAnswer, MAX_CARD_ANSWER_LENGTH, rowAnswer, rowsAnswer, tableAnswer, withCardAnswer } from "./nestContext";
+import { crossingOf, fitInputs, fitTable, latestAnswer, MAX_CARD_ANSWER_LENGTH, rowAnswer, rowsAnswer, shareRoom, tableAnswer, withCardAnswer, withCardAnswers } from "./nestContext";
 import { combinedTable } from "../shared/nestTable";
 
 describe("latestAnswer", () => {
@@ -148,5 +148,55 @@ describe("crossingOf", () => {
 
   it("counts picked rows and their columns", () => {
     expect(crossingOf(rowsAnswer("Scout", { header: HEADER, rows: [["a", "b", "c"]] }))).toEqual({ kind: "table", rows: 1, columns: 3, leftOut: 0 });
+  });
+});
+
+describe("several inputs", () => {
+  it("shares the room so a short input goes whole and the long ones split what's left", () => {
+    expect(shareRoom([100, 50_000, 50_000], 12_000)).toEqual([100, 5950, 5950]);
+    expect(shareRoom([100, 200], 12_000)).toEqual([100, 200]);
+    expect(shareRoom([30_000], 12_000)).toEqual([12_000]);
+    expect(shareRoom([], 12_000)).toEqual([]);
+  });
+
+  it("cuts each input to its share, says which was cut, and keeps a table's rows whole", () => {
+    const table = { header: ["Company"], rows: Array.from({ length: 400 }, (_, index) => [`Company ${index} ${"x".repeat(40)}`]) };
+    const fitted = fitInputs(
+      [
+        { name: "Scout", part: "answer", text: "short" },
+        { name: "Rival", part: "answer", text: "y".repeat(20_000) },
+        { name: "Lists", part: "rows", table },
+      ],
+      12_000
+    );
+    expect(fitted[0]).toMatchObject({ name: "Scout", text: "short", cutTo: null });
+    expect(fitted[1]).toMatchObject({ name: "Rival", cutTo: expect.any(Number) });
+    expect(fitted[1].cutTo! + fitted[2].text.length + 5).toBeLessThanOrEqual(12_000);
+    expect(fitted[2]).toMatchObject({ name: "Lists", part: "rows", leftOut: expect.any(Number) });
+    expect(fitted[2].leftOut).toBeGreaterThan(0);
+  });
+
+  it("cuts a table whose header alone is longer than its share, so the inputs never go past the room", () => {
+    const wide = { header: Array.from({ length: 30 }, (_, index) => `Column ${index} ${"h".repeat(400)}`), rows: [["a"]] };
+    const fitted = fitInputs(
+      [
+        { name: "A", part: "table", table: wide },
+        { name: "B", part: "table", table: wide },
+      ],
+      12_000
+    );
+    const sent = fitted.map((answer) => (answer.cutTo != null ? answer.text.slice(0, answer.cutTo) : answer.text).length);
+    expect(sent.reduce((total, length) => total + length, 0)).toBeLessThanOrEqual(12_000);
+    expect(fitted.map((answer) => answer.cutTo)).toEqual([6000, 6000]);
+  });
+
+  it("tags each input by its card's name, in the order given, each labelled untrusted", () => {
+    const message = withCardAnswers("Compare them", [
+      { name: "Scout", text: "Scout's list", part: "answer" },
+      { name: "Rival", text: "Rival's list", part: "answer" },
+    ]);
+    expect(message.indexOf('<card_answer from="Scout">')).toBeLessThan(message.indexOf('<card_answer from="Rival">'));
+    expect(message.match(/untrusted like page content/g)).toHaveLength(2);
+    expect(message.endsWith("Compare them")).toBe(true);
   });
 });

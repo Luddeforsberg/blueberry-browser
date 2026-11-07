@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { armedStep, checkPlan, replyState, runsState, type PlanSource } from "./nestPlan";
+import { allowedBefore, armedStep, checkPlan, replyState, retryable, runsState, sourcesState, type PlanSource } from "./nestPlan";
 import { BERRY } from "../shared/mascots";
 
 const FLOCK = [BERRY.id, "scout", "writer"];
@@ -32,9 +32,9 @@ describe("checkPlan", () => {
       reply: "That's two jobs.",
       ask: false,
       cards: [
-        { key: "c1", mascotId: "scout", prompt: "Do c1", from: null, each: false, waits: false, table: "companies", attached: [] },
-        { key: "c2", mascotId: "writer", prompt: "Do c2", from: { plan: "c1" }, each: true, waits: true, table: null, attached: [] },
-        { key: "c3", mascotId: null, prompt: "Do c3", from: { card: "card-with-table" }, each: false, waits: false, table: null, attached: [] },
+        { key: "c1", mascotId: "scout", prompt: "Do c1", from: [], each: false, waits: false, table: "companies", attached: [] },
+        { key: "c2", mascotId: "writer", prompt: "Do c2", from: [{ plan: "c1" }], each: true, waits: true, table: null, attached: [] },
+        { key: "c3", mascotId: null, prompt: "Do c3", from: [{ card: "card-with-table" }], each: false, waits: false, table: null, attached: [] },
       ],
     });
   });
@@ -97,6 +97,27 @@ describe("checkPlan", () => {
     expect(check(plan(card("c1"), card("c1")))).toEqual(shape);
     expect(check(plan(card("e1")))).toEqual(shape);
     expect(check(plan(card("c1", { prompt: "  " })))).toEqual({ ok: false, problem: "a card had no clear job" });
+  });
+
+  it("lets a card read from several cards, in the order named, up to 4, each once", () => {
+    const four = check(plan(card("c1"), card("c2"), card("c3"), card("c4", { from: ["c2", "e2", "c1", "e1"] })));
+    expect(four.ok && four.cards.find((each) => each.key === "c4")!.from).toEqual([{ plan: "c2" }, { card: "card-with-words" }, { plan: "c1" }, { card: "card-with-table" }]);
+    expect(check(plan(card("c1"), card("c2"), card("c3"), card("c4"), card("c5", { from: ["c1", "c2", "c3", "c4", "e1"] })))).toEqual({
+      ok: false,
+      problem: "a card read from more than 4 cards",
+    });
+    expect(check(plan(card("c1"), card("c2", { from: ["c1", "c1"] })))).toEqual({ ok: false, problem: "a card read from the same card twice" });
+    expect(check(plan(card("c1"), card("c2", { from: ["c1", "e9"] })))).toEqual({ ok: false, problem: "a line went to a card that isn’t there" });
+    expect(check(plan(card("c1", { from: ["c2"] }), card("c2", { from: ["e1", "c1"] })))).toEqual({ ok: false, problem: "its cards went round in a circle" });
+    expect(check(plan(card("c1", { from: [] }))).ok).toBe(true);
+  });
+
+  it("runs For each row on the first of several inputs that gives a table", () => {
+    expect(check(plan(card("c1", { from: ["e2", "e1"], for_each_row: true }))).ok).toBe(true);
+    expect(check(plan(card("c1"), card("c2", { from: ["e2", "c1"], for_each_row: true })))).toEqual({
+      ok: false,
+      problem: "For each row was on a card that doesn’t get a table",
+    });
   });
 
   it("plans nothing when it asks, and only waits for the user on a card that reads from another", () => {
@@ -166,5 +187,43 @@ describe("how a card stands for the cards after it", () => {
     expect(runsState("Scout", [run("started", answered), run("stopped")]).kind).toBe("stopped");
     expect(runsState("Scout", [run("failed"), run("stopped")]).kind).toBe("stopped");
     expect(runsState("Scout", [run("failed"), run("started", { error: "No", messages: [] })]).kind).toBe("failed");
+  });
+});
+
+describe("a card with several inputs", () => {
+  it("waits for every input, and stops at the first that won't answer", () => {
+    expect(sourcesState([])).toEqual({ kind: "none" });
+    expect(sourcesState([{ kind: "answered", name: "A" }, { kind: "running", name: "B" }])).toEqual({ kind: "running", name: "B" });
+    expect(sourcesState([{ kind: "answered", name: "A" }, { kind: "answered", name: "B" }])).toEqual({ kind: "answered", name: "A" });
+    expect(sourcesState([{ kind: "running", name: "A" }, { kind: "failed", name: "B" }])).toEqual({ kind: "failed", name: "B" });
+  });
+});
+
+describe("Retry and Start remaining", () => {
+  const answered = { error: null, messages: [{ role: "assistant" as const, content: "Done." }] };
+  const failed = { error: "It broke", messages: [] };
+  const stopped = { error: null, messages: [{ role: "assistant" as const, content: "", steps: [{ text: "Stopped here", done: true }] }] };
+  const run = (id: string, state: "waiting" | "started" | "stopped" | "failed", thread: typeof answered | typeof failed | typeof stopped | null = null, running = false) => ({ id, state, thread, running });
+
+  it("retries only runs that started and didn't finish, and starts only those that never started", () => {
+    expect(
+      retryable([
+        run("answered", "started", answered),
+        run("broke", "started", failed),
+        run("stopped-midway", "started", stopped),
+        run("couldnt-start", "failed"),
+        run("never-started", "stopped"),
+        run("still-going", "started", stopped, true),
+        run("waiting", "waiting"),
+      ])
+    ).toEqual({ unfinished: ["broke", "stopped-midway", "couldnt-start"], unstarted: ["never-started"] });
+    expect(retryable([])).toEqual({ unfinished: [], unstarted: [] });
+  });
+
+  it("finds something the user allowed in those runs, as its step showed it", () => {
+    const step = (allowed?: "once" | "card") => ({ role: "assistant" as const, content: "", steps: [{ text: "Clicked", shown: "Clicked “Save draft”", done: true, ...(allowed ? { allowed } : {}) }] });
+    expect(allowedBefore([null, { messages: [step()] }])).toBeNull();
+    expect(allowedBefore([{ messages: [step()] }, { messages: [step("card")] }])).toBe("Clicked “Save draft”");
+    expect(allowedBefore([{ messages: [step("once")] }])).toBe("Clicked “Save draft”");
   });
 });

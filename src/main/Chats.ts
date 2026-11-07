@@ -1,5 +1,6 @@
 import {
   ModelConfigError,
+  modelConfig,
   type GenerateTitle,
   type ReplyContent,
   type ReplyMessage,
@@ -23,9 +24,11 @@ import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
 import { addressToKeep, replyPointsTo } from "./jobTabs";
-import { withCardAnswer, type CardAnswer } from "./nestContext";
+import { withCardAnswers, type CardAnswer } from "./nestContext";
 import { attachmentBlocks, type SentAttachment } from "./nestFiles";
 import type { MemoryToOffer } from "./MemoryStore";
+import type { GrantKey } from "./cardGrant";
+import { costOf, roughRunCost, type TokenUsage } from "../shared/modelPrices";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_PAGE_TEXT_LENGTH = 4000;
@@ -46,7 +49,30 @@ const hostOf = (url: string): string | null => {
   }
 };
 
-const publicApproval = ({ id, text, question, handoff }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}), ...(handoff ? { handoff } : {}) });
+const publicApproval = ({ id, text, question, handoff, grant }: ChatApproval): ChatApproval => ({
+  id,
+  text,
+  ...(question ? { question } : {}),
+  ...(handoff ? { handoff } : {}),
+  ...(grant ? { grant } : {}),
+});
+
+// What a reply's tokens cost with the model in .env, or null without one, or for a model the price table doesn't know.
+const replyCost = (usage: TokenUsage): number | null => {
+  if (usage.input === 0 && usage.output === 0) return null;
+  try {
+    return costOf(modelConfig().model, usage);
+  } catch {
+    return null;
+  }
+};
+
+// Allow for this card's runs, for one run of a For-each card: which actions the card's runs may do without asking, and
+// how the user's choice adds one. It lives in `Nests`, in memory only.
+export interface CardGrantAccess {
+  covers: (key: string) => boolean;
+  add: (key: string) => void;
+}
 
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
@@ -113,7 +139,8 @@ interface Run {
   steps: ChatStep[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
-  approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void }) | null;
+  // `grantKey` is what Allow for this card's runs would add, which never leaves main.
+  approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void; grantKey?: string }) | null;
   tabs: Set<Tab>;
   // Every tab it has used in this reply and every site it's been on, latest last.
   used: Set<Tab>;
@@ -148,12 +175,16 @@ interface Run {
   // The user typed this here and is there to answer, so it may ask or plan before starting.
   userPresent: boolean;
   // The answer on the card a Nest's line comes from, read when this was sent. Only the model gets it, with the newest message.
-  cardAnswer?: CardAnswer;
+  cardAnswers?: readonly CardAnswer[];
   // What the user typed for this job, when the chat's messages aren't all their words, as on a card Berry planned.
   userSaid?: string;
   // The files and notes on a Nest's card, which go with the newest message every time it's sent, and are never saved in
   // the chat.
   attachments?: readonly SentAttachment[];
+  // Only on a run of a For-each card, started here and not in the cloud.
+  cardGrant?: CardGrantAccess;
+  // What the model calls of this reply used, which says what it cost.
+  usage: TokenUsage;
 }
 
 // How one reply ended, for whoever started it.
@@ -450,8 +481,9 @@ export class Chats {
     // A picture can't be gone through, so `Tab` refuses to take one instead. A refusal goes straight to the model too.
     return tools.map((tool) => ({
       ...tool,
-      run: async (args) => {
-        const result = await tool.run(args);
+      // `granted` is the key a call allowed for its card's runs matched, which the tool holds the action to.
+      run: async (args, granted) => {
+        const result = await tool.run(args, granted);
         return tool.returnsImage && result.startsWith("data:image/") ? result : this.withoutCodes(result);
       },
       refuses: async (args) => {
@@ -794,6 +826,21 @@ export class Chats {
     return this.cloudChats.has(chatId) || !!this.runner?.has(chatId);
   }
 
+  // What these chats' replies have cost so far, or null when none of them says.
+  costOf(chatIds: readonly string[]): number | null {
+    const costs = chatIds.flatMap((id) => (this.store.chat(id)?.messages ?? []).flatMap((message) => (typeof message.cost === "number" ? [message.cost] : [])));
+    return costs.length > 0 ? costs.reduce((total, cost) => total + cost, 0) : null;
+  }
+
+  // A rough guess at one job's cost with the model in .env, when there's nothing like it to go on.
+  roughJobCost(): number | null {
+    try {
+      return roughRunCost(modelConfig().model);
+    } catch {
+      return null;
+    }
+  }
+
   isRunning(chatId: string): boolean {
     return this.runs.has(chatId) || !!this.runner?.progress(chatId);
   }
@@ -802,7 +849,7 @@ export class Chats {
   // The reply follows through the events. `from` names the app outside Blueberry that started a new chat, and `sites`,
   // `tools` and `askAtLeast` can only narrow what this reply may do, on top of the mascot's own and the setting.
   // `onEnd` hears how this reply ended, and nothing of a later one. `userPresent` is only for a message the user typed in
-  // one of Blueberry's own composers, where they're there to answer a question before it starts. `cardAnswer` goes to the
+  // one of Blueberry's own composers, where they're there to answer a question before it starts. `cardAnswers` go to the
   // model with this message only, labelled untrusted, and is never saved. `started` hears a new chat's id before anything
   // about it is published, so a Nest can claim it first. `userSaid` is what the user typed for this job when the chat's
   // messages aren't all theirs, such as a prompt Berry planned: only these words then name sites it may go to unasked.
@@ -822,10 +869,11 @@ export class Chats {
       cloud = false,
       runner = false,
       userPresent = false,
-      cardAnswer,
+      cardAnswers,
       started,
       userSaid,
       attachments,
+      cardGrant,
     }: {
       seePage: boolean;
       mascotId?: string | null;
@@ -837,10 +885,11 @@ export class Chats {
       cloud?: boolean;
       runner?: boolean;
       userPresent?: boolean;
-      cardAnswer?: CardAnswer;
+      cardAnswers?: readonly CardAnswer[];
       started?: (chatId: string) => void;
       userSaid?: string;
       attachments?: readonly SentAttachment[];
+      cardGrant?: CardGrantAccess;
     }
   ): ChatThread | null {
     const message = text.trim();
@@ -867,7 +916,9 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswer, userSaid, attachments };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswers, userSaid, attachments, usage: { input: 0, cached: 0, output: 0 },
+      // Never for a job in the cloud or one an app started.
+      ...(cardGrant && !inCloud && from === null ? { cardGrant } : {}) };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -985,7 +1036,7 @@ export class Chats {
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
       run.withPage = page !== null;
-      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswer, run.attachments);
+      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswers, run.attachments);
       const said = this.userWords(chatId).join("\n");
       const notes = (run.attachments ?? []).flatMap((attachment) => (attachment.kind === "note" ? [attachment.text] : []));
       const tools = this.jobTools(chatId, run, page, [run.userSaid ?? said, ...notes].join("\n"));
@@ -1009,7 +1060,8 @@ export class Chats {
     this.publishWorkingTabs();
     const steps = endedSteps(run.steps, signal.aborted);
     if (run.partial || steps.length > 0) {
-      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
+      const cost = replyCost(run.usage);
+      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}), ...(cost !== null ? { cost } : {}) });
     }
     const error = this.errors.get(chatId) ?? null;
     run.onEnd?.({ reply: run.partial, steps, outcome: run.controller.signal.aborted ? "stopped" : error ? "failed" : "done", error });
@@ -1071,12 +1123,17 @@ export class Chats {
     onWords: (content: string) => void,
     onUsage?: (tokens: number) => void
   ): Promise<void> {
+    const { cardGrant } = run;
     for await (const part of this.streamReply(messages, run.controller.signal, {
       tools,
       actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
-      approve: (text) => this.askToAllow(id, run, text),
-      onStep: (text, shown) => this.startStep(id, run, text, shown),
-      onUsage,
+      approve: (text, grant) => this.askToAllow(id, run, text, grant),
+      ...(cardGrant && !run.cloud ? { granted: (key: string) => cardGrant.covers(key) } : {}),
+      onStep: (text, shown, allowed) => this.startStep(id, run, text, shown, allowed),
+      onUsage: (usage) => {
+        run.usage = { input: run.usage.input + usage.input, cached: run.usage.cached + usage.cached, output: run.usage.output + usage.output };
+        onUsage?.(usage.total);
+      },
       mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
       userPresent: run.userPresent,
     })) {
@@ -1146,6 +1203,7 @@ export class Chats {
       handedOver: false,
       cloud,
       userPresent: false,
+      usage: { input: 0, cached: 0, output: 0 },
     };
     this.runs.set(id, run);
     this.taskPopups.set(id, new Set());
@@ -1190,8 +1248,8 @@ export class Chats {
     if (thread) this.events.onThread(thread);
   }
 
-  private startStep(chatId: string, run: Run, text: string, shown?: string): () => void {
-    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}) };
+  private startStep(chatId: string, run: Run, text: string, shown?: string, allowed?: "once" | "card"): () => void {
+    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}), ...(allowed ? { allowed } : {}) };
     run.steps.push(step);
     run.breakBeforeText = run.partial !== "";
     this.publish(chatId, run);
@@ -1201,7 +1259,14 @@ export class Chats {
     };
   }
 
-  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
+  private wait<T>(
+    chatId: string,
+    run: Run,
+    text: string,
+    kind: Pick<ChatApproval, "question" | "handoff">,
+    onAnswer: (allow: boolean, answer?: string) => T,
+    grant: GrantKey | null = null
+  ): Promise<T> {
     const { signal } = run.controller;
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
@@ -1212,6 +1277,8 @@ export class Chats {
         id: randomUUID(),
         text,
         ...kind,
+        // Only on a run of a For-each card, for an action that can be matched exactly.
+        ...(grant && run.cardGrant && !run.cloud ? { grant: grant.words, grantKey: grant.key } : {}),
         askedAt: Date.now(),
         answer: (allow, answer) => {
           signal.removeEventListener("abort", stopped);
@@ -1225,8 +1292,8 @@ export class Chats {
     });
   }
 
-  private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
-    return this.wait(chatId, run, text, {}, (allow) => allow);
+  private askToAllow(chatId: string, run: Run, text: string, grant: GrantKey | null = null): Promise<boolean> {
+    return this.wait(chatId, run, text, {}, (allow) => allow, grant);
   }
 
   // Null if the user would rather not answer.
@@ -1238,9 +1305,28 @@ export class Chats {
     });
   }
 
-  // False if that request has already been answered or its reply has ended. `answer` is for a question.
-  decide(chatId: string, approvalId: string, allow: boolean, answer?: string, { fromPhone = false, fromApp = false }: { fromPhone?: boolean; fromApp?: boolean } = {}): boolean {
+  // False if that request has already been answered or its reply has ended. `answer` is for a question. `forCard` is Allow
+  // for this card's runs, which only the user grants, in this window: never from the phone, another app or the runner,
+  // and only where the card offered it.
+  decide(
+    chatId: string,
+    approvalId: string,
+    allow: boolean,
+    answer?: string,
+    { fromPhone = false, fromApp = false, forCard = false }: { fromPhone?: boolean; fromApp?: boolean; forCard?: boolean } = {}
+  ): boolean {
     const run = this.runs.get(chatId);
+    if (forCard === true) {
+      if (fromPhone || fromApp || !run || run.cloud || !run.cardGrant || run.approval?.id !== approvalId || !run.approval.grantKey) return false;
+      run.cardGrant.add(run.approval.grantKey);
+      // The card's other runs go at once, so some may be asking for exactly this already. Those are allowed with it.
+      const covered = [...this.runs].flatMap(([otherId, other]) =>
+        otherId !== chatId && !other.cloud && other.approval?.grantKey && other.cardGrant?.covers(other.approval.grantKey) ? [[otherId, other.approval.id] as const] : []
+      );
+      const decided = this.decide(chatId, approvalId, true);
+      covered.forEach(([otherId, otherApproval]) => this.decide(otherId, otherApproval, true));
+      return decided;
+    }
     // On the runner, only the user answers, from this window. The phone and apps can't.
     if (!run && this.runner?.has(chatId)) return !fromPhone && !fromApp && this.runner.decide(chatId, approvalId, allow === true, typeof answer === "string" ? answer.trim().slice(0, MAX_ANSWER_LENGTH) : undefined);
     if (run?.approval?.id !== approvalId) return false;
@@ -1269,12 +1355,12 @@ export class Chats {
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.
   // A Nest's card's files and notes go first, each labelled.
-  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile, answer?: CardAnswer, attachments: readonly SentAttachment[] = []): Promise<ReplyMessage[]> {
+  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile, answers: readonly CardAnswer[] = [], attachments: readonly SentAttachment[] = []): Promise<ReplyMessage[]> {
     const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
     const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
-    if ((!page && !answer && attachments.length === 0) || !newest || typeof newest.content !== "string") return messages;
-    const text = answer ? withCardAnswer(newest.content, { ...answer, text: this.withoutCodes(answer.text) }) : newest.content;
+    if ((!page && answers.length === 0 && attachments.length === 0) || !newest || typeof newest.content !== "string") return messages;
+    const text = withCardAnswers(newest.content, answers.map((answer) => ({ ...answer, text: this.withoutCodes(answer.text) })));
     const content = page ? withPage(text, page) : text;
     if (attachments.length === 0) return [...messages.slice(0, -1), { role: "user", content }];
     const files = attachmentBlocks(attachments);

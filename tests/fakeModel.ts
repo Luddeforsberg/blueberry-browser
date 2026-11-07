@@ -26,6 +26,12 @@ export const startFakeModel = async () => {
   let title = "NONE";
   let toolCalls: Array<{ calls: Array<{ name: string; args: object }>; say?: string }> = [];
   let thinkMs = 0;
+  // Tokens each main reply reports, as OpenAI does at the end of a stream when asked.
+  let usage: { input: number; output: number } | null = null;
+  const usageChunk = () =>
+    usage
+      ? `data: ${JSON.stringify({ id: "fake", object: "chat.completion.chunk", created: 0, model: "fake", choices: [], usage: { prompt_tokens: usage.input, completion_tokens: usage.output, total_tokens: usage.input + usage.output } })}\n\n`
+      : "";
   const requests: FakeModelRequest[] = [];
   const titleRequests: FakeModelRequest[] = [];
   let memory = '{"facts":[]}';
@@ -112,7 +118,7 @@ export const startFakeModel = async () => {
       if (nextCalls.say) response.write(sseChunk({ role: "assistant", content: nextCalls.say }, null));
       response.write(sseChunk({ role: "assistant", content: null, tool_calls: calls }, null));
       response.write(sseChunk({}, "tool_calls"));
-      response.end("data: [DONE]\n\n");
+      response.end(`${usageChunk()}data: [DONE]\n\n`);
       return;
     }
     const reply = tokens;
@@ -126,7 +132,7 @@ export const startFakeModel = async () => {
     if (held) await held;
     for (const token of reply.slice(1)) response.write(sseChunk({ content: token }, null));
     response.write(sseChunk({}, "stop"));
-    response.end("data: [DONE]\n\n");
+    response.end(`${usageChunk()}data: [DONE]\n\n`);
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
 
@@ -158,6 +164,7 @@ export const startFakeModel = async () => {
       title = "NONE";
       toolCalls = [];
       thinkMs = 0;
+      usage = null;
       requests.length = 0;
       titleRequests.length = 0;
       suggest = null;
@@ -205,6 +212,10 @@ export const startFakeModel = async () => {
     // How long each answer takes, as a real model's does, for anything watching the time between steps.
     thinkFor(ms: number) {
       thinkMs = ms;
+    },
+    // The tokens every main reply reports from now on.
+    usageWith(next: { input: number; output: number } | null) {
+      usage = next;
     },
     replyWith(...next: string[]) {
       tokens = next;

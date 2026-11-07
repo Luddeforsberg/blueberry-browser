@@ -6,6 +6,8 @@ import { join } from "path";
 import type { PageTool } from "./browserTools";
 import type { ActionApproval } from "../shared/ipc";
 import type { ChatThreadMessage } from "../shared/library";
+import type { TokenUsage } from "../shared/modelPrices";
+import type { GrantKey } from "./cardGrant";
 
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
@@ -29,13 +31,18 @@ export interface ReplyOptions {
   tools: PageTool[];
   // Read on every action, so a change in Settings applies straight away.
   actionApproval: () => ActionApproval;
-  // Resolves with the user's answer, and rejects if the reply is stopped first.
-  approve: (description: string) => Promise<boolean>;
+  // Resolves with the user's answer, and rejects if the reply is stopped first. `grant` is what Allow for this card's runs
+  // would cover, offered only on a run of a For-each card and only where the action can be matched exactly.
+  approve: (description: string, grant?: GrantKey | null) => Promise<boolean>;
+  // Only on a run of a For-each card: whether the user allowed exactly this action for the card's runs. A call it covers
+  // doesn't ask, after a bird's limits, and only where it would otherwise ask.
+  granted?: (key: string) => boolean;
   // Called as each tool starts, with what the chat should show. The result is called when it ends. `shown` is set for a
-  // call the user allowed, naming what they allowed, and is only for the screen.
-  onStep: (text: string, shown?: string) => () => void;
+  // call the user allowed, naming what they allowed, and is only for the screen. `allowed` says how: on its own card, or
+  // by Allow for this card's runs.
+  onStep: (text: string, shown?: string, allowed?: "once" | "card") => () => void;
   // Told the tokens each model call used, as they're reported.
-  onUsage?: (tokens: number) => void;
+  onUsage?: (usage: TokenUsage & { total: number }) => void;
   // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
   mascotNote?: string;
   // The user typed this in Blueberry's own composer and is there to answer, so a reply may ask or plan first. Never for a
@@ -244,7 +251,7 @@ export class ReplySorter {
 export async function* streamReply(
   messages: ReplyMessage[],
   signal: AbortSignal,
-  { tools, actionApproval, approve, onStep, onUsage, mascotNote = "", userPresent = false }: ReplyOptions,
+  { tools, actionApproval, approve, granted, onStep, onUsage, mascotNote = "", userPresent = false }: ReplyOptions,
   model?: BaseChatModel
 ): AsyncGenerator<ReplyPart> {
   const [
@@ -279,6 +286,14 @@ export async function* streamReply(
     if (mode === "always") return true;
     return mode === "risky" && (!isRisky || (await isRisky(args)));
   };
+  // The key of exactly this action, if it was allowed for the card's runs, worked out from the page as it is now.
+  const grantMatched = async ({ grantKey }: PageTool, args: unknown): Promise<string | null> => {
+    if (!granted || !grantKey) return null;
+    const key = await grantKey(args).catch(() => null);
+    return key !== null && granted(key.key) ? key.key : null;
+  };
+  // What each paused call's card offers for Allow for this card's runs, by its call's id.
+  const offered = new Map<string, GrantKey | null>();
   const interruptOn = Object.fromEntries(
     tools.flatMap((pageTool) =>
       pageTool.describe
@@ -287,13 +302,20 @@ export async function* streamReply(
               pageTool.name,
               {
                 allowedDecisions: ["approve" as const, "reject" as const],
-                description: ({ args, id }: { args: unknown; id?: string }) => {
+                description: async ({ args, id }: { args: unknown; id?: string }) => {
                   if (id === undefined || !presented.has(id)) pageTool.whileAsking?.(args);
                   if (id !== undefined) presented.add(id);
-                  return pageTool.describe!(args);
+                  if (!granted || !pageTool.grantKey || id === undefined) return pageTool.describe!(args);
+                  // What Allow for this card's runs would cover is read with the words the card shows, and offered only
+                  // if the page gave the same key on both sides of them.
+                  const before = await pageTool.grantKey(args).catch(() => null);
+                  const words = await pageTool.describe!(args);
+                  const after = before && (await pageTool.grantKey(args).catch(() => null));
+                  offered.set(id, before && after?.key === before.key ? before : null);
+                  return words;
                 },
                 when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
-                  !(await refusedOutright(pageTool, toolCall.args)) && needsAsking(pageTool, toolCall.args),
+                  !(await refusedOutright(pageTool, toolCall.args)) && (await needsAsking(pageTool, toolCall.args)) && (await grantMatched(pageTool, toolCall.args)) === null,
               },
             ],
           ]
@@ -320,11 +342,22 @@ export async function* streamReply(
           // Allowed, it must still be the same action. Not asked about, it must still not need asking.
           const allowedAs = allowed.get(config.toolCall?.id ?? "");
           if (describe && allowedAs !== undefined && (await describe(args)) !== allowedAs) return CHANGED;
-          if (describe && allowedAs === undefined && (await needsAsking(pageTool, args))) return CHANGED;
-          const shown = (allowedAs !== undefined && pageTool.allowedLabel?.(args)) || pageTool.shownLabel?.(args) || undefined;
-          const finish = onStep(label(args), shown);
+          // Not asked about because the user allowed it for the card's runs, it must still be exactly that action, and the
+          // tool holds it to the key that matched until the input goes in.
+          let pinned: string | null = null;
+          if (describe && allowedAs === undefined && (await needsAsking(pageTool, args))) {
+            pinned = await grantMatched(pageTool, args);
+            if (pinned === null) return CHANGED;
+            // So the step can name what was allowed, as it does for an approval.
+            await describe(args);
+          }
+          // Allowed on its card, it may have been by choosing Allow for this card's runs there, which the step then says.
+          const byGrant = pinned !== null || (allowedAs !== undefined && (await grantMatched(pageTool, args)) !== null);
+          const wasAllowed = allowedAs !== undefined || byGrant;
+          const shown = (wasAllowed && pageTool.allowedLabel?.(args)) || pageTool.shownLabel?.(args) || undefined;
+          const finish = onStep(label(args), shown, byGrant ? "card" : allowedAs !== undefined ? "once" : undefined);
           try {
-            const result = await run(args);
+            const result = await (pinned !== null ? run(args, pinned) : run(args));
             // A failure is words. The image goes with a reminder, because it can have instructions drawn in it too.
             return returnsImage && result.startsWith("data:image/")
               ? [
@@ -359,7 +392,9 @@ export async function* streamReply(
         // Tool results come through this stream too, and they're for the model.
         if (chunk.type === "ai") yield* sorter.chunk(chunk.text, callsTools(chunk as AIMessageChunk));
         const usage = chunk.type === "ai" ? (chunk as AIMessageChunk).usage_metadata : undefined;
-        if (usage) onUsage?.(usage.total_tokens);
+        if (usage) {
+          onUsage?.({ total: usage.total_tokens, input: usage.input_tokens, cached: usage.input_token_details?.cache_read ?? 0, output: usage.output_tokens });
+        }
       } else {
         // LangGraph adds this key to its updates, which the agent's types don't show.
         const { __interrupt__: interrupts = [], model_request: request } = part[1] as unknown as { __interrupt__?: Interrupt[]; model_request?: { messages?: BaseMessage[] } };
@@ -378,7 +413,7 @@ export async function* streamReply(
     for (const { id, value } of paused) {
       if (!id || !value) throw new Error("A paused action has nothing to identify it by.");
       const { tool_call_id: callId, description } = value as { tool_call_id: string; description: string };
-      const yes = await approve(description);
+      const yes = await approve(description, offered.get(callId) ?? null);
       if (yes) allowed.set(callId, description);
       decisions[id] = yes ? { type: "approve" } : { type: "reject", message: DECLINED };
     }

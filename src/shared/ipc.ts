@@ -353,6 +353,8 @@ export interface NestNewCard {
 
 // For each row either starts, or says why it can't, such as more rows than the cap.
 export type NestSendEachResult = { ok: true } | { ok: false; error: string };
+// `warn` when the runs did something the user allowed before, which going again may repeat: it goes only once confirmed.
+export type NestRetryResult = { ok: true } | { ok: false; error: string } | { ok: false; warn: string };
 
 // What the Nest's composer sends with its words: the bird the user chose, and where a plan's cards can go, as the top
 // left of the board in sight and the cards already on it, measured.
@@ -528,6 +530,9 @@ export interface InvokeChannels {
     args: [chatId: string, approvalId: string, allow: boolean, answer?: string];
     result: boolean;
   };
+  // Allow for this card's runs, on an approval of one run of a For-each card that offers it. Only from the chrome, and
+  // main refuses it anywhere else: the phone, another app, the runner and a job in the cloud never reach it.
+  "chat:allow-for-card": { region: "chrome"; args: [chatId: string, approvalId: string]; result: boolean };
   "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
   // The native menu for a chat in the sidebar. Delete happens in main, so only Rename comes back.
   "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string]; result: "rename" | null };
@@ -539,6 +544,10 @@ export interface InvokeChannels {
   "nests:menu": { region: "chrome" | "overlay"; args: [nestId: string]; result: "rename" | null };
   // A draft card, unconnected or pulled out of `from`, which it then gets the latest answer of whenever it sends.
   "nests:add-card": { region: "chrome"; args: [nestId: string, card: NestNewCard]; result: NestCard | null };
+  // Another card as one more input on a draft or a planned card, with the rows picked from it if any. Main checks it.
+  "nests:add-input": { region: "chrome"; args: [cardId: string, fromId: string, picked?: PickedRows]; result: NestSendEachResult };
+  // Retry the runs of a For-each card that didn't finish, or start the ones that didn't start. `warn` asks to confirm first.
+  "nests:retry-runs": { region: "chrome"; args: [cardId: string, which: "unfinished" | "unstarted", confirmed: boolean]; result: NestRetryResult };
   "nests:move-card": { region: "chrome"; args: [cardId: string, x: number, y: number]; result: boolean };
   "nests:nudge-cards": { region: "chrome"; args: [nestId: string, moves: { id: string; x: number; y: number }[]]; result: boolean };
   // Only a draft's bird can change. A sent card keeps its chat's.
@@ -793,6 +802,7 @@ export interface ChatAPI {
   send: (chatId: string | null, text: string, options: ChatSendOptions) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
   decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => Promise<boolean>;
+  allowForCard: (chatId: string, approvalId: string) => Promise<boolean>;
   rename: (chatId: string, title: string) => Promise<boolean>;
   showMenu: (chatId: string) => Promise<"rename" | null>;
   getPageText: () => Promise<string | null>;
@@ -810,6 +820,8 @@ export interface NestsAPI {
   rename: (nestId: string, title: string) => Promise<boolean>;
   showMenu: (nestId: string) => Promise<"rename" | null>;
   addCard: (nestId: string, card: NestNewCard) => Promise<NestCard | null>;
+  addInput: (cardId: string, fromId: string, picked?: PickedRows) => Promise<NestSendEachResult>;
+  retryRuns: (cardId: string, which: "unfinished" | "unstarted", confirmed: boolean) => Promise<NestRetryResult>;
   moveCard: (cardId: string, x: number, y: number) => Promise<boolean>;
   // Cards placed for the user, moved out of the way of one that grew. Main moves no card the user placed or dragged.
   nudgeCards: (nestId: string, moves: { id: string; x: number; y: number }[]) => Promise<boolean>;

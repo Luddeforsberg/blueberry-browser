@@ -14,7 +14,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/base.css'
 import type { NestFocus, NestHandOff, TabInfo } from '@shared/ipc'
-import type { MascotProfile, NestBoard, NestRequest } from '@shared/library'
+import type { MascotProfile, NestBoard, NestCard, NestRequest } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -25,7 +25,7 @@ import { Berry, useAssistantName } from '../components/Berry'
 import { SHIMMER_QUIET, UserMessage } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
 import { Attachments, useAttaching } from '../components/NestAttachments'
-import type { PickedRows } from '@shared/nestTable'
+import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
 import { CardView, draftText, GhostSweep, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
 import {
     besideSpot,
@@ -91,6 +91,30 @@ const toNodes = (board: NestBoard, openId: string | null, previous: CardNode[], 
             data: { card }
         }
     })
+
+// The cards a draft or planned card could also read from: any with something to give, or for a planned card another of
+// the plan, that it doesn't read from already and that doesn't read from it. Main checks it again.
+const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
+    const card = board.cards.find((each) => each.id === cardId)
+    const into = board.lines.filter((line) => line.to === cardId)
+    if (!card || card.chatId || card.each || card.table || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
+    const after = new Set<string>([cardId])
+    for (let grew = true; grew; ) {
+        grew = false
+        for (const line of board.lines) {
+            if (after.has(line.from) && !after.has(line.to)) {
+                after.add(line.to)
+                grew = true
+            }
+        }
+    }
+    return board.cards.filter(
+        (each) =>
+            !after.has(each.id) &&
+            !into.some((line) => line.from === each.id) &&
+            (!!each.chatId || !!each.each || !!each.table || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
+    )
+}
 
 // The selected rows, in the table's order, as a line out of their card takes them.
 const pickedOf = (selection: RowSelection | null, cardId: string): PickedRows | undefined =>
@@ -549,6 +573,8 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
+    // Why the last thing sent from the composer, or a line dropped on a card, couldn't go.
+    const [problem, setProblem] = useState<string | null>(null)
     const planning = board.planning ?? null
     const pending = board.cards.some((card) => card.plan?.state === 'planned')
 
@@ -558,11 +584,12 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             openRunId,
             setOpen: open,
             focusId,
-            sourceOf: (cardId) => {
-                const line = board.lines.find(({ to }) => to === cardId)
-                return (line && board.cards.find((card) => card.id === line.from)) || null
-            },
-            lineInto: (cardId) => board.lines.find(({ to }) => to === cardId) ?? null,
+            inputsOf: (cardId) =>
+                board.lines.flatMap((line) => {
+                    const source = line.to === cardId ? board.cards.find((card) => card.id === line.from) : undefined
+                    return source ? [{ line, source }] : []
+                }),
+            inputCandidates: (cardId) => inputCandidates(board, cardId),
             pullOut: (cardId) => {
                 const source = flow.getNode(cardId)
                 if (!source) return
@@ -603,13 +630,20 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             pulling.current = null
             if (!from || state.isValid) return
             const point = 'changedTouches' in event ? event.changedTouches[0] : event
+            const picked = pickedOf(selection, from)
+            // Dropped on a draft or a planned card, it's one more input there.
+            const onCard = (document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null)?.closest<HTMLElement>('.react-flow__node')?.dataset.id
+            if (onCard && onCard !== from && inputCandidates(board, onCard).some((card) => card.id === from)) {
+                setSelection(null)
+                void api.addInput(onCard, from, picked).then((result) => setProblem(result.ok ? null : result.error))
+                return
+            }
             const at = flow.screenToFlowPosition({ x: point.clientX, y: point.clientY })
             dropEmptyDrafts()
-            const picked = pickedOf(selection, from)
             setSelection(null)
             void add({ x: at.x, y: at.y - DROP_ABOVE }, { from, picked })
         },
-        [flow, add, dropEmptyDrafts, selection]
+        [flow, add, dropEmptyDrafts, selection, board, api]
     )
 
     const paneClick = useCallback(
@@ -649,7 +683,6 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // The composer at the bottom goes to Berry first, which starts one card in the first free place in sight, lays out a
     // plan from there, or asks. If it can't go, the words come back.
     const talking = board.talk.find((request) => request.open)
-    const [problem, setProblem] = useState<string | null>(null)
     // Where a new plan will land, while Berry makes it: in sight, as main places it.
     const [ghostsAt, setGhostsAt] = useState<{ x: number; y: number } | null>(null)
     useEffect(() => {
