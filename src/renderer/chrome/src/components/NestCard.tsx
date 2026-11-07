@@ -11,7 +11,7 @@ import { useChatThread, useChatThreads } from '../contexts/ChatContext'
 import { useFlock } from '../contexts/LibraryContext'
 import { cardStatus, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunPhase } from '../nestBoard'
 import { Berry, useAssistantName } from './Berry'
-import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
+import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_QUIET, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
 import { AddMenu, ChatComposer, Composer } from './Composer'
 import { Attachments, useAttaching } from './NestAttachments'
 import { MascotChip, MascotPerch } from './MascotPerch'
@@ -33,7 +33,10 @@ export interface RowSelection {
 // What a card can ask of the board it's on.
 export interface NestBoardActions {
     openId: string | null
-    setOpen: (cardId: string | null) => void
+    // With `runId`, a For-each card opens at that run's thread.
+    setOpen: (cardId: string | null, runId?: string | null) => void
+    // The run a For-each card was opened at, from Needs you.
+    openRunId: string | null
     // The draft that was just made, whose prompt takes the keyboard.
     focusId: string | null
     sourceOf: (cardId: string) => NestCard | null
@@ -45,6 +48,14 @@ export interface NestBoardActions {
     pick: (cardId: string, text: string, table: Table, index: number, mode: PickMode) => void
     // The cards of a run plan that wait for the user to say this card's answer is right.
     waitingOn: (cardId: string) => NestCard[]
+    // For-each cards whose line comes out of this card, for the rows they're working on in its table.
+    forEachFrom: (cardId: string) => NestCard[]
+    // Whether a card's own bird is away, flying a hand-off along a line, or about to land there.
+    away: (cardId: string) => boolean
+    // Berry is changing the plan, so its planned cards are about to be replaced.
+    replanning: boolean
+    // Threads to show instead of loading them, for the component gallery.
+    samples?: Readonly<Record<string, ChatThread>>
 }
 
 export const NestBoardContext = createContext<NestBoardActions | null>(null)
@@ -53,6 +64,19 @@ const useBoard = () => {
     const board = useContext(NestBoardContext)
     if (!board) throw new Error('A card needs its board')
     return board
+}
+
+// A card's chat, kept current, or the gallery's sample.
+const useCardThread = (chatId: string | null): ChatThread | null => {
+    const { samples } = useBoard()
+    const live = useChatThread(samples ? null : chatId)
+    return samples ? (chatId ? samples[chatId] ?? null : null) : live
+}
+
+const useCardThreads = (chatIds: readonly string[]): Record<string, ChatThread> => {
+    const { samples } = useBoard()
+    const live = useChatThreads(samples ? [] : chatIds)
+    return samples ? Object.fromEntries(chatIds.flatMap((id) => (samples[id] ? [[id, samples[id]]] : []))) : live
 }
 
 // What's typed in a draft, kept while the page is away so going to another tab loses nothing. Memory only.
@@ -91,11 +115,28 @@ const TONES = {
     failed: 'text-destructive'
 }
 
-// The bird stands on the card's top edge, and moves the card with it.
-const Perched: React.FC<{ mascot: MascotProfile; mood: Mood }> = ({ mascot, mood }) => (
-    <div className="nest-drag absolute left-5 cursor-grab" style={{ top: -BIRD_SIZE * STANDING_FEET }}>
-        <Berry size={BIRD_SIZE} mood={mood} mascot={mascot} />
-    </div>
+// The bird stands on the card's top edge, and moves the card with it. While it's away flying a hand-off, its place is
+// empty, and it comes back with a quick fade.
+const Perched: React.FC<{ cardId: string; mascot: MascotProfile; mood: Mood }> = ({ cardId, mascot, mood }) => {
+    const away = useBoard().away(cardId)
+    return (
+        <div
+            className={cn("nest-drag absolute left-5 cursor-grab", away ? "opacity-0" : "opacity-100 transition-opacity duration-layout")}
+            style={{ top: -BIRD_SIZE * STANDING_FEET }}
+        >
+            <Berry size={BIRD_SIZE} mood={mood} mascot={mascot} />
+        </div>
+    )
+}
+
+// While Berry is changing the plan, a grey sweep runs along a card's outline, as on the shapes where a new plan will
+// land. Only while the model is working, and still with reduced motion.
+export const GhostSweep: React.FC<{ delay?: number }> = ({ delay = 0 }) => (
+    <span
+        aria-hidden
+        style={{ animationDelay: `${delay}ms` }}
+        className="pointer-events-none absolute -inset-px rounded-[inherit] p-[1.5px] bg-ghost-sweep bg-[length:200%_100%] bg-[position:150%_0] animate-shimmer [mask:linear-gradient(#000_0_0)_content-box_exclude,linear-gradient(#000_0_0)]"
+    />
 )
 
 const CardButton: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
@@ -151,7 +192,7 @@ const CARD_SHELL = "group/card relative rounded-panel border bg-surface text-for
 // rows can be selected. Open, the whole chat and a reply field that carries the thread on.
 const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const board = useBoard()
-    const thread = useChatThread(card.chatId)
+    const thread = useCardThread(card.chatId)
     const { find } = useFlock()
     const mascot = find(thread?.mascotId ?? card.mascotId)
     const name = useAssistantName(mascot)
@@ -171,14 +212,21 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     useEffect(() => {
         if (selectedHere && board.selection?.text !== reply) clearSelection()
     }, [selectedHere, board.selection?.text, reply, clearSelection])
+    const here = useWorkingRows(card.id, table)
+    // Working with nothing to show yet, no words, no step and no question, its status is what shimmers.
+    const waitingOnModel = running && !thread.partial && !thread.approval && !thread.statusLine && !thread.steps.some((step) => !step.done)
 
     return (
         <div className={cn(CARD_SHELL, running ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
-            <Perched mascot={mascot} mood={moodOf(thread)} />
+            <Perched cardId={card.id} mascot={mascot} mood={moodOf(thread)} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
-                {status && <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>}
+                {status && (
+                    <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>
+                        <span className={waitingOnModel ? SHIMMER_QUIET : undefined}>{status.text}</span>
+                    </span>
+                )}
                 <span className="ml-auto flex items-center">
                     {answered && (
                         <span data-keep-selection>
@@ -220,6 +268,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                                     table={table}
                                     selected={running ? null : selected}
                                     onPick={(index, mode) => board.pick(card.id, reply, table, index, mode)}
+                                    here={here}
                                 />
                             </div>
                         )}
@@ -264,12 +313,34 @@ const getsWhat = (line: NestLine | null, sourceName: string) =>
 const withWhat = (line: NestLine | null, sourceName: string) =>
     line?.picked ? `With ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `With ${sourceName}’s latest answer`
 
-// What a running card is doing: the bird's own words if it said any, or the step it's on.
+// What a running card is doing: the bird's own words if it said any, or the step it's on. Before either, its status
+// shimmers in the header instead.
 const Working: React.FC<{ thread: ChatThread }> = ({ thread }) => {
     if (thread.statusLine) return <StatusLine text={thread.statusLine} />
     const step = thread.steps.findLast((each) => !each.done)
-    if (thread.approval) return null
-    return <p role="status" className="text-14 line-clamp-2"><span className={SHIMMER_TEXT}>{step ? (step.shown ?? step.text) : 'Thinking'}</span></p>
+    if (thread.approval || !step) return null
+    return <p role="status" className="text-14 line-clamp-2"><span className={SHIMMER_TEXT}>{step.shown ?? step.text}</span></p>
+}
+
+// The rows of this card's table that For-each cards reading from it are working on right now, with who.
+const useWorkingRows = (cardId: string, table: Table | null): { who: string; rows: Map<number, string> } | null => {
+    const board = useBoard()
+    const { find } = useFlock()
+    const berryName = useAssistantName()
+    const cards = table ? board.forEachFrom(cardId) : []
+    const threads = useCardThreads(cards.flatMap((card) => card.each?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? []))
+    if (!table || cards.length === 0) return null
+    const nameOf = (card: NestCard) => (card.mascotId ? find(card.mascotId).name : berryName)
+    const keyOf = (row: readonly string[]) => JSON.stringify(row)
+    const index = new Map(table.rows.map((row, at) => [keyOf(row), at]))
+    const rows = new Map<number, string>()
+    for (const card of cards) {
+        for (const run of card.each?.runs ?? []) {
+            const at = index.get(keyOf(run.row))
+            if (at !== undefined && run.chatId && threads[run.chatId]?.partial != null) rows.set(at, nameOf(card))
+        }
+    }
+    return { who: nameOf(cards[0]), rows }
 }
 
 // The latest answer in the chat's own markdown, cut to a height that keeps the board readable, with the rest a press away.
@@ -365,8 +436,8 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const picked = board.lineInto(card.id)?.picked ?? null
     const sourceMascot = source ? find(source.mascotId) : undefined
     const sourceName = useAssistantName(sourceMascot)
-    const sourceThread = useChatThread(source?.chatId ?? null)
-    const runThreads = useChatThreads(source?.each?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])
+    const sourceThread = useCardThread(source?.chatId ?? null)
+    const runThreads = useCardThreads(source?.each?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])
     const runAnswers = Object.values(runThreads).filter((thread) => savedAnswer(thread)).length
     const sourceAnswer = savedAnswer(sourceThread)
     const sourceTable = useMemo(() => (sourceAnswer ? findTable(sourceAnswer) : null), [sourceAnswer])
@@ -416,7 +487,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
 
     return (
         <div className={cn(CARD_SHELL, "border-accent-ink shadow-raised")} style={{ width: CARD_WIDTH }}>
-            <Perched mascot={mascot} mood="rest" />
+            <Perched cardId={card.id} mascot={mascot} mood="rest" />
             <LineEnds canPull={false} onPull={() => undefined} label="" />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
@@ -440,6 +511,12 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                         if (event.key === 'Enter' && !event.shiftKey) {
                             event.preventDefault()
                             void send()
+                        }
+                        // Esc closes an empty draft, and leaves one with words in it, back on the card.
+                        if (event.key === 'Escape') {
+                            event.preventDefault()
+                            if (!text.trim() && card.attachments.length === 0 && !card.plan) board.remove(card.id)
+                            else (event.currentTarget.closest('.react-flow__node') as HTMLElement | null)?.focus()
                         }
                     }}
                     addItems={attaching.items}
@@ -532,13 +609,13 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     const source = board.sourceOf(card.id)
     const line = board.lineInto(card.id)
     const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
-    const threads = useChatThreads(each.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])))
+    const threads = useCardThreads(each.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])))
     const [openRun, setOpenRun] = useState<string | null>(null)
     const open = board.openId === card.id
-    // Closing the card goes back to every run for next time.
+    // Closing the card goes back to every run for next time. Opened at a run, from Needs you, it shows that run.
     useEffect(() => {
-        if (!open) setOpenRun(null)
-    }, [open])
+        setOpenRun(open ? board.openRunId : null)
+    }, [open, board.openRunId])
 
     const views: RunView[] = each.runs.map((run) => {
         const thread = run.chatId ? threads[run.chatId] : undefined
@@ -555,12 +632,12 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${sourceName}’s table`) : 'For each row'
     const openRunOf = (id: string) => {
         setOpenRun(id)
-        board.setOpen(card.id)
+        board.setOpen(card.id, id)
     }
 
     return (
         <div className={cn(CARD_SHELL, running ? "shadow-reading border-transparent" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
-            <Perched mascot={mascot} mood={asking.length > 0 ? 'asking' : running ? 'thinking' : 'rest'} />
+            <Perched cardId={card.id} mascot={mascot} mood={asking.length > 0 ? 'asking' : running ? 'thinking' : 'rest'} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, 0)} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
@@ -660,7 +737,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
     const name = useAssistantName(mascot)
     const source = board.sourceOf(card.id)
     const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
-    const sourceThread = useChatThread(source?.chatId ?? null)
+    const sourceThread = useCardThread(source?.chatId ?? null)
     const sourceAnswer = savedAnswer(sourceThread)
     const editable = plan.state === 'planned'
     // For each row needs a table to run on: one the card it reads from will answer with, or one already in its answer.
@@ -690,8 +767,9 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
     )
 
     return (
-        <div className={cn(CARD_SHELL, "border-dashed border-accent-ink/50")} style={{ width: CARD_WIDTH }}>
-            <Perched mascot={mascot} mood="rest" />
+        <div className={cn(CARD_SHELL, "border-dashed border-accent-ink/50 transition-opacity duration-layout", editable && board.replanning && "opacity-60")} style={{ width: CARD_WIDTH }}>
+            {editable && board.replanning && <GhostSweep />}
+            <Perched cardId={card.id} mascot={mascot} mood="rest" />
             <LineEnds canPull={editable} onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${name}’s`} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>

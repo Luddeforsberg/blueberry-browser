@@ -66,6 +66,7 @@ describe("NestStore", () => {
       }
     }
     db.exec("DROP TABLE IF EXISTS plan_attachments;");
+    db.exec("ALTER TABLE nests DROP COLUMN title_settled;");
     db.close();
 
     const again = new NestStore(file);
@@ -73,6 +74,31 @@ describe("NestStore", () => {
     const [, kept] = again.setPlan(nest, [plan("p1", scout.id), plan("p2", writer.id)], "Find companies")!;
     expect(again.card(kept)!.attachments.map((each) => each.name)).toEqual(["one-pager.pdf"]);
     expect(again.board(nest)!.attached.map((each) => each.name)).toEqual(["one-pager.pdf"]);
+  });
+
+  it("names a Nest only until its name is settled, and settles the old placeholder's name no more", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const fresh = store.createNest("New Nest");
+    expect(store.nameNest(fresh, "Find customers", false)).toBe(true);
+    expect(store.titleSettled(fresh)).toBe(false);
+    expect(store.nameNest(fresh, "Customer outreach", true)).toBe(true);
+    expect(store.nameNest(fresh, "Something else", true)).toBe(false);
+    const mine = store.createNest("New Nest");
+    store.renameNest(mine, "My own name");
+    expect(store.nameNest(mine, "Generated", true)).toBe(false);
+    expect(store.board(mine)!.title).toBe("My own name");
+    const fromChat = store.createNest("Swedish SaaS", true);
+    expect(store.titleSettled(fromChat)).toBe(true);
+
+    // A Nest from before names were settled keeps its name, unless it's the old placeholder.
+    const old = store.createNest("Untitled nest");
+    const db = new DatabaseSync(file);
+    db.exec("PRAGMA user_version = 7; ALTER TABLE nests DROP COLUMN title_settled;");
+    db.close();
+    const again = new NestStore(file);
+    expect(again.titleSettled(old)).toBe(false);
+    expect(again.titleSettled(mine)).toBe(true);
   });
 
   it("only draws a line from a card in the same nest", () => {

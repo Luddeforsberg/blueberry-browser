@@ -36,6 +36,11 @@ import { DownloadRow } from '../components/DownloadRow'
 import { RecordingNotice, TrailNotes } from '../components/ShowBerry'
 import { DownloadsProgress } from '../components/DownloadsButton'
 import { useShell } from '../contexts/ShellContext'
+import { ReactFlow, ReactFlowProvider, ViewportPortal, type Edge } from '@xyflow/react'
+import '@xyflow/react/dist/base.css'
+import type { ChatThread, NestCard } from '@shared/library'
+import { CardView, LineView, NestBoardContext, type CardNode, type LineEdge, type NestBoardActions } from '../components/NestCard'
+import { PlanGhosts } from './NestPage'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 
@@ -169,6 +174,120 @@ const WORK_SAMPLES: Array<{ label: string; view: WorkView; asking?: boolean }> =
     { label: 'Finished', view: sampleWork([sampleTab('picture')], { outcome: 'done' }) },
     { label: 'Stopped', view: sampleWork([sampleTab('picture')], { outcome: 'stopped' }) },
 ]
+
+// A Nest's board as it stands, drawn by the real cards from sample threads: a finished card with its table, the row a
+// For-each card is on, that card part way, a card working with nothing written yet, a plan being changed, and the
+// shapes where a new plan will land.
+const sampleThread = (id: string, extra: Partial<ChatThread>): ChatThread => ({
+    id,
+    title: id,
+    updatedAt: 0,
+    mascotId: null,
+    from: null,
+    messages: [],
+    partial: null,
+    statusLine: null,
+    steps: [],
+    approval: null,
+    error: null,
+    memoryIds: [],
+    ...extra
+})
+
+const COMPANIES = [['Lindqvist Data', '84'], ['Fjällbo', '41'], ['Kvarnsten', '130'], ['Sjöström Labs', '62'], ['Brygga', '23']]
+
+const SAMPLE_THREADS: Record<string, ChatThread> = {
+    scout: sampleThread('scout', {
+        messages: [
+            { role: 'user', content: 'Find 5 Swedish B2B SaaS companies with 20 to 200 people.' },
+            { role: 'assistant', content: ['Here they are.', '', '| Company | People |', '|---|---|', ...COMPANIES.map(([name, people]) => `| ${name} | ${people} |`)].join('\n') }
+        ]
+    }),
+    'run-1': sampleThread('run-1', { messages: [{ role: 'user', content: 'Write' }, { role: 'assistant', content: 'Hej Sara, I saw you’re hiring two SDRs this quarter…' }] }),
+    'run-2': sampleThread('run-2', { messages: [{ role: 'user', content: 'Write' }], partial: '', steps: [{ text: 'Reading kvarnsten.se', done: false }] }),
+    working: sampleThread('working', { messages: [{ role: 'user', content: 'Which of these is hiring fastest?' }], partial: '' })
+}
+
+const sampleCard = (id: string, x: number, y: number, extra: Partial<NestCard> = {}): CardNode => ({
+    id,
+    type: 'card',
+    position: { x, y },
+    draggable: false,
+    focusable: false,
+    data: { card: { id, chatId: null, mascotId: null, x, y, each: null, plan: null, attachments: [], ...extra } }
+})
+
+const SAMPLE_NODES: CardNode[] = [
+    sampleCard('scout', 0, 60, { chatId: 'scout' }),
+    sampleCard('writer', 560, 60, {
+        each: {
+            prompt: 'Write a short first email to whoever leads sales.',
+            header: ['Company', 'People'],
+            runs: [
+                { id: 'run-1', row: COMPANIES[0], chatId: 'run-1', state: 'started' },
+                { id: 'run-2', row: COMPANIES[2], chatId: 'run-2', state: 'started' },
+                { id: 'run-3', row: COMPANIES[4], chatId: null, state: 'waiting' }
+            ]
+        }
+    }),
+    sampleCard('working', 0, 560, { chatId: 'working' }),
+    sampleCard('planned', 560, 560, { plan: { state: 'planned', prompt: 'Find each lead’s latest LinkedIn post.', each: false, waits: false, table: null, note: null } })
+]
+
+const SAMPLE_EDGES: LineEdge[] = [{ id: 'line', source: 'scout', target: 'writer', sourceHandle: 'out', targetHandle: 'in', type: 'line', data: { draft: false } } as Edge<{ draft: boolean }, 'line'>]
+
+const SAMPLE_BOARD: NestBoardActions = {
+    openId: null,
+    openRunId: null,
+    setOpen: () => undefined,
+    focusId: null,
+    sourceOf: (cardId) => (cardId === 'writer' ? SAMPLE_NODES[0].data.card : null),
+    lineInto: (cardId) => (cardId === 'writer' ? { id: 'line', from: 'scout', to: 'writer', picked: null } : null),
+    pullOut: () => undefined,
+    remove: () => undefined,
+    selection: null,
+    clearSelection: () => undefined,
+    pick: () => undefined,
+    waitingOn: () => [],
+    forEachFrom: (cardId) => (cardId === 'scout' ? [SAMPLE_NODES[1].data.card] : []),
+    away: () => false,
+    replanning: true,
+    samples: SAMPLE_THREADS
+}
+
+const NestSample: React.FC = () => {
+    const { theme } = useShell()
+    return (
+        <NestBoardContext.Provider value={SAMPLE_BOARD}>
+            <ReactFlowProvider>
+                <div className="h-[1120px] rounded-card border overflow-hidden">
+                    <ReactFlow<CardNode, LineEdge>
+                        nodes={SAMPLE_NODES}
+                        edges={SAMPLE_EDGES}
+                        nodeTypes={{ card: CardView }}
+                        edgeTypes={{ line: LineView }}
+                        colorMode={theme.isDark ? 'dark' : 'light'}
+                        defaultViewport={{ x: 32, y: 72, zoom: 0.78 }}
+                        nodesDraggable={false}
+                        nodesConnectable={false}
+                        elementsSelectable={false}
+                        panOnDrag={false}
+                        zoomOnScroll={false}
+                        zoomOnPinch={false}
+                        zoomOnDoubleClick={false}
+                        preventScrolling={false}
+                        proOptions={{ hideAttribution: true }}
+                        className="nest-board"
+                    >
+                        <ViewportPortal>
+                            <PlanGhosts at={{ x: 0, y: 1000 }} />
+                        </ViewportPortal>
+                    </ReactFlow>
+                </div>
+            </ReactFlowProvider>
+        </NestBoardContext.Provider>
+    )
+}
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <section className="mt-10">
@@ -311,6 +430,10 @@ export const GalleryPage: React.FC = () => {
                         <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
                         <ChatComposer onSend={() => undefined} onStop={() => undefined} placeholder="While replying" disabled />
                     </div>
+                </Section>
+
+                <Section title="Nest">
+                    <NestSample />
                 </Section>
 
                 <Section title="Show Berry how">

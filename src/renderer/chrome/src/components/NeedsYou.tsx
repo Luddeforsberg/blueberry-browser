@@ -143,7 +143,7 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
                         <span className={cn("shrink-0 flex items-center", QUIETLY)}>
                             {!question && !handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>}
                             {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={goToTab}>Go to the tab</Button>}
-                            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
+                            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={openJob}>{item.routineId ? 'Open the routine' : item.inNest ? 'Open the card' : 'Open the chat'}</Button>
                             {question && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `Skipped. ${name} carries on without it.`)}>Skip</Button>}
                             {handoff && !onThatTab && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={done}>I’m done</Button>}
                             {handoff && <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => send(false, `${name} carries on without it.`)}>Not now</Button>}

@@ -226,7 +226,17 @@ const NestRow: React.FC<{ nest: NestSummary; selected: boolean; onOpen: () => vo
                     <GitFork className={cn(ICON, "text-muted-foreground")} />
                 </span>
                 <span className="flex-1 truncate">{nest.title}</span>
-                {working.length > 0 ? (
+                {/* A card waiting on the user comes first, then how far For each row has got, then who's working. */}
+                {nest.waiting ? (
+                    <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
+                        <BerryDot />
+                        <span className="sr-only">Needs you</span>
+                    </span>
+                ) : nest.progress ? (
+                    <span className="shrink-0 -mr-6 text-12 text-muted-foreground tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">
+                        {nest.progress.done} of {nest.progress.total}
+                    </span>
+                ) : working.length > 0 ? (
                     <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
                         <BerryDot working />
                         <span className="sr-only">{working.join(', ')} working</span>
@@ -403,7 +413,8 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 nest={nest}
                 selected={isOpen('nest', nest.id)}
                 jobTabs={tabs.filter((jobTab) => jobTab.jobChatId !== null && nest.chatIds.includes(jobTab.jobChatId))}
-                onOpen={() => void browser.openPage('nest', { param: nest.id, title: nest.title })}
+                // With a card waiting on the user, the Nest opens at that card, as its row in Needs you does.
+                onOpen={() => void (nest.waiting ? browser.openPage('chat', { param: nest.waiting }) : browser.openPage('nest', { param: nest.id, title: nest.title }))}
                 onClose={tab && (() => void closeTab(tab.id))}
             />
         )

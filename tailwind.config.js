@@ -136,6 +136,11 @@ module.exports = {
       backgroundImage: {
         shimmer:
           "linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--accent-ink)) 38%, rgb(var(--foreground)) 50%, rgb(var(--accent-ink)) 62%, rgb(var(--muted-foreground) / 0.55) 80%)",
+        // The same sweep in grey, for a Nest waiting on the model: muted text, a little lighter as it passes.
+        "shimmer-quiet":
+          "linear-gradient(90deg, rgb(var(--muted-foreground)) 36%, var(--shimmer-sweep) 50%, rgb(var(--muted-foreground)) 64%)",
+        // And along the outline of a card that's about to appear.
+        "ghost-sweep": "linear-gradient(90deg, var(--ghost-line) 36%, var(--ghost-sweep) 50%, var(--ghost-line) 64%)",
       },
       animation: {
         "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",

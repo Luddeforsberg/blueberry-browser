@@ -93,6 +93,10 @@ const MIGRATIONS = [
    );
    CREATE INDEX plan_attachments_by_attachment ON plan_attachments(attachment_id);
    ALTER TABLE attachments DROP COLUMN source_id;`,
+  // A settled name is final: the user chose it, or the cheap model named the Nest from its first request. Until then it's
+  // "New Nest", then that request's first words. Nests from before this keep theirs, except the old placeholder.
+  `ALTER TABLE nests ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 1;
+   UPDATE nests SET title_settled = 0 WHERE title = 'Untitled nest';`,
 ];
 
 export interface AttachmentRow {
@@ -211,14 +215,26 @@ export class NestStore {
     return { ...nest, cards, lines, talk: this.talk(id), attached: this.attachmentsOf({ nestId: id }) };
   }
 
-  createNest(title: string): string {
+  // `settled` for a name that's final already, such as a chat's when the chat becomes a Nest.
+  createNest(title: string, settled = false): string {
     const id = randomUUID();
-    this.db.prepare("INSERT INTO nests (id, title, updated_at) VALUES (?, ?, ?)").run(id, title, Date.now());
+    this.db.prepare("INSERT INTO nests (id, title, updated_at, title_settled) VALUES (?, ?, ?, ?)").run(id, title, Date.now(), settled ? 1 : 0);
     return id;
   }
 
+  // The user's choice, which a generated name never replaces.
   renameNest(id: string, title: string): boolean {
-    return this.db.prepare("UPDATE nests SET title = ?, updated_at = ? WHERE id = ?").run(title, Date.now(), id).changes > 0;
+    return this.db.prepare("UPDATE nests SET title = ?, title_settled = 1, updated_at = ? WHERE id = ?").run(title, Date.now(), id).changes > 0;
+  }
+
+  titleSettled(id: string): boolean {
+    return this.db.prepare("SELECT 1 FROM nests WHERE id = ? AND title_settled = 1").get(id) !== undefined;
+  }
+
+  // Only while the name isn't settled. `settle` for the cheap model's name, which is final, and not for the first words
+  // of a request, which stand in until then. False if the user renamed it or deleted it meanwhile.
+  nameNest(id: string, title: string, settle: boolean): boolean {
+    return this.db.prepare("UPDATE nests SET title = ?, title_settled = ? WHERE id = ? AND title_settled = 0").run(title, settle ? 1 : 0, id).changes > 0;
   }
 
   // Its cards and lines go with it. Their chats are the caller's to delete, so it gets their ids first.

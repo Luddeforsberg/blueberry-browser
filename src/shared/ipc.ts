@@ -371,6 +371,20 @@ export type NestAttachResult = { ok: true } | { ok: false; error: string };
 
 // Run either starts the plan, or says why it can't yet, such as a card with nothing to do.
 export type NestRunPlanResult = { ok: true } | { ok: false; error: string };
+export type NestFromChatResult = { ok: true; nestId: string } | { ok: false; error: string };
+// A card to open on a Nest's board, and scroll into view: one Needs you or a notification was about. With `runId`, that
+// run of a For-each card.
+export interface NestFocus {
+  nestId: string;
+  cardId: string;
+  runId: string | null;
+}
+// A card that started with work from the card its line comes from, for the bird's flight along the line.
+export interface NestHandOff {
+  nestId: string;
+  from: string;
+  to: string;
+}
 
 export interface ChatSendOptions {
   seePage: boolean;
@@ -540,6 +554,8 @@ export interface InvokeChannels {
   // Run: sends every planned card. Each starts once the card it reads from has answered, or once the user says so.
   "nests:run-plan": { region: "chrome"; args: [nestId: string]; result: NestRunPlanResult };
   "nests:discard-plan": { region: "chrome"; args: [nestId: string]; result: boolean };
+  // Open as a Nest: a new Nest whose first card is this chat, which opens in the chat's tab.
+  "nests:from-chat": { region: "chrome"; args: [chatId: string]; result: NestFromChatResult };
   // Looks right, continue: starts the cards of a run plan that wait for this card's answer to be checked.
   "nests:continue": { region: "chrome"; args: [cardId: string]; result: boolean };
   // Opens the system's file picker in main, which reads and copies in what's picked. A renderer never names a path. Says
@@ -690,6 +706,10 @@ export interface EventChannels {
   "chat:deleted": string;
   "nests:updated": NestBoard;
   "nests:deleted": string;
+  "nests:focus": NestFocus;
+  "nests:hand-off": NestHandOff;
+  // ⌘+, ⌘− and ⌘0 on a Nest's board, from the View menu.
+  "nests:zoom": "in" | "out" | "fit";
   // Text the user chose to ask about. It waits in the composer and is never sent by itself.
   "chat:draft": string;
   "find:opened": null;
@@ -792,6 +812,10 @@ export interface NestsAPI {
   removeAttachment: (attachmentId: string, fromCardId?: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
+  fromChat: (chatId: string) => Promise<NestFromChatResult>;
+  onFocus: (callback: (focus: NestFocus) => void) => Unsubscribe;
+  onHandOff: (callback: (handOff: NestHandOff) => void) => Unsubscribe;
+  onZoom: (callback: (zoom: "in" | "out" | "fit") => void) => Unsubscribe;
 }
 
 export interface LibraryAPI {

@@ -77,6 +77,7 @@ export const CHANNEL_REGIONS: {
   "nests:edit-plan": ["chrome"],
   "nests:run-plan": ["chrome"],
   "nests:discard-plan": ["chrome"],
+  "nests:from-chat": ["chrome"],
   "nests:continue": ["chrome"],
   "nests:attach-files": ["chrome"],
   "nests:add-note": ["chrome"],

@@ -33,6 +33,7 @@ export const startFakeModel = async () => {
   let suggest: ((digest: string) => string) | null = null;
   const suggestionRequests: FakeModelRequest[] = [];
   let plans: object[] = [];
+  let planHold: Promise<void> | null = null;
   const planRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
@@ -67,6 +68,9 @@ export const startFakeModel = async () => {
     if (parsed.response_format?.json_schema?.name === "nest_plan") {
       planRequests.push(parsed);
       const plan = plans.shift() ?? { reply: "I couldn't plan that.", ask: true, cards: [] };
+      const heldPlan = planHold;
+      planHold = null;
+      if (heldPlan) await heldPlan;
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -127,6 +131,7 @@ export const startFakeModel = async () => {
     planRequests,
     reset() {
       plans = [];
+      planHold = null;
       planRequests.length = 0;
       memory = '{"facts":[]}';
       memoryRequests.length = 0;
@@ -148,6 +153,12 @@ export const startFakeModel = async () => {
     // What the cheap model proposes for the new tab, worked out from the digest it was sent.
     suggestFrom(next: (digest: string) => string) {
       suggest = next;
+    },
+    // The next plan waits until the returned function is called, as a real model takes a while to plan.
+    holdPlan() {
+      let release = () => {};
+      planHold = new Promise<void>((resolve) => (release = resolve));
+      return () => release();
     },
     // What the planner answers next, as the model would in the plan's shape. Call again for the one after.
     // A card that names no files gets none, as the real model says with an empty list.
