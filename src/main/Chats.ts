@@ -687,6 +687,16 @@ export class Chats {
     return null;
   }
 
+  // The address and title a page may be kept under, such as on a reply or a Nest's board, or null for none. Past a
+  // handoff only its site and path, never one a code was typed into, and never a code the user typed.
+  pageToKeep(tab: Tab | CdpTab): UsedPage | null {
+    const url = addressToKeep(tab.url, {
+      handedBack: this.everHandedOver.has(tab.id),
+      codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
+    });
+    return url ? { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) } : null;
+  }
+
   // A reply is over, so the pages its job opened close, and the reply keeps their addresses to open again. The one the
   // reply sends the user to stays, as theirs. One that can't close, such as the one they're looking at, stays the job's,
   // since looking isn't taking over. One held for the user, or that another job is using, is left alone.
@@ -702,11 +712,8 @@ export class Chats {
     const pages = new Map<string, UsedPage>();
     used.forEach((tab) => {
       if (!job.own.has(tab.id)) return;
-      const url = addressToKeep(tab.url, {
-        handedBack: this.everHandedOver.has(tab.id),
-        codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
-      });
-      if (url) pages.set(url, { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) });
+      const page = this.pageToKeep(tab);
+      if (page) pages.set(page.url, page);
     });
     const current = job.current ? tabOf(job.current) : null;
     const pointed = current && job.own.has(current.id) && replyPointsTo(run.partial, current.url) ? current.id : null;

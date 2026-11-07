@@ -883,9 +883,10 @@ export class NestStore {
     return this.db.prepare("SELECT id, page_url AS url FROM cards WHERE page_job = ? ORDER BY rowid").all(cardId) as { id: string; url: string }[];
   }
 
-  // Its job has ended and its tab is still open, so it stays as an ordinary tab card, still joined to that card.
-  keepPage(id: string): boolean {
-    return this.db.prepare("UPDATE cards SET page_job = NULL WHERE id = ? AND page_job IS NOT NULL").run(id).changes > 0;
+  // Its job has ended and its tab is still open, so it stays as an ordinary tab card, still joined to that card, under
+  // the address and title a reply would keep of it.
+  keepPage(id: string, { url, title }: { url: string; title: string }): boolean {
+    return this.db.prepare("UPDATE cards SET page_job = NULL, page_url = ?, page_title = ? WHERE id = ? AND page_job IS NOT NULL").run(url, title, id).changes > 0;
   }
 
   deletePage(id: string): boolean {

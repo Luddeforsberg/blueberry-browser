@@ -472,4 +472,12 @@ describe("a page passed across a line", () => {
     expect(JSON.stringify(clean)).not.toContain("481516");
     expect(withCardAnswer("Go on", clean)).not.toContain("481516");
   });
+
+  it("takes a code out of a page left out to fit, and out of why its text didn't come", () => {
+    const code = (text: string) => text.replaceAll("481516", "[code removed]");
+    const dropped = mapCardText({ name: "example.com/verify/481516", text: "", part: "thread", dropped: true }, code);
+    expect(withCardAnswers("Go on", [dropped])).not.toContain("481516");
+    const refused = mapCardText({ name: "481516.example.com", text: "", part: "page", page: { url: "https://481516.example.com/", title: "", tabId: null, room: 0, why: "Hub isn't allowed on 481516.example.com." } }, code);
+    expect(withCardAnswer("Go on", refused)).not.toContain("481516");
+  });
 });

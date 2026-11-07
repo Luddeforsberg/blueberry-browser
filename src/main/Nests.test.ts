@@ -31,6 +31,7 @@ interface FakeTab {
   heldForUser: boolean;
   holds: number;
   mayShowCode: boolean;
+  noScreenshotsUntil: number;
   foreignFrames: never[];
   getTextWithFrames: () => Promise<string>;
 }
@@ -38,7 +39,7 @@ let openTabs: FakeTab[];
 // The tabs each running job is using, by its chat.
 let jobTabs: Map<string, string[]>;
 const fakeTab = (id: string, url: string, text: string): FakeTab => {
-  const tab: FakeTab = { id, url, title: "Pricing", favicon: null, text, existingView: {}, heldForUser: false, holds: 0, mayShowCode: false, foreignFrames: [], getTextWithFrames: async () => tab.text };
+  const tab: FakeTab = { id, url, title: "Pricing", favicon: null, text, existingView: {}, heldForUser: false, holds: 0, mayShowCode: false, noScreenshotsUntil: 0, foreignFrames: [], getTextWithFrames: async () => tab.text };
   return tab;
 };
 const GONE: MascotProfile = { ...BERRY, id: "gone", name: "Gone", deletedAt: 1 };
@@ -136,6 +137,10 @@ const setup = (namer?: NestNamer, writer?: NestWriter) => {
     info: (tabId) => {
       const tab = openTabs.find((each) => each.id === tabId);
       return tab ? { url: tab.url, title: tab.title, favicon: tab.favicon } : null;
+    },
+    keep: (tabId) => {
+      const tab = openTabs.find((each) => each.id === tabId);
+      return tab ? chats.pageToKeep(tab as unknown as Tab) : null;
     },
     work: (chatId) => (chats.isRunning(chatId) ? { tabs: (jobTabs.get(chatId) ?? []).map((id, index, all) => ({ id, state: "picture" as const, current: index === all.length - 1 })) } : null),
   });
@@ -2164,9 +2169,17 @@ describe("Tabs and links on the board", () => {
     // A view gives the card nothing: the line goes into it, never out of it.
     expect(store.linesTo(scout.id)).toEqual([]);
 
-    // When the job ends, the tab still open stays as an ordinary tab card, joined to the card.
+    // A code typed from the phone went into another of its tabs, which is never kept.
+    openTabs.push({ ...fakeTab("tab-3", "https://c.example/verify?code=481516", "C"), noScreenshotsUntil: Date.now() + 60_000 });
+    jobTabs.set(chatId, ["tab-2", "tab-3"]);
+    nests.tabsChanged();
+    expect(views().map((card) => card.page!.url)).toEqual(["https://b.example/", "https://c.example/"]);
+    expect(nests.dropPage(nest, { tabId: "tab-3" }, { at: { x: 0, y: 0 }, taken: [] })).toEqual({ ok: false, error: "A code went into that tab, so it can’t go on the board." });
+
+    // When the job ends, a tab still open stays as an ordinary tab card, joined to the card, unless a code went into it.
     await release();
     expect(views()).toMatchObject([{ page: { tab: { id: "tab-2" }, job: null, dropped: false } }]);
+    expect(JSON.stringify(nests.board(nest))).not.toContain("481516");
     expect(nests.board(nest)!.cards.find((card) => card.id === scout.id)!.showingTabs).toBeUndefined();
     expect(nests.showTabs(scout.id, true)).toBe(false);
   });

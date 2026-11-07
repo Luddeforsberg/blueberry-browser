@@ -370,6 +370,10 @@ export class Window {
         const tab = this.allTabs.find((each) => each.id === tabId);
         return tab ? { url: tab.url, title: tab.title, favicon: tab.favicon } : null;
       },
+      keep: (tabId) => {
+        const tab = this.allTabs.find((each) => each.id === tabId);
+        return tab ? this.chats.pageToKeep(tab) : null;
+      },
       // Only this window's tabs, never a cloud page, which is never on a board.
       work: (chatId) => {
         const job = this.chats.work(chatId);

@@ -86,11 +86,14 @@ type LineInput = RawInput | null | "stale";
 // running job is using. Tab ids start again each launch, so a card only ever holds one in memory.
 export interface NestTabs {
   info: (tabId: string) => { url: string; title: string; favicon: string | null } | null;
+  // The address and title an open tab may be kept under on the board, as a reply keeps a page: past a handoff only its
+  // site and path, none for a tab a code was typed into, and codes the user typed taken out.
+  keep: (tabId: string) => UsedPage | null;
   // Null once the job has ended. Only tabs in this window, never a cloud page.
   work: (chatId: string) => { tabs: { id: string; state: WorkTabState; current: boolean }[] } | null;
 }
 
-const NO_TABS: NestTabs = { info: () => null, work: () => null };
+const NO_TABS: NestTabs = { info: () => null, keep: () => null, work: () => null };
 
 // Where a card is taken to be in main, which never measures one: its own size, or the usual one for its kind.
 const rectOfCard = (card: NestCard): Rect =>
@@ -263,12 +266,16 @@ export class Nests {
     const { url, title, tabId } = (typeof drop === "object" && drop !== null ? drop : {}) as { url?: unknown; title?: unknown; tabId?: unknown };
     const tab = typeof tabId === "string" ? this.tabs.info(tabId) : null;
     if (typeof tabId === "string" && !tab) return { ok: false, error: "That tab isn’t open any more." };
-    const checked = checkAddress(tab ? tab.url : url);
-    if (!checked.ok) return tab ? { ok: false, error: "Only a tab with a web page in it can go on the board." } : checked;
+    if (tab && !checkAddress(tab.url).ok) return { ok: false, error: "Only a tab with a web page in it can go on the board." };
+    // Kept as a reply keeps a page, so nothing saved can hold a code.
+    const kept = tab ? this.tabs.keep(tabId as string) : null;
+    if (tab && !kept) return { ok: false, error: "A code went into that tab, so it can’t go on the board." };
+    const checked = checkAddress(kept ? kept.url : url);
+    if (!checked.ok) return checked;
     const place = this.placing(options);
     const known = this.store.board(nestId)?.cards ?? [];
     const taken = [...place.taken, ...known.filter((card) => !place.taken.some((rect) => rect.x === card.x && rect.y === card.y)).map(rectOfCard)];
-    const card = this.store.addPageCard(nestId, { ...freeSpot(taken, place.at, PAGE_CARD), url: checked.url, title: cleanTitle(tab ? tab.title : title), dropped: true });
+    const card = this.store.addPageCard(nestId, { ...freeSpot(taken, place.at, PAGE_CARD), url: checked.url, title: cleanTitle(kept ? kept.title : title), dropped: true });
     if (!card) return { ok: false, error: "That Nest isn’t there any more." };
     if (tab) this.tabOf.set(card.id, tabId as string);
     this.changed(nestId);
@@ -317,12 +324,16 @@ export class Nests {
     for (const tab of work.tabs) {
       const info = this.tabs.info(tab.id);
       if (!info || this.showing.get(cardId)?.has(tab.id) || [...this.tabOf].some(([id, each]) => each === tab.id && shown.some((page) => page.id === id))) continue;
-      const checked = checkAddress(info.url);
-      if (!checked.ok) continue;
+      const live = checkAddress(info.url);
+      if (!live.ok) continue;
+      // While it's a view, the tab itself is what shows. What's saved is only what a reply would keep of it, or its site.
+      const kept = this.tabs.keep(tab.id);
+      const checked = kept ? checkAddress(kept.url) : null;
       const rects = this.store.board(card.nestId)!.cards.map(rectOfCard);
       const from = rectOfCard(card);
       const spot = freeSpot(rects, { x: from.x + from.width + CARD_GAP, y: from.y }, PAGE_CARD);
-      const made = this.store.addPageCard(card.nestId, { ...spot, url: checked.url, title: cleanTitle(info.title), job: cardId });
+      const saved = checked?.ok ? { url: checked.url, title: cleanTitle(kept!.title) } : { url: new URL(live.url).origin + "/", title: "" };
+      const made = this.store.addPageCard(card.nestId, { ...spot, ...saved, job: cardId });
       if (made) {
         this.tabOf.set(made.id, tab.id);
         changed = true;
@@ -340,10 +351,11 @@ export class Nests {
     const kept = new Set<string>();
     for (const page of this.store.jobPages(cardId)) {
       const tabId = this.tabOf.get(page.id);
-      const info = tabId ? this.tabs.info(tabId) : null;
-      if (info) {
-        this.store.keepPage(page.id);
-        kept.add(page.url);
+      const open = tabId && this.tabs.info(tabId) ? this.tabs.keep(tabId) : null;
+      const checked = open ? checkAddress(open.url) : null;
+      if (open && checked?.ok) {
+        this.store.keepPage(page.id, { url: checked.url, title: cleanTitle(open.title) });
+        kept.add(checked.url);
       } else this.forgetPages(this.store.deletePage(page.id) ? [page.id] : []);
     }
     for (const page of pages) {
