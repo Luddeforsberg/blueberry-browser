@@ -1,7 +1,7 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
 // All of it is saved locally.
 
-import type { PickedRows } from "./nestTable";
+import type { LineCrossing, PickedRows } from "./nestTable";
 
 export interface Bookmark {
   id: string;
@@ -445,6 +445,8 @@ export interface NestCard {
   each: NestForEach | null;
   // Set while it's a card Berry planned that hasn't started.
   plan: NestPlanned | null;
+  // Set on a card made from a file the user added: its rows, with no chat and no bird.
+  table: NestTableFile | null;
   // Its files and notes, which go to its bird with every message. They can change only before it's sent.
   attachments: NestAttachment[];
 }
@@ -487,11 +489,22 @@ export interface NestRequest {
   messages: { role: "user" | "berry"; text: string }[];
 }
 
-// A card sent with For each row: the same prompt, run once for each row, each run its own chat.
+// A card sent with For each row: the same prompt, run once for each row, each run its own chat. Its result is the table
+// it ran on with one more column, `column`, each row's short value in it.
 export interface NestForEach {
   prompt: string;
   header: string[];
+  column: string;
+  // The cheap model is naming the column right now.
+  naming?: boolean;
   runs: NestRun[];
+}
+
+// The rows of a CSV or TSV file the user added, as they were then, and the card's title from the file's name.
+export interface NestTableFile {
+  name: string;
+  header: string[];
+  rows: string[][];
 }
 
 // Waiting for its turn, started (its chat says how it's going), stopped before it started, or couldn't start.
@@ -502,6 +515,10 @@ export interface NestRun {
   row: string[];
   chatId: string | null;
   state: NestRunState;
+  // Its short value in the card's column, once its answer has one. The full answer stays in its chat.
+  cell: string | null;
+  // The value is being written from its answer right now.
+  filling?: boolean;
 }
 
 // The card `to` gets the latest answer on `from` each time it sends, or only `picked`, the rows the user selected.
@@ -510,6 +527,8 @@ export interface NestLine {
   from: string;
   to: string;
   picked: PickedRows | null;
+  // Exactly what crosses it now, counted from what would be sent. Null until the source has something to give.
+  crosses?: LineCrossing | null;
 }
 
 export interface NestBoard {

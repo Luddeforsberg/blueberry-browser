@@ -18,7 +18,7 @@ import type { MascotProfile, NestBoard, NestRequest } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { ChevronRight, Scan } from 'lucide-react'
+import { ChevronRight, Scan, Table2 } from 'lucide-react'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from '../components/Berry'
@@ -323,7 +323,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const [selection, setSelection] = useState<RowSelection | null>(null)
     // Set when a press away from the rows cleared them, so the click that follows on the board doesn't also make a card.
     const clearedByPress = useRef(false)
-    const label = useCallback((card: NestBoard['cards'][number]) => `${card.mascotId ? find(card.mascotId).name : berryName}’s card`, [find, berryName])
+    const label = useCallback(
+        (card: NestBoard['cards'][number]) => (card.table ? `The table ${card.table.name}` : `${card.mascotId ? find(card.mascotId).name : berryName}’s card`),
+        [find, berryName]
+    )
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
     const edges = useMemo(() => toEdges(board), [board])
     const [prompt, setPrompt] = useState('')
@@ -542,7 +545,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // so does a draft with a file or note on it.
     const dropEmptyDrafts = useCallback(() => {
         board.cards
-            .filter((card) => !card.chatId && !card.each && !card.plan && !draftText(card.id).trim() && card.attachments.length === 0)
+            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !draftText(card.id).trim() && card.attachments.length === 0)
             .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
@@ -649,8 +652,19 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     useEffect(() => {
         if (!planning) setGhostsAt(null)
     }, [planning])
-    // What's attached here goes with the request: to its one card, or to the cards Berry's plan gives it to.
+    // What's attached here goes with the request: to its one card, or to the cards Berry's plan gives it to. A table from a
+    // file is a card of its own, in the first free place in sight.
     const attaching = useAttaching(planning ? null : { nestId: board.id })
+    const addTable = async () => {
+        const box = wrapper.current?.getBoundingClientRect()
+        if (!box) return
+        setProblem(null)
+        open(null)
+        const at = flow.screenToFlowPosition({ x: box.left + EDGE_INSET.x, y: box.top + EDGE_INSET.y })
+        const result = await api.addTableFile(board.id, { at, taken: rects() })
+        if (!result.ok) setProblem(result.error)
+    }
+    const addItems = attaching.items && [...attaching.items, { label: 'Add a table from a file', icon: <Table2 />, onSelect: () => void addTable() }]
     const sendNew = async () => {
         const text = prompt.trim()
         const box = wrapper.current?.getBoundingClientRect()
@@ -743,7 +757,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                                 void sendNew()
                             }
                         }}
-                        addItems={attaching.items}
+                        addItems={addItems}
                         addLabel="Add a file or note"
                         menuUp
                         attachment={<Attachments attachments={board.attached} target={planning ? null : { nestId: board.id }} attaching={attaching} className="px-1 pb-1" />}

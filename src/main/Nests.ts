@@ -2,11 +2,13 @@ import type { Chats } from "./Chats";
 import type { NestStore } from "./NestStore";
 import type { MascotStore } from "./MascotStore";
 import type { ChatThread, MascotProfile, NestBoard, NestCard, NestSummary } from "../shared/library";
-import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRunPlanResult, NestSendEachResult } from "../shared/ipc";
+import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
-import { findTable, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type PickedRows } from "../shared/nestTable";
+import { combinedTable, findTable, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, tableMarkdown, type LineCrossing, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
-import { latestAnswer, rowAnswer, rowsAnswer, runsAnswer, type CardAnswer } from "./nestContext";
+import { crossingOf, latestAnswer, rowAnswer, rowsAnswer, tableAnswer, type CardAnswer } from "./nestContext";
+import { DEFAULT_COLUMN, fallbackCell, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
+import { tableFromFile } from "./nestCsv";
 import { armedStep, checkPlan, CLOSED_BEFORE_START, replyState, runsState, type PlanCard, type PlanSource, type SourceState } from "./nestPlan";
 import { answerStart, PLAN_SYSTEM_PROMPT, planDigest, type BoardCardDigest, type PlannedDigest } from "./nestPlanner";
 import type { AttachmentRow, AttachTo, NewPlannedCard } from "./NestStore";
@@ -83,6 +85,11 @@ export class Nests {
   // Nests the cheap model is naming right now, and how many times each has been tried since launch.
   private readonly naming = new Set<string>();
   private readonly nameTries = new Map<string, number>();
+  // Runs whose value is being written from their answer, each with the newest request for it, so an older one that comes
+  // back late never replaces a newer answer's value.
+  private readonly fills = new Map<string, number>();
+  // For-each cards whose column the cheap model is naming.
+  private readonly columnNaming = new Set<string>();
 
   constructor(
     private readonly store: NestStore,
@@ -91,12 +98,16 @@ export class Nests {
     private readonly mascots: Pick<MascotStore, "resolve" | "all">,
     private readonly events: NestEvents,
     private readonly planner: NestPlanner = NO_PLANNER,
-    private readonly namer: NestNamer = NO_NAMER
+    private readonly namer: NestNamer = NO_NAMER,
+    // The cheap model, writing a For-each card's column name and each row's value in it.
+    private readonly writer: NestWriter = NO_WRITER
   ) {
     // Runs still waiting when the app last closed don't start by themselves now: the press that queued them was then.
     // Cards of a plan that hadn't started don't either.
     store.stopWaiting();
     store.holdAfter(null, CLOSED_BEFORE_START);
+    // Runs that ended while a value was still being written, when the app last closed, get theirs once the window is up.
+    setTimeout(() => store.endedRunsWithoutCell().forEach((runId) => this.fillCell(runId)), 0);
   }
 
   list(): NestSummary[] {
@@ -119,9 +130,27 @@ export class Nests {
     return new Set(this.store.chatIds());
   }
 
+  // With what only main knows: which values and column names are being written, and what crosses each line now.
   board(id: string): NestBoard | null {
     const board = this.store.board(id);
-    return board && { ...board, planning: this.planning.get(id) ?? null, naming: this.naming.has(id) };
+    if (!board) return null;
+    const cards = board.cards.map((card) =>
+      card.each
+        ? { ...card, each: { ...card.each, naming: this.columnNaming.has(card.id), runs: card.each.runs.map((run) => ({ ...run, filling: this.fills.has(run.id) })) } }
+        : card
+    );
+    const lines = board.lines.map((line) => ({ ...line, crosses: this.crossing(line.to) }));
+    return { ...board, cards, lines, planning: this.planning.get(id) ?? null, naming: this.naming.has(id) };
+  }
+
+  // What crosses the line into a card now: what it sends, and what each run gets with For each row. Null when nothing
+  // would, such as before the source has answered.
+  private crossing(cardId: string): LineCrossing | null {
+    const input = this.inputFor(cardId);
+    const rows = this.rowsFor(cardId);
+    const whole = "answer" in input && input.answer ? crossingOf(input.answer) : null;
+    const each = "problem" in rows ? null : { rows: rows.rows.length, columns: rows.header.length };
+    return whole || each ? { whole, each } : null;
   }
 
   title(id: string): string | null {
@@ -231,7 +260,7 @@ export class Nests {
     // of the plan, but not while Berry changes the plan, which would replace it.
     const source = from === null ? null : this.store.card(from);
     const planned = source?.plan?.state === "planned";
-    if (from !== null && !source?.chatId && !source?.each && !planned) return null;
+    if (from !== null && !source?.chatId && !source?.each && !source?.table && !planned) return null;
     if (source && this.replanned(source)) return null;
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
     const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
@@ -289,7 +318,7 @@ export class Nests {
   send(cardId: string, text: string): ChatThread | null {
     const card = this.store.card(cardId);
     // A planned card goes with its plan, by Run. One that was held is a draft, and the user may send it.
-    if (!card || card.each || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
+    if (!card || card.each || card.table || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
     const input = this.inputFor(cardId);
     if ("problem" in input) return null;
     const cardAnswer = input.answer;
@@ -318,7 +347,7 @@ export class Nests {
   sendEach(cardId: string, text: string): NestSendEachResult {
     const card = this.store.card(cardId);
     const prompt = typeof text === "string" ? text.trim() : "";
-    if (!card || card.chatId || card.each) return { ok: false, error: "This card has been sent already." };
+    if (!card || card.chatId || card.each || card.table) return { ok: false, error: "This card has been sent already." };
     if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     if (!prompt) return { ok: false, error: "Write what to do with each row first." };
     if (this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
@@ -326,7 +355,8 @@ export class Nests {
     if ("problem" in rows) return { ok: false, error: rows.problem };
     const problem = runCountProblem(rows.rows.length);
     if (problem) return { ok: false, error: problem };
-    if (!this.store.startForEach(cardId, prompt, rows.header, rows.rows)) return { ok: false, error: "This card has been sent already." };
+    if (!this.store.startForEach(cardId, prompt, rows.header, rows.rows, DEFAULT_COLUMN)) return { ok: false, error: "This card has been sent already." };
+    this.nameColumn(cardId, prompt);
     this.nameFrom(card.nestId, prompt);
     this.changed(card.nestId);
     this.handedOff(cardId);
@@ -343,9 +373,10 @@ export class Nests {
     const sent = this.chats.send(run.chatId, text, {
       seePage: false,
       userPresent: true,
-      cardAnswer: rowAnswer(this.sourceName(card.id), card.each.header, run.row),
+      cardAnswer: this.rowFor(card.id, card.each.header, run.row),
       onEnd: () => {
         this.pump();
+        this.fillCell(runId);
         this.advance(card.nestId);
       },
       ...this.userSaid(card.id, run.chatId, text),
@@ -536,7 +567,7 @@ export class Nests {
     const { cardId, nestId } = target as { cardId?: unknown; nestId?: unknown };
     if (typeof cardId === "string") {
       const card = this.store.card(cardId);
-      if (!card || card.chatId || card.each || card.plan?.state === "armed") return null;
+      if (!card || card.chatId || card.each || card.table || card.plan?.state === "armed") return null;
       return this.replanned(card) ? null : { cardId };
     }
     if (typeof nestId === "string") return this.store.board(nestId) && !this.planning.has(nestId) ? { nestId } : null;
@@ -611,13 +642,20 @@ export class Nests {
     const line = this.store.lineTo(cardId);
     if (!line) return { kind: "none" };
     const { source } = line;
-    const name = this.mascots.resolve(source.mascotId).name;
+    const name = this.labelOf(source);
+    // A file's rows are there from the start.
+    if (source.table) return { kind: "answered", name };
     if (source.plan?.state === "held") return { kind: "held", name };
     if (source.plan) return { kind: "planned", name };
     if (source.each) {
+      // A run whose value is still being written isn't done, so what the next card gets has every value in it.
       return runsState(
         name,
-        source.each.runs.map((run) => ({ state: run.state, running: !!run.chatId && this.chats.isRunning(run.chatId), thread: run.chatId ? this.chats.thread(run.chatId) : null }))
+        source.each.runs.map((run) => ({
+          state: run.state,
+          running: (!!run.chatId && this.chats.isRunning(run.chatId)) || this.fills.has(run.id),
+          thread: run.chatId ? this.chats.thread(run.chatId) : null,
+        }))
       );
     }
     if (!source.chatId) return { kind: "silent", name };
@@ -634,12 +672,14 @@ export class Nests {
     if (this.flockId(card.mascotId) === undefined) return this.store.hold(card.id, "Didn’t start, because its bird isn’t in your flock any more");
     if (plan.each) {
       const rows = this.rowsFor(card.id);
-      const name = this.sourceName(card.id);
+      const source = this.store.sourceOf(card.id);
+      const name = source ? this.labelOf(source) : "Another card";
       if ("problem" in rows) return this.store.hold(card.id, `Didn’t start, because ${name}’s answer has no table`);
       if (runCountProblem(rows.rows.length)) {
         return this.store.hold(card.id, `Didn’t start, because ${name}’s table has ${rows.rows.length} rows, and For each row runs at most ${MAX_RUNS} times`);
       }
-      if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows)) return false;
+      if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows, DEFAULT_COLUMN)) return false;
+      this.nameColumn(card.id, plan.prompt);
       this.handedOff(card.id);
       this.pump();
       return true;
@@ -665,7 +705,8 @@ export class Nests {
   private handedOff(cardId: string): void {
     const line = this.store.lineTo(cardId);
     const nestId = this.store.card(cardId)?.nestId;
-    if (line && nestId) this.events.handOff?.(nestId, line.source.id, cardId);
+    // A file's card has no bird to carry it.
+    if (line && nestId && !line.source.table) this.events.handOff?.(nestId, line.source.id, cardId);
   }
 
   // On a card Berry planned, what the user typed: the request it was planned from, and anything they've typed in its chat
@@ -679,14 +720,111 @@ export class Nests {
     return { userSaid: [said, ...since, ...(chatId && typed !== null ? [typed] : [])].join("\n") };
   }
 
-  // Whether For each row can run on what a planned card reads from: a planned card that will answer with a table, or a
-  // sent card whose latest answer has one.
+  // Whether For each row can run on what a planned card reads from: a planned card that will answer with a table, or
+  // run for each row and so make one, or a card that has a table now.
   private getsTable(cardId: string): boolean {
     const source = this.store.lineTo(cardId)?.source;
-    if (!source || source.each) return false;
-    if (source.plan) return !source.plan.each && source.plan.table !== null;
-    const answer = source.chatId ? this.answerOf(source.chatId) : null;
-    return !!answer && findTable(answer) !== null;
+    if (!source) return false;
+    if (source.plan) return source.plan.each || source.plan.table !== null;
+    return this.tableOf(source) !== null;
+  }
+
+  // A card's table as it is now: a file's rows, a For-each card's rows with its column, or the table in a sent card's
+  // latest answer, the one it shows. Null when it has none.
+  tableOf(card: NestCard): PickedRows | null {
+    if (card.table) return { header: card.table.header, rows: card.table.rows };
+    if (card.each) return combinedTable(card.each);
+    const answer = card.chatId ? this.answerOf(card.chatId) : null;
+    const table = answer ? findTable(answer) : null;
+    return table && { header: table.header, rows: table.rows };
+  }
+
+  // What a card's table is called when it's copied or saved: a file's title, or its bird's name and the Nest's.
+  exportOf(cardId: string): { title: string; table: PickedRows } | null {
+    const card = this.store.card(cardId);
+    const table = card && this.tableOf(card);
+    if (!card || !table) return null;
+    return { title: card.table ? card.table.name : `${this.title(card.nestId) ?? "Nest"} - ${this.labelOf(card)}`, table };
+  }
+
+  // Renames a For-each card's column. The user's name is final, and a generated one never replaces it.
+  renameColumn(cardId: unknown, name: unknown): boolean {
+    const words = typeof name === "string" ? name.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    if (!card?.each || !words || !this.store.nameColumn(card.id, words, true)) return false;
+    this.columnNaming.delete(card.id);
+    this.changed(card.nestId);
+    return true;
+  }
+
+  // A CSV or TSV file the user picked, already read in main, as a table card of its own, in the first free place in sight.
+  addTableFile(nestId: string, name: string, bytes: Uint8Array, options: Pick<NestAskOptions, "at" | "taken">): NestTableResult {
+    if (!this.store.board(nestId)) return { ok: false, error: "That Nest isn’t there any more." };
+    const parsed = tableFromFile(name, bytes);
+    if (!parsed.ok) return parsed;
+    const place = this.placing(options);
+    const card = this.store.addTableCard(nestId, { ...freeSpot(place.taken, place.at), table: parsed.table });
+    if (!card) return { ok: false, error: "That Nest isn’t there any more." };
+    this.changed(nestId);
+    return { ok: true, cardId: card.id };
+  }
+
+  // The cheap model names a For-each card's column from its job, in the background. Until then, and if it can't, the
+  // column is "Result". A name the user gave meanwhile stays.
+  private nameColumn(cardId: string, job: string): void {
+    this.columnNaming.add(cardId);
+    void this.writer
+      .column(job)
+      .catch((error) => {
+        console.error("Couldn't name a column:", error instanceof Error ? error.message : "unknown error");
+        return null;
+      })
+      .then((name) => {
+        if (name && this.columnNaming.has(cardId)) this.store.nameColumn(cardId, name, false);
+      })
+      .finally(() => {
+        this.columnNaming.delete(cardId);
+        const nestId = this.store.card(cardId)?.nestId;
+        if (nestId) this.changed(nestId);
+      });
+  }
+
+  // A run's value in its card's column, from its latest answer, once its reply has ended: the whole answer when it's
+  // short, or else what the cheap model makes of it, or else its first line. A run whose reply came back empty has none.
+  // The answer is read now, and a value written for an older answer never lands.
+  private fillCell(runId: string): void {
+    const run = this.store.run(runId);
+    const card = run && this.store.card(run.cardId);
+    if (!run?.chatId || !card?.each || this.chats.isRunning(run.chatId)) return;
+    const answer = this.answerOf(run.chatId);
+    const ready = answer === null ? null : shortCell(answer);
+    const turn = (this.fills.get(runId) ?? 0) + 1;
+    if (answer === null || ready !== null) {
+      const was = this.fills.delete(runId);
+      if (!was && ready === run.cell) return;
+      this.store.setRunCell(runId, ready);
+      this.changed(card.nestId);
+      return;
+    }
+    this.fills.set(runId, turn);
+    this.changed(card.nestId);
+    const { prompt, column, header } = card.each;
+    void this.writer
+      .cell({ job: prompt, column, header, row: run.row, answer })
+      .catch((error) => {
+        console.error("Couldn't write a cell:", error instanceof Error ? error.message : "unknown error");
+        return null;
+      })
+      .then((cell) => {
+        if (this.fills.get(runId) !== turn) return;
+        this.fills.delete(runId);
+        this.store.setRunCell(runId, cell ?? fallbackCell(answer));
+        const nestId = this.store.card(card.id)?.nestId;
+        if (!nestId) return;
+        this.changed(nestId);
+        // The cards of a run plan after it start once every value is in.
+        this.advance(nestId);
+      });
   }
 
   // One card as the chosen bird, in the first free place in sight, sent with the user's own words.
@@ -746,16 +884,22 @@ export class Nests {
     attachable: readonly (AttachmentRow & { key: string })[],
     planKeys: ReadonlyMap<string, string>
   ): { digest: string; sources: PlanSource[] } {
-    const sent = board.cards.filter((card) => card.chatId || card.each);
+    const sent = board.cards.filter((card) => card.chatId || card.each || card.table);
     const keyOf = new Map(sent.map((card, index) => [card.id, `e${index + 1}`]));
     const sources: PlanSource[] = [];
     const cards: BoardCardDigest[] = sent.map((card) => {
       const key = keyOf.get(card.id)!;
       const bird = this.mascots.resolve(card.mascotId).name;
+      // A file the user added, by its title and its first rows, untrusted like any file.
+      if (card.table) {
+        sources.push({ key, cardId: card.id, table: true });
+        return { key, bird: "none, a file the user added", status: `A table from ${card.table.name}`, asked: null, answer: answerStart(tableMarkdown(card.table.header, card.table.rows)) };
+      }
       if (card.each) {
-        const answered = card.each.runs.filter((run) => run.chatId && this.answerOf(run.chatId)).length;
-        sources.push({ key, cardId: card.id, table: false });
-        return { key, bird, status: `${answered} of ${card.each.runs.length} answered`, asked: card.each.prompt, answer: null, runs: card.each.runs.length };
+        const answered = card.each.runs.filter((run) => run.cell !== null).length;
+        sources.push({ key, cardId: card.id, table: true });
+        const table = combinedTable(card.each);
+        return { key, bird, status: `${answered} of ${card.each.runs.length} answered`, asked: card.each.prompt, answer: answerStart(tableMarkdown(table.header, table.rows)), runs: card.each.runs.length };
       }
       const thread = card.chatId ? this.chats.thread(card.chatId) : null;
       const answer = thread ? latestAnswer(thread.messages) : null;
@@ -790,33 +934,43 @@ export class Nests {
     return { digest: planDigest({ flock, chosen: this.mascots.resolve(chosen), board: cards, plan, attached }), sources };
   }
 
-  // What a card gets from the card its line comes from: that card's latest answer, the rows the user picked from it as
-  // long as they're still in it, or every run's answer from a For-each card.
+  // What a card gets from the card its line comes from: that card's latest answer, the rows the user picked from its
+  // table as long as they're still in it, or the whole table of a For-each card or of a file, cut to whole rows.
   inputFor(cardId: string): CardInput {
     const line = this.store.lineTo(cardId);
     if (!line) return { answer: null };
-    const name = this.mascots.resolve(line.source.mascotId).name;
-    if (line.source.each) {
-      const runs = line.source.each.runs.flatMap((run) => {
-        const answer = run.chatId ? this.answerOf(run.chatId) : null;
-        return answer ? [{ row: run.row, answer }] : [];
-      });
-      return { answer: runs.length > 0 ? runsAnswer(name, runs) : null };
+    const { source, picked } = line;
+    const name = this.labelOf(source);
+    const fromFile = !!source.table;
+    if (picked) {
+      if (missingRows(picked, this.tableOf(source)).length > 0) return { problem: STALE_ROWS };
+      return { answer: rowsAnswer(name, picked, fromFile) };
     }
-    const text = line.source.chatId ? this.answerOf(line.source.chatId) : null;
-    if (!line.picked) return { answer: text ? { name, text } : null };
-    if (missingRows(line.picked, text ? findTable(text) : null).length > 0) return { problem: STALE_ROWS };
-    return { answer: rowsAnswer(name, line.picked) };
+    if (source.table) return { answer: tableAnswer(name, this.tableOf(source)!, true) };
+    // Nothing until a row has a value.
+    if (source.each) return { answer: source.each.runs.some((run) => run.cell !== null) ? tableAnswer(name, combinedTable(source.each)) : null };
+    const text = source.chatId ? this.answerOf(source.chatId) : null;
+    return { answer: text ? { name, text } : null };
   }
 
   // The rows For each row runs on: the ones picked, if they're all still there, or else the source's whole table.
   private rowsFor(cardId: string): PickedRows | { problem: string } {
     const line = this.store.lineTo(cardId);
-    const text = line?.source.chatId ? this.answerOf(line.source.chatId) : null;
-    const table = text ? findTable(text) : null;
-    if (!line || line.source.each || !table) return { problem: "For each row needs a line from a card whose answer has a table." };
-    if (!line.picked) return { header: table.header, rows: table.rows };
+    const table = line ? this.tableOf(line.source) : null;
+    if (!line || !table || table.rows.length === 0) return { problem: "For each row needs a line from a card with a table." };
+    if (!line.picked) return table;
     return missingRows(line.picked, table).length > 0 ? { problem: STALE_ROWS } : line.picked;
+  }
+
+  // What one run gets: its own row, labelled with where it came from.
+  private rowFor(cardId: string, header: readonly string[], row: readonly string[]): CardAnswer {
+    const source = this.store.sourceOf(cardId);
+    return rowAnswer(source ? this.labelOf(source) : "Another card", header, row, !!source?.table);
+  }
+
+  // What a card is called to the model and on screen: its bird's name, or a file's title.
+  private labelOf(card: NestCard): string {
+    return card.table ? card.table.name : this.mascots.resolve(card.mascotId).name;
   }
 
   // Starts waiting runs, oldest first, while fewer than `RUNS_AT_ONCE` are going on every card together. A run waiting
@@ -841,10 +995,11 @@ export class Nests {
     const sent = this.chats.send(null, card.each.prompt, {
       seePage: false,
       mascotId: card.mascotId,
-      cardAnswer: rowAnswer(this.sourceName(card.id), card.each.header, run.row),
+      cardAnswer: this.rowFor(card.id, card.each.header, run.row),
       started: (chatId) => this.store.setRunChat(run.id, chatId),
       onEnd: () => {
         this.pump();
+        this.fillCell(run.id);
         this.advance(card.nestId);
       },
       ...this.userSaid(card.id, null, null),
@@ -861,19 +1016,13 @@ export class Nests {
     return thread ? latestAnswer(thread.messages) : null;
   }
 
-  // The bird of the card a line comes from, as rows are labelled for the model. Its card may have gone since.
-  private sourceName(cardId: string): string {
-    const source = this.store.sourceOf(cardId);
-    return source ? this.mascots.resolve(source.mascotId).name : "Another card";
-  }
-
-  // What the user picked, if every row of it is in the table of the source's latest answer now. Undefined if not.
+  // What the user picked, if every row of it is in the source's table now. Undefined if not.
   private pickedFrom(source: NestCard | null, picked: unknown): PickedRows | undefined {
     const rows = picked as PickedRows;
     const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((cell) => typeof cell === "string");
-    if (!source?.chatId || !rows || !strings(rows.header) || !Array.isArray(rows.rows) || rows.rows.length === 0 || !rows.rows.every(strings)) return undefined;
-    const text = this.answerOf(source.chatId);
-    if (!text || missingRows(rows, findTable(text)).length > 0) return undefined;
+    if (!source || !rows || !strings(rows.header) || !Array.isArray(rows.rows) || rows.rows.length === 0 || !rows.rows.every(strings)) return undefined;
+    const table = this.tableOf(source);
+    if (!table || missingRows(rows, table).length > 0) return undefined;
     return { header: rows.header, rows: rows.rows };
   }
 

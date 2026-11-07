@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, systemPreferences, type WebContents } from "electron";
+import { BaseWindow, ClipboardItem, Menu, app, clipboard, dialog, nativeTheme, powerMonitor, session, systemPreferences, type WebContents } from "electron";
 import { release } from "os";
 import { TAB_WEB_PREFERENCES, Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -25,7 +25,9 @@ import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
 import { askInShape, generateTitle, hasModel, modelInputs, streamReply, writeWithCheapModel } from "./agent";
 import { maxBytesFor, sizeInWords } from "./nestFiles";
-import { readFile, stat } from "fs/promises";
+import { readFile, stat, writeFile } from "fs/promises";
+import { cheapWriter } from "./nestCells";
+import { csvFileName, MAX_TABLE_BYTES, toCsv, toHtmlTable, toTsv } from "./nestCsv";
 import { PLAN_SCHEMA } from "./nestPlanner";
 import { basename, join } from "path";
 import { Suggestions } from "./Suggestions";
@@ -64,6 +66,7 @@ import type {
   InternalPage,
   LayoutMode,
   NestFromChatResult,
+  NestTableResult,
   ResizablePanel,
   MascotSaveResult,
   Settings,
@@ -352,7 +355,10 @@ export class Window {
       // Cards' answers can repeat a code typed from the phone, so they're taken out as anywhere else the model reads.
       plan: (system, messages) =>
         askInShape(system, messages.map((message) => ({ ...message, content: this.chats.withoutCodes(message.content) })), PLAN_SCHEMA, "nest_plan"),
-    }, async (words) => (hasModel() ? generateTitle([{ role: "user", content: this.chats.withoutCodes(words) }]) : null));
+    }, async (words) => (hasModel() ? generateTitle([{ role: "user", content: this.chats.withoutCodes(words) }]) : null),
+    // A For-each card's column name and each row's value, from the cheap model. Answers can repeat a code typed from the
+    // phone, so they're taken out first, as anywhere else the model reads.
+    cheapWriter(async (system, data) => (hasModel() ? writeWithCheapModel(system, this.chats.withoutCodes(data)) : "")));
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -1393,6 +1399,55 @@ export class Window {
       if (!result.ok) problems.push(result.error);
     }
     return { problems };
+  }
+
+  // The system's file picker for a CSV or TSV file, which is read and parsed here into a table card. The renderer never
+  // names a path, and the file is never read again.
+  async addTableFile(nestId: string, place: unknown): Promise<NestTableResult> {
+    if (!this.nests.title(nestId)) return { ok: false, error: "That Nest isn’t there any more." };
+    const { canceled, filePaths } = await dialog.showOpenDialog(this._baseWindow, {
+      title: "Add a table from a file",
+      properties: ["openFile"],
+      filters: [{ name: "CSV or TSV", extensions: ["csv", "tsv"] }],
+    });
+    const path = filePaths[0];
+    if (canceled || !path) return { ok: true, cardId: null };
+    const name = basename(path);
+    let bytes: Uint8Array;
+    try {
+      if ((await stat(path)).size > MAX_TABLE_BYTES) return { ok: false, error: `${name} is more than the 2 MB a table can be.` };
+      bytes = await readFile(path);
+    } catch {
+      return { ok: false, error: `${name} couldn’t be read.` };
+    }
+    return this.nests.addTableFile(nestId, name, bytes, (place ?? {}) as Parameters<Nests["addTableFile"]>[3]);
+  }
+
+  // A card's table on the clipboard: as tab-separated text and as an HTML table, which Sheets, Excel and Numbers all
+  // paste as cells.
+  async copyTable(cardId: unknown): Promise<boolean> {
+    const found = typeof cardId === "string" ? this.nests.exportOf(cardId) : null;
+    if (!found) return false;
+    await clipboard.write([new ClipboardItem({ "text/plain": toTsv(found.table), "text/html": toHtmlTable(found.table) })]);
+    return true;
+  }
+
+  // A card's table as a CSV file, written only where the user chose in the save dialog.
+  async saveTable(cardId: unknown): Promise<boolean> {
+    const found = typeof cardId === "string" ? this.nests.exportOf(cardId) : null;
+    if (!found) return false;
+    const { canceled, filePath } = await dialog.showSaveDialog(this._baseWindow, {
+      title: "Download CSV",
+      defaultPath: join(app.getPath("downloads"), csvFileName(found.title)),
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+    if (canceled || !filePath) return false;
+    try {
+      await writeFile(filePath, toCsv(found.table), "utf8");
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // In the app already, or somewhere a notification would interrupt: fullscreen, or anything playing sound.

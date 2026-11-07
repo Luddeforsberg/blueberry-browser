@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
-import { ArrowLeft, GitFork, Maximize2, Minimize2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned } from '@shared/library'
-import { findTable, MAX_RUNS, missingRows, plainCell, rowName, STALE_ROWS, type Table } from '@shared/nestTable'
+import { ArrowLeft, GitFork, Maximize2, Minimize2, Table2, X } from 'lucide-react'
+import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
+import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, rowName, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
@@ -16,16 +16,17 @@ import { AddMenu, ChatComposer, Composer } from './Composer'
 import { Attachments, useAttaching } from './NestAttachments'
 import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
-import { TableResult, type PickMode } from './NestTable'
+import { CellText, TableMenu, TableResult, type PickMode } from './NestTable'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 export type LineEdge = Edge<{ draft: boolean }, 'line'>
 
-// Rows selected in one card's table, for the answer they were picked from.
+// Rows selected in one card's table, for the table they were picked from: `text` is what that table was made from, such as
+// the answer, so a new one lets them go.
 export interface RowSelection {
     cardId: string
     text: string
-    table: Table
+    table: PickedRows
     rows: number[]
     anchor: number | null
 }
@@ -45,7 +46,7 @@ export interface NestBoardActions {
     remove: (cardId: string) => void
     selection: RowSelection | null
     clearSelection: () => void
-    pick: (cardId: string, text: string, table: Table, index: number, mode: PickMode) => void
+    pick: (cardId: string, text: string, table: PickedRows, index: number, mode: PickMode) => void
     // The cards of a run plan that wait for the user to say this card's answer is right.
     waitingOn: (cardId: string) => NestCard[]
     // For-each cards whose line comes out of this card, for the rows they're working on in its table.
@@ -88,9 +89,6 @@ const draftEach = new Map<string, boolean>()
 
 // The newest saved answer, not one still being written.
 const savedAnswer = (thread: ChatThread | null | undefined) => (thread ? latestReply({ ...thread, partial: null }) : null)
-
-// The first line of an answer with words in it, for a run's one-line result.
-const answerStart = (text: string) => plainCell(text.split('\n').find((line) => line.replace(/[#>*\-|\s]/g, '') !== '')?.replace(/^\s*(#+|>|[-*]|\d+\.)\s*/, '') ?? '')
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
 
@@ -202,7 +200,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const mascot = find(thread?.mascotId ?? card.mascotId)
     const name = useAssistantName(mascot)
     const source = board.sourceOf(card.id)
-    const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
+    const sourceName = useSourceName(source)
     const open = board.openId === card.id
     const running = thread?.partial != null
     const status = thread && cardStatus(thread)
@@ -233,6 +231,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     </span>
                 )}
                 <span className="ml-auto flex items-center">
+                    {table && !running && <TableMenu cardId={card.id} />}
                     {answered && (
                         <span data-keep-selection>
                             <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
@@ -248,7 +247,7 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     </CardButton>
                 </span>
             </div>
-            {source && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(board.lineInto(card.id), sourceName)}</p>}
+            {source && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(board.lineInto(card.id), sourceName, !!source.table)}</p>}
             <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {thread &&
                 (open ? (
@@ -312,11 +311,19 @@ const LooksRight: React.FC<{ cardId: string }> = ({ cardId }) => {
 }
 
 // What a card on a line gets, in the words its header and reply field use.
-const getsWhat = (line: NestLine | null, sourceName: string) =>
-    line?.picked ? `${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `${sourceName}’s latest answer`
+const getsWhat = (line: NestLine | null, sourceName: string, file = false) =>
+    line?.picked ? `${plural(line.picked.rows.length, 'row')} from ${sourceName}` : file ? `every row of ${sourceName}` : `${sourceName}’s latest answer`
 
-const withWhat = (line: NestLine | null, sourceName: string) =>
-    line?.picked ? `With ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `With ${sourceName}’s latest answer`
+// What a sent card got, exactly, as main counts what crosses: "With Scout’s answer, about 900 words".
+const withWhat = (line: NestLine | null, sourceName: string, file = false) =>
+    line?.crosses?.whole ? `With ${crossingWords(line.crosses.whole, sourceName)}` : `With ${getsWhat(line, sourceName, file)}`
+
+// The name a card goes by on a line: its bird's, or a file's title.
+const useSourceName = (source: NestCard | null) => {
+    const { find } = useFlock()
+    const bird = useAssistantName(source ? find(source.mascotId) : undefined)
+    return source?.table ? source.table.name : bird
+}
 
 // What a running card is doing: the bird's own words if it said any, or the step it's on. Before either, its status
 // shimmers in the header instead.
@@ -328,7 +335,7 @@ const Working: React.FC<{ thread: ChatThread }> = ({ thread }) => {
 }
 
 // The rows of this card's table that For-each cards reading from it are working on right now, with who.
-const useWorkingRows = (cardId: string, table: Table | null): { who: string; rows: Map<number, string> } | null => {
+const useWorkingRows = (cardId: string, table: PickedRows | null): { who: string; rows: Map<number, string> } | null => {
     const board = useBoard()
     const { find } = useFlock()
     const berryName = useAssistantName()
@@ -438,18 +445,20 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     // A card of a plan that didn't start is a draft with its prompt, which the user can still send.
     const [text, setText] = useState(() => draftText(card.id) || (card.plan?.prompt ?? ''))
     const source = board.sourceOf(card.id)
-    const picked = board.lineInto(card.id)?.picked ?? null
-    const sourceMascot = source ? find(source.mascotId) : undefined
-    const sourceName = useAssistantName(sourceMascot)
+    const line = board.lineInto(card.id)
+    const picked = line?.picked ?? null
+    const sourceName = useSourceName(source)
     const sourceThread = useCardThread(source?.chatId ?? null)
-    const runThreads = useCardThreads(source?.each?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])
-    const runAnswers = Object.values(runThreads).filter((thread) => savedAnswer(thread)).length
     const sourceAnswer = savedAnswer(sourceThread)
-    const sourceTable = useMemo(() => (sourceAnswer ? findTable(sourceAnswer) : null), [sourceAnswer])
-    const sourceAnswered = source?.each ? runAnswers > 0 : !!sourceAnswer
-    const stale = !!picked && !!sourceThread && missingRows(picked, sourceTable).length > 0
+    // The table it reads from: a file's, a For-each card's with its column, or the one in the source's latest answer.
+    const sourceTable = useMemo<PickedRows | null>(
+        () => (source?.table ? source.table : source?.each ? combinedTable(source.each) : sourceAnswer ? findTable(sourceAnswer) : null),
+        [source?.table, source?.each, sourceAnswer]
+    )
+    const sourceAnswered = source?.table ? true : source?.each ? source.each.runs.some((run) => run.cell !== null) : !!sourceAnswer
+    const stale = !!picked && (!!sourceThread || !!source?.each || !!source?.table) && missingRows(picked, sourceTable).length > 0
     const rowCount = picked ? picked.rows.length : (sourceTable?.rows.length ?? 0)
-    const canEach = !!source && !source.each && (picked !== null || sourceTable !== null)
+    const canEach = !!source && (picked !== null || (sourceTable !== null && sourceTable.rows.length > 0))
     const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? (picked !== null || !!card.plan?.each))
     const forEach = canEach && eachOn
     const tooMany = forEach && rowCount > MAX_RUNS
@@ -482,13 +491,17 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
           ? stale
               ? `${sourceName}’s rows have changed`
               : `gets ${plural(picked.rows.length, 'row')} from ${sourceName}`
-          : source.each
-            ? sourceAnswered
-                ? `gets ${sourceName}’s ${plural(runAnswers, 'answer')}`
+          : source.table
+            ? `gets every row of ${sourceName}`
+            : source.each
+              ? sourceAnswered
+                  ? `gets ${sourceName}’s table`
+                  : `${sourceName} hasn’t answered yet`
+              : sourceAnswered
+                ? `gets ${sourceName}’s latest answer`
                 : `${sourceName} hasn’t answered yet`
-            : sourceAnswered
-              ? `gets ${sourceName}’s latest answer`
-              : `${sourceName} hasn’t answered yet`
+    // Exactly what crosses, as main counts it: what each run gets with For each row, or else what the card gets.
+    const crosses = stale ? null : forEach ? (line?.crosses?.each ? eachWords(line.crosses.each) : null) : line?.crosses?.whole ? crossingWords(line.crosses.whole, sourceName) : null
 
     return (
         <div className={cn(CARD_SHELL, "border-accent-ink shadow-raised")} style={{ width: CARD_WIDTH }}>
@@ -503,6 +516,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     </CardButton>
                 </span>
             </div>
+            {crosses && <p data-crosses className="px-5 -mt-1 mb-1 text-12 text-muted-foreground">{crosses}</p>}
             <div className="nodrag cursor-auto px-2 pb-2">
                 <Composer
                     bare
@@ -571,6 +585,7 @@ interface RunView {
     name: string
     phase: RunPhase
     thread: ChatThread | undefined
+    cell: string | null
 }
 
 const RUN_WORDS: Record<RunPhase, string> = {
@@ -582,30 +597,106 @@ const RUN_WORDS: Record<RunPhase, string> = {
     'not-started': 'Didn’t start'
 }
 
-// How many finished runs a closed card lists before "N more".
-const RUNS_SHOWN = 5
+// One row's cell in a For-each card's column: its value once its run has one, or else how its run is going. A press on
+// it opens the run's thread, and a link in it opens in a new tab.
+const RunCell: React.FC<{ view: RunView; onOpen: () => void }> = ({ view, onOpen }) => {
+    const { phase, thread, cell } = view
+    const asking = phase === 'working' && thread?.approval ? cardStatus(thread).text : null
+    const content =
+        phase === 'done' ? (
+            cell ? <CellText cell={cell} /> : <span className="text-muted-foreground">No answer</span>
+        ) : asking ? (
+            <span className="text-accent-ink">{asking}</span>
+        ) : phase === 'working' ? (
+            <span className={SHIMMER_QUIET}>Working</span>
+        ) : (
+            <span className={phase === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>{RUN_WORDS[phase]}</span>
+        )
+    return (
+        <>
+            {thread && (
+                <button
+                    type="button"
+                    aria-label={`Open ${view.name}’s run`}
+                    onClick={(event) => {
+                        event.stopPropagation()
+                        onOpen()
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    className="absolute inset-0 w-full outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                />
+            )}
+            <span title={phase === 'done' && cell ? plainCell(cell) : undefined} className="relative block truncate pointer-events-none [&_a]:pointer-events-auto">
+                {content}
+            </span>
+        </>
+    )
+}
 
-// One run on a For-each card: its row's name, then the start of its answer, or where it is. Pressing it opens its thread.
-const RunRow: React.FC<{ view: RunView; onOpen: () => void }> = ({ view, onOpen }) => {
-    const answer = savedAnswer(view.thread)
-    const step = view.thread?.steps.findLast((each) => !each.done)
-    const line = view.phase === 'done' && answer ? answerStart(answer) : view.phase === 'working' && step ? (step.shown ?? step.text) : RUN_WORDS[view.phase]
+// A For-each card's own column's name, which reads as a header until it's pressed, and then renames it. While the cheap
+// model names it, it shimmers.
+const ColumnName: React.FC<{ cardId: string; name: string; naming: boolean }> = ({ cardId, name, naming }) => {
+    const [editing, setEditing] = useState(false)
+    const [value, setValue] = useState(name)
+    useEffect(() => setValue(name), [name])
+    const save = () => {
+        setEditing(false)
+        if (value.trim() && value.trim() !== name) void window.chromeAPI.nests.renameColumn(cardId, value)
+        else setValue(name)
+    }
+    if (editing) {
+        return (
+            <input
+                aria-label="Column name"
+                value={value}
+                maxLength={60}
+                autoFocus
+                onChange={(event) => setValue(event.target.value)}
+                onBlur={save}
+                onKeyDown={(event) => {
+                    event.stopPropagation()
+                    if (event.key === 'Enter') event.currentTarget.blur()
+                    if (event.key === 'Escape') {
+                        event.preventDefault()
+                        setValue(name)
+                        setEditing(false)
+                    }
+                }}
+                style={{ fieldSizing: 'content' } as React.CSSProperties}
+                className="min-w-16 h-6 -mx-1 px-1 rounded-control bg-muted text-12 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+        )
+    }
     return (
         <button
             type="button"
-            onClick={onOpen}
-            disabled={!view.thread}
-            className="w-full px-5 py-2 border-t flex flex-col text-left outline-none transition-colors enabled:hover:bg-muted/60 focus-visible:bg-muted disabled:cursor-default"
+            title="Rename the column"
+            aria-label={`${name}, rename the column`}
+            onClick={() => setEditing(true)}
+            className="h-6 -mx-1 px-1 rounded-control text-12 text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
-            <span className="text-13 font-semibold truncate w-full">{view.name}</span>
-            <span className={cn("text-13 truncate w-full", view.phase === 'failed' ? "text-destructive" : "text-muted-foreground")}>{line}</span>
+            <span className={naming ? SHIMMER_QUIET : undefined}>{name}</span>
         </button>
     )
 }
 
-// A card sent with For each row: the same prompt once for each row, each run its own chat. Closed, it shows how many
-// have ended, which rows are being worked on, any approval a run is waiting on, and each finished run's result. There's
-// no reply field on the card: a reply goes in one run's thread, which opening the run shows.
+// Rows picked in a table that isn't an answer, such as a For-each card's or a file's, kept for the table they were
+// picked in: `key` says what it was made from.
+const useTablePick = (cardId: string, key: string) => {
+    const board = useBoard()
+    const selectedHere = board.selection?.cardId === cardId
+    const selected = selectedHere && board.selection?.text === key ? board.selection.rows : []
+    const { clearSelection } = board
+    useEffect(() => {
+        if (selectedHere && board.selection?.text !== key) clearSelection()
+    }, [selectedHere, board.selection?.text, key, clearSelection])
+    return selected
+}
+
+// A card sent with For each row: the same prompt once for each row, each run its own chat. Its result is one table, the
+// rows it ran on with their columns and one more, each row's value filled in as its run ends, or how that run is going
+// until then. Rows waiting on the user show their approval or question above it, in the same card as a chat. A press on
+// a cell opens its run's thread under Every run. There's no reply field on the card: a reply goes in one run's thread.
 const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, each }) => {
     const board = useBoard()
     const { find } = useFlock()
@@ -613,28 +704,30 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     const name = useAssistantName(mascot)
     const source = board.sourceOf(card.id)
     const line = board.lineInto(card.id)
-    const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
+    const sourceName = useSourceName(source)
     const threads = useCardThreads(each.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])))
     const [openRun, setOpenRun] = useState<string | null>(null)
     const open = board.openId === card.id
-    // Closing the card goes back to every run for next time. Opened at a run, from Needs you, it shows that run.
+    // Closing the card goes back to the table for next time. Opened at a run, from Needs you, it shows that run.
     useEffect(() => {
         setOpenRun(open ? board.openRunId : null)
     }, [open, board.openRunId])
 
     const views: RunView[] = each.runs.map((run) => {
         const thread = run.chatId ? threads[run.chatId] : undefined
-        return { id: run.id, name: rowName(run.row), phase: runPhase(run, thread), thread }
+        return { id: run.id, name: rowName(run.row), phase: runPhase(run, thread), thread, cell: run.cell }
     })
     const status = forEachStatus(views.map((view) => view.phase))
     const active = views.some((view) => view.phase === 'waiting' || view.phase === 'working')
-    const asking = views.filter((view) => view.thread?.approval)
-    const working = views.filter((view) => view.phase === 'working' && !view.thread?.approval)
-    const ended = views.filter((view) => view.thread && (view.phase === 'done' || view.phase === 'failed' || view.phase === 'stopped'))
-    const answered = views.some((view) => savedAnswer(view.thread))
-    const running = working.length + asking.length > 0
+    const asking = views.filter((view) => view.thread?.approval && view.thread.partial !== null)
+    const running = views.some((view) => view.phase === 'working')
+    const answered = each.runs.some((run) => run.cell !== null)
     const shownRun = open && openRun ? views.find((view) => view.id === openRun && view.thread) : undefined
-    const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${sourceName}’s table`) : 'For each row'
+    const table = useMemo(() => combinedTable(each), [each])
+    const key = useMemo(() => JSON.stringify(table.rows), [table])
+    const selected = useTablePick(card.id, key)
+    const here = useWorkingRows(card.id, table)
+    const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${source.table ? sourceName : `${sourceName}’s table`}`) : 'For each row'
     const openRunOf = (id: string) => {
         setOpenRun(id)
         board.setOpen(card.id, id)
@@ -643,7 +736,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     return (
         <div className={cn(CARD_SHELL, cardShadow(running, open))} style={{ width: CARD_WIDTH }}>
             <Perched cardId={card.id} mascot={mascot} mood={asking.length > 0 ? 'asking' : running ? 'thinking' : 'rest'} />
-            <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, 0)} />
+            <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
                 <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>
@@ -657,12 +750,15 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                             Stop
                         </button>
                     )}
+                    {answered && <TableMenu cardId={card.id} />}
                     {answered && (
-                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
-                            <GitFork className="size-4" />
-                        </CardButton>
+                        <span data-keep-selection>
+                            <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                                <GitFork className="size-4" />
+                            </CardButton>
+                        </span>
                     )}
-                    <CardButton label={open ? 'Close the runs' : 'Open every run'} onClick={() => board.setOpen(open ? null : card.id)}>
+                    <CardButton label={open ? 'Close the table' : 'Open every row'} onClick={() => board.setOpen(open ? null : card.id)}>
                         {open ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                     </CardButton>
                     <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
@@ -670,7 +766,9 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                     </CardButton>
                 </span>
             </div>
-            <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{from}</p>
+            <p data-crosses className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">
+                {from} · {eachWords({ columns: each.header.length }).replace(/^O/, 'o')}
+            </p>
             <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {shownRun?.thread ? (
                 <div className="nodrag flex flex-col">
@@ -697,38 +795,66 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                 <div className="nodrag select-text cursor-auto flex flex-col">
                     <div className="px-5 pb-3 flex flex-col gap-3">
                         <p className="text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{each.prompt}</p>
-                        {!open &&
-                            working.map((view) => (
-                                <p key={view.id} role="status" className="text-14 line-clamp-1">
-                                    <span className="font-semibold">{view.name}</span>{' '}
-                                    <span className={SHIMMER_TEXT}>{view.thread?.statusLine ?? view.thread?.steps.findLast((step) => !step.done)?.text ?? 'Working'}</span>
-                                </p>
-                            ))}
-                        {!open &&
-                            asking.map((view) => (
-                                <div key={view.id} className="flex flex-col gap-1">
-                                    <p className="text-12 text-muted-foreground">{view.name}</p>
-                                    <ChatApprovalCard chatId={view.thread!.id} approval={view.thread!.approval!} mascot={mascot} />
-                                </div>
-                            ))}
-                    </div>
-                    <div className={cn("rounded-b-panel overflow-hidden", open && "nowheel max-h-[520px] overflow-y-auto")}>
-                        {(open ? views : ended.slice(0, RUNS_SHOWN)).map((view) => (
-                            <RunRow key={view.id} view={view} onOpen={() => openRunOf(view.id)} />
+                        {asking.map((view) => (
+                            <div key={view.id} className="flex flex-col gap-1">
+                                <p className="text-12 text-muted-foreground">{view.name}</p>
+                                <ChatApprovalCard chatId={view.thread!.id} approval={view.thread!.approval!} mascot={mascot} />
+                            </div>
                         ))}
-                        {!open && views.length > Math.min(ended.length, RUNS_SHOWN) && (
-                            <button
-                                type="button"
-                                onClick={() => board.setOpen(card.id)}
-                                className="w-full h-9 px-5 border-t text-left text-13 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:bg-muted"
-                            >
-                                {ended.length > RUNS_SHOWN ? `${ended.length - RUNS_SHOWN} more` : 'Show every run'}
-                            </button>
-                        )}
+                    </div>
+                    <div className={cn("overflow-hidden", !(!active && answered && board.waitingOn(card.id).length > 0) && "rounded-b-panel")}>
+                        <TableResult
+                            table={table}
+                            selected={active ? null : selected}
+                            onPick={(index, mode) => board.pick(card.id, key, table, index, mode)}
+                            here={here}
+                            every={open}
+                            own={{
+                                header: <ColumnName cardId={card.id} name={each.column} naming={!!each.naming} />,
+                                cell: (index) => <RunCell view={views[index]} onOpen={() => openRunOf(views[index].id)} />
+                            }}
+                        />
                     </div>
                 </div>
             )}
             {!active && answered && <LooksRight cardId={card.id} />}
+        </div>
+    )
+}
+
+// A table from a file the user added: its rows, owned by the user, with no chat and no bird. Its rows can be picked and a
+// line pulled out of them, and For each row works on it like any table.
+const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, file }) => {
+    const board = useBoard()
+    const table = useMemo(() => ({ header: file.header, rows: file.rows }), [file])
+    const selected = useTablePick(card.id, 'file')
+    const here = useWorkingRows(card.id, table)
+    const label = selected.length > 0 ? pullLabel('', selected.length) : `Pull a new card out of ${file.name}`
+    return (
+        <div className={cn(CARD_SHELL, "shadow-selected")} style={{ width: CARD_WIDTH }}>
+            <LineEnds canPull onPull={() => board.pullOut(card.id)} label={label} />
+            <div className="nest-drag cursor-grab h-12 pl-5 pr-3 flex items-center gap-2">
+                <Table2 aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                <span className="text-14 font-semibold truncate">{file.name}</span>
+                <span className="text-12 text-muted-foreground shrink-0">
+                    {plural(file.rows.length, 'row')}, {plural(file.header.length, 'column')}
+                </span>
+                <span className="ml-auto flex items-center">
+                    <TableMenu cardId={card.id} />
+                    <span data-keep-selection>
+                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                            <GitFork className="size-4" />
+                        </CardButton>
+                    </span>
+                    <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                        <X className="size-4" />
+                    </CardButton>
+                </span>
+            </div>
+            <div className={cn("nodrag cursor-auto overflow-hidden", board.waitingOn(card.id).length === 0 && "rounded-b-panel")}>
+                <TableResult table={table} selected={selected} onPick={(index, mode) => board.pick(card.id, 'file', table, index, mode)} here={here} />
+            </div>
+            <LooksRight cardId={card.id} />
         </div>
     )
 }
@@ -741,14 +867,15 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
     const mascot = find(card.mascotId)
     const name = useAssistantName(mascot)
     const source = board.sourceOf(card.id)
-    const sourceName = useAssistantName(source ? find(source.mascotId) : undefined)
+    const sourceName = useSourceName(source)
     const sourceThread = useCardThread(source?.chatId ?? null)
     const sourceAnswer = savedAnswer(sourceThread)
     const editable = plan.state === 'planned'
     // While Berry changes the plan, which replaces this card from what it was when Berry started, nothing on it changes.
     const waiting = editable && board.replanning
     // For each row needs a table to run on: one the card it reads from will answer with, or one already in its answer.
-    const getsTable = !!source && !source.each && (source.plan ? !source.plan.each && source.plan.table !== null : !!sourceAnswer && findTable(sourceAnswer) !== null)
+    const getsTable =
+        !!source && (source.table || source.each ? true : source.plan ? source.plan.each || source.plan.table !== null : !!sourceAnswer && findTable(sourceAnswer) !== null)
     const [text, setText] = useState(plan.prompt)
     const [choosing, setChoosing] = useState(false)
     const attaching = useAttaching(editable ? { cardId: card.id } : null)
@@ -879,7 +1006,9 @@ const PlanPrompt: React.FC<{ label: string; value: string; readOnly: boolean; on
 }
 
 export const CardView: React.FC<NodeProps<CardNode>> = ({ data: { card } }) =>
-    card.each ? (
+    card.table ? (
+        <TableCard card={card} file={card.table} />
+    ) : card.each ? (
         <ForEachCard card={card} each={card.each} />
     ) : card.chatId ? (
         <SentCard card={card} />

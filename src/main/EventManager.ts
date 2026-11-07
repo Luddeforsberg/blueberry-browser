@@ -239,6 +239,10 @@ export class EventManager {
     this.handle("nests:add-note", (target, text) => nests.addNote(target, text));
     this.handle("nests:edit-note", (attachmentId, text) => nests.editNote(attachmentId, text));
     this.handle("nests:remove-attachment", (attachmentId, fromCardId) => nests.removeAttachment(attachmentId, fromCardId));
+    this.handle("nests:add-table-file", (nestId, place) => this.mainWindow.addTableFile(nestId, place));
+    this.handle("nests:rename-column", (cardId, name) => nests.renameColumn(cardId, name));
+    this.handle("nests:copy-table", (cardId) => this.mainWindow.copyTable(cardId));
+    this.handle("nests:save-table", (cardId) => this.mainWindow.saveTable(cardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

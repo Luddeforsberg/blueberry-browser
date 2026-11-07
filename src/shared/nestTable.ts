@@ -94,12 +94,10 @@ export const findTable = (markdown: string, { streaming = false } = {}): Table |
 };
 
 // What a cell says, for drawing: links become their words, and emphasis and code marks go.
-export const plainCell = (cell: string): string =>
-  cell
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/<br\s*\/?>/gi, " ")
-    .replace(/(\*\*|__|\*|_|`)(?=\S)([^*_`]*?\S)\1/g, "$2")
-    .trim();
+export const plainCell = (cell: string): string => unmark(cell.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")).trim();
+
+// Line breaks and emphasis and code marks, gone, with nothing trimmed.
+const unmark = (text: string): string => text.replace(/<br\s*\/?>/gi, " ").replace(/(\*\*|__|\*|_|`)(?=\S)([^*_`]*?\S)\1/g, "$2");
 
 // What a run is called on the card: its row's first cell with words in it.
 export const rowName = (row: readonly string[]): string => plainCell(row.find((cell) => plainCell(cell) !== "") ?? "") || "A row";
@@ -107,7 +105,7 @@ export const rowName = (row: readonly string[]): string => plainCell(row.find((c
 const sameRow = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((cell, index) => cell === b[index]);
 
 // The picked rows that aren't in the table any more, so a card never sends rows its source no longer gives.
-export const missingRows = (picked: PickedRows, table: Table | null): string[][] =>
+export const missingRows = (picked: PickedRows, table: PickedRows | null): string[][] =>
   picked.rows.filter((row) => !table || !sameRow(picked.header, table.header) || !table.rows.some((each) => sameRow(each, row)));
 
 const cellText = (cell: string) => cell.replace(/\r?\n/g, " ").replace(/\|/g, "\\|");
@@ -122,3 +120,93 @@ export const runCountProblem = (count: number): string | null => {
   if (count > MAX_RUNS) return `For each row runs at most ${MAX_RUNS} times, and this has ${count} rows. Select ${MAX_RUNS} or fewer.`;
   return null;
 };
+
+// The table a For-each card makes: the rows it ran on, with their columns, and one column of its own, each row's short
+// value in it, empty until that row's run has one. What crosses a line out of it, what it shows and what's exported.
+export const combinedTable = (each: { header: readonly string[]; column: string; runs: readonly { row: readonly string[]; cell: string | null }[] }): PickedRows => ({
+  header: [...each.header, each.column],
+  rows: each.runs.map((run) => [...each.header.map((_, column) => run.row[column] ?? ""), run.cell ?? ""]),
+});
+
+// Only a web address can be a link in a cell, so a cell can't run script or open a file.
+export const safeHref = (href: string): string | null => {
+  try {
+    const url = new URL(href);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+};
+
+export interface CellPart {
+  text: string;
+  href?: string;
+}
+
+const LINKS = /(!?)\[([^\]]*)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>|)\]]+)/g;
+
+// What a cell says, with its links kept: a markdown link is its words linking to its address, and a bare web address
+// links to itself. An image is only its words, and anything that isn't a web address is plain text.
+export const cellParts = (cell: string): CellPart[] => {
+  const parts: CellPart[] = [];
+  const add = (text: string, href?: string) => {
+    if (!text) return;
+    const last = parts.at(-1);
+    if (!href && last && !last.href) last.text += text;
+    else parts.push(href ? { text, href } : { text });
+  };
+  let at = 0;
+  for (const match of cell.matchAll(LINKS)) {
+    add(cell.slice(at, match.index));
+    const [whole, image, words, address, bare] = match;
+    // A full stop or comma after a bare address ends the sentence, not the address.
+    const target = bare ? bare.replace(/[.,;:!?]+$/, "") : address;
+    const href = safeHref(target) ?? undefined;
+    if (bare) add(target, href);
+    if (bare) add(bare.slice(target.length));
+    else if (image || !href) add(words);
+    else add(words || address, href);
+    at = match.index + whole.length;
+  }
+  add(cell.slice(at));
+  // Emphasis and code marks go from the words, as in `plainCell`, and the cell's own ends are trimmed.
+  const shown = parts.map((part) => ({ ...part, text: part.href ? part.text : unmark(part.text) }));
+  if (shown[0] && !shown[0].href) shown[0].text = shown[0].text.trimStart();
+  const last = shown.at(-1);
+  if (last && !last.href) last.text = last.text.trimEnd();
+  return shown.filter((part) => part.text !== "");
+};
+
+// What crosses a line, counted from what's sent, so a card can say exactly that: a bird's answer, in words and whether
+// it was cut, or a table, in rows and columns and how many rows were left out to fit.
+export type Crossing =
+  | { kind: "answer"; words: number; cutTo: number | null }
+  | { kind: "table"; rows: number; columns: number; leftOut: number };
+
+// On every line: what crosses as it is, and what each run gets when For each row is on, or null where it can't be.
+export interface LineCrossing {
+  whole: Crossing | null;
+  each: { rows: number; columns: number } | null;
+}
+
+const count = (value: number) => value.toLocaleString("en-US");
+const counted = (value: number, one: string, many = `${one}s`) => `${count(value)} ${value === 1 ? one : many}`;
+
+// About as many words as a reader would guess: exact when few, then to the nearest ten, then hundred.
+const aboutWords = (words: number) => {
+  if (words < 20) return counted(words, "word");
+  const step = words < 1000 ? 10 : 100;
+  return `about ${count(Math.round(words / step) * step)} words`;
+};
+
+// "Scout’s answer, about 900 words", "12 rows, 3 columns from Writer", with anything cut said plainly.
+export const crossingWords = (crossing: Crossing, who: string): string => {
+  if (crossing.kind === "answer") {
+    return `${who}’s answer, ${aboutWords(crossing.words)}${crossing.cutTo !== null ? `, cut to the first ${count(crossing.cutTo)} characters` : ""}`;
+  }
+  const shape = `${counted(crossing.rows, "row")}, ${counted(crossing.columns, "column")} from ${who}`;
+  return crossing.leftOut > 0 ? `${shape}, with ${counted(crossing.leftOut, "more row")} left out to fit` : shape;
+};
+
+// What each run of For each row gets.
+export const eachWords = ({ columns }: { columns: number }): string => `One row each, ${counted(columns, "column")}`;

@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestAttachment, NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
 import type { SentAttachment } from "./nestFiles";
 import type { PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
@@ -100,6 +100,13 @@ const MIGRATIONS = [
   // Placed for the user, by a plan, the composer or a line's handle, and never moved by hand since, so the board may nudge
   // it out of the way of a card that grew. Cards from before this count as placed by hand, so they never move.
   `ALTER TABLE cards ADD COLUMN auto_placed INTEGER NOT NULL DEFAULT 0;`,
+  // A For-each card adds a column to the table it ran on: its name, which the user may rename, and each run's short value
+  // in it. A table card holds the rows of a file the user added, as they were then, with no chat and no bird.
+  `ALTER TABLE cards ADD COLUMN each_column TEXT;
+   ALTER TABLE cards ADD COLUMN each_column_settled INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE runs ADD COLUMN cell TEXT;
+   ALTER TABLE cards ADD COLUMN table_name TEXT;
+   ALTER TABLE cards ADD COLUMN table_rows TEXT;`,
 ];
 
 export interface AttachmentRow {
@@ -148,6 +155,9 @@ interface CardRow {
   planTable: string | null;
   planNote: string | null;
   autoPlaced: number;
+  eachColumn: string | null;
+  tableName: string | null;
+  tableRows: string | null;
 }
 
 interface RunRow {
@@ -156,14 +166,16 @@ interface RunRow {
   row: string;
   chatId: string | null;
   state: NestRunState;
+  cell: string | null;
 }
 
 const CARD_COLUMNS =
   "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader, " +
-  "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced";
-const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state";
+  "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
+  "each_column AS eachColumn, table_name AS tableName, table_rows AS tableRows";
+const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
-const toRun = ({ id, row, chatId, state }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state });
+const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
 
 // One card of a plan, placed, with the line into it: from another card of the same plan by its key, or a card on the board.
 export interface NewPlannedCard {
@@ -251,18 +263,20 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableRows }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
         : {
             prompt: eachPrompt,
             header: JSON.parse(eachHeader ?? "[]") as string[],
+            column: eachColumn ?? "",
             runs: (this.db.prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE card_id = ? ORDER BY position`).all(id) as unknown as RunRow[]).map(toRun),
           };
     const planned: NestPlanned | null =
       plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
-    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, each, plan: planned, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
+    const table: NestTableFile | null = tableName === null ? null : { name: tableName, ...(JSON.parse(tableRows ?? '{"header":[],"rows":[]}') as Omit<NestTableFile, "name">) };
+    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, each, plan: planned, table, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -354,7 +368,7 @@ export class NestStore {
   setBird(id: string, mascotId: string | null): boolean {
     return (
       this.db
-        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND (plan IS NULL OR plan <> 'armed')")
+        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND (plan IS NULL OR plan <> 'armed')")
         .run(mascotId, id).changes > 0
     );
   }
@@ -364,7 +378,7 @@ export class NestStore {
     const card = this.card(id);
     // Once it starts, a planned card is an ordinary one.
     const done =
-      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL").run(chatId, id).changes > 0;
+      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL").run(chatId, id).changes > 0;
     if (done && card) this.touch(card.nestId);
     return done;
   }
@@ -382,14 +396,16 @@ export class NestStore {
   }
 
   // A draft becomes a For-each card, with one waiting run for each row, in one go. False if it isn't a draft.
-  startForEach(id: string, prompt: string, header: string[], rows: string[][]): boolean {
+  startForEach(id: string, prompt: string, header: string[], rows: string[][], column: string): boolean {
     const card = this.card(id);
     if (!card) return false;
     this.db.exec("BEGIN");
     try {
       const changed = this.db
-        .prepare("UPDATE cards SET each_prompt = ?, each_header = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL")
-        .run(prompt, JSON.stringify(header), id).changes;
+        .prepare(
+          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL"
+        )
+        .run(prompt, JSON.stringify(header), column, id).changes;
       if (changed === 0) throw new NotHere();
       const insert = this.db.prepare("INSERT INTO runs (id, card_id, position, row, chat_id, state) VALUES (?, ?, ?, ?, NULL, 'waiting')");
       rows.forEach((row, position) => insert.run(randomUUID(), id, position, JSON.stringify(row)));
@@ -401,6 +417,31 @@ export class NestStore {
       throw error;
     }
     return true;
+  }
+
+  // The column's name. `settle` for the user's own, which a generated one never replaces.
+  nameColumn(id: string, name: string, settle: boolean): boolean {
+    return (
+      this.db
+        .prepare(`UPDATE cards SET each_column = ?, each_column_settled = ? WHERE id = ? AND each_prompt IS NOT NULL${settle ? "" : " AND each_column_settled = 0"}`)
+        .run(name, settle ? 1 : 0, id).changes > 0
+    );
+  }
+
+  // A run's short value in its card's column, or null when its answer has none.
+  setRunCell(id: string, cell: string | null): boolean {
+    return this.db.prepare("UPDATE runs SET cell = ? WHERE id = ?").run(cell, id).changes > 0;
+  }
+
+  // A file's rows as a card of their own, with no chat and no bird. Null if the Nest isn't there.
+  addTableCard(nestId: string, { x, y, table }: { x: number; y: number; table: NestTableFile }): NestCard | null {
+    if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) return null;
+    const id = randomUUID();
+    this.db
+      .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, auto_placed, table_name, table_rows) VALUES (?, ?, NULL, NULL, ?, ?, 1, ?, ?)")
+      .run(id, nestId, x, y, table.name, JSON.stringify({ header: table.header, rows: table.rows }));
+    this.touch(nestId);
+    return this.card(id);
   }
 
   run(id: string): (NestRun & { cardId: string }) | null {
@@ -419,6 +460,11 @@ export class NestStore {
       ...toRun(row),
       cardId: row.cardId,
     }));
+  }
+
+  // Runs that started and have no value in their card's column yet, on any card.
+  endedRunsWithoutCell(): string[] {
+    return (this.db.prepare("SELECT id FROM runs WHERE state = 'started' AND chat_id IS NOT NULL AND cell IS NULL").all() as { id: string }[]).map((row) => row.id);
   }
 
   // The chats of every run that has started, on any card.
@@ -485,7 +531,7 @@ export class NestStore {
         if (!card.from) continue;
         const from = "plan" in card.from ? ids.get(card.from.plan) : card.from.card;
         const source = from === undefined ? null : this.card(from);
-        if (!source || source.nestId !== nestId || (!("plan" in card.from) && !source.chatId && !source.each)) throw new NotHere();
+        if (!source || source.nestId !== nestId || (!("plan" in card.from) && !source.chatId && !source.each && !source.table)) throw new NotHere();
         line.run(randomUUID(), nestId, from!, ids.get(card.key)!);
       }
       this.touch(nestId);

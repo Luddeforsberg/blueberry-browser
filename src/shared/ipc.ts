@@ -371,6 +371,9 @@ export type NestAttachTarget = { cardId: string } | { nestId: string };
 // Added, or why not, such as a type that can't be read or no room left on the card.
 export type NestAttachResult = { ok: true } | { ok: false; error: string };
 
+// A table card made from a file the user picked, null if they picked none, or why the file can't be one.
+export type NestTableResult = { ok: true; cardId: string | null } | { ok: false; error: string };
+
 // Run either starts the plan, or says why it can't yet, such as a card with nothing to do.
 export type NestRunPlanResult = { ok: true } | { ok: false; error: string };
 export type NestFromChatResult = { ok: true; nestId: string } | { ok: false; error: string };
@@ -569,6 +572,14 @@ export interface InvokeChannels {
   "nests:edit-note": { region: "chrome"; args: [attachmentId: string, text: string]; result: boolean };
   // With a planned card's id, one of the composer's it points at stops being pointed at there, and stays on the composer.
   "nests:remove-attachment": { region: "chrome"; args: [attachmentId: string, fromCardId?: string]; result: boolean };
+  // Opens the system's file picker in main for a CSV or TSV file, which main reads and parses into a table card placed in
+  // sight. A renderer never names a path.
+  "nests:add-table-file": { region: "chrome"; args: [nestId: string, place: Pick<NestAskOptions, "at" | "taken">]; result: NestTableResult };
+  // The user's own name for a For-each card's column.
+  "nests:rename-column": { region: "chrome"; args: [cardId: string, name: string]; result: boolean };
+  // A card's table on the clipboard as cells, or saved as a CSV file where the user chooses in main's save dialog.
+  "nests:copy-table": { region: "chrome"; args: [cardId: string]; result: boolean };
+  "nests:save-table": { region: "chrome"; args: [cardId: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -815,6 +826,10 @@ export interface NestsAPI {
   addNote: (target: NestAttachTarget, text: string) => Promise<NestAttachResult>;
   editNote: (attachmentId: string, text: string) => Promise<boolean>;
   removeAttachment: (attachmentId: string, fromCardId?: string) => Promise<boolean>;
+  addTableFile: (nestId: string, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
+  renameColumn: (cardId: string, name: string) => Promise<boolean>;
+  copyTable: (cardId: string) => Promise<boolean>;
+  saveTable: (cardId: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
   fromChat: (chatId: string) => Promise<NestFromChatResult>;

@@ -12,7 +12,8 @@ const MAX_REPLY_LENGTH = 600;
 const MAX_TABLE_OF_LENGTH = 60;
 
 // A card already on the board that a planned card may read from, by the short key the planner was given for it.
-// `table` is true when its latest answer has a table and it isn't a For-each card, so For each row can run on it.
+// `table` is true when it has a table now, the one in its latest answer, a For-each card's or a file's, so For each row
+// can run on it.
 export interface PlanSource {
   key: string;
   cardId: string;
@@ -89,7 +90,8 @@ export const checkPlan = (
   for (const card of cards) {
     if (!card.each) continue;
     const planned = card.fromKey === null ? undefined : cards.find((other) => other.key === card.fromKey);
-    const table = card.fromKey !== null && (planned ? !planned.each && planned.table !== null : onBoard.get(card.fromKey)?.table === true);
+    // A card that runs for each row answers with a table too: the one it ran on, with its own column added.
+    const table = card.fromKey !== null && (planned ? planned.each || planned.table !== null : onBoard.get(card.fromKey)?.table === true);
     if (!table) return { ok: false, problem: "For each row was on a card that doesn’t get a table" };
   }
 

@@ -214,7 +214,7 @@ const sampleCard = (id: string, x: number, y: number, extra: Partial<NestCard> =
     position: { x, y },
     draggable: false,
     focusable: false,
-    data: { card: { id, chatId: null, mascotId: null, x, y, autoPlaced: false, each: null, plan: null, attachments: [], ...extra } }
+    data: { card: { id, chatId: null, mascotId: null, x, y, autoPlaced: false, each: null, plan: null, table: null, attachments: [], ...extra } }
 })
 
 const SAMPLE_NODES: CardNode[] = [
@@ -223,10 +223,11 @@ const SAMPLE_NODES: CardNode[] = [
         each: {
             prompt: 'Write a short first email to whoever leads sales.',
             header: ['Company', 'People'],
+            column: 'First email',
             runs: [
-                { id: 'run-1', row: COMPANIES[0], chatId: 'run-1', state: 'started' },
-                { id: 'run-2', row: COMPANIES[2], chatId: 'run-2', state: 'started' },
-                { id: 'run-3', row: COMPANIES[4], chatId: null, state: 'waiting' }
+                { id: 'run-1', row: COMPANIES[0], chatId: 'run-1', state: 'started', cell: 'Hej Sara, I saw you’re hiring two SDRs' },
+                { id: 'run-2', row: COMPANIES[2], chatId: 'run-2', state: 'started', cell: null },
+                { id: 'run-3', row: COMPANIES[4], chatId: null, state: 'waiting', cell: null }
             ]
         }
     }),
