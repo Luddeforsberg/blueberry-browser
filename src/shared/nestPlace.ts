@@ -21,13 +21,14 @@ const MARGIN = 24;
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.width + MARGIN && b.x < a.x + a.width + MARGIN && a.y < b.y + b.height + MARGIN && b.y < a.y + a.height + MARGIN;
 
-// The first place from `want` downwards where a card of `size` covers no other, so a new card never lands on one.
+// The first place from `want` downwards where a card of `size` covers no other, so a new card never lands on one. Past
+// the nearer places it tries, it goes below every card, which is always free.
 export const freeSpot = (cards: readonly Rect[], want: { x: number; y: number }, size = { width: CARD_WIDTH, height: CARD_HEIGHT }) => {
   for (let step = 0; step < MAX_TRIES; step++) {
     const spot = { x: want.x, y: want.y + step * ROW_STEP };
     if (!cards.some((card) => overlaps({ ...spot, ...size }, card))) return spot;
   }
-  return want;
+  return { x: want.x, y: Math.max(want.y, ...cards.map((card) => card.y + card.height + MARGIN)) };
 };
 
 // Where a card pulled out of `source` with a click goes: beside it, level with it, or below that if it's taken.

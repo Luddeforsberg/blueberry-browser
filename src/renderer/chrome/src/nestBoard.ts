@@ -38,10 +38,15 @@ export const cardStatus = (thread: Pick<ChatThread, 'partial' | 'approval' | 'er
     return { text: 'Not answered', tone: 'muted' }
 }
 
-// What a closed card shows: the answer being written, or else the newest one with words. Only ever drawn: what goes to
-// another card is read in main.
+// What a closed card shows: the answer being written, or else the newest one with words since the user last wrote, by
+// the same rule as `latestAnswer` in main, so a card never shows an older answer as its latest. Only ever drawn: what
+// goes to another card is read in main.
 export const latestReply = (thread: Pick<ChatThread, 'partial' | 'messages'>): string | null =>
-    thread.partial || (thread.messages.findLast((message) => message.role === 'assistant' && message.content.trim() !== '')?.content ?? null)
+    thread.partial ||
+    (thread.messages
+        .slice(thread.messages.findLastIndex((message) => message.role === 'user') + 1)
+        .findLast((message) => message.role === 'assistant' && message.content.trim() !== '')?.content ??
+        null)
 
 // "Scout is working", "Scout and Writer are working", "Scout, Writer and Berry are working".
 export const workingLine = (names: readonly string[]): string | null => {

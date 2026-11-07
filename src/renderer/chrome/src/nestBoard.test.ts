@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, PERCH, pickRows, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, PERCH, pickRows, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -12,6 +12,14 @@ describe('freeSpot', () => {
         const spot = freeSpot([card(64, 80), card(64, 320)], { x: 64, y: 80 })
         expect(spot.x).toBe(64)
         expect(spot.y).toBeGreaterThanOrEqual(320 + CARD_HEIGHT)
+    })
+
+    it('goes below every card when a long column leaves no gap nearer, and never onto one', () => {
+        const column = Array.from({ length: 60 }, (_, index) => card(64, 80 + index * (CARD_HEIGHT + 24)))
+        const spot = freeSpot(column, { x: 64, y: 80 })
+        expect(spot.x).toBe(64)
+        const last = column.at(-1)!
+        expect(spot.y).toBeGreaterThanOrEqual(last.y + last.height)
     })
 })
 
@@ -104,6 +112,19 @@ describe('cardStatus', () => {
         expect(cardStatus({ ...thread, messages: [asked, { role: 'assistant', content: 'Found' }] })).toEqual({ text: 'Done', tone: 'done' })
         expect(cardStatus({ ...thread, messages: [asked, { role: 'assistant', content: '', steps: [{ text: 'Stopped here', done: true }] }] }).text).toBe('Stopped')
         expect(cardStatus({ ...thread, error: 'Couldn’t reach the model.', messages: [asked] }).text).toBe('Didn’t finish')
+    })
+})
+
+describe('latestReply', () => {
+    it('is the answer being written, or the newest one with words since the user last wrote', () => {
+        const messages = [
+            { role: 'user' as const, content: 'Find companies' },
+            { role: 'assistant' as const, content: 'Twelve companies' },
+            { role: 'user' as const, content: 'Only Swedish ones' }
+        ]
+        expect(latestReply({ partial: null, messages: [...messages, { role: 'assistant', content: 'Five' }, { role: 'assistant', content: ' ' }] })).toBe('Five')
+        expect(latestReply({ partial: 'Fi', messages })).toBe('Fi')
+        expect(latestReply({ partial: null, messages: [...messages, { role: 'assistant', content: '' }] })).toBeNull()
     })
 })
 
