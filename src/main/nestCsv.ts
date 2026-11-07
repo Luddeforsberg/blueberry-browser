@@ -10,6 +10,7 @@ export const MAX_TABLE_COLUMNS = 30;
 // 2,000 rows of 30 columns at about 30 characters a cell, and nothing that big is a list someone made by hand.
 export const MAX_TABLE_BYTES = 2 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 80;
+const MAX_HEADER_LENGTH = 100;
 
 export type TableFile = { ok: true; table: { name: string } & PickedRows } | { ok: false; error: string };
 
@@ -90,7 +91,9 @@ export const tableFromFile = (name: string, bytes: Uint8Array): TableFile => {
   if (bytes.length > MAX_TABLE_BYTES) return { ok: false, error: `${name} is more than the 2 MB a table can be.` };
   if (bytes.includes(0)) return { ok: false, error: `${name} doesn’t look like a ${kind.toUpperCase()} file.` };
   const text = decode(bytes);
-  const lines = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text)).filter((cells) => cells.some((cell) => cell.trim() !== ""));
+  // Blank lines go. A first line of empty cells is still the header, and a row of them is no row.
+  const records = parseDelimited(text, kind === "tsv" ? "\t" : sniffDelimiter(text)).filter((cells) => cells.length > 1 || cells[0].trim() !== "");
+  const lines = records.filter((cells, index) => index === 0 || cells.some((cell) => cell.trim() !== ""));
   if (lines.length < 2) return { ok: false, error: `${name} has no rows under its first line.` };
   // Counted without spreading, since a file far past the row limit can have more lines than a call takes arguments.
   const columns = lines.reduce((most, cells) => Math.max(most, cells.length), 0);
@@ -99,7 +102,11 @@ export const tableFromFile = (name: string, bytes: Uint8Array): TableFile => {
   if (rows > MAX_TABLE_ROWS) {
     return { ok: false, error: `${name} has ${counted(rows)} rows, and a table can have ${counted(MAX_TABLE_ROWS)} at most. Split it and add each part.` };
   }
-  const header = Array.from({ length: columns }, (_, column) => lines[0][column]?.trim() || `Column ${column + 1}`);
+  // A column's name is a name, so one far longer is cut, and the header always fits in what crosses a line.
+  const header = Array.from({ length: columns }, (_, column) => {
+    const words = lines[0][column]?.trim() || `Column ${column + 1}`;
+    return words.length > MAX_HEADER_LENGTH ? `${words.slice(0, MAX_HEADER_LENGTH - 1).trimEnd()}…` : words;
+  });
   return {
     ok: true,
     table: { name: tableTitle(name), header, rows: lines.slice(1).map((cells) => header.map((_, column) => cells[column]?.trim() ?? "")) },

@@ -44,12 +44,20 @@ const firstLine = (text: string) =>
 
 const unquote = (text: string) => text.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, "").trim();
 
+// Cut on a word. An address at the cut goes, since a link cut short, or with the ellipsis on it, would go somewhere else.
 const cut = (text: string, length: number) => {
   if (text.length <= length) return text;
   const short = text.slice(0, length - 1);
   const space = short.lastIndexOf(" ");
-  return `${(space > length / 2 ? short.slice(0, space) : short).trimEnd()}…`;
+  let kept = (space > length / 2 ? short.slice(0, space) : short).trimEnd();
+  const last = /https?:\/\/\S*$/.exec(kept);
+  if (last) kept = kept.slice(0, last.index).trimEnd();
+  return `${kept}…`;
 };
+
+// Every web address in an answer, as a link's target or written out, without the full stop or comma after one.
+const addressesIn = (answer: string): Set<string> =>
+  new Set([...answer.matchAll(/\]\(([^)\s]+)\)|(https?:\/\/[^\s<>|)\]]+)/g)].map(([, target, bare]) => (target ?? bare.replace(/[.,;:!?]+$/, ""))));
 
 // A column's name, or null when there's none worth showing.
 export const parseColumn = (reply: string): string | null => {
@@ -69,13 +77,15 @@ export const shortCell = (answer: string): string | null => {
 // answer itself gives, so the model can't add one of its own. Null when nothing's left.
 export const parseCell = (reply: string, answer: string): string | null => {
   let text = unquote(firstLine(reply)).replace(/^(cell|value)\s*:\s*/i, "");
-  text = text.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (whole, words: string, href: string) => {
-    const safe = safeHref(href);
-    return safe && answer.includes(href) ? whole : words || href;
+  const given = addressesIn(answer);
+  text = text.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (whole, words: string, href: string) => (safeHref(href) && given.has(href) ? whole : words || href));
+  // A bare address is a link too on the card, so the same goes for one: kept only if the answer gives exactly it, and
+  // otherwise only its site, as words.
+  text = text.replace(/(?<!\]\()https?:\/\/[^\s<>|)\]]+/g, (found) => {
+    const address = found.replace(/[.,;:!?]+$/, "");
+    const after = found.slice(address.length);
+    return (given.has(address) ? address : address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]) + after;
   });
-  // A bare address is a link too on the card, so the same goes for one: kept only if the answer gives it, and otherwise
-  // only its site, as words.
-  text = text.replace(/(?<!\]\()https?:\/\/[^\s<>|)\]]+/g, (address) => (answer.includes(address) ? address : address.replace(/^https?:\/\//, "").split(/[/?#]/)[0]));
   text = text.replace(/\s+/g, " ").trim();
   if (!text || text.toUpperCase() === "NONE") return null;
   // Cut, it keeps only words, since a link cut short would go nowhere.

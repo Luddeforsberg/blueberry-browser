@@ -106,7 +106,8 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN each_column_settled INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE runs ADD COLUMN cell TEXT;
    ALTER TABLE cards ADD COLUMN table_name TEXT;
-   ALTER TABLE cards ADD COLUMN table_rows TEXT;`,
+   ALTER TABLE cards ADD COLUMN table_rows TEXT;
+   UPDATE cards SET each_column = 'Result' WHERE each_prompt IS NOT NULL;`,
 ];
 
 export interface AttachmentRow {

@@ -1,9 +1,8 @@
 import type { ChatThreadMessage } from "../shared/library";
-import { tableMarkdown, type Crossing, type PickedRows } from "../shared/nestTable";
+import { MAX_CROSSING_LENGTH, tableMarkdown, type Crossing, type PickedRows } from "../shared/nestTable";
 import { nameForPrompt } from "./mascotNote";
 
-// Plenty for a list or a write-up, and short enough that one card can't crowd out the job it's passed to.
-export const MAX_CARD_ANSWER_LENGTH = 12000;
+export const MAX_CARD_ANSWER_LENGTH = MAX_CROSSING_LENGTH;
 
 // What a card gets from the card a line comes from: that card's bird, and its latest answer as it is now, or only the
 // rows the user picked from its table, one row for one run of For each row, or the whole table of a For-each card or of

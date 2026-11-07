@@ -46,6 +46,11 @@ describe("parseCell", () => {
     // A bare address links on the card too, so one the answer doesn't give is only its site, as words.
     expect(parseCell("See https://invented.example/collect?id=1 now", ANSWER)).toBe("See invented.example now");
     expect(parseCell("https://linkedin.com/posts/omar-1", ANSWER)).toBe("https://linkedin.com/posts/omar-1");
+    // Only exactly an address the answer gives, not one that its address starts with.
+    const answer = "See https://safe.example.org/about for more.";
+    expect(parseCell("[Safe](https://safe.example)", answer)).toBe("Safe");
+    expect(parseCell("https://safe.example", answer)).toBe("safe.example");
+    expect(parseCell("[About](https://safe.example.org/about)", answer)).toBe("[About](https://safe.example.org/about)");
   });
 
   it("keeps a value at the limit whole, and cuts one past it on a word, as words only", () => {
@@ -56,6 +61,13 @@ describe("parseCell", () => {
     expect(cut.length).toBeLessThanOrEqual(MAX_CELL_LENGTH);
     expect(cut.endsWith("word…")).toBe(true);
     expect(cut).not.toContain("](");
+  });
+
+  it("never leaves an address at the cut, where it would link somewhere the answer doesn't give", () => {
+    // An address too long to keep whole, starting early, so the cut falls inside it rather than on a space before it.
+    const address = `https://linkedin.com/posts/${"omar-".repeat(30)}1`;
+    expect(parseCell(`Post: ${address}`, `${ANSWER} ${address}`)).toBe("Post:…");
+    expect(fallbackCell(`Post: ${address}`)).toBe("Post:…");
   });
 });
 

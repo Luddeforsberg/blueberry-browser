@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useLayoutEffect, us
 import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import { ArrowLeft, GitFork, Maximize2, Minimize2, Table2, X } from 'lucide-react'
 import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
-import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, rowName, STALE_ROWS, type PickedRows } from '@shared/nestTable'
+import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
@@ -724,7 +724,8 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     const answered = each.runs.some((run) => run.cell !== null)
     const shownRun = open && openRun ? views.find((view) => view.id === openRun && view.thread) : undefined
     const table = useMemo(() => combinedTable(each), [each])
-    const key = useMemo(() => JSON.stringify(table.rows), [table])
+    // The header too, so renaming the column lets a selection go rather than leaving one main would refuse.
+    const key = useMemo(() => JSON.stringify(table), [table])
     const selected = useTablePick(card.id, key)
     const here = useWorkingRows(card.id, table)
     const from = source ? (line?.picked ? `For each of ${plural(line.picked.rows.length, 'row')} from ${sourceName}` : `For each row of ${source.table ? sourceName : `${sourceName}’s table`}`) : 'For each row'
@@ -767,7 +768,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                 </span>
             </div>
             <p data-crosses className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">
-                {from} · {eachWords({ columns: each.header.length }).replace(/^O/, 'o')}
+                {from} · {eachWords({ columns: each.header.length, cut: rowTooLong(each.header, each.runs.map((run) => run.row)) }).replace(/^O/, 'o')}
             </p>
             <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {shownRun?.thread ? (

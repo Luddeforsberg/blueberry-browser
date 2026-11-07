@@ -239,6 +239,18 @@ describe("NestStore", () => {
     expect(store.chatIds()).toEqual([]);
   });
 
+  it("names the column of a For-each card from before columns, so none is left blank", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Nest");
+    const card = store.addCard(nest, { x: 0, y: 0 })!;
+    store.startForEach(card.id, "Find posts", ["Company"], [["Fjällbo"]], "Latest post");
+    const db = new DatabaseSync(file);
+    db.exec(`PRAGMA user_version = 9; ${LATER_COLUMNS}`);
+    db.close();
+    expect(new NestStore(file).card(card.id)!.each!.column).toBe("Result");
+  });
+
   it("keeps a column's name the user gave over a generated one, a run's value, and a file's rows as a card nothing can send from", () => {
     const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
     const store = new NestStore(file);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellParts, combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, missingRows, plainCell, rowName, runCountProblem, splitRow, tableMarkdown } from "./nestTable";
+import { cellParts, combinedTable, crossingWords, eachWords, findTable, MAX_CROSSING_LENGTH, MAX_RUNS, missingRows, plainCell, rowName, rowTooLong, runCountProblem, splitRow, tableMarkdown } from "./nestTable";
 
 const COMPANIES = [
   "Here are the companies I found.",
@@ -148,5 +148,8 @@ describe("what crosses a line, in words", () => {
     expect(crossingWords({ kind: "table", rows: 40, columns: 3, leftOut: 1 }, "Writer")).toBe("40 rows, 3 columns from Writer, with 1 more row left out to fit");
     expect(eachWords({ columns: 3 })).toBe("One row each, 3 columns");
     expect(eachWords({ columns: 3, cut: true })).toBe("One row each, 3 columns, a row too long to go whole cut to its first 12,000 characters");
+    expect(rowTooLong(["A"], [["a".repeat(MAX_CROSSING_LENGTH - 18)]])).toBe(false);
+    expect(rowTooLong(["A"], [["a".repeat(MAX_CROSSING_LENGTH - 17)]])).toBe(true);
+    expect(rowTooLong(["A"], [])).toBe(false);
   });
 });

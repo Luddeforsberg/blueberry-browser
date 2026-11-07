@@ -4,9 +4,9 @@ import type { MascotStore } from "./MascotStore";
 import type { ChatThread, MascotProfile, NestBoard, NestCard, NestSummary } from "../shared/library";
 import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
-import { combinedTable, findTable, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, tableMarkdown, type LineCrossing, type PickedRows } from "../shared/nestTable";
+import { combinedTable, findTable, MAX_RUNS, missingRows, rowTooLong, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, tableMarkdown, type LineCrossing, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from "../shared/nestPlace";
-import { crossingOf, latestAnswer, MAX_CARD_ANSWER_LENGTH, rowAnswer, rowsAnswer, tableAnswer, type CardAnswer } from "./nestContext";
+import { crossingOf, latestAnswer, rowAnswer, rowsAnswer, tableAnswer, type CardAnswer } from "./nestContext";
 import { DEFAULT_COLUMN, fallbackCell, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
 import { tableFromFile } from "./nestCsv";
 import { armedStep, checkPlan, CLOSED_BEFORE_START, replyState, runsState, type PlanCard, type PlanSource, type SourceState } from "./nestPlan";
@@ -153,7 +153,7 @@ export class Nests {
     const each =
       "problem" in rows
         ? null
-        : { rows: rows.rows.length, columns: rows.header.length, cut: rows.rows.some((row) => rowAnswer("", rows.header, row).text.length > MAX_CARD_ANSWER_LENGTH) };
+        : { rows: rows.rows.length, columns: rows.header.length, cut: rowTooLong(rows.header, rows.rows) };
     return whole || each ? { whole, each } : null;
   }
 

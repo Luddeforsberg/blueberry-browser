@@ -17,6 +17,10 @@ export interface PickedRows {
 // Why a card won't send rows it was given once they've gone from the card they came from.
 export const STALE_ROWS = "The rows you picked aren’t in that card’s latest answer any more. Pull a new line out of it to pick again.";
 
+// How much of a card's answer or table crosses a line: plenty for a list or a write-up, and short enough that one card
+// can't crowd out the job it's passed to.
+export const MAX_CROSSING_LENGTH = 12000;
+
 // One past this many rows, For each row refuses to start.
 export const MAX_RUNS = 25;
 // How many runs of For each row go at once, everywhere, because the Mac and the sites can't take more.
@@ -210,5 +214,9 @@ export const crossingWords = (crossing: Crossing, who: string): string => {
 };
 
 // What each run of For each row gets.
-export const eachWords = ({ columns, cut = false }: { columns: number; cut?: boolean }, cutTo = 12000): string =>
-  `One row each, ${counted(columns, "column")}${cut ? `, a row too long to go whole cut to its first ${count(cutTo)} characters` : ""}`;
+export const eachWords = ({ columns, cut = false }: { columns: number; cut?: boolean }): string =>
+  `One row each, ${counted(columns, "column")}${cut ? `, a row too long to go whole cut to its first ${count(MAX_CROSSING_LENGTH)} characters` : ""}`;
+
+// Whether any of these rows is too long to go to a run whole.
+export const rowTooLong = (header: readonly string[], rows: readonly (readonly string[])[]): boolean =>
+  rows.some((row) => tableMarkdown(header, [row]).length > MAX_CROSSING_LENGTH);

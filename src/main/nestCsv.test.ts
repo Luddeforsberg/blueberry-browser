@@ -50,6 +50,15 @@ describe("tableFromFile", () => {
     });
   });
 
+  it("keeps a first line of empty cells as the header, naming each column by its place, and cuts a name far too long", () => {
+    expect(tableFromFile("a.csv", bytes(",,\nAcme,42,CEO\n,,\nBrygga,23,CFO"))).toEqual({
+      ok: true,
+      table: { name: "a", header: ["Column 1", "Column 2", "Column 3"], rows: [["Acme", "42", "CEO"], ["Brygga", "23", "CFO"]] },
+    });
+    const long = tableFromFile("a.csv", bytes(`${"n".repeat(13000)}\n1`));
+    expect(long.ok && long.table.header[0]).toBe(`${"n".repeat(99)}…`);
+  });
+
   it("reads a TSV by its tabs, and a file saved by Excel in its Windows code page", () => {
     expect(tableFromFile("a.tsv", bytes("x\ty\n1,5\t2"))).toMatchObject({ ok: true, table: { header: ["x", "y"], rows: [["1,5", "2"]] } });
     const latin = Uint8Array.from([...bytes("Stad\nG"), 0xf6, ...bytes("teborg\n")]);
