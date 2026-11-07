@@ -292,6 +292,8 @@ export async function* streamReply(
     const key = await grantKey(args).catch(() => null);
     return key !== null && granted(key.key);
   };
+  // What each paused call's card offers for Allow for this card's runs, by its call's id.
+  const offered = new Map<string, GrantKey | null>();
   const interruptOn = Object.fromEntries(
     tools.flatMap((pageTool) =>
       pageTool.describe
@@ -300,10 +302,17 @@ export async function* streamReply(
               pageTool.name,
               {
                 allowedDecisions: ["approve" as const, "reject" as const],
-                description: ({ args, id }: { args: unknown; id?: string }) => {
+                description: async ({ args, id }: { args: unknown; id?: string }) => {
                   if (id === undefined || !presented.has(id)) pageTool.whileAsking?.(args);
                   if (id !== undefined) presented.add(id);
-                  return pageTool.describe!(args);
+                  if (!granted || !pageTool.grantKey || id === undefined) return pageTool.describe!(args);
+                  // What Allow for this card's runs would cover is read with the words the card shows, and offered only
+                  // if the page gave the same key on both sides of them.
+                  const before = await pageTool.grantKey(args).catch(() => null);
+                  const words = await pageTool.describe!(args);
+                  const after = before && (await pageTool.grantKey(args).catch(() => null));
+                  offered.set(id, before && after?.key === before.key ? before : null);
+                  return words;
                 },
                 when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
                   !(await refusedOutright(pageTool, toolCall.args)) && (await needsAsking(pageTool, toolCall.args)) && !(await coveredByGrant(pageTool, toolCall.args)),
@@ -402,10 +411,8 @@ export async function* streamReply(
     const decisions: Record<string, object> = {};
     for (const { id, value } of paused) {
       if (!id || !value) throw new Error("A paused action has nothing to identify it by.");
-      const { tool_call_id: callId, description, name, args } = value as { tool_call_id: string; description: string; name?: string; args?: unknown };
-      const pageTool = granted ? tools.find((each) => each.name === name) : undefined;
-      const grant = pageTool?.grantKey ? await pageTool.grantKey(args).catch(() => null) : null;
-      const yes = await approve(description, grant);
+      const { tool_call_id: callId, description } = value as { tool_call_id: string; description: string };
+      const yes = await approve(description, offered.get(callId) ?? null);
       if (yes) allowed.set(callId, description);
       decisions[id] = yes ? { type: "approve" } : { type: "reject", message: DECLINED };
     }

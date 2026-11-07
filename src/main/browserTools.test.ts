@@ -606,3 +606,24 @@ describe("the fetch_page tool", () => {
     expect(redirected).not.toContain("Jane, CEO");
   });
 });
+
+describe("an action after the bird's flight", () => {
+  it("doesn't happen when the element changed while the bird flew, since that isn't what was allowed", async () => {
+    let flown = false;
+    const peck = vi.fn(async () => {});
+    const actor = { showing: true, goTo: async () => void (flown = true), peck };
+    const runInPage = vi.fn(async (script: string) =>
+      script.includes("safeToType: safeToType(el)")
+        ? { role: "textbox", name: flown ? "Password" : "Subject", target: null, riskyClick: false, safeToType: false, secret: flown, frameUrl: null }
+        : { status: "aimed", x: 10, y: 10, width: 10, height: 10, name: "Save" }
+    );
+    const tab = { id: "tab-1", url: "https://mail.example/", foreignFrames: [], frames: [], runInPage, actor } as unknown as Tab;
+    const click = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} }).find(
+      ({ name }) => name === "click"
+    )!;
+
+    expect(await click.run({ ref: "e1" })).toMatch(/changed before the action happened/);
+    expect(flown).toBe(true);
+    expect(peck).not.toHaveBeenCalled();
+  });
+});

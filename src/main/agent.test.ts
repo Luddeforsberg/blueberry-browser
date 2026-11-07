@@ -259,6 +259,19 @@ describe("a mascot's limits and approvals", () => {
       expect(unmatched).toHaveBeenCalledWith("Click the button “Save draft”", null);
     });
 
+    it("offers nothing when the page gives another key while the card's words are read", async () => {
+      let reads = 0;
+      const shifting = click({
+        schema: z.object({ name: z.string() }),
+        describe: async () => "Click the button “Save draft”",
+        grantKey: async () => ({ key: `click Save draft to ${reads++}`, words: "clicking “Save draft”" }),
+        run: vi.fn(async () => "clicked"),
+      });
+      const approve = vi.fn(async () => true);
+      await replyWith(shifting, clicks("Save draft"), new Set<string>(), approve);
+      expect(approve).toHaveBeenCalledWith("Click the button “Save draft”", null);
+    });
+
     it("asks again when the action stops matching between the check and the run", async () => {
       // Covered when LangChain decided not to ask, then a different element by the time it runs: nothing happens.
       let checks = 0;

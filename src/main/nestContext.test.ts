@@ -176,6 +176,20 @@ describe("several inputs", () => {
     expect(fitted[2].leftOut).toBeGreaterThan(0);
   });
 
+  it("cuts a table whose header alone is longer than its share, so the inputs never go past the room", () => {
+    const wide = { header: Array.from({ length: 30 }, (_, index) => `Column ${index} ${"h".repeat(400)}`), rows: [["a"]] };
+    const fitted = fitInputs(
+      [
+        { name: "A", part: "table", table: wide },
+        { name: "B", part: "table", table: wide },
+      ],
+      12_000
+    );
+    const sent = fitted.map((answer) => (answer.cutTo != null ? answer.text.slice(0, answer.cutTo) : answer.text).length);
+    expect(sent.reduce((total, length) => total + length, 0)).toBeLessThanOrEqual(12_000);
+    expect(fitted.map((answer) => answer.cutTo)).toEqual([6000, 6000]);
+  });
+
   it("tags each input by its card's name, in the order given, each labelled untrusted", () => {
     const message = withCardAnswers("Compare them", [
       { name: "Scout", text: "Scout's list", part: "answer" },

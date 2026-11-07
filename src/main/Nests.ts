@@ -148,7 +148,7 @@ export class Nests {
     const board = this.store.board(id);
     if (!board) return null;
     const cards = board.cards.map((card) => {
-      const withCost = { ...card, cost: this.chats.costOf(this.chatsOf(card)), perRun: this.perRunOf(card) };
+      const withCost = { ...card, cost: this.costOf(card), perRun: this.perRunOf(card) };
       return card.each
         ? { ...withCost, each: { ...card.each, naming: this.columnNaming.has(card.id), runs: card.each.runs.map((run) => ({ ...run, filling: this.fills.has(run.id) })) } }
         : withCost;
@@ -467,7 +467,7 @@ export class Nests {
     if ("problem" in input) return { ok: false, error: input.problem };
     const problem = runCountProblem(rows.rows.length);
     if (problem) return { ok: false, error: problem };
-    if (!this.store.startForEach(cardId, prompt, rows.header, rows.rows, DEFAULT_COLUMN)) return { ok: false, error: "This card has been sent already." };
+    if (!this.store.startForEach(cardId, prompt, rows.header, rows.rows, DEFAULT_COLUMN, rows.lineId)) return { ok: false, error: "This card has been sent already." };
     this.nameColumn(cardId, prompt);
     this.nameFrom(card.nestId, prompt);
     this.changed(card.nestId);
@@ -481,11 +481,13 @@ export class Nests {
     const run = this.store.run(runId);
     const card = run && this.store.card(run.cardId);
     if (!run?.chatId || !card?.each || typeof text !== "string") return null;
+    const cardAnswers = this.runInputs(card.id, card.each.header, run.row);
+    if (!cardAnswers) return null;
     // It's the user's own press on one thread, so it doesn't wait for a place, but it holds one, and gives it back.
     const sent = this.chats.send(run.chatId, text, {
       seePage: false,
       userPresent: true,
-      cardAnswers: this.runInputs(card.id, card.each.header, run.row),
+      cardAnswers,
       onEnd: () => {
         this.pump();
         this.endGrantIfDone(card.id);
@@ -562,7 +564,7 @@ export class Nests {
     if (ids.length === 0) return { ok: false, error: which === "unfinished" ? "Every run finished." : "Every run started." };
     const done = allowedBefore(runs.filter((run) => ids.includes(run.id)).map((run) => run.thread));
     if (done && confirmed !== true) return { ok: false, warn: `Some of these already did something you allowed, such as “${done}”, and may do it again.` };
-    const chats = this.store.restartRuns(card.id, ids);
+    const chats = this.store.restartRuns(card.id, ids, (chatId) => this.chats.costOf([chatId]) ?? 0);
     chats.forEach((chatId) => this.deleteChat(chatId));
     this.changed(card.nestId);
     this.pump();
@@ -853,7 +855,7 @@ export class Nests {
         return this.store.hold(card.id, `Didn’t start, because ${name}’s table has ${rows.rows.length} rows, and For each row runs at most ${MAX_RUNS} times`);
       }
       if ("problem" in this.inputFor(card.id)) return this.store.hold(card.id, "Didn’t start, because what it reads from has changed");
-      if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows, DEFAULT_COLUMN)) return false;
+      if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows, DEFAULT_COLUMN, rows.lineId)) return false;
       this.nameColumn(card.id, plan.prompt);
       this.handedOff(card.id);
       this.pump();
@@ -1147,14 +1149,24 @@ export class Nests {
     return missingRows(line.picked, table).length > 0 ? { problem: STALE_ROWS } : { ...line.picked, lineId: line.lineId };
   }
 
-  // What one run gets: its own row, labelled with where it came from, and every other input whole, as context shared by
-  // every run, all in one room.
-  private runInputs(cardId: string, header: readonly string[], row: readonly string[]): CardAnswer[] {
+  // What one run gets: its own row, labelled with the line it came from when the card was sent, and every other input
+  // whole, as context shared by every run, all in one room. Null when rows picked on another input have gone, so the run
+  // doesn't go without them.
+  private runInputs(cardId: string, header: readonly string[], row: readonly string[]): CardAnswer[] | null {
     const lines = this.store.linesTo(cardId);
-    const driving = this.drivingLine(cardId) ?? lines[0];
-    const others = lines.filter((line) => line !== driving && line.lineId !== driving?.lineId).map((line) => this.lineInput(line));
+    const lineId = this.store.eachLine(cardId);
+    const driving = lineId ? lines.find((line) => line.lineId === lineId) : (this.drivingLine(cardId) ?? lines[0]);
+    const others = lines.filter((line) => line.lineId !== driving?.lineId).map((line) => this.lineInput(line));
+    if (others.includes("stale")) return null;
     const rowInput: RawInput = { name: driving ? this.labelOf(driving.source) : "Another card", fromFile: !!driving?.source.table, part: "row", header, row };
     return fitInputs([rowInput, ...others.filter((input): input is RawInput => input !== null && input !== "stale")]);
+  }
+
+  // What a card's chats cost, with what its runs cost on tries Retry replaced.
+  private costOf(card: NestCard): number | null {
+    const chats = this.chats.costOf(this.chatsOf(card));
+    const spent = card.each ? this.store.spentOn(card.id) : 0;
+    return chats === null && spent === 0 ? null : (chats ?? 0) + spent;
   }
 
   // What a card is called to the model and on screen: its bird's name, or a file's title.
@@ -1181,10 +1193,11 @@ export class Nests {
   private startRun(run: { id: string; cardId: string; row: string[] }): boolean {
     const card = this.store.card(run.cardId);
     if (!card?.each) return false;
-    const sent = this.chats.send(null, card.each.prompt, {
+    const cardAnswers = this.runInputs(card.id, card.each.header, run.row);
+    const sent = cardAnswers && this.chats.send(null, card.each.prompt, {
       seePage: false,
       mascotId: card.mascotId,
-      cardAnswers: this.runInputs(card.id, card.each.header, run.row),
+      cardAnswers,
       started: (chatId) => this.store.setRunChat(run.id, chatId),
       onEnd: () => {
         this.pump();
@@ -1196,10 +1209,11 @@ export class Nests {
       ...this.userSaid(card.id, null, null),
       ...this.attachmentsFor(card.id),
     });
-    // Its bird has gone from the flock, or the chat couldn't start. The others still try.
+    // Its bird has gone from the flock, rows picked on another input have gone, or the chat couldn't start. The others
+    // still try.
     if (!sent) this.store.setRunState(run.id, "failed");
     this.changed(card.nestId);
-    return sent !== null;
+    return !!sent;
   }
 
   // What one run of For each row will likely cost, on a draft that could run it and on a For-each card, for its runs again:

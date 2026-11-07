@@ -126,6 +126,9 @@ const MIGRATIONS = [
    DROP TABLE lines;
    ALTER TABLE lines_many RENAME TO lines;
    CREATE INDEX lines_by_to ON lines(to_card);`,
+  // The line a For-each card's runs took their rows from, and what a run's earlier tries cost before Retry replaced them.
+  `ALTER TABLE cards ADD COLUMN each_line TEXT;
+   ALTER TABLE runs ADD COLUMN spent REAL NOT NULL DEFAULT 0;`,
 ];
 
 // One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
@@ -445,16 +448,16 @@ export class NestStore {
   }
 
   // A draft becomes a For-each card, with one waiting run for each row, in one go. False if it isn't a draft.
-  startForEach(id: string, prompt: string, header: string[], rows: string[][], column: string): boolean {
+  startForEach(id: string, prompt: string, header: string[], rows: string[][], column: string, lineId: string): boolean {
     const card = this.card(id);
     if (!card) return false;
     this.db.exec("BEGIN");
     try {
       const changed = this.db
         .prepare(
-          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL"
+          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_line = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL"
         )
-        .run(prompt, JSON.stringify(header), column, id).changes;
+        .run(prompt, JSON.stringify(header), column, lineId, id).changes;
       if (changed === 0) throw new NotHere();
       const insert = this.db.prepare("INSERT INTO runs (id, card_id, position, row, chat_id, state) VALUES (?, ?, ?, ?, NULL, 'waiting')");
       rows.forEach((row, position) => insert.run(randomUUID(), id, position, JSON.stringify(row)));
@@ -538,15 +541,16 @@ export class NestStore {
   // Runs of one card go back to waiting their turn, each with no chat and no value, for Retry and Start remaining. Only
   // runs that had stopped or failed, or started, so one waiting or about to start is left alone. The chats they had, for
   // the caller to delete.
-  restartRuns(cardId: string, ids: readonly string[]): string[] {
+  // `costOf` is what a run's chat cost, which the run keeps, since the chat goes.
+  restartRuns(cardId: string, ids: readonly string[], costOf: (chatId: string) => number): string[] {
     const chats: string[] = [];
     this.db.exec("BEGIN");
     try {
       const old = this.db.prepare("SELECT chat_id FROM runs WHERE id = ? AND card_id = ? AND state <> 'waiting'");
-      const restart = this.db.prepare("UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL WHERE id = ? AND card_id = ? AND state <> 'waiting'");
+      const restart = this.db.prepare("UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL, spent = spent + ? WHERE id = ? AND card_id = ? AND state <> 'waiting'");
       for (const id of ids) {
         const row = old.get(id, cardId) as { chat_id: string | null } | undefined;
-        if (row && restart.run(id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);
+        if (row && restart.run(row.chat_id ? costOf(row.chat_id) : 0, id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);
       }
       const card = this.card(cardId);
       if (card) this.touch(card.nestId);
@@ -557,6 +561,16 @@ export class NestStore {
     }
     return chats;
   }
+  // What a For-each card's runs cost on tries Retry replaced.
+  spentOn(cardId: string): number {
+    return (this.db.prepare("SELECT COALESCE(SUM(spent), 0) AS spent FROM runs WHERE card_id = ?").get(cardId) as { spent: number }).spent;
+  }
+
+  // The line a For-each card's runs took their rows from, null for one sent before that was kept.
+  eachLine(cardId: string): string | null {
+    return (this.db.prepare("SELECT each_line FROM cards WHERE id = ?").get(cardId) as { each_line: string | null } | undefined)?.each_line ?? null;
+  }
+
 
   setRunState(id: string, state: "stopped" | "failed"): boolean {
     return this.db.prepare("UPDATE runs SET state = ? WHERE id = ? AND state = 'waiting'").run(state, id).changes > 0;

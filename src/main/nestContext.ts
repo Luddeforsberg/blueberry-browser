@@ -154,6 +154,8 @@ export const fitInputs = (inputs: readonly RawInput[], room = MAX_CARD_ANSWER_LE
       return { name, text, part: "row", fromFile, rows: 1, columns: input.header.length, cutTo: text.length > share ? share : null };
     }
     const { text, kept } = fitTable(input.table.header, input.table.rows, share);
-    return { name, text, part: input.part, fromFile, rows: kept, columns: input.table.header.length, leftOut: input.table.rows.length - kept };
+    // A header too long for its share is cut like any text, so no input goes past it.
+    const cutTo = text.length > share ? share : null;
+    return { name, text, part: input.part, fromFile, rows: kept, columns: input.table.header.length, leftOut: input.table.rows.length - kept, cutTo };
   });
 };

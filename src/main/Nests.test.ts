@@ -37,6 +37,7 @@ let usage: { input: number; cached: number; output: number } | null;
 const model: StreamReply = async function* (messages, signal, options) {
   sent.push(messages);
   tools = options.tools;
+  if (usage) options.onUsage?.({ ...usage, total: usage.input + usage.output });
   if (asking) {
     if (options.granted) grantChecks.push(options.granted);
     grantedAtStart.push(options.granted?.(asking.key) ?? false);
@@ -51,7 +52,6 @@ const model: StreamReply = async function* (messages, signal, options) {
       signal?.addEventListener("abort", () => resolve());
     });
   }
-  if (usage) options.onUsage?.({ ...usage, total: usage.input + usage.output });
   const reply = replies.shift() ?? "ok";
   if (reply === FAILS) throw new Error("The model broke");
   yield reply;
@@ -640,7 +640,7 @@ describe("Nests", () => {
     const store = new NestStore(":memory:");
     const nest = store.createNest("Nest");
     const card = store.addCard(nest, { x: 0, y: 0 })!;
-    store.startForEach(card.id, "Write", ["Company"], [["One"]], "Result");
+    store.startForEach(card.id, "Write", ["Company"], [["One"]], "Result", "line-1");
 
     new Nests(store, { send: vi.fn(), delete: vi.fn(), thread: vi.fn(), isRunning: vi.fn(), stop: vi.fn() } as never, { resolve: () => BERRY, all: () => [BERRY] }, {
       onBoard: () => {},
@@ -1615,6 +1615,76 @@ describe("Trust and real work in a Nest", () => {
     expect(context.nests.retryRuns(context.writer.id, "unfinished", true)).toEqual({ ok: true });
     await settleAll();
     expect(context.nests.card(context.writer.id)!.each!.runs[0].chatId).not.toBe(only.chatId);
+  });
+
+  it("keeps the line the runs took their rows from, even when another input answers with a table later", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const brief = nests.addCard(nest, { x: 0, y: 0 })!;
+    const scout = nests.addCard(nest, { x: 0, y: 400, mascotId: "scout" })!;
+    replies.push("Our product is a browser.", TABLE(5));
+    await sendAndWait(brief.id, "Describe us");
+    await sendAndWait(scout.id, "Find companies");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: brief.id })!;
+    expect(nests.addInput(writer.id, scout.id)).toEqual({ ok: true });
+    held = [];
+    nests.sendEach(writer.id, "Write");
+    await settle();
+    const waiting = held;
+    held = null;
+    replies.push("| Product | Price |\n|---|---|\n| Browser | 0 |");
+    await sendAndWait(brief.id, "As a table");
+    held = waiting;
+    await release();
+    await release();
+    held = null;
+    const later = sent.slice(-2).map(newest);
+    later.forEach((message) => {
+      expect(message.match(/\| Company \d+ \|/g)).toHaveLength(1);
+      expect(message).toMatch(/^<card_answer from="Scout">/);
+      expect(message).toContain("| Browser | 0 |");
+    });
+  });
+
+  it("doesn't start a run without rows picked on another input once they've gone", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    const brief = nests.addCard(nest, { x: 0, y: 400 })!;
+    replies.push(TABLE(5), "| Product |\n|---|\n| P1 |\n| P2 |");
+    await sendAndWait(scout.id, "Find companies");
+    await sendAndWait(brief.id, "Our products");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    expect(nests.addInput(writer.id, brief.id, { header: ["Product"], rows: [["P1"]] })).toEqual({ ok: true });
+    held = [];
+    nests.sendEach(writer.id, "Write");
+    await settle();
+    const waiting = held;
+    held = null;
+    replies.push("No products any more.");
+    await sendAndWait(brief.id, "Again");
+    held = waiting;
+    await release();
+    held = null;
+    for (let tries = 0; tries < 10; tries++) await settle();
+    expect(nests.card(writer.id)!.each!.runs.map(({ state }) => state)).toEqual(["started", "started", "started", "failed", "failed"]);
+  });
+
+  it("keeps what a run cost before Retry replaced it", async () => {
+    const context = await forEach(1);
+    usage = { input: 10_000, cached: 0, output: 1_000 };
+    held = [];
+    context.nests.sendEach(context.writer.id, "Write");
+    await settle();
+    context.nests.stopCard(context.writer.id);
+    await release();
+    held = null;
+    const cost = () => context.nests.board(context.nest)!.cards.find((card) => card.id === context.writer.id)!.cost;
+    expect(cost()).toBeCloseTo(0.015, 6);
+    expect(context.nests.retryRuns(context.writer.id, "unfinished", false)).toEqual({ ok: true });
+    for (let tries = 0; tries < 10; tries++) await settle();
+    expect(context.nests.card(context.writer.id)!.each!.runs[0].state).toBe("started");
+    expect(cost()).toBeCloseTo(0.03, 6);
   });
 
   it("shows what a card's chats cost, and estimates a For-each card's runs from its own, its source's or a rough guess", async () => {

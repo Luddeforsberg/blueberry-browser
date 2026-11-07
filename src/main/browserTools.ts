@@ -524,13 +524,23 @@ export const createPageTools = <T extends PageTarget>({
   };
   // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
   // or the tab taken over while it flew, and an action must not follow that.
+  // The element must still be what it was before the flight, since what was allowed, or allowed for a card's runs, was
+  // that element.
   const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
     const actor = actorOn(tab);
     if (!actor) return true;
+    const before = identity(await describeRef(tab, ref).catch(() => null));
     const found = await spotOfRef(tab, actor, ref);
     if (found) await actor.goTo(found.spot, words(found.name), kind, found.ref);
-    return carryOn(tab);
+    if (!carryOn(tab)) return false;
+    if (identity(await describeRef(tab, ref).catch(() => null)) === before) return true;
+    changedInFlight.add(tab.id);
+    return false;
   };
+  const identity = (info: ElementInfo | null) =>
+    JSON.stringify(info && [info.role, info.name, info.target, info.secret ?? false, info.frameUrl, info.frameOrigin ?? null, info.safeToType, info.riskyClick]);
+  // Tabs where the element changed while the bird flew, so the action stopped.
+  const changedInFlight = new Set<string>();
   // While the card waits, it stands on what the card is about, then and whenever the user comes to look. Nothing waits
   // for this, so the card goes out as it always did.
   const standOnRef = ({ tabId: id, ref }: { tabId?: string; ref: string }) => {
@@ -540,7 +550,11 @@ export const createPageTools = <T extends PageTarget>({
   };
   const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
-  const leftOff = (tab: T) => tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
+  const CHANGED_IN_FLIGHT = "What's there changed before the action happened, so it didn't. Look at the page again.";
+  const leftOff = (tab: T) => {
+    if (changedInFlight.delete(tab.id)) return CHANGED_IN_FLIGHT;
+    return tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
+  };
 
   // Fields the user has stepped in on in this reply, which it doesn't type in again.
   const usersFields = new Set<string>();

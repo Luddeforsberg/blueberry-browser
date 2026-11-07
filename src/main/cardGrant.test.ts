@@ -30,6 +30,8 @@ describe("the key Allow for this card's runs matches on", () => {
     expect(clickGrant("click", PAGE, { ...SAVE, name: "  " })).toBeNull();
     expect(clickGrant("click", PAGE, { ...SAVE, name: "unnamed" })).toBeNull();
     expect(clickGrant("click", PAGE, { ...SAVE, name: "x".repeat(201) })).toBeNull();
+    // Clipped by the page script, so another name that starts the same way would look the same.
+    expect(clickGrant("click", PAGE, { ...SAVE, name: `Send the contract to ${"x".repeat(55)}…` })).toBeNull();
     expect(clickGrant("click", "file:///Users/me/a.html", SAVE)).toBeNull();
     expect(clickGrant("click", "https://me:secret@mail.example.com/", SAVE)).toBeNull();
     expect(clickGrant("click", PAGE, null)).toBeNull();
