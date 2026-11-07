@@ -18,10 +18,10 @@ describe("NestStore", () => {
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20 },
-        { id: writer.id, chatId: null, mascotId: null, x: 420.5, y: 32 },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, each: null },
+        { id: writer.id, chatId: null, mascotId: null, x: 420.5, y: 32, each: null },
       ],
-      lines: [{ id: expect.any(String), from: scout.id, to: writer.id }],
+      lines: [{ id: expect.any(String), from: scout.id, to: writer.id, picked: null }],
     });
   });
 
@@ -91,5 +91,49 @@ describe("NestStore", () => {
     store.renameNest(older, "Renamed");
 
     expect(store.nests().map(({ title }) => title)).toEqual(["Renamed", "Newer"]);
+  });
+
+  it("keeps the rows picked for a line as they were", () => {
+    const store = new NestStore(":memory:");
+    const nest = store.createNest("Nest");
+    const source = store.addCard(nest, { x: 0, y: 0 })!;
+    const picked = { header: ["Company"], rows: [["Fjällbo"], ["Brygga"]] };
+    const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
+
+    expect(store.lineTo(next.id)).toEqual({ source: expect.objectContaining({ id: source.id }), picked });
+    expect(store.board(nest)?.lines[0].picked).toEqual(picked);
+  });
+
+  it("makes a draft a For-each card once, with a waiting run for each row, and starts each run only once", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Nest");
+    const card = store.addCard(nest, { x: 0, y: 0 })!;
+
+    expect(store.startForEach(card.id, "Write to each", ["Company"], [["Fjällbo"], ["Brygga"]])).toBe(true);
+    expect(store.startForEach(card.id, "Again", ["Company"], [["Kvarnsten"]])).toBe(false);
+    expect(store.setChat(card.id, "chat-1")).toBe(false);
+    expect(store.setBird(card.id, "scout")).toBe(false);
+    const [first, second] = store.waitingRuns();
+    expect(store.setRunChat(first.id, "run-chat-1")).toBe(true);
+    expect(store.setRunChat(first.id, "run-chat-2")).toBe(false);
+    expect(store.stopWaiting(card.id)).toBe(1);
+    expect(store.setRunChat(second.id, "run-chat-3")).toBe(false);
+
+    expect(new NestStore(file).card(card.id)?.each).toEqual({
+      prompt: "Write to each",
+      header: ["Company"],
+      runs: [
+        { id: first.id, row: ["Fjällbo"], chatId: "run-chat-1", state: "started" },
+        { id: second.id, row: ["Brygga"], chatId: null, state: "stopped" },
+      ],
+    });
+    expect(store.runOfChat("run-chat-1")?.cardId).toBe(card.id);
+    expect(store.startedRunChats()).toEqual(["run-chat-1"]);
+    expect(store.chatIds(nest)).toEqual(["run-chat-1"]);
+
+    expect(store.deleteCard(card.id)).toBe(true);
+    expect(store.run(first.id)).toBeNull();
+    expect(store.chatIds()).toEqual([]);
   });
 });

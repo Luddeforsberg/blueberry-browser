@@ -17,8 +17,9 @@ import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
-import { CardView, draftText, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions } from '../components/NestCard'
-import { besideSpot, CARD_HEIGHT, CARD_WIDTH, freeSpot, workingLine, type Rect } from '../nestBoard'
+import type { PickedRows } from '@shared/nestTable'
+import { CardView, draftText, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
+import { besideSpot, CARD_HEIGHT, CARD_WIDTH, freeSpot, pickRows, workingLine, type Rect } from '../nestBoard'
 
 const NODE_TYPES = { card: CardView }
 const EDGE_TYPES = { line: LineView }
@@ -45,6 +46,12 @@ const toNodes = (board: NestBoard, openId: string | null, previous: CardNode[]):
         }
     })
 
+// The selected rows, in the table's order, as a line out of their card takes them.
+const pickedOf = (selection: RowSelection | null, cardId: string): PickedRows | undefined =>
+    selection?.cardId === cardId && selection.rows.length > 0
+        ? { header: selection.table.header, rows: selection.rows.map((index) => selection.table.rows[index]) }
+        : undefined
+
 const toEdges = (board: NestBoard): LineEdge[] =>
     board.lines.map((line) => ({
         id: line.id,
@@ -54,7 +61,7 @@ const toEdges = (board: NestBoard): LineEdge[] =>
         targetHandle: 'in',
         type: 'line',
         focusable: false,
-        data: { draft: !board.cards.find((card) => card.id === line.to)?.chatId }
+        data: { draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each)) }
     }))
 
 // The Nest's name, which reads as a title until it's pressed, and then renames it.
@@ -92,6 +99,9 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const chosenName = useAssistantName(chosen)
     const [openId, setOpenId] = useState<string | null>(null)
     const [focusId, setFocusId] = useState<string | null>(null)
+    const [selection, setSelection] = useState<RowSelection | null>(null)
+    // Set when a press away from the rows cleared them, so the click that follows on the board doesn't also make a card.
+    const clearedByPress = useRef(false)
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, []))
     const edges = useMemo(() => toEdges(board), [board])
     const [prompt, setPrompt] = useState('')
@@ -128,8 +138,29 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [flow]
     )
 
+    // Esc, or a press anywhere but the rows and what pulls a line out of them, lets the selection go.
+    useEffect(() => {
+        if (!selection) return undefined
+        const clear = (event: Event) => {
+            if (event instanceof KeyboardEvent) {
+                if (event.key !== 'Escape') return
+            } else {
+                const target = event.target as Element | null
+                if (target?.closest?.('[data-keep-selection]')) return
+                if (target?.closest?.('.react-flow__pane')) clearedByPress.current = true
+            }
+            setSelection(null)
+        }
+        window.addEventListener('pointerdown', clear, true)
+        window.addEventListener('keydown', clear)
+        return () => {
+            window.removeEventListener('pointerdown', clear, true)
+            window.removeEventListener('keydown', clear)
+        }
+    }, [selection])
+
     const add = useCallback(
-        async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string } = {}) => {
+        async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string; picked?: PickedRows } = {}) => {
             const card = await api.addCard(board.id, { ...spot, ...extra })
             if (card) {
                 setFocusId(card.id)
@@ -142,7 +173,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
 
     // Empty drafts go when the user starts something else, so the board never fills with them.
     const dropEmptyDrafts = useCallback(() => {
-        board.cards.filter((card) => !card.chatId && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
+        board.cards.filter((card) => !card.chatId && !card.each && !draftText(card.id).trim()).forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
     const actions = useMemo<NestBoardActions>(
@@ -154,19 +185,29 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 const line = board.lines.find(({ to }) => to === cardId)
                 return (line && board.cards.find((card) => card.id === line.from)) || null
             },
+            lineInto: (cardId) => board.lines.find(({ to }) => to === cardId) ?? null,
             pullOut: (cardId) => {
                 const source = flow.getNode(cardId)
                 if (!source) return
                 dropEmptyDrafts()
-                void add(besideSpot(rectOf(source), rects()), { from: cardId })
+                const picked = pickedOf(selection, cardId)
+                setSelection(null)
+                void add(besideSpot(rectOf(source), rects()), { from: cardId, picked })
             },
             remove: (cardId) => {
                 setDraftText(cardId, '')
                 if (openId === cardId) setOpenId(null)
                 void api.deleteCard(cardId)
+            },
+            selection,
+            clearSelection: () => setSelection(null),
+            pick: (cardId, text, table, index, mode) => {
+                const same = selection?.cardId === cardId && selection.text === text
+                const next = pickRows(same ? selection.rows : [], same ? selection.anchor : null, index, mode)
+                setSelection(next.rows.length > 0 ? { cardId, text, table, ...next } : null)
             }
         }),
-        [openId, focusId, board, rects, flow, add, api, dropEmptyDrafts]
+        [openId, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection]
     )
 
     // A line pulled out to an empty spot leaves a new card there. A click on the handle never gets here: it's under the
@@ -179,14 +220,20 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             const point = 'changedTouches' in event ? event.changedTouches[0] : event
             const at = flow.screenToFlowPosition({ x: point.clientX, y: point.clientY })
             dropEmptyDrafts()
-            void add({ x: at.x, y: at.y - DROP_ABOVE }, { from })
+            const picked = pickedOf(selection, from)
+            setSelection(null)
+            void add({ x: at.x, y: at.y - DROP_ABOVE }, { from, picked })
         },
-        [flow, add, dropEmptyDrafts]
+        [flow, add, dropEmptyDrafts, selection]
     )
 
     const paneClick = useCallback(
         (event: React.MouseEvent) => {
-            // A click away from an open card only closes it.
+            // A click away from an open card or selected rows only closes or clears them.
+            if (clearedByPress.current) {
+                clearedByPress.current = false
+                return
+            }
             if (openId) return setOpenId(null)
             const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
             dropEmptyDrafts()

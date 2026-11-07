@@ -1,6 +1,8 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
 // All of it is saved locally.
 
+import type { PickedRows } from "./nestTable";
+
 export interface Bookmark {
   id: string;
   title: string;
@@ -422,19 +424,39 @@ export interface NestSummary {
 
 export interface NestCard {
   id: string;
-  // Null while it's a draft, which nothing has been sent from yet.
+  // Null while it's a draft, which nothing has been sent from yet, and on a For-each card, whose runs have chats instead.
   chatId: string | null;
   // Who a draft will run as, null for Berry. A sent card is its chat's, which keeps its own.
   mascotId: string | null;
   x: number;
   y: number;
+  // Set once it was sent with For each row on.
+  each: NestForEach | null;
 }
 
-// The card `to` gets the latest answer on `from` each time it sends.
+// A card sent with For each row: the same prompt, run once for each row, each run its own chat.
+export interface NestForEach {
+  prompt: string;
+  header: string[];
+  runs: NestRun[];
+}
+
+// Waiting for its turn, started (its chat says how it's going), stopped before it started, or couldn't start.
+export type NestRunState = "waiting" | "started" | "stopped" | "failed";
+
+export interface NestRun {
+  id: string;
+  row: string[];
+  chatId: string | null;
+  state: NestRunState;
+}
+
+// The card `to` gets the latest answer on `from` each time it sends, or only `picked`, the rows the user selected.
 export interface NestLine {
   id: string;
   from: string;
   to: string;
+  picked: PickedRows | null;
 }
 
 export interface NestBoard {

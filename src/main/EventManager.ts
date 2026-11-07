@@ -187,8 +187,13 @@ export class EventManager {
     // A card's chat opened as a chat tab still sends through its card, so it gets its source card's answer as it would there.
     this.handle("chat:send", (chatId, text, options) => {
       if (typeof text !== "string") return null;
-      const card = typeof chatId === "string" ? this.mainWindow.nests.cardOfChat(chatId) : null;
-      return card ? this.mainWindow.nests.send(card.id, text) : this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true });
+      const nests = this.mainWindow.nests;
+      const card = typeof chatId === "string" ? nests.cardOfChat(chatId) : null;
+      if (card) return nests.send(card.id, text);
+      // A run of For each row gets its row again the same way.
+      const run = typeof chatId === "string" ? nests.runOfChat(chatId) : null;
+      if (run) return nests.sendRun(run.id, text);
+      return this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true });
     });
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
@@ -220,6 +225,9 @@ export class EventManager {
     this.handle("nests:set-bird", (cardId, mascotId) => nests.setBird(cardId, mascotId));
     this.handle("nests:delete-card", (cardId) => this.mainWindow.confirmDeleteCard(cardId));
     this.handle("nests:send", (cardId, text) => nests.send(cardId, text));
+    this.handle("nests:send-each", (cardId, text) => nests.sendEach(cardId, text));
+    this.handle("nests:send-run", (runId, text) => nests.sendRun(runId, text));
+    this.handle("nests:stop-card", (cardId) => nests.stopCard(cardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

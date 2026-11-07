@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, freeSpot, workingLine } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, forEachStatus, freeSpot, pickRows, runPhase, workingLine } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -49,5 +49,43 @@ describe('workingLine', () => {
         expect(workingLine(['Scout'])).toBe('Scout is working')
         expect(workingLine(['Scout', 'Writer'])).toBe('Scout and Writer are working')
         expect(workingLine(['Scout', 'Writer', 'Berry'])).toBe('Scout, Writer and Berry are working')
+    })
+})
+
+describe('pickRows', () => {
+    it('picks one row with a plain click, and none when that row was the only one', () => {
+        expect(pickRows([2, 3], 2, 4, 'one')).toEqual({ rows: [4], anchor: 4 })
+        expect(pickRows([4], 4, 4, 'one')).toEqual({ rows: [], anchor: 4 })
+    })
+
+    it('adds or takes away one row with Cmd', () => {
+        expect(pickRows([0, 4], 4, 2, 'toggle')).toEqual({ rows: [0, 2, 4], anchor: 2 })
+        expect(pickRows([0, 2, 4], 2, 4, 'toggle')).toEqual({ rows: [0, 2], anchor: 4 })
+    })
+
+    it('picks every row from the last one clicked with Shift, either way, and just the one with nothing clicked yet', () => {
+        expect(pickRows([1], 1, 3, 'range')).toEqual({ rows: [1, 2, 3], anchor: 1 })
+        expect(pickRows([3], 3, 0, 'range')).toEqual({ rows: [0, 1, 2, 3], anchor: 3 })
+        expect(pickRows([], null, 2, 'range')).toEqual({ rows: [2], anchor: 2 })
+    })
+})
+
+describe('For each row status', () => {
+    const answered = { partial: null, approval: null, error: null, messages: [{ role: 'user' as const, content: 'Go' }, { role: 'assistant' as const, content: 'Hej' }] }
+
+    it('reads each run from its state and its chat', () => {
+        expect(runPhase({ state: 'waiting' }, undefined)).toBe('waiting')
+        expect(runPhase({ state: 'stopped' }, undefined)).toBe('not-started')
+        expect(runPhase({ state: 'started' }, undefined)).toBe('working')
+        expect(runPhase({ state: 'started' }, { ...answered, partial: '' })).toBe('working')
+        expect(runPhase({ state: 'started' }, answered)).toBe('done')
+        expect(runPhase({ state: 'started' }, { ...answered, error: 'No key' })).toBe('failed')
+    })
+
+    it('counts the runs that have ended while any is going, then says how they went', () => {
+        expect(forEachStatus(['done', 'working', 'waiting', 'failed'])).toEqual({ text: '2 of 4', tone: 'working' })
+        expect(forEachStatus(['done', 'done'])).toEqual({ text: 'Done', tone: 'done' })
+        expect(forEachStatus(['done', 'failed'])).toEqual({ text: '1 didn’t finish', tone: 'failed' })
+        expect(forEachStatus(['done', 'not-started'])).toEqual({ text: 'Stopped', tone: 'muted' })
     })
 })

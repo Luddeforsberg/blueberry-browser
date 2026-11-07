@@ -34,7 +34,9 @@ export const Composer: React.FC<{
     onChooseMascot?: (id: string) => void
     // Whether this job is done in the cloud, where that's set up. It's an item in the + menu, and a mark on Send while on.
     cloud?: { on: boolean; onToggle: () => void }
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud }) => {
+    // Options for how it's sent, on a line of their own under the text, with the buttons at its end.
+    footer?: React.ReactNode
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
@@ -99,7 +101,7 @@ export const Composer: React.FC<{
                 </div>
             )}
             {attachment && <div className="mb-1 cursor-default">{attachment}</div>}
-            <div className="flex items-end gap-1">
+            <div className={footer ? "flex flex-col" : "flex items-end gap-1"}>
                 <textarea
                     ref={textareaRef}
                     aria-label={label}
@@ -112,74 +114,87 @@ export const Composer: React.FC<{
                     onKeyDown={onKeyDown}
                     className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
                 />
-                {mascot && (
-                    <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
-                )}
-                {!noAdd && (onAdd || menu) && (
-                    <div ref={menuRef} className="relative">
-                        <button
-                            ref={addRef}
-                            type="button"
-                            aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
-                            title={menu ? undefined : addLabel}
-                            aria-haspopup={menu ? 'menu' : undefined}
-                            aria-expanded={menu ? menuOpen : undefined}
-                            onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
-                            className={cn(
-                                "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
-                                "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                                menuOpen && "bg-muted"
+                <FooterRow footer={footer}>
+                    {mascot && (
+                        <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
+                    )}
+                    {!noAdd && (onAdd || menu) && (
+                        <div ref={menuRef} className="relative">
+                            <button
+                                ref={addRef}
+                                type="button"
+                                aria-label={menu ? 'More options' : (addLabel ?? 'Add to chat')}
+                                title={menu ? undefined : addLabel}
+                                aria-haspopup={menu ? 'menu' : undefined}
+                                aria-expanded={menu ? menuOpen : undefined}
+                                onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
+                                className={cn(
+                                    "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
+                                    "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                                    menuOpen && "bg-muted"
+                                )}
+                            >
+                                <Plus className="size-5" />
+                            </button>
+                            {menu && menuOpen && (
+                                <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default">
+                                    <button
+                                        type="button"
+                                        role="menuitemcheckbox"
+                                        aria-checked={menu.on}
+                                        autoFocus
+                                        onClick={() => {
+                                            menu.onToggle()
+                                            setMenuOpen(false)
+                                            textareaRef.current?.focus()
+                                        }}
+                                        className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+                                    >
+                                        <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                                        <span className="flex-1">Do this in the cloud</span>
+                                        {menu.on && <Check className="size-4 shrink-0 text-accent-ink" />}
+                                    </button>
+                                </div>
                             )}
-                        >
-                            <Plus className="size-5" />
-                        </button>
-                        {menu && menuOpen && (
-                            <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default">
-                                <button
-                                    type="button"
-                                    role="menuitemcheckbox"
-                                    aria-checked={menu.on}
-                                    autoFocus
-                                    onClick={() => {
-                                        menu.onToggle()
-                                        setMenuOpen(false)
-                                        textareaRef.current?.focus()
-                                    }}
-                                    className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
-                                >
-                                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
-                                    <span className="flex-1">Do this in the cloud</span>
-                                    {menu.on && <Check className="size-4 shrink-0 text-accent-ink" />}
-                                </button>
-                            </div>
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        aria-label={onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'}
+                        title={!onStop && cloud?.on ? 'Done in the cloud' : undefined}
+                        onClick={onStop ?? onSend}
+                        disabled={!onStop && !canSend}
+                        className={cn(
+                            bare ? "size-8 mb-0.5 disabled:opacity-40" : "size-9",
+                            "relative shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
+                            "bg-primary text-primary-foreground hover:brightness-110",
+                            "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
+                            "disabled:hover:brightness-100"
                         )}
-                    </div>
-                )}
-                <button
-                    type="button"
-                    aria-label={onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'}
-                    title={!onStop && cloud?.on ? 'Done in the cloud' : undefined}
-                    onClick={onStop ?? onSend}
-                    disabled={!onStop && !canSend}
-                    className={cn(
-                        bare ? "size-8 mb-0.5 disabled:opacity-40" : "size-9",
-                        "relative shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
-                        "bg-primary text-primary-foreground hover:brightness-110",
-                        "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
-                        "disabled:hover:brightness-100"
-                    )}
-                >
-                    {onStop ? <Square className="size-3.5" fill="currentColor" /> : <ArrowUp className="size-[18px]" />}
-                    {!onStop && cloud?.on && (
-                        <span aria-hidden className="absolute -top-1 -right-1 size-[18px] rounded-full bg-surface border flex items-center justify-center text-accent-ink">
-                            <Cloud className="size-3" strokeWidth={2.5} />
-                        </span>
-                    )}
-                </button>
+                    >
+                        {onStop ? <Square className="size-3.5" fill="currentColor" /> : <ArrowUp className="size-[18px]" />}
+                        {!onStop && cloud?.on && (
+                            <span aria-hidden className="absolute -top-1 -right-1 size-[18px] rounded-full bg-surface border flex items-center justify-center text-accent-ink">
+                                <Cloud className="size-3" strokeWidth={2.5} />
+                            </span>
+                        )}
+                    </button>
+                </FooterRow>
             </div>
         </div>
     )
 }
+
+// The buttons sit beside the text, or at the end of the footer's line when there is one.
+const FooterRow: React.FC<{ footer: React.ReactNode; children: React.ReactNode }> = ({ footer, children }) =>
+    footer ? (
+        <div className="mt-1 flex items-center gap-1">
+            <div className="flex-1 min-w-0 flex items-center gap-2">{footer}</div>
+            {children}
+        </div>
+    ) : (
+        <>{children}</>
+    )
 
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
