@@ -607,64 +607,59 @@ describe("the fetch_page tool", () => {
   });
 });
 
-describe("an action allowed for a card's runs", () => {
-  // A page whose one element can change at any moment, with no bird drawn, and every input and typed piece written down.
-  const page = (change: { at: "start" | "mouseMove" | "focus" }, start: { role: string; name: string }, then: { role?: string; name?: string; secret?: boolean }) => {
-    let changed = change.at === "start";
+describe("a click allowed for a card's runs", () => {
+  // A page whose one element can change at any moment, with no bird drawn, and every input written down. `lands` is what
+  // the page says about the press: landed, or nothing, as when something else took it.
+  const page = (change: "start" | "mouseMove" | null, then: { name?: string }, lands = true) => {
+    let changed = change === "start";
     const inputs: string[] = [];
-    const typed: string[] = [];
+    const scripts: string[] = [];
     const runInPage = vi.fn(async (script: string) => {
+      scripts.push(script);
       if (script.includes("safeToType: safeToType(el)")) {
-        return { role: start.role, name: start.name, target: null, riskyClick: true, safeToType: false, secret: false, frameUrl: null, ...(changed ? then : {}) };
+        return { role: "button", name: "Save draft", target: null, riskyClick: true, safeToType: false, secret: false, frameUrl: null, ...(changed ? then : {}) };
       }
-      if (script.includes('return "ready"')) {
-        if (change.at === "focus") changed = true;
-        return "ready";
-      }
-      if (script.includes("activeElement !== el")) {
-        typed.push(script);
-        return true;
-      }
+      if (inputs.includes("mouseDown")) return lands ? true : false;
       return { status: "aimed", x: 10, y: 10 };
     });
     const sendAgentInput = vi.fn(async (event: { type: string }) => {
       inputs.push(event.type);
-      if (event.type === "mouseMove" && change.at === "mouseMove") changed = true;
+      if (event.type === "mouseMove" && change === "mouseMove") changed = true;
     });
     const tab = { id: "tab-1", url: "https://mail.example/compose", zoomFactor: 1, foreignFrames: [], frames: [], runInPage, sendAgentInput, actor: null } as unknown as Tab;
     const tools = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} });
-    return { tools, inputs, typed };
+    const click = tools.find((tool) => tool.name === "click")!;
+    return { tools, click, inputs, scripts };
   };
-  const SAVE = { role: "button", name: "Save draft" };
-  const SUBJECT = { role: "textbox", name: "Subject" };
-  const keyOf = async (tools: ReturnType<typeof page>["tools"], name: string, args: object) => (await tools.find((tool) => tool.name === name)!.grantKey!(args))!.key;
+  const SAVE_KEY = async () => (await page(null, {}).click.grantKey!({ ref: "e1" }))!.key;
 
-  it("holds the call to the key that matched, so an element renamed before the run starts isn't pressed", async () => {
-    const before = page({ at: "mouseMove" }, SAVE, {});
-    const granted = await keyOf(before.tools, "click", { ref: "e1" });
-    const { tools, inputs } = page({ at: "start" }, SAVE, { name: "Send" });
-    expect(await tools.find((tool) => tool.name === "click")!.run({ ref: "e1" }, granted)).toMatch(/changed from what the user allowed/);
+  it("is held to the key that matched, so an element renamed before the run starts isn't pressed", async () => {
+    const { click, inputs } = page("start", { name: "Send" });
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/changed from what the user allowed/);
     expect(inputs).toEqual([]);
   });
 
   it("checks again after the pointer moves, just before the press", async () => {
-    const { tools, inputs } = page({ at: "mouseMove" }, SAVE, { name: "Send" });
-    const granted = await keyOf(page({ at: "start" }, SAVE, {}).tools, "click", { ref: "e1" });
-    expect(await tools.find((tool) => tool.name === "click")!.run({ ref: "e1" }, granted)).toMatch(/changed from what the user allowed/);
+    const { click, inputs } = page("mouseMove", { name: "Send" });
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/changed from what the user allowed/);
     expect(inputs).toContain("mouseMove");
     expect(inputs).not.toContain("mouseDown");
   });
 
-  it("types a piece at a time, checking the field before each, so a field that turns secret as it's focused gets nothing", async () => {
-    const { tools, typed } = page({ at: "focus" }, SUBJECT, { secret: true });
-    const granted = await keyOf(page({ at: "start" }, SUBJECT, {}).tools, "type_text", { ref: "e1", text: "Hello there" });
-    expect(await tools.find((tool) => tool.name === "type_text")!.run({ ref: "e1", text: "Hello there" }, granted)).toMatch(/changed from what the user allowed/);
-    expect(typed).toEqual([]);
+  it("never falls back on a scripted click when the press doesn't land", async () => {
+    const { click, scripts } = page(null, {}, false);
+    expect(await click.run({ ref: "e1" }, await SAVE_KEY())).toMatch(/didn't reach it as a real press/);
+    expect(scripts.some((script) => script.includes(".click()") || script.includes("MouseEvent"))).toBe(false);
   });
 
   it("acts as before when nothing was granted, even if the element changes", async () => {
-    const { tools, inputs } = page({ at: "mouseMove" }, SAVE, { name: "Send" });
-    await tools.find((tool) => tool.name === "click")!.run({ ref: "e1" });
+    const { click, inputs } = page("mouseMove", { name: "Send" });
+    await click.run({ ref: "e1" });
     expect(inputs).toContain("mouseDown");
+  });
+
+  it("is the only element action with a key: double-click, typing and every other tool always ask", () => {
+    const { tools } = page(null, {});
+    expect(tools.filter((tool) => tool.grantKey).map((tool) => tool.name).sort()).toEqual(["click", "go_to", "open_tab"]);
   });
 });

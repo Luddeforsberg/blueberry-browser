@@ -1,15 +1,13 @@
 // Allow for this card's runs: what the user allowed once on one run of a For-each card, which the card's other runs may
 // then do without asking. It's pure and plain Node, so the matching can be tested without a page or a model.
 //
-// The key is exactly what the approval card named, and nothing broader:
-// - click and double_click: the tool, the page's origin, the element's role and its name as the card showed them, and
-//   where it goes for a link or a form's button. Clicking “Save draft” never covers clicking “Send”, another site, or a
-//   double-click.
-// - type_text: the tool, the page's origin, the field's role and name, where its form goes, and whether it presses Enter
-//   after. What's typed may differ from row to row.
+// The key is exactly what the approval card named, and nothing broader, and only two kinds of action ever get one:
+// - click, a single click sent as real input: the page's origin, the element's role and its name as the card showed
+//   them, and where it goes for a link or a form's button. Clicking “Save draft” never covers clicking “Send”, another
+//   site or another kind of element.
 // - open_tab and go_to: the tool and the whole address, since the address is what goes out to the site.
-// Nothing else ever gets a key: no secret field, nothing in a frame, no element without a name or with a clipped one, no
-// field named by what's typed in it, and no other tool, so those always ask.
+// Nothing else ever gets a key: no double-click, no typing, no other tool, no secret field, nothing in a frame, no
+// element without a name or with a clipped one, so those always ask.
 
 export interface GrantKey {
   key: string;
@@ -24,7 +22,6 @@ export interface GrantElement {
   name: string;
   target: string | null;
   secret?: boolean;
-  namedByContent?: boolean;
   frameUrl: string | null;
   frameOrigin?: string;
 }
@@ -46,29 +43,17 @@ const named = (element: GrantElement): string | null => {
   const name = element.name.replace(/\s+/g, " ").trim();
   // The page script clips a long name with "…", and two names clipped alike would share a key.
   if (!name || name === "unnamed" || name.length > MAX_NAME_LENGTH || name.endsWith("…")) return null;
-  if (element.secret || element.namedByContent || element.frameUrl || element.frameOrigin) return null;
+  if (element.secret || element.frameUrl || element.frameOrigin) return null;
   return name;
 };
 
-const VERBS: Record<"click" | "double_click", string> = { click: "clicking", double_click: "double-clicking" };
-
-export const clickGrant = (tool: "click" | "double_click", pageUrl: string, element: GrantElement | null): GrantKey | null => {
+export const clickGrant = (pageUrl: string, element: GrantElement | null): GrantKey | null => {
   const page = webOrigin(pageUrl);
   const name = element && named(element);
   if (!page || !element || !name) return null;
   return {
-    key: JSON.stringify([tool, page.origin, element.role, name, element.target ?? ""]),
-    words: `${VERBS[tool]} the ${element.role} “${name}” on ${page.host}`,
-  };
-};
-
-export const typeGrant = (pageUrl: string, element: GrantElement | null, submit: boolean): GrantKey | null => {
-  const page = webOrigin(pageUrl);
-  const name = element && named(element);
-  if (!page || !element || !name) return null;
-  return {
-    key: JSON.stringify(["type_text", page.origin, element.role, name, element.target ?? "", submit]),
-    words: `typing into the ${element.role} “${name}”${submit ? " and submitting it" : ""} on ${page.host}`,
+    key: JSON.stringify(["click", page.origin, element.role, name, element.target ?? ""]),
+    words: `clicking the ${element.role} “${name}” on ${page.host}`,
   };
 };
 
