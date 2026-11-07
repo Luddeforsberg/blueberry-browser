@@ -731,7 +731,7 @@ export class Nests {
 
   // A card's table as it is now: a file's rows, a For-each card's rows with its column, or the table in a sent card's
   // latest answer, the one it shows. Null when it has none.
-  tableOf(card: NestCard): PickedRows | null {
+  private tableOf(card: NestCard): PickedRows | null {
     if (card.table) return { header: card.table.header, rows: card.table.rows };
     if (card.each) return combinedTable(card.each);
     const answer = card.chatId ? this.answerOf(card.chatId) : null;
