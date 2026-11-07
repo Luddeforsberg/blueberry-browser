@@ -11,7 +11,8 @@ const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN each_column; ALTER TABLE cards DROP COLUMN each_column_settled; ALTER TABLE runs DROP COLUMN cell; " +
   "ALTER TABLE cards DROP COLUMN table_name; ALTER TABLE cards DROP COLUMN table_header; ALTER TABLE cards DROP COLUMN table_count; " +
   "ALTER TABLE cards DROP COLUMN table_preview; ALTER TABLE cards DROP COLUMN table_rows; " +
-  "ALTER TABLE cards DROP COLUMN each_line; ALTER TABLE runs DROP COLUMN spent;";
+  "ALTER TABLE cards DROP COLUMN each_line; ALTER TABLE runs DROP COLUMN spent; " +
+  "ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height;";
 
 describe("NestStore", () => {
   it("keeps a nest's cards, their places and the lines between them across opening the file again", () => {
@@ -109,6 +110,24 @@ describe("NestStore", () => {
     const again = new NestStore(file);
     expect(again.titleSettled(old)).toBe(false);
     expect(again.titleSettled(mine)).toBe(true);
+  });
+
+  it("keeps the size a card was made, and gives a card from before sizes none", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Leads");
+    const card = store.addCard(nest, { x: 0, y: 0 })!;
+    // As a file from before sizes has it.
+    const db = new DatabaseSync(file);
+    const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+    db.exec(`PRAGMA user_version = ${version - 1}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height;`);
+    db.close();
+
+    const again = new NestStore(file);
+    expect(again.card(card.id)).not.toHaveProperty("size");
+    expect(again.resizeCard(card.id, 640, 520)).toBe(true);
+    expect(again.resizeCard("missing", 640, 520)).toBe(false);
+    expect(new NestStore(file).board(nest)!.cards[0].size).toEqual({ width: 640, height: 520 });
   });
 
   it("nudges only cards placed for the user, in their own nest, until the user moves one by hand", () => {

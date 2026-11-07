@@ -127,14 +127,24 @@ const TABLE = {
 
 describe("exporting a table", () => {
   it("writes a cell's link as its words and address, and drops emphasis", () => {
-    expect(exportCell("[Brygga](https://brygga.se)")).toBe("Brygga (https://brygga.se)");
+    expect(exportCell("[Brygga](https://brygga.se)")).toBe("Brygga (https://brygga.se/)");
     expect(exportCell("[https://brygga.se](https://brygga.se)")).toBe("https://brygga.se");
     expect(exportCell("**Hot** lead")).toBe("Hot lead");
+    expect(exportCell("**[Strawberry Browser](https://strawberrybrowser.com/a_b)**")).toBe("Strawberry Browser (https://strawberrybrowser.com/a_b)");
+    expect(exportCell("[**Arc** Search](https://arc.net/)")).toBe("Arc Search (https://arc.net/)");
+    expect(exportCell("_B2B_ teams, `$20` a seat<br>and more")).toBe("B2B teams, $20 a seat\nand more");
+  });
+
+  it("copies bold links as plain words, with no marks, in TSV and HTML", () => {
+    const table = { header: ["**Name**", "Who it sells to"], rows: [["**[Comet](https://comet.ai)**", "*Knowledge* workers"]] };
+    expect(toTsv(table)).toBe("Name\tWho it sells to\nComet (https://comet.ai/)\tKnowledge workers");
+    expect(toHtmlTable(table)).toContain('<td><a href="https://comet.ai/">Comet</a></td><td>Knowledge workers</td>');
+    expect(toHtmlTable(table)).not.toContain("*");
   });
 
   it("writes CSV with a byte order mark and CRLF, quoting commas, quotes and line breaks, and keeps a formula as text", () => {
     expect(toCsv(TABLE)).toBe(
-      '\uFEFFCompany,Note\r\n"Fjällbo, AB","Said ""hej""\ntwice"\r\nBrygga (https://brygga.se),Hot lead\r\n"\'=HYPERLINK(""https://evil.example"")",-5\r\n'
+      '\uFEFFCompany,Note\r\n"Fjällbo, AB","Said ""hej""\ntwice"\r\nBrygga (https://brygga.se/),Hot lead\r\n"\'=HYPERLINK(""https://evil.example"")",-5\r\n'
     );
   });
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { BaseEdge, getBezierPath, Handle, Position, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
+import { BaseEdge, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import { ArrowLeft, GitFork, GitMerge, Maximize2, Minimize2, Table2, X } from 'lucide-react'
 import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
 import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
@@ -13,14 +13,14 @@ import { Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { useChatThread, useChatThreads } from '../contexts/ChatContext'
 import { useFlock } from '../contexts/LibraryContext'
-import { cardStatus, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunPhase } from '../nestBoard'
+import { cardStatus, CARD_SIZE, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunPhase } from '../nestBoard'
 import { Berry, useAssistantName } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_QUIET, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
 import { AddMenu, ChatComposer, Composer } from './Composer'
 import { Attachments, useAttaching } from './NestAttachments'
 import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
-import { CellText, TableMenu, TableResult, type PickMode, type WorkingRows } from './NestTable'
+import { CARD_PROSE, CellText, TableMenu, TableResult, useCut, type PickMode, type WorkingRows } from './NestTable'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 export type LineEdge = Edge<{ draft: boolean }, 'line'>
@@ -61,6 +61,9 @@ export interface NestBoardActions {
     away: (cardId: string) => boolean
     // Berry is changing the plan, so its planned cards are about to be replaced.
     replanning: boolean
+    // The user is making a card bigger or smaller from its corner, and where they left it, which is saved.
+    resizeStart: (cardId: string) => void
+    resizeEnd: (cardId: string, size: { width: number; height: number }) => void
     // Threads to show instead of loading them, for the component gallery.
     samples?: Readonly<Record<string, ChatThread>>
 }
@@ -192,6 +195,39 @@ const pullLabel = (name: string, picked: number) => (picked > 0 ? `Pull a new ca
 
 const CARD_SHELL = "group/card relative rounded-panel border bg-surface text-foreground transition-shadow duration-layout"
 
+// A card's own size, when the user made it one: then it keeps that size and what's in it fills it. Otherwise it's the
+// usual width and as tall as what it shows. An open card always grows with what it shows.
+export interface CardBox {
+    width: number
+    fill: boolean
+}
+
+const boxStyle = (box: CardBox): React.CSSProperties => ({ width: box.width, height: box.fill ? '100%' : undefined })
+
+// The card's bottom-right corner, which makes it bigger or smaller. React Flow's own control, which takes the press, so
+// it never moves the card, pans the board or pulls a line out.
+const ResizeCorner: React.FC<{ cardId: string }> = ({ cardId }) => {
+    const board = useBoard()
+    return (
+        <NodeResizeControl
+            position="bottom-right"
+            minWidth={CARD_SIZE.minWidth}
+            maxWidth={CARD_SIZE.maxWidth}
+            minHeight={CARD_SIZE.minHeight}
+            maxHeight={CARD_SIZE.maxHeight}
+            onResizeStart={() => board.resizeStart(cardId)}
+            onResizeEnd={(_, { width, height }) => board.resizeEnd(cardId, { width, height })}
+            // Centred on the corner, so it covers only the card's rounded corner and never a cell under it.
+            className="z-10 text-muted-foreground opacity-0 transition-opacity group-hover/card:opacity-100 hover:text-foreground"
+            style={{ width: 16, height: 16, border: 0, borderRadius: 0, background: 'transparent' }}
+        >
+            <svg aria-hidden viewBox="0 0 10 10" className="absolute left-0 top-0 size-2.5 -translate-x-1 -translate-y-1" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+                <path d="M9 3 3 9M9 7 7 9" />
+            </svg>
+        </NodeResizeControl>
+    )
+}
+
 // A sent card's shadow: the reading ring while it runs, and once it's opened, the raised shadow of something floating
 // over the board, under the ring if it runs.
 const cardShadow = (running: boolean, open: boolean) =>
@@ -199,7 +235,7 @@ const cardShadow = (running: boolean, open: boolean) =>
 
 // A card that has been sent: one bird's chat. Closed, it shows what was asked and the latest answer, or its table, whose
 // rows can be selected. Open, the whole chat and a reply field that carries the thread on.
-const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
+const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => {
     const board = useBoard()
     const thread = useCardThread(card.chatId)
     const { find } = useFlock()
@@ -225,17 +261,16 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const waitingOnModel = running && !thread.partial && !thread.approval && !thread.statusLine && !thread.steps.some((step) => !step.done)
 
     return (
-        <div className={cn(CARD_SHELL, cardShadow(running, open))} style={{ width: CARD_WIDTH }}>
+        <div className={cn(CARD_SHELL, cardShadow(running, open), box.fill && "flex flex-col")} style={boxStyle(box)}>
             <Perched cardId={card.id} mascot={mascot} mood={moodOf(thread)} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
-            <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
+            <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
                 {status && (
                     <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>
                         <span className={waitingOnModel ? SHIMMER_QUIET : undefined}>{status.text}</span>
                     </span>
                 )}
-                {!running && card.cost != null && <CostTag cost={card.cost} label="What this card’s chat has cost" />}
                 <span className="ml-auto flex items-center">
                     {table && !running && <TableMenu cardId={card.id} />}
                     {answered && (
@@ -264,27 +299,43 @@ const SentCard: React.FC<{ card: NestCard }> = ({ card }) => {
                         note={inputs.length > 0 ? `Gets ${listed(inputs.map((input) => getsWhat(input, inputs.length > 1)))} when you send` : null}
                     />
                 ) : (
-                    <div className="nodrag select-text cursor-auto flex flex-col">
-                        <div className={cn("px-5 flex flex-col gap-3", table ? "pb-3 empty:hidden" : "pb-4")}>
-                            {asked && <p className="text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{asked}</p>}
+                    <div className={cn("nodrag select-text cursor-auto flex flex-col", box.fill && "flex-1 min-h-0 overflow-hidden rounded-b-panel")}>
+                        {/* Made a size, what's above the table scrolls when an approval or question is longer than the card. */}
+                        <div
+                            className={cn(
+                                "px-5 flex flex-col gap-3",
+                                table ? "pb-3 empty:hidden" : "pb-4",
+                                box.fill && "nowheel min-h-0 overflow-y-auto",
+                                box.fill && !table && "flex-1"
+                            )}
+                        >
+                            {asked && <p className="shrink-0 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{asked}</p>}
                             {running && !thread.partial && <Working thread={thread} />}
                             {thread.approval && <ChatApprovalCard chatId={thread.id} approval={thread.approval} mascot={mascot} />}
-                            {reply && !table && <CutReply text={reply} onMore={() => board.setOpen(card.id)} />}
+                            {reply && !table && <CutReply text={reply} fill={box.fill} onMore={() => board.setOpen(card.id)} />}
                             {thread.error && <ChatError message={thread.error} />}
                         </div>
                         {reply && table && (
-                            <div className={cn("overflow-hidden", !(!running && answered && board.waitingOn(card.id).length > 0) && "rounded-b-panel")}>
+                            <div
+                                className={cn(
+                                    "overflow-hidden",
+                                    box.fill && "flex-1 min-h-[100px] flex flex-col",
+                                    !(!running && answered && board.waitingOn(card.id).length > 0) && "rounded-b-panel"
+                                )}
+                            >
                                 <TableResult
                                     table={table}
                                     selected={running ? null : selected}
                                     onPick={(index, mode) => board.pick(card.id, reply, table, index, mode)}
                                     here={here}
+                                    fill={box.fill}
                                 />
                             </div>
                         )}
                     </div>
                 ))}
             {!running && answered && <LooksRight cardId={card.id} />}
+            {!open && <ResizeCorner cardId={card.id} />}
         </div>
     )
 }
@@ -299,7 +350,7 @@ const LooksRight: React.FC<{ cardId: string }> = ({ cardId }) => {
     const names = [...new Set(waiting.map((card) => find(card.mascotId).name))]
     const who = names.length === 1 ? `${names[0]} starts` : `${names.slice(0, -1).join(', ')} and ${names.at(-1)} start`
     return (
-        <div className="nodrag cursor-auto px-5 py-3 border-t flex items-center gap-3">
+        <div className="nodrag cursor-auto shrink-0 px-5 py-3 border-t flex items-center gap-3">
             <p className="flex-1 min-w-0 text-13 text-muted-foreground">{who} when you say this is right.</p>
             <Button
                 size="sm"
@@ -319,13 +370,6 @@ const LooksRight: React.FC<{ cardId: string }> = ({ cardId }) => {
 // "about $0.40" from what runs like these cost, or "roughly $1.20" when it's only a guess for the model, with nothing
 // like it run yet.
 const estimateWords = (perRun: NonNullable<NestCard['perRun']>, runs: number) => `${perRun.rough ? 'roughly' : 'about'} ${costWords(perRun.cost * runs)}`
-
-// What a card's chats have cost, quietly beside its status. A Nest has no total.
-const CostTag: React.FC<{ cost: number; label: string }> = ({ cost, label }) => (
-    <span title={label} aria-label={`${label}: ${costWords(cost)}`} className="text-12 text-muted-foreground tabular-nums shrink-0">
-        {costWords(cost)}
-    </span>
-)
 
 // One input of a card: the line, the card it comes from, the name it goes by there, its bird's or a file's title, whether
 // it has anything to give yet, and how many rows its table has.
@@ -410,30 +454,21 @@ const useWorkingRows = (cardId: string, table: PickedRows | null, some = false):
     return { who: nameOf(cards[0]), rows, outside }
 }
 
-// The latest answer in the chat's own markdown, cut to a height that keeps the board readable, with the rest a press away.
-const CutReply: React.FC<{ text: string; onMore: () => void }> = ({ text, onMore }) => {
-    const box = useRef<HTMLDivElement>(null)
-    const [cut, setCut] = useState(false)
-    useLayoutEffect(() => {
-        const element = box.current
-        if (!element) return undefined
-        const check = () => setCut(element.scrollHeight > element.clientHeight + 1)
-        check()
-        const observer = new ResizeObserver(check)
-        observer.observe(element.firstElementChild ?? element)
-        return () => observer.disconnect()
-    }, [text])
+// The latest answer in the chat's own markdown, compact, cut to a height that keeps the board readable, or to what the
+// card's own size leaves, with the rest a press away.
+const CutReply: React.FC<{ text: string; fill: boolean; onMore: () => void }> = ({ text, fill, onMore }) => {
+    const { box, cut } = useCut<HTMLDivElement>(text)
     return (
-        <div className="flex flex-col items-start gap-1">
+        <div className={cn("flex flex-col items-start gap-1", fill && "flex-1 min-h-0")}>
             <div
                 ref={box}
-                className={cn("w-full overflow-hidden [&_.prose]:text-14", cut && "[mask-image:linear-gradient(to_bottom,black_calc(100%-48px),transparent)]")}
-                style={{ maxHeight: REPLY_HEIGHT }}
+                className={cn("w-full overflow-hidden", fill && "flex-1 min-h-0", cut && "[mask-image:linear-gradient(to_bottom,black_calc(100%-48px),transparent)]")}
+                style={fill ? undefined : { maxHeight: REPLY_HEIGHT }}
             >
-                <Markdown content={text} />
+                <Markdown content={text} className={cn("text-14", CARD_PROSE)} />
             </div>
             {cut && (
-                <button type="button" onClick={onMore} className="-mx-1.5 px-1.5 h-6 rounded-control text-13 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                <button type="button" onClick={onMore} className="shrink-0 -mx-1.5 px-1.5 h-6 rounded-control text-13 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                     Show all of it
                 </button>
             )}
@@ -783,7 +818,7 @@ const useTablePick = (cardId: string, key: string) => {
 // rows it ran on with their columns and one more, each row's value filled in as its run ends, or how that run is going
 // until then. Rows waiting on the user show their approval or question above it, in the same card as a chat. A press on
 // a cell opens its run's thread under Every run. There's no reply field on the card: a reply goes in one run's thread.
-const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, each }) => {
+const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }> = ({ card, each, box }) => {
     const board = useBoard()
     const { find } = useFlock()
     const mascot = find(card.mascotId)
@@ -830,13 +865,12 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
     }
 
     return (
-        <div className={cn(CARD_SHELL, cardShadow(running, open))} style={{ width: CARD_WIDTH }}>
+        <div className={cn(CARD_SHELL, cardShadow(running, open), box.fill && "flex flex-col")} style={boxStyle(box)}>
             <Perched cardId={card.id} mascot={mascot} mood={asking.length > 0 ? 'asking' : running ? 'thinking' : 'rest'} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
-            <div className="nest-drag cursor-grab h-12 pl-[76px] pr-3 flex items-center gap-2">
+            <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
                 <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>
-                {card.cost != null && <CostTag cost={card.cost} label="What its runs have cost so far" />}
                 <span className="ml-auto flex items-center">
                     {active && (
                         <button
@@ -863,7 +897,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                     </CardButton>
                 </span>
             </div>
-            <p data-crosses className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">
+            <p data-crosses className="shrink-0 px-5 -mt-1 mb-2 text-12 text-muted-foreground">
                 {from} · {eachWords({ columns: each.header.length, cut: rowTooLong(each.header, each.runs.map((run) => run.row)) }).replace(/^O/, 'o')}
                 {others.length > 0 && ` · with ${listed(others.map((input) => `${input.name}’s answer`))}`}
             </p>
@@ -890,9 +924,9 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                     />
                 </div>
             ) : (
-                <div className="nodrag select-text cursor-auto flex flex-col">
-                    <div className="px-5 pb-3 flex flex-col gap-3">
-                        <p className="text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{each.prompt}</p>
+                <div className={cn("nodrag select-text cursor-auto flex flex-col", box.fill && "flex-1 min-h-0")}>
+                    <div className={cn("px-5 pb-3 flex flex-col gap-3", box.fill ? "nowheel min-h-0 overflow-y-auto" : "shrink-0")}>
+                        <p className="shrink-0 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{each.prompt}</p>
                         {asking.map((view) => (
                             <div key={view.id} className="flex flex-col gap-1">
                                 <p className="text-12 text-muted-foreground">{view.name}</p>
@@ -900,13 +934,20 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
                             </div>
                         ))}
                     </div>
-                    <div className={cn("overflow-hidden", !(!active && ((answered && board.waitingOn(card.id).length > 0) || again)) && "rounded-b-panel")}>
+                    <div
+                        className={cn(
+                            "overflow-hidden",
+                            box.fill && "flex-1 min-h-[100px] flex flex-col",
+                            !(!active && ((answered && board.waitingOn(card.id).length > 0) || again)) && "rounded-b-panel"
+                        )}
+                    >
                         <TableResult
                             table={table}
                             selected={active ? null : selected}
                             onPick={(index, mode) => board.pick(card.id, key, table, index, mode)}
                             here={here}
                             every={open}
+                            fill={box.fill}
                             own={{
                                 header: <ColumnName cardId={card.id} name={each.column} naming={!!each.naming} />,
                                 cell: (index) => <RunCell view={views[index]} onOpen={() => openRunOf(views[index].id)} />
@@ -917,6 +958,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach }> = ({ card, ea
             )}
             {!active && again && <GoAgain cardId={card.id} unfinished={unfinished} unstarted={unstarted} perRun={card.perRun ?? null} />}
             {!active && answered && <LooksRight cardId={card.id} />}
+            {!open && <ResizeCorner cardId={card.id} />}
         </div>
     )
 }
@@ -937,7 +979,7 @@ const GoAgain: React.FC<{ cardId: string; unfinished: number; unstarted: number;
         else setProblem(result.error)
     }
     return (
-        <div className="nodrag cursor-auto px-5 py-3 border-t flex flex-col gap-2">
+        <div className="nodrag cursor-auto shrink-0 px-5 py-3 border-t flex flex-col gap-2">
             {warning ? (
                 <>
                     <p role="alert" className="text-13 text-destructive">{warning.text}</p>
@@ -976,7 +1018,7 @@ const GoAgain: React.FC<{ cardId: string; unfinished: number; unstarted: number;
 
 // A table from a file the user added: its rows, owned by the user, with no chat and no bird. Its rows can be picked and a
 // line pulled out of them, and For each row works on it like any table.
-const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, file }) => {
+const TableCard: React.FC<{ card: NestCard; file: NestTableFile; box: CardBox }> = ({ card, file, box }) => {
     const board = useBoard()
     // A board carries only the first rows, each cell cut. The whole table is asked of main once, when "N more" opens it,
     // or when a row is first pressed while one of the first rows was cut, so what's picked is what main has.
@@ -1002,9 +1044,9 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
     const here = useWorkingRows(card.id, table, rows === null && file.count > file.rows.length)
     const label = selected.length > 0 ? pullLabel('', selected.length) : `Pull a new card out of ${file.name}`
     return (
-        <div className={cn(CARD_SHELL, "shadow-selected")} style={{ width: CARD_WIDTH }}>
+        <div className={cn(CARD_SHELL, "shadow-selected", box.fill && "flex flex-col")} style={boxStyle(box)}>
             <LineEnds canPull onPull={() => board.pullOut(card.id)} label={label} />
-            <div className="nest-drag cursor-grab h-12 pl-5 pr-3 flex items-center gap-2">
+            <div className="nest-drag cursor-grab h-12 shrink-0 pl-5 pr-3 flex items-center gap-2">
                 <Table2 aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                 <span className="text-14 font-semibold truncate">{file.name}</span>
                 <span className="text-12 text-muted-foreground shrink-0">
@@ -1022,7 +1064,7 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
                     </CardButton>
                 </span>
             </div>
-            <div className={cn("nodrag cursor-auto overflow-hidden", board.waitingOn(card.id).length === 0 && "rounded-b-panel")}>
+            <div className={cn("nodrag cursor-auto overflow-hidden", box.fill && "flex-1 min-h-0 flex flex-col", board.waitingOn(card.id).length === 0 && "rounded-b-panel")}>
                 <TableResult
                     table={table}
                     total={file.count}
@@ -1030,9 +1072,11 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile }> = ({ card, fi
                     selected={selected}
                     onPick={(index, mode) => void pick(index, mode)}
                     here={here}
+                    fill={box.fill}
                 />
             </div>
             <LooksRight cardId={card.id} />
+            <ResizeCorner cardId={card.id} />
         </div>
     )
 }
@@ -1190,18 +1234,24 @@ const PlanPrompt: React.FC<{ label: string; value: string; readOnly: boolean; on
     )
 }
 
-export const CardView: React.FC<NodeProps<CardNode>> = ({ data: { card } }) =>
-    card.table ? (
-        <TableCard card={card} file={card.table} />
+// A card made a size of its own has it on its node, as React Flow's corner sets it while it's dragged. React Flow's own
+// width and height props fall back to the measured size, so they can't tell.
+export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) => {
+    const width = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.width)
+    const height = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.height)
+    const box: CardBox = { width: width ?? CARD_WIDTH, fill: height != null }
+    return card.table ? (
+        <TableCard card={card} file={card.table} box={box} />
     ) : card.each ? (
-        <ForEachCard card={card} each={card.each} />
+        <ForEachCard card={card} each={card.each} box={box} />
     ) : card.chatId ? (
-        <SentCard card={card} />
+        <SentCard card={card} box={box} />
     ) : card.plan && card.plan.state !== 'held' ? (
         <PlannedCard card={card} plan={card.plan} />
     ) : (
         <DraftCard card={card} />
     )
+}
 
 const LINE = "stroke-accent-ink/60"
 // The round ends sit just outside the cards, touching their edges, since a line is drawn under the cards.

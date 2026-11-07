@@ -1,4 +1,4 @@
-import { safeHref, type PickedRows } from "../shared/nestTable";
+import { cellParts, exportCellText, type PickedRows } from "../shared/nestTable";
 
 // Tables in and out of a Nest: a CSV or TSV file the user adds becomes a table card's rows, and any card's table goes out
 // as a CSV file or as cells on the clipboard. Pure, so main does all of it and a renderer never names a path.
@@ -117,14 +117,8 @@ export const tableFromFile = (name: string, bytes: Uint8Array): TableFile => {
   };
 };
 
-// A cell as words for a spreadsheet: a link is its words and its address, and emphasis marks go.
-export const exportCell = (cell: string): string =>
-  cell
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (_, words: string, href: string) => (!words || words === href ? href : `${words} (${href})`))
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/(\*\*|__|\*|_|`)(?=\S)([^*_`]*?\S)\1/g, "$2")
-    .trim();
+// A cell as words for a spreadsheet: a link is its words and its address, and emphasis and code marks go.
+export const exportCell = exportCellText;
 
 // A spreadsheet runs a cell starting with these as a formula, and a table's words came from web pages, so such a cell
 // starts with an apostrophe and stays text. A plain number keeps its sign.
@@ -146,11 +140,17 @@ const escapeHtml = (text: string): string => text.replace(/&/g, "&amp;").replace
 
 // The same as an HTML table, which a spreadsheet pastes as cells with their links, and a document as a table.
 export const toHtmlTable = ({ header, rows }: PickedRows): string => {
+  // Links stay links, and everything else is plain words, in the same words as the CSV.
   const cellHtml = (cell: string) => {
-    const link = /^\[([^\]]*)\]\(([^)\s]+)\)$/.exec(cell.trim()) ?? (/^https?:\/\/\S+$/.test(cell.trim()) ? [cell, cell.trim(), cell.trim()] : null);
-    const href = link ? safeHref(link[2]) : null;
-    const words = escapeHtml(guard(link ? link[1] || link[2] : exportCell(cell)));
-    return href ? `<a href="${escapeHtml(href)}">${words}</a>` : words.replace(/\n/g, "<br>");
+    const parts = cellParts(cell);
+    let html = guard(exportCell(cell)) === exportCell(cell) ? "" : "'";
+    for (let at = 0; at < parts.length; at++) {
+      const { href } = parts[at];
+      let words = parts[at].text;
+      while (href && parts[at + 1]?.href === href) words += parts[++at].text;
+      html += href ? `<a href="${escapeHtml(href)}">${escapeHtml(words)}</a>` : escapeHtml(words).replace(/\n/g, "<br>");
+    }
+    return html;
   };
   const line = (cells: readonly string[], tag: "th" | "td") => `<tr>${cells.map((cell) => `<${tag}>${cellHtml(cell)}</${tag}>`).join("")}</tr>`;
   return `<table><thead>${line(header, "th")}</thead><tbody>${rows.map((cells) => line(cells, "td")).join("")}</tbody></table>`;

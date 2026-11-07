@@ -1,7 +1,7 @@
 import type { ChatThread, NestRun } from '@shared/library'
 import { CARD_HEIGHT, type Rect } from '@shared/nestPlace'
 
-export { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, settle, type Nudge, type PlacedCard, type Rect } from '@shared/nestPlace'
+export { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_SIZE, CARD_WIDTH, freeSpot, settle, type Nudge, type PlacedCard, type Rect } from '@shared/nestPlace'
 
 // What the board remembers of each card's measured height: the last one while closed, and the one while open.
 export interface CardHeights {

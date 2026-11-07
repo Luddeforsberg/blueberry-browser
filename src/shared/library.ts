@@ -456,6 +456,8 @@ export interface NestCard {
   table: NestTableFile | null;
   // Its files and notes, which go to its bird with every message. They can change only before it's sent.
   attachments: NestAttachment[];
+  // The size the user made it from its corner, or none for the usual width and a height that follows what it shows.
+  size?: { width: number; height: number };
   // What its chats have cost so far, every run's on a For-each card, or null when nothing says. Never totalled for a Nest.
   cost?: number | null;
   // On a draft that could run For each row, and on a For-each card for its runs again: what one run will likely cost.
