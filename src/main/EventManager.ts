@@ -184,9 +184,12 @@ export class EventManager {
 
   private handleChatEvents(): void {
     // Only Blueberry's own composers send this, so the user is there to answer if Berry asks before it starts.
-    this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true }) : null
-    );
+    // A card's chat opened as a chat tab still sends through its card, so it gets its source card's answer as it would there.
+    this.handle("chat:send", (chatId, text, options) => {
+      if (typeof text !== "string") return null;
+      const card = typeof chatId === "string" ? this.mainWindow.nests.cardOfChat(chatId) : null;
+      return card ? this.mainWindow.nests.send(card.id, text) : this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true });
+    });
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
     this.handle("recording:state", () => this.mainWindow.recordings.state);
@@ -205,6 +208,18 @@ export class EventManager {
     );
 
     this.handle("chat:menu", (chatId) => this.mainWindow.showChatMenu(chatId));
+
+    // A card sends through the chat path, from Blueberry's own composer, so the user is there to answer too.
+    const nests = this.mainWindow.nests;
+    this.handle("nests:create", () => this.mainWindow.createNest());
+    this.handle("nests:board", (nestId) => nests.board(nestId));
+    this.handle("nests:rename", (nestId, title) => nests.rename(nestId, title));
+    this.handle("nests:menu", (nestId) => this.mainWindow.showNestMenu(nestId));
+    this.handle("nests:add-card", (nestId, card) => nests.addCard(nestId, card));
+    this.handle("nests:move-card", (cardId, x, y) => nests.moveCard(cardId, x, y));
+    this.handle("nests:set-bird", (cardId, mascotId) => nests.setBird(cardId, mascotId));
+    this.handle("nests:delete-card", (cardId) => this.mainWindow.confirmDeleteCard(cardId));
+    this.handle("nests:send", (cardId, text) => nests.send(cardId, text));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

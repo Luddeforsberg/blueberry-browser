@@ -33,7 +33,7 @@ export interface Session {
   height: number;
 }
 
-const PAGES: readonly InternalPage[] = ["new-tab", "chat", "routines", "settings", "downloads", "gallery", "history", "flock", "mascot-gallery", "needs-you"];
+const PAGES: readonly InternalPage[] = ["new-tab", "chat", "nest", "routines", "settings", "downloads", "gallery", "history", "flock", "mascot-gallery", "needs-you"];
 const MAX_ENTRIES = 50;
 const WRITE_DELAY_MS = 500;
 
@@ -63,7 +63,7 @@ const sanitizeTab = (raw: unknown): SavedTab | null => {
   const tab = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   if (PAGES.includes(tab.page as InternalPage)) {
     // From when a chat could be open before it began. Chats start on the new tab page now.
-    if (tab.page === "chat" && typeof tab.param !== "string") return null;
+    if ((tab.page === "chat" || tab.page === "nest") && typeof tab.param !== "string") return null;
     return {
       page: tab.page as InternalPage,
       param: typeof tab.param === "string" ? tab.param : null,

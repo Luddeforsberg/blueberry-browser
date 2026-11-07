@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Bird, ChevronDown, Cloud, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { Bird, ChevronDown, Cloud, Ellipsis, GitFork, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import type { ChatThreadSummary } from '@shared/library'
+import type { ChatThreadSummary, NestSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
 import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -49,8 +49,10 @@ const Section: React.FC<{
     collapsible?: boolean
     // What stays showing while it's collapsed.
     whenClosed?: React.ReactNode
+    // A button at the end of the heading, such as one that makes a new item.
+    action?: React.ReactNode
     children: React.ReactNode
-}> = ({ id, title, collapsible = false, whenClosed, children }) => {
+}> = ({ id, title, collapsible = false, whenClosed, action, children }) => {
     const [open, setOpen] = useState(true)
 
     return (
@@ -69,6 +71,7 @@ const Section: React.FC<{
                 ) : (
                     title
                 )}
+                {action && <span className="ml-auto -mr-2 flex">{action}</span>}
             </h2>
             {open ? children : whenClosed}
         </section>
@@ -152,6 +155,106 @@ const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     )
 }
 
+// Editing a row's name in place. Enter or leaving it saves, Escape leaves the name as it was.
+const RowRename: React.FC<{ label: string; name: string; onDone: (name: string | null) => void }> = ({ label, name, onDone }) => {
+    // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
+    const finished = useRef(false)
+    const finish = (value: string | null) => {
+        if (finished.current) return
+        finished.current = true
+        onDone(value !== null && value.trim() !== name ? value : null)
+    }
+    return (
+        <li>
+            <input
+                aria-label={label}
+                defaultValue={name}
+                maxLength={100}
+                autoFocus
+                onFocus={(event) => event.target.select()}
+                onBlur={(event) => finish(event.target.value)}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') finish(event.currentTarget.value)
+                    if (event.key === 'Escape') finish(null)
+                }}
+                className={cn(ROW, "bg-surface shadow-selected")}
+            />
+        </li>
+    )
+}
+
+// A Nest in the sidebar, which opens its board. Like a chat's row, it renames and deletes from its button or a right-click,
+// and the pages its cards' jobs opened sit under it.
+const NestRow: React.FC<{ nest: NestSummary; selected: boolean; onOpen: () => void; jobTabs: TabInfo[]; onClose?: () => void }> = ({ nest, selected, onOpen, jobTabs, onClose }) => {
+    const [editing, setEditing] = useState(false)
+    const { find } = useFlock()
+    const api = window.chromeAPI.nests
+    const working = nest.working.map((id) => find(id).name)
+
+    const showMenu = async () => {
+        if ((await api.showMenu(nest.id)) === 'rename') setEditing(true)
+    }
+
+    if (editing) {
+        return (
+            <RowRename
+                label="Nest name"
+                name={nest.title}
+                onDone={(title) => {
+                    setEditing(false)
+                    if (title !== null) void api.rename(nest.id, title)
+                }}
+            />
+        )
+    }
+
+    return (
+        <li
+            className="group/chat relative"
+            onContextMenu={(event) => {
+                event.preventDefault()
+                void showMenu()
+            }}
+        >
+            <button
+                type="button"
+                aria-current={selected ? 'page' : undefined}
+                onClick={onOpen}
+                className={cn(ROW, onClose ? "pr-[60px]" : "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
+            >
+                <span className={LEADING_SLOT}>
+                    <GitFork className={cn(ICON, "text-muted-foreground")} />
+                </span>
+                <span className="flex-1 truncate">{nest.title}</span>
+                {working.length > 0 && (
+                    <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
+                        <BerryDot working />
+                        <span className="sr-only">{working.join(', ')} working</span>
+                    </span>
+                )}
+            </button>
+            <button
+                type="button"
+                aria-label={`More options for ${nest.title}`}
+                onClick={() => void showMenu()}
+                className={cn(ROW_ACTION, onClose ? "right-8" : "right-1")}
+            >
+                <Ellipsis className={ICON} />
+            </button>
+            {onClose && (
+                <button type="button" aria-label={`Close ${nest.title}`} onClick={onClose} className={cn(ROW_ACTION, "right-1")}>
+                    <X className="size-3" />
+                </button>
+            )}
+            {jobTabs.length > 0 && (
+                <ul aria-label={`Pages opened in ${nest.title}`} className="mt-0.5 flex flex-col gap-0.5">
+                    {jobTabs.map((tab) => <JobTabRow key={tab.id} tab={tab} />)}
+                </ul>
+            )}
+        </li>
+    )
+}
+
 // A chat in the sidebar. Hover or keyboard focus swaps its age for a button with Rename and Delete.
 export const ChatRow: React.FC<{
     chat: ChatThreadSummary
@@ -163,44 +266,25 @@ export const ChatRow: React.FC<{
     onClose?: () => void
 }> = ({ chat, selected, onOpen, jobTabs = [], onClose }) => {
     const [editing, setEditing] = useState(false)
-    // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
-    const finished = useRef(false)
     const api = window.chromeAPI.chat
     const { find } = useFlock()
     const mascot = find(chat.mascotId)
     const { showBerry } = useShell().settings
 
     const showMenu = async () => {
-        if ((await api.showMenu(chat.id)) === 'rename') {
-            finished.current = false
-            setEditing(true)
-        }
-    }
-
-    const finish = (title: string | null) => {
-        if (finished.current) return
-        finished.current = true
-        setEditing(false)
-        if (title !== null && title.trim() !== chat.title) void api.rename(chat.id, title)
+        if ((await api.showMenu(chat.id)) === 'rename') setEditing(true)
     }
 
     if (editing) {
         return (
-            <li>
-                <input
-                    aria-label="Chat name"
-                    defaultValue={chat.title}
-                    maxLength={100}
-                    autoFocus
-                    onFocus={(event) => event.target.select()}
-                    onBlur={(event) => finish(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter') finish(event.currentTarget.value)
-                        if (event.key === 'Escape') finish(null)
-                    }}
-                    className={cn(ROW, "bg-surface shadow-selected")}
-                />
-            </li>
+            <RowRename
+                label="Chat name"
+                name={chat.title}
+                onDone={(title) => {
+                    setEditing(false)
+                    if (title !== null) void api.rename(chat.id, title)
+                }}
+            />
         )
     }
 
@@ -308,6 +392,21 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
     }
     const openChat = library.chats.find((chat) => isOpen('chat', chat.id))
 
+    // Like a chat, a Nest's tab shows only as its row.
+    const nestRow = (nest: NestSummary) => {
+        const tab = tabs.find(({ page, pageParam }) => page === 'nest' && pageParam === nest.id)
+        return (
+            <NestRow
+                key={nest.id}
+                nest={nest}
+                selected={isOpen('nest', nest.id)}
+                jobTabs={tabs.filter((jobTab) => jobTab.jobChatId !== null && nest.chatIds.includes(jobTab.jobChatId))}
+                onOpen={() => void browser.openPage('nest', { param: nest.id, title: nest.title })}
+                onClose={tab && (() => void closeTab(tab.id))}
+            />
+        )
+    }
+
     // The buttons on top sit on the toolbar's row, wherever this sidebar starts: the floating one is inset in its view.
     const nav = useRef<HTMLElement>(null)
     const [top, setTop] = useState(0)
@@ -378,6 +477,24 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                             onClick={() => void browser.openPage('flock')}
                         />
                     </ul>
+
+                    <Section
+                        id="sidebar-nests"
+                        title="Nests"
+                        action={
+                            <button
+                                type="button"
+                                aria-label="New nest"
+                                title="New nest"
+                                onClick={() => void window.chromeAPI.nests.create()}
+                                className="size-[26px] flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors app-region-no-drag hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <Plus className={ICON} />
+                            </button>
+                        }
+                    >
+                        {library.nests.length > 0 && <ul>{library.nests.map(nestRow)}</ul>}
+                    </Section>
 
                     {library.chats.length > 0 && (
                         // Collapsed, the open chat stays, since Tabs doesn't list it.

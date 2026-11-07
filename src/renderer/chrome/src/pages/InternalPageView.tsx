@@ -2,6 +2,7 @@ import React from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { NewTabPage } from './NewTabPage'
 import { ChatPage } from './ChatPage'
+import { NestPage } from './NestPage'
 import { RoutinesPage } from './RoutinesPage'
 import { SettingsPage } from './SettingsPage'
 import { GalleryPage } from './GalleryPage'
@@ -19,6 +20,8 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             return <NewTabPage key={tab.id} tab={tab} />
         case 'chat':
             return <ChatPage key={tab.id} tab={tab} />
+        case 'nest':
+            return <NestPage key={tab.id} tab={tab} />
         case 'routines':
             return <RoutinesPage />
         case 'settings':

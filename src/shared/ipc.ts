@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryLinked, NestBoard, NestCard, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -14,7 +14,7 @@ export type LayoutMode = "vertical" | "horizontal";
 export type ResizablePanel = "sidebar" | "chat";
 
 // Pages the chrome draws itself. They open as tabs, on the same card as a web page.
-export type InternalPage = "new-tab" | "chat" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you" | "recording" | "cloud";
+export type InternalPage = "new-tab" | "chat" | "nest" | "routines" | "settings" | "downloads" | "gallery" | "history" | "flock" | "mascot-gallery" | "needs-you" | "recording" | "cloud";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -338,6 +338,14 @@ export type RoutineSaveResult = { ok: true; id: string } | { ok: false; error: s
 export type MascotSaveResult = { ok: true; id: string } | { ok: false; error: string };
 
 // `mascotId` picks who a new chat runs as. An existing chat keeps the one it started with.
+export interface NestNewCard {
+  x: number;
+  y: number;
+  mascotId?: string | null;
+  // The card it's pulled out of.
+  from?: string | null;
+}
+
 export interface ChatSendOptions {
   seePage: boolean;
   mascotId?: string | null;
@@ -478,6 +486,21 @@ export interface InvokeChannels {
   "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
   // The native menu for a chat in the sidebar. Delete happens in main, so only Rename comes back.
   "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string]; result: "rename" | null };
+  // A Nest opens as a tab of its own, so creating one opens it, and this says which.
+  "nests:create": { region: "chrome" | "overlay"; args: []; result: string };
+  "nests:board": { region: "chrome"; args: [nestId: string]; result: NestBoard | null };
+  "nests:rename": { region: "chrome" | "overlay"; args: [nestId: string, title: string]; result: boolean };
+  // The native menu for a Nest in the sidebar. Delete asks and happens in main, so only Rename comes back.
+  "nests:menu": { region: "chrome" | "overlay"; args: [nestId: string]; result: "rename" | null };
+  // A draft card, unconnected or pulled out of `from`, which it then gets the latest answer of whenever it sends.
+  "nests:add-card": { region: "chrome"; args: [nestId: string, card: NestNewCard]; result: NestCard | null };
+  "nests:move-card": { region: "chrome"; args: [cardId: string, x: number, y: number]; result: boolean };
+  // Only a draft's bird can change. A sent card keeps its chat's.
+  "nests:set-bird": { region: "chrome"; args: [cardId: string, mascotId: string]; result: boolean };
+  // Asks first in main when the card has a chat, which goes with it.
+  "nests:delete-card": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // Sends from a card through the chat path, starting its chat if it's a draft. It runs only because the user sent it.
+  "nests:send": { region: "chrome"; args: [cardId: string, text: string]; result: ChatThread | null };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -616,6 +639,8 @@ export interface EventChannels {
   "chat:chunk": ChatChunk;
   "chat:updated": ChatThread;
   "chat:deleted": string;
+  "nests:updated": NestBoard;
+  "nests:deleted": string;
   // Text the user chose to ask about. It waits in the composer and is never sent by itself.
   "chat:draft": string;
   "find:opened": null;
@@ -692,6 +717,20 @@ export interface ChatAPI {
   onChatUpdated: (callback: (thread: ChatThread) => void) => Unsubscribe;
   onChatDeleted: (callback: (chatId: string) => void) => Unsubscribe;
   onDraft: (callback: (text: string) => void) => Unsubscribe;
+}
+
+export interface NestsAPI {
+  create: () => Promise<string>;
+  board: (nestId: string) => Promise<NestBoard | null>;
+  rename: (nestId: string, title: string) => Promise<boolean>;
+  showMenu: (nestId: string) => Promise<"rename" | null>;
+  addCard: (nestId: string, card: NestNewCard) => Promise<NestCard | null>;
+  moveCard: (cardId: string, x: number, y: number) => Promise<boolean>;
+  setBird: (cardId: string, mascotId: string) => Promise<boolean>;
+  deleteCard: (cardId: string) => Promise<boolean>;
+  send: (cardId: string, text: string) => Promise<ChatThread | null>;
+  onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
+  onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
 }
 
 export interface LibraryAPI {
@@ -860,6 +899,7 @@ export interface ChromeAPI {
   settings: SettingsAPI;
   library: LibraryAPI;
   chat: ChatAPI;
+  nests: NestsAPI;
   work: WorkAPI;
   recording: RecordingAPI;
   find: FindAPI;

@@ -5,6 +5,8 @@ import { InternalTab } from "./InternalTab";
 import type { SettingsStore } from "./SettingsStore";
 import type { BookmarkStore } from "./BookmarkStore";
 import type { ChatStore } from "./ChatStore";
+import type { NestStore } from "./NestStore";
+import { Nests } from "./Nests";
 import type { HistoryStore } from "./HistoryStore";
 import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHistory";
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
@@ -65,7 +67,7 @@ import type {
   ThemeState,
   Visit,
 } from "../shared/ipc";
-import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult } from "../shared/library";
+import type { ChatThread, LibrarySnapshot, NeedsYouItem, NestBoard, PublishResult } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 export type BrowserTab = Tab | InternalTab;
@@ -135,6 +137,7 @@ export class Window {
   readonly gallery: Gallery;
   private readonly phone: Phone;
   readonly chats: Chats;
+  readonly nests: Nests;
   readonly workViews: WorkViews;
   readonly recordings: Recordings;
   readonly routines: Routines;
@@ -150,6 +153,7 @@ export class Window {
   constructor(
     private readonly settingsStore: SettingsStore,
     private readonly chatStore: ChatStore,
+    nestStore: NestStore,
     private readonly bookmarkStore: BookmarkStore,
     private readonly pinnedStore: BookmarkStore,
     routineStore: RoutineStore,
@@ -330,6 +334,15 @@ export class Window {
         this.workViews.sync();
       },
     }, (id) => this.mascotStore.resolve(id), this.memory, this.cloud, this.runnerJobs);
+
+    this.nests = new Nests(nestStore, this.chats, mascotStore, {
+      onBoard: (board) => {
+        this.syncNestTabTitle(board);
+        sendToRenderer(this.chrome.view.webContents, "nests:updated", board);
+      },
+      onListChanged: () => this.publishLibrary(),
+      chatDeleted: (chatId) => this.closeChatTabs(chatId),
+    });
 
     this.workViews = new WorkViews({
       chrome: () => this.chrome.view.webContents,
@@ -676,10 +689,17 @@ export class Window {
   }
 
   get librarySnapshot(): LibrarySnapshot {
+    // Made after the chats, which can publish while the window is being built.
+    const cardChats = this.nests?.cardChats() ?? new Set<string>();
     return {
       pinned: this.pinnedStore.get(),
       bookmarks: this.bookmarkStore.get(),
-      chats: this.chatStore.summaries().map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id), cloud: this.chats.inCloud(chat.id) })),
+      // A card's chat belongs to its Nest, so it isn't listed with the others.
+      chats: this.chatStore
+        .summaries()
+        .filter((chat) => !cardChats.has(chat.id))
+        .map((chat) => ({ ...chat, running: this.chats.isRunning(chat.id), cloud: this.chats.inCloud(chat.id) })),
+      nests: this.nests?.list() ?? [],
       routines: this.routines.list(),
       mascots: this.mascotStore.all(),
       needsYou: this.needsYou,
@@ -790,7 +810,9 @@ export class Window {
     if (saved.page === "cloud") return null;
     const chat = saved.page === "chat" && saved.param ? this.chatStore.summaries().find(({ id: chatId }) => chatId === saved.param) : null;
     if (saved.page === "chat" && saved.param && !chat) return null;
-    this.tabsMap.set(id, new InternalTab(id, saved.page, saved.param, chat?.title ?? saved.title));
+    const nestTitle = saved.page === "nest" && saved.param ? this.nests.title(saved.param) : null;
+    if (saved.page === "nest" && nestTitle === null) return null;
+    this.tabsMap.set(id, new InternalTab(id, saved.page, saved.param, chat?.title ?? nestTitle ?? saved.title));
     return id;
   }
 
@@ -847,6 +869,7 @@ export class Window {
     const param = options.param ?? null;
     // A chat only starts from the new tab page, so a chat tab always has a chat.
     if (page === "chat" && param === null) return this.openPage("new-tab");
+    if (page === "nest" && (param === null || this.nests.title(param) === null)) return this.openPage("new-tab");
     const existing = this.entries.find(
       (tab) =>
         tab instanceof InternalTab &&
@@ -862,7 +885,8 @@ export class Window {
 
     // The chat's own title, whoever asked, or the tab says "Chat" until the thread next changes.
     const chatTitle = page === "chat" && param ? this.chatStore.chat(param)?.title : undefined;
-    const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, chatTitle ?? options.title);
+    const nestTitle = page === "nest" && param ? this.nests.title(param) : null;
+    const tab = new InternalTab(`tab-${++this.tabCounter}`, page, param, chatTitle ?? nestTitle ?? options.title);
     this.tabsMap.set(tab.id, tab);
     this.switchActiveTab(tab.id);
     return tab;
@@ -1199,13 +1223,80 @@ export class Window {
       cancelId: 1,
     });
     if (response !== 0 || !this.chats.delete(chatId)) return;
+    this.closeChatTabs(chatId);
+  }
 
-    // Closing the last tab closes the window, and deleting a chat shouldn't do that.
-    const tabs = this.chatTabs(chatId);
-    if (tabs.length === this.tabCount) this.openPage("new-tab");
-    this.closedTabs = this.closedTabs.filter((tab) => tab.page !== "chat" || tab.pageParam !== chatId);
-    tabs.forEach((tab) => this.closeTab(tab.id, false));
+  // A deleted chat's tabs go, and Reopen Closed Tab can't bring it back.
+  private closeChatTabs(chatId: string): void {
+    this.closePageTabs("chat", chatId);
     sendToRenderer(this.chrome.view.webContents, "chat:deleted", chatId);
+  }
+
+  private closePageTabs(page: InternalPage, param: string): void {
+    const tabs = this.entries.filter((tab): tab is InternalTab => tab instanceof InternalTab && tab.page === page && tab.param === param);
+    // Closing the last tab closes the window, and deleting a chat or a Nest shouldn't do that.
+    if (tabs.length > 0 && tabs.length === this.tabCount) this.openPage("new-tab");
+    this.closedTabs = this.closedTabs.filter((tab) => tab.page !== page || tab.pageParam !== param);
+    tabs.forEach((tab) => this.closeTab(tab.id, false));
+  }
+
+  // Opens it, as the sidebar's + promises.
+  createNest(): string {
+    const id = this.nests.create();
+    this.openPage("nest", { param: id });
+    return id;
+  }
+
+  private syncNestTabTitle({ id, title }: NestBoard): void {
+    const stale = this.entries.filter((tab): tab is InternalTab => tab instanceof InternalTab && tab.page === "nest" && tab.param === id && tab.title !== title);
+    stale.forEach((tab) => (tab.title = title));
+    if (stale.length > 0) this.notifyTabs();
+  }
+
+  showNestMenu(nestId: string): Promise<"rename" | null> {
+    return new Promise((resolve) => {
+      Menu.buildFromTemplate([
+        { label: "Rename", click: () => resolve("rename") },
+        { label: "Delete…", click: () => void this.confirmDeleteNest(nestId) },
+      ]).popup({
+        window: this._baseWindow,
+        callback: () => setTimeout(() => resolve(null), MENU_CLICK_GRACE_MS),
+      });
+    });
+  }
+
+  private async confirmDeleteNest(nestId: string): Promise<void> {
+    const title = this.nests.title(nestId);
+    if (title === null) return;
+    const { response } = await dialog.showMessageBox(this._baseWindow, {
+      type: "warning",
+      message: `Delete “${title}”?`,
+      detail: "This Nest and the chats on its cards will be permanently removed from this computer.",
+      buttons: ["Delete", "Cancel"],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    if (response !== 0 || !this.nests.delete(nestId)) return;
+    this.closePageTabs("nest", nestId);
+    sendToRenderer(this.chrome.view.webContents, "nests:deleted", nestId);
+  }
+
+  // A draft goes at once. A card with a chat asks first, because the chat goes with it.
+  async confirmDeleteCard(cardId: string): Promise<boolean> {
+    const card = this.nests.card(cardId);
+    if (!card) return false;
+    if (card.chatId) {
+      const { response } = await dialog.showMessageBox(this._baseWindow, {
+        type: "warning",
+        message: "Delete this card?",
+        detail: "Its chat will be permanently removed from this computer.",
+        buttons: ["Delete", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+      });
+      if (response !== 0) return false;
+    }
+    return this.nests.deleteCard(cardId);
   }
 
   // In the app already, or somewhere a notification would interrupt: fullscreen, or anything playing sound.

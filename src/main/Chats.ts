@@ -23,6 +23,7 @@ import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
 import { addressToKeep, replyPointsTo } from "./jobTabs";
+import { withCardAnswer, type CardAnswer } from "./nestContext";
 import type { MemoryToOffer } from "./MemoryStore";
 
 const MAX_TITLE_LENGTH = 40;
@@ -145,6 +146,8 @@ interface Run {
   onEnd?: (ended: EndedReply) => void;
   // The user typed this here and is there to answer, so it may ask or plan before starting.
   userPresent: boolean;
+  // The answer on the card a Nest's line comes from, read when this was sent. Only the model gets it, with the newest message.
+  cardAnswer?: CardAnswer;
 }
 
 // How one reply ended, for whoever started it.
@@ -793,7 +796,9 @@ export class Chats {
   // The reply follows through the events. `from` names the app outside Blueberry that started a new chat, and `sites`,
   // `tools` and `askAtLeast` can only narrow what this reply may do, on top of the mascot's own and the setting.
   // `onEnd` hears how this reply ended, and nothing of a later one. `userPresent` is only for a message the user typed in
-  // one of Blueberry's own composers, where they're there to answer a question before it starts.
+  // one of Blueberry's own composers, where they're there to answer a question before it starts. `cardAnswer` goes to the
+  // model with this message only, labelled untrusted, and is never saved. `started` hears a new chat's id before anything
+  // about it is published, so a Nest can claim it first.
   send(
     chatId: string | null,
     text: string,
@@ -808,7 +813,22 @@ export class Chats {
       cloud = false,
       runner = false,
       userPresent = false,
-    }: { seePage: boolean; mascotId?: string | null; from?: string | null; sites?: string[]; tools?: string[]; askAtLeast?: ActionApproval; onEnd?: (ended: EndedReply) => void; cloud?: boolean; runner?: boolean; userPresent?: boolean }
+      cardAnswer,
+      started,
+    }: {
+      seePage: boolean;
+      mascotId?: string | null;
+      from?: string | null;
+      sites?: string[];
+      tools?: string[];
+      askAtLeast?: ActionApproval;
+      onEnd?: (ended: EndedReply) => void;
+      cloud?: boolean;
+      runner?: boolean;
+      userPresent?: boolean;
+      cardAnswer?: CardAnswer;
+      started?: (chatId: string) => void;
+    }
   ): ChatThread | null {
     const message = text.trim();
     if (!message) return null;
@@ -824,6 +844,7 @@ export class Chats {
     const chosen = typeof mascotId === "string" && mascotId !== BERRY.id ? mascotId : null;
     if (!chatId && chosen && this.mascotOf(chosen).deletedAt !== null) return null;
     const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
+    if (!chatId) started?.(id);
     const profile = this.mascotOf(this.store.chat(id)?.mascotId ?? null);
     const narrowed = sites.length > 0 ? { ...profile, sites: narrowSites(profile.sites, sites) } : profile;
     const mascot = tools ? { ...narrowed, tools: narrowed.tools.filter((tool) => tools.includes(tool)) } : narrowed;
@@ -833,7 +854,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswer };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -951,7 +972,7 @@ export class Chats {
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
       run.withPage = page !== null;
-      const messages = await this.withNewestPage(chatId, seePage, run.mascot);
+      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswer);
       const said = this.userWords(chatId).join("\n");
       const tools = this.jobTools(chatId, run, page, said);
       this.recall(chatId, run, said);
@@ -1233,12 +1254,13 @@ export class Chats {
   }
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.
-  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile): Promise<ReplyMessage[]> {
+  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile, answer?: CardAnswer): Promise<ReplyMessage[]> {
     const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
     const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
-    if (!page || !newest || typeof newest.content !== "string") return messages;
-    return [...messages.slice(0, -1), { role: "user", content: withPage(newest.content, page) }];
+    if ((!page && !answer) || !newest || typeof newest.content !== "string") return messages;
+    const text = answer ? withCardAnswer(newest.content, { ...answer, text: this.withoutCodes(answer.text) }) : newest.content;
+    return [...messages.slice(0, -1), { role: "user", content: page ? withPage(text, page) : text }];
   }
 
   private async readPage(mascot: MascotProfile): Promise<Page | null> {

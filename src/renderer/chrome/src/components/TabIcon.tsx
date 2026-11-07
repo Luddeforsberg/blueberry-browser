@@ -1,6 +1,6 @@
 import React from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { Bird, CircleAlert, Cloud, Compass, Download, Eye, Feather, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
+import { Bird, CircleAlert, Cloud, Compass, Download, Eye, Feather, GitFork, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
 import { BerryDot } from '@common/components/Mascot'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
@@ -9,6 +9,7 @@ import { Favicon } from './Favicon'
 const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
     'new-tab': Compass,
     chat: MessageCircle,
+    nest: GitFork,
     routines: RefreshCw,
     settings: Settings,
     downloads: Download,

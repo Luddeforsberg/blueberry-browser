@@ -3,6 +3,7 @@ import type { InternalPage } from "../shared/ipc";
 const TITLES: Record<InternalPage, string> = {
   "new-tab": "New tab",
   chat: "Chat",
+  nest: "Nest",
   routines: "Routines",
   settings: "Settings",
   downloads: "Downloads",
