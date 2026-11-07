@@ -1155,7 +1155,8 @@ export class Nests {
   private runInputs(cardId: string, header: readonly string[], row: readonly string[]): CardAnswer[] | null {
     const lines = this.store.linesTo(cardId);
     const lineId = this.store.eachLine(cardId);
-    const driving = lineId ? lines.find((line) => line.lineId === lineId) : (this.drivingLine(cardId) ?? lines[0]);
+    // A card sent before the line was kept could only read from one.
+    const driving = lineId ? lines.find((line) => line.lineId === lineId) : lines[0];
     const others = lines.filter((line) => line.lineId !== driving?.lineId).map((line) => this.lineInput(line));
     if (others.includes("stale")) return null;
     const rowInput: RawInput = { name: driving ? this.labelOf(driving.source) : "Another card", fromFile: !!driving?.source.table, part: "row", header, row };

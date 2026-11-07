@@ -626,4 +626,43 @@ describe("an action after the bird's flight", () => {
     expect(flown).toBe(true);
     expect(peck).not.toHaveBeenCalled();
   });
+
+  it("checks against the element as it was when the action began, not after the page scrolled to it", async () => {
+    let aimed = false;
+    const actor = { showing: true, goTo: async () => {}, peck: async () => {} };
+    const sendInputEvent = vi.fn();
+    const runInPage = vi.fn(async (script: string) => {
+      if (script.includes("safeToType: safeToType(el)")) {
+        return { role: "button", name: "Save draft", target: aimed ? "https://mail.example/send" : "https://mail.example/draft", riskyClick: true, safeToType: false, frameUrl: null };
+      }
+      aimed = true;
+      return { status: "aimed", x: 10, y: 10, width: 10, height: 10, name: "Save draft" };
+    });
+    const tab = { id: "tab-1", url: "https://mail.example/", foreignFrames: [], frames: [], runInPage, actor, sendInputEvent } as unknown as Tab;
+    const click = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} }).find(
+      ({ name }) => name === "click"
+    )!;
+
+    expect(await click.run({ ref: "e1" })).toMatch(/changed before the action happened/);
+    expect(sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  it("doesn't happen when the element changes while the bird pecks, just before the press", async () => {
+    let pecked = false;
+    const actor = { showing: true, goTo: async () => {}, peck: async () => void (pecked = true) };
+    const sendInputEvent = vi.fn();
+    const runInPage = vi.fn(async (script: string) =>
+      script.includes("safeToType: safeToType(el)")
+        ? { role: "button", name: "Save draft", target: pecked ? "https://mail.example/send" : "https://mail.example/draft", riskyClick: true, safeToType: false, frameUrl: null }
+        : { status: "aimed", x: 10, y: 10, width: 10, height: 10, name: "Save draft" }
+    );
+    const tab = { id: "tab-1", url: "https://mail.example/", foreignFrames: [], frames: [], runInPage, actor, sendInputEvent } as unknown as Tab;
+    const click = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} }).find(
+      ({ name }) => name === "click"
+    )!;
+
+    expect(await click.run({ ref: "e1" })).toMatch(/changed before the action happened/);
+    expect(pecked).toBe(true);
+    expect(sendInputEvent).not.toHaveBeenCalled();
+  });
 });

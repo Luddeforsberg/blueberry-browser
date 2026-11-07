@@ -524,22 +524,28 @@ export const createPageTools = <T extends PageTarget>({
   };
   // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
   // or the tab taken over while it flew, and an action must not follow that.
-  // The element must still be what it was before the flight, since what was allowed, or allowed for a card's runs, was
-  // that element.
-  const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
+  // The element must still be what it was when the action began, or before the flight, since what was allowed, or
+  // allowed for a card's runs, was that element.
+  const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing, pinned?: string): Promise<boolean> => {
     const actor = actorOn(tab);
     if (!actor) return true;
-    const before = identity(await describeRef(tab, ref).catch(() => null));
+    const before = pinned ?? (await identityOf(tab, ref));
     const found = await spotOfRef(tab, actor, ref);
     if (found) await actor.goTo(found.spot, words(found.name), kind, found.ref);
     if (!carryOn(tab)) return false;
-    if (identity(await describeRef(tab, ref).catch(() => null)) === before) return true;
+    return stillSame(tab, ref, before);
+  };
+  const identityOf = async (tab: T, ref: string) => {
+    const info = await describeRef(tab, ref).catch(() => null);
+    return JSON.stringify(info && [info.role, info.name, info.target, info.secret ?? false, info.frameUrl, info.frameOrigin ?? null, info.safeToType, info.riskyClick]);
+  };
+  // Checked again just before input goes in, after anything that waits.
+  const stillSame = async (tab: T, ref: string, pinned: string): Promise<boolean> => {
+    if ((await identityOf(tab, ref)) === pinned) return true;
     changedInFlight.add(tab.id);
     return false;
   };
-  const identity = (info: ElementInfo | null) =>
-    JSON.stringify(info && [info.role, info.name, info.target, info.secret ?? false, info.frameUrl, info.frameOrigin ?? null, info.safeToType, info.riskyClick]);
-  // Tabs where the element changed while the bird flew, so the action stopped.
+  // Tabs where the element changed before the action happened, so it stopped.
   const changedInFlight = new Set<string>();
   // While the card waits, it stands on what the card is about, then and whenever the user comes to look. Nothing waits
   // for this, so the card goes out as it always did.
@@ -551,6 +557,7 @@ export const createPageTools = <T extends PageTarget>({
   const carryOn = (tab: T) => !stopped() && canSee() && !tookOver(tab.id);
   const STOPPED = "The job was stopped, so that didn't happen.";
   const CHANGED_IN_FLIGHT = "What's there changed before the action happened, so it didn't. Look at the page again.";
+  const CHANGED_BEFORE = "changed-before";
   const leftOff = (tab: T) => {
     if (changedInFlight.delete(tab.id)) return CHANGED_IN_FLIGHT;
     return tookOver(tab.id) ?? (canSee() ? STOPPED : NO_ACCESS);
@@ -632,14 +639,17 @@ export const createPageTools = <T extends PageTarget>({
   // something covering it gets the scripted click sent straight to the element, not the real one.
   const clickRef = async (tab: T, ref: string, clicks: 1 | 2) => {
     const doing = clicks === 2 ? "Double-clicking" : "Clicking";
-    const scripted = () => onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks));
+    // What the element is as the action begins, which every later wait checks against.
+    const pinned = await identityOf(tab, ref);
+    const scripted = async () => ((await stillSame(tab, ref, pinned)) ? onRef<string>(tab, ref, (inner) => scriptedClick(inner, clicks)) : CHANGED_BEFORE);
     const finish = (result: string | null, note = "") => {
+      if (result === CHANGED_BEFORE) return leftOff(tab);
       if (result === null) return STALE_ELEMENT;
       if (result === "disabled") return "That element is disabled, so nothing happened.";
       return whereNow(tab).then((where) => (note ? `${where} ${note}` : where));
     };
     if (frameOf(tab, ref)) {
-      if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look"))) return leftOff(tab);
+      if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look", pinned))) return leftOff(tab);
       return finish(await scripted(), SCRIPTED);
     }
     // With a bird on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
@@ -653,14 +663,14 @@ export const createPageTools = <T extends PageTarget>({
     if (aim === null) return STALE_ELEMENT;
     if (aim.status === "disabled") return finish("disabled");
     if (!arm) {
-      if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
+      if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land", pinned))) return leftOff(tab);
       // Where it is now, as the page may have moved while the bird flew, and now the watch goes on.
       if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
       if (aim === null) return STALE_ELEMENT;
     }
     for (let tries = 0; aim?.status === "aimed" && tries <= RETRIES_AFTER_MISS; tries++) {
       await actorOn(tab)?.peck(aim.x!, aim.y!, clicks);
-      if (!carryOn(tab)) return leftOff(tab);
+      if (!carryOn(tab) || !(await stillSame(tab, ref, pinned))) return leftOff(tab);
       if (!(await clickAt(tab, { x: aim.x!, y: aim.y! }, clicks, () => carryOn(tab)))) return leftOff(tab);
       const arrived = await landed(() => tab.runInPage<boolean | "missed" | null>(inputLanded));
       if (arrived === "landed") return finish("done");
@@ -1071,8 +1081,10 @@ export const createPageTools = <T extends PageTarget>({
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
           const started = Date.now();
+          const pinned = await identityOf(tab, ref);
           // What's typed is never in these words, only where it's going.
-          if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch"))) return leftOff(tab);
+          if (!(await flyToRef(tab, ref, (name) => (name ? `Typing in ${clipWords(name)}` : "Typing"), "perch", pinned))) return leftOff(tab);
+          if (!(await stillSame(tab, ref, pinned))) return leftOff(tab);
           const result = await typeInField(tab, ref, text, started);
           if (result === "stopped") return leftOff(tab);
           if (result === "user-in-field") return USER_IN_FIELD;
@@ -1084,7 +1096,7 @@ export const createPageTools = <T extends PageTarget>({
           if (result !== "done") return "That element can't be typed into, so nothing happened.";
           if (submit) {
             await actorOn(tab)?.hop("Submitting");
-            if (!carryOn(tab)) return leftOff(tab);
+            if (!carryOn(tab) || !(await stillSame(tab, ref, pinned))) return leftOff(tab);
             if (tab.actor?.touchedSince(started)) {
               usersFields.add(`${tab.id}/${ref}`);
               return USER_IN_FIELD;
