@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, PERCH, pickRows, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, PERCH, pickRows, roomToGrow, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -250,5 +250,39 @@ describe('flights along a line', () => {
         expect(flightDuration(flightPath(from, to, true))).toBeGreaterThanOrEqual(600)
         expect(flightDuration(flightPath(from, { ...to, x: 20_000 }, true))).toBe(900)
         expect(flightDuration([{ x: 0, y: 0, offset: 0 }, { x: 1, y: 0, offset: 1 }])).toBe(600)
+    })
+})
+
+describe('roomToGrow', () => {
+    const card = { x: 0, y: 0, width: 440, height: 300 }
+    const right = { x: 600, y: 0, width: 440, height: 300 }
+    const below = { x: 0, y: 500, width: 440, height: 300 }
+
+    it('lets a card grow as far as asked with nothing in the way', () => {
+        expect(roomToGrow(card, [], { width: 1200, height: 1200 })).toEqual({ width: 1200, height: 1200 })
+        expect(roomToGrow(card, [{ x: 0, y: -400, width: 440, height: 300 }], { width: 900, height: 900 })).toEqual({ width: 900, height: 900 })
+    })
+
+    it('stops short of a card to its right or below it, and nothing else moves', () => {
+        expect(roomToGrow(card, [right], { width: 900, height: 300 })).toEqual({ width: 576, height: 300 })
+        expect(roomToGrow(card, [below], { width: 440, height: 900 })).toEqual({ width: 440, height: 476 })
+        expect(roomToGrow(card, [right, below], { width: 900, height: 900 })).toEqual({ width: 576, height: 476 })
+        // Up to the edge it's allowed, and one past it stops there.
+        expect(roomToGrow(card, [right], { width: 576, height: 300 })).toEqual({ width: 576, height: 300 })
+        expect(roomToGrow(card, [right], { width: 601, height: 300 })).toEqual({ width: 576, height: 300 })
+    })
+
+    it('at a card off its corner, stops at whichever edge leaves it bigger', () => {
+        const corner = { x: 600, y: 400, width: 200, height: 200 }
+        expect(roomToGrow(card, [corner], { width: 1000, height: 500 })).toEqual({ width: 1000, height: 376 })
+        expect(roomToGrow(card, [corner], { width: 700, height: 1000 })).toEqual({ width: 576, height: 1000 })
+    })
+
+    it('never shrinks a card below where it started, and a card it already covered never stops it', () => {
+        const close = { x: 460, y: 0, width: 440, height: 300 }
+        expect(roomToGrow(card, [close], { width: 800, height: 300 })).toEqual({ width: 440, height: 300 })
+        const under = { x: 100, y: 100, width: 200, height: 200 }
+        expect(roomToGrow(card, [under], { width: 900, height: 900 })).toEqual({ width: 900, height: 900 })
+        expect(roomToGrow(card, [right], { width: 380, height: 260 })).toEqual({ width: 380, height: 260 })
     })
 })

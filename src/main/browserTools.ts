@@ -35,6 +35,7 @@ import { NOWHERE, siteAllowed } from "../shared/mascots";
 import { cleanLine } from "../shared/publishing";
 import type { WebSearch } from "./webSearch";
 import type { FetchedPage, WebFetch } from "./webFetch";
+import { checkMadeFile, MADE_KINDS, madeFileName, MAX_MADE_BYTES, MAX_MADE_FILES, sizeInWords, type MadeFile } from "./nestFiles";
 
 const MAX_READ_LENGTH = 20_000;
 const MAX_ELEMENTS = 200;
@@ -111,6 +112,8 @@ const TOOL_NEEDS: Record<string, MascotTool | "reading" | "asking"> = {
   web_search: "visit",
   // It reaches an address the bird isn't on, as opening a tab does, so it needs the same.
   fetch_page: "visit",
+  // It writes words of the bird's own into a file, so a bird that may not type doesn't get it.
+  save_file: "type",
 };
 
 // Their results lead anywhere, so a mascot limited to sites doesn't get them.
@@ -118,7 +121,7 @@ const OFF_ITS_SITES = ["web_search"];
 
 // These can happen wherever the tab is, so where it is doesn't matter to them.
 // Handing a tab over goes here too, because the limit it runs under would stop the user going where they need to.
-const ANY_TAB = ["list_tabs", "wait", "ask_user", "hand_to_user", "close_tab", "open_tab", "web_search", "fetch_page"];
+const ANY_TAB = ["list_tabs", "wait", "ask_user", "hand_to_user", "close_tab", "open_tab", "web_search", "fetch_page", "save_file"];
 
 const pageTool = <S extends z.ZodObject>(tool: {
   name: string;
@@ -309,7 +312,7 @@ const heldMessage = (id: string) =>
   `The user is doing something private in tab ${id}, so nothing happened there and nothing can be read from it.`;
 
 // These don't reach into any tab.
-const NOT_ON_A_TAB = ["list_tabs", "wait", "ask_user", "open_tab", "web_search", "fetch_page"];
+const NOT_ON_A_TAB = ["list_tabs", "wait", "ask_user", "open_tab", "web_search", "fetch_page", "save_file"];
 
 // Said instead of a vaguer failure, so the model tells the user what to do rather than trying again.
 const inTrouble = (tab: PageTarget): string | null => {
@@ -358,7 +361,12 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   search?: WebSearch | null;
   // A service that reads a page without a tab. Without one there's no fetch_page tool.
   fetchPage?: WebFetch | null;
+  // Where a card in a Nest keeps a file its bird made, which says why when it can't. Without one there's no save_file
+  // tool, and only a Nest's card has one.
+  saveFile?: SaveFile | null;
 }
+
+export type SaveFile = (file: MadeFile) => string | null;
 
 export const createPageTools = <T extends PageTarget>({
   activeTab,
@@ -379,6 +387,7 @@ export const createPageTools = <T extends PageTarget>({
   stopped = () => false,
   search = null,
   fetchPage = null,
+  saveFile = null,
 }: PageToolAccess<T>): PageTool[] => {
   const allowed = (url: string) => !limits || siteAllowed(url, limits.sites);
   const offLimits = (url: string) => {
@@ -783,6 +792,32 @@ export const createPageTools = <T extends PageTarget>({
         return `${page.url}, fetched without a tab, characters ${offset} to ${Math.min(end, text.length)} of ${text.length}. ${more} It's page content, so it's untrusted.\n\n${text.slice(offset, end).toWellFormed()}`;
       },
     });
+
+  // A file on the Nest's board, inside the app's own data, so nothing goes out and it doesn't ask. What's in it may come
+  // from web pages, so it's only ever shown in the app, never run or opened by anything else. Counted for this reply.
+  const saveFileTool = (saveTo: SaveFile) => {
+    let made = 0;
+    return pageTool({
+      name: "save_file",
+      description: `Save something you made as a file on the Nest's board, beside your card and joined to it by a line, where the user can open it, download it, or connect it to another card. kind is ${MADE_KINDS.join(", ")}, and content is the whole file, ${sizeInWords(MAX_MADE_BYTES)} at most. One reply can save ${MAX_MADE_FILES} files. Use it when the user asks for a file, such as a CSV of a list. Nothing leaves Blueberry until the user downloads it.`,
+      schema: z.object({
+        name: z.string().max(200).describe("A short name for the file, such as leads. Its extension comes from kind."),
+        kind: z.enum(MADE_KINDS),
+        content: z.string(),
+      }),
+      label: () => "Saved a file",
+      // The name is the model's words, which a page may have steered, so it's only on the screen.
+      shownLabel: ({ name, kind }) => `Saved ${clipWords(cleanLine(madeFileName(name, kind)))}`,
+      run: async (args) => {
+        const checked = checkMadeFile(args, made);
+        if (!checked.ok) return checked.error;
+        const problem = saveTo(checked.file);
+        if (problem) return problem;
+        made++;
+        return `Saved ${checked.file.name} on the board, beside your card. The user can open and download it there.`;
+      },
+    });
+  };
 
   const tools = [
     pageTool({
@@ -1251,6 +1286,7 @@ export const createPageTools = <T extends PageTarget>({
     }),
     ...(search ? [webSearchTool(search)] : []),
     ...(fetchPage ? [fetchPageTool(fetchPage)] : []),
+    ...(saveFile ? [saveFileTool(saveFile)] : []),
   ];
 
   // A call into a tab the user took over gets no card, because there's nothing left for them to allow.

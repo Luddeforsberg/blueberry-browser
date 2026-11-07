@@ -736,3 +736,48 @@ describe("a click allowed for a card's runs", () => {
     expect(tools.filter((tool) => tool.grantKey).map((tool) => tool.name).sort()).toEqual(["click", "go_to", "open_tab"]);
   });
 });
+
+describe("save_file", () => {
+  const tab = { id: "tab-1", url: "https://page.example/", foreignFrames: [] } as unknown as Tab;
+  const toolsWith = (saveFile: ((file: { name: string; type: string; data: Uint8Array }) => string | null) | null, limits?: { sites: string[]; tools: MascotTool[] }) =>
+    createPageTools({
+      activeTab: () => tab,
+      allTabs: () => [tab],
+      openTab: () => tab,
+      closeTab: () => true,
+      ask: async () => null,
+      canSee: () => true,
+      onUse: () => {},
+      saveFile,
+      limits: limits && { name: "Scout", ...limits },
+    });
+  const saveOf = (tools: ReturnType<typeof toolsWith>) => tools.find(({ name }) => name === "save_file");
+
+  it("is offered only where a Nest's card gives somewhere to keep the file, and to a bird limited by tools only if it may type", () => {
+    expect(saveOf(toolsWith(null))).toBeUndefined();
+    expect(saveOf(toolsWith(() => null))).toBeDefined();
+    expect(saveOf(toolsWith(() => null, { sites: [], tools: [] }))).toBeUndefined();
+    expect(saveOf(toolsWith(() => null, { sites: [], tools: ["visit", "click"] }))).toBeUndefined();
+    expect(saveOf(toolsWith(() => null, { sites: [], tools: ["type"] }))).toBeDefined();
+    // Limited to sites, it still works: it reaches no page.
+    expect(saveOf(toolsWith(() => null, { sites: ["github.com"], tools: ["type"] }))).toBeDefined();
+  });
+
+  it("never asks, keeps only a checked file, and saves five in one reply at most", async () => {
+    const kept: { name: string; type: string; data: Uint8Array }[] = [];
+    const tool = saveOf(toolsWith((file) => (kept.push(file), null), { sites: ["github.com"], tools: ["type"] }))!;
+    expect(tool.describe).toBeUndefined();
+    expect(await tool.refuses!({ name: "a", kind: "md", content: "x" })).toBeNull();
+    expect(await tool.run({ name: "../../leads", kind: "csv", content: "Company\nBrygga" })).toBe("Saved leads.csv on the board, beside your card. The user can open and download it there.");
+    expect(kept[0]).toEqual({ name: "leads.csv", type: "text/csv", data: new TextEncoder().encode("Company\nBrygga") });
+    expect(tool.label({ name: "leads", kind: "csv", content: "x" })).toBe("Saved a file");
+    for (let index = 1; index < 5; index++) await tool.run({ name: `f${index}`, kind: "txt", content: "x" });
+    expect(kept).toHaveLength(5);
+    expect(await tool.run({ name: "six", kind: "txt", content: "x" })).toBe("Nothing was saved: one reply can save 5 files at most, and this one has.");
+    expect(kept).toHaveLength(5);
+    // A kind off the list never reaches where it's kept.
+    const fresh = saveOf(toolsWith((file) => (kept.push(file), null)))!;
+    await expect(Promise.resolve().then(() => fresh.run({ name: "page", kind: "html", content: "<script></script>" }))).rejects.toThrow();
+    expect(kept).toHaveLength(5);
+  });
+});

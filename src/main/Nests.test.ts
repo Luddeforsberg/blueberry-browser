@@ -35,9 +35,16 @@ let approved: boolean[];
 let grantChecks: ((key: string) => boolean)[];
 // While set, each reply reports these tokens.
 let usage: { input: number; cached: number; output: number } | null;
+// Tools each reply calls before it answers, as the model would, and what they said back.
+let calls: { name: string; args: unknown }[];
+let results: string[];
 const model: StreamReply = async function* (messages, signal, options) {
   sent.push(messages);
   tools = options.tools;
+  for (const call of calls.splice(0)) {
+    const tool = options.tools.find((each) => each.name === call.name);
+    results.push(tool ? await tool.run(call.args) : `No ${call.name} here`);
+  }
   if (usage) options.onUsage?.({ ...usage, total: usage.input + usage.output });
   if (asking) {
     if (options.granted) grantChecks.push(options.granted);
@@ -125,6 +132,8 @@ beforeEach(() => {
   approved = [];
   grantChecks = [];
   usage = null;
+  calls = [];
+  results = [];
 });
 
 const TABLE = (rows: number) =>
@@ -1784,5 +1793,169 @@ describe("Trust and real work in a Nest", () => {
     // A card that ran once has no estimate, and nothing adds the Nest up.
     expect(cardOf(scout.id).perRun).toBeNull();
     expect(context.nests.board(nest)).not.toHaveProperty("cost");
+  });
+});
+
+describe("Files on the canvas", () => {
+  const READS_ALL = { model: "gpt-test", pdf: true, image: true };
+  const PDF = Buffer.from("%PDF-1.4\n1 0 obj << /Type /Page >> endobj\n%%EOF\n", "latin1");
+  const PLACE = { at: { x: 100, y: 100 }, taken: [] };
+  const blocksOf = (messages: ReplyMessage[]) => messages.at(-1)!.content as Exclude<ReplyMessage["content"], string>;
+  const textOf = (messages: ReplyMessage[]) =>
+    blocksOf(messages)
+      .map((block) => (block.type === "text" ? block.text : `[${block.type}]`))
+      .join("\n");
+  const fileCards = (nests: Nests, nest: string) => nests.board(nest)!.cards.filter((card) => card.file);
+
+  it("makes a card of a file dropped on the board, where it landed, refusing what + refuses in the same words, and a CSV a table", () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    const dropped = nests.dropFile(nest, "pitch.txt", Buffer.from("Brygga sells boats\nin Malmö"), READS_ALL, PLACE);
+    expect(dropped).toEqual({ ok: true, cardId: expect.any(String) });
+    expect(nests.card((dropped as { cardId: string }).cardId)).toMatchObject({
+      x: 100,
+      y: 100,
+      chatId: null,
+      mascotId: null,
+      file: { name: "pitch.txt", type: "text/plain", made: false, preview: "Brygga sells boats\nin Malmö" },
+    });
+    // Another dropped in the same place goes under it rather than on it.
+    const second = nests.dropFile(nest, "deck.pdf", PDF, READS_ALL, PLACE) as { cardId: string };
+    expect(nests.card(second.cardId)!.y).toBeGreaterThan(100);
+    expect(JSON.stringify(nests.board(nest))).not.toContain(PDF.toString("base64"));
+
+    const refusal = (name: string, bytes: Uint8Array) => nests.attachFile({ nestId: nest }, name, bytes, READS_ALL);
+    expect(nests.dropFile(nest, "brief.docx", Buffer.from("PK"), READS_ALL, PLACE)).toEqual(refusal("brief.docx", Buffer.from("PK")));
+    expect(nests.dropFile(nest, "fake.pdf", Buffer.from("not a pdf"), READS_ALL, PLACE)).toEqual({ ok: false, error: "fake.pdf doesn’t look like the PDF file its name says." });
+    expect(nests.dropFile(nest, "deck.pdf", PDF, { ...READS_ALL, pdf: false }, PLACE)).toMatchObject({ ok: false, error: expect.stringContaining("can’t read PDFs") });
+    const table = nests.dropFile(nest, "leads.csv", Buffer.from("Company\nBrygga"), READS_ALL, PLACE) as { cardId: string };
+    expect(nests.card(table.cardId)).toMatchObject({ file: null, table: { name: "leads", count: 1 } });
+  });
+
+  it("gives a file on a line to the card it goes to, said on the line, and the card keeps its own copy when the file's card goes", async () => {
+    const { nests, sendAndWait, deleted } = setup();
+    const nest = nests.create();
+    const pitch = nests.dropFile(nest, "pitch.pdf", PDF, READS_ALL, PLACE) as { cardId: string };
+    const writer = nests.addCard(nest, { x: 700, y: 100, from: pitch.cardId })!;
+    expect(nests.board(nest)!.lines[0].crosses).toEqual({ stale: false, whole: null, each: null, files: { names: ["pitch.pdf"], leftOut: [] } });
+
+    await sendAndWait(writer.id, "Sum up the pitch");
+    expect(blocksOf(sent[0]).map((block) => block.type)).toEqual(["text", "file", "text"]);
+    expect(blocksOf(sent[0])[1]).toMatchObject({ mime_type: "application/pdf", data: PDF.toString("base64") });
+    expect(textOf(sent[0])).toContain('The user put the PDF "pitch.pdf" on the board and connected it to this card.');
+    expect(textOf(sent[0])).toContain("untrusted");
+    expect(nests.card(writer.id)!.attachments).toMatchObject([{ kind: "file", name: "pitch.pdf" }]);
+
+    // A reply sends it once, not twice, and deleting the file's card changes nothing on a card that sent with it.
+    await sendAndWait(writer.id, "Shorter");
+    expect(blocksOf(sent[1]).filter((block) => block.type === "file")).toHaveLength(1);
+    expect(nests.deleteCard(pitch.cardId)).toBe(true);
+    expect(deleted).toEqual([]);
+    expect(nests.fileContent(pitch.cardId)).toBeNull();
+    expect(nests.card(writer.id)!.attachments).toMatchObject([{ kind: "file", name: "pitch.pdf" }]);
+    await sendAndWait(writer.id, "Shorter still");
+    expect(blocksOf(sent[2])[1]).toMatchObject({ type: "file", data: PDF.toString("base64") });
+  });
+
+  it("passes a file on down the chain, and leaves out one a card has no room for, saying so", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const pitch = nests.dropFile(nest, "pitch.txt", Buffer.from("Brygga sells boats"), READS_ALL, PLACE) as { cardId: string };
+    const scout = nests.addCard(nest, { x: 700, y: 100, from: pitch.cardId, mascotId: "scout" })!;
+    replies.push("Brygga is a boat maker in Malmö.");
+    await sendAndWait(scout.id, "Who is Brygga?");
+    const writer = nests.addCard(nest, { x: 1400, y: 100, from: scout.id })!;
+    const line = nests.board(nest)!.lines.find((each) => each.to === writer.id)!;
+    expect(line.crosses).toMatchObject({ whole: { kind: "thread", answers: 1 }, files: { names: ["pitch.txt"], leftOut: [] } });
+    await sendAndWait(writer.id, "Write to them");
+    expect(textOf(sent[1])).toContain('<attached_file name="pitch.txt">\nBrygga sells boats\n</attached_file>');
+    expect(textOf(sent[1])).toContain("<card_thread");
+
+    // A card with five of its own has no room for more.
+    const full = nests.addCard(nest, { x: 1400, y: 600, from: pitch.cardId })!;
+    for (let index = 0; index < 5; index++) nests.addNote({ cardId: full.id }, `Note ${index}`);
+    expect(nests.board(nest)!.lines.find((each) => each.to === full.id)!.crosses).toMatchObject({ files: { names: [], leftOut: ["pitch.txt"] } });
+    await sendAndWait(full.id, "Go");
+    expect(textOf(sent[2])).toContain('Left out, since this card had no room for more files: "pitch.txt"');
+    expect(textOf(sent[2])).not.toContain("Brygga sells boats");
+  });
+
+  it("offers save_file to a card in a Nest only, never to a plain chat or a run of For each row", async () => {
+    const { nests, chats, sendAndWait, replyEnded } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find a company");
+    expect(tools.map((tool) => tool.name)).toContain("save_file");
+
+    let done = replyEnded();
+    chats.send(null, "Find a company", { seePage: false, userPresent: true });
+    await done;
+    expect(tools.map((tool) => tool.name)).not.toContain("save_file");
+
+    const each = nests.addCard(nest, { x: 600, y: 0, from: scout.id })!;
+    done = replyEnded();
+    expect(nests.sendEach(each.id, "Find their site")).toEqual({ ok: true });
+    await done;
+    expect(tools.map((tool) => tool.name)).not.toContain("save_file");
+  });
+
+  it("keeps what a card's bird makes as a file's card beside it, joined by a line, that opens in the app and feeds the next card", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    calls.push({ name: "save_file", args: { name: "../leads.html", kind: "csv", content: "Company,City\nBrygga,Malmö\n=HYPERLINK(1),x" } });
+    replies.push("Saved the list.");
+    await sendAndWait(scout.id, "Make a CSV of the leads");
+    expect(results).toEqual(["Saved leads.csv on the board, beside your card. The user can open and download it there."]);
+    const [made] = fileCards(nests, nest);
+    expect(made).toMatchObject({ autoPlaced: true, file: { name: "leads.csv", type: "text/csv", made: true, preview: "Company,City\nBrygga,Malmö\n=HYPERLINK(1),x" } });
+    // Beside the card that made it, clear of it, and joined to it.
+    expect(made.x).toBeGreaterThanOrEqual(440);
+    expect(nests.board(nest)!.lines).toMatchObject([{ from: scout.id, to: made.id }]);
+    expect(nests.fileContent(made.id)).toEqual({ table: { header: ["Company", "City"], rows: [["Brygga", "Malmö"], ["=HYPERLINK(1)", "x"]] } });
+    expect(nests.fileDownload(made.id)).toMatchObject({ name: "leads.csv", type: "text/csv" });
+
+    const writer = nests.addCard(nest, { x: 1200, y: 0, from: made.id })!;
+    await sendAndWait(writer.id, "Write to each");
+    expect(textOf(sent[1])).toContain('The CSV file "leads.csv" was written by a bird on another card of this Nest and reached this card through a line.');
+    expect(textOf(sent[1])).toContain("Brygga,Malmö");
+
+    // A file's card sends nothing and reads from nothing.
+    expect(nests.sendCard(made.id, "Hello")).toEqual({ ok: false, error: "A file’s card has nothing to send." });
+    expect(nests.addInput(made.id, scout.id)).toEqual({ ok: false, error: "A file’s card can’t read from another card." });
+  });
+
+  it("saves five files in one reply at most, each placed clear of the others", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    for (let index = 0; index < 6; index++) calls.push({ name: "save_file", args: { name: `note ${index}`, kind: "md", content: `# Note ${index}` } });
+    await sendAndWait(scout.id, "Write six notes");
+    expect(results.at(-1)).toBe("Nothing was saved: one reply can save 5 files at most, and this one has.");
+    const made = fileCards(nests, nest);
+    expect(made.map((card) => card.file!.name)).toEqual(["note 0.md", "note 1.md", "note 2.md", "note 3.md", "note 4.md"]);
+    expect(new Set(made.map((card) => `${card.x},${card.y}`)).size).toBe(5);
+    // The next reply may save again.
+    calls.push({ name: "save_file", args: { name: "more", kind: "txt", content: "More" } });
+    await sendAndWait(scout.id, "One more");
+    expect(fileCards(nests, nest)).toHaveLength(6);
+  });
+
+  it("starts the next simple message as a card once Berry has answered a question about the board", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("Five rivals.");
+    await sendAndWait(scout.id, "Find rivals");
+    plans.push({ reply: "Scout found five rivals.", ask: false, answers_board: true, cards: [] });
+    await nests.ask(nest, "What did Scout find?", { at: { x: 0, y: 400 }, taken: [] });
+    expect(nests.board(nest)!.talk.at(-1)).toMatchObject({ open: false, messages: [{ role: "user" }, { role: "berry", text: "Scout found five rivals." }] });
+
+    plans.push({ reply: "", ask: false, cards: [{ key: "c1", bird: BERRY.id, prompt: "Find a sixth rival", from: [], for_each_row: false, waits_for_user: false, table_of: null, attached: [] }] });
+    await nests.ask(nest, "Find a sixth rival", { at: { x: 0, y: 400 }, taken: [] });
+    const cards = nests.board(nest)!.cards;
+    expect(cards).toHaveLength(2);
+    expect(cards[1]).toMatchObject({ plan: null, chatId: expect.any(String) });
   });
 });

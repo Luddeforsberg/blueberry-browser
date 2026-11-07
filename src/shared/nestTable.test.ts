@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cellParts, combinedTable, crossingWords, eachWords, findTable, MAX_CROSSING_LENGTH, MAX_RUNS, missingRows, plainCell, rowName, rowTooLong, runCountProblem, splitRow, tableMarkdown } from "./nestTable";
+import { cellParts, combinedTable, crossingWords, eachWords, filesWords, findTable, lineWords, MAX_CROSSING_LENGTH, MAX_RUNS, missingRows, plainCell, rowName, rowTooLong, runCountProblem, splitRow, tableMarkdown } from "./nestTable";
 
 const COMPANIES = [
   "Here are the companies I found.",
@@ -222,5 +222,24 @@ describe("what crosses a line, in words", () => {
     expect(rowTooLong(["A"], [["a".repeat(MAX_CROSSING_LENGTH - 18)]])).toBe(false);
     expect(rowTooLong(["A"], [["a".repeat(MAX_CROSSING_LENGTH - 17)]])).toBe(true);
     expect(rowTooLong(["A"], [])).toBe(false);
+  });
+});
+
+describe("files on a line, in words", () => {
+  it("names the files that cross, and any the card has no room for", () => {
+    expect(filesWords({ names: ["pitch.pdf"], leftOut: [] })).toBe("1 file: pitch.pdf");
+    expect(filesWords({ names: ["pitch.pdf", "chart.png"], leftOut: [] })).toBe("2 files: pitch.pdf and chart.png");
+    expect(filesWords({ names: ["a.md", "b.md", "c.md", "d.md"], leftOut: [] })).toBe("4 files: a.md, b.md and 2 more");
+    expect(filesWords({ names: ["Smith, Jones.pdf"], leftOut: [] })).toBe("1 file: Smith, Jones.pdf");
+    expect(filesWords({ names: ["a.pdf"], leftOut: ["big.pdf"] })).toBe("1 file: a.pdf, with 1 file left out, since the card has no room for it: big.pdf");
+    expect(filesWords({ names: [], leftOut: ["x.pdf", "y.pdf"] })).toBe("2 files left out, since the card has no room for them: x.pdf and y.pdf");
+  });
+
+  it("puts a card's part and its files together, or either alone", () => {
+    const thread = { kind: "thread" as const, answers: 1, earlier: 0, words: 900, cut: false };
+    expect(lineWords({ whole: thread, files: { names: ["pitch.pdf"], leftOut: [] } }, "Scout")).toBe("Scout’s answer, about 900 words, and 1 file: pitch.pdf");
+    expect(lineWords({ whole: null, files: { names: ["pitch.pdf"], leftOut: [] } }, "pitch.pdf")).toBe("1 file: pitch.pdf");
+    expect(lineWords({ whole: thread }, "Scout")).toBe("Scout’s answer, about 900 words");
+    expect(lineWords({ whole: null, files: { names: [], leftOut: [] } }, "Scout")).toBeNull();
   });
 });

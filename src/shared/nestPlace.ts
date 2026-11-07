@@ -60,6 +60,31 @@ const clearOf = (card: Rect, others: readonly Rect[]): number => {
   }
 };
 
+// Left between a card being made bigger and the card it stops at: the room settling keeps, so nothing moves after.
+const RESIZE_GAP = MARGIN;
+
+const covers = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+// How big a card being made bigger from its bottom-right corner may get: it stops short of the first card in its way, to
+// its right or below it, and where one is both, at whichever edge leaves it bigger. A card it already covered when the
+// drag started doesn't stop it, so it can always be made smaller, or pulled off one. Nothing else moves.
+export const roomToGrow = (start: Rect, others: readonly Rect[], want: { width: number; height: number }): { width: number; height: number } => {
+  const inWay = others.filter((other) => !covers(start, other));
+  let { width, height } = want;
+  for (let tries = 0; tries < inWay.length; tries++) {
+    const hit = inWay.find((other) => covers({ x: start.x, y: start.y, width, height }, other));
+    if (!hit) break;
+    // It can't be above or to the left: the card grows from where it starts, and didn't cover it there.
+    const right = hit.x >= start.x + start.width;
+    const below = hit.y >= start.y + start.height;
+    const narrower = Math.max(start.width, hit.x - RESIZE_GAP - start.x);
+    const shorter = Math.max(start.height, hit.y - RESIZE_GAP - start.y);
+    if (right && (!below || narrower * height >= width * shorter)) width = Math.min(width, narrower);
+    else height = Math.min(height, shorter);
+  }
+  return { width, height };
+};
+
 // After cards have grown, such as when an answer or a table arrives: each card covered by one above it moves straight
 // down, only as far as it must, past every card in the way, if it was placed for the user and never moved by hand.
 // Nothing else moves, so a card the user placed stays where it is, even when one grew over it. Top to bottom, so one

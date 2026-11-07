@@ -129,6 +129,11 @@ const csvCell = (cell: string): string => {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
+// A CSV file a bird wrote, as it wrote it: every cell's words kept exactly, Markdown and all, but a cell a spreadsheet would
+// run as a formula starts with an apostrophe, since its words may have come from web pages.
+export const fileCsv = ({ header, rows }: PickedRows): string =>
+  `\uFEFF${[header, ...rows].map((cells) => cells.map((cell) => { const text = guard(cell); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; }).join(",")).join("\r\n")}\r\n`;
+
 // A CSV file Excel and Sheets both open as it is: a byte order mark so Excel reads it as UTF-8, and CRLF line ends.
 export const toCsv = ({ header, rows }: PickedRows): string => `\uFEFF${[header, ...rows].map((cells) => cells.map(csvCell).join(",")).join("\r\n")}\r\n`;
 

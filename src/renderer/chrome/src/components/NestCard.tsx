@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BaseEdge, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
-import { ArrowLeft, GitFork, GitMerge, Maximize2, Minimize2, Table2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
-import { combinedTable, crossingWords, eachWords, findTable, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
+import { ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, Table2, X } from 'lucide-react'
+import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestPlanned, NestTableFile } from '@shared/library'
+import { combinedTable, eachWords, findTable, lineWords, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
 import { BERRY_ID } from '@shared/mascots'
 import { costWords } from '@shared/modelPrices'
 import { useShell } from '../contexts/ShellContext'
@@ -21,6 +21,7 @@ import { Attachments, useAttaching } from './NestAttachments'
 import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
 import { CARD_PROSE, CellText, TableMenu, TableResult, useCut, type PickMode, type WorkingRows } from './NestTable'
+import { formatBytes } from './downloadStatus'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 export type LineEdge = Edge<{ draft: boolean }, 'line'>
@@ -204,6 +205,9 @@ export interface CardBox {
 
 const boxStyle = (box: CardBox): React.CSSProperties => ({ width: box.width, height: box.fill ? '100%' : undefined })
 
+// Made wider than usual from its corner, a table's long cells wrap rather than being cut. At the usual width they stay one line.
+const wide = (box: CardBox) => box.fill && box.width > CARD_WIDTH
+
 // The card's bottom-right corner, which makes it bigger or smaller. React Flow's own control, which takes the press, so
 // it never moves the card, pans the board or pulls a line out.
 const ResizeCorner: React.FC<{ cardId: string }> = ({ cardId }) => {
@@ -288,7 +292,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                     </CardButton>
                 </span>
             </div>
-            {inputs.length > 0 && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(inputs)}</p>}
+            {withWhat(inputs) && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(inputs)}</p>}
             <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {thread &&
                 (open ? (
@@ -329,6 +333,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                                     onPick={(index, mode) => board.pick(card.id, reply, table, index, mode)}
                                     here={here}
                                     fill={box.fill}
+                                    wrap={wide(box)}
                                 />
                             </div>
                         )}
@@ -384,7 +389,7 @@ interface InputView {
 
 // What a card goes by on a line: its bird's name, as Show Berry has it, or a file's title.
 const nameOn = (source: NestCard, mascot: MascotProfile, showBerry: boolean) =>
-    source.table ? source.table.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
+    source.table ? source.table.name : source.file ? source.file.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
 
 const useInputs = (cardId: string): InputView[] => {
     const board = useBoard()
@@ -399,7 +404,7 @@ const useInputs = (cardId: string): InputView[] => {
             line,
             source,
             name: nameOn(source, find(source.mascotId), showBerry),
-            answered: source.table ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
+            answered: source.table || source.file ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
             running: thread?.partial != null,
             rows: source.table ? source.table.count : source.each ? source.each.runs.length : answer ? (findTable(answer)?.rows.length ?? 0) : 0
         }
@@ -414,12 +419,16 @@ const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? ''
 
 // What a card on a line gets, in the words its header and reply field use.
 const getsWhat = ({ line, name, source }: InputView) =>
-    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : `${name}’s thread`
+    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : source.file ? name : `${name}’s thread`
 
 // What a sent card got, exactly, as main counts what crosses: "With Scout’s thread (2 answers) and 1 card before it,
 // about 1,800 words".
-const withWhat = (inputs: readonly InputView[]) =>
-    `With ${inputs.map((input) => (input.line.crosses?.whole ? crossingWords(input.line.crosses.whole, input.name) : getsWhat(input))).join(' · ')}`
+// Files aren't named here: once it's sent, the card's own copies show on its paperclip line, which stays true after the
+// file's card is gone.
+const withWhat = (inputs: readonly InputView[]): string | null => {
+    const words = inputs.filter((input) => !input.source.file).map((input) => (input.line.crosses?.whole ? lineWords({ whole: input.line.crosses.whole }, input.name) : null) ?? getsWhat(input))
+    return words.length > 0 ? `With ${words.join(' · ')}` : null
+}
 
 // What a running card is doing: the bird's own words if it said any, or the step it's on. Before either, its status
 // shimmers in the header instead.
@@ -590,7 +599,9 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
             ? `${plural(input.line.picked, 'row')} from ${input.name}`
             : input.source.table
               ? `every row of ${input.name}`
-              : input.source.each
+              : input.source.file
+                ? input.name
+                : input.source.each
                 ? `${input.name}’s table`
                 : `${input.name}’s thread`
     const gets =
@@ -608,11 +619,19 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
         : forEach
           ? [
                 driving?.line.crosses?.each ? `${eachWords(driving.line.crosses.each)}${several ? ` from ${driving.name}` : ''}` : null,
-                ...inputs.filter((input) => input !== driving && input.line.crosses?.shared).map((input) => `with ${crossingWords(input.line.crosses!.shared!, input.name)}`)
+                ...inputs.flatMap((input) => {
+                    // Every run gets the other inputs whole, and every file any line brings.
+                    const crossing = input.line.crosses
+                    const words = crossing && lineWords({ whole: input === driving ? null : (crossing.shared ?? null), files: crossing.files }, input.name)
+                    return words ? [`with ${words}`] : []
+                })
             ]
                 .filter(Boolean)
                 .join(' · ') || null
-          : inputs.flatMap((input) => (input.line.crosses?.whole ? [crossingWords(input.line.crosses.whole, input.name)] : [])).join(' · ') || null
+          : inputs.flatMap((input) => {
+                const words = input.line.crosses ? lineWords(input.line.crosses, input.name) : null
+                return words ? [words] : []
+            }).join(' · ') || null
     // Add an input: another card on the board, after the ones it has.
     const inputItems = board.inputCandidates(card.id).map((source) => ({
         label: `Add an input: ${nameOn(source, find(source.mascotId), showBerry)}`,
@@ -949,6 +968,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
                             here={here}
                             every={open}
                             fill={box.fill}
+                            wrap={wide(box)}
                             own={{
                                 header: <ColumnName cardId={card.id} name={each.column} naming={!!each.naming} />,
                                 cell: (index) => <RunCell view={views[index]} onOpen={() => openRunOf(views[index].id)} />
@@ -1074,10 +1094,122 @@ const TableCard: React.FC<{ card: NestCard; file: NestTableFile; box: CardBox }>
                     onPick={(index, mode) => void pick(index, mode)}
                     here={here}
                     fill={box.fill}
+                    wrap={wide(box)}
                 />
             </div>
             <LooksRight cardId={card.id} />
             <ResizeCorner cardId={card.id} />
+        </div>
+    )
+}
+
+// What a file's card says it is, beside its name.
+const FILE_KINDS: Record<string, string> = {
+    'application/pdf': 'PDF',
+    'image/png': 'PNG image',
+    'image/jpeg': 'JPEG image',
+    'image/webp': 'WebP image',
+    'image/gif': 'GIF image',
+    'text/plain': 'Text',
+    'text/markdown': 'Markdown',
+    'text/csv': 'CSV',
+    'application/json': 'JSON'
+}
+
+// What a file's card shows of its file, read from main once while it's drawn and wanted, since a file never changes.
+const useFileContent = (cardId: string, wanted: boolean): NestFileContent | null => {
+    const { samples } = useBoard()
+    const [content, setContent] = useState<NestFileContent | null>(null)
+    useEffect(() => {
+        if (!wanted || content || samples) return undefined
+        let live = true
+        void window.chromeAPI.nests.fileContent(cardId).then((read) => {
+            if (live) setContent(read)
+        })
+        return () => {
+            live = false
+        }
+    }, [cardId, wanted, content, samples])
+    return content
+}
+
+// A file opened on its card, drawn here and nowhere else: Markdown with the chat's renderer as a stranger's, so nothing in
+// it loads or links anywhere, a CSV as its rows, text and JSON as they are, an image as itself.
+const FileWhole: React.FC<{ file: NestFile; content: NestFileContent | null }> = ({ file, content }) => {
+    if (!content) return <p role="status" className="text-13"><span className={SHIMMER_QUIET}>Opening</span></p>
+    if (content.image) return <img src={content.image} alt={file.name} draggable={false} className="block max-w-full rounded-control" />
+    if (content.table) {
+        return (
+            <div className="overflow-hidden rounded-b-panel">
+                <TableResult table={content.table} selected={null} onPick={() => undefined} every />
+            </div>
+        )
+    }
+    if (content.text === undefined) return null
+    if (file.type === 'text/markdown') {
+        return (
+            <div className="nowheel max-h-[520px] overflow-y-auto">
+                <Markdown content={content.text} fromStranger className={cn("text-14", CARD_PROSE)} />
+            </div>
+        )
+    }
+    return <pre className="nowheel max-h-[520px] overflow-auto text-13 font-mono whitespace-pre-wrap break-words">{content.text}</pre>
+}
+
+// A file on a card of its own: one the user dropped on the board, or one a card's bird made, joined to that card by a
+// line. No bird stands on it. It shows its name, what it is and a little of it, opens in place, downloads where the user
+// chooses, and a line pulled out of it gives it to the next card as a file.
+const FileCard: React.FC<{ card: NestCard; file: NestFile }> = ({ card, file }) => {
+    const board = useBoard()
+    const open = board.openId === card.id
+    const image = file.type.startsWith('image/')
+    const pdf = file.type === 'application/pdf'
+    const content = useFileContent(card.id, image || open)
+    const Icon = image ? Image : FileText
+    const details = [FILE_KINDS[file.type] ?? 'File', pdf && file.pages ? plural(file.pages, 'page') : null, formatBytes(file.size)].filter(Boolean).join(' · ')
+    return (
+        <div className={cn(CARD_SHELL, open ? "shadow-raised" : "shadow-selected")} style={{ width: CARD_WIDTH }}>
+            <LineEnds canPull onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${file.name}`} />
+            <div className="nest-drag cursor-grab h-12 pl-5 pr-3 flex items-center gap-2">
+                <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                <span className="text-14 font-semibold truncate" title={file.name}>{file.name}</span>
+                <span className="text-12 text-muted-foreground shrink-0">{details}</span>
+                <span className="ml-auto flex items-center">
+                    <CardButton label={`Download ${file.name}`} onClick={() => void window.chromeAPI.nests.saveFile(card.id)}>
+                        <Download className="size-4" />
+                    </CardButton>
+                    <span data-keep-selection>
+                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                            <GitFork className="size-4" />
+                        </CardButton>
+                    </span>
+                    {!pdf && (
+                        <CardButton label={open ? 'Close the file' : 'Open the file'} onClick={() => board.setOpen(open ? null : card.id)}>
+                            {open ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                        </CardButton>
+                    )}
+                    <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                        <X className="size-4" />
+                    </CardButton>
+                </span>
+            </div>
+            <div className={cn("nodrag cursor-auto select-text", open && content?.table ? "" : "px-5 pb-4", open && !content?.table && "pt-3 border-t")}>
+                {open ? (
+                    <FileWhole file={file} content={content} />
+                ) : image ? (
+                    content?.image ? (
+                        <img src={content.image} alt={file.name} draggable={false} className="block max-h-48 max-w-full rounded-control" />
+                    ) : (
+                        <div aria-hidden className="h-24 rounded-control bg-muted" />
+                    )
+                ) : pdf ? (
+                    <p className="text-13 text-muted-foreground">A card you connect it to reads the whole PDF.</p>
+                ) : (
+                    file.preview && (
+                        <pre data-file-preview className="text-12 leading-5 font-mono text-muted-foreground whitespace-pre-wrap break-words line-clamp-6">{file.preview}</pre>
+                    )
+                )}
+            </div>
         </div>
     )
 }
@@ -1241,7 +1373,9 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
     const width = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.width)
     const height = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.height)
     const box: CardBox = { width: width ?? CARD_WIDTH, fill: height != null }
-    return card.table ? (
+    return card.file ? (
+        <FileCard card={card} file={card.file} />
+    ) : card.table ? (
         <TableCard card={card} file={card.table} box={box} />
     ) : card.each ? (
         <ForEachCard card={card} each={card.each} box={box} />
