@@ -38,6 +38,7 @@ import {
     flightPath,
     freeSpot,
     pickRows,
+    settle,
     showViewport,
     workingLine,
     ZOOM,
@@ -377,6 +378,29 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         if (next) void flow.setViewport(next, MOVE)
     }, [flow, rects])
 
+    // Cards grow once they're drawn, such as when an answer or a table arrives, or runs come in. Whenever one does, the
+    // cards placed for the user that it now covers move down out of its way, and the ones the user placed stay. The open
+    // card counts at its closed size, since it floats over the others. Not while a card is being dragged.
+    const closedHeights = useRef(new Map<string, number>())
+    useEffect(() => {
+        if (nodes.some((node) => node.dragging || !node.measured?.height)) return
+        const cards = nodes.map((node) => {
+            const measured = node.measured!.height!
+            if (node.id !== openId) closedHeights.current.set(node.id, measured)
+            const height = node.id === openId ? closedHeights.current.get(node.id) ?? CARD_HEIGHT : measured
+            return { id: node.id, ...node.position, width: node.measured!.width ?? CARD_WIDTH, height, movable: node.data.card.autoPlaced }
+        })
+        const nudges = settle(cards)
+        if (nudges.length === 0) return
+        setNodes((current) =>
+            current.map((node) => {
+                const nudge = nudges.find(({ id }) => id === node.id)
+                return nudge ? { ...node, position: { x: nudge.x, y: nudge.y } } : node
+            })
+        )
+        void api.nudgeCards(board.id, nudges)
+    }, [nodes, openId, api, board.id])
+
     // ⌘+, ⌘− and ⌘0 come from the View menu, since they're its accelerators.
     useEffect(
         () =>
@@ -499,7 +523,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
 
     // A new card closes the open one, so it never lands behind the layer that dims the board.
     const add = useCallback(
-        async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string; picked?: PickedRows } = {}) => {
+        async (spot: { x: number; y: number }, extra: { from?: string; mascotId?: string; picked?: PickedRows; auto?: boolean } = {}) => {
             open(null)
             const card = await api.addCard(board.id, { ...spot, ...extra })
             if (card) {
@@ -539,7 +563,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 dropEmptyDrafts()
                 const picked = pickedOf(selection, cardId)
                 setSelection(null)
-                void add(besideSpot(rectOf(source), rects()), { from: cardId, picked })
+                void add(besideSpot(rectOf(source), rects()), { from: cardId, picked, auto: true })
             },
             remove: (cardId) => {
                 setDraftText(cardId, '')
@@ -652,7 +676,11 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     nodeTypes={NODE_TYPES}
                     edgeTypes={EDGE_TYPES}
                     onNodesChange={(changes: NodeChange<CardNode>[]) => setNodes((current) => applyNodeChanges(changes, current))}
-                    onNodeDragStop={(_, node) => void api.moveCard(node.id, node.position.x, node.position.y)}
+                    onNodeDragStop={(_, node) => {
+                        // Moved by hand, it stays where it's left, even before main says so.
+                        setNodes((current) => current.map((each) => (each.id === node.id ? { ...each, data: { card: { ...each.data.card, autoPlaced: false } } } : each)))
+                        void api.moveCard(node.id, node.position.x, node.position.y)
+                    }}
                     onConnectStart={(_, { nodeId }) => (pulling.current = nodeId)}
                     onConnectEnd={connectEnd}
                     connectionLineComponent={PullingLine}

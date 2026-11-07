@@ -434,8 +434,9 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   // Open as a Nest turns it into the first card of a new Nest, in the same tab, named as the chat was.
   await chrome.getByRole("button", { name: "Open as a Nest" }).click();
   await expect(chrome.getByRole("textbox", { name: "Nest name" })).toHaveValue("Flights to Berlin");
-  const card = chrome.locator(".react-flow__node");
-  await expect(card).toHaveCount(1);
+  const cards = chrome.locator(".react-flow__node");
+  const card = cards.first();
+  await expect(cards).toHaveCount(1);
   await expect(card).toContainText("Three flights under €200");
   await expect(card).toContainText("Find flights to Berlin in May");
   // It left the Chats list for the Nest, and nothing ran to do it.
@@ -453,6 +454,18 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   await chrome.keyboard.press("Escape");
   await expect(reply).toHaveCount(0);
 
+  // The composer places a card in the first free place, under this one.
+  oneJob();
+  model.replyWith("Two hotels by Alexanderplatz under €120.");
+  await chrome.getByRole("textbox", { name: "Ask in this Nest" }).fill("Find a hotel near Alexanderplatz");
+  await chrome.getByRole("textbox", { name: "Ask in this Nest" }).press("Enter");
+  const hotels = cards.nth(1);
+  await expect(hotels.getByRole("status")).toHaveText("Done");
+  const below = async () => [(await card.boundingBox())!, (await hotels.boundingBox())!];
+  const [firstAt, hotelsAt] = await below();
+  expect(hotelsAt.y).toBeGreaterThan(firstAt.y + firstAt.height);
+  expect(hotelsAt.x).toBeLessThan(firstAt.x + firstAt.width);
+
   // A reply on the card that asks before opening a page. It's waiting, so the sidebar's row says so.
   await card.focus();
   await chrome.keyboard.press("Enter");
@@ -462,6 +475,11 @@ test("a chat becomes a Nest's first card, and Needs you opens the Nest at the ca
   await reply.press("Enter");
   await expect(card.getByRole("status").first()).toHaveText("Needs your OK");
   await chrome.keyboard.press("Escape");
+  // The card grew with the question, so the card placed under it moved down out of its way.
+  await expect.poll(async () => {
+    const [grown, moved] = await below();
+    return moved.y - (grown.y + grown.height);
+  }).toBeGreaterThan(0);
   await expect(chrome.getByRole("region", { name: /^Nests/ }).getByText("Needs you")).toBeAttached();
 
   // Away on the board, the card out of sight, the row in Needs you opens the Nest at that card, open and in view.

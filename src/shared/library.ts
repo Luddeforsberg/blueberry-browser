@@ -438,6 +438,9 @@ export interface NestCard {
   mascotId: string | null;
   x: number;
   y: number;
+  // Placed for the user, by a plan, the composer or a line's handle, and not moved by hand since, so the board may move it
+  // down out of the way of a card that grew. One the user placed or dragged never moves by itself.
+  autoPlaced: boolean;
   // Set once it was sent with For each row on.
   each: NestForEach | null;
   // Set while it's a card Berry planned that hasn't started.

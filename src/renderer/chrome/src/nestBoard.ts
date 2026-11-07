@@ -1,7 +1,7 @@
 import type { ChatThread, NestRun } from '@shared/library'
 import type { Rect } from '@shared/nestPlace'
 
-export { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, type Rect } from '@shared/nestPlace'
+export { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, freeSpot, settle, type Nudge, type PlacedCard, type Rect } from '@shared/nestPlace'
 
 export type CardTone = 'muted' | 'working' | 'done' | 'failed'
 

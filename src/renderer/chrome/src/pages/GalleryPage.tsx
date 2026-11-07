@@ -214,7 +214,7 @@ const sampleCard = (id: string, x: number, y: number, extra: Partial<NestCard> =
     position: { x, y },
     draggable: false,
     focusable: false,
-    data: { card: { id, chatId: null, mascotId: null, x, y, each: null, plan: null, attachments: [], ...extra } }
+    data: { card: { id, chatId: null, mascotId: null, x, y, autoPlaced: false, each: null, plan: null, attachments: [], ...extra } }
 })
 
 const SAMPLE_NODES: CardNode[] = [

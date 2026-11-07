@@ -162,7 +162,7 @@ export class Nests {
     if (this.chats.isRunning(chatId)) return { ok: false, error: "Wait until it’s finished, or stop it first." };
     if (this.flockId(thread.mascotId) === undefined) return { ok: false, error: "That chat’s bird isn’t in your flock any more." };
     const nestId = this.store.createNest(titleFrom(thread.title) || NEW_NEST_TITLE, true);
-    const card = this.store.addCard(nestId, { x: 0, y: 0, mascotId: thread.mascotId });
+    const card = this.store.addCard(nestId, { x: 0, y: 0, mascotId: thread.mascotId, auto: true });
     if (!card || !this.store.setChat(card.id, chatId)) {
       this.store.deleteNest(nestId);
       return { ok: false, error: "That chat couldn’t become a Nest." };
@@ -235,9 +235,22 @@ export class Nests {
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
     const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
     if (picked === undefined) return null;
-    const card = this.store.addCard(nestId, { x, y, from, mascotId, picked, planned });
+    const card = this.store.addCard(nestId, { x, y, from, mascotId, picked, planned, auto: input.auto === true });
     if (card) this.changed(nestId);
     return card;
+  }
+
+  // Cards the board moved out of the way of one that grew. The store only moves cards of this Nest placed for the user and
+  // never moved by hand, so a card the user placed stays where it is whatever the renderer asks.
+  nudgeCards(nestId: unknown, moves: unknown): boolean {
+    if (typeof nestId !== "string" || !Array.isArray(moves)) return false;
+    const valid = moves.slice(0, MAX_TAKEN).flatMap((move) => {
+      const to = { x: coordinate(move?.x), y: coordinate(move?.y) };
+      return typeof move?.id === "string" && to.x !== null && to.y !== null ? [{ id: move.id as string, x: to.x, y: to.y }] : [];
+    });
+    if (valid.length === 0 || this.store.nudgeCards(nestId, valid) === 0) return false;
+    this.events.onBoard(this.store.board(nestId)!);
+    return true;
   }
 
   moveCard(cardId: string, x: unknown, y: unknown): boolean {
@@ -672,7 +685,7 @@ export class Nests {
   // One card as the chosen bird, in the first free place in sight, sent with the user's own words.
   private oneCard(nestId: string, words: string, mascotId: string | null, place: { at: { x: number; y: number }; taken: Rect[] }): boolean {
     const spot = freeSpot(place.taken, place.at);
-    const card = this.store.addCard(nestId, { ...spot, mascotId });
+    const card = this.store.addCard(nestId, { ...spot, mascotId, auto: true });
     if (!card) return false;
     // It's the one job they were attached for.
     this.store.moveComposerTo(nestId, card.id);

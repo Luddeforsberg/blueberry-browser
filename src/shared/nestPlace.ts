@@ -32,3 +32,44 @@ export const freeSpot = (cards: readonly Rect[], want: { x: number; y: number },
 
 // Where a card pulled out of `source` with a click goes: beside it, level with it, or below that if it's taken.
 export const besideSpot = (source: Rect, cards: readonly Rect[]) => freeSpot(cards, { x: source.x + source.width + CARD_GAP, y: source.y });
+
+// A card on the board as it's drawn now, and whether it was placed for the user and never moved by hand, so it may be
+// nudged out of the way.
+export interface PlacedCard extends Rect {
+  id: string;
+  movable: boolean;
+}
+
+export interface Nudge {
+  id: string;
+  x: number;
+  y: number;
+}
+
+// The first place from where a card is, straight down, where it covers none of `others`.
+const clearOf = (card: Rect, others: readonly Rect[]): number => {
+  let y = card.y;
+  for (;;) {
+    const hits = others.filter((other) => overlaps({ ...card, y }, other));
+    if (hits.length === 0) return y;
+    y = Math.max(...hits.map((other) => other.y + other.height + MARGIN));
+  }
+};
+
+// After cards have grown, such as when an answer or a table arrives: each card covered by one above it moves straight
+// down, only as far as it must, past every card in the way, if it was placed for the user and never moved by hand.
+// Nothing else moves, so a card the user placed stays where it is, even when one grew over it. Top to bottom, so one
+// card's move makes room for the next.
+export const settle = (cards: readonly PlacedCard[]): Nudge[] => {
+  const fixed = cards.filter((card) => !card.movable);
+  const above: Rect[] = [];
+  const nudges: Nudge[] = [];
+  for (const card of [...cards].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    if (card.movable && above.some((other) => overlaps(card, other))) {
+      const y = clearOf(card, [...above, ...fixed]);
+      nudges.push({ id: card.id, x: card.x, y });
+      above.push({ ...card, y });
+    } else above.push(card);
+  }
+  return nudges;
+};
