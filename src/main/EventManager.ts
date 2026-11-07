@@ -250,6 +250,9 @@ export class EventManager {
     this.handle("nests:copy-table", (cardId) => this.mainWindow.copyTable(cardId));
     this.handle("nests:table-rows", (cardId) => nests.tableRows(cardId));
     this.handle("nests:save-table", (cardId) => this.mainWindow.saveTable(cardId));
+    this.handle("nests:drop-file", (nestId, file, place) => this.mainWindow.dropFile(nestId, file, place));
+    this.handle("nests:file-content", (cardId) => nests.fileContent(cardId));
+    this.handle("nests:save-file", (cardId) => this.mainWindow.saveFile(cardId));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 

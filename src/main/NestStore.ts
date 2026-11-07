@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestAttachment, NestBoard, NestCard, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
 import type { SentAttachment } from "./nestFiles";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
@@ -132,6 +132,14 @@ const MIGRATIONS = [
   // The size the user made a card from its corner. None means the usual size.
   `ALTER TABLE cards ADD COLUMN width REAL;
    ALTER TABLE cards ADD COLUMN height REAL;`,
+  // A file's card: the file is its one attachment, which it owns, with its first lines kept for the card. file_made is null
+  // on every other card, 0 for a file the user put on the board and 1 for one a card's bird made. A card that read a
+  // file's card through a line keeps its own copy once it has sent, with the card it came from in via_card, which may be
+  // gone since, and made when a bird made it.
+  `ALTER TABLE cards ADD COLUMN file_made INTEGER;
+   ALTER TABLE cards ADD COLUMN file_preview TEXT;
+   ALTER TABLE attachments ADD COLUMN via_card TEXT;
+   ALTER TABLE attachments ADD COLUMN made INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 // One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
@@ -194,6 +202,8 @@ interface CardRow {
   tablePreview: string | null;
   width: number | null;
   height: number | null;
+  fileMade: number | null;
+  filePreview: string | null;
 }
 
 interface RunRow {
@@ -209,7 +219,8 @@ const CARD_COLUMNS =
   "id, nest_id AS nestId, chat_id AS chatId, mascot_id AS mascotId, x, y, each_prompt AS eachPrompt, each_header AS eachHeader, " +
   "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
   // Not a file's whole table, which is read only when it's needed.
-  "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height";
+  "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height, " +
+  "file_made AS fileMade, file_preview AS filePreview";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -246,7 +257,8 @@ export class NestStore {
   constructor(file: string) {
     if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
     this.db = new DatabaseSync(file);
-    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+    // Files are kept in here, so what's deleted is overwritten rather than left in the file's free pages.
+    this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON;");
     migrate(this.db, MIGRATIONS);
   }
 
@@ -304,7 +316,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -321,7 +333,12 @@ export class NestStore {
         ? null
         : { name: tableName, header: JSON.parse(tableHeader ?? "[]") as string[], rows: JSON.parse(tablePreview ?? "[]") as string[][], count: tableCount ?? 0 };
     const size = width !== null && height !== null ? { size: { width, height } } : {};
-    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
+    if (fileMade !== null) {
+      const own = this.attachmentRows({ cardId: id })[0];
+      const file: NestFile = { name: own?.name ?? "", type: own?.type ?? "", size: own?.size ?? 0, pages: own?.pages ?? null, preview: filePreview, made: fileMade === 1 };
+      return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file, attachments: [] };
+    }
+    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, file: null, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -417,7 +434,7 @@ export class NestStore {
   setBird(id: string, mascotId: string | null): boolean {
     return (
       this.db
-        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND (plan IS NULL OR plan <> 'armed')")
+        .prepare("UPDATE cards SET mascot_id = ? WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL AND (plan IS NULL OR plan <> 'armed')")
         .run(mascotId, id).changes > 0
     );
   }
@@ -427,7 +444,7 @@ export class NestStore {
     const card = this.card(id);
     // Once it starts, a planned card is an ordinary one.
     const done =
-      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL").run(chatId, id).changes > 0;
+      this.db.prepare("UPDATE cards SET chat_id = ?, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL").run(chatId, id).changes > 0;
     if (done && card) this.touch(card.nestId);
     return done;
   }
@@ -465,7 +482,7 @@ export class NestStore {
     try {
       const changed = this.db
         .prepare(
-          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_line = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL"
+          "UPDATE cards SET each_prompt = ?, each_header = ?, each_column = ?, each_line = ?, each_column_settled = 0, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL"
         )
         .run(prompt, JSON.stringify(header), column, lineId, id).changes;
       if (changed === 0) throw new NotHere();
@@ -636,7 +653,7 @@ export class NestStore {
         for (const each of card.from) {
           const from = "plan" in each ? ids.get(each.plan) : each.card;
           const source = from === undefined ? null : this.card(from);
-          if (!source || source.nestId !== nestId || (!("plan" in each) && !source.chatId && !source.each && !source.table)) throw new NotHere();
+          if (!source || source.nestId !== nestId || (!("plan" in each) && !source.chatId && !source.each && !source.table && !source.file)) throw new NotHere();
           line.run(randomUUID(), nestId, from!, ids.get(card.key)!);
         }
       }
@@ -766,14 +783,76 @@ export class NestStore {
 
   // A card's files and notes as they go to its bird, with each file's bytes as they were copied in.
   sentAttachments(cardId: string): SentAttachment[] {
-    const rows = this.db.prepare("SELECT kind, name, type, data, note FROM attachments WHERE card_id = ? ORDER BY rowid").all(cardId) as {
+    const rows = this.db.prepare("SELECT kind, name, type, data, note, via_card AS via, made FROM attachments WHERE card_id = ? ORDER BY rowid").all(cardId) as {
       kind: "file" | "note";
       name: string;
       type: string;
       data: Uint8Array | null;
       note: string | null;
+      via: string | null;
+      made: number;
     }[];
-    return rows.map((row) => (row.kind === "note" ? { kind: "note", text: row.note ?? "" } : { kind: "file", name: row.name, type: row.type, data: row.data ?? new Uint8Array() }));
+    return rows.map((row) => {
+      if (row.kind === "note") return { kind: "note", text: row.note ?? "" };
+      const from = row.via === null ? {} : { from: row.made === 1 ? ("made" as const) : ("board" as const) };
+      return { kind: "file", name: row.name, type: row.type, data: row.data ?? new Uint8Array(), ...from };
+    });
+  }
+
+  // A file's card, with no chat and no bird, owning its one file, and the line from the card that made it if a bird did.
+  // In one go. Null if the Nest or that card isn't there.
+  addFileCard(
+    nestId: string,
+    { x, y, file, preview, madeBy = null }: { x: number; y: number; file: { name: string; type: string; size: number; pages: number | null; data: Uint8Array }; preview: string | null; madeBy?: string | null }
+  ): NestCard | null {
+    const id = randomUUID();
+    this.db.exec("BEGIN");
+    try {
+      if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) throw new NotHere();
+      if (madeBy !== null && this.card(madeBy)?.nestId !== nestId) throw new NotHere();
+      this.db
+        .prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, auto_placed, file_made, file_preview) VALUES (?, ?, NULL, NULL, ?, ?, 1, ?, ?)")
+        .run(id, nestId, x, y, madeBy === null ? 0 : 1, preview);
+      this.db
+        .prepare("INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note, made) VALUES (?, ?, ?, 'file', ?, ?, ?, ?, ?, NULL, ?)")
+        .run(randomUUID(), nestId, id, file.name, file.type, file.size, file.pages, file.data, madeBy === null ? 0 : 1);
+      if (madeBy !== null) this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, NULL)").run(randomUUID(), nestId, madeBy, id);
+      this.touch(nestId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      if (error instanceof NotHere) return null;
+      throw error;
+    }
+    return this.card(id);
+  }
+
+  // A file's card's file with its bytes, or null for any other card.
+  fileOf(cardId: string): { name: string; type: string; size: number; pages: number | null; data: Uint8Array; made: boolean } | null {
+    const row = this.db
+      .prepare("SELECT a.name, a.type, a.size, a.pages, a.data, c.file_made AS made FROM attachments a JOIN cards c ON c.id = a.card_id WHERE c.id = ? AND c.file_made IS NOT NULL")
+      .get(cardId) as { name: string; type: string; size: number; pages: number | null; data: Uint8Array | null; made: number } | undefined;
+    return row ? { ...row, data: row.data ?? new Uint8Array(), made: row.made === 1 } : null;
+  }
+
+  // The file's cards a card has its own copies from, by id, whether they're still there or not.
+  copiedFrom(cardId: string): Set<string> {
+    return new Set((this.db.prepare("SELECT via_card FROM attachments WHERE card_id = ? AND via_card IS NOT NULL").all(cardId) as { via_card: string }[]).map((row) => row.via_card));
+  }
+
+  // A card keeps its own copy of a file's card's file once it sends with it, so deleting that card later changes nothing
+  // here. Only once for each file's card. False if either isn't there.
+  copyFile(cardId: string, fileCardId: string): boolean {
+    if (this.copiedFrom(cardId).has(fileCardId) || !this.card(cardId)) return false;
+    return (
+      this.db
+        .prepare(
+          `INSERT INTO attachments (id, nest_id, card_id, kind, name, type, size, pages, data, note, via_card, made)
+           SELECT ?, a.nest_id, ?, 'file', a.name, a.type, a.size, a.pages, a.data, NULL, ?, a.made FROM attachments a JOIN cards c ON c.id = a.card_id
+           WHERE c.id = ? AND c.file_made IS NOT NULL AND c.nest_id = (SELECT nest_id FROM cards WHERE id = ?)`
+        )
+        .run(randomUUID(), cardId, fileCardId, fileCardId, cardId).changes > 0
+    );
   }
 
   // Where a file or note is: its Nest, and its card or null for the composer.

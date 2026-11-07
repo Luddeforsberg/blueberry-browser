@@ -12,7 +12,8 @@ const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN table_name; ALTER TABLE cards DROP COLUMN table_header; ALTER TABLE cards DROP COLUMN table_count; " +
   "ALTER TABLE cards DROP COLUMN table_preview; ALTER TABLE cards DROP COLUMN table_rows; " +
   "ALTER TABLE cards DROP COLUMN each_line; ALTER TABLE runs DROP COLUMN spent; " +
-  "ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height;";
+  "ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; " +
+  "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made;";
 
 describe("NestStore", () => {
   it("keeps a nest's cards, their places and the lines between them across opening the file again", () => {
@@ -32,7 +33,7 @@ describe("NestStore", () => {
       id: nest,
       title: "Find customers",
       cards: [
-        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, autoPlaced: false, each: null, plan: null, table: null, attachments: [] },
+        { id: scout.id, chatId: "chat-1", mascotId: "scout", x: 10, y: 20, autoPlaced: false, each: null, plan: null, table: null, file: null, attachments: [] },
         {
           id: writer.id,
           chatId: null,
@@ -43,6 +44,7 @@ describe("NestStore", () => {
           each: null,
           plan: null,
           table: null,
+          file: null,
           attachments: [{ id: expect.any(String), kind: "file", name: "one-pager.pdf", type: "application/pdf", size: 6 }],
         },
       ],
@@ -120,7 +122,10 @@ describe("NestStore", () => {
     // As a file from before sizes has it.
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 1}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height;`);
+    db.exec(
+      `PRAGMA user_version = ${version - 2}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+        "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made;"
+    );
     db.close();
 
     const again = new NestStore(file);
@@ -308,5 +313,60 @@ describe("NestStore", () => {
     // A line can come out of it, as out of any card with something to give.
     const plan = { key: "p1", mascotId: null, prompt: "For each", from: [{ card: table.id }], each: true, waits: false, table: null, x: 0, y: 400, attached: [], keeps: null };
     expect(again.setPlan(nest, [plan], "Do it")).toHaveLength(1);
+  });
+
+  it("gives a file's card its file to own, lets a line only point at it, and keeps a copy on a card that sent with it", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Files");
+    const bytes = new TextEncoder().encode("Lindqvist Data, Fjällbo");
+    const pitch = store.addFileCard(nest, { x: 0, y: 0, file: { name: "pitch.txt", type: "text/plain", size: bytes.length, pages: null, data: bytes }, preview: "Lindqvist Data, Fjällbo" })!;
+    expect(pitch).toMatchObject({ chatId: null, mascotId: null, autoPlaced: true, table: null, attachments: [], file: { name: "pitch.txt", type: "text/plain", size: bytes.length, made: false, preview: "Lindqvist Data, Fjällbo" } });
+    expect(store.fileOf(pitch.id)).toMatchObject({ name: "pitch.txt", data: bytes, made: false });
+    // It never becomes a chat, a For-each card or anyone's bird's.
+    expect(store.setChat(pitch.id, "chat")).toBe(false);
+    expect(store.startForEach(pitch.id, "Go", ["A"], [["a"]], "Result", "line")).toBe(false);
+    expect(store.setBird(pitch.id, "scout")).toBe(false);
+
+    const writer = store.addCard(nest, { x: 600, y: 0, from: pitch.id })!;
+    // The line only points: the card has nothing of its own until it sends.
+    expect(store.sentAttachments(writer.id)).toEqual([]);
+    expect(store.copyFile(writer.id, pitch.id)).toBe(true);
+    expect(store.copyFile(writer.id, pitch.id)).toBe(false);
+    expect(store.copiedFrom(writer.id)).toEqual(new Set([pitch.id]));
+    expect(store.sentAttachments(writer.id)).toEqual([{ kind: "file", name: "pitch.txt", type: "text/plain", data: bytes, from: "board" }]);
+
+    // Deleting the file's card deletes its file, and the line, and the card that sent keeps its own copy.
+    expect(store.deleteCard(pitch.id)).toBe(true);
+    expect(store.fileOf(pitch.id)).toBeNull();
+    expect(store.linesTo(writer.id)).toEqual([]);
+    expect(store.sentAttachments(writer.id)).toEqual([{ kind: "file", name: "pitch.txt", type: "text/plain", data: bytes, from: "board" }]);
+    const rows = new DatabaseSync(file).prepare("SELECT card_id FROM attachments").all() as { card_id: string }[];
+    expect(rows).toEqual([{ card_id: writer.id }]);
+    // A card that hadn't sent yet has nothing to copy any more.
+    const late = store.addCard(nest, { x: 0, y: 600 })!;
+    expect(store.copyFile(late.id, pitch.id)).toBe(false);
+
+    // Deleting the card that sent deletes its copy too, so nothing is left behind.
+    store.deleteCard(writer.id);
+    expect(new DatabaseSync(file).prepare("SELECT COUNT(*) AS count FROM attachments").get()).toEqual({ count: 0 });
+  });
+
+  it("joins a file a card's bird made to that card, and never copies a file's card from another Nest", () => {
+    const store = new NestStore(":memory:");
+    const nest = store.createNest("Made");
+    const other = store.createNest("Other");
+    const scout = store.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    store.setChat(scout.id, "chat-1");
+    const data = new TextEncoder().encode("Company\nBrygga");
+    const made = store.addFileCard(nest, { x: 600, y: 0, file: { name: "leads.csv", type: "text/csv", size: data.length, pages: null, data }, preview: "Company\nBrygga", madeBy: scout.id })!;
+    expect(made.file).toMatchObject({ made: true });
+    expect(store.linesTo(made.id).map((line) => line.source.id)).toEqual([scout.id]);
+    expect(store.addFileCard(other, { x: 0, y: 0, file: { name: "x.md", type: "text/markdown", size: 1, pages: null, data }, preview: null, madeBy: scout.id })).toBeNull();
+    const elsewhere = store.addCard(other, { x: 0, y: 0 })!;
+    expect(store.copyFile(elsewhere.id, made.id)).toBe(false);
+    const next = store.addCard(nest, { x: 1200, y: 0, from: made.id })!;
+    store.copyFile(next.id, made.id);
+    expect(store.sentAttachments(next.id)).toMatchObject([{ name: "leads.csv", from: "made" }]);
   });
 });

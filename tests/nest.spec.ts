@@ -932,3 +932,100 @@ test("a starter only fills an empty Nest's composer, and a chat that's several j
   await expect(chrome.getByRole("button", { name: "Open as a Nest" })).toBeVisible();
   await expect(chrome.getByText("That’s several jobs, which a Nest does side by side.")).toHaveCount(0);
 });
+
+test("a file dropped on the board goes to the card a line takes it to, and a card's save_file makes a file card that opens and downloads", async () => {
+  test.setTimeout(60_000);
+  model.reset();
+  const folder = mkdtempSync(join(tmpdir(), "blueberry-nest-files-"));
+  app = await launchApp(undefined, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(150);
+      await chrome.screenshot({ path: join(SHOTS, `${name}-${appearance}.png`) });
+    }
+  };
+  await chrome.getByRole("button", { name: "New nest" }).click();
+
+  // A file dropped on the board, as the system hands it over, lands as a card of its own where it was let go.
+  const pane = chrome.locator(".react-flow__pane");
+  const box = (await pane.boundingBox())!;
+  const dropped = await chrome.evaluateHandle(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["Brygga Båt AB makes electric boats in Malmö.\nHedvik Robotics builds farm robots."], "pitch.txt", { type: "text/plain" }));
+    return transfer;
+  });
+  const at = { clientX: box.x + 160, clientY: box.y + 160 };
+  for (const type of ["dragenter", "dragover", "drop"]) await pane.dispatchEvent(type, { dataTransfer: dropped, ...at });
+  const file = chrome.locator(".react-flow__node").first();
+  await expect(file).toContainText("pitch.txt");
+  await expect(file).toContainText("Text");
+  await expect(file.locator("[data-file-preview]")).toContainText("Brygga Båt AB makes electric boats in Malmö.");
+
+  // A line pulled out of it takes the file to the next card, which says so.
+  await file.hover();
+  await file.getByLabel("Pull a new card out of pitch.txt").click();
+  const card = chrome.locator(".react-flow__node").nth(1);
+  await expect(card).toContainText("gets pitch.txt");
+  await expect(card.locator("[data-crosses]")).toHaveText("1 file: pitch.txt");
+
+  // Its bird saves a CSV, which lands beside it as a file card, joined to it.
+  model.callTools({ name: "save_file", args: { name: "companies", kind: "csv", content: "Company,City\nBrygga Båt AB,Malmö\n=1+1,Lund" } });
+  model.replyWith("I saved the companies as companies.csv.");
+  await card.getByRole("textbox", { name: "What should Berry do?" }).fill("Make a CSV of the companies in the pitch");
+  await card.getByRole("textbox", { name: "What should Berry do?" }).press("Enter");
+  await expect(card.getByRole("status")).toHaveText("Done");
+  const sentWith = model.requests[0].messages.findLast(({ role }) => role === "user")!.content as Array<Record<string, unknown>>;
+  const words = sentWith.filter((block) => block.type === "text").map((block) => String(block.text)).join("\n");
+  expect(words).toContain('<attached_file name="pitch.txt">\nBrygga Båt AB makes electric boats in Malmö.');
+  expect(words).toContain('The user put the text file "pitch.txt" on the board and connected it to this card.');
+  expect(model.requests[0].tools?.some((tool) => tool.function.name === "save_file")).toBe(true);
+
+  const made = chrome.getByRole("group", { name: "The file companies.csv" });
+  await expect(made).toContainText("CSV");
+  await expect(chrome.locator(".react-flow__edge")).toHaveCount(2);
+  // Berry's card says it got the file once, as its own copy.
+  await expect(card.getByRole("button", { name: "With: pitch.txt" })).toBeVisible();
+  await expect(card).not.toContainText("1 file: pitch.txt");
+  await shots("file-cards");
+
+  // Made bigger from its corner toward the file card, Berry's card stops short of it, and the file card stays put.
+  // After the board has moved to show the new card.
+  await chrome.waitForTimeout(400);
+  const gap = async () => {
+    const [from, to] = [(await card.boundingBox())!, (await made.boundingBox())!];
+    return Math.round(to.x - from.x) * 10_000 + Math.round(to.y - from.y);
+  };
+  const gapBefore = await gap();
+  await card.hover();
+  const grip = (await card.locator(".react-flow__resize-control").boundingBox())!;
+  await chrome.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(grip.x + 600, grip.y + 40, { steps: 10 });
+  await chrome.mouse.up();
+  const grown = (await card.boundingBox())!;
+  expect(grown.width).toBeGreaterThan(500);
+  expect(grown.x + grown.width).toBeLessThan((await made.boundingBox())!.x);
+  expect(await gap()).toBe(gapBefore);
+  await shots("resize-stops");
+
+  // Opened in the app, it reads as a table.
+  await made.hover();
+  await made.getByRole("button", { name: "Open the file" }).click();
+  await expect(made.getByRole("table")).toContainText("Brygga Båt AB");
+  await shots("file-card-open");
+  await made.getByRole("button", { name: "Close the file" }).click();
+
+  // Download writes it only where the save dialog says, with a cell a spreadsheet would run kept as text.
+  const saveTo = join(folder, "companies.csv");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as never;
+  }, saveTo);
+  await made.hover();
+  await made.getByRole("button", { name: "Download companies.csv" }).click();
+  await expect.poll(() => existsSync(saveTo)).toBe(true);
+  expect(readFileSync(saveTo, "utf8")).toBe("﻿Company,City\r\nBrygga Båt AB,Malmö\r\n'=1+1,Lund\r\n");
+});

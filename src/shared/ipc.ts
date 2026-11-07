@@ -2,7 +2,7 @@
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
 import type { PickedRows } from "./nestTable";
-import type { ChatThread, GalleryLinked, NestBoard, NestCard, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryLinked, NestBoard, NestCard, NestFileContent, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -370,6 +370,13 @@ export type NestAskResult = { ok: true } | { ok: false; error: string };
 // Where a file or note goes: a card that hasn't been sent, or the Nest's composer.
 export type NestAttachTarget = { cardId: string } | { nestId: string };
 
+// A file dropped on a Nest's board, as the chrome read it.
+export interface NestDroppedFile {
+  name: string;
+  size: number;
+  bytes: Uint8Array | null;
+}
+
 // Added, or why not, such as a type that can't be read or no room left on the card.
 export type NestAttachResult = { ok: true } | { ok: false; error: string };
 
@@ -592,6 +599,13 @@ export interface InvokeChannels {
   // A file's whole table, which a board carries only the first rows of.
   "nests:table-rows": { region: "chrome"; args: [cardId: string]; result: string[][] | null };
   "nests:save-table": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // A file dropped on the board, read in the chrome from what was dropped, never a path: its name, size and bytes, or no
+  // bytes when it's too big to read. Main checks it and makes a file's card where it landed, or a table card for a CSV.
+  "nests:drop-file": { region: "chrome"; args: [nestId: string, file: NestDroppedFile, place: Pick<NestAskOptions, "at" | "taken">]; result: NestTableResult };
+  // What a file's card shows when it's opened, read in main.
+  "nests:file-content": { region: "chrome"; args: [cardId: string]; result: NestFileContent | null };
+  // A file's card's file, written only where the user chooses in main's save dialog.
+  "nests:save-file": { region: "chrome"; args: [cardId: string]; result: boolean };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
@@ -849,6 +863,9 @@ export interface NestsAPI {
   copyTable: (cardId: string) => Promise<boolean>;
   tableRows: (cardId: string) => Promise<string[][] | null>;
   saveTable: (cardId: string) => Promise<boolean>;
+  dropFile: (nestId: string, file: NestDroppedFile, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
+  fileContent: (cardId: string) => Promise<NestFileContent | null>;
+  saveFile: (cardId: string) => Promise<boolean>;
   onUpdated: (callback: (board: NestBoard) => void) => Unsubscribe;
   onDeleted: (callback: (nestId: string) => void) => Unsubscribe;
   fromChat: (chatId: string) => Promise<NestFromChatResult>;

@@ -35,10 +35,13 @@ export interface CheckedFile {
   pages: number | null;
 }
 
-// A file or note as it's kept, with what's needed to send it.
+// A file or note as it's kept, with what's needed to send it. `from` says how a file reached the card when the user didn't
+// attach it there: through a line from a file the user put on the board, or from a file a bird on another card made.
 export type SentAttachment =
-  | { kind: "file"; name: string; type: string; data: Uint8Array }
-  | { kind: "note"; text: string };
+  | { kind: "file"; name: string; type: string; data: Uint8Array; from?: "board" | "made" }
+  | { kind: "note"; text: string }
+  // Files the card's lines bring that it had no room for, by name, so the model knows they were left out.
+  | { kind: "missing"; names: string[] };
 
 const TYPES: Record<string, { type: string; kind: FileKind }> = {
   pdf: { type: "application/pdf", kind: "pdf" },
@@ -225,6 +228,7 @@ const TYPE_WORDS: Record<string, string> = {
   "text/plain": "text file",
   "text/markdown": "Markdown file",
   "text/csv": "CSV file",
+  "application/json": "JSON file",
 };
 
 export const typeInWords = (type: string): string => TYPE_WORDS[type] ?? "file";
@@ -238,8 +242,19 @@ export const attachmentBlocks = (attachments: readonly SentAttachment[]): Exclud
     if (attachment.kind === "note") {
       return [{ type: "text", text: `<user_note>\n${inTag(attachment.text, "user_note")}\n</user_note>\nThat's a note the user wrote on this card, in their own words.` }];
     }
+    if (attachment.kind === "missing") {
+      const names = attachment.names.map((name) => `"${nameForModel(name)}"`).join(", ");
+      return [{ type: "text", text: `Left out, since this card had no room for more files: ${names}, connected to it through its lines. You haven't seen them.` }];
+    }
     const name = nameForModel(attachment.name);
-    const label = `The user attached the ${typeInWords(attachment.type)} "${name}" to this card. ${UNTRUSTED}`;
+    const what = typeInWords(attachment.type);
+    const how =
+      attachment.from === "made"
+        ? `The ${what} "${name}" was written by a bird on another card of this Nest and reached this card through a line.`
+        : attachment.from === "board"
+          ? `The user put the ${what} "${name}" on the board and connected it to this card.`
+          : `The user attached the ${what} "${name}" to this card.`;
+    const label = `${how} ${UNTRUSTED}`;
     const data = Buffer.from(attachment.data);
     if (attachment.type === "application/pdf") {
       return [
@@ -255,3 +270,78 @@ export const attachmentBlocks = (attachments: readonly SentAttachment[]): Exclud
     }
     return [{ type: "text", text: `<attached_file name="${name}">\n${inTag(data.toString("utf8"), "attached_file")}\n</attached_file>\n${label}` }];
   });
+
+// What a card's bird may make with save_file: plain text in four kinds, never HTML, SVG or anything that runs. It's kept
+// in the Nest, inside the app's data, and only leaves when the user presses Download.
+export const MADE_KINDS = ["md", "csv", "txt", "json"] as const;
+export type MadeKind = (typeof MADE_KINDS)[number];
+export const MAX_MADE_BYTES = 1024 * 1024;
+export const MAX_MADE_FILES = 5;
+const MADE_TYPES: Record<MadeKind, string> = { md: "text/markdown", csv: "text/csv", txt: "text/plain", json: "application/json" };
+const MAX_MADE_NAME = 80;
+// Names Windows keeps for devices, whatever comes after the dot.
+const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
+
+// A made file's name: its last part only, so no path, without characters a file system or a terminal treats specially,
+// no dot or space at either end, and any extensions it came with replaced by its kind's.
+export const madeFileName = (name: string, kind: MadeKind): string => {
+  const last = name.split(/[\\/]/).pop() ?? "";
+  let base = last
+    .replace(/[\p{Cc}\p{Cf}<>:"|?*]/gu, "")
+    .replace(/\s+/g, " ")
+    .replace(/(\.[a-z][a-z0-9]{0,7})+$/i, "")
+    .slice(0, MAX_MADE_NAME)
+    .replace(/^[.\s]+|[.\s]+$/g, "");
+  if (!base) base = "file";
+  if (RESERVED.test(base)) base = `${base}-file`;
+  return `${base}.${kind}`;
+};
+
+export type MadeFile = { name: string; type: string; data: Uint8Array };
+
+// What save_file was given, checked: a kind on the list, words in it, no more than this reply may make, within the size,
+// and JSON that parses. `made` is how many files this reply has saved so far. Says why not, for the model.
+export const checkMadeFile = (
+  { name, kind, content }: { name: unknown; kind: unknown; content: unknown },
+  made: number
+): { ok: true; file: MadeFile } | { ok: false; error: string } => {
+  if (!MADE_KINDS.includes(kind as MadeKind)) return { ok: false, error: `Nothing was saved: a file can only be ${MADE_KINDS.join(", ")}.` };
+  if (made >= MAX_MADE_FILES) return { ok: false, error: `Nothing was saved: one reply can save ${MAX_MADE_FILES} files at most, and this one has.` };
+  if (typeof content !== "string" || !content.trim()) return { ok: false, error: "Nothing was saved: the file had nothing in it." };
+  if (content.includes("\0")) return { ok: false, error: "Nothing was saved: a file can only hold text." };
+  const data = Buffer.from(content, "utf8");
+  if (data.length > MAX_MADE_BYTES) return { ok: false, error: `Nothing was saved: the file was ${sizeInWords(data.length)}, and one can be ${sizeInWords(MAX_MADE_BYTES)} at most.` };
+  if (kind === "json") {
+    try {
+      JSON.parse(content);
+    } catch {
+      return { ok: false, error: "Nothing was saved: that isn't valid JSON." };
+    }
+  }
+  return { ok: true, file: { name: madeFileName(typeof name === "string" ? name : "", kind as MadeKind), type: MADE_TYPES[kind as MadeKind], data: new Uint8Array(data) } };
+};
+
+const PREVIEW_LINES = 6;
+const PREVIEW_LINE_LENGTH = 160;
+
+// The first lines of a text file, for its card, or null for a PDF or an image, whose card shows something else.
+export const filePreview = (type: string, data: Uint8Array): string | null => {
+  if (type === "application/pdf" || type.startsWith("image/")) return null;
+  const text = Buffer.from(data.subarray(0, 8192)).toString("utf8").replace(/^\uFEFF/, "");
+  const lines = text.split(/\r?\n/).filter((line, index, all) => line.trim() !== "" || index < all.length - 1);
+  return lines
+    .slice(0, PREVIEW_LINES)
+    .map((line) => (line.length > PREVIEW_LINE_LENGTH ? `${line.slice(0, PREVIEW_LINE_LENGTH - 1)}…` : line))
+    .join("\n");
+};
+
+// A file's name as Download suggests it: its last part only, without characters a file system won't take or that turn
+// text around, and no dot at its start.
+export const downloadName = (name: string): string =>
+  (name.split(/[\\/]/).pop() ?? "")
+    .replace(/[\p{Cc}\p{Cf}]/gu, "")
+    .replace(/[<>:"|?*]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[.\s]+/, "")
+    .slice(-120) || "file";

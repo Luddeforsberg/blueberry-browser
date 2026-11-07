@@ -24,10 +24,10 @@ import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
 import { askInShape, generateTitle, hasModel, modelInputs, streamReply, writeWithCheapModel } from "./agent";
-import { maxBytesFor, sizeInWords } from "./nestFiles";
+import { downloadName, maxBytesFor, sizeInWords, typeInWords } from "./nestFiles";
 import { readFile, stat, writeFile } from "fs/promises";
 import { cheapWriter } from "./nestCells";
-import { csvFileName, MAX_TABLE_BYTES, toCsv, toHtmlTable, toTsv } from "./nestCsv";
+import { csvFileName, MAX_TABLE_BYTES, parseDelimited, sniffDelimiter, toCsv, toHtmlTable, toTsv } from "./nestCsv";
 import { PLAN_SCHEMA } from "./nestPlanner";
 import { basename, join } from "path";
 import { Suggestions } from "./Suggestions";
@@ -1350,7 +1350,18 @@ export class Window {
     const card = this.nests.card(cardId);
     if (!card) return false;
     const runs = card.each?.runs.filter((run) => run.chatId).length ?? 0;
-    if (card.chatId || runs > 0) {
+    // A file a bird made is only kept here. A card that read it keeps its own copy either way.
+    if (card.file?.made) {
+      const { response } = await dialog.showMessageBox(this._baseWindow, {
+        type: "warning",
+        message: "Delete this file?",
+        detail: `${card.file.name} was made here and isn’t saved anywhere else, so it will be gone for good. Download it first to keep it.`,
+        buttons: ["Delete", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+      });
+      if (response !== 0) return false;
+    } else if (card.chatId || runs > 0) {
       const { response } = await dialog.showMessageBox(this._baseWindow, {
         type: "warning",
         message: "Delete this card?",
@@ -1421,6 +1432,50 @@ export class Window {
       return { ok: false, error: `${name} couldn’t be read.` };
     }
     return this.nests.addTableFile(nestId, name, bytes, (place ?? {}) as Parameters<Nests["addTableFile"]>[3]);
+  }
+
+  // A file dropped on a Nest's board, which the chrome read from the drop: never a path. Checked here as a file picked with
+  // + is, and one too big for its kind is refused before anything is done with it.
+  async dropFile(nestId: unknown, file: unknown, place: unknown): Promise<NestTableResult> {
+    if (typeof nestId !== "string" || !this.nests.title(nestId)) return { ok: false, error: "That Nest isn’t there any more." };
+    const { name: given, size, bytes } = (file ?? {}) as { name?: unknown; size?: unknown; bytes?: unknown };
+    const name = typeof given === "string" ? (given.split(/[\\/]/).pop() ?? "").slice(0, 255) : "";
+    if (!name || typeof size !== "number" || !Number.isFinite(size) || size < 0) return { ok: false, error: "That file couldn’t be read." };
+    const data = ArrayBuffer.isView(bytes) ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) : null;
+    const table = /\.(csv|tsv)$/i.test(name);
+    const most = table ? MAX_TABLE_BYTES : maxBytesFor(name);
+    const length = data?.length ?? size;
+    if (most !== null && length > most) {
+      return { ok: false, error: table ? `${name} is more than the 2 MB a table can be.` : `${name} is ${sizeInWords(length)}, more than the ${sizeInWords(most)} a file like it can be.` };
+    }
+    // A type that's refused anyway needs no bytes to say so.
+    if (most !== null && !data) return { ok: false, error: `${name} couldn’t be read.` };
+    return this.nests.dropFile(nestId, name, data ?? new Uint8Array(), await modelInputs(), (place ?? {}) as Parameters<Nests["dropFile"]>[4]);
+  }
+
+  // A file's card's file, written only where the user chose in the save dialog, and nowhere until then. Nothing opens it
+  // afterwards. A CSV is written from its rows, so a cell a spreadsheet would run as a formula stays text.
+  async saveFile(cardId: unknown): Promise<boolean> {
+    const found = this.nests.fileDownload(cardId);
+    if (!found) return false;
+    const name = downloadName(found.name);
+    const extension = /\.([a-z0-9]{1,8})$/i.exec(name)?.[1];
+    const { canceled, filePath } = await dialog.showSaveDialog(this._baseWindow, {
+      title: "Download",
+      defaultPath: join(app.getPath("downloads"), name),
+      ...(extension ? { filters: [{ name: typeInWords(found.type), extensions: [extension] }] } : {}),
+    });
+    if (canceled || !filePath) return false;
+    try {
+      if (found.type === "text/csv") {
+        const text = Buffer.from(found.data).toString("utf8");
+        const [header = [], ...rows] = parseDelimited(text, sniffDelimiter(text));
+        await writeFile(filePath, toCsv({ header, rows }), "utf8");
+      } else await writeFile(filePath, found.data);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // A card's table on the clipboard: as tab-separated text and as an HTML table, which Sheets, Excel and Numbers all

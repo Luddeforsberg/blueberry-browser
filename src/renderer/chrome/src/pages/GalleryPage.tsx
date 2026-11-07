@@ -214,7 +214,7 @@ const sampleCard = (id: string, x: number, y: number, extra: Partial<NestCard> =
     position: { x, y },
     draggable: false,
     focusable: false,
-    data: { card: { id, chatId: null, mascotId: null, x, y, autoPlaced: false, each: null, plan: null, table: null, attachments: [], ...extra } }
+    data: { card: { id, chatId: null, mascotId: null, x, y, autoPlaced: false, each: null, plan: null, table: null, file: null, attachments: [], ...extra } }
 })
 
 const SAMPLE_NODES: CardNode[] = [
@@ -232,7 +232,10 @@ const SAMPLE_NODES: CardNode[] = [
         }
     }),
     sampleCard('working', 0, 560, { chatId: 'working' }),
-    sampleCard('planned', 560, 560, { plan: { state: 'planned', prompt: 'Find each lead’s latest LinkedIn post.', each: false, waits: false, table: null, note: null } })
+    sampleCard('planned', 560, 560, { plan: { state: 'planned', prompt: 'Find each lead’s latest LinkedIn post.', each: false, waits: false, table: null, note: null } }),
+    sampleCard('file', 0, 860, {
+        file: { name: 'leads.csv', type: 'text/csv', size: 412, pages: null, preview: 'Company,City\nKvarnsten,Uppsala\nBrygga,Malmö', made: true }
+    })
 ]
 
 const SAMPLE_EDGES: LineEdge[] = [{ id: 'line', source: 'scout', target: 'writer', sourceHandle: 'out', targetHandle: 'in', type: 'line', data: { draft: false } } as Edge<{ draft: boolean }, 'line'>]

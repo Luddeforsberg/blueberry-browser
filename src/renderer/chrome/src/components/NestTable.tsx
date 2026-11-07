@@ -117,7 +117,9 @@ export const TableResult: React.FC<{
     onMore?: () => void
     // The card was made a size of its own, so the table takes what's left of it, with every row, scrolling both ways.
     fill?: boolean
-}> = ({ table, selected, onPick, here = null, own, every = false, total, onMore, fill = false }) => {
+    // The card was made wider than usual, so a long cell wraps onto more lines rather than being cut.
+    wrap?: boolean
+}> = ({ table, selected, onPick, here = null, own, every = false, total, onMore, fill = false, wrap = false }) => {
     const [more, setMore] = useState(false)
     const all = every || more || fill
     const hidden = every || fill ? 0 : Math.max(0, (total ?? table.rows.length) - ROWS_SHOWN)
@@ -187,8 +189,13 @@ export const TableResult: React.FC<{
                                         <td
                                             key={column}
                                             // A value cut short shows whole on hover.
-                                            title={own && column === last ? undefined : plainCell(row[column] ?? '') || undefined}
-                                            className={cn("pl-5 last:pr-5 truncate", own && column === last ? "relative max-w-[240px]" : "max-w-[200px]")}
+                                            title={wrap || (own && column === last) ? undefined : plainCell(row[column] ?? '') || undefined}
+                                            className={cn(
+                                                "pl-5 last:pr-5",
+                                                wrap ? "py-2 align-top whitespace-normal break-words min-w-[120px] max-w-[360px]" : "truncate",
+                                                !wrap && (own && column === last ? "relative max-w-[240px]" : "max-w-[200px]"),
+                                                wrap && own && column === last && "relative"
+                                            )}
                                         >
                                             {own && column === last ? own.cell(index) : <CellText cell={row[column] ?? ''} />}
                                         </td>

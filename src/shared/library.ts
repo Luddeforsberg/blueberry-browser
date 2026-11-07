@@ -454,6 +454,8 @@ export interface NestCard {
   plan: NestPlanned | null;
   // Set on a card made from a file the user added: its rows, with no chat and no bird.
   table: NestTableFile | null;
+  // Set on a file's card: a file the user put on the board, or one a card's bird made, with no chat and no bird.
+  file: NestFile | null;
   // Its files and notes, which go to its bird with every message. They can change only before it's sent.
   attachments: NestAttachment[];
   // The size the user made it from its corner, or none for the usual width and a height that follows what it shows.
@@ -521,6 +523,26 @@ export interface NestTableFile {
   header: string[];
   rows: string[][];
   count: number;
+}
+
+// A file on a card of its own. Its bytes stay in main: the card gets its name, type and size, and the first lines of a
+// text file. `made` when a card's bird made it, and then the line into its card comes from that card.
+export interface NestFile {
+  name: string;
+  type: string;
+  size: number;
+  // A PDF's pages, when they could be counted.
+  pages: number | null;
+  preview: string | null;
+  made: boolean;
+}
+
+// What a file's card shows when it's opened, read in main: a Markdown, text or JSON file's words, a CSV file's rows, or
+// an image as a data address. A PDF shows only its pages and size.
+export interface NestFileContent {
+  text?: string;
+  table?: { header: string[]; rows: string[][] };
+  image?: string;
 }
 
 // Waiting for its turn, started (its chat says how it's going), stopped before it started, or couldn't start.

@@ -39,6 +39,7 @@ import {
     flightPath,
     freeSpot,
     pickRows,
+    roomToGrow,
     settle,
     settleHeight,
     showViewport,
@@ -69,6 +70,11 @@ const OPEN_Z = 10
 const DIM_Z = 5
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
+
+// The largest file a drop reads into the chrome, the biggest any kind of file can be. Main says why a bigger one can't go.
+const MAX_DROP_READ = 10 * 1024 * 1024
+// How many files one drop adds.
+const MAX_DROPPED = 10
 
 // What the keyboard and a screen reader are told about a card on the board.
 const CARD_KEYS = {
@@ -109,7 +115,7 @@ const toNodes = (
 const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
     const card = board.cards.find((each) => each.id === cardId)
     const into = board.lines.filter((line) => line.to === cardId)
-    if (!card || card.chatId || card.each || card.table || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
+    if (!card || card.chatId || card.each || card.table || card.file || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
     const after = new Set<string>([cardId])
     for (let grew = true; grew; ) {
         grew = false
@@ -124,7 +130,7 @@ const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
         (each) =>
             !after.has(each.id) &&
             !into.some((line) => line.from === each.id) &&
-            (!!each.chatId || !!each.each || !!each.table || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
+            (!!each.chatId || !!each.each || !!each.table || !!each.file || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
     )
 }
 
@@ -143,7 +149,7 @@ const toEdges = (board: NestBoard): LineEdge[] =>
         targetHandle: 'in',
         type: 'line',
         focusable: false,
-        data: { draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each)) }
+        data: { draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each || card.file)) }
     }))
 
 // Where each Nest was last looked at, so going to another tab and back keeps the place. Memory only.
@@ -360,7 +366,8 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // Set when a press away from the rows cleared them, so the click that follows on the board doesn't also make a card.
     const clearedByPress = useRef(false)
     const label = useCallback(
-        (card: NestBoard['cards'][number]) => (card.table ? `The table ${card.table.name}` : `${card.mascotId ? find(card.mascotId).name : berryName}’s card`),
+        (card: NestBoard['cards'][number]) =>
+            card.table ? `The table ${card.table.name}` : card.file ? `The file ${card.file.name}` : `${card.mascotId ? find(card.mascotId).name : berryName}’s card`,
         [find, berryName]
     )
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
@@ -384,8 +391,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const pulling = useRef<string | null>(null)
     const api = window.chromeAPI.nests
 
-    // The card whose corner is being dragged, which neither the board's updates nor settling may move or size meanwhile.
+    // The card whose corner is being dragged, which neither the board's updates nor settling may move or size meanwhile,
+    // and where it was when the drag began, which says what's in its way.
     const resizing = useRef<string | null>(null)
+    const resizeFrom = useRef<{ id: string; rect: Rect } | null>(null)
     useEffect(() => setNodes((previous) => toNodes(board, openId, previous, label, resizing.current)), [board, openId, label])
 
     const open = useCallback((cardId: string | null, runId: string | null = null) => {
@@ -458,6 +467,15 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         )
         void api.nudgeCards(board.id, nudges)
     }, [nodes, openId, api, board.id])
+
+    // A card made bigger from its corner stops short of any card in its way rather than covering it, and nothing moves for
+    // it. React Flow sends what the corner asks for while it's dragged and once more as it's let go, both with `resizing`.
+    const stopAtNeighbours = (change: NodeChange<CardNode>, current: CardNode[]): NodeChange<CardNode> => {
+        const from = resizeFrom.current
+        if (change.type !== 'dimensions' || typeof change.resizing !== 'boolean' || !change.dimensions || change.id !== from?.id) return change
+        const others = current.filter((node) => node.id !== change.id).map(rectOf)
+        return { ...change, dimensions: roomToGrow(from.rect, others, change.dimensions) }
+    }
 
     // ⌘+, ⌘− and ⌘0 come from the View menu, since they're its accelerators.
     useEffect(
@@ -597,7 +615,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // so does a draft with a file or note on it.
     const dropEmptyDrafts = useCallback(() => {
         board.cards
-            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !draftText(card.id).trim() && card.attachments.length === 0)
+            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !card.file && !draftText(card.id).trim() && card.attachments.length === 0)
             .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
@@ -646,9 +664,16 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             forEachFrom: (cardId) => board.cards.filter((card) => card.each && board.lines.some((line) => line.from === cardId && line.to === card.id)),
             away: (cardId) => away.has(cardId),
             replanning: !!planning && pending,
-            resizeStart: (cardId) => (resizing.current = cardId),
-            // Kept on the card at once, so nothing puts it back before main says so.
-            resizeEnd: (cardId, size) => {
+            resizeStart: (cardId) => {
+                resizing.current = cardId
+                const node = flow.getNode(cardId)
+                resizeFrom.current = node ? { id: cardId, rect: rectOf(node) } : null
+            },
+            // Kept on the card at once, so nothing puts it back before main says so. It's the size the card stopped at,
+            // which is less than where the corner was let go if another card was in the way.
+            resizeEnd: (cardId, wanted) => {
+                const node = flow.getNode(cardId)
+                const size = { width: node?.width ?? wanted.width, height: node?.height ?? wanted.height }
                 resizing.current = null
                 setNodes((current) => current.map((each) => (each.id === cardId ? { ...each, ...size, data: { card: { ...each.data.card, size } } } : each)))
                 void api.resizeCard(cardId, Math.round(size.width), Math.round(size.height))
@@ -707,7 +732,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         if (event.key === 'Enter') {
             event.preventDefault()
             const card = board.cards.find((each) => each.id === cardId)
-            if (card?.chatId || card?.each) open(openId === cardId ? null : cardId)
+            if (card?.chatId || card?.each || (card?.file && card.file.type !== 'application/pdf')) open(openId === cardId ? null : cardId)
             else node.querySelector<HTMLElement>('textarea')?.focus()
         } else if (event.key === 'Backspace' || event.key === 'Delete') {
             event.preventDefault()
@@ -736,6 +761,38 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         if (!result.ok) setProblem(result.error)
     }
     const addItems = attaching.items && [...attaching.items, { label: 'Add a table from a file', icon: <Table2 />, onSelect: () => void addTable() }]
+
+    // Files dropped anywhere on the board, each a card of its own where it was let go, or a table card for a CSV. The
+    // chrome only reads what was dropped and hands main the bytes, never a path, and main checks each as + does.
+    const [dropping, setDropping] = useState(false)
+    const dragDepth = useRef(0)
+    const hasFiles = (event: React.DragEvent) => event.dataTransfer.types.includes('Files')
+    const dropFiles = async (event: React.DragEvent) => {
+        if (!hasFiles(event)) return
+        event.preventDefault()
+        dragDepth.current = 0
+        setDropping(false)
+        const files = [...event.dataTransfer.files]
+        if (files.length === 0) return
+        setProblem(null)
+        open(null)
+        const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
+        const taken = rects()
+        const problems: string[] = []
+        for (const file of files.slice(0, MAX_DROPPED)) {
+            let bytes: Uint8Array | null = null
+            try {
+                bytes = file.size <= MAX_DROP_READ ? new Uint8Array(await file.arrayBuffer()) : null
+            } catch {
+                problems.push(`${file.name} couldn’t be read.`)
+                continue
+            }
+            const result = await api.dropFile(board.id, { name: file.name, size: file.size, bytes }, { at: { x: at.x - 32, y: at.y - 24 }, taken })
+            if (!result.ok) problems.push(result.error)
+        }
+        if (files.length > MAX_DROPPED) problems.push(`Drop ${MAX_DROPPED} files at a time at most. The first ${MAX_DROPPED} were added.`)
+        if (problems.length > 0) setProblem(problems.join(' '))
+    }
     const sendNew = async () => {
         const text = prompt.trim()
         const box = wrapper.current?.getBoundingClientRect()
@@ -757,13 +814,33 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
 
     return (
         <NestBoardContext.Provider value={actions}>
-            <div ref={wrapper} className="relative flex-1 min-h-0" onKeyDown={onKeyDown}>
+            <div
+                ref={wrapper}
+                className={cn("relative flex-1 min-h-0", dropping && "after:pointer-events-none after:absolute after:inset-2 after:rounded-panel after:border-2 after:border-dashed after:border-accent-ink/50")}
+                onKeyDown={onKeyDown}
+                onDragEnter={(event) => {
+                    if (!hasFiles(event)) return
+                    dragDepth.current++
+                    setDropping(true)
+                }}
+                onDragOver={(event) => {
+                    if (!hasFiles(event)) return
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'copy'
+                }}
+                onDragLeave={(event) => {
+                    if (!hasFiles(event)) return
+                    dragDepth.current = Math.max(0, dragDepth.current - 1)
+                    if (dragDepth.current === 0) setDropping(false)
+                }}
+                onDrop={(event) => void dropFiles(event)}
+            >
                 <ReactFlow<CardNode, LineEdge>
                     nodes={nodes}
                     edges={edges}
                     nodeTypes={NODE_TYPES}
                     edgeTypes={EDGE_TYPES}
-                    onNodesChange={(changes: NodeChange<CardNode>[]) => setNodes((current) => applyNodeChanges(changes, current))}
+                    onNodesChange={(changes: NodeChange<CardNode>[]) => setNodes((current) => applyNodeChanges(changes.map((change) => stopAtNeighbours(change, current)), current))}
                     onNodeDragStop={(_, node) => {
                         // Moved by hand, it stays where it's left, even before main says so.
                         setNodes((current) => current.map((each) => (each.id === node.id ? { ...each, data: { card: { ...each.data.card, autoPlaced: false } } } : each)))

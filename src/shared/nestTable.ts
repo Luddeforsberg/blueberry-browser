@@ -389,6 +389,13 @@ export interface LineCrossing {
   drives?: boolean;
   // With several inputs and For each row on, on every other line: what each run gets from it as shared context.
   shared?: Crossing | null;
+  // The files that go across it, from a file's card on it or further up the chain, by name, and any that had no room.
+  files?: FilesCrossing;
+}
+
+export interface FilesCrossing {
+  names: string[];
+  leftOut: string[];
 }
 
 const count = (value: number) => value.toLocaleString("en-US");
@@ -422,6 +429,27 @@ export const crossingWords = (crossing: Crossing, who: string): string => {
   const shape = `${counted(crossing.rows, "row")}, ${counted(crossing.columns, "column")} from ${who}`;
   const lost = [...(crossing.leftOut > 0 ? [counted(crossing.leftOut, "more row")] : []), ...beforeLost(before)];
   return `${shape}${cardsBefore ? `, and ${cardsBefore}, ${aboutWords(before!.words)}` : ""}${lossWords(lost, !!before?.cut)}`;
+};
+
+// "pitch.pdf", "pitch.pdf and chart.png", "a.md, b.md and 3 more".
+const namesIn = (names: readonly string[]) => {
+  const shown = names.length <= 3 ? names : [...names.slice(0, 2), `${names.length - 2} more`];
+  return shown.length < 2 ? (shown[0] ?? "") : `${shown.slice(0, -1).join(", ")} and ${shown.at(-1)}`;
+};
+
+// "1 file: pitch.pdf", "2 files: pitch.pdf and chart.png", with any that had no room on the card said plainly.
+export const filesWords = ({ names, leftOut }: FilesCrossing): string => {
+  const going = names.length > 0 ? `${counted(names.length, "file")}: ${namesIn(names)}` : "";
+  const lost = leftOut.length > 0 ? `${going ? "with " : ""}${counted(leftOut.length, "file")} left out, since the card has no room for ${leftOut.length === 1 ? "it" : "them"}: ${namesIn(leftOut)}` : "";
+  return [going, lost].filter(Boolean).join(", ");
+};
+
+// What crosses a line, in words: the card's part, and the files that come with it.
+export const lineWords = (crossing: Pick<LineCrossing, "whole" | "files">, who: string): string | null => {
+  const files = crossing.files && (crossing.files.names.length > 0 || crossing.files.leftOut.length > 0) ? filesWords(crossing.files) : null;
+  const own = crossing.whole ? crossingWords(crossing.whole, who) : null;
+  if (own && files) return `${own}, and ${files}`;
+  return own ?? files;
 };
 
 // What each run of For each row gets.

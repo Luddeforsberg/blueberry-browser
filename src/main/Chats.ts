@@ -9,7 +9,7 @@ import {
 import { randomUUID } from "crypto";
 import { firecrawlSearch } from "./webSearch";
 import { firecrawlFetch } from "./webFetch";
-import { createPageTools, HANDOFF_WORDS, showsFrameOffLimits, siteOf, type PageTool, type PageToolAccess } from "./browserTools";
+import { createPageTools, HANDOFF_WORDS, showsFrameOffLimits, siteOf, type PageTool, type PageToolAccess, type SaveFile } from "./browserTools";
 import { enterCodeInTab } from "./codeEntry";
 import type { CodeResult } from "./Phone";
 import { codeEcho } from "./phoneReplies";
@@ -183,6 +183,8 @@ interface Run {
   attachments?: readonly SentAttachment[];
   // Only on a run of a For-each card, started here and not in the cloud.
   cardGrant?: CardGrantAccess;
+  // Only on a Nest's card, started here and not in the cloud: where save_file keeps what the bird made.
+  saveFile?: SaveFile;
   // What the model calls of this reply used, which says what it cost.
   usage: TokenUsage;
 }
@@ -475,6 +477,7 @@ export class Chats {
       beenTo: run.earlierSites,
       search: firecrawlSearch(),
       fetchPage: firecrawlFetch(),
+      saveFile: run.saveFile ?? null,
       closeTab: (tab) => this.closeRunTab(run, tab),
       ask: (question) => this.askQuestion(chatId, run, question),
     });
@@ -874,6 +877,7 @@ export class Chats {
       userSaid,
       attachments,
       cardGrant,
+      saveFile,
     }: {
       seePage: boolean;
       mascotId?: string | null;
@@ -890,6 +894,7 @@ export class Chats {
       userSaid?: string;
       attachments?: readonly SentAttachment[];
       cardGrant?: CardGrantAccess;
+      saveFile?: SaveFile;
     }
   ): ChatThread | null {
     const message = text.trim();
@@ -918,7 +923,8 @@ export class Chats {
 
     const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswers, userSaid, attachments, usage: { input: 0, cached: 0, output: 0 },
       // Never for a job in the cloud or one an app started.
-      ...(cardGrant && !inCloud && from === null ? { cardGrant } : {}) };
+      ...(cardGrant && !inCloud && from === null ? { cardGrant } : {}),
+      ...(saveFile && !inCloud && from === null ? { saveFile } : {}) };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
