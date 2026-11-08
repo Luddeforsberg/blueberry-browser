@@ -23,6 +23,13 @@ const plan = (...cards: object[]) => ({ reply: "That's two jobs.", ask: false, c
 const check = (raw: unknown) => checkPlan(raw, { flock: FLOCK, sources: SOURCES });
 
 describe("checkPlan", () => {
+  it("keeps the plan's name for its section cleaned, and none when it gave none", () => {
+    expect(check({ ...plan(card("c1"), card("c2")), section: " Competitor\n research " })).toMatchObject({ ok: true, section: "Competitor research" });
+    expect(check(plan(card("c1"), card("c2")))).not.toHaveProperty("section");
+    expect(check({ ...plan(card("c1")), section: 42 })).not.toHaveProperty("section");
+    expect(check({ ...plan(card("c1")), section: "\u200b " })).not.toHaveProperty("section");
+  });
+
   it("keeps a plan whose cards read from each other or from the board, sources first", () => {
     const result = check(
       plan(card("c2", { bird: "writer", from: "c1", for_each_row: true, waits_for_user: true }), card("c1", { table_of: "companies" }), card("c3", { from: "e1", bird: BERRY.id }))

@@ -11,7 +11,8 @@ import type { NestWriter } from "./nestCells";
 import type { CardChange, NestRecapWriter } from "./nestReturn";
 import { BERRY } from "../shared/mascots";
 import { lineWords, STALE_ROWS } from "../shared/nestTable";
-import { CARD_SIZE } from "../shared/nestPlace";
+import { CARD_HEIGHT, CARD_SIZE, CARD_WIDTH } from "../shared/nestPlace";
+import { inSection } from "../shared/nestSections";
 
 vi.mock("./agent", async (importOriginal) => {
   const { ModelConfigError } = await importOriginal<typeof import("./agent")>();
@@ -849,6 +850,7 @@ describe("Berry planning in a Nest", () => {
     expect(card.plan).toBeNull();
     expect(newest(sent[0])).toBe("Find Swedish SaaS companies");
     expect(nests.board(nest)!.talk).toEqual([]);
+    expect(nests.board(nest)!.sections).toEqual([]);
   });
 
   it("lays out several jobs as planned cards that run nothing, with the request and Berry's answer kept", async () => {
@@ -874,6 +876,18 @@ describe("Berry planning in a Nest", () => {
     ]);
     expect(nests.list()[0].planned).toBe(true);
     expect(sent).toHaveLength(0);
+    // Two cards go in a section around them, named by the request when the plan names none, in a colour picked in code.
+    const [section] = nests.board(nest)!.sections;
+    expect(section).toMatchObject({ name: "Find companies and write to each", color: "yellow" });
+    expect([scout, writer].every((card) => inSection({ x: card.x, y: card.y, width: CARD_WIDTH, height: CARD_HEIGHT }, section))).toBe(true);
+    // A plan changed to one card has no section, and the plan's section never takes a colour from the next.
+    expect(nests.addSection(nest, { x: 0, y: 2000, width: 300, height: 200 })).toMatchObject({ name: "Section", color: "yellow" });
+    plans.push({ ...TWO_JOBS, section: "  Outreach\u200b ", cards: [planCard("c1")] });
+    await nests.ask(nest, "Only the list", PLACE);
+    expect(nests.board(nest)!.sections.map((each) => each.name)).toEqual(["Section"]);
+    plans.push({ ...TWO_JOBS, section: "  Outreach\u200b " });
+    await nests.ask(nest, "Both again", PLACE);
+    expect(nests.board(nest)!.sections).toMatchObject([{ name: "Section" }, { name: "Outreach", color: "green" }]);
   });
 
   it("still says Berry is planning on the board it sends after a card was nudged out of the way", async () => {

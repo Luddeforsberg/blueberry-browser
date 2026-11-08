@@ -141,6 +141,19 @@ For our own chrome (web pages do not count), this is a guideline and not a measu
 | `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
 | `glass-tint` | `background` at 88% | `background` at 88% | All glass |
 
+A Nest's sections each have a fill and an ink, its edge at 30% and its colour dot, in six colours. Dark mode's are muted, so a section stays a quiet area behind the cards:
+
+| Token | Light fill / ink | Dark fill / ink |
+|---|---|---|
+| `section-yellow` | `#fbf3cf` / `#a87c08` | `#36321f` / `#d8b64a` |
+| `section-green` | `#dff3e4` / `#2f9a5a` | `#223127` / `#67bf83` |
+| `section-blue` | `#dfe8fb` / `#3d73d9` | `#222c3b` / `#6f9be0` |
+| `section-pink` | `#fbe1ec` / `#d4508a` | `#38252d` / `#e083a8` |
+| `section-purple` | `#e9e3fa` / `#8460d6` | `#2d283b` / `#a58ae0` |
+| `section-gray` | `#e9ebf1` / `#80869b` | `#2c2d31` / `#9a9ca5` |
+
+A section's name is `foreground` on its fill: at least 13.5:1 in light mode and 11.5:1 in dark. Each ink is at least 3:1 on its fill in light mode and 4.9:1 in dark, so a colour dot reads as a control.
+
 Contrast is calculated against each mode's most difficult frame colour, and against a `surface` card at 80% over the art blueberry's darkest colour in light mode and lightest in dark mode. Re-measure on real windows. What the birds on the fruit say is `primary-foreground` directly on it, over a pool of `berry-fruit-crown` shadow. Measured on real windows, white reaches at least 6.4:1 on the brightest pixel behind the words in light mode and 9.2:1 in dark.
 
 | Text colour | Light on frame | Dark on frame | Light on berry card | Dark on berry card |
@@ -599,7 +612,15 @@ A Nest is a board for working in several threads at once, over days. Each card i
 - **A page the user named.** A link or tab the user dropped on the board counts as an address they gave the card a line takes it to, for that exact address only, as if they had typed it in that card's prompt: its bird may open it without asking. Another path, a query or another subdomain of its site asks as before, and so does a card further down the chain, or a card the line doesn't go to. It never widens a bird: a bird limited to sites is refused an address off them whatever it was given. Berry planning doesn't see page cards, and a page can only go to a card you send yourself, not to a card of a plan.
 - **A card's own tabs.** While a card's job runs, a quiet 28px button in its header, a window icon, shows the tabs it's using as page cards around it, each joined to it by a dotted line that carries nothing, placed clear of every card. They come as the job opens them and go as they close, each pictured as the working view pictures them, faster where the bird is working, which wears the reading ring and says "Working here", and a tab the job can't picture says why, as the working view does. Pressing one goes to that tab, as from the working view. Taking one off the board keeps it off while that job runs. When the job ends, its tabs that closed leave the board, ones still open stay as tab cards, and the pages its reply kept stay as link cards, joined to it. None of them adds anything to a send unless the user pulls a line out of one, and neither counts as a page the user named. A card's job never runs in the cloud, so there's no cloud page to show.
 
-Not built yet: dropping a file onto a draft's own files, Word files, Excel files as tables, and showing a PDF in the app.
+- **Sections.** A named, coloured area behind cards, such as a yellow "Outreach" and a green "Research", drawn under every card and line, so cards, lines, handles and drop targets over it work as anywhere on the board, and a press on its empty inside is a press on the board.
+- **Making one:** `S`, or the dashed-square tool beside Fit to screen, then a drag anywhere on the board draws one, and a click makes one 520 by 360 there. Esc puts the tool away. With cards selected, **Group** beside it, or ⌘G (Ctrl+G elsewhere), fits one around them, with 32px on the sides, 40px below and 104px above for the name and the birds. A new section is "Section", in the first colour no section on the board has yet, with its name selected to type over. At least 240 by 160.
+- **How it looks:** its fill, a 1px edge in its ink at 30%, and the panel radius. The name is 13px semibold `foreground`, top left, 36px down to its baseline, and zoomed out it grows up from there, to 26px on screen at 25%, so a board seen whole reads as a map beside the cards' titles.
+- **Selecting it:** pressing the name selects the section, with a 2px `accent-ink` ring, and every card in it, so the composer's chip says "Ask about Research" and Berry reads only those cards, as with any selection: main gets their ids, never the name. Pressing the name again renames it, where Enter keeps it and Esc puts the old one back. A selected section shows a small `surface` pill just under its bottom-right corner, with its six colour dots and a × that deletes it, and a round handle on each corner. Those keep their size on screen at any zoom. A press on the board, or on a card, or Esc, lets it go.
+- **What's in it:** a card is in a section while its centre is, counting a card taller than usual at its usual height, so a card that grows with its answer stays in. Nothing else is kept: dragging a card out takes it out, dropping one in puts it in, and making a section bigger or smaller changes what's in it. Placing new cards treats sections as background.
+- **Moving it:** dragging the name moves the section with its cards and any section wholly inside it, each kept as moved by hand. A corner makes it bigger or smaller, the opposite corner staying put, and moves nothing. ⌫ or the × deletes only the section: its cards stay where they are.
+- **Berry plans into a section:** a plan of two cards or more lands in a new section around them, named by the plan in one to three words, or by the request when it gives none, cleaned like a title, and in a colour picked in code. Changing the plan changes its section, discarding it takes the section away, and Run keeps it. Once you move, resize, rename or recolour it, it's yours, and a new plan gets its own. A plan of one card gets none.
+
+Not built yet: dropping a file onto a draft's own files, Word files, Excel files as tables, showing a PDF in the app, and a line from a whole section into a card.
 
 ### Routines
 

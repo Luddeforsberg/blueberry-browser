@@ -1238,9 +1238,11 @@ export class Window {
     if (target) this.findBar.open(target);
   }
 
-  // With the bar closed there's nothing to step through yet, so this opens it.
+  // With the bar closed there's nothing to step through yet, so this opens it, except on a Nest's board, where ⌘G groups
+  // the selected cards in a section.
   findStep(forward: boolean): void {
     if (this.findBar.isOpen) this.findBar.step(forward);
+    else if (forward && this.onNest) sendToRenderer(this.chrome.view.webContents, "nests:group", null);
     else this.openFindBar();
   }
 

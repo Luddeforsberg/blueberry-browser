@@ -417,6 +417,8 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
   const cards = chrome.locator(".react-flow__node");
   await expect(cards).toHaveCount(2);
   await expect(ghosts).toHaveCount(0);
+  // Two cards land in a section of their own, named for the request when the plan names none.
+  await expect(chrome.locator("[data-section-name]")).toHaveText("Find Swedish SaaS companies we could se…");
   const [scout, writer] = [cards.nth(0), cards.nth(1)];
   await expect(scout.getByRole("status")).toHaveText("Planned");
   await expect(scout).toContainText("Only goes to allabolag.se");
@@ -1777,4 +1779,109 @@ test("coming back to a board: a card named for what it found, a dot until it's o
   await expect(reopened.locator("[data-card-title]")).toHaveText("Shortlist");
   await expect(reopened.locator("[data-unread]")).toHaveCount(0);
   await expect(again.locator("[data-since]")).toHaveCount(0);
+});
+
+test("a section drawn around a card is named, moves the card with it, and asks about only its cards", async () => {
+  test.setTimeout(60_000);
+  model.reset();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
+  app = await launchApp(profile, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  const cards = chrome.locator(".react-flow__node");
+  for (const [ask, answer] of [
+    ["Find our rivals", "Comet and Dia are the rivals."],
+    ["Find their prices", "Comet is free, and Dia is $20."],
+  ]) {
+    oneJob();
+    model.replyWith(answer);
+    await composer.fill(ask);
+    await composer.press("Enter");
+    await expect(cards.filter({ hasText: answer }).getByRole("status")).toHaveText("Done");
+  }
+  const rivals = cards.filter({ hasText: "Comet and Dia" });
+  const prices = cards.filter({ hasText: "Comet is free" });
+  const saved = () =>
+    chrome.evaluate(async () => {
+      const nests = (await window.chromeAPI.library.getLibrary()).nests;
+      return (await window.chromeAPI.nests.board(nests[0].id))!;
+    });
+
+  // S, with the board's keyboard, then a drag around the first card draws a section, with its name ready to type.
+  await rivals.focus();
+  await chrome.keyboard.press("s");
+  await expect(chrome.getByRole("button", { name: "Draw a section" })).toHaveAttribute("aria-pressed", "true");
+  const box = (await rivals.boundingBox())!;
+  await chrome.mouse.move(box.x - 40, box.y - 70);
+  await chrome.mouse.down();
+  await chrome.mouse.move(box.x + box.width + 40, box.y + Math.min(box.height, 200) + 10, { steps: 6 });
+  await chrome.mouse.up();
+  const field = chrome.getByRole("textbox", { name: "Section name" });
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue("Section");
+  await field.fill("Research");
+  await field.press("Enter");
+  const name = chrome.locator("[data-section-name]");
+  await expect(name).toHaveText("Research");
+  await expect.poll(async () => (await saved()).sections.map((section) => section.name)).toEqual(["Research"]);
+  if (SHOTS) {
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(150);
+      await chrome.screenshot({ path: join(SHOTS, `section-${appearance}.png`) });
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+    // Zoomed out, the name grows so the board reads as a map, then back to 100%.
+    const zoom = (to: "in" | "out") => app.evaluate(({ webContents }, way) => webContents.getAllWebContents().forEach((each) => each.send("nests:zoom", way)), to);
+    for (let step = 0; step < 6; step++) {
+      await zoom("out");
+      await chrome.waitForTimeout(250);
+    }
+    await chrome.waitForTimeout(800);
+    await chrome.screenshot({ path: join(SHOTS, "section-far.png") });
+    await chrome.getByRole("button", { name: /Back to 100%/ }).click();
+    await chrome.waitForTimeout(400);
+  }
+
+  // Dragging its name moves the section and the card in it, and only that card, kept in main as moved.
+  const before = await saved();
+  const pricesBefore = (await prices.boundingBox())!;
+  const label = (await name.boundingBox())!;
+  await chrome.mouse.move(label.x + 10, label.y + label.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(label.x + 160, label.y + label.height / 2 + 30, { steps: 8 });
+  await chrome.mouse.up();
+  await expect.poll(async () => (await rivals.boundingBox())!.x - box.x).toBeGreaterThan(100);
+  expect((await prices.boundingBox())!.x).toBeCloseTo(pricesBefore.x, 0);
+  await expect.poll(async () => (await saved()).sections[0].x - before.sections[0].x).toBeGreaterThan(100);
+  const after = await saved();
+  const moved = (id: string) => after.cards.find((card) => card.id === id)!.x - before.cards.find((card) => card.id === id)!.x;
+  const [first, second] = before.cards;
+  expect(moved(first.id)).toBeCloseTo(after.sections[0].x - before.sections[0].x, 0);
+  expect(moved(second.id)).toBe(0);
+
+  // A press on its name selects its cards, so the composer asks about the section, and Berry reads only its card.
+  await chrome.keyboard.press("Escape");
+  await name.click();
+  const chip = chrome.locator("[data-about-chip]");
+  await expect(chip).toHaveText("Ask about Research");
+  model.planWith({ reply: "Comet and Dia.", ask: false, answers_board: true, cards: [] });
+  await composer.fill("Who are the rivals?");
+  await composer.press("Enter");
+  await expect(chrome.locator("[data-peek]")).toContainText("Berry: Comet and Dia.");
+  const asked = newestUserMessage(model.planRequests.at(-1)!);
+  expect(asked).toContain("The user selected one card on the board and is asking about it alone");
+  expect(asked).toContain("Comet and Dia are the rivals.");
+  expect(asked).not.toContain("Comet is free");
+  expect(asked).not.toContain("Research");
+
+  // ⌫ on the selected section deletes it, never its card.
+  await name.click();
+  await expect(chrome.getByRole("textbox", { name: "Section name" })).toBeFocused();
+  await chrome.keyboard.press("Escape");
+  await chrome.keyboard.press("Backspace");
+  await expect(name).toHaveCount(0);
+  await expect(cards).toHaveCount(2);
 });
