@@ -180,10 +180,20 @@ describe("cellParts", () => {
   });
 
   it("reads a long cell of marks that never close in time that grows with its length, not its square", () => {
+    // Compared with itself at a quarter of the length, not against the clock, so a slow CI runner can't fail it: four
+    // times the length takes about four times as long, where a square would take sixteen. The best of three runs keeps
+    // one pause from counting.
+    const fastest = (cell: string) =>
+      Math.min(
+        ...[0, 1, 2].map(() => {
+          const started = performance.now();
+          expect(plainCell(cell).length).toBeGreaterThan(0);
+          return performance.now() - started;
+        })
+      );
     for (const unit of ["*a ", "**a ", "_a ", "`a ", "``a `", "*`a ", "[a](", "[a ", "![a](", " https://", "a*", "**a*"]) {
-      const started = performance.now();
-      expect(plainCell(unit.repeat(20_000)).length).toBeGreaterThan(0);
-      expect(performance.now() - started, unit).toBeLessThan(500);
+      const short = Math.max(fastest(unit.repeat(5_000)), 1);
+      expect(fastest(unit.repeat(20_000)) / short, unit).toBeLessThan(9);
     }
   });
 
