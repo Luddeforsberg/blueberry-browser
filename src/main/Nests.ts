@@ -70,8 +70,6 @@ const NO_PLANNER: NestPlanner = { available: () => false, plan: async () => null
 // How tall a planned card is taken to be when placing a plan, and how many cards a request may say are already there.
 const PLANNED_HEIGHT = 180;
 const MAX_TAKEN = 500;
-// The longest answer a note's card keeps, far past anything Berry says about a board.
-const MAX_NOTE_CARD_LENGTH = 20_000;
 // The pictures an HTML card's page gets as data, together, so its page stays small enough to draw.
 const MAX_HTML_IMAGE_BYTES = 8 * 1024 * 1024;
 // What an HTML card's page is built from: the bird's page as it wrote it, and the hash its policy names our script by.
@@ -939,7 +937,7 @@ export class Nests {
     const place = this.placing(options);
     const known = this.store.board(nestId)?.cards ?? [];
     const taken = [...place.taken, ...known.filter((card) => !place.taken.some((rect) => rect.x === card.x && rect.y === card.y)).map(rectOfCard)];
-    const card = this.store.addNoteCard(nestId, { ...freeSpot(taken, place.at), text: text.slice(0, MAX_NOTE_CARD_LENGTH) });
+    const card = this.store.addNoteCard(nestId, { ...freeSpot(taken, place.at), text });
     if (!card) return { ok: false, error: "That Nest isn’t there any more." };
     this.changed(nestId);
     return { ok: true, cardId: card.id };
