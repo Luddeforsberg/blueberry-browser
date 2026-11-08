@@ -182,7 +182,8 @@ describe("cellParts", () => {
   it("reads a long cell of marks that never close in time that grows with its length, not its square", () => {
     // Compared with itself at a quarter of the length, not against the clock, so a slow CI runner can't fail it: four
     // times the length takes about four times as long, where a square would take sixteen. The best of three runs keeps
-    // one pause from counting.
+    // one pause from counting. The short run counts as at least 5ms: a linear one takes well under that, so a pause on a
+    // slow runner can't make a tiny time into a big ratio, while a square already takes far longer than 5ms at that length.
     const fastest = (cell: string) =>
       Math.min(
         ...[0, 1, 2].map(() => {
@@ -192,7 +193,7 @@ describe("cellParts", () => {
         })
       );
     for (const unit of ["*a ", "**a ", "_a ", "`a ", "``a `", "*`a ", "[a](", "[a ", "![a](", " https://", "a*", "**a*"]) {
-      const short = Math.max(fastest(unit.repeat(5_000)), 1);
+      const short = Math.max(fastest(unit.repeat(5_000)), 5);
       expect(fastest(unit.repeat(20_000)) / short, unit).toBeLessThan(9);
     }
   });
