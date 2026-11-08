@@ -35,8 +35,16 @@ export const dropIndex = (offset: number, from: number, slots: readonly Slot[]):
 export const settledOffset = (from: number, to: number, slots: readonly Slot[]): number =>
     to > from ? slots[to].start + slots[to].size - slots[from].start - slots[from].size : slots[to].start - slots[from].start
 
+// A tab let go over a place that takes one, such as a Nest's board, which is marked `data-tab-drop` and hears this
+// event with the tab and where it was let go.
+export const TAB_DROP_EVENT = 'blueberry:tab-drop'
+const dropZoneAt = (x: number, y: number): HTMLElement | null =>
+    (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-tab-drop]') ?? null
+
 interface Drag {
     tabId: string
+    // Over a place that takes a tab, outside its list: where the pointer is. The list stays as it was meanwhile.
+    out: { x: number; y: number } | null
     // The order this drag started from. A different order means it no longer applies.
     order: string
     from: number
@@ -72,7 +80,7 @@ export const useTabDrag = (
         const item = event.currentTarget
         const list = item.parentElement
         const from = tabIds.indexOf(tabId)
-        if (!list || tabIds.length < 2 || from === -1) return
+        if (!list || from === -1) return
 
         const coordinate = (e: { clientX: number; clientY: number }) => (axis === 'x' ? e.clientX : e.clientY)
         const slotOf = (element: Element): Slot => {
@@ -81,22 +89,25 @@ export const useTabDrag = (
         }
         const { pointerId } = event
         const startAt = coordinate(event)
+        const pressedAt = { x: event.clientX, y: event.clientY }
         let current: Drag | null = null
 
         const onPointerMove = (e: PointerEvent) => {
             if (e.buttons === 0) return
             const delta = coordinate(e) - startAt
             if (!current) {
-                if (Math.abs(delta) < DRAG_THRESHOLD) return
+                if (Math.hypot(e.clientX - pressedAt.x, e.clientY - pressedAt.y) < DRAG_THRESHOLD) return
                 item.setPointerCapture(pointerId)
                 const slots = [...list.children].map(slotOf)
-                const gap = slots[1].start - slots[0].start - slots[0].size
-                current = { tabId, order, from, to: from, offset: 0, slots, room: slots[from].size + gap, settling: false }
+                const gap = slots.length > 1 ? slots[1].start - slots[0].start - slots[0].size : 0
+                current = { tabId, order, out: null, from, to: from, offset: 0, slots, room: slots[from].size + gap, settling: false }
             }
+            const out = dropZoneAt(e.clientX, e.clientY) ? { x: e.clientX, y: e.clientY } : null
             current = {
                 ...current,
-                offset: clampOffset(delta, from, current.slots),
-                to: dropIndex(delta, from, current.slots)
+                out,
+                offset: out ? 0 : clampOffset(delta, from, current.slots),
+                to: out ? from : dropIndex(delta, from, current.slots)
             }
             setStored(current)
         }
@@ -104,9 +115,14 @@ export const useTabDrag = (
         const finish = (drop: boolean) => {
             stopListening.current?.()
             if (!current) return
-            const { to, slots } = current
+            const { to, slots, out } = current
             if (!drop) {
                 setStored(null)
+                return
+            }
+            if (out) {
+                setStored(null)
+                dropZoneAt(out.x, out.y)?.dispatchEvent(new CustomEvent(TAB_DROP_EVENT, { detail: { tabId, x: out.x, y: out.y } }))
                 return
             }
             setStored({ ...current, offset: settledOffset(from, to, slots), settling: true })
@@ -129,7 +145,7 @@ export const useTabDrag = (
     }
 
     const offsetOf = (index: number): number => {
-        if (!drag) return 0
+        if (!drag || drag.out) return 0
         if (index === drag.from) return drag.offset
         if (index > drag.from && index <= drag.to) return -drag.room
         if (index < drag.from && index >= drag.to) return drag.room
@@ -147,5 +163,8 @@ export const useTabDrag = (
         }
     }
 
-    return { start, itemProps }
+    // The tab being carried over a place that takes it, and where the pointer is, for the picture that follows it.
+    const carried = drag?.out ? { tabId: drag.tabId, ...drag.out } : null
+
+    return { start, itemProps, carried }
 }

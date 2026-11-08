@@ -258,6 +258,7 @@ const SAMPLE_BOARD: NestBoardActions = {
     replanning: true,
     resizeStart: () => undefined,
     resizeEnd: () => undefined,
+    watchPage: () => undefined,
     samples: SAMPLE_THREADS
 }
 

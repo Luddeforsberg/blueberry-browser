@@ -9,7 +9,7 @@ import {
 import { randomUUID } from "crypto";
 import { firecrawlSearch } from "./webSearch";
 import { firecrawlFetch } from "./webFetch";
-import { createPageTools, HANDOFF_WORDS, showsFrameOffLimits, siteOf, type PageTool, type PageToolAccess, type SaveFile } from "./browserTools";
+import { createPageTools, HANDOFF_WORDS, readPageText, showsFrameOffLimits, siteOf, type PageTool, type PageToolAccess, type SaveFile } from "./browserTools";
 import { enterCodeInTab } from "./codeEntry";
 import type { CodeResult } from "./Phone";
 import { codeEcho } from "./phoneReplies";
@@ -178,6 +178,8 @@ interface Run {
   cardAnswers?: readonly CardAnswer[];
   // What the user typed for this job, when the chat's messages aren't all their words, as on a card Berry planned.
   userSaid?: string;
+  // Exact addresses the user put on a Nest's board and connected to this card, each opened without asking as if typed.
+  givenAddresses?: readonly string[];
   // The files and notes on a Nest's card, which go with the newest message every time it's sent, and are never saved in
   // the chat.
   attachments?: readonly SentAttachment[];
@@ -474,6 +476,7 @@ export class Chats {
       handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
       limits: unlimited(run.mascot) ? undefined : run.mascot,
       asked,
+      given: run.givenAddresses,
       beenTo: run.earlierSites,
       search: firecrawlSearch(),
       fetchPage: firecrawlFetch(),
@@ -684,6 +687,16 @@ export class Chats {
     return null;
   }
 
+  // The address and title a page may be kept under, such as on a reply or a Nest's board, or null for none. Past a
+  // handoff only its site and path, never one a code was typed into, and never a code the user typed.
+  pageToKeep(tab: Tab | CdpTab): UsedPage | null {
+    const url = addressToKeep(tab.url, {
+      handedBack: this.everHandedOver.has(tab.id),
+      codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
+    });
+    return url ? { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) } : null;
+  }
+
   // A reply is over, so the pages its job opened close, and the reply keeps their addresses to open again. The one the
   // reply sends the user to stays, as theirs. One that can't close, such as the one they're looking at, stays the job's,
   // since looking isn't taking over. One held for the user, or that another job is using, is left alone.
@@ -699,11 +712,8 @@ export class Chats {
     const pages = new Map<string, UsedPage>();
     used.forEach((tab) => {
       if (!job.own.has(tab.id)) return;
-      const url = addressToKeep(tab.url, {
-        handedBack: this.everHandedOver.has(tab.id),
-        codeTyped: "noScreenshotsUntil" in tab && tab.noScreenshotsUntil > 0,
-      });
-      if (url) pages.set(url, { url: this.withoutCodes(url), title: this.withoutCodes(tab.title || siteOf(url)) });
+      const page = this.pageToKeep(tab);
+      if (page) pages.set(page.url, page);
     });
     const current = job.current ? tabOf(job.current) : null;
     const pointed = current && job.own.has(current.id) && replyPointsTo(run.partial, current.url) ? current.id : null;
@@ -875,6 +885,7 @@ export class Chats {
       cardAnswers,
       started,
       userSaid,
+      givenAddresses,
       attachments,
       cardGrant,
       saveFile,
@@ -892,6 +903,7 @@ export class Chats {
       cardAnswers?: readonly CardAnswer[];
       started?: (chatId: string) => void;
       userSaid?: string;
+      givenAddresses?: readonly string[];
       attachments?: readonly SentAttachment[];
       cardGrant?: CardGrantAccess;
       saveFile?: SaveFile;
@@ -921,7 +933,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswers, userSaid, attachments, usage: { input: 0, cached: 0, output: 0 },
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswers, userSaid, givenAddresses, attachments, usage: { input: 0, cached: 0, output: 0 },
       // Never for a job in the cloud or one an app started.
       ...(cardGrant && !inCloud && from === null ? { cardGrant } : {}),
       ...(saveFile && !inCloud && from === null ? { saveFile } : {}) };
@@ -1366,11 +1378,38 @@ export class Chats {
     const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
     if ((!page && answers.length === 0 && attachments.length === 0) || !newest || typeof newest.content !== "string") return messages;
-    const text = withCardAnswers(newest.content, answers.map((answer) => mapCardText(answer, (said) => this.withoutCodes(said))));
+    const read = await Promise.all(answers.map((answer) => this.withPageRead(answer, mascot)));
+    const text = withCardAnswers(newest.content, read.map((answer) => mapCardText(answer, (said) => this.withoutCodes(said))));
     const content = page ? withPage(text, page) : text;
     if (attachments.length === 0) return [...messages.slice(0, -1), { role: "user", content }];
     const files = attachmentBlocks(attachments);
     return [...messages.slice(0, -1), { role: "user", content: [...files, ...(typeof content === "string" ? [{ type: "text" as const, text: content }] : content)] }];
+  }
+
+  // A Nest's tab card's text, read now, as the card sends, through the same path the tools read a page by, so a secret
+  // field's value is never in it. Only as the page that goes with a message would be: while the user lets Berry see
+  // pages, not while they have the tab, and only on the bird's sites, frames too. Otherwise its address goes alone, with
+  // why. Codes the user typed come out after, with everything else from a card.
+  private async withPageRead(answer: CardAnswer, mascot: MascotProfile): Promise<CardAnswer> {
+    const page = answer.page;
+    if (!page?.tabId) return answer;
+    const without = (why: string): CardAnswer => ({ ...answer, page: { ...page, tabId: null, why } });
+    const tab = this.browser.allTabs().find((each) => each.id === page.tabId);
+    const mayRead = (open: Tab) => this.pageAccess && !this.handedOver.has(open.id) && !open.heldForUser && !open.mayShowCode && siteAllowed(open.url, mascot.sites);
+    if (!tab?.existingView) return without("Its tab has closed, or hasn't loaded since Blueberry opened.");
+    if (!this.pageAccess) return without("The user has turned off what can be seen of their pages, so its text wasn't read.");
+    if (!siteAllowed(tab.url, mascot.sites)) return without(`${mascot.name} isn't allowed on ${siteOf(tab.url)}, so its text wasn't read.`);
+    if (!mayRead(tab)) return without("The user has that tab right now, so its text wasn't read.");
+    if (page.room <= 0) return without("There was no room left for its text.");
+    const { holds } = tab;
+    const text = await readPageText(tab, (origin) => siteAllowed(origin, mascot.sites));
+    // Checked again, since any of it can change while the page is read, and the user may have had the tab and given it
+    // back meanwhile, when what was read could be theirs.
+    if (text === null || !mayRead(tab) || tab.holds !== holds) return without("Its text couldn't be read.");
+    const clean = this.withoutCodes(text).trim();
+    const cut = clean.length > page.room;
+    const mark = " [… cut to fit]";
+    return { ...answer, page: { ...page, url: this.withoutCodes(tab.url), text: cut ? `${clean.slice(0, Math.max(0, page.room - mark.length))}${mark}` : clean, cut } };
   }
 
   private async readPage(mascot: MascotProfile): Promise<Page | null> {
