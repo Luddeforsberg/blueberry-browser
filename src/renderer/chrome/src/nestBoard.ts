@@ -206,3 +206,14 @@ export const flightDuration = (path: readonly FlightPoint[]): number => {
     const length = path.reduce((sum, point, index) => (index === 0 ? 0 : sum + Math.hypot(point.x - path[index - 1].x, point.y - path[index - 1].y)), 0)
     return Math.round(clamp(600 + length * 0.25, 600, 900))
 }
+
+// How many HTML cards run their page at once. Each is a page of its own, with its scripts going, so the rest wait.
+export const MAX_LIVE_PAGES = 4
+
+// Which HTML cards run their page: the open one always, then those on screen, the most recently shown first, up to the
+// cap. `shown` is in the order they came on screen or were asked for, the latest last.
+export const livePages = (shown: readonly string[], openId: string | null, max = MAX_LIVE_PAGES): Set<string> => {
+    const live = new Set<string>(openId && shown.includes(openId) ? [openId] : [])
+    for (let index = shown.length - 1; index >= 0 && live.size < max; index--) live.add(shown[index])
+    return live
+}

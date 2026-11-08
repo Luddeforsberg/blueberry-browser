@@ -110,7 +110,8 @@ const toNodes = (
             id: card.id,
             type: 'card',
             position: { x: card.x, y: card.y },
-            width: size?.width,
+            // An HTML card open is bigger than its own size, so the page has room.
+            width: card.id === openId && card.file?.type === 'text/html' ? undefined : size?.width,
             height: card.id === openId ? undefined : size?.height,
             dragHandle: '.nest-drag',
             // The open card floats over the others and the layer that dims them, since it's the one being read.
@@ -525,6 +526,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         if (fresh.length === 0) return
         reveal(fresh.some((card) => card.plan?.state === 'planned') ? board.cards.filter((card) => card.plan?.state === 'planned').map((card) => card.id) : fresh.map((card) => card.id))
     }, [board.cards, reveal])
+
+    // An HTML card opens wider than it was, so the board moves to show it.
+    useEffect(() => {
+        if (openId && board.cards.find((card) => card.id === openId)?.file?.type === 'text/html') reveal([openId])
+        // Only when it opens, not each time the board changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openId, reveal])
 
     // Esc closes the open card from anywhere on the page, unless something else already took it, such as a draft's prompt.
     useEffect(() => {

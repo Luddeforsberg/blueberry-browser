@@ -14,6 +14,9 @@ import { PLAN_SYSTEM_PROMPT, planDigest, type BoardCardDigest, type PlannedDiges
 import type { AttachmentRow, AttachTo, CardLine, NewPlannedCard } from "./NestStore";
 import { checkFile, filePreview, MAX_NOTE_LENGTH, roomProblem, sizeInWords, typeInWords, type MadeFile, type ModelInputs, type SentAttachment } from "./nestFiles";
 import { CardGrants } from "./cardGrant";
+import { EMPTY_HTML_DATA, htmlCardDocument, htmlCardDownload, type HtmlCardData, type HtmlCardTable } from "../shared/nestHtml";
+import { CHART_LIBRARY } from "./chartLibrary";
+import { createHash } from "crypto";
 import { perRunEstimate } from "../shared/modelPrices";
 import type { CardGrantAccess } from "./Chats";
 import { checkAddress, cleanTitle, pageName } from "../shared/nestPages";
@@ -67,6 +70,11 @@ const NO_PLANNER: NestPlanner = { available: () => false, plan: async () => null
 // How tall a planned card is taken to be when placing a plan, and how many cards a request may say are already there.
 const PLANNED_HEIGHT = 180;
 const MAX_TAKEN = 500;
+// The pictures an HTML card's page gets as data, together, so its page stays small enough to draw.
+const MAX_HTML_IMAGE_BYTES = 8 * 1024 * 1024;
+// What an HTML card's page is built from: the bird's page as it wrote it, and the hash its policy names our script by.
+const htmlSource = (data: Uint8Array) => Buffer.from(data).toString("utf8").replace(/^\uFEFF/, "");
+const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("base64");
 const STILL_PLANNING = "Berry is still changing the plan. Try again in a moment.";
 const PLAN_FAILED = "I couldn’t plan that just now. Try again, or click the board to start a card yourself.";
 const planRefused = (why: string) => `I couldn’t lay that out as cards, because ${why}. Try asking another way.`;
@@ -1314,6 +1322,7 @@ export class Nests {
     if (!file) return null;
     if (file.type.startsWith("image/")) return { image: `data:${file.type};base64,${Buffer.from(file.data).toString("base64")}` };
     if (file.type === "application/pdf") return {};
+    if (file.type === "text/html") return { html: this.htmlPage(cardId as string, file.data) };
     const text = Buffer.from(file.data).toString("utf8").replace(/^\uFEFF/, "");
     if (file.type === "text/csv") {
       const parsed = tableFromFile(/\.csv$/i.test(file.name) ? file.name : `${file.name}.csv`, file.data);
@@ -1323,9 +1332,55 @@ export class Nests {
   }
 
   // A file's card's file, for Download, which writes it only where the user chooses.
+  // An HTML card's page goes as the bird wrote it, with its policy and its library in the same sandboxed frame, and with
+  // `window.nest.data` empty: the board's data stays here, since a browser it's opened in later can still look up a host
+  // name the page spells it out in (see `htmlCardDownload`). What the bird wrote into the page itself goes with it.
   fileDownload(cardId: unknown): { name: string; type: string; data: Uint8Array } | null {
     const file = typeof cardId === "string" ? this.store.fileOf(cardId) : null;
+    if (file?.type === "text/html") {
+      const page = htmlCardDownload(htmlSource(file.data), CHART_LIBRARY, sha256, file.name.replace(/\.html$/i, ""));
+      return { name: file.name, type: file.type, data: new Uint8Array(Buffer.from(page, "utf8")) };
+    }
     return file && { name: file.name, type: file.type, data: file.data };
+  }
+
+  // An HTML card's whole page: what the bird wrote, after the policy and the data it reads. Only ever drawn in the
+  // chrome's sandboxed frame, or written where the user chooses.
+  private htmlPage(cardId: string, data: Uint8Array): string {
+    return htmlCardDocument(htmlSource(data), this.htmlData(cardId), CHART_LIBRARY, sha256);
+  }
+
+  // What an HTML card's page reads as `window.nest.data`: what the card that made it has now, its latest answer and the
+  // table in it, each card it reads from with theirs, or the rows a line picked, and the pictures on it, as its bird saw
+  // them. Codes the user typed are taken out, as from anything that leaves a card. Empty once that card is gone.
+  private htmlData(cardId: string): HtmlCardData {
+    const maker = this.store.linesTo(cardId).find((line) => !!line.source.chatId)?.source;
+    if (!maker?.chatId) return EMPTY_HTML_DATA;
+    const text = (value: string | null) => (value === null ? null : this.clean(value));
+    const table = (rows: PickedRows | null): HtmlCardTable | null => rows && { header: rows.header.map(this.clean), rows: rows.rows.map((row) => row.map(this.clean)) };
+    const own = (card: NestCard) => ({ answer: text(card.chatId ? this.answerOf(card.chatId) : null), table: table(this.tableOf(card)) });
+    const lines = this.store.linesTo(maker.id);
+    const images: HtmlCardData["images"] = [];
+    let room = MAX_HTML_IMAGE_BYTES;
+    const offer = (name: string, type: string, bytes: Uint8Array) => {
+      if (!type.startsWith("image/") || bytes.length > room) return;
+      room -= bytes.length;
+      images.push({ name, src: `data:${type};base64,${Buffer.from(bytes).toString("base64")}` });
+    };
+    for (const attachment of this.store.sentAttachments(maker.id)) if (attachment.kind === "file") offer(attachment.name, attachment.type, attachment.data);
+    for (const { source } of lines) {
+      const file = source.file && !this.store.copiedFrom(maker.id).has(source.id) ? this.store.fileOf(source.id) : null;
+      if (file) offer(file.name, file.type, file.data);
+    }
+    return {
+      card: { bird: this.labelOf(maker), ...own(maker) },
+      // Picked rows only while they're all still in their card's table, as a send checks, so rows taken out never reach it.
+      inputs: lines.map(({ source, picked }) => ({
+        name: this.labelOf(source),
+        ...(picked ? { answer: null, table: missingRows(picked, this.tableOf(source)).length > 0 ? null : table(picked) } : own(source)),
+      })),
+      images,
+    };
   }
 
   // The cheap model names a For-each card's column from its job, in the background. Until then, and if it can't, the

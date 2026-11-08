@@ -25,6 +25,11 @@ import * as dotenv from "dotenv";
 // Gallery server. Both are read only once the window opens, after this.
 if (app.isPackaged) dotenv.config({ path: join(app.getPath("userData"), ".env"), quiet: true });
 
+// No page asks for a host name to be looked up ahead of time. A <link rel="dns-prefetch"> is resolved by Chromium past
+// every policy, request handler and x-dns-prefetch-control, so an HTML card's page could spell its data out in a name it
+// looks up. Electron already makes preconnect do nothing, so tabs only lose an early lookup.
+app.commandLine.appendSwitch("blink-settings", "dnsPrefetchingEnabled=false");
+
 // One copy per profile, so a link or a second launch goes to the window that's already open.
 const firstCopy = app.requestSingleInstanceLock();
 if (!firstCopy) app.quit();

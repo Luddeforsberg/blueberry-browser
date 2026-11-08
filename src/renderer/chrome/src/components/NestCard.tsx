@@ -16,7 +16,8 @@ import { Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { useChatThread, useChatThreads } from '../contexts/ChatContext'
 import { useFlock } from '../contexts/LibraryContext'
-import { cardStatus, CARD_SIZE, CARD_WIDTH, forEachStatus, latestReply, runPhase, type RunPhase } from '../nestBoard'
+import { cardStatus, CARD_SIZE, CARD_WIDTH, forEachStatus, latestReply, livePages, runPhase, type RunPhase } from '../nestBoard'
+import { HTML_FRAME_ALLOW, HTML_FRAME_SANDBOX } from '@shared/nestHtml'
 import { Berry, useAssistantName } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_QUIET, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
 import { AddMenu, ChatComposer, Composer } from './Composer'
@@ -1131,7 +1132,8 @@ const FILE_KINDS: Record<string, string> = {
     'text/plain': 'Text',
     'text/markdown': 'Markdown',
     'text/csv': 'CSV',
-    'application/json': 'JSON'
+    'application/json': 'JSON',
+    'text/html': 'HTML page'
 }
 
 // What a file's card shows of its file, read from main once while it's drawn and wanted, since a file never changes.
@@ -1340,6 +1342,139 @@ const PageCard: React.FC<{ card: NestCard; page: NestPage }> = ({ card, page }) 
     )
 }
 
+// The HTML cards on screen, in the order they came into view or were asked for, the latest last, which decides which of
+// them run their page (`livePages`). Kept for the whole chrome, since every Nest's pages count against the one cap.
+const shownPages = (() => {
+    let shown: string[] = []
+    const listeners = new Set<() => void>()
+    const set = (next: string[]) => {
+        shown = next
+        listeners.forEach((listener) => listener())
+    }
+    return {
+        subscribe: (listener: () => void) => {
+            listeners.add(listener)
+            return () => listeners.delete(listener)
+        },
+        get: () => shown,
+        show: (id: string) => set([...shown.filter((each) => each !== id), id]),
+        hide: (id: string) => {
+            if (shown.includes(id)) set(shown.filter((each) => each !== id))
+        }
+    }
+})()
+
+// Whether an HTML card runs its page: only while it's on screen, and only if it's among the few that may at once. A page
+// off screen is unloaded, so its scripts stop.
+const useLivePage = (cardId: string, element: React.RefObject<HTMLElement | null>, open: boolean): { live: boolean; wake: () => void } => {
+    const shown = useSyncExternalStore(shownPages.subscribe, shownPages.get)
+    useEffect(() => {
+        const target = element.current
+        if (!target) return undefined
+        const watching = new IntersectionObserver(([entry]) => (entry.isIntersecting ? shownPages.show(cardId) : shownPages.hide(cardId)))
+        watching.observe(target)
+        return () => {
+            watching.disconnect()
+            shownPages.hide(cardId)
+        }
+    }, [cardId, element])
+    // Opening one brings it to the front of the queue.
+    useEffect(() => {
+        if (open && shownPages.get().includes(cardId)) shownPages.show(cardId)
+    }, [open, cardId])
+    const { openId } = useBoard()
+    return { live: useMemo(() => livePages(shown, openId), [shown, openId]).has(cardId), wake: () => shownPages.show(cardId) }
+}
+
+// An HTML card's page, read from main each time it starts running, so it has its maker's data as it is then, and let go
+// when it stops.
+const usePage = (cardId: string, live: boolean): string | null => {
+    const { samples } = useBoard()
+    const [page, setPage] = useState<string | null>(null)
+    useEffect(() => {
+        if (!live || samples) return undefined
+        let current = true
+        void window.chromeAPI.nests.fileContent(cardId).then((read) => {
+            if (current) setPage(read?.html ?? null)
+        })
+        return () => {
+            current = false
+            setPage(null)
+        }
+    }, [cardId, live, samples])
+    return page
+}
+
+// How tall an HTML card's page is when the card has no size of its own, and how big it is open.
+const PAGE_HEIGHT = 280
+const OPEN_PAGE = { width: 880, height: 640 }
+
+// A page a card's bird made, running live on its card: a chart, a small report, a demo of a UI. A model that read web
+// pages wrote it, so it runs in a frame with nothing but its own scripts, under a policy with no network, and main keeps
+// it on its own page and refuses anything it asks of the network (see `src/shared/nestHtml.ts`). Open, it's bigger. It
+// downloads as it runs here, and a line out of it gives its source to the next card as text.
+const HtmlCard: React.FC<{ card: NestCard; file: NestFile; box: CardBox }> = ({ card, file, box }) => {
+    const board = useBoard()
+    const open = board.openId === card.id
+    const area = useRef<HTMLDivElement>(null)
+    const { live, wake } = useLivePage(card.id, area, open)
+    const page = usePage(card.id, live)
+    const size = open ? { width: Math.max(box.width, OPEN_PAGE.width) } : boxStyle(box)
+    return (
+        <div className={cn(CARD_SHELL, "flex flex-col", open ? "shadow-raised" : "shadow-selected")} style={size}>
+            <div className="nest-drag cursor-grab h-12 shrink-0 pl-5 pr-3 flex items-center gap-2">
+                <AppWindow aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                <span className="text-14 font-semibold truncate" title={file.name}>{file.name}</span>
+                <span className="text-12 text-muted-foreground shrink-0">{`${FILE_KINDS[file.type]} · ${formatBytes(file.size)}`}</span>
+                <span className="ml-auto flex items-center">
+                    <CardButton label={`Download ${file.name}`} onClick={() => void window.chromeAPI.nests.saveFile(card.id)}>
+                        <Download className="size-4" />
+                    </CardButton>
+                    <span data-keep-selection>
+                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                            <GitFork className="size-4" />
+                        </CardButton>
+                    </span>
+                    <CardButton label={open ? 'Close the page' : 'Open the page'} onClick={() => board.setOpen(open ? null : card.id)}>
+                        {open ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                    </CardButton>
+                    <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                        <X className="size-4" />
+                    </CardButton>
+                </span>
+            </div>
+            <div
+                ref={area}
+                className={cn("nodrag nowheel relative border-t overflow-hidden rounded-b-panel", box.fill && !open && "flex-1 min-h-0")}
+                style={open ? { height: OPEN_PAGE.height } : box.fill ? undefined : { height: PAGE_HEIGHT }}
+            >
+                {live && page !== null ? (
+                    // The sandbox comes before the page, so the frame never starts with a page and no sandbox.
+                    <iframe
+                        data-html-page
+                        title={`The page ${file.name}`}
+                        sandbox={HTML_FRAME_SANDBOX}
+                        allow={HTML_FRAME_ALLOW}
+                        referrerPolicy="no-referrer"
+                        srcDoc={page}
+                        className="absolute inset-0 size-full border-0 bg-transparent"
+                    />
+                ) : live ? (
+                    <p role="status" className="p-5 text-13"><span className={SHIMMER_QUIET}>Opening</span></p>
+                ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted/40">
+                        <p className="text-13 text-muted-foreground">Paused, since a few other pages are running.</p>
+                        <Button variant="outline" size="sm" onClick={wake}>Run it</Button>
+                    </div>
+                )}
+            </div>
+            {!open && <ResizeCorner cardId={card.id} />}
+            {/* After the page, so its frame never covers where a line is pulled from. */}
+            <LineEnds canPull onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${file.name}`} />
+        </div>
+    )
+}
+
 // A card Berry planned, dashed until it starts. Before Run, its prompt edits in place, its bird and For each row change,
 // and a line pulls out of it to add another. Once the plan runs, it only says what it's waiting for.
 const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, plan }) => {
@@ -1501,6 +1636,8 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
     const box: CardBox = { width: width ?? CARD_WIDTH, fill: height != null }
     return card.page ? (
         <PageCard card={card} page={card.page} />
+    ) : card.file?.type === 'text/html' ? (
+        <HtmlCard card={card} file={card.file} box={box} />
     ) : card.file ? (
         <FileCard card={card} file={card.file} />
     ) : card.table ? (
