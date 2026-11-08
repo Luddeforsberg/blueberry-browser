@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { describe, expect, it } from "vitest";
-import { EMPTY_HTML_DATA, HTML_FRAME_SANDBOX, htmlCardDocument, htmlCardDownload, htmlCardPolicy, scriptJson, wantsCharts, type HtmlCardData } from "./nestHtml";
+import { EMPTY_HTML_DATA, HTML_CARD_NO_SCRIPT_FILES, HTML_FRAME_SANDBOX, htmlCardDocument, htmlCardDownload, htmlCardPolicy, scriptJson, wantsCharts, type HtmlCardData } from "./nestHtml";
 
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("base64");
 const build = (html: string, data: HtmlCardData = EMPTY_HTML_DATA, charts: string | null = null) => htmlCardDocument(html, data, charts, sha256);
@@ -62,6 +62,16 @@ describe("the policy", () => {
       // The parser reads every line break as \n, and that's what's hashed.
       expect(bootOf(document)).not.toContain("\r");
     }
+  });
+
+  it("has a second policy, right after it, that lets no script load from anywhere, even one that names our hash", () => {
+    const second = `<meta http-equiv="Content-Security-Policy" content="${HTML_CARD_NO_SCRIPT_FILES}">`;
+    const document = build("<p></p>");
+    expect(document.startsWith(`${HEAD}<meta http-equiv="Content-Security-Policy" content="${policyOf(document)}">${second}`)).toBe(true);
+    // No hash, no host and no scheme, so an integrity attribute matches nothing, and inline scripts still need the hash.
+    expect(directives(HTML_CARD_NO_SCRIPT_FILES)).toEqual(new Map([["script-src", ["'unsafe-inline'", "'unsafe-eval'"]]]));
+    const file = htmlCardDownload("<p></p>", EMPTY_HTML_DATA, null, sha256, "page");
+    expect(file).toContain(`content="${policyOf(file)}">${second}`);
   });
 
   it("turns DNS prefetching off and sends no referrer, before our script", () => {

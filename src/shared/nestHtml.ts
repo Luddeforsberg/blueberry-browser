@@ -33,6 +33,15 @@ export const htmlCardPolicy = (bootHash: string): string =>
     "base-uri 'none'",
   ].join("; ");
 
+// A second policy beside it. A hash also lets in a script from any address whose integrity attribute names that hash,
+// and the request goes out before the check, so a page could copy ours from its policy and send data in the address.
+// Every policy applies at once, and this one names no hash and no address: no script loads from anywhere, and inline
+// ones still need the first policy's hash.
+export const HTML_CARD_NO_SCRIPT_FILES = "script-src 'unsafe-inline' 'unsafe-eval'";
+
+const policyMetas = (policy: string): string =>
+  `<meta http-equiv="Content-Security-Policy" content="${policy}">` + `<meta http-equiv="Content-Security-Policy" content="${HTML_CARD_NO_SCRIPT_FILES}">`;
+
 export interface HtmlCardTable {
   header: string[];
   rows: string[][];
@@ -99,7 +108,7 @@ const buildPage = (html: string, data: HtmlCardData, charts: string | null, sha2
   const policy = htmlCardPolicy(sha256(boot));
   const page =
     "<!doctype html><html><head>" +
-    `<meta http-equiv="Content-Security-Policy" content="${policy}">` +
+    policyMetas(policy) +
     '<meta charset="utf-8">' +
     '<meta http-equiv="x-dns-prefetch-control" content="off">' +
     '<meta name="referrer" content="no-referrer">' +
@@ -124,7 +133,7 @@ export const htmlCardDownload = (html: string, data: HtmlCardData, charts: strin
   const attribute = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return (
     "<!doctype html><html><head>" +
-    `<meta http-equiv="Content-Security-Policy" content="${policy}">` +
+    policyMetas(policy) +
     '<meta charset="utf-8">' +
     '<meta name="referrer" content="no-referrer">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
