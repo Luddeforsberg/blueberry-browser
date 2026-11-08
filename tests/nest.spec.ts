@@ -148,6 +148,34 @@ test("a card pulled out of another gets its thread, and the Nest keeps both", as
   // Card chats belong to the Nest, so the sidebar has no chats to list.
   await expect(chrome.getByRole("heading", { name: "Chats" })).toHaveCount(0);
 
+  // The first card answers again, so the card after it says its earlier card changed and its line is dashed, until
+  // Update sends it what's new. Nothing runs by itself meanwhile.
+  const lineStroke = line.locator(".react-flow__edge-path");
+  await expect(lineStroke).not.toHaveAttribute("style", /stroke-dasharray/);
+  model.replyWith("Brygga sells to sales teams too.");
+  await first.getByRole("button", { name: "Open the whole chat" }).click();
+  await reply.fill("Find one more");
+  await reply.press("Enter");
+  await expect.poll(() => model.requests.length).toBe(3);
+  await expect(first.getByRole("status")).toHaveText("Done");
+  await first.getByRole("button", { name: "Close the chat" }).click();
+  const changed = draft.locator("[data-earlier-changed]");
+  await expect(changed).toContainText("Earlier card changed");
+  await expect(lineStroke).toHaveAttribute("style", /stroke-dasharray: 5,? 5/);
+  await expect(first.locator("[data-earlier-changed]")).toHaveCount(0);
+  await shots("earlier-changed");
+  expect(model.requests).toHaveLength(3);
+  model.replyWith("Three drafts written.");
+  await changed.getByRole("button", { name: "Update" }).click();
+  await expect(draft).toContainText("Three drafts written.");
+  await expect(draft.getByRole("status")).toHaveText("Done");
+  await expect(changed).toHaveCount(0);
+  await expect(lineStroke).not.toHaveAttribute("style", /stroke-dasharray/);
+  expect(model.requests).toHaveLength(4);
+  const updated = newestUserMessage(model.requests[3]);
+  expect(updated).toContain("Brygga sells to sales teams too.");
+  expect(updated.endsWith("An earlier card changed. Update your answer with what’s new.")).toBe(true);
+
   // Both cards and their line are still there after a restart.
   await app.close();
   app = await launchApp(profile, { modelEnv: model.env });
@@ -155,7 +183,12 @@ test("a card pulled out of another gets its thread, and the Nest keeps both", as
   await again.getByRole("button", { name: "Swedish SaaS leads", exact: true }).click();
   await expect(again.locator(".react-flow__node")).toHaveCount(2);
   await expect(again.locator(".react-flow__edge")).toHaveCount(1);
-  await expect(again.locator(".react-flow__node").nth(1)).toContainText("Two drafts written.");
+  const second = again.locator(".react-flow__node").nth(1);
+  await expect(second).toContainText("Three drafts written.");
+  // What its last message knew is kept, and nothing has changed since.
+  await second.hover();
+  await expect(second.locator("[data-nest-knows]")).toHaveText("Knows: 1 card");
+  await expect(second.locator("[data-earlier-changed]")).toHaveCount(0);
 });
 
 const COMPANIES = [

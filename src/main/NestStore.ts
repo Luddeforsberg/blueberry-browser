@@ -6,6 +6,36 @@ import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLi
 import type { SentAttachment } from "./nestFiles";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
+import type { CardKnows } from "../shared/nestKnows";
+
+const KNOWS_COUNTS = ["cards", "pages", "files", "notes", "cut", "leftOutCards", "leftOutFiles"] as const;
+
+// A card's saved counts, or null for anything that isn't them, so a damaged row says nothing rather than something wrong.
+const knowsFrom = (text: string): CardKnows | null => {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof value !== "object" || value === null) return null;
+  const saved = value as Record<string, unknown>;
+  const count = (key: string) => Number.isSafeInteger(saved[key]) && (saved[key] as number) >= 0;
+  if (typeof saved.at !== "number" || !Number.isFinite(saved.at) || !KNOWS_COUNTS.every(count)) return null;
+  return { sent: true, at: saved.at, ...(Object.fromEntries(KNOWS_COUNTS.map((key) => [key, saved[key]])) as Record<(typeof KNOWS_COUNTS)[number], number>) };
+};
+
+// A run's fingerprints by line, keeping only strings, so a damaged row counts as one that never sent.
+const sentWithFrom = (text: string | null): Record<string, string> => {
+  if (text === null) return {};
+  try {
+    const value = JSON.parse(text) as unknown;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return {};
+  }
+};
 
 const MIGRATIONS = [
   `CREATE TABLE nests (
@@ -167,6 +197,12 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN unread INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE cards ADD COLUMN changed_at INTEGER;
    ALTER TABLE nests ADD COLUMN seen_at INTEGER;`,
+  // When an earlier card changes. A line's `sent_with` is a fingerprint of what crossed it the last time the card it goes
+  // to sent, never a copy (see `nestStale.ts`), null until then. A For-each card's runs each keep theirs instead, as JSON
+  // by line, since each sends on its own. `knows` is what a card's last message went with, counted, as `CardKnows` JSON.
+  `ALTER TABLE lines ADD COLUMN sent_with TEXT;
+   ALTER TABLE runs ADD COLUMN sent_with TEXT;
+   ALTER TABLE cards ADD COLUMN knows TEXT;`,
 ];
 
 // How many of a Nest's newest requests its board carries, so a Nest used for months doesn't send a longer board.
@@ -197,6 +233,8 @@ export interface CardLine {
   source: NestCard;
   picked: PickedRows | null;
   fresh: boolean;
+  // What crossed it the last time its card sent, as a fingerprint, or null if the card hasn't sent with it.
+  sentWith: string | null;
 }
 
 export interface AttachmentRow {
@@ -262,6 +300,7 @@ interface CardRow {
   title: string | null;
   titleSettled: number;
   unread: number;
+  knows: string | null;
 }
 
 interface RunRow {
@@ -279,7 +318,7 @@ const CARD_COLUMNS =
   // Not a file's whole table, which is read only when it's needed.
   "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height, " +
   "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob, note_text AS noteText, " +
-  "title, title_settled AS titleSettled, unread";
+  "title, title_settled AS titleSettled, unread, knows";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -383,7 +422,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText, title, titleSettled, unread }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText, title, titleSettled, unread, knows }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -411,7 +450,8 @@ export class NestStore {
       const file: NestFile = { name: own?.name ?? "", type: own?.type ?? "", size: own?.size ?? 0, pages: own?.pages ?? null, preview: filePreview, made: fileMade === 1 };
       return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file, attachments: [] };
     }
-    const recap = { ...(title !== null ? { title, titleSettled: titleSettled === 1 } : {}), ...(unread === 1 ? { unread: true } : {}) };
+    const known = knows === null ? null : knowsFrom(knows);
+    const recap = { ...(title !== null ? { title, titleSettled: titleSettled === 1 } : {}), ...(unread === 1 ? { unread: true } : {}), ...(known ? { knows: known } : {}) };
     return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, file: null, ...recap, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
@@ -556,11 +596,43 @@ export class NestStore {
 
   // Every line into a card, in the order they were drawn.
   linesTo(id: string): CardLine[] {
-    const rows = this.db.prepare("SELECT id, from_card, picked, fresh FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as { id: string; from_card: string; picked: string | null; fresh: number }[];
+    const rows = this.db.prepare("SELECT id, from_card, picked, fresh, sent_with FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as {
+      id: string;
+      from_card: string;
+      picked: string | null;
+      fresh: number;
+      sent_with: string | null;
+    }[];
     return rows.flatMap((row) => {
       const source = this.card(row.from_card);
-      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null, fresh: row.fresh === 1 }] : [];
+      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null, fresh: row.fresh === 1, sentWith: row.sent_with }] : [];
     });
+  }
+
+  // What crossed each of these lines into the card as it sent, by line, replacing what they kept before.
+  keepSentWith(to: string, fingerprints: ReadonlyMap<string, string>): void {
+    const keep = this.db.prepare("UPDATE lines SET sent_with = ? WHERE id = ? AND to_card = ?");
+    for (const [lineId, fingerprint] of fingerprints) keep.run(fingerprint, lineId, to);
+  }
+
+  // The same for one run of a For-each card, kept with the run, over what it kept before for these lines.
+  keepRunSentWith(runId: string, fingerprints: ReadonlyMap<string, string>): void {
+    const before = (this.db.prepare("SELECT sent_with FROM runs WHERE id = ?").get(runId) as { sent_with: string | null } | undefined)?.sent_with;
+    if (before === undefined) return;
+    const kept = { ...sentWithFrom(before), ...Object.fromEntries(fingerprints) };
+    this.db.prepare("UPDATE runs SET sent_with = ? WHERE id = ?").run(JSON.stringify(kept), runId);
+  }
+
+  // What each run of a For-each card that has sent went with, by line.
+  runsSentWith(cardId: string): Record<string, string>[] {
+    return (this.db.prepare("SELECT sent_with FROM runs WHERE card_id = ? AND sent_with IS NOT NULL ORDER BY position").all(cardId) as { sent_with: string }[]).map((row) =>
+      sentWithFrom(row.sent_with)
+    );
+  }
+
+  // What the card's last message went with, counted.
+  setKnows(id: string, knows: CardKnows): boolean {
+    return this.db.prepare("UPDATE cards SET knows = ? WHERE id = ?").run(JSON.stringify(knows), id).changes > 0;
   }
 
   // The cards that read from this one.
@@ -697,7 +769,9 @@ export class NestStore {
     this.db.exec("BEGIN");
     try {
       const old = this.db.prepare("SELECT chat_id FROM runs WHERE id = ? AND card_id = ? AND state <> 'waiting'");
-      const restart = this.db.prepare("UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL, spent = spent + ? WHERE id = ? AND card_id = ? AND state <> 'waiting'");
+      const restart = this.db.prepare(
+        "UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL, sent_with = NULL, spent = spent + ? WHERE id = ? AND card_id = ? AND state <> 'waiting'"
+      );
       for (const id of ids) {
         const row = old.get(id, cardId) as { chat_id: string | null } | undefined;
         if (row && restart.run(row.chat_id ? costOf(row.chat_id) : 0, id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);

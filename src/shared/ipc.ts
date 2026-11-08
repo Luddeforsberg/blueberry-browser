@@ -575,6 +575,7 @@ export interface InvokeChannels {
   "nests:remove-input": { region: "chrome"; args: [lineId: string]; result: NestSendEachResult };
   // Retry the runs of a For-each card that didn't finish, or start the ones that didn't start. `warn` asks to confirm first.
   "nests:retry-runs": { region: "chrome"; args: [cardId: string, which: "unfinished" | "unstarted", confirmed: boolean]; result: NestRetryResult };
+  "nests:update-card": { region: "chrome"; args: [cardId: string, confirmed: boolean]; result: NestRetryResult };
   "nests:move-card": { region: "chrome"; args: [cardId: string, x: number, y: number]; result: boolean };
   "nests:resize-card": { region: "chrome"; args: [cardId: string, width: number, height: number]; result: boolean };
   "nests:nudge-cards": { region: "chrome"; args: [nestId: string, moves: { id: string; x: number; y: number }[]]; result: boolean };
@@ -878,6 +879,8 @@ export interface NestsAPI {
   addInput: (cardId: string, fromId: string, picked?: PickedRows) => Promise<NestSendEachResult>;
   removeInput: (lineId: string) => Promise<NestSendEachResult>;
   retryRuns: (cardId: string, which: "unfinished" | "unstarted", confirmed: boolean) => Promise<NestRetryResult>;
+  // Update on a card whose earlier card changed: one fixed message on its thread, or a For-each card's rows again.
+  updateCard: (cardId: string, confirmed: boolean) => Promise<NestRetryResult>;
   moveCard: (cardId: string, x: number, y: number) => Promise<boolean>;
   // The size the user made a card from its corner.
   resizeCard: (cardId: string, width: number, height: number) => Promise<boolean>;

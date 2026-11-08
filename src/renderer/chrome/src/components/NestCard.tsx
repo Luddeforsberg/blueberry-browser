@@ -31,10 +31,10 @@ import { CardTitle, FarCard, UnreadDot } from './NestReturn'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 // `view` on a line into one of a working card's tabs, or a page its job kept: it only joins them, and carries nothing.
-// `fresh` on a line into a sent card that its next message is the first to get, and `removable` on one the user may take
-// away.
+// `fresh` on a line into a sent card that its next message is the first to get, `changed` on one whose source changed
+// since its card sent with it, and `removable` on one the user may take away.
 export type LineEdge = Edge<
-    { draft: boolean; view?: boolean; fresh?: boolean; removable?: boolean; reads?: boolean; forEach?: boolean; pulseAt?: number },
+    { draft: boolean; view?: boolean; fresh?: boolean; changed?: boolean; removable?: boolean; reads?: boolean; forEach?: boolean; pulseAt?: number },
     'line'
 >
 
@@ -367,7 +367,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                                 className={cn(
                                     "overflow-hidden",
                                     box.fill && "flex-1 min-h-[100px] flex flex-col",
-                                    !(!running && answered && board.waitingOn(card.id).length > 0) && "rounded-b-panel"
+                                    !((!running && answered && board.waitingOn(card.id).length > 0) || card.earlierChanged) && "rounded-b-panel"
                                 )}
                             >
                                 <TableResult
@@ -383,7 +383,53 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                     </div>
                 ))}
             {!running && answered && <LooksRight cardId={card.id} />}
+            {card.earlierChanged && <EarlierChanged cardId={card.id} working={running} />}
             {!open && <ResizeCorner cardId={card.id} />}
+        </div>
+    )
+}
+
+// At the foot of a sent or For-each card when a card it reads from has changed since it last sent: Update, the user's own
+// press, sends it what's new. On a card's own chat that's one message in its thread, with fixed words main chooses. On a
+// For-each card it's every row again, which main asks about first, since what they did may happen again. Never while it
+// works, and the strip says so.
+const EarlierChanged: React.FC<{ cardId: string; working: boolean; perRun?: NestCard['perRun']; runs?: number }> = ({ cardId, working, perRun, runs }) => {
+    const [warning, setWarning] = useState<string | null>(null)
+    const [problem, setProblem] = useState<string | null>(null)
+    const [busy, setBusy] = useState(false)
+    const update = async (confirmed: boolean) => {
+        setBusy(true)
+        setProblem(null)
+        const result = await window.chromeAPI.nests.updateCard(cardId, confirmed)
+        setBusy(false)
+        if (result.ok) setWarning(null)
+        else if ('warn' in result) setWarning(result.warn)
+        else setProblem(result.error)
+    }
+    return (
+        <div data-earlier-changed className="nodrag cursor-auto shrink-0 px-5 py-3 border-t flex flex-col gap-2">
+            {warning && !working ? (
+                <>
+                    <p role="alert" className="text-13 text-destructive">{warning}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button size="sm" disabled={busy} onClick={() => void update(true)}>
+                            Run again
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={busy} onClick={() => setWarning(null)}>
+                            Cancel
+                        </Button>
+                        {perRun && runs && <span className="text-12 text-muted-foreground tabular-nums">{estimateWords(perRun, runs)} for all of them</span>}
+                    </div>
+                </>
+            ) : (
+                <div className="flex items-center gap-3">
+                    <p className="flex-1 min-w-0 text-13 text-muted-foreground">{working ? 'Earlier card changed. Update once it’s done.' : 'Earlier card changed'}</p>
+                    <Button size="sm" variant="outline" disabled={busy || working} onClick={() => void update(false)}>
+                        Update
+                    </Button>
+                </div>
+            )}
+            {problem && <p role="alert" className="text-12 text-destructive">{problem}</p>}
         </div>
     )
 }
@@ -1010,7 +1056,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
                         className={cn(
                             "overflow-hidden",
                             box.fill && "flex-1 min-h-[100px] flex flex-col",
-                            !(!active && ((answered && board.waitingOn(card.id).length > 0) || again)) && "rounded-b-panel"
+                            !((!active && ((answered && board.waitingOn(card.id).length > 0) || again)) || card.earlierChanged) && "rounded-b-panel"
                         )}
                     >
                         <TableResult
@@ -1030,6 +1076,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
                 </div>
             )}
             {!active && again && <GoAgain cardId={card.id} unfinished={unfinished} unstarted={unstarted} perRun={card.perRun ?? null} />}
+            {card.earlierChanged && <EarlierChanged cardId={card.id} working={active} perRun={card.perRun ?? null} runs={each.runs.length} />}
             {!active && answered && <LooksRight cardId={card.id} />}
             {!open && <ResizeCorner cardId={card.id} />}
         </div>
@@ -1771,9 +1818,9 @@ const END = 3.5
 const STROKE = 1.5
 
 // A line between two cards, dashed while the card it goes to hasn't been sent, with a small round end at each card.
-// Also dashed while it's new on a sent card, until the next message takes it. One the user may take away shows a small ×
-// halfway along on hover, or once pressed or reached from the keyboard, when Delete takes it away too, but not while
-// another line is pulled across it. Pressing any line says what goes through it, and a light runs along it as its card sends.
+// Also dashed while it's new on a sent card, until the next message takes it, or once what it gives has changed since
+// its card last sent. One the user may take away shows a small × halfway along on hover, or once pressed or reached
+// from the keyboard, when Delete takes it away too, but not while another line is pulled across it. Pressing any line says what goes through it, and a light runs along it as its card sends.
 export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) => {
     const board = useContext(NestBoardContext)
     const [hovered, setHovered] = useState(false)
@@ -1793,7 +1840,7 @@ export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, target, sourceX, s
                     id={id}
                     path={path}
                     className={selected ? "stroke-accent-ink" : LINE}
-                    style={{ strokeWidth: selected ? STROKE + 0.5 : STROKE, strokeDasharray: data?.view ? '1 4' : data?.draft || data?.fresh ? '5 5' : undefined, strokeLinecap: data?.view ? 'round' : undefined }}
+                    style={{ strokeWidth: selected ? STROKE + 0.5 : STROKE, strokeDasharray: data?.view ? '1 4' : data?.draft || data?.fresh || data?.changed ? '5 5' : undefined, strokeLinecap: data?.view ? 'round' : undefined }}
                 />
                 {pulse && <LinePulse path={path} pulse={pulse} width={STROKE + 1.5} />}
                 <circle cx={from} cy={sourceY} r={END} className={cn(LINE, "fill-canvas")} strokeWidth={STROKE} />

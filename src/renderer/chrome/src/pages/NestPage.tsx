@@ -191,6 +191,7 @@ const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[
                 draft: !(to && (to.chatId || to.each || to.file || to.page)),
                 view: !!to?.page,
                 ...(line.fresh ? { fresh: true } : {}),
+                ...(line.changed ? { changed: true } : {}),
                 ...(canRemove ? { removable: true } : {}),
                 // Pressed, it says what goes through it. A light runs along it whenever its card's message goes.
                 ...(reads ? { reads: true } : {}),
