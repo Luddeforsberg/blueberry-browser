@@ -2524,7 +2524,10 @@ describe("Coming back to a board", () => {
     replies.push(FAILS);
     await sendAndWait(card.id, "Again");
     expect(unread()).toBe(true);
-    nests.readCard(card.id);
+    // Open behind a hidden window, it isn't seen yet.
+    expect(nests.readCard(card.id)).toBe(false);
+    nests.screen(nest, true);
+    expect(nests.readCard(card.id)).toBe(true);
 
     // Another tab in front, and the card starts waiting for an OK.
     nests.screen(null, true);
@@ -2532,6 +2535,7 @@ describe("Coming back to a board", () => {
     nests.send(card.id, "Save a draft");
     await vi.waitFor(() => expect(chats.thread(nests.board(nest)!.cards[0].chatId!)?.approval).toBeTruthy());
     expect(unread()).toBe(true);
+    nests.screen(nest, true);
     nests.readCard(card.id);
     // Stopped by the user is no news.
     const stopped = sendAndWait(card.id, "x").catch(() => {});
@@ -2590,5 +2594,58 @@ describe("Coming back to a board", () => {
     expect(nests.board(nest)!.since).toEqual({ id: expect.any(Number), text: "2 cards changed since earlier today.", cards: [writer.id, scout.id] });
     // Closing with the Nest open is leaving it, so nothing is news after a restart.
     nests.close();
+  });
+
+  it("counts what changed while the window was hidden, keeps each Nest's summary to its own visit, and loses nothing to leaving early", async () => {
+    const pending: ((text: string) => void)[] = [];
+    const { nests, sendAndWait } = setup(undefined, undefined, titles(async () => null, () => new Promise((resolve) => pending.push(resolve))));
+    const a = nests.create();
+    const b = nests.create();
+    const onA = nests.addCard(a, { x: 0, y: 0 })!;
+    const onB = nests.addCard(b, { x: 0, y: 0 })!;
+    nests.screen(a, true);
+    nests.screen(b, true);
+    // Minimized with B in front, and both change.
+    nests.screen(b, false);
+    await tick();
+    await sendAndWait(onA.id, "One");
+    await sendAndWait(onB.id, "Two");
+    nests.screen(b, true);
+    expect(pending).toHaveLength(1);
+    // Going to A before B's summary lands: A's is A's own, and B's, written for a visit that's over, is dropped.
+    nests.screen(a, true);
+    expect(pending).toHaveLength(2);
+    pending[0]("Too late.");
+    pending[1]("A changed.");
+    await settleAll();
+    expect(nests.board(b)!.since).toBeNull();
+    expect(nests.board(a)!.since).toMatchObject({ text: "A changed.", cards: [onA.id] });
+    // Back on B, it's written again from when B was last open before that, so nothing is lost to leaving early.
+    nests.screen(b, true);
+    expect(pending).toHaveLength(3);
+    pending[2]("B changed.");
+    await settleAll();
+    expect(nests.board(b)!.since).toMatchObject({ text: "B changed.", cards: [onB.id] });
+  });
+
+  it("tells the summary a For-each card waits for the user, not that it's done", async () => {
+    const read: CardChange[][] = [];
+    const { nests, sendAndWait } = setup(undefined, undefined, titles(async () => null, async (changes) => (read.push([...changes]), "x")));
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push(TABLE(1));
+    await sendAndWait(scout.id, "Find companies");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    nests.screen(nest, true);
+    nests.screen(null, true);
+    await tick();
+    asking = { key: "save", words: "Save" };
+    expect(nests.sendEach(writer.id, "Save a draft")).toEqual({ ok: true });
+    await vi.waitFor(() => expect(nests.card(writer.id)!.each!.runs[0].chatId).toBeTruthy());
+    await settleAll();
+    nests.screen(nest, true);
+    await settleAll();
+    expect(read[0]).toEqual([expect.objectContaining({ status: "Waiting for you", answer: null })]);
+    nests.stopCard(writer.id);
   });
 });

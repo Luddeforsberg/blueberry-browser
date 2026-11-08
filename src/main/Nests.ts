@@ -154,9 +154,15 @@ export class Nests {
   // The newest request for each card's title, so one that comes back late never replaces a newer answer's.
   private readonly titling = new Map<string, number>();
   private titleTurn = 0;
+  // The Nest the user can see now: in the front tab of a showing window. Memory only.
+  private here: string | null = null;
   // What changed since each Nest was last open, from the last time it was opened this launch.
   private readonly since = new Map<string, NestSince>();
   private sinceTurn = 0;
+  // Each Nest's visits this launch, so a summary lands only on the visit it was written for, and the summary still being
+  // written for one, with when the Nest was last open before it, so leaving and coming back before it lands loses nothing.
+  private readonly visits = new Map<string, number>();
+  private readonly summing = new Map<string, { visit: number; seenAt: number }>();
 
   constructor(
     private readonly store: NestStore,
@@ -1318,7 +1324,7 @@ export class Nests {
   private cardChanged(cardId: string, nestId: string): void {
     const at = Date.now();
     this.store.cardChanged(cardId, at, missed(this.front, this.inSight.get(nestId), nestId, cardId));
-    if (this.front?.nestId === nestId) this.store.seeNest(nestId, at);
+    if (this.here === nestId) this.store.seeNest(nestId, at);
     this.changed(nestId);
   }
 
@@ -1366,15 +1372,21 @@ export class Nests {
     else this.asking.delete(thread.id);
   }
 
-  // Which Nest is in the window's front tab, if any, and whether the window is showing. Leaving a Nest is when it was
-  // last open. Coming back to one where cards changed since, Berry says what changed.
+  // Which Nest is in the window's front tab, if any, and whether the window is showing. A Nest is open while it's both, so
+  // leaving it, or hiding or minimizing the window, is when it was last open. Coming back to one where cards changed
+  // since, Berry says what changed.
   screen(nestId: string | null, showing: boolean): void {
-    const before = this.front?.nestId ?? null;
+    const before = this.here;
     this.front = nestId ? { nestId, showing } : null;
-    if (before === nestId) return;
+    this.here = showing ? nestId : null;
+    if (before === this.here) return;
     const now = Date.now();
-    if (before) this.store.seeNest(before, now);
-    if (nestId) this.cameBack(nestId, now);
+    if (before) {
+      this.store.seeNest(before, now);
+      // A summary still being written is for a visit that's over, and the next one writes it again.
+      this.visits.set(before, (this.visits.get(before) ?? 0) + 1);
+    }
+    if (this.here) this.cameBack(this.here, now);
   }
 
   // The cards a Nest's board has in sight now, and the open one.
@@ -1383,26 +1395,32 @@ export class Nests {
     this.inSight.set(nestId, new Set(cardIds.filter((id): id is string => typeof id === "string").slice(0, MAX_TAKEN)));
   }
 
-  // The user opened the card, so its dot goes.
+  // The user opened the card, so its dot goes. Only while they can see it: an open card stays open behind a hidden window.
   readCard(cardId: unknown): boolean {
     const card = typeof cardId === "string" ? this.store.card(cardId) : null;
-    if (!card || !this.store.readCard(card.id)) return false;
+    if (!card || this.here !== card.nestId || !this.store.readCard(card.id)) return false;
     this.changed(card.nestId);
     return true;
   }
 
   private cameBack(nestId: string, now: number): void {
-    const seenAt = this.store.seenAt(nestId);
+    const visit = (this.visits.get(nestId) ?? 0) + 1;
+    this.visits.set(nestId, visit);
+    // Left before the last summary landed, it's written again from when the Nest was open before that.
+    const seenAt = this.summing.get(nestId)?.seenAt ?? this.store.seenAt(nestId);
+    this.summing.delete(nestId);
     this.store.seeNest(nestId, now);
     // What changed before is old news now.
-    const before = this.since.delete(nestId);
+    this.since.delete(nestId);
     const changed = changedSince(this.store.changeTimes(nestId), seenAt);
     if (seenAt === null || changed.length === 0) {
-      if (before) this.changed(nestId);
+      // The page hears it's seen again either way, so an open card's dot can go now.
+      const board = this.board(nestId);
+      if (board) this.events.onBoard(board);
       return;
     }
     const ids = changed.map((card) => card.id);
-    const turn = ++this.sinceTurn;
+    this.summing.set(nestId, { visit, seenAt });
     const fallback = sinceFallback(ids.length, seenAt, now);
     const changes = ids.flatMap((id) => {
       const card = this.store.card(id);
@@ -1415,9 +1433,10 @@ export class Nests {
         return null;
       })
       .then((text) => {
-        // Opened again meanwhile, so this is about an older visit.
-        if (this.sinceTurn !== turn || !this.store.board(nestId)) return;
-        this.since.set(nestId, { id: turn, text: text ?? fallback, cards: ids });
+        // Opened again meanwhile, so this is about an older visit, and the newer one has its own.
+        if (this.visits.get(nestId) !== visit || !this.store.board(nestId)) return;
+        this.summing.delete(nestId);
+        this.since.set(nestId, { id: ++this.sinceTurn, text: text ?? fallback, cards: ids });
         this.changed(nestId);
       });
   }
@@ -1427,8 +1446,13 @@ export class Nests {
     const bird = this.labelOf(card);
     const title = card.title ?? null;
     if (card.each) {
-      const failed = card.each.runs.filter((run) => run.state === "failed" || (!!run.chatId && !!this.chats.thread(run.chatId)?.error)).length;
-      return { bird, title: title ?? card.each.column, status: failed > 0 ? `${failed} of ${card.each.runs.length} didn’t finish` : `Done, ${card.each.runs.length} rows`, answer: null };
+      const { runs } = card.each;
+      const threads = runs.map((run) => (run.chatId ? this.chats.thread(run.chatId) : null));
+      const asking = threads.some((thread) => !!thread?.approval);
+      const going = runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)));
+      const failed = runs.filter((run, index) => run.state === "failed" || !!threads[index]?.error).length;
+      const status = asking ? "Waiting for you" : going ? "Still working" : failed > 0 ? `${failed} of ${runs.length} didn’t finish` : `Done, ${runs.length} ${runs.length === 1 ? "row" : "rows"}`;
+      return { bird, title: title ?? card.each.column, status, answer: null };
     }
     const thread = card.chatId ? this.chats.thread(card.chatId) : null;
     const status = thread?.approval ? "Waiting for you" : thread?.error ? "Didn’t finish" : "Done";
@@ -1931,7 +1955,7 @@ export class Nests {
   close(): void {
     this.closed = true;
     // Closing with a Nest open is leaving it.
-    if (this.front) this.store.seeNest(this.front.nestId, Date.now());
+    if (this.here) this.store.seeNest(this.here, Date.now());
   }
 
   private startRun(run: { id: string; cardId: string; row: string[] }): boolean {

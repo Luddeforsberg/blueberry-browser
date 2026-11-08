@@ -131,10 +131,11 @@ export const useCardsInView = (board: NestBoard, openId: string | null) => {
             void window.chromeAPI.nests.inView(nestId, [])
         }
     }, [store, nestId, openId])
+    // Main refuses it while the window is hidden, so it asks again with each board that comes, as one does on coming back.
     const openUnread = !!openId && !!board.cards.find((card) => card.id === openId)?.unread
     useEffect(() => {
         if (openId && openUnread) void window.chromeAPI.nests.readCard(openId)
-    }, [openId, openUnread])
+    }, [openId, openUnread, board])
 }
 
 // Each Nest's newest summary that has highlighted its cards already, so going away and back doesn't do it again. Memory
