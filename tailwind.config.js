@@ -28,6 +28,12 @@ module.exports = {
       success: "rgb(var(--success) / <alpha-value>)",
       warning: "rgb(var(--warning) / <alpha-value>)",
       bookmark: "rgb(var(--bookmark) / <alpha-value>)",
+      section: Object.fromEntries(
+        ["yellow", "green", "blue", "pink", "purple", "gray"].flatMap((color) => [
+          [color, `rgb(var(--section-${color}) / <alpha-value>)`],
+          [`${color}-ink`, `rgb(var(--section-${color}-ink) / <alpha-value>)`],
+        ])
+      ),
       primary: {
         DEFAULT: "rgb(var(--primary) / <alpha-value>)",
         foreground: "rgb(var(--primary-foreground) / <alpha-value>)",

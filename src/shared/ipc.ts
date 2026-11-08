@@ -2,7 +2,7 @@
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
 import type { PickedRows } from "./nestTable";
-import type { ChatThread, GalleryLinked, NestBoard, NestCard, NestFileContent, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryLinked, NestBoard, NestCard, NestFileContent, NestSection, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -339,6 +339,26 @@ export type RoutineSaveResult = { ok: true; id: string } | { ok: false; error: s
 export type MascotSaveResult = { ok: true; id: string } | { ok: false; error: string };
 
 // `mascotId` picks who a new chat runs as. An existing chat keeps the one it started with.
+export interface NestRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface NestSectionChange {
+  name?: string;
+  color?: NestSection["color"];
+  rect?: NestRect;
+}
+
+export interface NestSectionMove {
+  x: number;
+  y: number;
+  cards: { id: string; x: number; y: number }[];
+  sections: { id: string; x: number; y: number }[];
+}
+
 export interface NestNewCard {
   x: number;
   y: number;
@@ -579,6 +599,13 @@ export interface InvokeChannels {
   "nests:move-card": { region: "chrome"; args: [cardId: string, x: number, y: number]; result: boolean };
   "nests:resize-card": { region: "chrome"; args: [cardId: string, width: number, height: number]; result: boolean };
   "nests:nudge-cards": { region: "chrome"; args: [nestId: string, moves: { id: string; x: number; y: number }[]]; result: boolean };
+  // A section drawn on the board or fitted around selected cards, named "Section" in the next free colour.
+  "nests:add-section": { region: "chrome"; args: [nestId: string, rect: NestRect]; result: NestSection | null };
+  "nests:edit-section": { region: "chrome"; args: [sectionId: string, change: NestSectionChange]; result: boolean };
+  // A section moved with what's inside it, which only the board measures. Only cards and sections of its Nest move.
+  "nests:move-section": { region: "chrome"; args: [sectionId: string, move: NestSectionMove]; result: boolean };
+  // Only the section: its cards stay.
+  "nests:delete-section": { region: "chrome"; args: [sectionId: string]; result: boolean };
   // Only a draft's bird can change. A sent card keeps its chat's.
   "nests:set-bird": { region: "chrome"; args: [cardId: string, mascotId: string]; result: boolean };
   // Asks first in main when the card has a chat, which goes with it.
@@ -791,6 +818,8 @@ export interface EventChannels {
   "nests:frame": NestFrame;
   // ⌘+, ⌘− and ⌘0 on a Nest's board, from the View menu.
   "nests:zoom": "in" | "out" | "fit";
+  // ⌘G on a Nest's board, from the Edit menu, which groups the selected cards in a section.
+  "nests:group": null;
   // Text the user chose to ask about. It waits in the composer and is never sent by itself.
   "chat:draft": string;
   "find:opened": null;
@@ -886,6 +915,10 @@ export interface NestsAPI {
   resizeCard: (cardId: string, width: number, height: number) => Promise<boolean>;
   // Cards placed for the user, moved out of the way of one that grew. Main moves no card the user placed or dragged.
   nudgeCards: (nestId: string, moves: { id: string; x: number; y: number }[]) => Promise<boolean>;
+  addSection: (nestId: string, rect: NestRect) => Promise<NestSection | null>;
+  editSection: (sectionId: string, change: NestSectionChange) => Promise<boolean>;
+  moveSection: (sectionId: string, move: NestSectionMove) => Promise<boolean>;
+  deleteSection: (sectionId: string) => Promise<boolean>;
   setBird: (cardId: string, mascotId: string) => Promise<boolean>;
   deleteCard: (cardId: string) => Promise<boolean>;
   // Each says why when it can't send, so a press never does nothing.
@@ -926,6 +959,7 @@ export interface NestsAPI {
   onFocus: (callback: (focus: NestFocus) => void) => Unsubscribe;
   onHandOff: (callback: (handOff: NestHandOff) => void) => Unsubscribe;
   onZoom: (callback: (zoom: "in" | "out" | "fit") => void) => Unsubscribe;
+  onGroup: (callback: () => void) => Unsubscribe;
 }
 
 export interface LibraryAPI {

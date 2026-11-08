@@ -1,7 +1,7 @@
 import type { Chats } from "./Chats";
 import type { NestStore } from "./NestStore";
 import type { MascotStore } from "./MascotStore";
-import type { ChatThread, MascotProfile, NestBoard, NestCard, NestFileContent, NestLine, NestSummary } from "../shared/library";
+import type { ChatThread, MascotProfile, NestBoard, NestCard, NestFileContent, NestLine, NestSection, NestSummary } from "../shared/library";
 import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRetryResult, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_CONTEXT_LENGTH, MAX_CROSSING_LENGTH, MAX_INPUTS, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type FilesCrossing, type LineCrossing, type PickedRows } from "../shared/nestTable";
@@ -25,6 +25,7 @@ import type { EndedReply } from "./Chats";
 import { changedSince, missed, NO_RECAP, sinceFallback, type CardChange, type NestRecapWriter } from "./nestReturn";
 import type { CardKnows } from "../shared/nestKnows";
 import { agreed, changedLines, fingerprint, SENT_NOTHING } from "./nestStale";
+import { isSectionColor, nextColor, planSection, SECTION_NAME, SECTION_SIZE, sectionName } from "../shared/nestSections";
 
 const MAX_TITLE_LENGTH = 100;
 // What a Nest is called until its first request, whose first words then stand in until the cheap model names it.
@@ -73,6 +74,9 @@ const NO_PLANNER: NestPlanner = { available: () => false, plan: async () => null
 
 // How tall a planned card is taken to be when placing a plan, and how many cards a request may say are already there.
 const PLANNED_HEIGHT = 180;
+// How tall a planned card is taken to be in its plan's section: more than where it's placed, since a long prompt, a bird's
+// limits and a line about its table make it taller.
+const PLAN_SECTION_HEIGHT = 300;
 const MAX_TAKEN = 500;
 // The pictures an HTML card's page gets as data, together, so its page stays small enough to draw.
 const MAX_HTML_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -117,6 +121,17 @@ const rectOfCard = (card: NestCard): Rect =>
 
 const coordinate = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_COORDINATE ? value : null;
+
+// A section's place and size from a renderer, on the board and within the sizes a section can be, or null.
+const sectionRect = (value: unknown): Rect | null => {
+  const rect = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+  const x = coordinate(rect.x);
+  const y = coordinate(rect.y);
+  const size = (each: unknown, min: number, max: number) => (typeof each === "number" && Number.isFinite(each) ? Math.min(max, Math.max(min, each)) : null);
+  const width = size(rect.width, SECTION_SIZE.minWidth, SECTION_SIZE.maxWidth);
+  const height = size(rect.height, SECTION_SIZE.minHeight, SECTION_SIZE.maxHeight);
+  return x === null || y === null || width === null || height === null ? null : { x, y, width, height };
+};
 
 // Every card is one chat through `Chats`, so its bird's limits, Ask before acting, approvals, Needs you and the step
 // limit apply as in any chat. A line only adds the source card's thread, or the rows picked from it, and what that card
@@ -843,6 +858,55 @@ export class Nests {
     return true;
   }
 
+  // A section drawn on the board, or fitted around cards, called "Section" in the next free colour until the user names it.
+  addSection(nestId: string, rect: unknown): NestSection | null {
+    const fits = sectionRect(rect);
+    if (!fits || !this.store.board(nestId)) return null;
+    const section = this.store.addSection(nestId, { name: SECTION_NAME, color: nextColor(this.store.sectionColors(nestId)), ...fits });
+    if (section) this.events.onBoard(this.board(nestId)!);
+    return section;
+  }
+
+  // A section renamed, given another colour, or made bigger or smaller. An empty name keeps the one it has.
+  editSection(sectionId: string, change: unknown): boolean {
+    const section = typeof sectionId === "string" ? this.store.section(sectionId) : null;
+    if (!section || typeof change !== "object" || change === null) return false;
+    const { name, color, rect } = change as { name?: unknown; color?: unknown; rect?: unknown };
+    const named = name === undefined ? undefined : sectionName(name);
+    const fits = rect === undefined ? undefined : sectionRect(rect);
+    if (named === "" || fits === null || (color !== undefined && !isSectionColor(color)) || (named === undefined && fits === undefined && color === undefined)) return false;
+    if (!this.store.editSection(sectionId, { name: named, color: color as NestSection["color"] | undefined, rect: fits })) return false;
+    this.events.onBoard(this.board(section.nestId)!);
+    return true;
+  }
+
+  // A section moved, and with it the cards and sections inside it, which the board says, since only it measures cards.
+  // Only cards and sections of the same Nest move.
+  moveSection(sectionId: string, move: unknown): boolean {
+    const section = typeof sectionId === "string" ? this.store.section(sectionId) : null;
+    if (!section || typeof move !== "object" || move === null) return false;
+    const { x, y, cards, sections } = move as { x?: unknown; y?: unknown; cards?: unknown; sections?: unknown };
+    const to = { x: coordinate(x), y: coordinate(y) };
+    const moves = (list: unknown) =>
+      Array.isArray(list)
+        ? list.slice(0, MAX_TAKEN).flatMap((each) => {
+            const at = { x: coordinate(each?.x), y: coordinate(each?.y) };
+            return typeof each?.id === "string" && at.x !== null && at.y !== null ? [{ id: each.id as string, x: at.x, y: at.y }] : [];
+          })
+        : [];
+    if (to.x === null || to.y === null || !this.store.moveSection(sectionId, { x: to.x, y: to.y }, moves(cards), moves(sections))) return false;
+    this.events.onBoard(this.board(section.nestId)!);
+    return true;
+  }
+
+  // Only the section goes: its cards stay where they are.
+  deleteSection(sectionId: string): boolean {
+    const section = typeof sectionId === "string" ? this.store.section(sectionId) : null;
+    if (!section || !this.store.deleteSection(sectionId)) return false;
+    this.events.onBoard(this.board(section.nestId)!);
+    return true;
+  }
+
   setBird(cardId: string, mascotId: unknown): boolean {
     const card = this.store.card(cardId);
     const bird = this.flockId(mascotId);
@@ -1155,11 +1219,23 @@ export class Nests {
       // a plan waits, which the next message still changes.
       if (pending.length === 0) this.store.closeRequest(nestId);
     } else if (checked.ask || checked.cards.length === 0) this.store.say(nestId, "berry", checked.reply || PLAN_FAILED, checked.reply ? { kind: "ask" } : {});
-    else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place, attachedKeys, planKeys), this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n")))
+    else if (!this.setPlan(nestId, this.placePlan(checked.cards, board, pending, place, attachedKeys, planKeys), checked.section ?? words))
       this.store.say(nestId, "berry", planRefused("a line went to a card that isn’t there"));
     else this.store.say(nestId, "berry", checked.reply || "I’ve laid it out above. Press Run when it looks right.", { kind: "plan", planned: checked.cards.length });
     this.changed(nestId);
     return { ok: true };
+  }
+
+  // A plan on the board, in a section of its own named by the plan when it's several cards. The section's colour is picked
+  // here, never by the model.
+  private setPlan(nestId: string, cards: NewPlannedCard[], name: string): boolean {
+    const said = this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n");
+    const section = planSection(
+      cards.map((card) => ({ x: card.x, y: card.y, width: CARD_WIDTH, height: PLAN_SECTION_HEIGHT })),
+      name,
+      this.store.sectionColors(nestId, true)
+    );
+    return this.store.setPlan(nestId, cards, said, section) !== null;
   }
 
   // The cards a request asks about: null for the whole board, with none selected, or undefined when any isn't a card on

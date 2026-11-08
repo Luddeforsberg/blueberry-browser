@@ -6,8 +6,11 @@ import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
+// What the migration for sections added.
+const SECTIONS_TABLE = "DROP TABLE sections; ";
+
 // What the migration for an earlier card changing added: what each line was sent with, and what a card's message knew.
-const STALE_COLUMNS = "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE runs DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
+const STALE_COLUMNS = SECTIONS_TABLE + "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE runs DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
 
 // What the migration for coming back to a board added: card titles, unread dots, and when cards and Nests were last seen.
 const RETURN_COLUMNS =
@@ -69,6 +72,7 @@ describe("NestStore", () => {
         },
       ],
       lines: [{ id: expect.any(String), from: scout.id, to: writer.id, picked: null }],
+      sections: [],
       talk: [],
       composerTucked: false,
       attached: [{ id: expect.any(String), kind: "note", name: "", type: "text/plain", size: 8, text: "Only B2B" }],
@@ -144,7 +148,7 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 7}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+      `PRAGMA user_version = ${version - 8}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
         "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
         PAGE_COLUMNS +
         COMPOSER_COLUMNS
@@ -405,7 +409,7 @@ describe("NestStore", () => {
     // As a file from before the composer could tuck has it, with the talk as it was then.
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 3}; ${COMPOSER_COLUMNS}`);
+    db.exec(`PRAGMA user_version = ${version - 4}; ${COMPOSER_COLUMNS}`);
     db.close();
 
     const again = new NestStore(file);
@@ -472,10 +476,54 @@ describe("NestStore", () => {
     expect(new NestStore(file).card(writer.id)).not.toHaveProperty("knows");
     // As a file from before has it: nothing was kept, so nothing has changed.
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 1}; ${STALE_COLUMNS}`);
+    db.exec(`PRAGMA user_version = ${version - 2}; ${STALE_COLUMNS}`);
     db.close();
     const older = new NestStore(file);
     expect(older.linesTo(writer.id)[0].sentWith).toBeNull();
     expect(older.card(writer.id)).not.toHaveProperty("knows");
+  });
+
+  it("keeps sections across opening the file again, moves only its own Nest's cards with one, and deletes a section without its cards", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Leads");
+    const other = store.createNest("Other");
+    const inside = store.addCard(nest, { x: 100, y: 100, auto: true })!;
+    const elsewhere = store.addCard(other, { x: 100, y: 100 })!;
+    const section = store.addSection(nest, { name: "Research", color: "green", x: 0, y: 0, width: 600, height: 400 })!;
+    expect(store.addSection("gone", { name: "Section", color: "blue", x: 0, y: 0, width: 300, height: 200 })).toBeNull();
+    expect(store.moveSection(section.id, { x: 50, y: 60 }, [{ id: inside.id, x: 150, y: 160 }, { id: elsewhere.id, x: 999, y: 999 }], [])).toBe(true);
+    expect(store.editSection(section.id, { name: "Outreach", color: "yellow", rect: { x: 50, y: 60, width: 700, height: 500 } })).toBe(true);
+
+    const again = new NestStore(file);
+    expect(again.board(nest)!.sections).toEqual([{ id: section.id, name: "Outreach", color: "yellow", x: 50, y: 60, width: 700, height: 500 }]);
+    expect(again.card(inside.id)).toMatchObject({ x: 150, y: 160, autoPlaced: false });
+    expect(again.card(elsewhere.id)).toMatchObject({ x: 100, y: 100 });
+    expect(again.board(other)!.sections).toEqual([]);
+    expect(again.deleteSection(section.id)).toBe(true);
+    expect(again.board(nest)!.sections).toEqual([]);
+    expect(again.card(inside.id)).not.toBeNull();
+    expect(again.deleteSection(section.id)).toBe(false);
+  });
+
+  it("puts a plan's section in place of the last plan's, keeps it once the plan runs, and takes it away with a discarded plan", () => {
+    const store = new NestStore(":memory:");
+    const nest = store.createNest("Leads");
+    const plan = (key: string) => ({ key, mascotId: null, prompt: `Do ${key}`, from: [], each: false, waits: false, table: null, x: 0, y: 0, attached: [], keeps: null });
+    const around = (name: string) => ({ name, color: "blue" as const, x: 0, y: 0, width: 400, height: 300 });
+    store.setPlan(nest, [plan("p1"), plan("p2")], "Find and write", around("Outreach"));
+    store.setPlan(nest, [plan("p1"), plan("p2")], "Find and write", around("Prospects"));
+    expect(store.board(nest)!.sections.map((each) => each.name)).toEqual(["Prospects"]);
+    // A planned section's colour is free for the next plan, which replaces it.
+    expect(store.sectionColors(nest, true)).toEqual([]);
+    expect(store.sectionColors(nest)).toEqual(["blue"]);
+    store.setPlan(nest, [plan("p1")], "Just one");
+    expect(store.board(nest)!.sections).toEqual([]);
+    store.setPlan(nest, [plan("p1"), plan("p2")], "Find and write", around("Outreach"));
+    store.armPlan(nest);
+    store.setPlan(nest, [plan("p3"), plan("p4")], "Again", around("Second"));
+    store.discardPlan(nest);
+    expect(store.board(nest)!.sections.map((each) => each.name)).toEqual(["Outreach"]);
+    expect(store.sectionColors(nest)).toEqual(["blue"]);
   });
 });

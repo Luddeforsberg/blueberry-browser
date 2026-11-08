@@ -26,6 +26,8 @@ import { Berry, useAssistantName } from '../components/Berry'
 import { SHIMMER_QUIET } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
 import { AboutChip, NestComposer } from '../components/NestComposer'
+import { SectionDraw, SectionLayer, SectionTools, type SectionMove } from '../components/NestSections'
+import { cardsIn, fitSection, SECTION_PAD, sectionsIn } from '@shared/nestSections'
 import { useCardsInView, useSinceHighlight } from '../components/NestReturn'
 import { firstBlank, NEST_STARTERS, onLeftInComposer, takeFromComposer } from '../nestStart'
 import { Attachments, useAttaching } from '../components/NestAttachments'
@@ -353,11 +355,12 @@ const FlightView: React.FC<{ flight: Flight; onLanded: (flight: Flight) => void;
 
 // Fit to screen, and how far the board is zoomed when it isn't at 100%, which a press puts back. Nothing else: the
 // board moves with two fingers, pinches to zoom, and ⌘+, ⌘− and ⌘0 do the same from the keyboard.
-const ZoomControls: React.FC<{ onFit: () => void; onActualSize: () => void }> = ({ onFit, onActualSize }) => {
+const ZoomControls: React.FC<{ onFit: () => void; onActualSize: () => void; children?: React.ReactNode }> = ({ onFit, onActualSize, children }) => {
     const { zoom } = useViewport()
     const percent = Math.round(zoom * 100)
     return (
         <div className="absolute top-3 right-4 flex items-center gap-1">
+            {children}
             {percent !== 100 && (
                 <button
                     type="button"
@@ -435,6 +438,18 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const selectGesture = useRef(false)
     const selectedCards = useMemo(() => nodes.filter((node) => node.selected && askable(node.data.card)).map((node) => node.id), [nodes])
     const clearCards = useCallback(() => setNodes((current) => current.map((node) => (node.selected ? { ...node, selected: false } : node))), [])
+    // Sections: the one selected, whose name a press selected with its cards, the one being named, and the section tool.
+    const [sectionId, setSectionId] = useState<string | null>(null)
+    const [renamingId, setRenamingId] = useState<string | null>(null)
+    const [drawing, setDrawing] = useState(false)
+    const section = board.sections.find((each) => each.id === sectionId) ?? null
+    const inSectionNow = useCallback(
+        (rect: Rect) => cardsIn(rect, nodes.map((node) => ({ id: node.id, ...rectOf(node) }))),
+        [nodes]
+    )
+    // The chip names the section while exactly the cards in it that Berry can read are selected.
+    const sectionCards = useMemo(() => (section ? inSectionNow(section).filter((id) => askable(nodes.find((node) => node.id === id)!.data.card)) : []), [section, inSectionNow, nodes])
+    const aboutSection = section && sectionCards.length > 0 && sectionCards.length === selectedCards.length && sectionCards.every((id) => selectedCards.includes(id)) ? section.name : null
     const [prompt, setPrompt] = useState('')
     // A starter or a chat's request fills the composer and moves the keyboard there, never sending.
     const [composerFocus, setComposerFocus] = useState<{ key: number; range?: [number, number] }>({ key: 0 })
@@ -529,16 +544,20 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         return box ? { width: box.width, height: box.height } : null
     }
 
-    // Moves the board just enough to show cards that are out of sight, once they've been drawn and measured.
+    // Moves the board just enough to show cards that are out of sight, once they've been drawn and measured, and anything
+    // else that should show with them.
     const reveal = useCallback(
-        (cardIds: readonly string[]) => {
+        (cardIds: readonly string[], around: readonly Rect[] = []) => {
             requestAnimationFrame(() =>
                 requestAnimationFrame(() => {
                     const size = boxSize()
-                    const shown = cardIds.flatMap((id) => {
-                        const node = flow.getNode(id)
-                        return node ? [rectOf(node)] : []
-                    })
+                    const shown = [
+                        ...cardIds.flatMap((id) => {
+                            const node = flow.getNode(id)
+                            return node ? [rectOf(node)] : []
+                        }),
+                        ...around
+                    ]
                     const next = size && showViewport(shown, flow.getViewport(), size, VIEW_INSETS)
                     if (next) void flow.setViewport(next, MOVE)
                 })
@@ -612,8 +631,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         if (!before) return
         const fresh = board.cards.filter((card) => !before.has(card.id))
         if (fresh.length === 0) return
-        reveal(fresh.some((card) => card.plan?.state === 'planned') ? board.cards.filter((card) => card.plan?.state === 'planned').map((card) => card.id) : fresh.map((card) => card.id))
-    }, [board.cards, reveal])
+        if (!fresh.some((card) => card.plan?.state === 'planned')) return reveal(fresh.map((card) => card.id))
+        const planned = board.cards.filter((card) => card.plan?.state === 'planned').map((card) => ({ id: card.id, x: card.x, y: card.y, width: CARD_WIDTH, height: CARD_HEIGHT }))
+        // With the name of the plan's section, never the whole of it, which may not fit at this zoom.
+        reveal(
+            planned.map((card) => card.id),
+            board.sections.filter((section) => cardsIn(section, planned).length > 0).map((section) => ({ x: section.x, y: section.y, width: Math.min(section.width, 240), height: SECTION_PAD.top / 2 }))
+        )
+    }, [board.cards, board.sections, reveal])
 
     // An HTML card opens wider than it was, so the board moves to show it.
     useEffect(() => {
@@ -957,12 +982,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             if (drawerOpen) return closeDrawer(false)
             if (selectedLine) return setSelectedLine(null)
             if (openId) return open(null)
+            if (sectionId) return setSectionId(null)
             if (nodes.some((node) => node.selected)) return
             const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
             dropEmptyDrafts()
             void add({ x: at.x - 32, y: at.y - 24 })
         },
-        [openId, open, flow, add, dropEmptyDrafts, drawerOpen, closeDrawer, nodes, selectedLine]
+        [openId, open, flow, add, dropEmptyDrafts, drawerOpen, closeDrawer, nodes, selectedLine, sectionId]
     )
 
     // `/` while the board has the keyboard and no field does opens the drawer, or brings the tucked composer back. Esc
@@ -1000,6 +1026,83 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         const result = await api.putOnBoard(board.id, messageId, { at, taken: rects() })
         return result.ok ? null : result.error
     }
+
+    // A press on a section's name selects it and every card in it, so the composer asks about them alone. A press on the
+    // name of the one selected renames it.
+    const selectSection = (rect: Rect & { id: string }) => {
+        const inside = new Set(inSectionNow(rect))
+        setSectionId(rect.id)
+        setNodes((current) => current.map((node) => (!!node.selected === inside.has(node.id) ? node : { ...node, selected: inside.has(node.id) })))
+    }
+    const pressSectionName = (id: string) => {
+        const pressed = board.sections.find((each) => each.id === id)
+        if (!pressed) return
+        if (id === sectionId) return setRenamingId(id)
+        selectSection(pressed)
+    }
+    const sectionInside = (id: string): SectionMove => {
+        const pressed = board.sections.find((each) => each.id === id)
+        if (!pressed) return { cards: [], sections: [] }
+        const inside = new Set(inSectionNow(pressed))
+        return {
+            cards: nodes.filter((node) => inside.has(node.id)).map((node) => ({ id: node.id, ...node.position })),
+            sections: board.sections.filter((each) => sectionsIn(pressed, board.sections).includes(each.id)).map(({ id: inner, x, y }) => ({ id: inner, x, y }))
+        }
+    }
+    // Cards carried by a section count as dragged while it moves, so nothing settles them meanwhile, and as moved by hand
+    // once it's let go, as main keeps them.
+    const moveWithSection = (moves: { id: string; x: number; y: number }[], done: boolean) => {
+        const to = new Map(moves.map((move) => [move.id, move]))
+        setNodes((current) =>
+            current.map((node) => {
+                const move = to.get(node.id)
+                if (!move) return node
+                return { ...node, position: { x: move.x, y: move.y }, dragging: !done, ...(done ? { data: { card: { ...node.data.card, autoPlaced: false } } } : {}) }
+            })
+        )
+    }
+    // A new section, drawn or fitted around cards, is selected with the cards in it and its name ready to type. Never
+    // under an open card.
+    const makeSection = async (rect: Rect) => {
+        open(null)
+        const made = await api.addSection(board.id, rect)
+        if (!made) return setProblem('That section couldn’t be made.')
+        selectSection(made)
+        setRenamingId(made.id)
+    }
+    const toggleDrawing = () => {
+        if (!drawing) open(null)
+        setDrawing(!drawing)
+    }
+    const drawingToggle = useRef(toggleDrawing)
+    drawingToggle.current = toggleDrawing
+    const group = () => {
+        const around = fitSection(nodes.filter((node) => node.selected).map(rectOf))
+        if (around) void makeSection(around)
+    }
+    const grouping = useRef(group)
+    grouping.current = group
+    useEffect(() => api.onGroup(() => grouping.current()), [api])
+    // S puts the section tool on or away, and with a section selected, ⌫ deletes it, never its cards, and Esc lets it go.
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            const element = wrapper.current
+            if (!element || event.defaultPrevented || element.offsetParent === null || event.metaKey || event.ctrlKey || event.altKey) return
+            const active = document.activeElement
+            if (active && active !== document.body && !element.contains(active)) return
+            if (active instanceof HTMLElement && (active.isContentEditable || active.matches('input, textarea, select'))) return
+            if (event.key === 's' || event.key === 'S') {
+                event.preventDefault()
+                drawingToggle.current()
+            } else if (sectionId && (event.key === 'Backspace' || event.key === 'Delete') && !active?.closest('.react-flow__node, .react-flow__edge')) {
+                event.preventDefault()
+                setSectionId(null)
+                void api.deleteSection(sectionId)
+            } else if (sectionId && event.key === 'Escape') setSectionId(null)
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [api, sectionId])
 
     // From the keyboard, Tab goes from card to card. On a card itself, Enter opens it and ⌫ deletes it, asking first as
     // the × does.
@@ -1141,6 +1244,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 onKeyDown={onKeyDown}
                 onPointerDownCapture={(event) => {
                     const target = event.target as Element
+                    if (target.closest('.react-flow__node')) setSectionId(null)
                     selectGesture.current =
                         (event.shiftKey || event.metaKey || event.ctrlKey) &&
                         (target.classList.contains('react-flow__pane') || (!!target.closest('.nest-drag') && !target.closest('button, a, input, textarea')))
@@ -1227,6 +1331,17 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 >
                     <Background variant={BackgroundVariant.Dots} gap={DOTS.gap} size={DOTS.size} className="text-muted-foreground/40" color="currentColor" />
                     <ViewportPortal>
+                        {board.sections.length > 0 && (
+                            <SectionLayer
+                                sections={board.sections}
+                                selectedId={sectionId}
+                                renamingId={renamingId}
+                                onPressName={pressSectionName}
+                                onRenaming={setRenamingId}
+                                inside={sectionInside}
+                                moveCards={moveWithSection}
+                            />
+                        )}
                         <OpenDim
                             shown={!!openId}
                             onClose={() => {
@@ -1240,7 +1355,24 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         ))}
                     </ViewportPortal>
                 </ReactFlow>
-                {board.cards.length > 0 && <ZoomControls onFit={fit} onActualSize={() => void flow.zoomTo(1, MOVE)} />}
+                {drawing && (
+                    <SectionDraw
+                        onDrawn={(rect) => {
+                            setDrawing(false)
+                            void makeSection(rect)
+                        }}
+                        onCancel={() => setDrawing(false)}
+                    />
+                )}
+                {board.cards.length > 0 ? (
+                    <ZoomControls onFit={fit} onActualSize={() => void flow.zoomTo(1, MOVE)}>
+                        <SectionTools drawing={drawing} onDraw={toggleDrawing} canGroup={nodes.some((node) => node.selected)} onGroup={group} />
+                    </ZoomControls>
+                ) : (
+                    <div className="absolute top-3 right-4 flex items-center gap-1">
+                        <SectionTools drawing={drawing} onDraw={toggleDrawing} canGroup={false} onGroup={group} />
+                    </div>
+                )}
                 {board.cards.length === 0 && !planning && board.talk.length === 0 && (
                     <div className="pointer-events-none absolute inset-x-0 top-[38%] px-4 flex flex-col items-center gap-4">
                         <p className="text-center text-14 text-muted-foreground">
@@ -1288,7 +1420,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                             <>
                                 {selectedCards.length > 0 && (
                                     <div className="px-1 pb-1">
-                                        <AboutChip count={selectedCards.length} onClear={clearCards} />
+                                        <AboutChip
+                                            count={selectedCards.length}
+                                            name={aboutSection}
+                                            onClear={() => {
+                                                clearCards()
+                                                setSectionId(null)
+                                            }}
+                                        />
                                     </div>
                                 )}
                                 <Attachments attachments={board.attached} target={planning ? null : { nestId: board.id }} attaching={attaching} className="px-1 pb-1" />

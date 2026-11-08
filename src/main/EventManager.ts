@@ -231,6 +231,10 @@ export class EventManager {
     this.handle("nests:move-card", (cardId, x, y) => nests.moveCard(cardId, x, y));
     this.handle("nests:resize-card", (cardId, width, height) => nests.resizeCard(cardId, width, height));
     this.handle("nests:nudge-cards", (nestId, moves) => nests.nudgeCards(nestId, moves));
+    this.handle("nests:add-section", (nestId, rect) => nests.addSection(nestId, rect));
+    this.handle("nests:edit-section", (sectionId, change) => nests.editSection(sectionId, change));
+    this.handle("nests:move-section", (sectionId, move) => nests.moveSection(sectionId, move));
+    this.handle("nests:delete-section", (sectionId) => nests.deleteSection(sectionId));
     this.handle("nests:set-bird", (cardId, mascotId) => nests.setBird(cardId, mascotId));
     this.handle("nests:delete-card", (cardId) => this.mainWindow.confirmDeleteCard(cardId));
     this.handle("nests:send", (cardId, text) => nests.sendCard(cardId, text));

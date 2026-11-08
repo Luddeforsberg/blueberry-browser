@@ -19,6 +19,10 @@ export const PLAN_SCHEMA = z.object({
   answers_board: z
     .boolean()
     .describe("True when the user asked about the board itself and reply answers it from the cards' answers, with no cards."),
+  section: z
+    .string()
+    .nullable()
+    .describe("A short name for the plan's cards together, one to three words in the user's language, such as Outreach or Competitor research. Null with one card or none."),
   cards: z.array(
     z.object({
       key: z.string().describe("A short key for this card, such as c1, unique in this plan. To keep a card of the current plan, use its key."),
