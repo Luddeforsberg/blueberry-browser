@@ -48,6 +48,7 @@ export const lineCut = (crossing: LineCrossing, forEach: boolean): boolean => {
     !!part &&
     (before(part) ||
       (part.kind === "thread" && (part.cut || part.earlier > 0)) ||
+      (part.kind === "versions" && part.cut) ||
       (part.kind === "table" && part.leftOut > 0) ||
       (part.kind === "note" && part.cut));
   const filesLost = (files?.leftOut.length ?? 0) > 0;

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
-import { AppWindow, ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, StickyNote, Table2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestNote, NestPage, NestPlanned, NestTableFile } from '@shared/library'
+import { AppWindow, ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, Minus, Plus, Star, StickyNote, Table2, X } from 'lucide-react'
+import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestNote, NestPage, NestPlanned, NestTableFile, NestVersions } from '@shared/library'
+import { MAX_ANGLE_LENGTH, MAX_VERSIONS, versionLetter, VERSIONS_WARNING } from '@shared/nestVersions'
 import { pageName } from '@shared/nestPages'
 import { PAGE_CARD } from '@shared/nestPlace'
 import { Favicon } from './Favicon'
@@ -124,6 +125,8 @@ export const draftText = (cardId: string) => draftTexts.get(cardId) ?? ''
 export const setDraftText = (cardId: string, text: string) => (text ? draftTexts.set(cardId, text) : draftTexts.delete(cardId))
 // Whether a draft's For each row is on, once the user has touched it. Memory only, like its text.
 const draftEach = new Map<string, boolean>()
+// A draft's note for each of its versions, one for each, once the user has set more than one. Memory only, like its text.
+const draftVersions = new Map<string, string[]>()
 
 // The newest saved answer, not one still being written.
 const savedAnswer = (thread: ChatThread | null | undefined) => (thread ? latestReply({ ...thread, partial: null }) : null)
@@ -393,7 +396,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
 // press, sends it what's new. On a card's own chat that's one message in its thread, with fixed words main chooses. On a
 // For-each card it's every row again, which main asks about first, since what they did may happen again. Never while it
 // works, and the strip says so.
-const EarlierChanged: React.FC<{ cardId: string; working: boolean; perRun?: NestCard['perRun']; runs?: number }> = ({ cardId, working, perRun, runs }) => {
+const EarlierChanged: React.FC<{ cardId: string; working: boolean; perRun?: NestCard['perRun']; runs?: number; again?: string }> = ({ cardId, working, perRun, runs, again = 'Run again' }) => {
     const [warning, setWarning] = useState<string | null>(null)
     const [problem, setProblem] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
@@ -413,7 +416,7 @@ const EarlierChanged: React.FC<{ cardId: string; working: boolean; perRun?: Nest
                     <p role="alert" className="text-13 text-destructive">{warning}</p>
                     <div className="flex flex-wrap items-center gap-2">
                         <Button size="sm" disabled={busy} onClick={() => void update(true)}>
-                            Run again
+                            {again}
                         </Button>
                         <Button size="sm" variant="outline" disabled={busy} onClick={() => setWarning(null)}>
                             Cancel
@@ -487,15 +490,18 @@ const useInputs = (cardId: string): InputView[] => {
     const { find } = useFlock()
     const { showBerry } = useShell().settings
     const inputs = board.inputsOf(cardId)
-    const threads = useCardThreads(inputs.flatMap(({ source }) => (source.chatId ? [source.chatId] : [])))
+    const threads = useCardThreads(inputs.flatMap(({ source }) => [...(source.chatId ? [source.chatId] : []), ...(source.versions?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])]))
     return inputs.map(({ line, source }) => {
         const thread = source.chatId ? threads[source.chatId] : undefined
         const answer = savedAnswer(thread)
+        // A card of versions has something to give once its pick has answered, or with none picked, once any version has.
+        const versions = source.versions?.runs.filter((run) => !source.versions!.pick || run.id === source.versions!.pick) ?? []
+        const versionAnswered = versions.some((run) => !!run.chatId && !!savedAnswer(threads[run.chatId]))
         return {
             line,
             source,
             name: nameOn(source, find(source.mascotId), showBerry),
-            answered: source.table || source.file || source.page || source.note ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
+            answered: source.table || source.file || source.page || source.note ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : source.versions ? versionAnswered : !!answer,
             running: thread?.partial != null,
             rows: source.table ? source.table.count : source.each ? source.each.runs.length : answer ? (findTable(answer)?.rows.length ?? 0) : 0
         }
@@ -510,7 +516,21 @@ const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? ''
 
 // What a card on a line gets, in the words its header and reply field use.
 const getsWhat = ({ line, name, source }: InputView) =>
-    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : source.file || source.page || source.note ? name : `${name}’s thread`
+    line.picked
+        ? `${plural(line.picked, 'row')} from ${name}`
+        : source.table
+          ? `every row of ${name}`
+          : source.file || source.page || source.note
+            ? name
+            : source.versions
+              ? versionsWhat(source.versions, name)
+              : `${name}’s thread`
+
+// What a card of versions gives: its pick's thread, or every version while none is picked.
+const versionsWhat = (versions: NestVersions, name: string) => {
+    const picked = versions.runs.find((run) => run.id === versions.pick)
+    return picked ? `${name}’s version ${picked.letter}` : `${name}’s versions`
+}
 
 // What a sent card got, exactly, as main counts what crosses: "With Scout’s thread (2 answers) and 1 card before it,
 // about 1,800 words".
@@ -585,12 +605,13 @@ const CutReply: React.FC<{ text: string; fill: boolean; onMore: () => void }> = 
 
 // The card opened: its whole chat, as the chat page draws it, and a field to reply in. `note` says what goes with a reply,
 // and why a reply couldn't be sent shows in its place.
-const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => Promise<NestSendEachResult>; note: string | null; bordered?: boolean }> = ({
+const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => Promise<NestSendEachResult>; note: string | null; bordered?: boolean; autoFocus?: boolean }> = ({
     thread,
     mascot,
     onSend,
     note,
-    bordered = true
+    bordered = true,
+    autoFocus = true
 }) => {
     const name = useAssistantName(mascot)
     const [problem, setProblem] = useState<string | null>(null)
@@ -637,7 +658,7 @@ const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (
                             note && <p className="px-2 text-12 text-muted-foreground">{note}</p>
                         )
                     }
-                    autoFocus
+                    autoFocus={autoFocus}
                 />
             </div>
         </div>
@@ -664,10 +685,17 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const silent = inputs.find((input) => !input.answered)
     const rowCount = picked ?? driving?.rows ?? 0
     const canEach = !!driving
+    const [notes, setNotes] = useState<string[]>(() => draftVersions.get(card.id) ?? [''])
+    // The notes as they are now, for an answer from Suggest angles that comes back after the user changed them.
+    const notesNow = useRef(notes)
+    notesNow.current = notes
+    // Versions and For each row don't go together yet, so whichever is on keeps the other off.
+    const versionsOn = notes.length > 1
     const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? (picked !== null || !!card.plan?.each))
-    const forEach = canEach && eachOn
+    const forEach = canEach && eachOn && !versionsOn
     const tooMany = forEach && rowCount > MAX_RUNS
     const [sending, setSending] = useState(false)
+    const [suggesting, setSuggesting] = useState(false)
     const [problem, setProblem] = useState<string | null>(null)
     const switchId = useId()
     const attaching = useAttaching({ cardId: card.id })
@@ -676,18 +704,39 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
         setText(value)
         setDraftText(card.id, value)
     }
-    const canSend = text.trim() !== '' && !sending && !silent && !stale && !tooMany
+    const changeNotes = (next: string[]) => {
+        setNotes(next)
+        if (next.length > 1) draftVersions.set(card.id, next)
+        else draftVersions.delete(card.id)
+    }
+    const canSend = text.trim() !== '' && !sending && !suggesting && !silent && !stale && !tooMany
     const send = async () => {
         if (!canSend) return
         setSending(true)
         setProblem(null)
         const api = window.chromeAPI.nests
-        const result = forEach ? await api.sendEach(card.id, text.trim()) : await api.send(card.id, text.trim())
+        const result = versionsOn
+            ? await api.sendVersions(card.id, text.trim(), notes)
+            : forEach
+              ? await api.sendEach(card.id, text.trim())
+              : await api.send(card.id, text.trim())
         setSending(false)
         if (result.ok) {
             setDraftText(card.id, '')
             draftEach.delete(card.id)
+            draftVersions.delete(card.id)
         } else setProblem(result.error)
+    }
+    // Fills the empty notes, and sends nothing: the user reads them, and changes them, before Send. Only notes still empty
+    // when it answers, and nothing if the number of versions changed meanwhile.
+    const suggest = async () => {
+        setSuggesting(true)
+        setProblem(null)
+        const result = await window.chromeAPI.nests.suggestAngles(card.id, text.trim(), notes)
+        setSuggesting(false)
+        const now = notesNow.current
+        if (!result.ok) setProblem(result.error)
+        else if (result.notes.length === now.length) changeNotes(now.map((note, index) => (note.trim() ? note : result.notes[index])))
     }
 
     const several = inputs.length > 1
@@ -700,7 +749,9 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                 ? input.name
                 : input.source.each
                 ? `${input.name}’s table`
-                : `${input.name}’s thread`
+                : input.source.versions
+                  ? versionsWhat(input.source.versions, input.name)
+                  : `${input.name}’s thread`
     const gets =
         inputs.length === 0
             ? 'New card'
@@ -781,30 +832,34 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     onSend={() => void send()}
                     mascot={mascot}
                     onChooseMascot={(id) => void window.chromeAPI.nests.setBird(card.id, id)}
+                    beforeFooter={versionsOn && <VersionNotes notes={notes} onChange={changeNotes} onSuggest={() => void suggest()} suggesting={suggesting} canSuggest={text.trim() !== '' && notes.some((note) => !note.trim())} />}
                     footer={
-                        canEach && (
-                            <>
-                                <span className="flex items-center gap-2 pl-2">
+                        <>
+                            {canEach && (
+                                <span className="flex items-center gap-2 pl-2" title={versionsOn ? 'Set Versions back to 1 to run it for each row.' : undefined}>
                                     <Switch
                                         checked={forEach}
                                         labelledBy={switchId}
+                                        disabled={versionsOn}
                                         onChange={(on) => {
                                             setEachOn(on)
                                             draftEach.set(card.id, on)
                                             setProblem(null)
                                         }}
                                     />
-                                    <span id={switchId} className="text-13">For each row</span>
+                                    <span id={switchId} className={cn("text-13", versionsOn && "text-muted-foreground")}>For each row</span>
                                 </span>
-                                {forEach && (
-                                    <span className={cn("ml-auto pr-1 text-13 truncate", tooMany ? "text-destructive" : "text-muted-foreground")}>
-                                        {tooMany
-                                            ? `${rowCount} rows, ${MAX_RUNS} at most`
-                                            : `${plural(rowCount, 'run')}${card.perRun ? `, ${estimateWords(card.perRun, rowCount)}` : ''}`}
-                                    </span>
-                                )}
-                            </>
-                        )
+                            )}
+                            <VersionStepper count={notes.length} onChange={(count) => changeNotes(Array.from({ length: count }, (_, index) => notes[index] ?? ''))} blocked={forEach ? 'Turn For each row off to send versions.' : null} />
+                            {versionsOn && card.perRun && <span className="min-w-0 text-13 text-muted-foreground truncate">· {estimateWords(card.perRun, notes.length)}</span>}
+                            {forEach && (
+                                <span className={cn("ml-auto pr-1 text-13 truncate", tooMany ? "text-destructive" : "text-muted-foreground")}>
+                                    {tooMany
+                                        ? `${rowCount} rows, ${MAX_RUNS} at most`
+                                        : `${plural(rowCount, 'run')}${card.perRun ? `, ${estimateWords(card.perRun, rowCount)}` : ''}`}
+                                </span>
+                            )}
+                        </>
                     }
                 />
                 {(stale || problem || tooMany) && (
@@ -812,11 +867,65 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                         {problem ?? (stale ? STALE_ROWS : `For each row runs at most ${MAX_RUNS} times. Select ${MAX_RUNS} rows or fewer, or turn it off.`)}
                     </p>
                 )}
+                {versionsOn && !problem && !stale && <p className="px-2 pt-1 text-12 text-muted-foreground">{VERSIONS_WARNING}</p>}
                 {card.plan?.note && <p role="status" className="px-2 pt-1 text-12 text-muted-foreground">{card.plan.note}. You can still send it yourself.</p>}
             </div>
         </div>
     )
 }
+
+// How many versions a draft sends, next to Send: 1 is an ordinary card. Off, with why, while For each row is on.
+const VersionStepper: React.FC<{ count: number; onChange: (count: number) => void; blocked: string | null }> = ({ count, onChange, blocked }) => {
+    const step = "nodrag size-6 rounded-full flex items-center justify-center text-muted-foreground outline-none transition-colors enabled:hover:bg-muted enabled:hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+    return (
+        <span role="group" aria-label="Versions" title={blocked ?? undefined} className={cn("shrink-0 flex items-center gap-0.5 pl-1", blocked && "opacity-60")}>
+            <button type="button" aria-label="Fewer versions" disabled={!!blocked || count <= 1} onClick={() => onChange(count - 1)} className={step}>
+                <Minus className="size-3.5" />
+            </button>
+            <span aria-live="polite" className="min-w-[68px] text-center text-13 tabular-nums">
+                {count} {count === 1 ? 'version' : 'versions'}
+            </span>
+            <button type="button" aria-label="More versions" disabled={!!blocked || count >= MAX_VERSIONS} onClick={() => onChange(count + 1)} className={step}>
+                <Plus className="size-3.5" />
+            </button>
+            {blocked && <span className="sr-only">{blocked}</span>}
+        </span>
+    )
+}
+
+// Above one version, a short note for each, all optional: an empty one asks for one clearly different from the others.
+// Suggest angles fills the empty ones from the cheap model, which reads only the prompt and the inputs' names.
+const VersionNotes: React.FC<{ notes: string[]; onChange: (notes: string[]) => void; onSuggest: () => void; suggesting: boolean; canSuggest: boolean }> = ({
+    notes,
+    onChange,
+    onSuggest,
+    suggesting,
+    canSuggest
+}) => (
+    <div data-version-notes className="px-2 pt-1 pb-1 flex flex-col gap-1">
+        {notes.map((note, index) => (
+            <label key={index} className="flex items-center gap-2">
+                <span className="w-4 shrink-0 text-12 font-semibold text-muted-foreground">{versionLetter(index)}</span>
+                <input
+                    value={note}
+                    maxLength={MAX_ANGLE_LENGTH}
+                    aria-label={`Note for version ${versionLetter(index)}`}
+                    placeholder="Clearly different from the others"
+                    onChange={(event) => onChange(notes.map((each, at) => (at === index ? event.target.value : each)))}
+                    className="nodrag flex-1 min-w-0 h-7 px-2 rounded-control bg-muted text-13 outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                />
+            </label>
+        ))}
+        <button
+            type="button"
+            onClick={onSuggest}
+            disabled={!canSuggest || suggesting}
+            className="self-start ml-5 h-6 px-1.5 rounded-control text-12 text-muted-foreground outline-none transition-colors enabled:hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+        >
+            <span className={suggesting ? SHIMMER_QUIET : undefined}>{suggesting ? 'Suggesting angles' : 'Suggest angles'}</span>
+        </button>
+    </div>
+)
 
 interface RunView {
     id: string
@@ -1079,6 +1188,235 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
             {card.earlierChanged && <EarlierChanged cardId={card.id} working={active} perRun={card.perRun ?? null} runs={each.runs.length} />}
             {!active && answered && <LooksRight cardId={card.id} />}
             {!open && <ResizeCorner cardId={card.id} />}
+        </div>
+    )
+}
+
+// Which version a card of versions shows, by card, kept while the page is away. Memory only.
+const shownVersions = new Map<string, string>()
+// How wide each version is, side by side, when the card is opened, and the widest the open card gets before it scrolls.
+const VERSION_COLUMN = 380
+const VERSIONS_OPEN_MAX = 1160
+
+const VERSION_WORDS: Record<RunPhase, string> = { ...RUN_WORDS, done: 'Done' }
+
+// A card sent as several versions: one card, drawn as a small stack, with a tab for each version. Closed, it shows the
+// version picked in its tabs, its note, and its answer, with ★ Use this and More like this. Open, every version side by
+// side, each with its whole chat and a reply field that continues only that version.
+const VersionsCard: React.FC<{ card: NestCard; versions: NestVersions; box: CardBox }> = ({ card, versions, box }) => {
+    const board = useBoard()
+    const { find } = useFlock()
+    const mascot = find(card.mascotId)
+    const name = useAssistantName(mascot)
+    const inputs = useInputs(card.id)
+    const threads = useCardThreads(versions.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])))
+    const open = board.openId === card.id
+    const [shown, setShown] = useState(() => shownVersions.get(card.id) ?? versions.pick ?? versions.runs[0]?.id ?? null)
+    const show = (id: string) => {
+        setShown(id)
+        shownVersions.set(card.id, id)
+    }
+    // Opened at one version, from Needs you, that's the one it shows.
+    useEffect(() => {
+        if (open && board.openRunId && versions.runs.some((run) => run.id === board.openRunId)) show(board.openRunId)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, board.openRunId])
+    // A version More like this just made is the one it shows.
+    const count = versions.runs.length
+    const counted = useRef(count)
+    useEffect(() => {
+        if (count > counted.current) show(versions.runs[count - 1].id)
+        counted.current = count
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [count])
+
+    const views = versions.runs.map((run) => {
+        const thread = run.chatId ? threads[run.chatId] : undefined
+        return { run, thread, phase: runPhase(run, thread), answer: savedAnswer(thread), picked: run.id === versions.pick }
+    })
+    const status = forEachStatus(views.map((view) => view.phase))
+    const active = views.some((view) => view.phase === 'waiting' || view.phase === 'working')
+    const running = views.some((view) => view.phase === 'working')
+    const asking = views.some((view) => view.thread?.approval && view.thread.partial !== null)
+    const answered = views.some((view) => !!view.answer)
+    const unfinished = views.filter((view) => view.phase === 'failed' || view.phase === 'stopped').length
+    const unstarted = views.filter((view) => view.phase === 'not-started').length
+    const current = views.find((view) => view.run.id === shown) ?? views[0]
+    const full = count >= MAX_VERSIONS
+    // Opened, the version shown closed, or the one Needs you opened it at, is the column in view.
+    const shownColumn = useRef<HTMLElement>(null)
+    useEffect(() => {
+        if (open) shownColumn.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }, [open, current?.run.id])
+    const reads = inputs.length > 0 ? `Gets ${listed(inputs.map((input) => getsWhat(input)))} when you send` : null
+
+    return (
+        <>
+            {!open && (
+                <>
+                    {count > 2 && <span aria-hidden className="pointer-events-none absolute inset-x-6 top-4 -bottom-4 rounded-panel border bg-surface" />}
+                    <span aria-hidden className="pointer-events-none absolute inset-x-3 top-2 -bottom-2 rounded-panel border bg-surface shadow-selected" />
+                </>
+            )}
+            <div
+                data-versions
+                className={cn(CARD_SHELL, cardShadow(running, open), box.fill && !open && "flex flex-col")}
+                style={open ? { width: Math.min(count * VERSION_COLUMN, VERSIONS_OPEN_MAX) } : boxStyle(box)}
+            >
+                {!open && <FarCard title={card.title ?? null} asked={versions.prompt} status={{ text: status.text, className: TONES[status.tone] }} unread={!!card.unread} />}
+                <Perched cardId={card.id} mascot={mascot} mood={asking ? 'asking' : running ? 'thinking' : 'rest'} />
+                <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, 0)} />
+                <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
+                    <span className="text-14 font-semibold truncate">{name}</span>
+                    {card.unread && <UnreadDot />}
+                    <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>
+                    <span className="ml-auto flex items-center">
+                        {active && (
+                            <button
+                                type="button"
+                                onClick={() => void window.chromeAPI.nests.stopCard(card.id)}
+                                className="nodrag mr-1 h-7 px-2.5 rounded-control border text-13 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                Stop
+                            </button>
+                        )}
+                        {answered && (
+                            <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                                <GitFork className="size-4" />
+                            </CardButton>
+                        )}
+                        <CardButton label={open ? 'Close the versions' : 'Open every version side by side'} onClick={() => board.setOpen(open ? null : card.id)}>
+                            {open ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                        </CardButton>
+                        <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                            <X className="size-4" />
+                        </CardButton>
+                    </span>
+                </div>
+                <p data-crosses className="shrink-0 px-5 -mt-1 mb-2 text-12 text-muted-foreground">
+                    {versions.pick ? `Version ${views.find((view) => view.picked)?.run.letter} goes on to the next card` : 'Every version goes on to the next card until you pick one'}
+                    {withWhat(inputs) && ` · ${withWhat(inputs)!.replace(/^With/, 'with')}`}
+                </p>
+                <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
+                {open ? (
+                    <div className="nodrag nowheel cursor-auto flex overflow-x-auto border-t">
+                        {views.map((view) => (
+                            <section
+                                key={view.run.id}
+                                ref={view === current ? shownColumn : undefined}
+                                data-version={view.run.letter} aria-label={`Version ${view.run.letter}`} className="shrink-0 flex flex-col border-r last:border-r-0" style={{ width: VERSION_COLUMN }}>
+                                <div className="px-5 pt-3 flex items-center gap-2">
+                                    <span className="text-14 font-semibold">{view.run.letter}</span>
+                                    {view.picked && <Star aria-label="Picked" className="size-3.5 fill-accent-ink text-accent-ink" />}
+                                    <span className={cn("text-12", view.phase === 'failed' ? "text-destructive" : "text-muted-foreground")}>{VERSION_WORDS[view.phase]}</span>
+                                </div>
+                                <VersionNote note={view.run.note} className="px-5 pt-1" />
+                                <VersionActions cardId={card.id} view={view} full={full} className="px-5 pt-2" />
+                                {view.thread ? (
+                                    <WholeChat
+                                        thread={view.thread}
+                                        mascot={mascot}
+                                        bordered={false}
+                                        autoFocus={view === current}
+                                        onSend={(text) => window.chromeAPI.nests.sendRun(view.run.id, text)}
+                                        note={reads}
+                                    />
+                                ) : (
+                                    <p className="px-5 py-4 text-13 text-muted-foreground">{VERSION_WORDS[view.phase]}</p>
+                                )}
+                            </section>
+                        ))}
+                    </div>
+                ) : (
+                    <div className={cn("nodrag select-text cursor-auto flex flex-col", box.fill && "flex-1 min-h-0")}>
+                        <div role="tablist" aria-label="Versions" className="shrink-0 px-4 pb-2 flex items-center gap-0.5">
+                            {views.map((view, index) => (
+                                <React.Fragment key={view.run.id}>
+                                    {index > 0 && <span aria-hidden className="text-12 text-muted-foreground">·</span>}
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={view === current}
+                                        aria-label={`Version ${view.run.letter}${view.picked ? ', picked' : ''}, ${VERSION_WORDS[view.phase]}`}
+                                        onClick={() => show(view.run.id)}
+                                        className={cn(
+                                            "h-7 min-w-7 px-2 rounded-control flex items-center justify-center gap-1 text-13 font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                                            view === current ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        {view.picked && <Star aria-hidden className="size-3 fill-accent-ink text-accent-ink" />}
+                                        {view.run.letter}
+                                        {view.thread?.approval && view.thread.partial !== null && <span aria-hidden className="size-1.5 rounded-full bg-accent-ink" />}
+                                        {view.phase === 'failed' && <span aria-hidden className="size-1.5 rounded-full bg-destructive" />}
+                                    </button>
+                                </React.Fragment>
+                            ))}
+                        </div>
+                        {current && (
+                            <div role="tabpanel" aria-label={`Version ${current.run.letter}`} className={cn("px-5 pb-4 flex flex-col gap-3", box.fill && "nowheel flex-1 min-h-0 overflow-y-auto")}>
+                                {card.title && <CardTitle cardId={card.id} title={card.title} />}
+                                <VersionNote note={current.run.note} className={card.title ? "-mt-2" : undefined} />
+                                <p className="shrink-0 -mt-2 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{versions.prompt}</p>
+                                {current.thread?.partial != null && !current.thread.partial && <Working thread={current.thread} />}
+                                {current.thread?.approval && <ChatApprovalCard chatId={current.thread.id} approval={current.thread.approval} mascot={mascot} />}
+                                {current.thread && latestReply(current.thread) && <CutReply text={latestReply(current.thread)!} fill={box.fill} onMore={() => board.setOpen(card.id, current.run.id)} />}
+                                {current.thread?.error && <ChatError message={current.thread.error} />}
+                                {!current.thread && <p className="text-13 text-muted-foreground">{VERSION_WORDS[current.phase]}</p>}
+                                <VersionActions cardId={card.id} view={current} full={full} />
+                            </div>
+                        )}
+                    </div>
+                )}
+                {!active && unfinished + unstarted > 0 && <GoAgain cardId={card.id} unfinished={unfinished} unstarted={unstarted} perRun={card.perRun ?? null} />}
+                {card.earlierChanged && <EarlierChanged cardId={card.id} working={active} perRun={card.perRun ?? null} runs={count} again="Update all" />}
+                {!active && answered && <LooksRight cardId={card.id} />}
+                {!open && <ResizeCorner cardId={card.id} />}
+            </div>
+        </>
+    )
+}
+
+// A version's note, or what an empty one means.
+const VersionNote: React.FC<{ note: string; className?: string }> = ({ note, className }) => (
+    <p className={cn("shrink-0 text-12 text-muted-foreground truncate", className)} title={note || undefined}>
+        {note || 'Clearly different from the others'}
+    </p>
+)
+
+// ★ Use this picks the version, so only it goes on to the next card, and pressed again lets every version go on. More like
+// this makes one more version from it. Both once it has an answer and isn't writing another.
+const VersionActions: React.FC<{ cardId: string; view: { run: NestVersions['runs'][number]; thread: ChatThread | undefined; answer: string | null; picked: boolean }; full: boolean; className?: string }> = ({
+    cardId,
+    view,
+    full,
+    className
+}) => {
+    const [problem, setProblem] = useState<string | null>(null)
+    const ready = !!view.answer && view.thread?.partial == null
+    if (!ready) return null
+    const api = window.chromeAPI.nests
+    return (
+        <div className={cn("shrink-0 flex flex-col gap-1", className)}>
+            <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant={view.picked ? 'default' : 'outline'} aria-pressed={view.picked} onClick={() => void api.pickVersion(cardId, view.picked ? null : view.run.id)}>
+                    <Star className={cn("size-3.5", view.picked && "fill-current")} />
+                    {view.picked ? 'Using this' : 'Use this'}
+                </Button>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={full}
+                    title={full ? `A card can have ${MAX_VERSIONS} versions at most.` : undefined}
+                    onClick={async () => {
+                        setProblem(null)
+                        const result = await api.moreLikeThis(cardId, view.run.id)
+                        if (!result.ok) setProblem(result.error)
+                    }}
+                >
+                    More like this
+                </Button>
+            </div>
+            {problem && <p role="alert" className="text-12 text-destructive">{problem}</p>}
         </div>
     )
 }
@@ -1770,6 +2108,8 @@ const CardKind: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) =>
         <TableCard card={card} file={card.table} box={box} />
     ) : card.each ? (
         <ForEachCard card={card} each={card.each} box={box} />
+    ) : card.versions ? (
+        <VersionsCard card={card} versions={card.versions} box={box} />
     ) : card.chatId ? (
         <SentCard card={card} box={box} />
     ) : card.plan && card.plan.state !== 'held' ? (

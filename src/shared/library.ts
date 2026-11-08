@@ -452,6 +452,8 @@ export interface NestCard {
   autoPlaced: boolean;
   // Set once it was sent with For each row on.
   each: NestForEach | null;
+  // Set once it was sent as several versions.
+  versions?: NestVersions | null;
   // Set while it's a card Berry planned that hasn't started.
   plan: NestPlanned | null;
   // Set on a card made from a file the user added: its rows, with no chat and no bird.
@@ -542,6 +544,23 @@ export interface NestForEach {
   // The cheap model is naming the column right now.
   naming?: boolean;
   runs: NestRun[];
+}
+
+// A card sent as several versions: one prompt, each version its own chat with its own note, run as For each row's runs
+// are. Only `pick` crosses its lines, or while none is picked, every version, each with its letter and note.
+export interface NestVersions {
+  prompt: string;
+  runs: NestVersion[];
+  pick: string | null;
+}
+
+export interface NestVersion {
+  id: string;
+  letter: string;
+  // What the user said this one should be, or empty for "clearly different from the others".
+  note: string;
+  chatId: string | null;
+  state: NestRunState;
 }
 
 // A CSV or TSV file the user added, as it was then: the card's title from the file's name, its header, and how many rows

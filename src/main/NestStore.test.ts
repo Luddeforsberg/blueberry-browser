@@ -10,7 +10,11 @@ import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 const SECTIONS_TABLE = "DROP TABLE sections; ";
 
 // What the migration for an earlier card changing added: what each line was sent with, and what a card's message knew.
-const STALE_COLUMNS = SECTIONS_TABLE + "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE runs DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
+// What the migration for versions added, the step after sections.
+const VERSIONS_COLUMNS = "ALTER TABLE cards DROP COLUMN versions; ALTER TABLE cards DROP COLUMN version_pick; ALTER TABLE runs DROP COLUMN like_run; ALTER TABLE runs DROP COLUMN knows;";
+const VERSIONS_STEPS = 1;
+
+const STALE_COLUMNS = VERSIONS_COLUMNS + SECTIONS_TABLE + "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE runs DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
 
 // What the migration for coming back to a board added: card titles, unread dots, and when cards and Nests were last seen.
 const RETURN_COLUMNS =
@@ -148,7 +152,7 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 8}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+      `PRAGMA user_version = ${version - 8 - VERSIONS_STEPS}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
         "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
         PAGE_COLUMNS +
         COMPOSER_COLUMNS
@@ -409,7 +413,7 @@ describe("NestStore", () => {
     // As a file from before the composer could tuck has it, with the talk as it was then.
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 4}; ${COMPOSER_COLUMNS}`);
+    db.exec(`PRAGMA user_version = ${version - 4 - VERSIONS_STEPS}; ${COMPOSER_COLUMNS}`);
     db.close();
 
     const again = new NestStore(file);
@@ -476,11 +480,66 @@ describe("NestStore", () => {
     expect(new NestStore(file).card(writer.id)).not.toHaveProperty("knows");
     // As a file from before has it: nothing was kept, so nothing has changed.
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 2}; ${STALE_COLUMNS}`);
+    db.exec(`PRAGMA user_version = ${version - 2 - VERSIONS_STEPS}; ${STALE_COLUMNS}`);
     db.close();
     const older = new NestStore(file);
     expect(older.linesTo(writer.id)[0].sentWith).toBeNull();
     expect(older.card(writer.id)).not.toHaveProperty("knows");
+  });
+  it("keeps a card's versions, their notes, More like this and the pick across opening the file again, and a file from before has none", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Outreach");
+    const card = store.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    const plain = store.addCard(nest, { x: 0, y: 400 })!;
+    expect(store.startVersions(card.id, "Write an email", ["Short", ""])).toBe(true);
+    // Only a draft, and only 2 to 5.
+    expect(store.startVersions(card.id, "Again", ["A", "B"])).toBe(false);
+    expect(store.startVersions(plain.id, "One", ["A"])).toBe(false);
+    expect(store.startVersions(plain.id, "Six", ["A", "B", "C", "D", "E", "F"])).toBe(false);
+    const [first, second] = store.card(card.id)!.versions!.runs;
+    store.setRunChat(first.id, "chat-a");
+    store.setRunKnows(first.id, { sent: true, at: 1, cards: 2, pages: 0, files: 0, notes: 0, cut: 1, leftOutCards: 0, leftOutFiles: 0 });
+    const third = store.addVersion(card.id, "More like version A", first.id)!;
+    expect(store.addVersion(card.id, "Like nothing here", "not-a-run")).toBeNull();
+    expect(store.pickVersion(card.id, first.id)).toBe(true);
+
+    const again = new NestStore(file);
+    const kept = again.card(card.id)!;
+    expect(kept.each).toBeNull();
+    expect(kept.versions).toEqual({
+      prompt: "Write an email",
+      pick: first.id,
+      runs: [
+        { id: first.id, letter: "A", note: "Short", chatId: "chat-a", state: "started" },
+        { id: second.id, letter: "B", note: "", chatId: null, state: "waiting" },
+        { id: third, letter: "C", note: "More like version A", chatId: null, state: "waiting" },
+      ],
+    });
+    expect(again.likeOf(third)).toBe(first.id);
+    // It knows what its pick knew.
+    expect(kept.knows).toMatchObject({ cards: 2, cut: 1 });
+    // Its bird and chat are its versions' now.
+    expect(again.setBird(card.id, null)).toBe(false);
+    expect(again.setChat(card.id, "chat-x")).toBe(false);
+    expect(again.chatIds(nest)).toEqual(["chat-a"]);
+    // Up to five.
+    again.addVersion(card.id, "", null);
+    again.addVersion(card.id, "", null);
+    expect(again.addVersion(card.id, "", null)).toBeNull();
+    expect(again.card(card.id)!.versions!.runs.map((run) => run.letter)).toEqual(["A", "B", "C", "D", "E"]);
+    // A version that goes again stays picked, and its new answer is what crosses once it's in.
+    again.restartRuns(card.id, [first.id], () => 0);
+    expect(again.card(card.id)!.versions!.pick).toBe(first.id);
+
+    // As a file from before versions has it: a card with a prompt and runs is For each row's.
+    const db = new DatabaseSync(file);
+    const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+    db.exec(`PRAGMA user_version = ${version - VERSIONS_STEPS}; ${VERSIONS_COLUMNS}`);
+    db.close();
+    const older = new NestStore(file);
+    expect(older.card(card.id)!.versions).toBeUndefined();
+    expect(older.card(card.id)!.each).toMatchObject({ prompt: "Write an email" });
   });
 
   it("keeps sections across opening the file again, moves only its own Nest's cards with one, and deletes a section without its cards", () => {

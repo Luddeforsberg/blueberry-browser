@@ -80,7 +80,7 @@ const OPEN_Z = 10
 const DIM_Z = 5
 
 // A card the composer can ask about: one with something on it for Berry to read.
-const askable = (card: NestCard) => !!(card.chatId || card.each || card.table || card.file || card.note)
+const askable = (card: NestCard) => !!(card.chatId || card.each || card.versions || card.table || card.file || card.note)
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
 
@@ -121,8 +121,8 @@ const toNodes = (
             id: card.id,
             type: 'card',
             position: { x: card.x, y: card.y },
-            // An HTML card open is bigger than its own size, so the page has room.
-            width: card.id === openId && card.file?.type === 'text/html' ? undefined : size?.width,
+            // An HTML card open is bigger than its own size, so the page has room, and so is a card of versions side by side.
+            width: card.id === openId && (card.file?.type === 'text/html' || card.versions) ? undefined : size?.width,
             height: card.id === openId ? undefined : size?.height,
             dragHandle: '.nest-drag',
             // The open card floats over the others and the layer that dims them, since it's the one being read.
@@ -139,7 +139,7 @@ const toNodes = (
 const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
     const card = board.cards.find((each) => each.id === cardId)
     const into = board.lines.filter((line) => line.to === cardId)
-    if (!card || card.each || card.table || card.file || card.page || card.note || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
+    if (!card || card.each || card.versions || card.table || card.file || card.page || card.note || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
     const after = new Set<string>([cardId])
     for (let grew = true; grew; ) {
         grew = false
@@ -154,7 +154,7 @@ const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
         (each) =>
             !after.has(each.id) &&
             !into.some((line) => line.from === each.id) &&
-            (!!each.chatId || !!each.each || !!each.table || !!each.file || !!each.note || (!!each.page && (!card.plan || card.plan.state === 'held')) || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
+            (!!each.chatId || !!each.each || !!each.versions || !!each.table || !!each.file || !!each.note || (!!each.page && (!card.plan || card.plan.state === 'held')) || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
     )
 }
 
@@ -167,7 +167,7 @@ const pickedOf = (selection: RowSelection | null, cardId: string): PickedRows | 
 // A line the user may take away goes into a card they still send from: a draft, a planned or held card, or a sent one.
 // Never into a For-each card, whose runs read it, a card of a plan waiting to start, or a file or page card, whose line
 // only says where it came from. Main checks it again.
-const removable = (card: NestCard | undefined) => !!card && !card.each && !card.file && !card.page && !card.note && card.plan?.state !== 'armed'
+const removable = (card: NestCard | undefined) => !!card && !card.each && !card.versions && !card.file && !card.page && !card.note && card.plan?.state !== 'armed'
 
 const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[] =>
     board.lines.map((line) => {
@@ -190,7 +190,7 @@ const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[
             ariaRole: 'img',
             ariaLabel: from && to ? `The line from ${label(from)} into ${label(to)}.${canRemove ? ' Press Delete to take it away.' : ''}` : undefined,
             data: {
-                draft: !(to && (to.chatId || to.each || to.file || to.page)),
+                draft: !(to && (to.chatId || to.each || to.versions || to.file || to.page)),
                 view: !!to?.page,
                 ...(line.fresh ? { fresh: true } : {}),
                 ...(line.changed ? { changed: true } : {}),
@@ -640,9 +640,10 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         )
     }, [board.cards, board.sections, reveal])
 
-    // An HTML card opens wider than it was, so the board moves to show it.
+    // An HTML card, or a card of versions side by side, opens wider than it was, so the board moves to show it.
     useEffect(() => {
-        if (openId && board.cards.find((card) => card.id === openId)?.file?.type === 'text/html') reveal([openId])
+        const opened = openId ? board.cards.find((card) => card.id === openId) : undefined
+        if (opened && (opened.file?.type === 'text/html' || opened.versions)) reveal([opened.id])
         // Only when it opens, not each time the board changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [openId, reveal])
@@ -756,7 +757,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // so does a draft with a file or note on it.
     const dropEmptyDrafts = useCallback(() => {
         board.cards
-            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !card.file && !card.page && !card.note && !draftText(card.id).trim() && card.attachments.length === 0)
+            .filter((card) => !card.chatId && !card.each && !card.versions && !card.plan && !card.table && !card.file && !card.page && !card.note && !draftText(card.id).trim() && card.attachments.length === 0)
             .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
@@ -1124,7 +1125,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             event.preventDefault()
             const card = board.cards.find((each) => each.id === cardId)
             if (card?.page) void api.goToTab(cardId)
-            else if (card?.chatId || card?.each || (card?.file && card.file.type !== 'application/pdf')) open(openId === cardId ? null : cardId)
+            else if (card?.chatId || card?.each || card?.versions || (card?.file && card.file.type !== 'application/pdf')) open(openId === cardId ? null : cardId)
             else node.querySelector<HTMLElement>('textarea')?.focus()
         } else if (event.key === 'Backspace' || event.key === 'Delete') {
             event.preventDefault()

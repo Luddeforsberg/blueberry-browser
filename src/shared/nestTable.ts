@@ -380,7 +380,9 @@ export type Crossing =
   // A page's card: an open tab, whose text is read when the card sends, or a link, which is only its address.
   | { kind: "page"; name: string; read: boolean; before?: Before }
   // A note's card: one of Berry's answers the user put on the board.
-  | { kind: "note"; words: number; cut: boolean; before?: Before };
+  | { kind: "note"; words: number; cut: boolean; before?: Before }
+  // A card of versions with none picked: every version, each with its letter and note.
+  | { kind: "versions"; versions: number; words: number; cut: boolean; before?: Before };
 
 // On every line: what crosses as it is, and what each run gets when For each row is on, or null where it can't be.
 export interface LineCrossing {
@@ -427,6 +429,10 @@ export const crossingWords = (crossing: Crossing, who: string): string => {
   const cardsBefore = before && before.cards > 0 ? counted(before.cards, "card") + " before it" : null;
   if (crossing.kind === "page") return `1 ${crossing.read ? "page" : "link"}: ${crossing.name}`;
   if (crossing.kind === "note") return `${who}, ${aboutWords(crossing.words)}${lossWords([], crossing.cut)}`;
+  if (crossing.kind === "versions") {
+    const own = `${who}’s ${counted(crossing.versions, "version")}, none picked`;
+    return `${own}${cardsBefore ? ` and ${cardsBefore}` : ""}, ${aboutWords(crossing.words + (before?.words ?? 0))}${lossWords(beforeLost(before), crossing.cut || !!before?.cut)}`;
+  }
   if (crossing.kind === "thread") {
     const own = crossing.answers === 1 ? `${who}’s answer` : `${who}’s thread (${counted(crossing.answers, "answer")})`;
     const lost = [...(crossing.earlier > 0 ? [counted(crossing.earlier, "earlier answer")] : []), ...beforeLost(before)];

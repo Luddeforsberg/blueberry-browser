@@ -373,6 +373,8 @@ export interface NestNewCard {
 
 // For each row either starts, or says why it can't, such as more rows than the cap.
 export type NestSendEachResult = { ok: true } | { ok: false; error: string };
+// A draft's notes for its versions, with the empty ones filled in by Suggest angles, or why they couldn't be.
+export type NestAnglesResult = { ok: true; notes: string[] } | { ok: false; error: string };
 // `warn` when the runs did something the user allowed before, which going again may repeat: it goes only once confirmed.
 export type NestRetryResult = { ok: true } | { ok: false; error: string } | { ok: false; warn: string };
 
@@ -614,8 +616,17 @@ export interface InvokeChannels {
   "nests:send": { region: "chrome"; args: [cardId: string, text: string]; result: NestSendEachResult };
   // Sends a draft once for each row its line brings, each run its own chat, a few at a time. Only because the user sent it.
   "nests:send-each": { region: "chrome"; args: [cardId: string, text: string]; result: NestSendEachResult };
-  // A reply in one run's thread, which gets its row again.
+  // A reply in one run's thread, which gets its row again, or in one version's, which continues only that version.
   "nests:send-run": { region: "chrome"; args: [runId: string, text: string]; result: NestSendEachResult };
+  // Sends a draft as one version for each note, each its own chat, a few at a time. Only because the user sent it.
+  "nests:send-versions": { region: "chrome"; args: [cardId: string, text: string, notes: string[]]; result: NestSendEachResult };
+  // Fills a draft's empty notes for its versions from the cheap model, which reads only the prompt and its inputs' names.
+  // It sends nothing: the notes come back to the draft.
+  "nests:suggest-angles": { region: "chrome"; args: [cardId: string, text: string, notes: string[]]; result: NestAnglesResult };
+  // ★ Use this: the version whose thread crosses the card's lines, or null for every version.
+  "nests:pick-version": { region: "chrome"; args: [cardId: string, runId: string | null]; result: boolean };
+  // More like this: one more version, like the one shown, which waits its turn. Only because the user pressed it.
+  "nests:more-like": { region: "chrome"; args: [cardId: string, runId: string]; result: NestSendEachResult };
   // Stops every run on a card, and whatever is still waiting never starts.
   "nests:stop-card": { region: "chrome"; args: [cardId: string]; result: boolean };
   // The Nest's composer: Berry starts one card at once, plans several, or asks first. Only because the user sent it.
@@ -925,6 +936,10 @@ export interface NestsAPI {
   send: (cardId: string, text: string) => Promise<NestSendEachResult>;
   sendEach: (cardId: string, text: string) => Promise<NestSendEachResult>;
   sendRun: (runId: string, text: string) => Promise<NestSendEachResult>;
+  sendVersions: (cardId: string, text: string, notes: string[]) => Promise<NestSendEachResult>;
+  suggestAngles: (cardId: string, text: string, notes: string[]) => Promise<NestAnglesResult>;
+  pickVersion: (cardId: string, runId: string | null) => Promise<boolean>;
+  moreLikeThis: (cardId: string, runId: string) => Promise<NestSendEachResult>;
   stopCard: (cardId: string) => Promise<boolean>;
   ask: (nestId: string, text: string, options: NestAskOptions) => Promise<NestAskResult>;
   setTucked: (nestId: string, tucked: boolean) => Promise<boolean>;

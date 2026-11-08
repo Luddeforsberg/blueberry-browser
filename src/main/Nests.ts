@@ -2,7 +2,7 @@ import type { Chats } from "./Chats";
 import type { NestStore } from "./NestStore";
 import type { MascotStore } from "./MascotStore";
 import type { ChatThread, MascotProfile, NestBoard, NestCard, NestFileContent, NestLine, NestSection, NestSummary } from "../shared/library";
-import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRetryResult, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
+import type { NestAnglesResult, NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResult, NestNewCard, NestRetryResult, NestRunPlanResult, NestSendEachResult, NestTableResult } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_CONTEXT_LENGTH, MAX_CROSSING_LENGTH, MAX_INPUTS, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type FilesCrossing, type LineCrossing, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_SIZE, CARD_WIDTH, freeSpot, PAGE_CARD, type Rect } from "../shared/nestPlace";
@@ -25,6 +25,8 @@ import type { EndedReply } from "./Chats";
 import { changedSince, missed, NO_RECAP, sinceFallback, type CardChange, type NestRecapWriter } from "./nestReturn";
 import type { CardKnows } from "../shared/nestKnows";
 import { agreed, changedLines, fingerprint, SENT_NOTHING } from "./nestStale";
+import { MAX_ANGLE_LENGTH, MAX_VERSIONS, moreLike, versionLetter } from "../shared/nestVersions";
+import { versionText } from "./nestVersions";
 import { isSectionColor, nextColor, planSection, SECTION_NAME, SECTION_SIZE, sectionName } from "../shared/nestSections";
 
 const MAX_TITLE_LENGTH = 100;
@@ -259,7 +261,7 @@ export class Nests {
     });
     const lines = board.lines.map((line) => ({ ...line, crosses: this.crossingOf(id, line, cards, board.lines), ...(changed.has(line.id) ? { changed: true as const } : {}) }));
     for (const [lineId, { nestId }] of this.crossings) if (nestId === id && !board.lines.some((line) => line.id === lineId)) this.crossings.delete(lineId);
-    for (const [cardId, { nestId }] of this.willKnow) if (nestId === id && !board.cards.some((card) => card.id === cardId && !card.chatId && !card.each)) this.willKnow.delete(cardId);
+    for (const [cardId, { nestId }] of this.willKnow) if (nestId === id && !board.cards.some((card) => card.id === cardId && !card.chatId && !card.each && !card.versions)) this.willKnow.delete(cardId);
     for (const [cardId, { nestId }] of this.changedInto) if (nestId === id && !board.cards.some((card) => card.id === cardId)) this.changedInto.delete(cardId);
     return { ...board, cards, lines, planning: this.planning.get(id) ?? null, naming: this.naming.has(id), since: this.since.get(id) ?? null };
   }
@@ -269,7 +271,7 @@ export class Nests {
   // nothing, such as a file's.
   private knowsFor(nestId: string, card: NestCard, cards: readonly NestCard[], lines: readonly NestLine[]): CardKnows | null {
     if (card.page || card.file || card.note || card.table) return null;
-    if (card.chatId || card.each) return card.knows ?? null;
+    if (card.chatId || card.each || card.versions) return card.knows ?? null;
     const revision = `${this.chainRevision(card.id, cards, lines)}|${!!card.plan?.each}`;
     const known = this.willKnow.get(card.id);
     if (known?.revision === revision) return known.value;
@@ -312,7 +314,10 @@ export class Nests {
   private heard(cardId: string, nestId: string, runId: string | null = null): { onContext: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void } {
     return {
       onContext: (answers, attachments) => {
-        if (!this.store.setKnows(cardId, knowsOf(answers, attachments, true, Date.now()))) return;
+        const knows = knowsOf(answers, attachments, true, Date.now());
+        if (!this.store.setKnows(cardId, knows)) return;
+        // A version keeps its own, which the card shows while it's the pick.
+        if (runId) this.store.setRunKnows(runId, knows);
         const read = new Map(
           answers.flatMap((answer) => {
             const checked = answer.part === "page" && answer.via === undefined && answer.page?.tabId ? checkAddress(answer.page.url) : null;
@@ -336,7 +341,8 @@ export class Nests {
   // sent with, whatever that card says now. `went` when it's known exactly, by line.
   private remember(cardId: string, runId: string | null, known?: ReadonlyMap<string, string>): void {
     const lines = this.store.linesTo(cardId);
-    const driving = runId ? (this.store.eachLine(cardId) ?? lines[0]?.lineId) : null;
+    // Every version gets every line whole, so only a For-each run has a line to leave out.
+    const driving = runId && this.store.card(cardId)?.each ? (this.store.eachLine(cardId) ?? lines[0]?.lineId) : null;
     const went = known ?? new Map(lines.filter((line) => line.lineId !== driving).map((line) => [line.lineId, this.fingerprintOf(line) ?? SENT_NOTHING]));
     if (went.size === 0) return;
     if (runId) this.store.keepRunSentWith(runId, went);
@@ -353,6 +359,7 @@ export class Nests {
   // give yet, so it can't have changed until it's done.
   private busy(source: NestCard): boolean {
     if (source.chatId && this.chats.isRunning(source.chatId)) return true;
+    if (source.versions) return source.versions.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)));
     return !!source.each?.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)) || this.fills.has(run.id));
   }
 
@@ -376,7 +383,7 @@ export class Nests {
   // say an earlier card changed. Only the card's own lines, never further up: a card below changes in turn, once this one
   // answers again. Worked out again only when one of its sources has changed, or it has sent.
   private changedLinesInto(nestId: string, card: NestCard, cards: readonly NestCard[], lines: readonly NestLine[]): string[] {
-    if (!card.chatId && !card.each) return [];
+    if (!card.chatId && !card.each && !card.versions) return [];
     const into = lines.filter((line) => line.to === card.id);
     if (into.length === 0) return [];
     const revision = JSON.stringify([
@@ -388,12 +395,13 @@ export class Nests {
     ]);
     const known = this.changedInto.get(card.id);
     if (known?.revision === revision) return known.value;
-    // A For-each card's runs each sent on their own.
-    const runs = card.each ? this.store.runsSentWith(card.id) : [];
+    // A For-each card's runs, and each version, sent on their own.
+    const several = !!card.each || !!card.versions;
+    const runs = several ? this.store.runsSentWith(card.id) : [];
     const value = changedLines(
       this.store.linesTo(card.id).map((line) => ({
         lineId: line.lineId,
-        sent: card.each ? agreed(runs.map((run) => run[line.lineId])) : line.sentWith,
+        sent: several ? agreed(runs.map((run) => run[line.lineId])) : line.sentWith,
         now: this.busy(line.source) ? null : this.fingerprintOf(line),
       }))
     );
@@ -445,6 +453,11 @@ export class Nests {
       return `page ${input?.part === "page" ? `${input.url} ${input.tabId ?? ""}` : ""}`;
     }
     if (card.each) return JSON.stringify([card.each.column, card.each.runs.map((run) => [run.state, run.cell])]);
+    // Which one is picked, and each version's thread, which only grows.
+    if (card.versions) {
+      const threads = card.versions.runs.map((run) => [run.state, run.chatId ? [this.chats.thread(run.chatId)?.messages.length ?? 0, this.answerOf(run.chatId) ?? ""] : null]);
+      return JSON.stringify(["versions", card.versions.pick, threads]);
+    }
     if (card.chatId) return `thread ${this.chats.thread(card.chatId)?.messages.length ?? 0} ${this.answerOf(card.chatId) ?? ""}`;
     return `plan ${card.plan?.state ?? ""}`;
   }
@@ -755,7 +768,7 @@ export class Nests {
     // of the plan, but not while Berry changes the plan, which would replace it.
     const source = from === null ? null : this.store.card(from);
     const planned = source?.plan?.state === "planned";
-    if (from !== null && !source?.chatId && !source?.each && !source?.table && !source?.file && !source?.page && !source?.note && !planned) return null;
+    if (from !== null && !source?.chatId && !source?.each && !source?.versions && !source?.table && !source?.file && !source?.page && !source?.note && !planned) return null;
     if (source && this.replanned(source)) return null;
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
     const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
@@ -780,10 +793,10 @@ export class Nests {
     if (card.page) return { ok: false, error: "A page’s card can’t read from another card." };
     if (card.note) return { ok: false, error: "A note can’t read from another card." };
     if (source.page && card.plan && card.plan.state !== "held") return { ok: false, error: "A page can go to a card you send yourself, not to a card of the plan." };
-    if (card.each || card.table || (card.plan && !planned && card.plan.state !== "held")) return { ok: false, error: "Only a card that hasn’t been sent can get another input." };
+    if (card.each || card.versions || card.table || (card.plan && !planned && card.plan.state !== "held")) return { ok: false, error: "Only a card that hasn’t been sent can get another input." };
     if (card.chatId && this.chats.isRunning(card.chatId)) return { ok: false, error: "This card is working. Add the line once it’s done." };
     if (this.replanned(card) || this.replanned(source)) return { ok: false, error: STILL_PLANNING };
-    const gives = !!source.chatId || !!source.each || !!source.table || !!source.file || !!source.page || !!source.note;
+    const gives = !!source.chatId || !!source.each || !!source.versions || !!source.table || !!source.file || !!source.page || !!source.note;
     if (planned ? !gives && source.plan?.state !== "planned" : !gives) {
       return { ok: false, error: "That card has nothing to give yet." };
     }
@@ -807,6 +820,7 @@ export class Nests {
     if (!card) return { ok: false, error: "That line isn’t there any more." };
     if (card.file || card.page) return { ok: false, error: "That line only shows where the card came from." };
     if (card.each) return { ok: false, error: "A card sent for each row keeps the lines it was sent with." };
+    if (card.versions) return { ok: false, error: "A card sent as versions keeps the lines it was sent with." };
     if (card.plan?.state === "armed") return { ok: false, error: "This card waits to start with these lines." };
     if (this.replanned(card)) return { ok: false, error: STILL_PLANNING };
     const filesBefore = this.chainFiles(card.id).map((each) => each.card.id);
@@ -947,7 +961,7 @@ export class Nests {
   send(cardId: string, text: string): ChatThread | null {
     const card = this.store.card(cardId);
     // A planned card goes with its plan, by Run. One that was held is a draft, and the user may send it.
-    if (!card || card.each || card.table || card.file || card.page || card.note || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
+    if (!card || card.each || card.versions || card.table || card.file || card.page || card.note || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
     const input = this.inputFor(cardId);
     if ("problem" in input) return null;
     const missing = this.takeFiles(cardId);
@@ -987,7 +1001,7 @@ export class Nests {
     if (card?.file) return { ok: false, error: "A file’s card has nothing to send." };
     if (card?.page) return { ok: false, error: "A page’s card has nothing to send." };
     if (card?.note) return { ok: false, error: "A note has nothing to send." };
-    if (!card || card.chatId || card.each || card.table) return { ok: false, error: "This card has been sent already." };
+    if (!card || card.chatId || card.each || card.versions || card.table) return { ok: false, error: "This card has been sent already." };
     if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     if (!prompt) return { ok: false, error: "Write what to do with each row first." };
     if (this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
@@ -1008,10 +1022,215 @@ export class Nests {
     return { ok: true };
   }
 
+  // Sends a draft as several versions of one answer: one version for each note, each its own chat as the card's bird,
+  // with the same prompt and inputs and its own note. They start a few at a time, as For each row's runs do, and each goes
+  // through `Chats.send`, so each asks for what it does as any chat would, and whatever it does happens once per version.
+  sendVersions(cardId: unknown, text: unknown, notes: unknown): NestSendEachResult {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    const prompt = typeof text === "string" ? text.trim() : "";
+    if (!card) return { ok: false, error: "This card isn’t there any more." };
+    if (card.table || card.file || card.page || card.note) return { ok: false, error: "Only a bird’s card can be sent as versions." };
+    if (card.chatId || card.each || card.versions) return { ok: false, error: "This card has been sent already." };
+    if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
+    if (this.closed) return { ok: false, error: "Blueberry is closing." };
+    if (!prompt) return { ok: false, error: "Write what to do first." };
+    if (!Array.isArray(notes) || notes.length < 2 || notes.length > MAX_VERSIONS || !notes.every((note) => typeof note === "string")) {
+      return { ok: false, error: `A card can be sent as 2 to ${MAX_VERSIONS} versions.` };
+    }
+    if (this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
+    const input = this.inputFor(card.id);
+    if ("problem" in input) return { ok: false, error: input.problem };
+    const cleaned = (notes as string[]).map((note) => note.replace(/\s+/g, " ").trim().slice(0, MAX_ANGLE_LENGTH));
+    if (!this.store.startVersions(card.id, prompt, cleaned)) return { ok: false, error: "This card has been sent already." };
+    // Every version gets the files its lines bring, as the card's own copies from now on.
+    this.missingFiles.set(card.id, this.takeFiles(card.id));
+    if (this.front?.nestId === card.nestId) this.inSight.set(card.nestId, new Set([...(this.inSight.get(card.nestId) ?? []), card.id]));
+    this.nameFrom(card.nestId, prompt);
+    this.changed(card.nestId);
+    this.pump();
+    return { ok: true };
+  }
+
+  // One version starting, when its turn comes, as the card's bird, with the card's prompt, what the card's lines give
+  // now, the card's files, and its own note. A run of More like this also gets the version it's like, as data.
+  private startVersion(card: NestCard & { nestId: string }, runId: string): boolean {
+    // A version of More like this waits for the one it's like while that one is still to answer, as after Update, so it
+    // gets its thread. If that one ends with no answer, this one goes without it.
+    const like = this.store.likeOf(runId);
+    const liked = like ? card.versions!.runs.find((run) => run.id === like) : undefined;
+    if (liked && (liked.state === "waiting" || (!!liked.chatId && this.chats.isRunning(liked.chatId)))) return false;
+    const cardAnswers = this.versionInputs(card, runId);
+    const sent =
+      cardAnswers &&
+      this.chats.send(null, card.versions!.prompt, {
+        seePage: false,
+        mascotId: card.mascotId,
+        ...(cardAnswers.length > 0 ? { cardAnswers } : {}),
+        started: (chatId) => this.store.setRunChat(runId, chatId),
+        onEnd: (end) => this.versionEnded(card.id, runId, end),
+        ...this.userSaid(card.id, null, null),
+        ...this.givenAddresses(card.id),
+        ...this.versionAttachments(card, runId),
+        ...this.heard(card.id, card.nestId, runId),
+      });
+    // Its bird has gone from the flock, rows picked on an input have gone, or the chat couldn't start.
+    if (!sent) this.store.setRunState(runId, "failed");
+    else this.remember(card.id, runId);
+    this.changed(card.nestId);
+    return !!sent;
+  }
+
+  // A reply typed in one version's tab: it continues only that version's thread, with what the card's lines give now and
+  // its note again. It's the user's own press, so it doesn't wait for a place.
+  private sendVersion(card: NestCard & { nestId: string }, runId: string, chatId: string, text: string): ChatThread | null {
+    const cardAnswers = this.versionInputs(card, runId);
+    if (!cardAnswers) return null;
+    const sent = this.chats.send(chatId, text, {
+      seePage: false,
+      userPresent: true,
+      ...(cardAnswers.length > 0 ? { cardAnswers } : {}),
+      onEnd: (end) => this.versionEnded(card.id, runId, end),
+      ...this.userSaid(card.id, chatId, text),
+      ...this.givenAddresses(card.id),
+      ...this.versionAttachments(card, runId),
+      ...this.heard(card.id, card.nestId, runId),
+    });
+    if (!sent) return null;
+    this.remember(card.id, runId);
+    this.store.touch(card.nestId);
+    this.changed(card.nestId);
+    return sent;
+  }
+
+  // What one version gets: every line into the card, whole, in one room, as the card would, and for More like this, the
+  // thread of the version it's like after them. Null when rows picked on an input have gone.
+  private versionInputs(card: NestCard, runId: string): CardAnswer[] | null {
+    const lines = this.store.linesTo(card.id);
+    const inputs = lines.map((line) => this.lineInput(line));
+    if (inputs.includes("stale")) return null;
+    const direct = lines.map((line, index) => ({ lineId: line.lineId, from: line.source.id, name: this.labelOf(line.source), input: inputs[index] as RawInput | null }));
+    const liked = this.likedVersion(card, runId);
+    if (liked) direct.push({ lineId: `like ${liked.id}`, from: `like ${liked.id}`, name: liked.name, input: { name: liked.name, part: "thread", exchanges: liked.exchanges } });
+    return fitChain(this.chainOf(card.id, direct), MAX_CONTEXT_LENGTH, this.clean).map(({ answer }) => answer);
+  }
+
+  // The version a run of More like this is like, with its letter and thread, if it still has one.
+  private likedVersion(card: NestCard, runId: string): { id: string; letter: string; name: string; exchanges: ReturnType<typeof threadOf> } | null {
+    const like = this.store.likeOf(runId);
+    const liked = like ? card.versions?.runs.find((run) => run.id === like) : undefined;
+    const exchanges = liked?.chatId ? threadOf(this.chats.thread(liked.chatId)?.messages ?? []) : [];
+    return liked && exchanges.length > 0 ? { id: liked.id, letter: liked.letter, name: `Version ${liked.letter}`, exchanges } : null;
+  }
+
+  // A version's files are the card's, and after them which version it is and its note, in words written in code.
+  private versionAttachments(card: NestCard, runId: string): { attachments: SentAttachment[] } {
+    const versions = card.versions!;
+    const run = versions.runs.find((each) => each.id === runId);
+    const { attachments = [] } = this.attachmentsFor(card.id);
+    const like = this.likedVersion(card, runId)?.letter ?? null;
+    const text = versionText({ letter: run?.letter ?? versionLetter(0), of: versions.runs.length, note: run?.note ?? "", like });
+    return { attachments: [...attachments, { kind: "version", text }] };
+  }
+
+  // A version's reply ended. The card has changed once none of its versions goes or waits, unless the user stopped it,
+  // and the pick's answer names the card. A card of a run plan that reads from it may start.
+  private versionEnded(cardId: string, runId: string, end: EndedReply): void {
+    this.pump();
+    const card = this.store.card(cardId);
+    if (!card?.versions) return;
+    const going = card.versions.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)));
+    if (!going && end.outcome !== "stopped") this.cardChanged(cardId, card.nestId);
+    const picked = card.versions.pick === runId ? card.versions.runs.find((run) => run.id === runId)?.chatId : null;
+    if (picked && end.outcome === "done" && end.reply.trim()) this.nameCard(cardId, picked, end.reply);
+    this.advance(card.nestId);
+  }
+
+  // ★ Use this: the version whose thread crosses the card's lines from now on, or none, when every version does. Only a
+  // version with an answer. The card's title follows it, and the cards that read this one see an earlier card changed.
+  pickVersion(cardId: unknown, runId: unknown): boolean {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    if (!card?.versions || (runId !== null && typeof runId !== "string")) return false;
+    const run = runId === null ? null : card.versions.runs.find((each) => each.id === runId);
+    const answer = run?.chatId ? this.answerOf(run.chatId) : null;
+    if (runId !== null && !answer) return false;
+    if (!this.store.pickVersion(card.id, run?.id ?? null)) return false;
+    this.titling.delete(card.id);
+    if (run?.chatId && answer) this.nameCard(card.id, run.chatId, answer);
+    this.changed(card.nestId);
+    return true;
+  }
+
+  // More like this: one more version, like the one shown, with the note "More like version B" and that version's thread
+  // as data. It waits its turn as any version does, up to the most a card can have.
+  moreLikeThis(cardId: unknown, runId: unknown): NestSendEachResult {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    const run = card?.versions?.runs.find((each) => each.id === runId);
+    if (!card?.versions || !run) return { ok: false, error: "That version isn’t there any more." };
+    if (this.closed) return { ok: false, error: "Blueberry is closing." };
+    if (!run.chatId || !this.answerOf(run.chatId)) return { ok: false, error: `Version ${run.letter} has no answer yet.` };
+    if (card.versions.runs.length >= MAX_VERSIONS) return { ok: false, error: `A card can have ${MAX_VERSIONS} versions at most.` };
+    if (this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
+    const input = this.inputFor(card.id);
+    if ("problem" in input) return { ok: false, error: input.problem };
+    if (!this.store.addVersion(card.id, moreLike(run.letter), run.id)) return { ok: false, error: `A card can have ${MAX_VERSIONS} versions at most.` };
+    this.changed(card.nestId);
+    this.pump();
+    return { ok: true };
+  }
+
+  // What a card of versions gives across its lines: the pick's thread, or while none is picked, every version that has
+  // answered, each with its letter and note. Nothing before any has.
+  private versionsPart(versions: NonNullable<NestCard["versions"]>, name: string): RawInput | null {
+    const threads = versions.runs.map((run) => ({ run, exchanges: run.chatId ? threadOf(this.chats.thread(run.chatId)?.messages ?? []) : [] }));
+    if (versions.pick) {
+      const picked = threads.find(({ run }) => run.id === versions.pick);
+      return picked && picked.exchanges.length > 0 ? { name, part: "thread", exchanges: picked.exchanges, pick: picked.run.id } : null;
+    }
+    const answered = threads.filter(({ exchanges }) => exchanges.length > 0);
+    return answered.length > 0 ? { name, part: "versions", versions: answered.map(({ run, exchanges }) => ({ letter: run.letter, note: run.note, exchanges })) } : null;
+  }
+
+  // A card of versions' answer as one text: the pick's, or every answered version's, each under its letter and note.
+  private versionsAnswer(versions: NonNullable<NestCard["versions"]>): string | null {
+    const part = this.versionsPart(versions, "");
+    if (part?.part === "thread") return part.exchanges.at(-1)?.answer ?? null;
+    if (part?.part !== "versions") return null;
+    return part.versions.map(({ letter, note, exchanges }) => `Version ${letter}${note ? ` (${note})` : ""}:\n${exchanges.at(-1)?.answer ?? ""}`).join("\n\n");
+  }
+
+  // Suggest angles: fills a draft's empty notes, in order, with what the cheap model suggests from only the card's prompt
+  // and the names of the cards it reads from, never what any of them says. Its words are checked and only fill the notes,
+  // which the user sees before anything is sent.
+  async suggestAngles(cardId: unknown, text: unknown, notes: unknown): Promise<NestAnglesResult> {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    const prompt = typeof text === "string" ? text.trim() : "";
+    if (!card || card.chatId || card.each || card.versions || card.table || card.file || card.page || card.note) return { ok: false, error: "This card has been sent already." };
+    if (!Array.isArray(notes) || notes.length < 2 || notes.length > MAX_VERSIONS || !notes.every((note) => typeof note === "string")) {
+      return { ok: false, error: `A card can be sent as 2 to ${MAX_VERSIONS} versions.` };
+    }
+    if (!prompt) return { ok: false, error: "Write what to do first, then angles can be suggested for it." };
+    const given = (notes as string[]).map((note) => note.slice(0, MAX_ANGLE_LENGTH));
+    const empty = given.flatMap((note, index) => (note.trim() ? [] : [index]));
+    if (empty.length === 0) return { ok: true, notes: given };
+    if (!this.recap.angles) return { ok: false, error: "Suggesting angles needs a model in .env." };
+    const names = this.store.linesTo(card.id).map((line) => this.labelOf(line.source));
+    const angles = await this.recap.angles(prompt, names, given.filter((note) => note.trim()), empty.length).catch((error: unknown) => {
+      console.error("Couldn't suggest angles:", error instanceof Error ? error.message : "unknown error");
+      return [] as string[];
+    });
+    if (angles.length === 0) return { ok: false, error: "No angles came back. Try again, or write your own." };
+    const filled = [...given];
+    empty.forEach((index, at) => {
+      if (angles[at]) filled[index] = angles[at];
+    });
+    return { ok: true, notes: filled };
+  }
+
   // A reply in one run's thread, which gets its row again, and only its row.
   sendRun(runId: string, text: string): ChatThread | null {
     const run = this.store.run(runId);
     const card = run && this.store.card(run.cardId);
+    if (run?.chatId && card?.versions && typeof text === "string") return this.sendVersion(card, run.id, run.chatId, text);
     if (!run?.chatId || !card?.each || typeof text !== "string") return null;
     const cardAnswers = this.runInputs(card.id, card.each.header, run.row);
     if (!cardAnswers) return null;
@@ -1050,6 +1269,7 @@ export class Nests {
     if (!card) return { ok: false, error: "This card isn’t there any more." };
     if (typeof text !== "string" || !text.trim()) return { ok: false, error: "Write what to do first." };
     if (card.each) return { ok: false, error: "Reply in one row’s run instead." };
+    if (card.versions) return { ok: false, error: "Reply in one version instead." };
     if (card.table) return { ok: false, error: "A table from a file has nothing to send." };
     if (card.file) return { ok: false, error: "A file’s card has nothing to send." };
     if (card.page) return { ok: false, error: "A page’s card has nothing to send." };
@@ -1090,7 +1310,7 @@ export class Nests {
   // user allowed, it asks first, since going again may do it again.
   retryRuns(cardId: unknown, which: unknown, confirmed: unknown): NestRetryResult {
     const card = typeof cardId === "string" ? this.store.card(cardId) : null;
-    if (!card?.each || (which !== "unfinished" && which !== "unstarted")) return { ok: false, error: "That card isn’t there any more." };
+    if ((!card?.each && !card?.versions) || (which !== "unfinished" && which !== "unstarted")) return { ok: false, error: "That card isn’t there any more." };
     return this.runAgain(card, which, confirmed === true);
   }
 
@@ -1102,16 +1322,17 @@ export class Nests {
   updateCard(cardId: unknown, confirmed: unknown): NestRetryResult {
     const card = typeof cardId === "string" ? this.store.card(cardId) : null;
     const board = card && this.store.board(card.nestId);
-    if (!card || !board || (!card.chatId && !card.each)) return { ok: false, error: "That card isn’t there any more." };
+    if (!card || !board || (!card.chatId && !card.each && !card.versions)) return { ok: false, error: "That card isn’t there any more." };
     if (this.changedLinesInto(card.nestId, card, board.cards, board.lines).length === 0) return { ok: false, error: "Nothing this card reads from has changed." };
-    if (card.each) return this.runAgain(card, "all", confirmed === true);
+    if (card.each || card.versions) return this.runAgain(card, "all", confirmed === true);
     return this.sendCard(card.id, UPDATE_MESSAGE);
   }
 
   private runAgain(card: NestCard & { nestId: string }, which: "unfinished" | "unstarted" | "all", confirmed: boolean): NestRetryResult {
-    if (!card.each) return { ok: false, error: "That card isn’t there any more." };
+    const each = card.each ?? card.versions;
+    if (!each) return { ok: false, error: "That card isn’t there any more." };
     if (this.closed) return { ok: false, error: "Blueberry is closing." };
-    const runs = card.each.runs.map((run) => ({
+    const runs = each.runs.map((run) => ({
       ...run,
       running: (!!run.chatId && this.chats.isRunning(run.chatId)) || this.fills.has(run.id),
       thread: run.chatId ? this.chats.thread(run.chatId) : null,
@@ -1119,11 +1340,12 @@ export class Nests {
     if (runs.some((run) => run.state === "waiting" || run.running)) return { ok: false, error: "Wait until every run has ended, or stop them first." };
     if (this.flockId(card.mascotId) === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
     const ids = which === "all" ? runs.map((run) => run.id) : retryable(runs)[which];
-    if (ids.length === 0) return { ok: false, error: which === "unfinished" ? "Every run finished." : "Every run started." };
+    if (ids.length === 0) return { ok: false, error: which === "unfinished" ? `Every ${card.versions ? "version" : "run"} finished.` : `Every ${card.versions ? "version" : "run"} started.` };
     const done = allowedBefore(runs.filter((run) => ids.includes(run.id)).map((run) => run.thread));
     // Every row going again always asks first, since each may do again what it did.
     if (which === "all" && !confirmed) {
-      const what = ids.length === 1 ? "its row" : `all ${ids.length.toLocaleString("en-US")} rows`;
+      const kind = card.versions ? "version" : "row";
+      const what = ids.length === 1 ? `its ${kind}` : `all ${ids.length.toLocaleString("en-US")} ${kind}s`;
       return { ok: false, warn: `Run ${what} again with what’s new? Anything already done may happen again${done ? `, such as “${done}”` : ""}.` };
     }
     if (done && !confirmed) return { ok: false, warn: `Some of these already did something you allowed, such as “${done}”, and may do it again.` };
@@ -1370,7 +1592,7 @@ export class Nests {
     const { cardId, nestId } = target as { cardId?: unknown; nestId?: unknown };
     if (typeof cardId === "string") {
       const card = this.store.card(cardId);
-      if (!card || card.chatId || card.each || card.table || card.file || card.note || card.plan?.state === "armed") return null;
+      if (!card || card.chatId || card.each || card.versions || card.table || card.file || card.note || card.plan?.state === "armed") return null;
       return this.replanned(card) ? null : { cardId };
     }
     if (typeof nestId === "string") return this.store.board(nestId) && !this.planning.has(nestId) ? { nestId } : null;
@@ -1509,6 +1731,12 @@ export class Nests {
     if (source.table || source.file || source.page || source.note) return { kind: "answered", name };
     if (source.plan?.state === "held") return { kind: "held", name };
     if (source.plan) return { kind: "planned", name };
+    if (source.versions) {
+      return runsState(
+        name,
+        source.versions.runs.map((run) => ({ state: run.state, running: !!run.chatId && this.chats.isRunning(run.chatId), thread: run.chatId ? this.chats.thread(run.chatId) : null }))
+      );
+    }
     if (source.each) {
       // A run whose value is still being written isn't done, so what the next card gets has every value in it.
       return runsState(
@@ -1621,7 +1849,7 @@ export class Nests {
   // The user's own name for a card, or none, and then the next answer names it again.
   renameCard(cardId: unknown, title: unknown): boolean {
     const card = typeof cardId === "string" ? this.store.card(cardId) : null;
-    if (!card || typeof title !== "string" || !card.chatId) return false;
+    if (!card || typeof title !== "string" || (!card.chatId && !card.versions)) return false;
     const name = titleFrom(title);
     if (!this.store.titleCard(card.id, name, true)) return false;
     this.titling.delete(card.id);
@@ -1722,9 +1950,17 @@ export class Nests {
       const status = asking ? "Waiting for you" : going ? "Still working" : failed > 0 ? `${failed} of ${runs.length} didn’t finish` : `Done, ${runs.length} ${runs.length === 1 ? "row" : "rows"}`;
       return { bird, title: title ?? card.each.column, status, answer: null };
     }
-    const thread = card.chatId ? this.chats.thread(card.chatId) : null;
+    // A card of versions says how its versions stand, and the pick's answer when there is one.
+    const chatId = card.versions ? (card.versions.runs.find((run) => run.id === card.versions!.pick)?.chatId ?? null) : card.chatId;
+    if (card.versions) {
+      const threads = card.versions.runs.map((run) => (run.chatId ? this.chats.thread(run.chatId) : null));
+      const going = card.versions.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)));
+      const status = threads.some((thread) => !!thread?.approval) ? "Waiting for you" : going ? "Still working" : `${card.versions.runs.length} versions${card.versions.pick ? ", one picked" : ", none picked yet"}`;
+      return { bird, title, status, answer: chatId ? this.answerOf(chatId) : null };
+    }
+    const thread = chatId ? this.chats.thread(chatId) : null;
     const status = thread?.approval ? "Waiting for you" : thread?.error ? "Didn’t finish" : "Done";
-    return { bird, title, status, answer: card.chatId ? this.answerOf(card.chatId) : null };
+    return { bird, title, status, answer: chatId ? this.answerOf(chatId) : null };
   }
 
   // Says a card just started with work from the card its line comes from. A card that reads from nothing has nobody to
@@ -1879,7 +2115,7 @@ export class Nests {
     if (!maker?.chatId) return EMPTY_HTML_DATA;
     const text = (value: string | null) => (value === null ? null : this.clean(value));
     const table = (rows: PickedRows | null): HtmlCardTable | null => rows && { header: rows.header.map(this.clean), rows: rows.rows.map((row) => row.map(this.clean)) };
-    const own = (card: NestCard) => ({ answer: text(card.note ? card.note.text : card.chatId ? this.answerOf(card.chatId) : null), table: table(this.tableOf(card)) });
+    const own = (card: NestCard) => ({ answer: text(card.note ? card.note.text : card.chatId ? this.answerOf(card.chatId) : card.versions ? this.versionsAnswer(card.versions) : null), table: table(this.tableOf(card)) });
     // What the maker has sent with, not a line its next message is the first to get.
     const lines = this.store.linesTo(maker.id).filter((line) => !line.fresh);
     const images: HtmlCardData["images"] = [];
@@ -2024,7 +2260,7 @@ export class Nests {
     // The cards the user selected, the only ones Berry then reads and a plan may read from. Null for the whole board.
     about: ReadonlySet<string> | null = null
   ): { digest: string; sources: PlanSource[] } {
-    const sent = board.cards.filter((card) => (card.chatId || card.each || card.table || card.file || card.note) && (!about || about.has(card.id)));
+    const sent = board.cards.filter((card) => (card.chatId || card.each || card.versions || card.table || card.file || card.note) && (!about || about.has(card.id)));
     // Cleaned before the planner's room is measured, for the same reason as a card's inputs.
     const cleanTable = ({ header, rows }: PickedRows): PickedRows => ({ header: header.map(this.clean), rows: rows.map((row) => row.map(this.clean)) });
     const keyOf = new Map(sent.map((card, index) => [card.id, `e${index + 1}`]));
@@ -2052,6 +2288,23 @@ export class Nests {
         const answered = card.each.runs.filter((run) => run.cell !== null).length;
         sources.push({ key, cardId: card.id, table: true });
         return { key, bird, status: `${answered} of ${card.each.runs.length} answered`, asked: card.each.prompt, table: cleanTable(combinedTable(card.each)), runs: card.each.runs.length };
+      }
+      // A card of versions, as what crosses its lines: the pick's thread, or each answered version's, under its letter and note.
+      if (card.versions) {
+        const part = this.versionsPart(card.versions, bird);
+        const label = (letter: string, note: string, asked: string) => `[Version ${letter}${note ? `, ${note}` : ""}] ${asked}`;
+        const exchanges =
+          part?.part === "thread" ? part.exchanges : part?.part === "versions" ? part.versions.flatMap(({ letter, note, exchanges: each }) => each.map((exchange) => ({ ...exchange, asked: label(letter, note, exchange.asked) }))) : [];
+        sources.push({ key, cardId: card.id, table: false });
+        const going = card.versions.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)));
+        const status = `${card.versions.runs.length} versions, ${card.versions.pick ? "one picked" : "none picked"}${going ? ", still working" : ""}`;
+        return {
+          key,
+          bird,
+          status,
+          asked: exchanges.length > 0 ? null : card.versions.prompt,
+          ...(exchanges.length > 0 ? { thread: exchanges.map(({ asked, answer: said }) => ({ asked: this.clean(asked), answer: this.clean(said) })) } : {}),
+        };
       }
       const thread = card.chatId ? this.chats.thread(card.chatId) : null;
       const answer = thread ? latestAnswer(thread.messages) : null;
@@ -2119,6 +2372,7 @@ export class Nests {
     if (source.note) return { name, part: "note", text: source.note.text };
     if (source.table) return { name, fromFile: true, part: "table", table: this.tableOf(source)! };
     if (source.each) return source.each.runs.some((run) => run.cell !== null) ? { name, part: "table", table: combinedTable(source.each) } : null;
+    if (source.versions) return this.versionsPart(source.versions, name);
     const thread = source.chatId ? this.chats.thread(source.chatId) : null;
     const exchanges = thread ? threadOf(thread.messages) : [];
     return exchanges.length > 0 ? { name, part: "thread", exchanges } : null;
@@ -2207,7 +2461,7 @@ export class Nests {
   // What a card's chats cost, with what its runs cost on tries Retry replaced.
   private costOf(card: NestCard): number | null {
     const chats = this.chats.costOf(this.chatsOf(card));
-    const spent = card.each ? this.store.spentOn(card.id) : 0;
+    const spent = card.each || card.versions ? this.store.spentOn(card.id) : 0;
     return chats === null && spent === 0 ? null : (chats ?? 0) + spent;
   }
 
@@ -2238,6 +2492,7 @@ export class Nests {
 
   private startRun(run: { id: string; cardId: string; row: string[] }): boolean {
     const card = this.store.card(run.cardId);
+    if (card?.versions) return this.startVersion(card, run.id);
     if (!card?.each) return false;
     const cardAnswers = this.runInputs(card.id, card.each.header, run.row);
     const sent = cardAnswers && this.chats.send(null, card.each.prompt, {
@@ -2270,13 +2525,17 @@ export class Nests {
   // its own runs, or the card its rows come from, or a rough guess. Null on any other card.
   private perRunOf(card: NestCard): { cost: number; rough: boolean } | null {
     const costs = (chatIds: readonly (string | null)[]) => chatIds.flatMap((chatId) => (chatId ? [this.chats.costOf([chatId])] : [])).filter((cost): cost is number => cost !== null);
-    const draft = !card.chatId && !card.each && !card.table && !card.file && !card.page && !card.note && card.plan?.state !== "armed";
-    if (!card.each && !draft) return null;
+    const draft = !card.chatId && !card.each && !card.versions && !card.table && !card.file && !card.page && !card.note && card.plan?.state !== "armed";
+    if (!card.each && !card.versions && !draft) return null;
     // A file's rows aren't read for this, since boards are sent often and a file costs nothing to read from.
-    const source = card.each ? null : this.store.linesTo(card.id).find((line) => !!line.source.table || line.picked !== null || (this.tableOf(line.source)?.rows.length ?? 0) > 0)?.source;
-    if (draft && !source) return null;
-    const fromSource = source?.each ? costs(source.each.runs.map((run) => run.chatId)) : costs([source?.chatId ?? null]);
-    return perRunEstimate({ own: costs(card.each?.runs.map((run) => run.chatId) ?? []), source: fromSource, rough: this.chats.roughJobCost() });
+    const lines = card.each || card.versions ? [] : this.store.linesTo(card.id);
+    const source = lines.find((line) => !!line.source.table || line.picked !== null || (this.tableOf(line.source)?.rows.length ?? 0) > 0)?.source;
+    // A draft with nothing to run each row on can still be sent as versions, each costing about what the card it reads
+    // from did, or a typical job for the model.
+    const reads = source ?? lines.find((line) => !!line.source.chatId)?.source;
+    const fromSource = reads?.each ? costs(reads.each.runs.map((run) => run.chatId)) : costs([reads?.chatId ?? null]);
+    const own = (card.each ?? card.versions)?.runs.map((run) => run.chatId) ?? [];
+    return perRunEstimate({ own: costs(own), source: fromSource, rough: this.chats.roughJobCost() });
   }
 
   // What a run of this card may do without asking, read live, so it ends for every run the moment the card does.
@@ -2307,7 +2566,7 @@ export class Nests {
   }
 
   private chatsOf(card: NestCard): string[] {
-    return [...(card.chatId ? [card.chatId] : []), ...(card.each?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])];
+    return [...(card.chatId ? [card.chatId] : []), ...((card.each ?? card.versions)?.runs.flatMap((run) => (run.chatId ? [run.chatId] : [])) ?? [])];
   }
 
   private deleteChat(chatId: string): void {

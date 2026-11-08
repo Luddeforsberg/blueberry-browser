@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  beforeOf,
   chainCrossings,
   mapCardText,
   crossingOf,
@@ -540,3 +541,42 @@ describe("what a card knows", () => {
     expect(knowsOf([page()], none, false, 0)).toMatchObject({ pages: 1, cut: 0 });
   });
 });
+
+describe("Versions crossing a line", () => {
+  const exchange = (size: number) => ({ asked: "Write it", answer: "w".repeat(size) });
+  const versions = (count: number, size: number, note: string) => ({
+    name: "Writer",
+    part: "versions" as const,
+    versions: Array.from({ length: count }, (_, index) => ({ letter: String.fromCharCode(65 + index), note, exchanges: [exchange(size)] })),
+  });
+  const used = (answer: CardAnswer) => (answer.versions ?? []).reduce((total, { note, exchanges }) => total + 60 + note.length + exchanges.reduce((sum, each) => sum + each.asked.length + each.answer.length + 40, 0), 0);
+
+  it("keeps every version whole when it fits, and stays in the room when it doesn't, notes and tags included", () => {
+    const whole = fitChain([{ lineId: "l", depth: 1, name: "Writer", into: null, input: versions(2, 100, "Short") }], 10_000)[0].answer;
+    expect(whole.versions!.map((version) => [version.letter, version.note, version.exchanges[0].answer.length])).toEqual([["A", "Short", 100], ["B", "Short", 100]]);
+    expect(crossingOf(whole)).toMatchObject({ kind: "versions", versions: 2, cut: false });
+    // A long note goes whole when the version fits.
+    const noted = fitChain([{ lineId: "l", depth: 1, name: "Writer", into: null, input: versions(2, 10, "n".repeat(160)) }], 10_000)[0].answer;
+    expect(noted.versions!.map((version) => version.note.length)).toEqual([160, 160]);
+    expect(crossingOf(noted)).toMatchObject({ cut: false });
+
+    // Five versions with long notes in a small room: notes are cut, and none goes past its share.
+    const tight = fitChain([{ lineId: "l", depth: 1, name: "Writer", into: null, input: versions(5, 2000, "n".repeat(160)) }], 1500)[0].answer;
+    expect(used(tight)).toBeLessThanOrEqual(1500);
+    expect(crossingOf(tight)).toMatchObject({ kind: "versions", cut: true });
+    // Too little room for any answer: the version is left out, and that's said.
+    const none = fitChain([{ lineId: "l", depth: 1, name: "Writer", into: null, input: versions(5, 2000, "n".repeat(160)) }], 400)[0].answer;
+    expect(used(none)).toBeLessThanOrEqual(400);
+    expect(none.versions!.length).toBeLessThan(5);
+    // What's left has words in its answers, never an empty thread.
+    expect(none.versions!.every((version) => version.exchanges.some((each) => each.answer.trim() !== ""))).toBe(true);
+    expect(crossingOf(none)).toMatchObject({ kind: "versions", cut: true });
+    expect(withCardAnswer("Go", none)).toContain("with some of its versions left out to fit");
+  });
+
+  it("says a version cut further up the chain was cut", () => {
+    const answer: CardAnswer = { name: "Writer", part: "versions", text: "", versions: [{ letter: "A", note: "", exchanges: [exchange(10)], cut: true }] };
+    expect(beforeOf([answer]).cut).toBe(true);
+  });
+});
+

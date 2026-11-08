@@ -2979,3 +2979,347 @@ describe("When an earlier card changes", () => {
     expect(card.knows).toMatchObject({ sent: true, cards: 1, cut: 0 });
   });
 });
+
+describe("Versions of a card", () => {
+  const cardOf = (nests: Nests, nest: string, id: string) => nests.board(nest)!.cards.find((card) => card.id === id)!;
+  // The newest message as the model got it, its text blocks joined, since a version's note goes as a block of its own.
+  const textOf = (messages: ReplyMessage[]) => {
+    const content = messages.at(-1)!.content;
+    return typeof content === "string" ? content : content.map((block) => (block.type === "text" ? block.text : `[${block.type}]`)).join("\n");
+  };
+  // Waits until no version of the card goes or waits.
+  const idle = async (nests: Nests, chats: Chats, cardId: string) => {
+    for (let tries = 0; tries < 50; tries++) {
+      const runs = nests.card(cardId)?.versions?.runs ?? [];
+      if (runs.every((run) => run.state !== "waiting" && !(run.chatId && chats.isRunning(run.chatId)))) return;
+      await settle();
+    }
+    throw new Error("The versions never ended");
+  };
+  // Scout answers, and a draft reads from it.
+  const scouted = async () => {
+    const context = setup();
+    const nest = context.nests.create();
+    const scout = context.nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push("Three leads: Brygga, Fjällbo, Lindqvist");
+    await context.sendAndWait(scout.id, "Find leads");
+    const writer = context.nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    return { ...context, nest, scout, writer };
+  };
+
+  it("sends one version as an ordinary card, and refuses one version, or more than five, as versions", async () => {
+    const { nests, nest, writer, sendAndWait } = await scouted();
+    expect(nests.sendVersions(writer.id, "Write an email", ["Formal"])).toEqual({ ok: false, error: expect.stringContaining("2 to 5") });
+    expect(nests.sendVersions(writer.id, "Write an email", ["A", "B", "C", "D", "E", "F"])).toEqual({ ok: false, error: expect.stringContaining("2 to 5") });
+    expect(cardOf(nests, nest, writer.id).versions).toBeUndefined();
+    expect(sent).toHaveLength(1);
+
+    replies.push("Dear Brygga");
+    await sendAndWait(writer.id, "Write an email");
+    const card = cardOf(nests, nest, writer.id);
+    expect(card.versions).toBeUndefined();
+    expect(card.chatId).not.toBeNull();
+    // A version's words never reach a card sent the usual way.
+    expect(textOf(sent[1])).not.toContain("version");
+  });
+
+  it("runs each version as its own chat with the same prompt and context and its own note, a few at a time, up to five", async () => {
+    const { nests, nest, writer, chats } = await scouted();
+    held = [];
+    expect(nests.sendVersions(writer.id, "Write an email", ["  Short and   warm ", "", "Lead with numbers", "", "Formal"])).toEqual({ ok: true });
+    await settle();
+    const versions = () => cardOf(nests, nest, writer.id).versions!;
+    expect(versions().runs.map(({ letter, note }) => [letter, note])).toEqual([["A", "Short and warm"], ["B", ""], ["C", "Lead with numbers"], ["D", ""], ["E", "Formal"]]);
+    // Three at once, as For each row's runs go.
+    expect(versions().runs.map(({ state }) => state)).toEqual(["started", "started", "started", "waiting", "waiting"]);
+    while (held.length > 0 || versions().runs.some((run) => run.state === "waiting")) await release();
+    await idle(nests, chats, writer.id);
+    expect(sent).toHaveLength(6);
+    const messages = sent.slice(1).map(textOf);
+    for (const message of messages) {
+      expect(message).toContain('<card_thread from="Scout">');
+      expect(message).toContain("Three leads: Brygga, Fjällbo, Lindqvist");
+      expect(message.endsWith("Write an email")).toBe(true);
+    }
+    expect(messages[0]).toContain("This is version A of 5");
+    expect(messages[0]).toContain("<version_angle>\nShort and warm\n</version_angle>");
+    expect(messages[1]).toContain("This is version B of 5");
+    expect(messages[1]).toContain("Make this one clearly different from the others");
+    expect(messages[1]).not.toContain("<version_angle>");
+    // Only the prompt is saved in each version's own chat, as the card's bird.
+    const chatIds = versions().runs.map((run) => run.chatId!);
+    expect(new Set(chatIds).size).toBe(5);
+    chatIds.forEach((chatId) => expect(chats.thread(chatId)?.messages[0]).toEqual({ role: "user", content: "Write an email" }));
+    // No sixth.
+    expect(nests.moreLikeThis(writer.id, versions().runs[0].id)).toEqual({ ok: false, error: expect.stringContaining("5 versions at most") });
+  });
+
+  it("blocks For each row on a card of versions, and versions on one sent for each row", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(TABLE(2));
+    await sendAndWait(scout.id, "Find companies");
+    const each = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    expect(nests.sendEach(each.id, "Write")).toEqual({ ok: true });
+    expect(nests.sendVersions(each.id, "Write", ["A", "B"])).toEqual({ ok: false, error: "This card has been sent already." });
+    const several = nests.addCard(nest, { x: 500, y: 400, from: scout.id })!;
+    expect(nests.sendVersions(several.id, "Write", ["A", "B"])).toEqual({ ok: true });
+    expect(nests.sendEach(several.id, "Write")).toEqual({ ok: false, error: "This card has been sent already." });
+    expect(nests.sendCard(several.id, "Write")).toEqual({ ok: false, error: "Reply in one version instead." });
+  });
+
+  it("gives the next card every version with its letter and note while none is picked, and only the pick once one is", async () => {
+    const { nests, nest, writer, chats, sendAndWait } = await scouted();
+    replies.push("Hej Brygga, short", "Dear Brygga, formal");
+    expect(nests.sendVersions(writer.id, "Write an email", ["Short", "Formal"])).toEqual({ ok: true });
+    await idle(nests, chats, writer.id);
+    const after = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    expect(nests.board(nest)!.lines.find((line) => line.to === after.id)!.crosses!.whole).toMatchObject({ kind: "versions", versions: 2, cut: false });
+    expect(lineWords(nests.board(nest)!.lines.find((line) => line.to === after.id)!.crosses!, "Berry")).toMatch(/^Berry’s 2 versions, none picked/);
+
+    replies.push("Sent nothing");
+    await sendAndWait(after.id, "Which is better?");
+    const both = textOf(sent.at(-1)!);
+    expect(both).toContain('<card_versions from="Berry">');
+    expect(both).toMatch(/<version letter="A">\n<angle>\nShort\n<\/angle>\n<asked>\nWrite an email\n<\/asked>\n<answer>\nHej Brygga, short\n<\/answer>\n<\/version>/);
+    expect(both).toContain('<version letter="B">\n<angle>\nFormal\n</angle>');
+    expect(both).toContain("hasn't picked one yet");
+    // What Scout said goes further up, once.
+    expect(both).toContain('<earlier_card from="Scout" via="Berry">');
+
+    const [, second] = cardOf(nests, nest, writer.id).versions!.runs;
+    expect(nests.pickVersion(writer.id, second.id)).toBe(true);
+    expect(cardOf(nests, nest, writer.id).versions!.pick).toBe(second.id);
+    expect(nests.board(nest)!.lines.find((line) => line.to === after.id)!.crosses!.whole).toMatchObject({ kind: "thread", answers: 1 });
+    replies.push("B it is");
+    await sendAndWait(after.id, "Polish it");
+    const picked = textOf(sent.at(-1)!);
+    expect(picked).toContain('<card_thread from="Berry">\n<asked>\nWrite an email\n</asked>\n<answer>\nDear Brygga, formal\n</answer>\n</card_thread>');
+    expect(picked).not.toContain("Hej Brygga");
+    expect(picked).not.toContain("<card_versions");
+  });
+
+  it("refuses a pick that isn't one of the card's versions with an answer, and lets the pick go", async () => {
+    const { nests, nest, writer, scout, chats } = await scouted();
+    held = [];
+    expect(nests.sendVersions(writer.id, "Write", ["", ""])).toEqual({ ok: true });
+    await settle();
+    const [first] = cardOf(nests, nest, writer.id).versions!.runs;
+    // Still writing, so there's nothing to pick yet.
+    expect(nests.pickVersion(writer.id, first.id)).toBe(false);
+    await release();
+    await idle(nests, chats, writer.id);
+    expect(nests.pickVersion(writer.id, "not-a-version")).toBe(false);
+    expect(nests.pickVersion(scout.id, first.id)).toBe(false);
+    expect(nests.pickVersion(writer.id, first.id)).toBe(true);
+    expect(nests.pickVersion(writer.id, first.id)).toBe(false);
+    expect(nests.pickVersion(writer.id, null)).toBe(true);
+    expect(cardOf(nests, nest, writer.id).versions!.pick).toBeNull();
+  });
+
+  it("shows Earlier card changed on the card below when the pick changes, and Update there sends what's new", async () => {
+    const { nests, nest, writer, chats, sendAndWait } = await scouted();
+    replies.push("Version one", "Version two");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    const [first, second] = cardOf(nests, nest, writer.id).versions!.runs;
+    nests.pickVersion(writer.id, first.id);
+    const after = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    await sendAndWait(after.id, "Use it");
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBeUndefined();
+
+    nests.pickVersion(writer.id, second.id);
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBe(true);
+    expect(nests.board(nest)!.lines.find((line) => line.to === after.id)!.changed).toBe(true);
+    replies.push("Updated");
+    expect(nests.updateCard(after.id, false)).toEqual({ ok: true });
+    for (let tries = 0; tries < 10 && chats.isRunning(cardOf(nests, nest, after.id).chatId!); tries++) await settle();
+    expect(textOf(sent.at(-1)!)).toContain("Version two");
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBeUndefined();
+    // Every version again counts as a change too.
+    nests.pickVersion(writer.id, null);
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBe(true);
+  });
+
+  it("names the card and says what it knows from the pick", async () => {
+    const titles: string[] = [];
+    const recap: NestRecapWriter = { title: async (_, answer) => (titles.push(answer), `Title for ${answer}`), since: async () => null };
+    const context = setup(undefined, undefined, recap);
+    const { nests, chats } = context;
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("Leads");
+    await context.sendAndWait(scout.id, "Find");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Short one", "Long one");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    await settle();
+    // No pick, no title: the first answer to come back isn't the card's.
+    expect(cardOf(nests, nest, writer.id).title).toBeUndefined();
+    const [, second] = cardOf(nests, nest, writer.id).versions!.runs;
+    nests.pickVersion(writer.id, second.id);
+    await settle();
+    expect(cardOf(nests, nest, writer.id).title).toBe("Title for Long one");
+    expect(cardOf(nests, nest, writer.id).knows).toMatchObject({ sent: true, cards: 1 });
+    // Letting the pick go takes the title it gave.
+    nests.pickVersion(writer.id, null);
+    expect(cardOf(nests, nest, writer.id).title).toBeUndefined();
+    // A title the user typed stays whatever is picked.
+    expect(nests.renameCard(writer.id, "My emails")).toBe(true);
+    nests.pickVersion(writer.id, second.id);
+    await settle();
+    expect(cardOf(nests, nest, writer.id).title).toBe("My emails");
+  });
+
+  it("continues only the version replied in, and More like this makes one more from the one shown", async () => {
+    const { nests, nest, writer, chats } = await scouted();
+    replies.push("Alpha", "Beta");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    const [first, second] = cardOf(nests, nest, writer.id).versions!.runs;
+    replies.push("Beta, shorter");
+    expect(nests.sendRunReply(second.id, "Shorter")).toEqual({ ok: true });
+    await idle(nests, chats, writer.id);
+    expect(chats.thread(first.chatId!)!.messages).toHaveLength(2);
+    expect(chats.thread(second.chatId!)!.messages.map((message) => message.content)).toEqual(["Write", "Beta", "Shorter", "Beta, shorter"]);
+    // The reply went with the card's context and its version's words again.
+    expect(textOf(sent.at(-1)!)).toContain("This is version B of 2");
+    expect(textOf(sent.at(-1)!)).toContain("Three leads");
+
+    replies.push("Gamma");
+    expect(nests.moreLikeThis(writer.id, second.id)).toEqual({ ok: true });
+    await idle(nests, chats, writer.id);
+    const third = cardOf(nests, nest, writer.id).versions!.runs[2];
+    expect(third).toMatchObject({ letter: "C", note: "More like version B", state: "started" });
+    const message = textOf(sent.at(-1)!);
+    expect(message).toContain('<card_thread from="Version B">');
+    expect(message).toContain("Beta, shorter");
+    expect(message).toContain("This is version C of 3");
+    expect(message).toContain("more like that one");
+    expect(message).not.toContain("Alpha");
+  });
+
+  it("runs every version again on Update, a few at a time, after saying so, keeping the pick and naming the card from it again", async () => {
+    const titles: string[] = [];
+    const recap: NestRecapWriter = { title: async (_, answer) => (titles.push(answer), `Title for ${answer}`), since: async () => null };
+    const context = setup(undefined, undefined, recap);
+    const { nests, chats } = context;
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("Leads, first");
+    await context.sendAndWait(scout.id, "Find");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("One", "Two", "Three", "Four");
+    nests.sendVersions(writer.id, "Write", ["", "", "", ""]);
+    await idle(nests, chats, writer.id);
+    const second = cardOf(nests, nest, writer.id).versions!.runs[1];
+    nests.pickVersion(writer.id, second.id);
+    replies.push("Leads, second");
+    await context.sendAndWait(scout.id, "Again");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: false, warn: expect.stringContaining("Run all 4 versions again") });
+    held = [];
+    replies.push("Uno", "Dos", "Tres", "Cuatro");
+    const before = sent.length;
+    expect(nests.updateCard(writer.id, true)).toEqual({ ok: true });
+    await settle();
+    // Three at once, as any runs go, and the pick stays.
+    expect(sent.length - before).toBe(3);
+    expect(cardOf(nests, nest, writer.id).versions!.pick).toBe(second.id);
+    while (held.length > 0 || cardOf(nests, nest, writer.id).versions!.runs.some((run) => run.state === "waiting")) await release();
+    await idle(nests, chats, writer.id);
+    await settle();
+    expect(sent.slice(before).every((messages) => textOf(messages).includes("Leads, second"))).toBe(true);
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    expect(cardOf(nests, nest, writer.id).title).toBe(`Title for ${chats.thread(cardOf(nests, nest, writer.id).versions!.runs[1].chatId!)!.messages[1].content}`);
+  });
+
+  it("counts a new pick as a change even when the two versions said the same", async () => {
+    const { nests, nest, writer, chats, sendAndWait } = await scouted();
+    replies.push("Same words", "Same words");
+    nests.sendVersions(writer.id, "Write", ["Short", "Long"]);
+    await idle(nests, chats, writer.id);
+    const [first, second] = cardOf(nests, nest, writer.id).versions!.runs;
+    nests.pickVersion(writer.id, first.id);
+    const after = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    await sendAndWait(after.id, "Use it");
+    nests.pickVersion(writer.id, second.id);
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBe(true);
+  });
+
+  it("starts a version of More like this only once the one it's like has answered again, so it gets its new thread", async () => {
+    const { nests, nest, scout, writer, chats, sendAndWait } = await scouted();
+    replies.push("Alpha", "Beta");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    const second = cardOf(nests, nest, writer.id).versions!.runs[1];
+    replies.push("Gamma");
+    nests.moreLikeThis(writer.id, second.id);
+    await idle(nests, chats, writer.id);
+    replies.push("New leads");
+    await sendAndWait(scout.id, "Again");
+    held = [];
+    replies.push("Alpha 2", "Beta 2", "Gamma 2");
+    expect(nests.updateCard(writer.id, true)).toEqual({ ok: true });
+    await settle();
+    // A and B go, and C waits for B.
+    expect(cardOf(nests, nest, writer.id).versions!.runs.map((run) => run.state)).toEqual(["started", "started", "waiting"]);
+    while (held.length > 0 || cardOf(nests, nest, writer.id).versions!.runs.some((run) => run.state === "waiting")) await release();
+    await idle(nests, chats, writer.id);
+    const message = textOf(sent.at(-1)!);
+    expect(message).toContain("This is version C of 3");
+    expect(message).toContain('<card_thread from="Version B">');
+    expect(message).toContain("Beta 2");
+  });
+
+  it("lets a plan read from a card of versions", async () => {
+    const { nests, nest, writer, chats } = await scouted();
+    replies.push("Hej", "Dear");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    plans.push({ reply: "Laid out.", ask: false, cards: [planCard("c1", { prompt: "Polish the emails", from: "e2" }), planCard("c2", { prompt: "Then this", from: "c1" })] });
+    await nests.ask(nest, "Polish them, then send a summary", PLACE);
+    const plannedCards = nests.board(nest)!.cards.filter((card) => card.plan);
+    expect(plannedCards).toHaveLength(2);
+    expect(nests.board(nest)!.lines.some((line) => line.from === writer.id && line.to === plannedCards[0].id)).toBe(true);
+  });
+
+  it("lets Berry read a card of versions when it plans, as what crosses its lines", async () => {
+    const { nests, nest, writer, chats } = await scouted();
+    replies.push("Hej", "Dear");
+    nests.sendVersions(writer.id, "Write", ["Short", ""]);
+    await idle(nests, chats, writer.id);
+    plans.push({ reply: "On it.", ask: false, cards: [planCard("c1", { prompt: "Compare them" })] });
+    await nests.ask(nest, "Which email is better?", PLACE);
+    const read = JSON.stringify(planned.at(-1)!.messages);
+    expect(read).toContain("[Version A, Short] Write");
+    expect(read).toContain("Dear");
+  });
+
+  it("fills only the empty notes from the cheap model, which reads only the prompt and the inputs' names", async () => {
+    const asked: unknown[] = [];
+    const recap: NestRecapWriter = {
+      title: async () => null,
+      since: async () => null,
+      angles: async (prompt, inputs, taken, count) => (asked.push({ prompt, inputs, taken, count }), ["Short and warm", "Lead with numbers"]),
+    };
+    const context = setup(undefined, undefined, recap);
+    const { nests } = context;
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push("Secret findings from a page");
+    await context.sendAndWait(scout.id, "Find");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    expect(await nests.suggestAngles(writer.id, "Write an email", ["", "Formal", ""])).toEqual({ ok: true, notes: ["Short and warm", "Formal", "Lead with numbers"] });
+    expect(asked).toEqual([{ prompt: "Write an email", inputs: ["Scout"], taken: ["Formal"], count: 2 }]);
+    expect(JSON.stringify(asked)).not.toContain("Secret");
+    expect(await nests.suggestAngles(writer.id, "", ["", ""])).toEqual({ ok: false, error: expect.stringContaining("Write what to do first") });
+    expect(await nests.suggestAngles(writer.id, "Write", [""])).toEqual({ ok: false, error: expect.stringContaining("2 to 5") });
+    // Nothing was sent.
+    expect(sent).toHaveLength(1);
+    expect(nests.card(writer.id)!.chatId).toBeNull();
+  });
+});
