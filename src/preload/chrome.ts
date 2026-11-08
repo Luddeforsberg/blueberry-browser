@@ -111,6 +111,7 @@ const chromeAPI: ChromeAPI = {
     addInput: (cardId, fromId, picked) => invoke("nests:add-input", cardId, fromId, picked),
     removeInput: (lineId) => invoke("nests:remove-input", lineId),
     retryRuns: (cardId, which, confirmed) => invoke("nests:retry-runs", cardId, which, confirmed),
+    updateCard: (cardId, confirmed) => invoke("nests:update-card", cardId, confirmed),
     moveCard: (cardId, x, y) => invoke("nests:move-card", cardId, x, y),
     resizeCard: (cardId, width, height) => invoke("nests:resize-card", cardId, width, height),
     nudgeCards: (nestId, moves) => invoke("nests:nudge-cards", nestId, moves),

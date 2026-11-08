@@ -6,8 +6,12 @@ import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
+// What the migration for an earlier card changing added: what each line was sent with, and what a card's message knew.
+const STALE_COLUMNS = "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
+
 // What the migration for coming back to a board added: card titles, unread dots, and when cards and Nests were last seen.
 const RETURN_COLUMNS =
+  STALE_COLUMNS +
   "ALTER TABLE cards DROP COLUMN title; ALTER TABLE cards DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN unread; ALTER TABLE cards DROP COLUMN changed_at; ALTER TABLE nests DROP COLUMN seen_at;";
 
 // What the migrations for page cards and fresh lines added.
@@ -140,7 +144,7 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 6}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+      `PRAGMA user_version = ${version - 7}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
         "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
         PAGE_COLUMNS +
         COMPOSER_COLUMNS
@@ -247,7 +251,7 @@ describe("NestStore", () => {
     const picked = { header: ["Company"], rows: [["Fjällbo"], ["Brygga"]] };
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
 
-    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked, fresh: false }]);
+    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked, fresh: false, sentWith: null }]);
     // The board carries only how many, and a line with none picked says so.
     expect(store.board(nest)?.lines[0].picked).toBe(2);
     store.addCard(nest, { x: 0, y: 0, from: source.id });
@@ -401,7 +405,7 @@ describe("NestStore", () => {
     // As a file from before the composer could tuck has it, with the talk as it was then.
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 2}; ${COMPOSER_COLUMNS}`);
+    db.exec(`PRAGMA user_version = ${version - 3}; ${COMPOSER_COLUMNS}`);
     db.close();
 
     const again = new NestStore(file);
@@ -425,5 +429,41 @@ describe("NestStore", () => {
     // Only an answer, and only in its own Nest.
     expect(reopened.answer(other, answered.id)).toBeNull();
     expect(reopened.answer(nest, asked.id)).toBeNull();
+  });
+
+  it("keeps what each line was sent with and what a card's message knew across opening the file again, and none from before", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Leads");
+    const scout = store.addCard(nest, { x: 0, y: 0 })!;
+    const writer = store.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    const [line] = store.linesTo(writer.id);
+    expect(line.sentWith).toBeNull();
+    const knows = { sent: true, at: 5, cards: 1, pages: 0, files: 2, notes: 0, cut: 1, leftOutCards: 0, leftOutFiles: 0 };
+    store.keepSentWith(writer.id, new Map([[line.lineId, "thread abc"]]));
+    // Only into its own card.
+    store.keepSentWith(scout.id, new Map([[line.lineId, "thread other"]]));
+    expect(store.setKnows(writer.id, knows)).toBe(true);
+    expect(store.setKnows("missing", knows)).toBe(false);
+
+    const reopened = new NestStore(file);
+    expect(reopened.linesTo(writer.id)[0].sentWith).toBe("thread abc");
+    expect(reopened.card(writer.id)!.knows).toEqual(knows);
+    reopened.forgetSentWith(writer.id);
+    expect(reopened.linesTo(writer.id)[0].sentWith).toBeNull();
+
+    // Damaged counts say nothing rather than something wrong.
+    const db = new DatabaseSync(file);
+    db.prepare("UPDATE cards SET knows = ? WHERE id = ?").run('{"sent":true,"at":5,"cards":-1}', writer.id);
+    expect(new NestStore(file).card(writer.id)).not.toHaveProperty("knows");
+    db.prepare("UPDATE cards SET knows = ? WHERE id = ?").run("not json", writer.id);
+    expect(new NestStore(file).card(writer.id)).not.toHaveProperty("knows");
+    // As a file from before has it: nothing was kept, so nothing has changed.
+    const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+    db.exec(`PRAGMA user_version = ${version - 1}; ${STALE_COLUMNS}`);
+    db.close();
+    const older = new NestStore(file);
+    expect(older.linesTo(writer.id)[0].sentWith).toBeNull();
+    expect(older.card(writer.id)).not.toHaveProperty("knows");
   });
 });

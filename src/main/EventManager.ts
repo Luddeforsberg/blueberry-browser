@@ -227,6 +227,7 @@ export class EventManager {
     this.handle("nests:add-input", (cardId, fromId, picked) => nests.addInput(cardId, fromId, picked));
     this.handle("nests:remove-input", (lineId) => nests.removeInput(lineId));
     this.handle("nests:retry-runs", (cardId, which, confirmed) => nests.retryRuns(cardId, which, confirmed));
+    this.handle("nests:update-card", (cardId, confirmed) => nests.updateCard(cardId, confirmed));
     this.handle("nests:move-card", (cardId, x, y) => nests.moveCard(cardId, x, y));
     this.handle("nests:resize-card", (cardId, width, height) => nests.resizeCard(cardId, width, height));
     this.handle("nests:nudge-cards", (nestId, moves) => nests.nudgeCards(nestId, moves));

@@ -478,6 +478,8 @@ export interface NestCard {
   unread?: boolean;
   // What it knows from other cards, counted, never what: its last message's, or what it reads when it's sent.
   knows?: CardKnows;
+  // On a sent or For-each card: a card it reads from has changed since it last sent, so Update would send it what's new.
+  earlierChanged?: true;
 }
 
 // A file or note on a card or on a Nest's composer. A file's contents stay in main: only its name, type and size come here.
@@ -619,6 +621,8 @@ export interface NestLine {
   crosses?: LineCrossing | null;
   // Drawn into a card that was sent already, so only its next message gets it. Gone once that's sent.
   fresh?: true;
+  // What it gives has changed since the card it goes to last sent with it.
+  changed?: true;
 }
 
 export interface NestBoard {

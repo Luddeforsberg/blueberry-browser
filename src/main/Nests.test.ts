@@ -2687,3 +2687,196 @@ describe("Coming back to a board", () => {
     nests.stopCard(writer.id);
   });
 });
+
+describe("When an earlier card changes", () => {
+  const settleAll = async () => {
+    for (let tries = 0; tries < 10; tries++) await settle();
+  };
+  const cardOf = (nests: Nests, nest: string, id: string) => nests.board(nest)!.cards.find((card) => card.id === id)!;
+  const changedLinesOf = (nests: Nests, nest: string) => nests.board(nest)!.lines.filter((line) => line.changed).map((line) => line.to);
+
+  it("says so once a card it sent with answers again, and Update sends it the fixed words with what's new, never cascading", async () => {
+    const { nests, sendAndWait, replyEnded } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push("Lindqvist Data");
+    await sendAndWait(scout.id, "Find a company");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Drafted.");
+    await sendAndWait(writer.id, "Write to it");
+    const after = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    replies.push("Checked.");
+    await sendAndWait(after.id, "Check it");
+    // Nothing reads differently yet, and a card that reads nothing never changes.
+    expect([scout, writer, after].map((card) => cardOf(nests, nest, card.id).earlierChanged)).toEqual([undefined, undefined, undefined]);
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: false, error: "Nothing this card reads from has changed." });
+
+    replies.push("Fjällbo too");
+    await sendAndWait(scout.id, "One more");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    expect(changedLinesOf(nests, nest)).toEqual([writer.id]);
+    // Only the card right after it: the one after that changes once this one answers again.
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBeUndefined();
+
+    const before = sent.length;
+    replies.push("Drafted for both.");
+    const done = replyEnded();
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: true });
+    await done;
+    expect(sent.length - before).toBe(1);
+    const message = newest(sent.at(-1)!);
+    expect(message).toContain("Fjällbo too");
+    expect(message.endsWith("An earlier card changed. Update your answer with what’s new.")).toBe(true);
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    expect(changedLinesOf(nests, nest)).toEqual([after.id]);
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBe(true);
+    // Nothing further down ran by itself.
+    expect(sent.length - before).toBe(1);
+  });
+
+  it("can't Update a working card, or a card whose source is answering again", async () => {
+    const { nests, chats, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("First");
+    await sendAndWait(scout.id, "Find");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    await sendAndWait(writer.id, "Write");
+    replies.push("Second");
+    await sendAndWait(scout.id, "Again");
+    held = [];
+    expect(nests.sendCard(writer.id, "Something else")).toEqual({ ok: true });
+    await settle();
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    await release();
+    held = null;
+    // The message it just sent went with what's new.
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+
+    // Its source answers again while it works: it says so, and Update waits until it's done.
+    held = [];
+    replies.push("Busy reply", "Third");
+    nests.sendCard(writer.id, "Busy");
+    await settle();
+    nests.sendCard(scout.id, "Once more");
+    await settle();
+    held.splice(1, 1)[0]();
+    for (let tries = 0; tries < 5; tries++) await settle();
+    expect(chats.isRunning(cardOf(nests, nest, writer.id).chatId!)).toBe(true);
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: false, error: "Wait until it’s finished, or stop it first." });
+    await release();
+    held = null;
+
+    // While its source answers again, there's nothing to give yet, so nothing has changed until it has.
+    replies.push("Fourth");
+    held = [];
+    nests.sendCard(scout.id, "And again");
+    await settle();
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    await release();
+    held = null;
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+  });
+
+  it("leaves out a line taken away, a source deleted, and a line its next message is the first to get", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    const rival = nests.addCard(nest, { x: 0, y: 400 })!;
+    replies.push("Scout's", "Rival's");
+    await sendAndWait(scout.id, "Find");
+    await sendAndWait(rival.id, "Find rivals");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    await sendAndWait(writer.id, "Write");
+    // A line drawn now is new on it, which says so already.
+    expect(nests.addInput(writer.id, rival.id)).toEqual({ ok: true });
+    replies.push("Rival's again");
+    await sendAndWait(rival.id, "More");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+
+    replies.push("Scout's again");
+    await sendAndWait(scout.id, "More");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    const line = nests.board(nest)!.lines.find((each) => each.from === scout.id)!;
+    expect(nests.removeInput(line.id)).toEqual({ ok: true });
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+
+    // Sent with the rival's line now, which then answers again, and then goes.
+    await sendAndWait(writer.id, "Write again");
+    replies.push("Rival's third");
+    await sendAndWait(rival.id, "More");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    expect(nests.deleteCard(rival.id)).toBe(true);
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: false, error: "Nothing this card reads from has changed." });
+  });
+
+  it("on a For-each card, counts its other inputs, and Update runs every row again once the user has seen the warning", async () => {
+    const { nests, sendAndWait, store, chats } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    const brief = nests.addCard(nest, { x: 0, y: 400 })!;
+    replies.push(TABLE(2), "Our product is a browser.");
+    await sendAndWait(scout.id, "Find companies");
+    await sendAndWait(brief.id, "Describe us");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    expect(nests.addInput(writer.id, brief.id)).toEqual({ ok: true });
+    replies.push("One", "Two");
+    expect(nests.sendEach(writer.id, "Write to the company")).toEqual({ ok: true });
+    await settleAll();
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+
+    // A new table on the line its rows come from doesn't count: its runs each have a row of the one it was sent with.
+    replies.push(TABLE(3));
+    await sendAndWait(scout.id, "Find more");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+
+    replies.push("Our product is a fast browser.");
+    await sendAndWait(brief.id, "Say it better");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    expect(changedLinesOf(nests, nest)).toEqual([writer.id]);
+    const chatsBefore = cardOf(nests, nest, writer.id).each!.runs.map((run) => run.chatId);
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: false, warn: "Run all 2 rows again with what’s new? Anything already done may happen again." });
+    expect(cardOf(nests, nest, writer.id).each!.runs.map((run) => run.chatId)).toEqual(chatsBefore);
+
+    const before = sent.length;
+    replies.push("One again", "Two again");
+    expect(nests.updateCard(writer.id, true)).toEqual({ ok: true });
+    await settleAll();
+    expect(sent.length - before).toBe(2);
+    sent.slice(-2).forEach((messages, index) => {
+      expect(newest(messages)).toContain("Our product is a fast browser.");
+      expect(newest(messages)).toContain(`| Company ${index + 1} | ${index + 10} |`);
+    });
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+
+    // One row going again with something newer than the others had leaves the card changed.
+    replies.push("Our product is the fastest browser.");
+    await sendAndWait(brief.id, "Once more");
+    const [first] = cardOf(nests, nest, writer.id).each!.runs;
+    replies.push("One, newest");
+    expect(nests.sendRunReply(first.id, "Go again")).toEqual({ ok: true });
+    await vi.waitFor(() => expect(chats.isRunning(first.chatId!)).toBe(false));
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    expect(store.linesTo(writer.id).find((line) => line.source.id === brief.id)!.sentWith).toBe("mixed");
+  });
+
+  it("still knows what a card sent with, and what it knew, when the app starts again", async () => {
+    const { nests, store, chats, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("First");
+    await sendAndWait(scout.id, "Find");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    await sendAndWait(writer.id, "Write");
+    replies.push("Second");
+    await sendAndWait(scout.id, "Again");
+
+    // As after a launch: nothing of the last one in memory.
+    const again = new Nests(store, chats, { resolve: () => BERRY, all: () => [BERRY] }, { onBoard: () => {}, onListChanged: () => {}, chatDeleted: () => {} });
+    const card = again.board(nest)!.cards.find((each) => each.id === writer.id)!;
+    expect(card.earlierChanged).toBe(true);
+    expect(card.knows).toMatchObject({ sent: true, cards: 1, cut: 0 });
+  });
+});
