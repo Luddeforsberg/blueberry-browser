@@ -7,7 +7,7 @@ import { NestStore } from "./NestStore";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
 // What the migration for an earlier card changing added: what each line was sent with, and what a card's message knew.
-const STALE_COLUMNS = "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
+const STALE_COLUMNS = "ALTER TABLE lines DROP COLUMN sent_with; ALTER TABLE runs DROP COLUMN sent_with; ALTER TABLE cards DROP COLUMN knows;";
 
 // What the migration for coming back to a board added: card titles, unread dots, and when cards and Nests were last seen.
 const RETURN_COLUMNS =
@@ -446,11 +446,23 @@ describe("NestStore", () => {
     expect(store.setKnows(writer.id, knows)).toBe(true);
     expect(store.setKnows("missing", knows)).toBe(false);
 
+    // A For-each card's runs each keep their own, until the run goes again.
+    const each = store.addCard(nest, { x: 0, y: 500, from: scout.id })!;
+    store.startForEach(each.id, "Write", ["Company"], [["One"], ["Two"]], "Result", "line-1");
+    const [one, two] = store.card(each.id)!.each!.runs;
+    store.keepRunSentWith(one.id, new Map([["line-a", "thread abc"]]));
+    store.keepRunSentWith(one.id, new Map([["line-b", "note xyz"]]));
+    store.keepRunSentWith("missing", new Map([["line-a", "thread abc"]]));
+    expect(store.runsSentWith(each.id)).toEqual([{ "line-a": "thread abc", "line-b": "note xyz" }]);
+
     const reopened = new NestStore(file);
     expect(reopened.linesTo(writer.id)[0].sentWith).toBe("thread abc");
     expect(reopened.card(writer.id)!.knows).toEqual(knows);
-    reopened.forgetSentWith(writer.id);
-    expect(reopened.linesTo(writer.id)[0].sentWith).toBeNull();
+    expect(reopened.runsSentWith(each.id)).toEqual([{ "line-a": "thread abc", "line-b": "note xyz" }]);
+    reopened.setRunState(two.id, "failed");
+    reopened.setRunChat(one.id, "chat-1");
+    reopened.restartRuns(each.id, [one.id, two.id], () => 0);
+    expect(reopened.runsSentWith(each.id)).toEqual([]);
 
     // Damaged counts say nothing rather than something wrong.
     const db = new DatabaseSync(file);

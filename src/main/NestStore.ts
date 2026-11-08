@@ -25,6 +25,18 @@ const knowsFrom = (text: string): CardKnows | null => {
   return { sent: true, at: saved.at, ...(Object.fromEntries(KNOWS_COUNTS.map((key) => [key, saved[key]])) as Record<(typeof KNOWS_COUNTS)[number], number>) };
 };
 
+// A run's fingerprints by line, keeping only strings, so a damaged row counts as one that never sent.
+const sentWithFrom = (text: string | null): Record<string, string> => {
+  if (text === null) return {};
+  try {
+    const value = JSON.parse(text) as unknown;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return {};
+  }
+};
+
 const MIGRATIONS = [
   `CREATE TABLE nests (
      id TEXT PRIMARY KEY,
@@ -185,10 +197,11 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN unread INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE cards ADD COLUMN changed_at INTEGER;
    ALTER TABLE nests ADD COLUMN seen_at INTEGER;`,
-  // When an earlier card changes. `sent_with` is a fingerprint of what crossed a line the last time the card it goes to
-  // sent with it, never a copy (see `nestStale.ts`), null until then. `knows` is what that message went with, counted,
-  // as `CardKnows` in JSON.
+  // When an earlier card changes. A line's `sent_with` is a fingerprint of what crossed it the last time the card it goes
+  // to sent, never a copy (see `nestStale.ts`), null until then. A For-each card's runs each keep theirs instead, as JSON
+  // by line, since each sends on its own. `knows` is what a card's last message went with, counted, as `CardKnows` JSON.
   `ALTER TABLE lines ADD COLUMN sent_with TEXT;
+   ALTER TABLE runs ADD COLUMN sent_with TEXT;
    ALTER TABLE cards ADD COLUMN knows TEXT;`,
 ];
 
@@ -602,9 +615,19 @@ export class NestStore {
     for (const [lineId, fingerprint] of fingerprints) keep.run(fingerprint, lineId, to);
   }
 
-  // The card is about to send again with every line, as For-each runs all over again, so none has been sent with yet.
-  forgetSentWith(to: string): void {
-    this.db.prepare("UPDATE lines SET sent_with = NULL WHERE to_card = ?").run(to);
+  // The same for one run of a For-each card, kept with the run, over what it kept before for these lines.
+  keepRunSentWith(runId: string, fingerprints: ReadonlyMap<string, string>): void {
+    const before = (this.db.prepare("SELECT sent_with FROM runs WHERE id = ?").get(runId) as { sent_with: string | null } | undefined)?.sent_with;
+    if (before === undefined) return;
+    const kept = { ...sentWithFrom(before), ...Object.fromEntries(fingerprints) };
+    this.db.prepare("UPDATE runs SET sent_with = ? WHERE id = ?").run(JSON.stringify(kept), runId);
+  }
+
+  // What each run of a For-each card that has sent went with, by line.
+  runsSentWith(cardId: string): Record<string, string>[] {
+    return (this.db.prepare("SELECT sent_with FROM runs WHERE card_id = ? AND sent_with IS NOT NULL ORDER BY position").all(cardId) as { sent_with: string }[]).map((row) =>
+      sentWithFrom(row.sent_with)
+    );
   }
 
   // What the card's last message went with, counted.
@@ -746,7 +769,9 @@ export class NestStore {
     this.db.exec("BEGIN");
     try {
       const old = this.db.prepare("SELECT chat_id FROM runs WHERE id = ? AND card_id = ? AND state <> 'waiting'");
-      const restart = this.db.prepare("UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL, spent = spent + ? WHERE id = ? AND card_id = ? AND state <> 'waiting'");
+      const restart = this.db.prepare(
+        "UPDATE runs SET state = 'waiting', chat_id = NULL, cell = NULL, sent_with = NULL, spent = spent + ? WHERE id = ? AND card_id = ? AND state <> 'waiting'"
+      );
       for (const id of ids) {
         const row = old.get(id, cardId) as { chat_id: string | null } | undefined;
         if (row && restart.run(row.chat_id ? costOf(row.chat_id) : 0, id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);

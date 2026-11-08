@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  changedLines,
-  fingerprint,
-  SENT_MIXED,
-  SENT_NOTHING,
-  sentWith,
-} from "./nestStale";
+import { agreed, changedLines, fingerprint, SENT_MIXED, SENT_NOTHING } from "./nestStale";
 
 const thread = (answer: string) => ({
   name: "Scout",
@@ -51,14 +45,14 @@ describe("fingerprint", () => {
   });
 });
 
-describe("sentWith", () => {
-  it("is what went on a card's own message, and mixed when a run went with something the runs before didn't", () => {
-    expect(sentWith("old", "new", false)).toBe("new");
-    expect(sentWith(null, null, false)).toBe(SENT_NOTHING);
-    expect(sentWith(null, "new", true)).toBe("new");
-    expect(sentWith("new", "new", true)).toBe("new");
-    expect(sentWith("old", "new", true)).toBe(SENT_MIXED);
-    expect(sentWith(SENT_MIXED, "new", true)).toBe(SENT_MIXED);
+describe("agreed", () => {
+  it("is what every run that sent went with, mixed when they differ, and nothing before any has sent", () => {
+    expect(agreed([])).toBeNull();
+    expect(agreed([undefined, undefined])).toBeNull();
+    expect(agreed(["new"])).toBe("new");
+    expect(agreed(["new", undefined, "new"])).toBe("new");
+    expect(agreed(["old", "new"])).toBe(SENT_MIXED);
+    expect(agreed([SENT_NOTHING, SENT_NOTHING])).toBe(SENT_NOTHING);
   });
 });
 

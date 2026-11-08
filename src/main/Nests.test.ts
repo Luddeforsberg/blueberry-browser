@@ -2859,7 +2859,66 @@ describe("When an earlier card changes", () => {
     expect(nests.sendRunReply(first.id, "Go again")).toEqual({ ok: true });
     await vi.waitFor(() => expect(chats.isRunning(first.chatId!)).toBe(false));
     expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
-    expect(store.linesTo(writer.id).find((line) => line.source.id === brief.id)!.sentWith).toBe("mixed");
+    // Once every row has gone with it, they agree again.
+    const second = cardOf(nests, nest, writer.id).each!.runs[1];
+    replies.push("Two, newest");
+    expect(nests.sendRunReply(second.id, "Go again")).toEqual({ ok: true });
+    await vi.waitFor(() => expect(chats.isRunning(second.chatId!)).toBe(false));
+    await settleAll();
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    expect(store.runsSentWith(writer.id)).toHaveLength(2);
+  });
+
+  it("doesn't count a For-each card as changed while one of its runs answers again, only once it's done", async () => {
+    const { nests, sendAndWait, chats } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push(TABLE(2));
+    await sendAndWait(scout.id, "Find companies");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("Short one", "Short two");
+    nests.sendEach(writer.id, "Write");
+    await settleAll();
+    const after = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    await sendAndWait(after.id, "Sum it up");
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBeUndefined();
+
+    held = [];
+    const [first] = cardOf(nests, nest, writer.id).each!.runs;
+    replies.push("Short one, again");
+    expect(nests.sendRunReply(first.id, "Again")).toEqual({ ok: true });
+    await settle();
+    // Its cell has gone while it answers, but the table isn't whole, so it hasn't changed yet.
+    expect(cardOf(nests, nest, writer.id).each!.runs[0].cell).toBeNull();
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBeUndefined();
+    expect(nests.updateCard(after.id, false)).toEqual({ ok: false, error: "Nothing this card reads from has changed." });
+    await release();
+    held = null;
+    await vi.waitFor(() => expect(chats.isRunning(first.chatId!)).toBe(false));
+    await settleAll();
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBe(true);
+  });
+
+  it("remembers a tab's address as its text was read, so a page that moved on meanwhile isn't counted as changed", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    openTabs = [fakeTab("tab-1", "https://shop.example/pricing", "Plans start at 10 euros.")];
+    const page = nests.dropPage(nest, { tabId: "tab-1" }, PLACE);
+    expect(page).toEqual({ ok: true, cardId: expect.any(String) });
+    const writer = nests.addCard(nest, { x: 500, y: 0 })!;
+    expect(nests.addInput(writer.id, (page as { cardId: string }).cardId)).toEqual({ ok: true });
+    held = [];
+    expect(nests.sendCard(writer.id, "Summarise the plans")).toEqual({ ok: true });
+    // The tab moves on after the card sent, before its message is built.
+    openTabs[0].url = "https://shop.example/pricing/annual";
+    await release();
+    held = null;
+    await settleAll();
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    // And once it moves on again after that, it has changed.
+    openTabs[0].url = "https://shop.example/about";
+    nests.tabsChanged();
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
   });
 
   it("still knows what a card sent with, and what it knew, when the app starts again", async () => {

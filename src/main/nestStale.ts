@@ -30,15 +30,12 @@ export const fingerprint = (
   return `${input.part} ${hash(JSON.stringify([input.table.header, input.table.rows]))}`;
 };
 
-// What a line keeps as sent with, from what went now and what it kept before. A card's own message replaces it. A run of a
-// For-each card only keeps it when it agrees with the runs before it, so one row sent with something older still shows.
-export const sentWith = (
-  before: string | null,
-  now: string | null,
-  run: boolean,
-): string => {
-  const went = now ?? SENT_NOTHING;
-  return run && before !== null && before !== went ? SENT_MIXED : went;
+// What a For-each card's line was sent with, from what each of its runs last sent through it: what they all agree on,
+// mixed when they don't, so one row sent with something older still shows, or null when no run has sent yet.
+export const agreed = (runs: readonly (string | undefined)[]): string | null => {
+  const sent = runs.filter((each): each is string => each !== undefined);
+  if (sent.length === 0) return null;
+  return sent.every((each) => each === sent[0]) ? sent[0] : SENT_MIXED;
 };
 
 // The lines into a card whose source has changed since the card sent with them. Not a line it never sent with, which

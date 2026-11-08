@@ -24,7 +24,7 @@ import type { NestSince, UsedPage, WorkTabState } from "../shared/library";
 import type { EndedReply } from "./Chats";
 import { changedSince, missed, NO_RECAP, sinceFallback, type CardChange, type NestRecapWriter } from "./nestReturn";
 import type { CardKnows } from "../shared/nestKnows";
-import { changedLines, fingerprint, sentWith } from "./nestStale";
+import { agreed, changedLines, fingerprint, SENT_NOTHING } from "./nestStale";
 
 const MAX_TITLE_LENGTH = 100;
 // What a Nest is called until its first request, whose first words then stand in until the cheap model names it.
@@ -291,30 +291,41 @@ export class Nests {
     return { answers: this.longestRun(cardId, rows, direct).map(({ answer }) => answer) };
   }
 
-  // Hears what a card's message went with as `Chats` builds it, so what the card says it knows is what went.
-  private heard(cardId: string, nestId: string): { onContext: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void } {
+  // Hears what a card's message went with as `Chats` builds it, so what the card says it knows is what went. A tab's
+  // text is read then, and it may have moved on since the card sent, so its address is remembered again as it went.
+  private heard(cardId: string, nestId: string, runId: string | null = null): { onContext: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void } {
     return {
       onContext: (answers, attachments) => {
         if (!this.store.setKnows(cardId, knowsOf(answers, attachments, true, Date.now()))) return;
+        this.remember(cardId, runId, (line) => !!line.source.page);
         this.changed(nestId);
       },
     };
   }
 
-  // Remembers what crossed each line into a card as it sent, as a fingerprint. A run of For each row leaves out the line
-  // its rows come from, since every run gets a row of the table the card was sent with, whatever that card says now.
-  private remember(cardId: string, run: boolean): void {
+  // Remembers what crossed each line into a card as it sent, as a fingerprint: on the card, or on the one run of For each
+  // row that sent. A run leaves out the line its rows come from, since every run gets a row of the table the card was
+  // sent with, whatever that card says now.
+  private remember(cardId: string, runId: string | null, only: (line: CardLine) => boolean = () => true): void {
     const lines = this.store.linesTo(cardId);
-    const driving = run ? (this.store.eachLine(cardId) ?? lines[0]?.lineId) : null;
-    const kept = new Map(lines.filter((line) => line.lineId !== driving).map((line) => [line.lineId, sentWith(line.sentWith, this.fingerprintOf(line), run)]));
-    this.store.keepSentWith(cardId, kept);
+    const driving = runId ? (this.store.eachLine(cardId) ?? lines[0]?.lineId) : null;
+    const went = new Map(lines.filter((line) => line.lineId !== driving && only(line)).map((line) => [line.lineId, this.fingerprintOf(line) ?? SENT_NOTHING]));
+    if (went.size === 0) return;
+    if (runId) this.store.keepRunSentWith(runId, went);
+    else this.store.keepSentWith(cardId, went);
+    this.sentChanged(cardId);
+  }
+
+  // What a card's lines were sent with changed, so whether an earlier card changed is worked out again.
+  private sentChanged(cardId: string): void {
     this.sends.set(cardId, (this.sends.get(cardId) ?? 0) + 1);
   }
 
-  // A card's For-each runs are all going again, so what they sent with before doesn't count.
-  private forgetSent(cardId: string): void {
-    this.store.forgetSentWith(cardId);
-    this.sends.set(cardId, (this.sends.get(cardId) ?? 0) + 1);
+  // A source still answering, or with For-each runs going, waiting or having their values written, has nothing whole to
+  // give yet, so it can't have changed until it's done.
+  private busy(source: NestCard): boolean {
+    if (source.chatId && this.chats.isRunning(source.chatId)) return true;
+    return !!source.each?.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)) || this.fills.has(run.id));
   }
 
   // What a line gives now, as a fingerprint: a file's bytes, or what its source gives of its own.
@@ -336,12 +347,20 @@ export class Nests {
       this.sends.get(card.id) ?? 0,
       into.map((line) => {
         const source = cards.find((each) => each.id === line.from);
-        return [line.id, line.picked, source ? this.revisionOf(source) : ""];
+        return [line.id, line.picked, source ? [this.revisionOf(source), this.busy(source)] : ""];
       }),
     ]);
     const known = this.changedInto.get(card.id);
     if (known?.revision === revision) return known.value;
-    const value = changedLines(this.store.linesTo(card.id).map((line) => ({ lineId: line.lineId, sent: line.sentWith, now: this.fingerprintOf(line) })));
+    // A For-each card's runs each sent on their own.
+    const runs = card.each ? this.store.runsSentWith(card.id) : [];
+    const value = changedLines(
+      this.store.linesTo(card.id).map((line) => ({
+        lineId: line.lineId,
+        sent: card.each ? agreed(runs.map((run) => run[line.lineId])) : line.sentWith,
+        now: this.busy(line.source) ? null : this.fingerprintOf(line),
+      }))
+    );
     this.changedInto.set(card.id, { nestId, revision, value });
     return value;
   }
@@ -863,7 +882,7 @@ export class Nests {
       ? this.chats.send(card.chatId, text, options)
       : this.chats.send(null, text, { ...options, mascotId: card.mascotId, started: (chatId) => this.store.setChat(cardId, chatId) });
     if (!sent) return null;
-    this.remember(cardId, false);
+    this.remember(cardId, null);
     // The user just sent it, so with its Nest in front it's in sight, even before the board has said where it is.
     if (this.front?.nestId === card.nestId) this.inSight.set(card.nestId, new Set([...(this.inSight.get(card.nestId) ?? []), cardId]));
     // Its lines all went with this message, so a fresh one reads like the rest from now on.
@@ -927,10 +946,10 @@ export class Nests {
       ...this.userSaid(card.id, run.chatId, text),
       ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id),
-      ...this.heard(card.id, card.nestId),
+      ...this.heard(card.id, card.nestId, runId),
     });
     if (!sent) return null;
-    this.remember(card.id, true);
+    this.remember(card.id, runId);
     // Its value was the old answer's: it goes, and one being written for that answer never lands, so a restart before
     // this reply's value is in still makes it. The board hears at once, since rows picked from it aren't there now.
     this.fills.delete(runId);
@@ -1023,8 +1042,9 @@ export class Nests {
       return { ok: false, warn: `Run ${what} again with what’s new? Anything already done may happen again${done ? `, such as “${done}”` : ""}.` };
     }
     if (done && !confirmed) return { ok: false, warn: `Some of these already did something you allowed, such as “${done}”, and may do it again.` };
-    if (which === "all") this.forgetSent(card.id);
     const chats = this.store.restartRuns(card.id, ids, (chatId) => this.chats.costOf([chatId]) ?? 0);
+    // What those runs sent with went with them.
+    this.sentChanged(card.id);
     chats.forEach((chatId) => this.deleteChat(chatId));
     this.changed(card.nestId);
     this.pump();
@@ -1447,7 +1467,7 @@ export class Nests {
       saveFile: this.fileSink(card.id),
     });
     if (!sent) return this.store.hold(card.id, "Didn’t start");
-    this.remember(card.id, false);
+    this.remember(card.id, null);
     this.handedOff(card.id);
     return true;
   }
@@ -2139,12 +2159,12 @@ export class Nests {
       ...this.userSaid(card.id, null, null),
       ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id),
-      ...this.heard(card.id, card.nestId),
+      ...this.heard(card.id, card.nestId, run.id),
     });
     // Its bird has gone from the flock, rows picked on another input have gone, or the chat couldn't start. The others
     // still try.
     if (!sent) this.store.setRunState(run.id, "failed");
-    else this.remember(card.id, true);
+    else this.remember(card.id, run.id);
     this.changed(card.nestId);
     return !!sent;
   }
