@@ -41,7 +41,9 @@ export const Composer: React.FC<{
     menuUp?: boolean
     // Options for how it's sent, on a line of their own under the text, with the buttons at its end.
     footer?: React.ReactNode
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, focusRange, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer, addItems, menuUp }) => {
+    // More to fill in before it's sent, between the text and the footer, such as a note for each version.
+    beforeFooter?: React.ReactNode
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, focusRange, spellCheck, attachment, onAdd, addLabel, noAdd, bare, canSend, onSend, onStop, mascot, onChooseMascot, cloud, footer, beforeFooter, addItems, menuUp }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
     // The + menu holds what can be added and the cloud option, so it's there only where the + has nothing else to do.
@@ -101,6 +103,7 @@ export const Composer: React.FC<{
                     onKeyDown={onKeyDown}
                     className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
                 />
+                {footer && beforeFooter}
                 <FooterRow footer={footer}>
                     {mascot && (
                         <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />

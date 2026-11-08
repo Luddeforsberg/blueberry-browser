@@ -25,6 +25,8 @@ export const fingerprint = (
     return `thread ${hash(JSON.stringify(input.exchanges.map(({ asked, answer }) => [asked, answer])))}`;
   if (input.part === "page") return `page ${hash(input.url)}`;
   if (input.part === "note") return `note ${hash(input.text)}`;
+  if (input.part === "versions")
+    return `versions ${hash(JSON.stringify(input.versions.map(({ letter, note, exchanges }) => [letter, note, exchanges.map(({ asked, answer }) => [asked, answer])])))}`;
   if (input.part === "row")
     return `row ${hash(JSON.stringify([input.header, input.row]))}`;
   return `${input.part} ${hash(JSON.stringify([input.table.header, input.table.rows]))}`;

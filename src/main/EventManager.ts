@@ -236,6 +236,10 @@ export class EventManager {
     this.handle("nests:send", (cardId, text) => nests.sendCard(cardId, text));
     this.handle("nests:send-each", (cardId, text) => nests.sendEach(cardId, text));
     this.handle("nests:send-run", (runId, text) => nests.sendRunReply(runId, text));
+    this.handle("nests:send-versions", (cardId, text, notes) => nests.sendVersions(cardId, text, notes));
+    this.handle("nests:suggest-angles", (cardId, text, notes) => nests.suggestAngles(cardId, text, notes));
+    this.handle("nests:pick-version", (cardId, runId) => nests.pickVersion(cardId, runId));
+    this.handle("nests:more-like", (cardId, runId) => nests.moreLikeThis(cardId, runId));
     this.handle("nests:stop-card", (cardId) => nests.stopCard(cardId));
     this.handle("nests:ask", (nestId, text, options) => nests.ask(nestId, text, options));
     this.handle("nests:set-tucked", (nestId, tucked) => nests.setTucked(nestId, tucked));

@@ -1778,3 +1778,112 @@ test("coming back to a board: a card named for what it found, a dot until it's o
   await expect(reopened.locator("[data-unread]")).toHaveCount(0);
   await expect(again.locator("[data-since]")).toHaveCount(0);
 });
+
+test("a card sent as three versions shows them as tabs, and the card below reads only the one picked", async () => {
+  model.reset();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
+  app = await launchApp(profile, { modelEnv: model.env });
+  const chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  // With NEST_SHOTS set, what the cards look like in both layouts, light and dark.
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const layoutMode of ["vertical", "horizontal"] as const) {
+      for (const appearance of ["light", "dark"] as const) {
+        await chrome.evaluate((settings) => window.chromeAPI.settings.updateSettings(settings), { appearance, layoutMode });
+        await chrome.waitForTimeout(250);
+        await chrome.screenshot({ path: join(SHOTS, `${name}-${layoutMode}-${appearance}.png`) });
+      }
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light", layoutMode: "vertical" }));
+  };
+
+  model.replyWith(FIRST_ANSWER);
+  oneJob();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  await composer.fill("Find two Swedish SaaS companies");
+  await composer.press("Enter");
+  const first = chrome.locator(".react-flow__node").first();
+  await expect(first.getByRole("status")).toHaveText("Done");
+  await first.hover();
+  await first.getByLabel("Pull a new card out of Berry’s").click();
+  const card = chrome.locator(".react-flow__node").nth(1);
+
+  // Three versions, one note typed and the empty ones suggested from only the prompt and the input's name.
+  await card.getByRole("textbox", { name: "What should Berry do?" }).fill("Write an outreach email");
+  await card.getByRole("button", { name: "More versions" }).click();
+  await card.getByRole("button", { name: "More versions" }).click();
+  await expect(card.getByRole("group", { name: "Versions" })).toContainText("3 versions");
+  await expect(card).toContainText("happens once per version");
+  await card.getByRole("textbox", { name: "Note for version A" }).fill("Short and warm");
+  model.anglesWith("1. Lead with a question\n2. Formal");
+  await card.getByRole("button", { name: "Suggest angles" }).click();
+  await expect(card.getByRole("textbox", { name: "Note for version B" })).toHaveValue("Lead with a question");
+  await expect(card.getByRole("textbox", { name: "Note for version C" })).toHaveValue("Formal");
+  const asked = JSON.stringify(model.angleRequests.at(-1)?.messages);
+  expect(asked).toContain("Write an outreach email");
+  expect(asked).not.toContain(FIRST_ANSWER);
+  // Nothing ran for the angles.
+  expect(model.requests).toHaveLength(1);
+  await shots("versions-draft");
+
+  // Each version says which it is, so the fake model's reply is that version's own.
+  model.replyFrom((data) => {
+    const letter = data.match(/This is version ([A-E]) of 3/)?.[1];
+    return letter ? `Email ${letter} for Lindqvist` : null;
+  });
+  await card.getByRole("button", { name: "Send" }).click();
+  await expect(card.locator(".nest-drag").getByRole("status")).toHaveText("Done");
+  expect(model.requests).toHaveLength(4);
+  // The note goes in a block of its own, before what was typed.
+  for (const letter of ["A", "B", "C"]) expect(model.requests.some((request) => JSON.stringify(request.messages.at(-1)).includes(`This is version ${letter} of 3`))).toBe(true);
+  expect(model.requests.slice(1).every((request) => JSON.stringify(request.messages).includes(FIRST_ANSWER))).toBe(true);
+
+  // One card with a tab for each; switching shows each version's answer.
+  const tabs = card.getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+  await tabs.nth(1).click();
+  await expect(card.getByRole("tabpanel")).toContainText("Email B for Lindqvist");
+  await expect(card.getByRole("tabpanel")).toContainText("Lead with a question");
+  await tabs.nth(2).click();
+  await expect(card.getByRole("tabpanel")).toContainText("Email C for Lindqvist");
+  await tabs.nth(1).click();
+  await card.getByRole("button", { name: "Use this" }).click();
+  await expect(tabs.nth(1)).toHaveAccessibleName(/^Version B, picked/);
+  await expect(card).toContainText("Version B goes on to the next card");
+  await shots("versions-card");
+
+  // Opened, the versions sit side by side.
+  await card.getByRole("button", { name: "Open every version side by side" }).click();
+  await expect(card.locator("[data-version]")).toHaveCount(3);
+  await shots("versions-open");
+  await card.getByRole("button", { name: "Close the versions" }).click();
+
+  // The card below reads only B.
+  model.replyFrom(null);
+  model.replyWith("Polished.");
+  await card.hover();
+  await card.getByLabel("Pull a new card out of Berry’s").click();
+  const below = chrome.locator(".react-flow__node").nth(2);
+  await below.getByRole("textbox", { name: "What should Berry do?" }).fill("Polish it");
+  await below.getByRole("button", { name: "Send" }).click();
+  await expect(below.locator(".nest-drag").getByRole("status")).toHaveText("Done");
+  const read = newestUserMessage(model.requests.at(-1)!);
+  expect(read).toContain("Email B for Lindqvist");
+  expect(read).not.toContain("Email A for Lindqvist");
+  expect(read).not.toContain("Email C for Lindqvist");
+
+  // Picking another changes what the card below reads, so it says an earlier card changed.
+  await tabs.nth(2).click();
+  await card.getByRole("button", { name: "Use this" }).click();
+  await expect(below.locator("[data-earlier-changed]")).toBeVisible();
+
+  // The versions, notes and pick are still there after a restart.
+  await app.close();
+  app = await launchApp(profile, { modelEnv: model.env });
+  const again = await findView(app, "view=chrome");
+  await again.getByRole("region", { name: /^Nests/ }).getByRole("button", { name: /^Find two Swedish/ }).click();
+  const reopened = again.locator(".react-flow__node").nth(1);
+  await expect(reopened.getByRole("tab")).toHaveCount(3);
+  await expect(reopened.getByRole("tab").nth(2)).toHaveAccessibleName(/^Version C, picked/);
+});

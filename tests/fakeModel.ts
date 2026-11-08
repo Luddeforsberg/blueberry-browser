@@ -49,6 +49,10 @@ export const startFakeModel = async () => {
   let cardTitle = "NONE";
   let since = "NONE";
   const recapRequests: FakeModelRequest[] = [];
+  // Angles the cheap model suggests for a draft's versions, and a main reply worked out from what it was sent.
+  let angles = "NONE";
+  const angleRequests: FakeModelRequest[] = [];
+  let replyFor: ((data: string) => string | null) | null = null;
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -66,6 +70,13 @@ export const startFakeModel = async () => {
       const content = JSON.stringify(parsed.messages[0]).includes("name one column") ? column : (cell?.(data) ?? "NONE");
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ id: "fake", object: "chat.completion", created: 0, model: TITLE_MODEL, choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }] }));
+      return;
+    }
+
+    if (parsed.model === TITLE_MODEL && /suggest angles for versions/.test(JSON.stringify(parsed.messages[0]))) {
+      angleRequests.push(parsed);
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ id: "fake", object: "chat.completion", created: 0, model: TITLE_MODEL, choices: [{ index: 0, message: { role: "assistant", content: angles }, finish_reason: "stop" }] }));
       return;
     }
 
@@ -133,7 +144,8 @@ export const startFakeModel = async () => {
       response.end(`${usageChunk()}data: [DONE]\n\n`);
       return;
     }
-    const reply = tokens;
+    const worked = replyFor?.(JSON.stringify(parsed.messages)) ?? null;
+    const reply = worked !== null ? [worked] : tokens;
     const heldStart = holdStart;
     const held = hold;
     holdStart = null;
@@ -162,7 +174,11 @@ export const startFakeModel = async () => {
     planRequests,
     cellRequests,
     recapRequests,
+    angleRequests,
     reset() {
+      angles = "NONE";
+      angleRequests.length = 0;
+      replyFor = null;
       cardTitle = "NONE";
       since = "NONE";
       recapRequests.length = 0;
@@ -243,6 +259,14 @@ export const startFakeModel = async () => {
     },
     replyWith(...next: string[]) {
       tokens = next;
+    },
+    // Each main reply worked out from the messages it was sent, or the usual words when it gives null.
+    replyFrom(next: ((data: string) => string | null) | null) {
+      replyFor = next;
+    },
+    // What the cheap model suggests as angles for a draft's versions, one a line.
+    anglesWith(next: string) {
+      angles = next;
     },
     // The next reply waits before its first token until the returned function is called.
     holdBeforeFirstToken() {

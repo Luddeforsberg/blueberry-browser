@@ -2,7 +2,8 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile, NestTalkMessage } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile, NestTalkMessage, NestVersion, NestVersions } from "../shared/library";
+import { MAX_VERSIONS, versionLetter } from "../shared/nestVersions";
 import type { SentAttachment } from "./nestFiles";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
@@ -203,6 +204,15 @@ const MIGRATIONS = [
   `ALTER TABLE lines ADD COLUMN sent_with TEXT;
    ALTER TABLE runs ADD COLUMN sent_with TEXT;
    ALTER TABLE cards ADD COLUMN knows TEXT;`,
+  // Kept for sections behind cards, which are built alongside versions. Whichever lands second takes its own place.
+  ``,
+  // Versions of one card: `versions` is 1 on a card sent as several, whose runs are its versions, each with its note as
+  // its row, and `version_pick` the one whose thread crosses its lines. A version made with More like this keeps the one
+  // it's like in `like_run`, and each version keeps what it knew, as a card does, since the card's follows the pick.
+  `ALTER TABLE cards ADD COLUMN versions INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE cards ADD COLUMN version_pick TEXT;
+   ALTER TABLE runs ADD COLUMN like_run TEXT;
+   ALTER TABLE runs ADD COLUMN knows TEXT;`,
 ];
 
 // How many of a Nest's newest requests its board carries, so a Nest used for months doesn't send a longer board.
@@ -301,6 +311,8 @@ interface CardRow {
   titleSettled: number;
   unread: number;
   knows: string | null;
+  versions: number;
+  versionPick: string | null;
 }
 
 interface RunRow {
@@ -310,6 +322,9 @@ interface RunRow {
   chatId: string | null;
   state: NestRunState;
   cell: string | null;
+  position: number;
+  likeRun: string | null;
+  runKnows: string | null;
 }
 
 const CARD_COLUMNS =
@@ -318,10 +333,13 @@ const CARD_COLUMNS =
   // Not a file's whole table, which is read only when it's needed.
   "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height, " +
   "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob, note_text AS noteText, " +
-  "title, title_settled AS titleSettled, unread, knows";
-const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
+  "title, title_settled AS titleSettled, unread, knows, versions, version_pick AS versionPick";
+const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell, position, like_run AS likeRun, knows AS runKnows";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
+
+// A version is a run whose row is its note, lettered by its place.
+const toVersion = ({ id, row, chatId, state, position }: RunRow): NestVersion => ({ id, letter: versionLetter(position), note: (JSON.parse(row) as string[])[0] ?? "", chatId, state });
 
 // One card of a plan, placed, with the line into it: from another card of the same plan by its key, or a card on the board.
 export interface NewPlannedCard {
@@ -422,16 +440,20 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText, title, titleSettled, unread, knows }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText, title, titleSettled, unread, knows, versions: several, versionPick }: CardRow): NestCard {
+    const runs = eachPrompt === null ? [] : (this.db.prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE card_id = ? ORDER BY position`).all(id) as unknown as RunRow[]);
     const each: NestForEach | null =
-      eachPrompt === null
+      eachPrompt === null || several === 1
         ? null
         : {
             prompt: eachPrompt,
             header: JSON.parse(eachHeader ?? "[]") as string[],
             column: eachColumn ?? "",
-            runs: (this.db.prepare(`SELECT ${RUN_COLUMNS} FROM runs WHERE card_id = ? ORDER BY position`).all(id) as unknown as RunRow[]).map(toRun),
+            runs: runs.map(toRun),
           };
+    const versions: NestVersions | null = eachPrompt !== null && several === 1 ? { prompt: eachPrompt, runs: runs.map(toVersion), pick: versionPick } : null;
+    // A card of versions knows what its pick's last message went with, and with none picked, what its last version did.
+    const picked = versions && versionPick ? runs.find((run) => run.id === versionPick)?.runKnows : null;
     const planned: NestPlanned | null =
       plan === null ? null : { state: plan, prompt: planPrompt ?? "", each: planEach === 1, waits: planWaits === 1, table: planTable, note: planNote };
     const table: NestTableFile | null =
@@ -450,9 +472,10 @@ export class NestStore {
       const file: NestFile = { name: own?.name ?? "", type: own?.type ?? "", size: own?.size ?? 0, pages: own?.pages ?? null, preview: filePreview, made: fileMade === 1 };
       return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file, attachments: [] };
     }
-    const known = knows === null ? null : knowsFrom(knows);
+    const kept = picked ?? knows;
+    const known = kept == null ? null : knowsFrom(kept);
     const recap = { ...(title !== null ? { title, titleSettled: titleSettled === 1 } : {}), ...(unread === 1 ? { unread: true } : {}), ...(known ? { knows: known } : {}) };
-    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, file: null, ...recap, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
+    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, ...(versions ? { versions } : {}), plan: planned, table, file: null, ...recap, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -693,6 +716,62 @@ export class NestStore {
     return true;
   }
 
+  // A draft becomes a card of versions, one waiting run for each note, in one go. False if it isn't a draft.
+  startVersions(id: string, prompt: string, notes: readonly string[]): boolean {
+    const card = this.card(id);
+    if (!card || notes.length < 2 || notes.length > MAX_VERSIONS) return false;
+    this.db.exec("BEGIN");
+    try {
+      const changed = this.db
+        .prepare(
+          "UPDATE cards SET each_prompt = ?, each_header = '[]', each_column = '', each_line = NULL, versions = 1, version_pick = NULL, plan = NULL, plan_note = NULL WHERE id = ? AND chat_id IS NULL AND each_prompt IS NULL AND table_name IS NULL AND file_made IS NULL AND page_url IS NULL AND note_text IS NULL"
+        )
+        .run(prompt, id).changes;
+      if (changed === 0) throw new NotHere();
+      const insert = this.db.prepare("INSERT INTO runs (id, card_id, position, row, chat_id, state) VALUES (?, ?, ?, ?, NULL, 'waiting')");
+      notes.forEach((note, position) => insert.run(randomUUID(), id, position, JSON.stringify([note])));
+      this.touch(card.nestId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      if (error instanceof NotHere) return false;
+      throw error;
+    }
+    return true;
+  }
+
+  // One more version on a card of versions, waiting its turn, like `like` if it's More like this. Null past the most.
+  addVersion(cardId: string, note: string, like: string | null): string | null {
+    const card = this.card(cardId);
+    if (!card?.versions || card.versions.runs.length >= MAX_VERSIONS) return null;
+    if (like !== null && !card.versions.runs.some((run) => run.id === like)) return null;
+    const id = randomUUID();
+    const position = (this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS next FROM runs WHERE card_id = ?").get(cardId) as { next: number }).next;
+    this.db.prepare("INSERT INTO runs (id, card_id, position, row, chat_id, state, like_run) VALUES (?, ?, ?, ?, NULL, 'waiting', ?)").run(id, cardId, position, JSON.stringify([note]), like);
+    this.touch(card.nestId);
+    return id;
+  }
+
+  // The version whose thread crosses the card's lines, or none, when every version does. Only one of the card's own.
+  // A title the cheap model gave the card was for the pick before, so it goes, and one the user typed stays.
+  pickVersion(cardId: string, runId: string | null): boolean {
+    const card = this.card(cardId);
+    if (!card?.versions || (runId !== null && !card.versions.runs.some((run) => run.id === runId)) || card.versions.pick === runId) return false;
+    this.db.prepare("UPDATE cards SET version_pick = ?, title = CASE WHEN title_settled = 1 THEN title ELSE NULL END WHERE id = ?").run(runId, cardId);
+    this.touch(card.nestId);
+    return true;
+  }
+
+  // The version a run of More like this is like, null for any other.
+  likeOf(runId: string): string | null {
+    return (this.db.prepare("SELECT like_run FROM runs WHERE id = ?").get(runId) as { like_run: string | null } | undefined)?.like_run ?? null;
+  }
+
+  // What one version's last message went with, counted.
+  setRunKnows(runId: string, knows: CardKnows): boolean {
+    return this.db.prepare("UPDATE runs SET knows = ? WHERE id = ?").run(JSON.stringify(knows), runId).changes > 0;
+  }
+
   // The column's name. `settle` for the user's own, which a generated one never replaces.
   nameColumn(id: string, name: string, settle: boolean): boolean {
     return (
@@ -776,6 +855,8 @@ export class NestStore {
         const row = old.get(id, cardId) as { chat_id: string | null } | undefined;
         if (row && restart.run(row.chat_id ? costOf(row.chat_id) : 0, id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);
       }
+      // A version that goes again has no thread to pick until it answers again.
+      this.db.prepare(`UPDATE cards SET version_pick = NULL WHERE id = ? AND version_pick IN (${ids.map(() => "?").join(", ") || "NULL"})`).run(cardId, ...ids);
       const card = this.card(cardId);
       if (card) this.touch(card.nestId);
       this.db.exec("COMMIT");

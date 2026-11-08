@@ -41,7 +41,9 @@ export type SentAttachment =
   | { kind: "file"; name: string; type: string; data: Uint8Array; from?: "board" | "made" }
   | { kind: "note"; text: string }
   // Files the card's lines bring that it had no room for, by name, so the model knows they were left out.
-  | { kind: "missing"; names: string[] };
+  | { kind: "missing"; names: string[] }
+  // Which version of a card's answer this is, and its note, in words written in code (see `nestVersions.ts`).
+  | { kind: "version"; text: string };
 
 const TYPES: Record<string, { type: string; kind: FileKind }> = {
   pdf: { type: "application/pdf", kind: "pdf" },
@@ -243,6 +245,7 @@ export const attachmentBlocks = (attachments: readonly SentAttachment[]): Exclud
     if (attachment.kind === "note") {
       return [{ type: "text", text: `<user_note>\n${inTag(attachment.text, "user_note")}\n</user_note>\nThat's a note the user wrote on this card, in their own words.` }];
     }
+    if (attachment.kind === "version") return [{ type: "text", text: attachment.text }];
     if (attachment.kind === "missing") {
       const names = attachment.names.map((name) => `"${nameForModel(name)}"`).join(", ");
       return [{ type: "text", text: `Left out, since this card had no room for more files: ${names}, connected to it through its lines. You haven't seen them.` }];

@@ -1,5 +1,6 @@
 import { plainCell } from "../shared/nestTable";
 import { tidyTitle } from "./titles";
+import { ANGLES_PROMPT, anglesData, parseAngles } from "./nestVersions";
 
 // Coming back to a board: a card named for what it found, a dot on a card that changed while nobody was looking, and a
 // few lines from Berry on what changed since the Nest was last open. The cheap model writes the words, from only the
@@ -111,6 +112,8 @@ export const missed = (front: { nestId: string; showing: boolean } | null, inSig
 export interface NestRecapWriter {
   title: (prompt: string, answer: string) => Promise<string | null>;
   since: (changes: readonly CardChange[]) => Promise<string | null>;
+  // Angles for a draft's versions, from only its prompt, the names of what it reads from and the angles already taken.
+  angles?: (prompt: string, inputs: readonly string[], taken: readonly string[], count: number) => Promise<string[]>;
 }
 
 export const NO_RECAP: NestRecapWriter = { title: async () => null, since: async () => null };
@@ -119,4 +122,5 @@ export const NO_RECAP: NestRecapWriter = { title: async () => null, since: async
 export const cheapRecap = (ask: (system: string, data: string) => Promise<string>): NestRecapWriter => ({
   title: async (prompt, answer) => parseCardTitle(await ask(CARD_TITLE_PROMPT, cardTitleData(prompt, answer))),
   since: async (changes) => parseSince(await ask(SINCE_PROMPT, sinceData(changes))),
+  angles: async (prompt, inputs, taken, count) => parseAngles(await ask(ANGLES_PROMPT, anglesData(prompt, inputs, taken, count)), count, taken),
 });
