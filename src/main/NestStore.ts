@@ -151,11 +151,13 @@ const MIGRATIONS = [
   `ALTER TABLE lines ADD COLUMN fresh INTEGER NOT NULL DEFAULT 0;`,
 ];
 
-// One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
+// One card's input: the line into it, the card it comes from, and the rows picked from that card if any. `fresh` while the
+// card it goes to was sent before it was drawn and hasn't sent since.
 export interface CardLine {
   lineId: string;
   source: NestCard;
   picked: PickedRows | null;
+  fresh: boolean;
 }
 
 export interface AttachmentRow {
@@ -476,10 +478,10 @@ export class NestStore {
 
   // Every line into a card, in the order they were drawn.
   linesTo(id: string): CardLine[] {
-    const rows = this.db.prepare("SELECT id, from_card, picked FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as { id: string; from_card: string; picked: string | null }[];
+    const rows = this.db.prepare("SELECT id, from_card, picked, fresh FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as { id: string; from_card: string; picked: string | null; fresh: number }[];
     return rows.flatMap((row) => {
       const source = this.card(row.from_card);
-      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null }] : [];
+      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null, fresh: row.fresh === 1 }] : [];
     });
   }
 
@@ -952,6 +954,12 @@ export class NestStore {
         )
         .run(randomUUID(), cardId, fileCardId, fileCardId, cardId).changes > 0
     );
+  }
+
+  // A card's own copies of these file's cards' files go, as a line it took them through goes.
+  dropCopies(cardId: string, fileCardIds: readonly string[]): void {
+    const drop = this.db.prepare("DELETE FROM attachments WHERE card_id = ? AND via_card = ?");
+    for (const fileCardId of fileCardIds) drop.run(cardId, fileCardId);
   }
 
   // Where a file or note is: its Nest, and its card or null for the composer.

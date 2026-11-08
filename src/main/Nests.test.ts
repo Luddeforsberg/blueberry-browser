@@ -1905,6 +1905,17 @@ describe("More inputs on a sent card", () => {
     expect(newest(sent.at(-1)!)).toMatch(/^<card_link from="strawberrybrowser.com pricing">/);
   });
 
+  it("passes a new input on down the chain only once the card it went into has sent with it", async () => {
+    const { nests, nest, writer, scout, sendAndWait } = await board();
+    const after = nests.addCard(nest, { x: 900, y: 0, from: writer.id })!;
+    expect(nests.addInput(writer.id, scout.id)).toEqual({ ok: true });
+    await sendAndWait(after.id, "Go on");
+    expect(newest(sent.at(-1)!)).not.toContain("Scout's list");
+    await sendAndWait(writer.id, "Use Scout's list");
+    await sendAndWait(after.id, "Again");
+    expect(newest(sent.at(-1)!)).toMatch(/<earlier_card from="Scout" via="Berry">[^]*Scout's list/);
+  });
+
   it("takes an input away from later messages only, and never from a card sent for each row", async () => {
     const context = await board();
     const { nests, nest, writer, scout, chatStore, sendAndWait } = context;
@@ -1987,6 +1998,19 @@ describe("Files on the canvas", () => {
     expect(nests.card(writer.id)!.attachments).toMatchObject([{ kind: "file", name: "pitch.pdf" }]);
     await sendAndWait(writer.id, "Shorter still");
     expect(blocksOf(sent[2])[1]).toMatchObject({ type: "file", data: PDF.toString("base64") });
+  });
+
+  it("stops sending a file once the line it came through is taken away", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const pitch = nests.dropFile(nest, "pitch.pdf", PDF, READS_ALL, PLACE) as { cardId: string };
+    const writer = nests.addCard(nest, { x: 700, y: 100, from: pitch.cardId })!;
+    await sendAndWait(writer.id, "Sum up the pitch");
+    expect(nests.card(writer.id)!.attachments).toMatchObject([{ kind: "file", name: "pitch.pdf" }]);
+    expect(nests.removeInput(nests.board(nest)!.lines[0].id)).toEqual({ ok: true });
+    expect(nests.card(writer.id)!.attachments).toEqual([]);
+    await sendAndWait(writer.id, "Shorter");
+    expect(sent[1].at(-1)!.content).toBe("Shorter");
   });
 
   it("passes a file on down the chain, and leaves out one a card has no room for, saying so", async () => {

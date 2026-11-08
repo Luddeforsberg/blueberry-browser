@@ -235,7 +235,7 @@ describe("NestStore", () => {
     const picked = { header: ["Company"], rows: [["Fjällbo"], ["Brygga"]] };
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
 
-    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked }]);
+    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked, fresh: false }]);
     // The board carries only how many, and a line with none picked says so.
     expect(store.board(nest)?.lines[0].picked).toBe(2);
     store.addCard(nest, { x: 0, y: 0, from: source.id });
