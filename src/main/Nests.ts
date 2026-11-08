@@ -1332,13 +1332,13 @@ export class Nests {
   }
 
   // A file's card's file, for Download, which writes it only where the user chooses.
-  // An HTML card's page goes as it runs on the board, with its policy, its data and its library, in the same sandboxed
-  // frame, so it still works, and requests nothing wherever the user opens it (see `htmlCardDownload` for what another
-  // browser may still look up).
+  // An HTML card's page goes as the bird wrote it, with its policy and its library in the same sandboxed frame, and with
+  // `window.nest.data` empty: the board's data stays here, since a browser it's opened in later can still look up a host
+  // name the page spells it out in (see `htmlCardDownload`). What the bird wrote into the page itself goes with it.
   fileDownload(cardId: unknown): { name: string; type: string; data: Uint8Array } | null {
     const file = typeof cardId === "string" ? this.store.fileOf(cardId) : null;
     if (file?.type === "text/html") {
-      const page = htmlCardDownload(htmlSource(file.data), this.htmlData(cardId as string), CHART_LIBRARY, sha256, file.name.replace(/\.html$/i, ""));
+      const page = htmlCardDownload(htmlSource(file.data), CHART_LIBRARY, sha256, file.name.replace(/\.html$/i, ""));
       return { name: file.name, type: file.type, data: new Uint8Array(Buffer.from(page, "utf8")) };
     }
     return file && { name: file.name, type: file.type, data: file.data };

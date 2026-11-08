@@ -1977,6 +1977,10 @@ describe("Files on the canvas", () => {
     const page = fileCards(nests, nest).find((card) => card.file?.type === "text/html")!;
     const dataOf = () => JSON.parse(/window\.nest = \{ data: (.*?), charts: null \};/.exec(nests.fileContent(page.id)!.html!)![1].replace(/\\u003c/g, "<"));
     expect(dataOf()).toMatchObject({ card: { answer: "Made a chart." }, inputs: [{ answer: null, table: picked }] });
+    // Downloaded, it's the page as the bird wrote it, with its data empty: none of what the board gave it.
+    const downloaded = Buffer.from(nests.fileDownload(page.id)!.data).toString("utf8");
+    expect(downloaded).toContain('window.nest = { data: {&quot;card&quot;:{&quot;bird&quot;:&quot;&quot;,&quot;answer&quot;:null,&quot;table&quot;:null},&quot;inputs&quot;:[],&quot;images&quot;:[]}');
+    for (const given of ["Company 1", "Company 3", "Made a chart.", "Scout"]) expect(downloaded).not.toContain(given);
 
     // Scout answers again without Company 3: the rows no longer go to the page, as they wouldn't go to a send.
     replies.push(TABLE(2));

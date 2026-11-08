@@ -70,7 +70,7 @@ describe("the policy", () => {
     expect(document.startsWith(`${HEAD}<meta http-equiv="Content-Security-Policy" content="${policyOf(document)}">${second}`)).toBe(true);
     // No hash, no host and no scheme, so an integrity attribute matches nothing, and inline scripts still need the hash.
     expect(directives(HTML_CARD_NO_SCRIPT_FILES)).toEqual(new Map([["script-src", ["'unsafe-inline'", "'unsafe-eval'"]]]));
-    const file = htmlCardDownload("<p></p>", EMPTY_HTML_DATA, null, sha256, "page");
+    const file = htmlCardDownload("<p></p>", null, sha256, "page");
     expect(file).toContain(`content="${policyOf(file)}">${second}`);
   });
 
@@ -129,7 +129,7 @@ describe("htmlCardDownload", () => {
   it("puts the page in the same sandboxed frame, in a page with no script that lets the frame go nowhere", () => {
     const html = '<p title="a & b">"</iframe><script>top.location = "https://evil.example/"</script></p>';
     const page = build(html);
-    const file = htmlCardDownload(html, EMPTY_HTML_DATA, null, sha256, 'chart "1" <b>');
+    const file = htmlCardDownload(html, null, sha256, 'chart "1" <b>');
     // The same policy as the page's, which the frame takes on too, so our script still runs there and nothing else.
     expect(policyOf(file)).toBe(policyOf(page));
     expect(directives(policyOf(file)).get("frame-src")).toEqual(["'none'"]);

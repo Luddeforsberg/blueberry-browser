@@ -1113,6 +1113,7 @@ const chart = new nest.charts(document.getElementById("chart"), {
   options: { animation: false, maintainAspectRatio: false },
 });
 document.body.dataset.drawn = JSON.stringify(chart.data.datasets[0].data);
+document.body.dataset.zero = String(nest.charts.defaults.scales.linear.beginAtZero);
 document.getElementById("sort").addEventListener("click", () => (document.body.dataset.sorted = JSON.stringify([...chart.data.datasets[0].data].sort((a, b) => b - a))));
 document.addEventListener("DOMContentLoaded", () => (document.body.dataset.ready = "yes"));
 </script></body></html>`;
@@ -1196,6 +1197,7 @@ test("a card makes an HTML card that charts its real data live, and a hostile on
     await expect(chartFrame).toHaveAttribute("sandbox", "allow-scripts");
     await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-drawn", "[12,30,7]");
     await expect(chartFrame.contentFrame().locator("h1")).toHaveText("Deals by Region");
+    await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-zero", "true");
     // Its script ran before DOMContentLoaded, as a page's own would, and a real click reaches it.
     await expect(chartFrame.contentFrame().locator("body")).toHaveAttribute("data-ready", "yes");
     await chartFrame.contentFrame().getByRole("button", { name: "Sort" }).click();
@@ -1241,13 +1243,16 @@ test("a card makes an HTML card that charts its real data live, and a hostile on
     await shots("html-card-open");
     await chartCard.getByRole("button", { name: "Close the page" }).click();
 
-    // Download writes the page as it runs here, with its policy, its data and its library, in the same sandboxed frame
-    // inside a page that runs nothing, only where the save dialog says.
+    // Download writes the page as the bird wrote it, with its policy and its library in the same sandboxed frame inside a
+    // page that runs nothing, and none of the board's data, only where the save dialog says, which says so.
     const folder = mkdtempSync(join(tmpdir(), "blueberry-nest-html-"));
     const download = async (name: string) => {
       const saveTo = join(folder, `${name}.html`);
       await app.evaluate(({ dialog }, path) => {
-        dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as never;
+        dialog.showSaveDialog = (async (_window: unknown, options: { title: string; message?: string }) => {
+          (globalThis as unknown as { saveAsked: unknown }).saveAsked = { title: options.title, message: options.message };
+          return { canceled: false, filePath: path };
+        }) as never;
       }, saveTo);
       const card = chrome.getByRole("group", { name: `The file ${name}.html` });
       await card.hover();
@@ -1259,17 +1264,21 @@ test("a card makes an HTML card that charts its real data live, and a hostile on
     const written = readFileSync(chartFile, "utf8");
     expect(written.startsWith('<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\';')).toBe(true);
     expect(written).toContain('<iframe sandbox="allow-scripts" ');
-    expect(written).toContain("&quot;rows&quot;:[[&quot;North&quot;,&quot;12&quot;],[&quot;South&quot;,&quot;30&quot;],[&quot;West&quot;,&quot;7&quot;]]");
+    for (const given of ["North", "South", "West", "Deals", "Region", "I made a chart of the deals."]) expect(written).not.toContain(given);
     expect(written).toContain("Chart.js v4.5.1");
-    // Opened as a file in a plain window, with none of the board's locks around it, the chart still draws, and the
-    // hostile one still reaches nothing.
+    expect(await app.evaluate(() => (globalThis as unknown as { saveAsked: unknown }).saveAsked)).toEqual({
+      title: "Download the page, without the board’s data",
+      message: "This is the page as the bird wrote it. The board’s data it reads on the card isn’t in it.",
+    });
+    // Opened as a file in a plain window, with none of the board's locks around it, the page loads with its data empty,
+    // and the hostile one still reaches nothing.
     const probeFile = await download("probe");
     // The probe's own page is gone once the policy refuses where it tried to go, so what it saw is read from what it said.
     const opened = await app.evaluate(async ({ BrowserWindow }, [chart, probe]) => {
       const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } });
       await window.loadFile(chart);
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      const drawn = await window.webContents.mainFrame.frames[0].executeJavaScript("document.body.dataset.drawn");
+      const drawn = await window.webContents.mainFrame.frames[0].executeJavaScript("JSON.stringify(window.nest.data) + ' ' + typeof window.nest.charts");
       let seen = "";
       window.webContents.on("console-message", ({ message }) => {
         if (message.startsWith("seen ")) seen = message.slice(5);
@@ -1279,7 +1288,7 @@ test("a card makes an HTML card that charts its real data live, and a hostile on
       window.destroy();
       return { drawn, seen };
     }, [chartFile, probeFile]);
-    expect(opened.drawn).toBe("[12,30,7]");
+    expect(opened.drawn).toBe('{"card":{"bird":"","answer":null,"table":null},"inputs":[],"images":[]} function');
     expect(JSON.parse(opened.seen)).toMatchObject({ api: "undefined", origin: "null", open: "null", fetch: "refused", rtc: "undefined/undefined/0", borrowed: "blocked", made: "threw" });
     expect(requests).toEqual([]);
     expect(connections).toBe(0);

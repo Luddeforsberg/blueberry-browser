@@ -92,10 +92,11 @@ document.addEventListener("readystatechange", () => {
 }, { once: true });
 }`;
 
-// The one script the policy lets run, so its hash is the page's. The HTML parser reads every line break as \n, which is
+// The one script the policy lets run, so its hash is the page's. Charts it draws count from zero unless told otherwise,
+// since an axis cut short makes a small change look large. The HTML parser reads every line break as \n, which is
 // what it's hashed as, and a NUL in it would read as something else, so a library with one isn't put in.
 const bootScript = (data: HtmlCardData, charts: string | null): string => {
-  const library = charts && !/<\/script|<!--|\0/i.test(charts) ? `${charts.replace(/\r\n?/g, "\n")}\n;window.nest.charts = window.Chart ?? null;\n` : "";
+  const library = charts && !/<\/script|<!--|\0/i.test(charts) ? `${charts.replace(/\r\n?/g, "\n")}\n;window.nest.charts = window.Chart ?? null;\ntry { window.Chart.defaults.scales.linear.beginAtZero = true; } catch {}\n` : "";
   return `${NO_WEBRTC}\nwindow.nest = { data: ${scriptJson(data)}, charts: null };\n${library}${RUN_PAGE}`;
 };
 
@@ -125,11 +126,12 @@ export const htmlCardDocument = (html: string, data: HtmlCardData, charts: strin
 // What Download writes: the same page in the same sandboxed frame, inside a page that has no script and lets its frame
 // go nowhere, since a browser it's opened in later has none of main's locks. Without it, a page opened on its own could
 // take the board's data along to any address by going there. The outer page has the same policy, since the frame takes
-// it on as well as its own, and it's what lets our script run in there. One thing it can't stop: a browser that looks up
-// the host of a <link rel="dns-prefetch"> or "preconnect" ahead of time, which no policy covers, so a page opened there
-// could still spell data out in a name it has looked up. Blueberry itself turns that off (`index.ts`).
-export const htmlCardDownload = (html: string, data: HtmlCardData, charts: string | null, sha256: (text: string) => string, title: string): string => {
-  const { page, policy } = buildPage(html, data, charts, sha256);
+// it on as well as its own, and it's what lets our script run in there. It never has the board's data: `window.nest.data`
+// is there but empty, since a browser that looks up the host of a <link rel="dns-prefetch"> or "preconnect" ahead of
+// time, which no policy covers, would let a page spell the data out in a name. Blueberry itself turns that off
+// (`index.ts`). What the bird wrote into the page itself still goes with it.
+export const htmlCardDownload = (html: string, charts: string | null, sha256: (text: string) => string, title: string): string => {
+  const { page, policy } = buildPage(html, EMPTY_HTML_DATA, charts, sha256);
   const attribute = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return (
     "<!doctype html><html><head>" +

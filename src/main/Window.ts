@@ -1527,8 +1527,11 @@ export class Window {
     if (!found) return false;
     const name = downloadName(found.name);
     const extension = /\.([a-z0-9]{1,8})$/i.exec(name)?.[1];
+    const page = found.type === "text/html";
     const { canceled, filePath } = await dialog.showSaveDialog(this._baseWindow, {
-      title: "Download",
+      title: page ? "Download the page, without the board’s data" : "Download",
+      // An HTML card's page leaves the board's data behind (`Nests.fileDownload`), so it says so. Only a Mac shows this.
+      ...(page ? { message: "This is the page as the bird wrote it. The board’s data it reads on the card isn’t in it." } : {}),
       defaultPath: join(app.getPath("downloads"), name),
       ...(extension ? { filters: [{ name: typeInWords(found.type), extensions: [extension] }] } : {}),
     });
