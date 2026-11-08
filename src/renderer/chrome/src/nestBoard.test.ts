@@ -199,25 +199,37 @@ describe('clearOfPeek', () => {
     // The peek over the composer, in the board box's pixels.
     const peek = { x: 300, y: 600, width: 600, height: 60 }
     const card = (x: number, y: number, height = 200) => ({ x, y, width: 440, height })
+    const view = { top: 72, width: 1200 }
 
     it('moves up just enough that a card under the peek ends a gap above it', () => {
-        expect(clearOfPeek([card(400, 450)], peek, 72)).toBe(600 - 12 - 650)
-        expect(clearOfPeek([card(400, 450), card(0, 200)], peek, 72)).toBe(-62)
+        expect(clearOfPeek([card(400, 450)], peek, view)).toBe(600 - 12 - 650)
+        expect(clearOfPeek([card(400, 450), card(0, 200)], peek, view)).toBe(-62)
     })
 
     it('leaves the board alone with nothing under the peek, beside it or above its gap', () => {
-        expect(clearOfPeek([], peek, 72)).toBe(0)
-        expect(clearOfPeek([card(400, 100)], peek, 72)).toBe(0)
-        expect(clearOfPeek([card(400, 388)], peek, 72)).toBe(0)
-        expect(clearOfPeek([card(910, 500)], peek, 72)).toBe(0)
-        expect(clearOfPeek([card(400, 700)], peek, 72)).toBe(0)
+        expect(clearOfPeek([], peek, view)).toBe(0)
+        expect(clearOfPeek([card(400, 100)], peek, view)).toBe(0)
+        expect(clearOfPeek([card(400, 388)], peek, view)).toBe(0)
+        expect(clearOfPeek([card(910, 500)], peek, view)).toBe(0)
+        expect(clearOfPeek([card(400, 700)], peek, view)).toBe(0)
     })
 
     it('leaves it when clearing would lift a card under it, or another in sight, past the top', () => {
-        expect(clearOfPeek([card(400, 200, 600)], peek, 72)).toBe(0)
-        expect(clearOfPeek([card(400, 450), card(0, 100)], peek, 72)).toBe(0)
+        expect(clearOfPeek([card(400, 200, 600)], peek, view)).toBe(0)
+        expect(clearOfPeek([card(400, 450), card(0, 100)], peek, view)).toBe(0)
         // A card already partly above the top doesn't hold it back.
-        expect(clearOfPeek([card(400, 450), card(0, -50)], peek, 72)).toBe(-62)
+        expect(clearOfPeek([card(400, 450), card(0, -50)], peek, view)).toBe(-62)
+    })
+
+    it('leaves it when clearing would slide a card from below under the peek', () => {
+        expect(clearOfPeek([card(400, 450), card(300, 700)], peek, view)).toBe(0)
+        expect(clearOfPeek([card(400, 450), card(300, 800)], peek, view)).toBe(-62)
+    })
+
+    it('lets a card out of sight to the side lift past the top', () => {
+        expect(clearOfPeek([card(400, 450), card(-1000, 100)], peek, view)).toBe(-62)
+        expect(clearOfPeek([card(400, 450), card(1300, 100)], peek, view)).toBe(-62)
+        expect(clearOfPeek([card(400, 450), card(1100, 100)], peek, view)).toBe(0)
     })
 })
 

@@ -151,7 +151,7 @@ export const SectionLayer: React.FC<SectionLayerProps> = ({ sections, selectedId
                 const selected = section.id === selectedId
                 // The name grows zoomed out, but stops short of the highest bird in the section.
                 const tops = inside(section.id).cards.map((card) => card.y)
-                const fontSize = sectionNameSize(zoom, tops.length > 0 ? Math.min(...tops) - PERCH.size - section.y : null)
+                const fontSize = sectionNameSize(zoom, tops.length > 0 ? Math.min(...tops) - PERCH.size - section.y : null, section.height)
                 const inset = fontSize * NAME_BOX.inset
                 return (
                     <div

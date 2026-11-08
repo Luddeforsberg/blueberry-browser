@@ -22,7 +22,7 @@ import type { CardGrantAccess } from "./Chats";
 import { checkAddress, cleanTitle, pageName } from "../shared/nestPages";
 import type { NestSince, UsedPage, WorkTabState } from "../shared/library";
 import type { EndedReply } from "./Chats";
-import { cardName, whose } from "../shared/nestNames";
+import { cardName, named, whose } from "../shared/nestNames";
 import { changedSince, missed, NO_RECAP, sinceFallback, type CardChange, type NestRecapWriter } from "./nestReturn";
 import type { CardKnows } from "../shared/nestKnows";
 import { agreed, changedLines, fingerprint, SENT_NOTHING } from "./nestStale";
@@ -1299,7 +1299,7 @@ export class Nests {
     if (!card) return false;
     this.store.stopWaiting(cardId);
     this.grants.end(cardId);
-    this.store.holdAfter(cardId, `Didn’t start, because ${this.labelOf(card)} was stopped`);
+    this.store.holdAfter(cardId, `Didn’t start, because ${named(cardName(card.title, this.labelOf(card)))} was stopped`);
     this.chatsOf(card).forEach((chatId) => this.chats.stop(chatId));
     this.changed(card.nestId);
     return true;
@@ -1727,7 +1727,7 @@ export class Nests {
   }
 
   private stateOf(source: NestCard): SourceState {
-    const name = this.labelOf(source);
+    const name = cardName(source.title, this.labelOf(source));
     // A file's rows, or a file, are there from the start.
     if (source.table || source.file || source.page || source.note) return { kind: "answered", name };
     if (source.plan?.state === "held") return { kind: "held", name };

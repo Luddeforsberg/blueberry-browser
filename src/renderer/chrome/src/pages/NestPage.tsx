@@ -576,7 +576,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             if (!box || flow.getNodes().some((node) => !node.measured?.height)) return false
             const { x, y, zoom } = flow.getViewport()
             const cards = rects().map((rect) => ({ x: rect.x * zoom + x, y: rect.y * zoom + y, width: rect.width * zoom, height: rect.height * zoom }))
-            const move = clearOfPeek(cards, { x: peek.left - box.left, y: peek.top - box.top, width: peek.width, height: peek.height }, VIEW_INSETS.top)
+            const move = clearOfPeek(cards, { x: peek.left - box.left, y: peek.top - box.top, width: peek.width, height: peek.height }, { top: VIEW_INSETS.top, width: box.width })
             if (move < 0) void flow.setViewport({ x, y: y + move, zoom }, MOVE)
             return true
         },

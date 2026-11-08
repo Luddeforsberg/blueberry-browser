@@ -116,21 +116,28 @@ describe("nameSize", () => {
 
 describe("sectionNameSize", () => {
   const box = NAME_BOX.inset + NAME_BOX.height;
-  it("grows as nameSize does while there's room above the highest bird, or no cards at all", () => {
-    expect(sectionNameSize(0.5, null)).toBe(nameSize(0.5));
-    expect(sectionNameSize(0.5, 1000)).toBe(nameSize(0.5));
-    expect(sectionNameSize(1, 60)).toBe(13);
+  const tall = 10_000;
+  it("grows as nameSize does while there's room above the highest bird and in the section", () => {
+    expect(sectionNameSize(0.5, null, tall)).toBe(nameSize(0.5));
+    expect(sectionNameSize(0.5, 1000, tall)).toBe(nameSize(0.5));
+    expect(sectionNameSize(1, 60, tall)).toBe(13);
   });
 
   it("stops where its box, inset included, would reach the highest bird", () => {
-    const size = sectionNameSize(0.5, 60);
+    const size = sectionNameSize(0.5, 60, tall);
     expect(size).toBeLessThan(nameSize(0.5));
     expect(size * box).toBeCloseTo(60);
   });
 
+  it("fits its box and an inset under it in the section, the smallest one at the furthest zoom too", () => {
+    const size = sectionNameSize(0.25, null, SECTION_SIZE.minHeight);
+    expect(size * (box + NAME_BOX.inset)).toBeLessThanOrEqual(SECTION_SIZE.minHeight);
+    expect(size * 0.25).toBeGreaterThanOrEqual(13);
+  });
+
   it("is never under 13px on screen, even with no room", () => {
-    expect(sectionNameSize(0.25, 60) * 0.25).toBe(13);
-    expect(sectionNameSize(0.25, 0) * 0.25).toBe(13);
-    expect(sectionNameSize(0.25, -40) * 0.25).toBe(13);
+    expect(sectionNameSize(0.25, 60, tall) * 0.25).toBe(13);
+    expect(sectionNameSize(0.25, 0, tall) * 0.25).toBe(13);
+    expect(sectionNameSize(0.25, -40, tall) * 0.25).toBe(13);
   });
 });

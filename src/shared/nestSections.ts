@@ -97,11 +97,12 @@ export const nameSize = (zoom: number): number => {
 export const NAME_BOX = { inset: 0.6, height: 1.55 };
 
 // The name's size, as `nameSize` has it, but never so big that its box reaches `room` board pixels down from the
-// section's top, where the highest bird in it stands, so no card covers it, and never under 13px on screen. Null room,
-// for a section with no cards, leaves it as it is.
-export const sectionNameSize = (zoom: number, room: number | null): number => {
-  const wanted = nameSize(zoom);
-  return room === null ? wanted : Math.max(13 / zoom, Math.min(wanted, room / (NAME_BOX.inset + NAME_BOX.height)));
+// section's top, where the highest bird in it stands, so no card covers it, or that its box and an inset under it are
+// taller than the section, and never under 13px on screen, which the smallest section has room for. Null room, for a
+// section with no cards, leaves only its height.
+export const sectionNameSize = (zoom: number, room: number | null, height: number): number => {
+  const fits = Math.min(height / (2 * NAME_BOX.inset + NAME_BOX.height), room === null ? Infinity : room / (NAME_BOX.inset + NAME_BOX.height));
+  return Math.max(13 / zoom, Math.min(nameSize(zoom), fits));
 };
 
 // The section a plan's cards go in: one fitted around them when the plan is two cards or more, named by the plan or else
