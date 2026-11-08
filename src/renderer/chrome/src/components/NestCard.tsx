@@ -605,12 +605,13 @@ const CutReply: React.FC<{ text: string; fill: boolean; onMore: () => void }> = 
 
 // The card opened: its whole chat, as the chat page draws it, and a field to reply in. `note` says what goes with a reply,
 // and why a reply couldn't be sent shows in its place.
-const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => Promise<NestSendEachResult>; note: string | null; bordered?: boolean }> = ({
+const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (text: string) => Promise<NestSendEachResult>; note: string | null; bordered?: boolean; autoFocus?: boolean }> = ({
     thread,
     mascot,
     onSend,
     note,
-    bordered = true
+    bordered = true,
+    autoFocus = true
 }) => {
     const name = useAssistantName(mascot)
     const [problem, setProblem] = useState<string | null>(null)
@@ -657,7 +658,7 @@ const WholeChat: React.FC<{ thread: ChatThread; mascot: MascotProfile; onSend: (
                             note && <p className="px-2 text-12 text-muted-foreground">{note}</p>
                         )
                     }
-                    autoFocus
+                    autoFocus={autoFocus}
                 />
             </div>
         </div>
@@ -1242,6 +1243,11 @@ const VersionsCard: React.FC<{ card: NestCard; versions: NestVersions; box: Card
     const unstarted = views.filter((view) => view.phase === 'not-started').length
     const current = views.find((view) => view.run.id === shown) ?? views[0]
     const full = count >= MAX_VERSIONS
+    // Opened, the version shown closed, or the one Needs you opened it at, is the column in view.
+    const shownColumn = useRef<HTMLElement>(null)
+    useEffect(() => {
+        if (open) shownColumn.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }, [open, current?.run.id])
     const reads = inputs.length > 0 ? `Gets ${listed(inputs.map((input) => getsWhat(input)))} when you send` : null
 
     return (
@@ -1295,7 +1301,10 @@ const VersionsCard: React.FC<{ card: NestCard; versions: NestVersions; box: Card
                 {open ? (
                     <div className="nodrag nowheel cursor-auto flex overflow-x-auto border-t">
                         {views.map((view) => (
-                            <section key={view.run.id} data-version={view.run.letter} aria-label={`Version ${view.run.letter}`} className="shrink-0 flex flex-col border-r last:border-r-0" style={{ width: VERSION_COLUMN }}>
+                            <section
+                                key={view.run.id}
+                                ref={view === current ? shownColumn : undefined}
+                                data-version={view.run.letter} aria-label={`Version ${view.run.letter}`} className="shrink-0 flex flex-col border-r last:border-r-0" style={{ width: VERSION_COLUMN }}>
                                 <div className="px-5 pt-3 flex items-center gap-2">
                                     <span className="text-14 font-semibold">{view.run.letter}</span>
                                     {view.picked && <Star aria-label="Picked" className="size-3.5 fill-accent-ink text-accent-ink" />}
@@ -1304,7 +1313,14 @@ const VersionsCard: React.FC<{ card: NestCard; versions: NestVersions; box: Card
                                 <VersionNote note={view.run.note} className="px-5 pt-1" />
                                 <VersionActions cardId={card.id} view={view} full={full} className="px-5 pt-2" />
                                 {view.thread ? (
-                                    <WholeChat thread={view.thread} mascot={mascot} bordered={false} onSend={(text) => window.chromeAPI.nests.sendRun(view.run.id, text)} note={reads} />
+                                    <WholeChat
+                                        thread={view.thread}
+                                        mascot={mascot}
+                                        bordered={false}
+                                        autoFocus={view === current}
+                                        onSend={(text) => window.chromeAPI.nests.sendRun(view.run.id, text)}
+                                        note={reads}
+                                    />
                                 ) : (
                                     <p className="px-5 py-4 text-13 text-muted-foreground">{VERSION_WORDS[view.phase]}</p>
                                 )}

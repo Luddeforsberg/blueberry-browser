@@ -930,7 +930,7 @@ export class NestStore {
         for (const each of card.from) {
           const from = "plan" in each ? ids.get(each.plan) : each.card;
           const source = from === undefined ? null : this.card(from);
-          if (!source || source.nestId !== nestId || (!("plan" in each) && !source.chatId && !source.each && !source.table && !source.file)) throw new NotHere();
+          if (!source || source.nestId !== nestId || (!("plan" in each) && !source.chatId && !source.each && !source.versions && !source.table && !source.file)) throw new NotHere();
           line.run(randomUUID(), nestId, from!, ids.get(card.key)!);
         }
       }

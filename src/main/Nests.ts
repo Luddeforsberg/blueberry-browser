@@ -990,6 +990,11 @@ export class Nests {
   // One version starting, when its turn comes, as the card's bird, with the card's prompt, what the card's lines give
   // now, the card's files, and its own note. A run of More like this also gets the version it's like, as data.
   private startVersion(card: NestCard & { nestId: string }, runId: string): boolean {
+    // A version of More like this waits for the one it's like while that one is still to answer, as after Update, so it
+    // gets its thread. If that one ends with no answer, this one goes without it.
+    const like = this.store.likeOf(runId);
+    const liked = like ? card.versions!.runs.find((run) => run.id === like) : undefined;
+    if (liked && (liked.state === "waiting" || (!!liked.chatId && this.chats.isRunning(liked.chatId)))) return false;
     const cardAnswers = this.versionInputs(card, runId);
     const sent =
       cardAnswers &&
@@ -1115,7 +1120,7 @@ export class Nests {
     const threads = versions.runs.map((run) => ({ run, exchanges: run.chatId ? threadOf(this.chats.thread(run.chatId)?.messages ?? []) : [] }));
     if (versions.pick) {
       const picked = threads.find(({ run }) => run.id === versions.pick);
-      return picked && picked.exchanges.length > 0 ? { name, part: "thread", exchanges: picked.exchanges } : null;
+      return picked && picked.exchanges.length > 0 ? { name, part: "thread", exchanges: picked.exchanges, pick: picked.run.id } : null;
     }
     const answered = threads.filter(({ exchanges }) => exchanges.length > 0);
     return answered.length > 0 ? { name, part: "versions", versions: answered.map(({ run, exchanges }) => ({ letter: run.letter, note: run.note, exchanges })) } : null;

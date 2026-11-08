@@ -3222,6 +3222,56 @@ describe("Versions of a card", () => {
     expect(cardOf(nests, nest, writer.id).title).toBe(`Title for ${chats.thread(cardOf(nests, nest, writer.id).versions!.runs[1].chatId!)!.messages[1].content}`);
   });
 
+  it("counts a new pick as a change even when the two versions said the same", async () => {
+    const { nests, nest, writer, chats, sendAndWait } = await scouted();
+    replies.push("Same words", "Same words");
+    nests.sendVersions(writer.id, "Write", ["Short", "Long"]);
+    await idle(nests, chats, writer.id);
+    const [first, second] = cardOf(nests, nest, writer.id).versions!.runs;
+    nests.pickVersion(writer.id, first.id);
+    const after = nests.addCard(nest, { x: 1000, y: 0, from: writer.id })!;
+    await sendAndWait(after.id, "Use it");
+    nests.pickVersion(writer.id, second.id);
+    expect(cardOf(nests, nest, after.id).earlierChanged).toBe(true);
+  });
+
+  it("starts a version of More like this only once the one it's like has answered again, so it gets its new thread", async () => {
+    const { nests, nest, scout, writer, chats, sendAndWait } = await scouted();
+    replies.push("Alpha", "Beta");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    const second = cardOf(nests, nest, writer.id).versions!.runs[1];
+    replies.push("Gamma");
+    nests.moreLikeThis(writer.id, second.id);
+    await idle(nests, chats, writer.id);
+    replies.push("New leads");
+    await sendAndWait(scout.id, "Again");
+    held = [];
+    replies.push("Alpha 2", "Beta 2", "Gamma 2");
+    expect(nests.updateCard(writer.id, true)).toEqual({ ok: true });
+    await settle();
+    // A and B go, and C waits for B.
+    expect(cardOf(nests, nest, writer.id).versions!.runs.map((run) => run.state)).toEqual(["started", "started", "waiting"]);
+    while (held.length > 0 || cardOf(nests, nest, writer.id).versions!.runs.some((run) => run.state === "waiting")) await release();
+    await idle(nests, chats, writer.id);
+    const message = textOf(sent.at(-1)!);
+    expect(message).toContain("This is version C of 3");
+    expect(message).toContain('<card_thread from="Version B">');
+    expect(message).toContain("Beta 2");
+  });
+
+  it("lets a plan read from a card of versions", async () => {
+    const { nests, nest, writer, chats } = await scouted();
+    replies.push("Hej", "Dear");
+    nests.sendVersions(writer.id, "Write", ["", ""]);
+    await idle(nests, chats, writer.id);
+    plans.push({ reply: "Laid out.", ask: false, cards: [planCard("c1", { prompt: "Polish the emails", from: "e2" }), planCard("c2", { prompt: "Then this", from: "c1" })] });
+    await nests.ask(nest, "Polish them, then send a summary", PLACE);
+    const plannedCards = nests.board(nest)!.cards.filter((card) => card.plan);
+    expect(plannedCards).toHaveLength(2);
+    expect(nests.board(nest)!.lines.some((line) => line.from === writer.id && line.to === plannedCards[0].id)).toBe(true);
+  });
+
   it("lets Berry read a card of versions when it plans, as what crosses its lines", async () => {
     const { nests, nest, writer, chats } = await scouted();
     replies.push("Hej", "Dear");

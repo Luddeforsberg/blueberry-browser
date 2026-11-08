@@ -308,7 +308,8 @@ export const crossingOf = (answer: CardAnswer): Crossing => {
 // One card's input before it's fitted into the room: a card's thread, rows picked from a table, a whole table, or the
 // one row a run of For each row gets.
 export type RawInput = { name: string; fromFile?: boolean } & (
-  | { part: "thread"; exchanges: readonly Exchange[] }
+  // `pick` on the thread of a card of versions' pick: which version it is, so picking another always counts as a change.
+  | { part: "thread"; exchanges: readonly Exchange[]; pick?: string }
   | { part: "rows" | "table"; table: PickedRows }
   | { part: "row"; header: readonly string[]; row: readonly string[] }
   | { part: "page"; url: string; title: string; tabId: string | null }
@@ -452,10 +453,13 @@ const fitOne = (input: RawInput, share: number): CardAnswer => {
     const shares = shareRoom(input.versions.map(versionLength), share);
     const fitted = input.versions.map((version, index): VersionThread | null => {
       const room = shares[index] - VERSION_TAGS;
-      const note = room > 0 ? cutText(version.note, Math.min(version.note.length, Math.floor(room / 4))) : "";
+      const fits = versionLength(version) <= shares[index];
+      const note = fits ? version.note : room > 0 ? cutText(version.note, Math.min(version.note.length, Math.floor(room / 4))) : "";
       const thread = fitThread(version.exchanges, Math.max(0, room - note.length));
       const noteCut = note.length < version.note.length;
-      return room > 0 && thread.exchanges.length > 0 ? { letter: version.letter, note, ...thread, cut: thread.cut || noteCut } : null;
+      // A version whose answers had no room at all is left out, not sent as an empty thread.
+      const kept = room > 0 && thread.exchanges.some((exchange) => exchange.answer.trim() !== "");
+      return kept ? { letter: version.letter, note, ...thread, cut: thread.cut || noteCut } : null;
     });
     const versions = fitted.filter((version) => version !== null);
     return { name, text: "", part: "versions", fromFile, versions, ...(versions.length < fitted.length ? { cut: true } : {}) };
