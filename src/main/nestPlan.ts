@@ -2,6 +2,7 @@ import type { ChatThread } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 import { latestAnswer } from "./nestContext";
 import { MAX_INPUTS } from "../shared/nestTable";
+import { sectionName } from "../shared/nestSections";
 
 // Berry plans a request in a Nest's composer as cards: this checks what the model laid out, and decides when each card of
 // a plan the user ran may start. It's pure, so the rules can be tested without a model or a window.
@@ -41,7 +42,8 @@ export interface PlanCard {
 
 // `answer` when the reply answers a question about the board from its cards, with no cards. It's shown and nothing else:
 // it can't run, start or change anything.
-export type CheckedPlan = { ok: true; reply: string; ask: boolean; answer?: boolean; cards: PlanCard[] } | { ok: false; problem: string };
+// `section` is the short name the plan gave its cards together, cleaned, when it gave one.
+export type CheckedPlan = { ok: true; reply: string; ask: boolean; answer?: boolean; cards: PlanCard[]; section?: string } | { ok: false; problem: string };
 
 const NOT_A_PLAN = "what came back wasn’t shaped like a plan";
 export const NO_CARDS = "it came back with no cards";
@@ -122,7 +124,8 @@ export const checkPlan = (
     if (!table) return { ok: false, problem: "For each row was on a card that doesn’t get a table" };
   }
 
-  return { ok: true, reply, ask: false, cards: ordered.map(({ fromKeys: _, ...card }) => card) };
+  const section = sectionName(raw.section);
+  return { ok: true, reply, ask: false, cards: ordered.map(({ fromKeys: _, ...card }) => card), ...(section ? { section } : {}) };
 };
 
 // Each card after every card it reads from, or null if they go round in a circle.

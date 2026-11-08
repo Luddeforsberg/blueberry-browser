@@ -109,7 +109,7 @@ export const startFakeModel = async () => {
     // A Nest's planner asks the main model for an answer in a set shape, all at once.
     if (parsed.response_format?.json_schema?.name === "nest_plan") {
       planRequests.push(parsed);
-      const plan = plans.shift() ?? { reply: "I couldn't plan that.", ask: true, answers_board: false, cards: [] };
+      const plan = plans.shift() ?? { reply: "I couldn't plan that.", ask: true, answers_board: false, section: null, cards: [] };
       const heldPlan = planHold;
       planHold = null;
       if (heldPlan) await heldPlan;
@@ -233,9 +233,9 @@ export const startFakeModel = async () => {
     },
     // What the planner answers next, as the model would in the plan's shape. Call again for the one after.
     // A card that names no files gets none, as the real model says with an empty list, and a plan isn't an answer about
-    // the board unless it says so.
+    // the board unless it says so, or in a section of its own name unless it says one.
     planWith(next: { cards?: object[]; [key: string]: unknown }) {
-      plans.push({ answers_board: false, ...next, ...(next.cards ? { cards: next.cards.map((card) => ({ attached: [], ...card })) } : {}) });
+      plans.push({ answers_board: false, section: null, ...next, ...(next.cards ? { cards: next.cards.map((card) => ({ attached: [], ...card })) } : {}) });
     },
     // What the cheap model proposes for a bird to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {

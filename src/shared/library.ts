@@ -3,6 +3,7 @@
 
 import type { LineCrossing } from "./nestTable";
 import type { CardKnows } from "./nestKnows";
+import type { NestSectionColor } from "./nestSections";
 
 export interface Bookmark {
   id: string;
@@ -644,11 +645,24 @@ export interface NestLine {
   changed?: true;
 }
 
+// A named, coloured area behind cards. Which cards are in it isn't kept: it's the cards whose centre is inside it, by
+// `inSection`, so moving it moves them and a card dragged in or out joins or leaves it.
+export interface NestSection {
+  id: string;
+  name: string;
+  color: NestSectionColor;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface NestBoard {
   id: string;
   title: string;
   cards: NestCard[];
   lines: NestLine[];
+  sections: NestSection[];
   // The Nest's whole conversation in its composer, oldest first, up to the newest requests a board carries.
   talk: NestRequest[];
   // The composer is tucked down to a tab at the board's bottom edge.

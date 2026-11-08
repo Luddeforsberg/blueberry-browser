@@ -153,9 +153,11 @@ const Drawer: React.FC<{
 }
 
 // The cards selected on the board, which the next message asks about alone. The × lets them go.
-export const AboutChip: React.FC<{ count: number; onClear: () => void }> = ({ count, onClear }) => (
+// Names the section instead when exactly its cards are selected, from a press on its name. The name stays here: Berry gets
+// only the cards, by id, as with any selection.
+export const AboutChip: React.FC<{ count: number; name?: string | null; onClear: () => void }> = ({ count, name, onClear }) => (
     <span data-about-chip className="inline-flex items-center h-7 pl-2.5 pr-1 gap-1 rounded-full bg-muted text-13">
-        Ask about {plural(count, 'card')}
+        <span className="truncate max-w-64">Ask about {name ?? plural(count, 'card')}</span>
         <button
             type="button"
             aria-label="Ask about the whole board"

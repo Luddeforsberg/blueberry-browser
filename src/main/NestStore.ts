@@ -2,12 +2,13 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile, NestTalkMessage, NestVersion, NestVersions } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestSection, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile, NestTalkMessage, NestVersion, NestVersions } from "../shared/library";
 import { MAX_VERSIONS, versionLetter } from "../shared/nestVersions";
 import type { SentAttachment } from "./nestFiles";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
 import type { CardKnows } from "../shared/nestKnows";
+import type { NestSectionColor } from "../shared/nestSections";
 
 const KNOWS_COUNTS = ["cards", "pages", "files", "notes", "cut", "leftOutCards", "leftOutFiles"] as const;
 
@@ -204,8 +205,20 @@ const MIGRATIONS = [
   `ALTER TABLE lines ADD COLUMN sent_with TEXT;
    ALTER TABLE runs ADD COLUMN sent_with TEXT;
    ALTER TABLE cards ADD COLUMN knows TEXT;`,
-  // Kept for sections behind cards, which are built alongside versions. Whichever lands second takes its own place.
-  ``,
+  // Sections: named, coloured areas behind cards. The cards in one aren't kept, since they're the ones whose centre is
+  // inside it. `planned` is 1 on the section around a plan that hasn't run, which goes or changes with the plan.
+  `CREATE TABLE sections (
+     id TEXT PRIMARY KEY,
+     nest_id TEXT NOT NULL REFERENCES nests(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     color TEXT NOT NULL CHECK (color IN ('yellow', 'green', 'blue', 'pink', 'purple', 'gray')),
+     x REAL NOT NULL,
+     y REAL NOT NULL,
+     width REAL NOT NULL,
+     height REAL NOT NULL,
+     planned INTEGER NOT NULL DEFAULT 0
+   );
+   CREATE INDEX sections_by_nest ON sections(nest_id);`,
   // Versions of one card: `versions` is 1 on a card sent as several, whose runs are its versions, each with its note as
   // its row, and `version_pick` the one whose thread crosses its lines. A version made with More like this keeps the one
   // it's like in `like_run`, and each version keeps what it knew, as a card does, since the card's follows the pick.
@@ -398,7 +411,73 @@ export class NestStore {
         .all(id) as unknown as (Omit<NestLine, "fresh"> & { fresh: number })[]
     ).map(({ fresh, ...line }) => ({ ...line, picked: line.picked ?? null, ...(fresh ? { fresh: true as const } : {}) }));
     const tucked = this.db.prepare("SELECT composer_tucked AS tucked FROM nests WHERE id = ?").get(id) as { tucked: number };
-    return { ...nest, cards, lines, talk: this.talk(id), composerTucked: tucked.tucked === 1, attached: this.attachmentsOf({ nestId: id }) };
+    return { ...nest, cards, lines, sections: this.sections(id), talk: this.talk(id), composerTucked: tucked.tucked === 1, attached: this.attachmentsOf({ nestId: id }) };
+  }
+
+  // Oldest first, so a newer section draws over an older one it overlaps.
+  sections(nestId: string): NestSection[] {
+    return this.db
+      .prepare("SELECT id, name, color, x, y, width, height FROM sections WHERE nest_id = ? ORDER BY rowid")
+      .all(nestId) as unknown as NestSection[];
+  }
+
+  // The colours the board's sections have. A new plan replaces the section around the plan that hasn't run, so for it
+  // that one's colour is free: `besidesPlan`.
+  sectionColors(nestId: string, besidesPlan = false): NestSectionColor[] {
+    return (
+      this.db.prepare(`SELECT color FROM sections WHERE nest_id = ?${besidesPlan ? " AND planned = 0" : ""} ORDER BY rowid`).all(nestId) as { color: NestSectionColor }[]
+    ).map((row) => row.color);
+  }
+
+  section(id: string): (NestSection & { nestId: string }) | null {
+    return (this.db.prepare("SELECT id, nest_id AS nestId, name, color, x, y, width, height FROM sections WHERE id = ?").get(id) as unknown as (NestSection & { nestId: string }) | undefined) ?? null;
+  }
+
+  addSection(nestId: string, { name, color, x, y, width, height }: Omit<NestSection, "id">): NestSection | null {
+    if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) return null;
+    const id = randomUUID();
+    this.db.prepare("INSERT INTO sections (id, nest_id, name, color, x, y, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(id, nestId, name, color, x, y, width, height);
+    this.touch(nestId);
+    return { id, name, color, x, y, width, height };
+  }
+
+  // Its name, colour or size. A section the user changes is theirs, so a new plan no longer replaces it.
+  editSection(id: string, change: { name?: string; color?: NestSectionColor; rect?: { x: number; y: number; width: number; height: number } }): boolean {
+    const { name, color, rect } = change;
+    return (
+      this.db
+        .prepare(
+          `UPDATE sections SET name = COALESCE(?, name), color = COALESCE(?, color), x = COALESCE(?, x), y = COALESCE(?, y),
+           width = COALESCE(?, width), height = COALESCE(?, height), planned = 0 WHERE id = ?`
+        )
+        .run(name ?? null, color ?? null, rect?.x ?? null, rect?.y ?? null, rect?.width ?? null, rect?.height ?? null, id).changes > 0
+    );
+  }
+
+  // A section moved, with the cards and sections inside it, in one go. Only cards and sections of its own Nest move, and
+  // a moved card counts as moved by hand.
+  moveSection(id: string, to: { x: number; y: number }, cards: readonly { id: string; x: number; y: number }[], sections: readonly { id: string; x: number; y: number }[]): boolean {
+    const section = this.section(id);
+    if (!section) return false;
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare("UPDATE sections SET x = ?, y = ?, planned = 0 WHERE id = ?").run(to.x, to.y, id);
+      const card = this.db.prepare("UPDATE cards SET x = ?, y = ?, auto_placed = 0 WHERE id = ? AND nest_id = ?");
+      for (const move of cards) card.run(move.x, move.y, move.id, section.nestId);
+      const inner = this.db.prepare("UPDATE sections SET x = ?, y = ?, planned = 0 WHERE id = ? AND nest_id = ? AND id <> ?");
+      for (const move of sections) inner.run(move.x, move.y, move.id, section.nestId, id);
+      this.touch(section.nestId);
+      this.db.exec("COMMIT");
+      return true;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  // Only the section: the cards in it stay where they are.
+  deleteSection(id: string): boolean {
+    return this.db.prepare("DELETE FROM sections WHERE id = ?").run(id).changes > 0;
   }
 
   // `settled` for a name that's final already, such as a chat's when the chat becomes a Nest.
@@ -897,7 +976,7 @@ export class NestStore {
 
   // Puts a plan on the board in place of the one there, if any, with the lines into its cards, in one go. A line from the
   // board only comes from a card in this Nest that has been sent. Null if anything doesn't fit, and then nothing changes.
-  setPlan(nestId: string, cards: readonly NewPlannedCard[], said: string): string[] | null {
+  setPlan(nestId: string, cards: readonly NewPlannedCard[], said: string, section: Omit<NestSection, "id"> | null = null): string[] | null {
     const ids = new Map(cards.map((card) => [card.key, randomUUID()]));
     this.db.exec("BEGIN");
     try {
@@ -925,6 +1004,13 @@ export class NestStore {
       }
       const remove = this.db.prepare("DELETE FROM cards WHERE id = ?");
       for (const id of replaced) remove.run(id);
+      // The section around the old plan goes with it, and the new plan gets its own when it's several cards.
+      this.db.prepare("DELETE FROM sections WHERE nest_id = ? AND planned = 1").run(nestId);
+      if (section) {
+        this.db
+          .prepare("INSERT INTO sections (id, nest_id, name, color, x, y, width, height, planned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)")
+          .run(randomUUID(), nestId, section.name, section.color, section.x, section.y, section.width, section.height);
+      }
       const line = this.db.prepare("INSERT INTO lines (id, nest_id, from_card, to_card) VALUES (?, ?, ?, ?)");
       for (const card of cards) {
         for (const each of card.from) {
@@ -973,6 +1059,7 @@ export class NestStore {
       const remove = this.db.prepare("DELETE FROM attachments WHERE id = ? AND card_id IS NULL");
       for (const id of handedOut) remove.run(id);
       const armed = Number(this.db.prepare("UPDATE cards SET plan = 'armed' WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
+      this.db.prepare("UPDATE sections SET planned = 0 WHERE nest_id = ?").run(nestId);
       if (armed > 0) this.touch(nestId);
       this.db.exec("COMMIT");
       return armed;
@@ -986,6 +1073,7 @@ export class NestStore {
   // them, and the composer's own stay as they are.
   discardPlan(nestId: string): number {
     this.db.prepare("UPDATE attachments SET card_id = NULL WHERE card_id IN (SELECT id FROM cards WHERE nest_id = ? AND plan = 'planned')").run(nestId);
+    this.db.prepare("DELETE FROM sections WHERE nest_id = ? AND planned = 1").run(nestId);
     return Number(this.db.prepare("DELETE FROM cards WHERE nest_id = ? AND plan = 'planned'").run(nestId).changes);
   }
 

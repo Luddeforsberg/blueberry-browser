@@ -114,6 +114,10 @@ const chromeAPI: ChromeAPI = {
     updateCard: (cardId, confirmed) => invoke("nests:update-card", cardId, confirmed),
     moveCard: (cardId, x, y) => invoke("nests:move-card", cardId, x, y),
     resizeCard: (cardId, width, height) => invoke("nests:resize-card", cardId, width, height),
+    addSection: (nestId, rect) => invoke("nests:add-section", nestId, rect),
+    editSection: (sectionId, change) => invoke("nests:edit-section", sectionId, change),
+    moveSection: (sectionId, move) => invoke("nests:move-section", sectionId, move),
+    deleteSection: (sectionId) => invoke("nests:delete-section", sectionId),
     nudgeCards: (nestId, moves) => invoke("nests:nudge-cards", nestId, moves),
     setBird: (cardId, mascotId) => invoke("nests:set-bird", cardId, mascotId),
     deleteCard: (cardId) => invoke("nests:delete-card", cardId),
@@ -158,6 +162,7 @@ const chromeAPI: ChromeAPI = {
     onFocus: (callback) => subscribe("nests:focus", callback),
     onHandOff: (callback) => subscribe("nests:hand-off", callback),
     onZoom: (callback) => subscribe("nests:zoom", callback),
+    onGroup: (callback) => subscribe("nests:group", () => callback()),
   },
   work: {
     watch: (chatId, pictureWidth) => invoke("work:watch", chatId, pictureWidth),
