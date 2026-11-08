@@ -8,6 +8,7 @@ import type { PageTool } from "./browserTools";
 import type { Tab } from "./Tab";
 import type { MascotProfile, NestBoard } from "../shared/library";
 import type { NestWriter } from "./nestCells";
+import type { CardChange, NestRecapWriter } from "./nestReturn";
 import { BERRY } from "../shared/mascots";
 import { lineWords, STALE_ROWS } from "../shared/nestTable";
 import { CARD_SIZE } from "../shared/nestPlace";
@@ -102,7 +103,8 @@ const planner: NestPlanner = {
   },
 };
 
-const setup = (namer?: NestNamer, writer?: NestWriter) => {
+const setup = (namer?: NestNamer, writer?: NestWriter, recap?: NestRecapWriter) => {
+  const made: { nests?: Nests } = {};
   const chatStore = new ChatStore(":memory:");
   const store = new NestStore(":memory:");
   let ended = () => {};
@@ -118,6 +120,8 @@ const setup = (namer?: NestNamer, writer?: NestWriter) => {
   }, {
     onChunk: () => {},
     onThread: (thread) => {
+      // As the window tells it, so a card whose chat starts waiting has changed.
+      made.nests?.threadChanged(thread);
       if (thread.partial === null) ended();
     },
     onListChanged: () => {},
@@ -143,7 +147,8 @@ const setup = (namer?: NestNamer, writer?: NestWriter) => {
       return tab ? chats.pageToKeep(tab as unknown as Tab) : null;
     },
     work: (chatId) => (chats.isRunning(chatId) ? { tabs: (jobTabs.get(chatId) ?? []).map((id, index, all) => ({ id, state: "picture" as const, current: index === all.length - 1 })) } : null),
-  });
+  }, recap);
+  made.nests = nests;
   // Resolves once the reply that's running has been saved.
   const replyEnded = () => new Promise<void>((resolve) => (ended = resolve));
   const sendAndWait = async (cardId: string, text: string) => {
@@ -2434,5 +2439,156 @@ describe("Tabs and links on the board", () => {
     expect(JSON.stringify(nests.board(nest))).not.toContain("481516");
     expect(nests.board(nest)!.cards.find((card) => card.id === scout.id)!.showingTabs).toBeUndefined();
     expect(nests.showTabs(scout.id, true)).toBe(false);
+  });
+});
+
+describe("Coming back to a board", () => {
+  const titles = (title: (prompt: string, answer: string) => Promise<string | null>, since: (changes: readonly CardChange[]) => Promise<string | null> = async () => null): NestRecapWriter => ({ title, since });
+  const settleAll = async () => {
+    for (let tries = 0; tries < 10; tries++) await settle();
+  };
+  // Long enough that what changes next is later than when the Nest was left, by the clock.
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 3));
+
+  it("names a card for what its answer found, from only its prompt and answer, and never replaces a title the user typed", async () => {
+    const asked: [string, string][] = [];
+    const named = ["12 candidates, 4 strong", "14 candidates, 5 strong", "Should not land"];
+    const { nests, sendAndWait } = setup(undefined, undefined, titles(async (prompt, answer) => (asked.push([prompt, answer]), named.shift() ?? null)));
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    // A draft has no title to give.
+    expect(nests.renameCard(scout.id, "Too soon")).toBe(false);
+    replies.push("Found 12 candidates. 4 look strong.");
+    await sendAndWait(scout.id, "Find candidates");
+    await settleAll();
+    expect(asked).toEqual([["Find candidates", "Found 12 candidates. 4 look strong."]]);
+    expect(nests.board(nest)!.cards[0]).toMatchObject({ title: "12 candidates, 4 strong", titleSettled: false });
+
+    replies.push("Found two more.");
+    await sendAndWait(scout.id, "Look again");
+    await settleAll();
+    expect(nests.board(nest)!.cards[0].title).toBe("14 candidates, 5 strong");
+
+    expect(nests.renameCard(scout.id, "  My shortlist ")).toBe(true);
+    replies.push("Found one more.");
+    await sendAndWait(scout.id, "And again");
+    await settleAll();
+    expect(nests.board(nest)!.cards[0]).toMatchObject({ title: "My shortlist", titleSettled: true });
+    expect(asked).toHaveLength(2);
+  });
+
+  it("names nothing from a reply that failed or came back empty, or when the model has no title", async () => {
+    let calls = 0;
+    const { nests, sendAndWait } = setup(undefined, undefined, titles(async () => (calls++, null)));
+    const nest = nests.create();
+    const card = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push(FAILS);
+    await sendAndWait(card.id, "Find candidates");
+    replies.push("");
+    await sendAndWait(card.id, "Try again");
+    await settleAll();
+    expect(calls).toBe(0);
+    replies.push("Found 3.");
+    await sendAndWait(card.id, "Once more");
+    await settleAll();
+    expect(calls).toBe(1);
+    expect(nests.board(nest)!.cards[0]).not.toHaveProperty("title");
+  });
+
+  it("puts a dot on a card that finished, failed or started waiting while nobody looked at it, until it's opened", async () => {
+    const { nests, chats, sendAndWait, replyEnded } = setup();
+    const nest = nests.create();
+    const card = nests.addCard(nest, { x: 0, y: 0 })!;
+    const unread = () => !!nests.board(nest)!.cards[0].unread;
+
+    // Its Nest open, and the card just sent, before the board has said what's in sight.
+    nests.screen(nest, true);
+    await sendAndWait(card.id, "First");
+    expect(unread()).toBe(false);
+    // The card in sight.
+    nests.inView(nest, [card.id]);
+    await sendAndWait(card.id, "Find candidates");
+    expect(unread()).toBe(false);
+
+    // Moved off-screen on the board while it works, and with the window hidden.
+    const ends = replyEnded();
+    nests.send(card.id, "Again");
+    nests.inView(nest, []);
+    await ends;
+    expect(unread()).toBe(true);
+    expect(nests.readCard(card.id)).toBe(true);
+    expect(unread()).toBe(false);
+    expect(nests.readCard(card.id)).toBe(false);
+    nests.inView(nest, [card.id]);
+    nests.screen(nest, false);
+    replies.push(FAILS);
+    await sendAndWait(card.id, "Again");
+    expect(unread()).toBe(true);
+    nests.readCard(card.id);
+
+    // Another tab in front, and the card starts waiting for an OK.
+    nests.screen(null, true);
+    asking = { key: "save", words: "Save" };
+    nests.send(card.id, "Save a draft");
+    await vi.waitFor(() => expect(chats.thread(nests.board(nest)!.cards[0].chatId!)?.approval).toBeTruthy());
+    expect(unread()).toBe(true);
+    nests.readCard(card.id);
+    // Stopped by the user is no news.
+    const stopped = sendAndWait(card.id, "x").catch(() => {});
+    nests.stopCard(card.id);
+    await stopped;
+    await settleAll();
+    expect(unread()).toBe(false);
+  });
+
+  it("says what changed since the Nest was last open, from only those cards, and highlights them", async () => {
+    const read: CardChange[][] = [];
+    const { nests, sendAndWait } = setup(undefined, undefined, titles(async () => "Two companies", async (changes) => (read.push([...changes]), "Scout found two companies.")));
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    const writer = nests.addCard(nest, { x: 500, y: 0 })!;
+    // Opened for the first time, there's nothing to come back to.
+    nests.screen(nest, true);
+    replies.push("Wrote it.");
+    await sendAndWait(writer.id, "Write while I watch");
+    nests.screen(null, true);
+    await tick();
+    replies.push("Lindqvist Data and Fjällbo");
+    await sendAndWait(scout.id, "Find two companies");
+    await settleAll();
+    expect(read).toEqual([]);
+
+    nests.screen(nest, true);
+    await settleAll();
+    expect(read).toEqual([[{ bird: "Scout", title: "Two companies", status: "Done", answer: "Lindqvist Data and Fjällbo" }]]);
+    expect(nests.board(nest)!.since).toEqual({ id: expect.any(Number), text: "Scout found two companies.", cards: [scout.id] });
+
+    // Back again with nothing new, it's old news.
+    nests.screen(null, true);
+    await tick();
+    nests.screen(nest, true);
+    await settleAll();
+    expect(nests.board(nest)!.since).toBeNull();
+    expect(read).toHaveLength(1);
+  });
+
+  it("says how many cards changed in a plain line when the model can't, never an error", async () => {
+    const { nests, sendAndWait } = setup(undefined, undefined, titles(async () => null, async () => {
+      throw new Error("No key");
+    }));
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    const writer = nests.addCard(nest, { x: 500, y: 0 })!;
+    nests.screen(nest, true);
+    nests.screen(null, true);
+    await tick();
+    await sendAndWait(scout.id, "One");
+    replies.push(FAILS);
+    await sendAndWait(writer.id, "Two");
+    nests.screen(nest, true);
+    await settleAll();
+    expect(nests.board(nest)!.since).toEqual({ id: expect.any(Number), text: "2 cards changed since earlier today.", cards: [writer.id, scout.id] });
+    // Closing with the Nest open is leaving it, so nothing is news after a restart.
+    nests.close();
   });
 });

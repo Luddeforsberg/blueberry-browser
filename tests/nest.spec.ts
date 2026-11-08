@@ -1637,3 +1637,74 @@ test("a line dragged onto a sent card's input dot lights it up and goes in, from
   await chrome.getByRole("button", { name: "Take this line away" }).click();
   await expect(chrome.locator(".react-flow__edge")).toHaveCount(1);
 });
+
+test("coming back to a board: a card named for what it found, a dot until it's opened, and Berry's lines on what changed", async () => {
+  model.reset();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
+  app = await launchApp(profile, { modelEnv: model.env });
+  const chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("button", { name: "New nest" }).click();
+
+  // The cheap model names the card from only its prompt and answer, as untrusted data.
+  model.replyWith("Found 12 candidates. 4 look strong.");
+  model.cardTitleWith("12 candidates, 4 strong");
+  oneJob();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  await composer.fill("Find candidates for the role");
+  await composer.press("Enter");
+  const card = chrome.locator(".react-flow__node").first();
+  await expect(card.getByRole("status")).toHaveText("Done");
+  const title = card.locator("[data-card-title]");
+  await expect(title).toHaveText("12 candidates, 4 strong");
+  await expect(card).toContainText("Find candidates for the role");
+  const named = JSON.stringify(model.recapRequests.at(-1)?.messages);
+  expect(named).toContain("Find candidates for the role");
+  expect(named).toContain("untrusted");
+
+  // A name the user types is never replaced.
+  await title.click();
+  await card.getByRole("textbox", { name: "Card title" }).fill("Shortlist");
+  await card.getByRole("textbox", { name: "Card title" }).press("Enter");
+  await expect(title).toHaveText("Shortlist");
+
+  // It finishes while the user is somewhere else.
+  const release = model.holdBeforeFirstToken();
+  model.replyWith("Found two more.");
+  model.sinceWith("Berry found two more candidates.\nNothing waits for you.");
+  await card.getByRole("button", { name: "Open the whole chat" }).click();
+  await card.getByPlaceholder("Reply to Berry").fill("Look for two more");
+  await card.getByPlaceholder("Reply to Berry").press("Enter");
+  await card.getByRole("button", { name: "Close the chat" }).click();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
+  release();
+  const nestId = await chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.page === "nest")!.pageParam!);
+  await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.nests.board(id), nestId))?.cards[0].unread).toBe(true);
+
+  // Coming back, the card has a dot, Berry says what changed, and the card glows for a moment.
+  await chrome.getByRole("region", { name: /^Nests/ }).getByRole("button", { name: /^Find candidates/ }).click();
+  await expect(card.locator("[data-unread]")).toBeVisible();
+  await expect(chrome.locator("[data-since]")).toContainText("Berry: Berry found two more candidates.");
+  await expect(chrome.locator("[data-since]")).toContainText("Nothing waits for you.");
+  await expect(card).toHaveClass(/nest-since/);
+  await expect(card).not.toHaveClass(/nest-since/, { timeout: 8000 });
+  await expect(title).toHaveText("Shortlist");
+  const summarised = JSON.stringify(model.recapRequests.at(-1)?.messages);
+  expect(summarised).toContain("Found two more.");
+  expect(summarised).toContain("untrusted");
+
+  // Opening it takes the dot away, for good.
+  await card.getByRole("button", { name: "Open the whole chat" }).click();
+  await expect(card.locator("[data-unread]")).toHaveCount(0);
+  await card.getByRole("button", { name: "Close the chat" }).click();
+  await chrome.locator("[data-since]").getByRole("button", { name: "Dismiss" }).click();
+  await expect(chrome.locator("[data-since]")).toHaveCount(0);
+
+  await app.close();
+  app = await launchApp(profile, { modelEnv: model.env });
+  const again = await findView(app, "view=chrome");
+  await again.getByRole("region", { name: /^Nests/ }).getByRole("button", { name: /^Find candidates/ }).click();
+  const reopened = again.locator(".react-flow__node").first();
+  await expect(reopened.locator("[data-card-title]")).toHaveText("Shortlist");
+  await expect(reopened.locator("[data-unread]")).toHaveCount(0);
+  await expect(again.locator("[data-since]")).toHaveCount(0);
+});

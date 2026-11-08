@@ -158,6 +158,15 @@ const MIGRATIONS = [
    ALTER TABLE talk ADD COLUMN planned INTEGER;
    ALTER TABLE talk ADD COLUMN about TEXT;
    ALTER TABLE cards ADD COLUMN note_text TEXT;`,
+  // Coming back to a board. A card's title names what it found: the cheap model's until the user types one, which is
+  // settled and never replaced. `unread` is the dot on a card that finished, failed or started waiting while nobody was
+  // looking at it, until it's opened, and `changed_at` is when it last did any of those. `seen_at` is when the Nest was
+  // last open, null until it's been left once.
+  `ALTER TABLE cards ADD COLUMN title TEXT;
+   ALTER TABLE cards ADD COLUMN title_settled INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE cards ADD COLUMN unread INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE cards ADD COLUMN changed_at INTEGER;
+   ALTER TABLE nests ADD COLUMN seen_at INTEGER;`,
 ];
 
 // How many of a Nest's newest requests its board carries, so a Nest used for months doesn't send a longer board.
@@ -250,6 +259,9 @@ interface CardRow {
   pageDropped: number;
   pageJob: string | null;
   noteText: string | null;
+  title: string | null;
+  titleSettled: number;
+  unread: number;
 }
 
 interface RunRow {
@@ -266,7 +278,8 @@ const CARD_COLUMNS =
   "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
   // Not a file's whole table, which is read only when it's needed.
   "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height, " +
-  "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob, note_text AS noteText";
+  "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob, note_text AS noteText, " +
+  "title, title_settled AS titleSettled, unread";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -370,7 +383,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText, title, titleSettled, unread }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -398,7 +411,8 @@ export class NestStore {
       const file: NestFile = { name: own?.name ?? "", type: own?.type ?? "", size: own?.size ?? 0, pages: own?.pages ?? null, preview: filePreview, made: fileMade === 1 };
       return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file, attachments: [] };
     }
-    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, file: null, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
+    const recap = { ...(title !== null ? { title, titleSettled: titleSettled === 1 } : {}), ...(unread === 1 ? { unread: true } : {}) };
+    return { id, chatId, mascotId, x, y, autoPlaced: autoPlaced === 1, ...size, each, plan: planned, table, file: null, ...recap, attachments: [...this.attachmentsOf({ cardId: id }), ...this.pointedAt(id).map((row) => toAttachment(row, true))] };
   }
 
   // The card a chat belongs to, or null for an ordinary chat.
@@ -463,6 +477,37 @@ export class NestStore {
       throw error;
     }
     return this.card(id);
+  }
+
+  // `settle` for a title the user typed, which the cheap model never replaces. One from the model lands only while the
+  // card has none of the user's. An empty one from the user takes theirs away, so the model may name it again.
+  titleCard(id: string, title: string, settle: boolean): boolean {
+    if (!settle) return this.db.prepare("UPDATE cards SET title = ? WHERE id = ? AND title_settled = 0").run(title, id).changes > 0;
+    return this.db.prepare("UPDATE cards SET title = ?, title_settled = ? WHERE id = ?").run(title || null, title ? 1 : 0, id).changes > 0;
+  }
+
+  // A card finished, failed or started waiting `at`, with a dot until it's opened if nobody was looking.
+  cardChanged(id: string, at: number, unread: boolean): boolean {
+    return this.db.prepare("UPDATE cards SET changed_at = ?, unread = MAX(unread, ?) WHERE id = ?").run(at, unread ? 1 : 0, id).changes > 0;
+  }
+
+  // The user opened it. False when it had no dot.
+  readCard(id: string): boolean {
+    return this.db.prepare("UPDATE cards SET unread = 0 WHERE id = ? AND unread = 1").run(id).changes > 0;
+  }
+
+  // When each of a Nest's cards last changed, null for one that never has.
+  changeTimes(nestId: string): { id: string; changedAt: number | null }[] {
+    return this.db.prepare("SELECT id, changed_at AS changedAt FROM cards WHERE nest_id = ? ORDER BY rowid").all(nestId) as unknown as { id: string; changedAt: number | null }[];
+  }
+
+  // When the Nest was last open, null until it has been left once.
+  seenAt(nestId: string): number | null {
+    return (this.db.prepare("SELECT seen_at AS seenAt FROM nests WHERE id = ?").get(nestId) as { seenAt: number | null } | undefined)?.seenAt ?? null;
+  }
+
+  seeNest(nestId: string, at: number): void {
+    this.db.prepare("UPDATE nests SET seen_at = ? WHERE id = ?").run(at, nestId);
   }
 
   // The user moved it, so from now on it stays where they leave it.

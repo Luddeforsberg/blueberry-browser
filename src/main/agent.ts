@@ -8,6 +8,7 @@ import type { ActionApproval } from "../shared/ipc";
 import type { ChatThreadMessage } from "../shared/library";
 import type { TokenUsage } from "../shared/modelPrices";
 import type { GrantKey } from "./cardGrant";
+import { tidyTitle } from "./titles";
 
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
@@ -147,7 +148,6 @@ const KEEP_RESULTS_WHOLE = 8;
 const SHORTEN_BATCH = 8;
 const SHORTENED_LENGTH = 600;
 const SHORTENED_NOTE = "\n[Shortened to save space. Look at the page again if you need the rest.]";
-const MAX_TITLE_LENGTH = 60;
 const MAX_TITLE_MESSAGES = 10;
 const MAX_TITLE_MESSAGE_LENGTH = 1000;
 
@@ -471,7 +471,5 @@ export const generateTitle = async (
     ["system", TITLE_PROMPT],
     ["human", transcript],
   ]);
-  const title = reply.text.trim().replace(/^["'“”]+|["'“”.!?]+$/g, "").trim();
-  if (!title || title.toUpperCase() === "NONE") return null;
-  return title.length > MAX_TITLE_LENGTH ? `${title.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : title;
+  return tidyTitle(reply.text);
 };

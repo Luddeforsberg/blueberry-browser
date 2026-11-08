@@ -99,6 +99,11 @@
   opacity: 0.6;
 }
 
+/* Coming back to a Nest, the cards that changed since it was last open glow for a moment as Berry says what changed. */
+.nest-board .react-flow__node.nest-since > div {
+  box-shadow: 0 0 0 2px rgb(var(--accent-ink) / 0.7), 0 0 24px 4px rgb(var(--accent-ink) / 0.25);
+}
+
 /* A line the keyboard reaches is drawn selected by its card instead of a square box. */
 .nest-board .react-flow__edge:focus-visible {
   outline: none;

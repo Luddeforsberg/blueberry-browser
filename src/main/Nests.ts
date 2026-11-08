@@ -20,7 +20,9 @@ import { createHash } from "crypto";
 import { perRunEstimate } from "../shared/modelPrices";
 import type { CardGrantAccess } from "./Chats";
 import { checkAddress, cleanTitle, pageName } from "../shared/nestPages";
-import type { UsedPage, WorkTabState } from "../shared/library";
+import type { NestSince, UsedPage, WorkTabState } from "../shared/library";
+import type { EndedReply } from "./Chats";
+import { changedSince, missed, NO_RECAP, sinceFallback, type CardChange, type NestRecapWriter } from "./nestReturn";
 
 const MAX_TITLE_LENGTH = 100;
 // What a Nest is called until its first request, whose first words then stand in until the cheap model names it.
@@ -143,6 +145,18 @@ export class Nests {
   // Cards whose job's tabs show around them, while it runs, each with the tabs the user took off the board meanwhile,
   // which don't come back while it runs. Memory only.
   private readonly showing = new Map<string, Set<string>>();
+  // The Nest in the window's front tab, and whether the window is showing, as `screen` last heard. Memory only.
+  private front: { nestId: string; showing: boolean } | null = null;
+  // The cards the board has in sight, or open, by Nest, as its page last said. Memory only.
+  private readonly inSight = new Map<string, Set<string>>();
+  // The approval each card's chat is waiting on, so only a new one counts as the card changing. Memory only.
+  private readonly asking = new Map<string, string>();
+  // The newest request for each card's title, so one that comes back late never replaces a newer answer's.
+  private readonly titling = new Map<string, number>();
+  private titleTurn = 0;
+  // What changed since each Nest was last open, from the last time it was opened this launch.
+  private readonly since = new Map<string, NestSince>();
+  private sinceTurn = 0;
 
   constructor(
     private readonly store: NestStore,
@@ -154,7 +168,9 @@ export class Nests {
     private readonly namer: NestNamer = NO_NAMER,
     // The cheap model, writing a For-each card's column name and each row's value in it.
     private readonly writer: NestWriter = NO_WRITER,
-    private readonly tabs: NestTabs = NO_TABS
+    private readonly tabs: NestTabs = NO_TABS,
+    // The cheap model, naming a card for what it found and saying what changed while a Nest wasn't open.
+    private readonly recap: NestRecapWriter = NO_RECAP
   ) {
     // Runs still waiting when the app last closed don't start by themselves now: the press that queued them was then.
     // Cards of a plan that hadn't started don't either.
@@ -199,7 +215,7 @@ export class Nests {
     });
     const lines = board.lines.map((line) => ({ ...line, crosses: this.crossingOf(id, line, cards, board.lines) }));
     for (const [lineId, { nestId }] of this.crossings) if (nestId === id && !board.lines.some((line) => line.id === lineId)) this.crossings.delete(lineId);
-    return { ...board, cards, lines, planning: this.planning.get(id) ?? null, naming: this.naming.has(id) };
+    return { ...board, cards, lines, planning: this.planning.get(id) ?? null, naming: this.naming.has(id), since: this.since.get(id) ?? null };
   }
 
   // What crosses a line, worked out again only when a source of the card it goes to has changed, since its inputs share
@@ -709,7 +725,7 @@ export class Nests {
     const options = {
       seePage: false,
       userPresent: true,
-      onEnd: () => this.ended(cardId, card.nestId),
+      onEnd: (end: EndedReply) => this.ended(cardId, card.nestId, end),
       ...(input.answers.length > 0 ? { cardAnswers: input.answers } : {}),
       ...this.userSaid(cardId, card.chatId, text),
       ...this.givenAddresses(cardId),
@@ -720,6 +736,8 @@ export class Nests {
       ? this.chats.send(card.chatId, text, options)
       : this.chats.send(null, text, { ...options, mascotId: card.mascotId, started: (chatId) => this.store.setChat(cardId, chatId) });
     if (!sent) return null;
+    // The user just sent it, so with its Nest in front it's in sight, even before the board has said where it is.
+    if (this.front?.nestId === card.nestId) this.inSight.set(card.nestId, new Set([...(this.inSight.get(card.nestId) ?? []), cardId]));
     // Its lines all went with this message, so a fresh one reads like the rest from now on.
     this.store.settleLines(cardId);
     this.nameFrom(card.nestId, text);
@@ -770,10 +788,11 @@ export class Nests {
       seePage: false,
       userPresent: true,
       cardAnswers,
-      onEnd: () => {
+      onEnd: (end) => {
         this.pump();
         this.endGrantIfDone(card.id);
         this.fillCell(runId);
+        this.runEnded(card.id, card.nestId, end);
         this.advance(card.nestId);
       },
       cardGrant: this.grantFor(card.id),
@@ -1265,7 +1284,7 @@ export class Nests {
       mascotId: card.mascotId,
       ...(input.answers.length > 0 ? { cardAnswers: input.answers } : {}),
       started: (chatId) => this.store.setChat(card.id, chatId),
-      onEnd: () => this.ended(card.id, nestId),
+      onEnd: (end) => this.ended(card.id, nestId, end),
       ...this.userSaid(card.id, null, null),
       ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id, missing),
@@ -1277,11 +1296,143 @@ export class Nests {
   }
 
   // A card's own reply ended: its job's tabs settle on the board, and a card of a run plan that reads from it may start.
-  private ended(cardId: string, nestId: string): void {
+  // It changed, unless the user stopped it, and a finished answer names it.
+  private ended(cardId: string, nestId: string, end: EndedReply): void {
     const chatId = this.store.card(cardId)?.chatId;
     const pages = (chatId ? this.chats.thread(chatId)?.messages.at(-1)?.pages : undefined) ?? [];
     this.finishJobTabs(cardId, pages);
+    if (end.outcome !== "stopped") this.cardChanged(cardId, nestId);
+    if (end.outcome === "done" && chatId && end.reply.trim()) this.nameCard(cardId, chatId, end.reply);
     this.advance(nestId);
+  }
+
+  // A For-each card has changed once none of its runs goes or waits any more, unless the user stopped it.
+  private runEnded(cardId: string, nestId: string, end: EndedReply): void {
+    const card = this.store.card(cardId);
+    const going = card?.each?.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)));
+    if (card && !going && end.outcome !== "stopped") this.cardChanged(cardId, nestId);
+  }
+
+  // A card finished, failed or started waiting for the user. Nobody looking at it, it gets a dot until it's opened. With
+  // its Nest open, the user was here for it, so it isn't news when they come back.
+  private cardChanged(cardId: string, nestId: string): void {
+    const at = Date.now();
+    this.store.cardChanged(cardId, at, missed(this.front, this.inSight.get(nestId), nestId, cardId));
+    if (this.front?.nestId === nestId) this.store.seeNest(nestId, at);
+    this.changed(nestId);
+  }
+
+  // The cheap model names a card for what its answer found. A title the user typed is never replaced, and one written
+  // for an older answer never lands.
+  private nameCard(cardId: string, chatId: string, answer: string): void {
+    const card = this.store.card(cardId);
+    const prompt = this.chats.thread(chatId)?.messages.findLast((message) => message.role === "user")?.content ?? "";
+    if (!card || card.titleSettled) return;
+    const turn = ++this.titleTurn;
+    this.titling.set(cardId, turn);
+    void this.recap
+      .title(prompt, answer)
+      .catch((error: unknown) => {
+        console.error("Failed to name a card:", error);
+        return null;
+      })
+      .then((title) => {
+        if (this.titling.get(cardId) !== turn) return;
+        this.titling.delete(cardId);
+        const nestId = this.store.card(cardId)?.nestId;
+        if (title && nestId && this.store.titleCard(cardId, title, false)) this.changed(nestId);
+      });
+  }
+
+  // The user's own name for a card, or none, and then the next answer names it again.
+  renameCard(cardId: unknown, title: unknown): boolean {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    if (!card || typeof title !== "string" || !card.chatId) return false;
+    const name = titleFrom(title);
+    if (!this.store.titleCard(card.id, name, true)) return false;
+    this.titling.delete(card.id);
+    this.changed(card.nestId);
+    return true;
+  }
+
+  // A card's chat changed. One that just started waiting for the user's OK, answer or hand-off has changed.
+  threadChanged(thread: ChatThread): void {
+    const approval = thread.approval?.id ?? null;
+    if (approval === (this.asking.get(thread.id) ?? null)) return;
+    if (!approval) return void this.asking.delete(thread.id);
+    this.asking.set(thread.id, approval);
+    const where = this.chatInNest(thread.id);
+    if (where) this.cardChanged(where.cardId, where.nestId);
+    else this.asking.delete(thread.id);
+  }
+
+  // Which Nest is in the window's front tab, if any, and whether the window is showing. Leaving a Nest is when it was
+  // last open. Coming back to one where cards changed since, Berry says what changed.
+  screen(nestId: string | null, showing: boolean): void {
+    const before = this.front?.nestId ?? null;
+    this.front = nestId ? { nestId, showing } : null;
+    if (before === nestId) return;
+    const now = Date.now();
+    if (before) this.store.seeNest(before, now);
+    if (nestId) this.cameBack(nestId, now);
+  }
+
+  // The cards a Nest's board has in sight now, and the open one.
+  inView(nestId: unknown, cardIds: unknown): void {
+    if (typeof nestId !== "string" || !Array.isArray(cardIds)) return;
+    this.inSight.set(nestId, new Set(cardIds.filter((id): id is string => typeof id === "string").slice(0, MAX_TAKEN)));
+  }
+
+  // The user opened the card, so its dot goes.
+  readCard(cardId: unknown): boolean {
+    const card = typeof cardId === "string" ? this.store.card(cardId) : null;
+    if (!card || !this.store.readCard(card.id)) return false;
+    this.changed(card.nestId);
+    return true;
+  }
+
+  private cameBack(nestId: string, now: number): void {
+    const seenAt = this.store.seenAt(nestId);
+    this.store.seeNest(nestId, now);
+    // What changed before is old news now.
+    const before = this.since.delete(nestId);
+    const changed = changedSince(this.store.changeTimes(nestId), seenAt);
+    if (seenAt === null || changed.length === 0) {
+      if (before) this.changed(nestId);
+      return;
+    }
+    const ids = changed.map((card) => card.id);
+    const turn = ++this.sinceTurn;
+    const fallback = sinceFallback(ids.length, seenAt, now);
+    const changes = ids.flatMap((id) => {
+      const card = this.store.card(id);
+      return card ? [this.changeOf(card)] : [];
+    });
+    void this.recap
+      .since(changes)
+      .catch((error: unknown) => {
+        console.error("Failed to say what changed in a Nest:", error);
+        return null;
+      })
+      .then((text) => {
+        // Opened again meanwhile, so this is about an older visit.
+        if (this.sinceTurn !== turn || !this.store.board(nestId)) return;
+        this.since.set(nestId, { id: turn, text: text ?? fallback, cards: ids });
+        this.changed(nestId);
+      });
+  }
+
+  // A changed card as the summary reads it: its bird, title, how it stands, and its newest answer, only its own words.
+  private changeOf(card: NestCard): CardChange {
+    const bird = this.labelOf(card);
+    const title = card.title ?? null;
+    if (card.each) {
+      const failed = card.each.runs.filter((run) => run.state === "failed" || (!!run.chatId && !!this.chats.thread(run.chatId)?.error)).length;
+      return { bird, title: title ?? card.each.column, status: failed > 0 ? `${failed} of ${card.each.runs.length} didn’t finish` : `Done, ${card.each.runs.length} rows`, answer: null };
+    }
+    const thread = card.chatId ? this.chats.thread(card.chatId) : null;
+    const status = thread?.approval ? "Waiting for you" : thread?.error ? "Didn’t finish" : "Done";
+    return { bird, title, status, answer: card.chatId ? this.answerOf(card.chatId) : null };
   }
 
   // Says a card just started with work from the card its line comes from. A card that reads from nothing has nobody to
@@ -1779,6 +1930,8 @@ export class Nests {
   // Before the window stops every chat, so nothing waiting starts as they end. What's still waiting stays stopped.
   close(): void {
     this.closed = true;
+    // Closing with a Nest open is leaving it.
+    if (this.front) this.store.seeNest(this.front.nestId, Date.now());
   }
 
   private startRun(run: { id: string; cardId: string; row: string[] }): boolean {
@@ -1790,10 +1943,11 @@ export class Nests {
       mascotId: card.mascotId,
       cardAnswers,
       started: (chatId) => this.store.setRunChat(run.id, chatId),
-      onEnd: () => {
+      onEnd: (end) => {
         this.pump();
         this.endGrantIfDone(card.id);
         this.fillCell(run.id);
+        this.runEnded(card.id, card.nestId, end);
         this.advance(card.nestId);
       },
       cardGrant: this.grantFor(card.id),
