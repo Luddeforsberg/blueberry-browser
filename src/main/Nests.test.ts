@@ -1926,6 +1926,28 @@ describe("Files on the canvas", () => {
     expect(nests.addInput(made.id, scout.id)).toEqual({ ok: false, error: "A file’s card can’t read from another card." });
   });
 
+  it("gives an HTML card's page its maker's data as it is now, and never rows taken out of their card", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    replies.push(TABLE(3));
+    await sendAndWait(scout.id, "Find companies");
+    const picked = { header: ["Company", "People"], rows: [["Company 1", "10"], ["Company 3", "12"]] };
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id, picked })!;
+    calls.push({ name: "save_file", args: { name: "chart", kind: "html", content: "<canvas></canvas>" } });
+    replies.push("Made a chart.");
+    await sendAndWait(writer.id, "Chart these");
+    const page = fileCards(nests, nest).find((card) => card.file?.type === "text/html")!;
+    const dataOf = () => JSON.parse(/window\.nest = \{ data: (.*?), charts: null \};/.exec(nests.fileContent(page.id)!.html!)![1].replace(/\\u003c/g, "<"));
+    expect(dataOf()).toMatchObject({ card: { answer: "Made a chart." }, inputs: [{ answer: null, table: picked }] });
+
+    // Scout answers again without Company 3: the rows no longer go to the page, as they wouldn't go to a send.
+    replies.push(TABLE(2));
+    await sendAndWait(scout.id, "Again");
+    expect(dataOf().inputs).toEqual([{ name: expect.any(String), answer: null, table: null }]);
+    expect(nests.fileContent(page.id)!.html).not.toContain("Company 3");
+  });
+
   it("saves five files in one reply at most, each placed clear of the others", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();

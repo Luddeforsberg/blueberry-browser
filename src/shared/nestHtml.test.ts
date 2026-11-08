@@ -85,6 +85,8 @@ describe("htmlCardDocument", () => {
     expect(boot.startsWith("for (const name of Object.getOwnPropertyNames(window)) if (/^(webkit)?rtc/i.test(name)) delete window[name];")).toBe(true);
     const given = /window\.nest = \{ data: (.*?), charts: null \};/.exec(boot);
     expect(JSON.parse(given![1])).toEqual(data);
+    // Classic scripts only: a module's import or export can't run with eval.
+    expect(boot).not.toContain('"module"');
     // Only our own script and none the data opened.
     expect(document.match(/<script>/g)).toHaveLength(1);
     expect(document).not.toContain("<img src=x");

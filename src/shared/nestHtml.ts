@@ -69,14 +69,15 @@ const NO_WEBRTC = "for (const name of Object.getOwnPropertyNames(window)) if (/^
 
 // Last: the page's own scripts, which the policy kept from running, once the page has been read and before
 // DOMContentLoaded, in the order they're written, each on its own as a script would be. Only inline ones, since there's
-// nowhere to load one from, and only as JavaScript. Errors show as the page's own.
+// nowhere to load one from, and only classic JavaScript, since a module's import or export can't run this way. Errors
+// show as the page's own.
 const RUN_PAGE = `{
 const ours = document.currentScript;
 document.addEventListener("readystatechange", () => {
   for (const script of document.querySelectorAll("script")) {
     if (script === ours) continue;
     const type = (script.getAttribute("type") ?? "").trim().toLowerCase();
-    if (script.hasAttribute("src") || !["", "module", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript"].includes(type)) continue;
+    if (script.hasAttribute("src") || !["", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript"].includes(type)) continue;
     try { (0, eval)(script.textContent ?? ""); } catch (error) { reportError(error); }
   }
 }, { once: true });
@@ -115,7 +116,9 @@ export const htmlCardDocument = (html: string, data: HtmlCardData, charts: strin
 // What Download writes: the same page in the same sandboxed frame, inside a page that has no script and lets its frame
 // go nowhere, since a browser it's opened in later has none of main's locks. Without it, a page opened on its own could
 // take the board's data along to any address by going there. The outer page has the same policy, since the frame takes
-// it on as well as its own, and it's what lets our script run in there.
+// it on as well as its own, and it's what lets our script run in there. One thing it can't stop: a browser that looks up
+// the host of a <link rel="dns-prefetch"> or "preconnect" ahead of time, which no policy covers, so a page opened there
+// could still spell data out in a name it has looked up. Blueberry itself turns that off (`index.ts`).
 export const htmlCardDownload = (html: string, data: HtmlCardData, charts: string | null, sha256: (text: string) => string, title: string): string => {
   const { page, policy } = buildPage(html, data, charts, sha256);
   const attribute = (text: string) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

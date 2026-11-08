@@ -1134,7 +1134,8 @@ export class Nests {
 
   // A file's card's file, for Download, which writes it only where the user chooses.
   // An HTML card's page goes as it runs on the board, with its policy, its data and its library, in the same sandboxed
-  // frame, so it still works, and still reaches nothing, wherever the user opens it.
+  // frame, so it still works, and requests nothing wherever the user opens it (see `htmlCardDownload` for what another
+  // browser may still look up).
   fileDownload(cardId: unknown): { name: string; type: string; data: Uint8Array } | null {
     const file = typeof cardId === "string" ? this.store.fileOf(cardId) : null;
     if (file?.type === "text/html") {
@@ -1174,7 +1175,11 @@ export class Nests {
     }
     return {
       card: { bird: this.labelOf(maker), ...own(maker) },
-      inputs: lines.map((line) => ({ name: this.labelOf(line.source), ...(line.picked ? { answer: null, table: table(line.picked) } : own(line.source)) })),
+      // Picked rows only while they're all still in their card's table, as a send checks, so rows taken out never reach it.
+      inputs: lines.map(({ source, picked }) => ({
+        name: this.labelOf(source),
+        ...(picked ? { answer: null, table: missingRows(picked, this.tableOf(source)).length > 0 ? null : table(picked) } : own(source)),
+      })),
       images,
     };
   }

