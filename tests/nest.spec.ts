@@ -959,6 +959,30 @@ test("Berry's answer peeks over the composer, its talk opens with / and closes w
   await composer.press("Enter");
   await expect(peek).toContainText("Berry: Both say Comet.");
   expect(newestUserMessage(model.planRequests.at(-1)!)).toContain("The user selected 2 cards on the board and is asking about them alone");
+  // Selected cards move together by a header, and Esc in the composer lets them go.
+  const savedX = () =>
+    chrome.evaluate(async () => {
+      const nests = (await window.chromeAPI.library.getLibrary()).nests;
+      return (await window.chromeAPI.nests.board(nests[0].id))!.cards.map((card) => card.x);
+    });
+  const start = await savedX();
+  const before = await Promise.all([0, 1].map(async (index) => (await cards.nth(index).boundingBox())!));
+  const header = (await cards.nth(0).locator(".nest-drag").nth(1).boundingBox())!;
+  await chrome.mouse.move(header.x + 160, header.y + 24);
+  await chrome.mouse.down();
+  await chrome.mouse.move(header.x + 260, header.y + 24, { steps: 6 });
+  await chrome.mouse.up();
+  await expect.poll(async () => (await cards.nth(0).boundingBox())!.x - before[0].x).toBeGreaterThan(50);
+  const moved = (await cards.nth(0).boundingBox())!.x - before[0].x;
+  expect((await cards.nth(1).boundingBox())!.x - before[1].x).toBeCloseTo(moved, 0);
+  // Each is kept where it was left, in main, not only on screen.
+  const after = await savedX();
+  expect(after[0]).not.toBe(start[0]);
+  expect(after[1] - start[1]).toBeCloseTo(after[0] - start[0], 0);
+  await composer.press("Escape");
+  await expect(chip).toHaveCount(0);
+  await cards.nth(0).locator(".nest-drag").nth(1).click({ modifiers: ["Meta"], position: { x: 160, y: 24 } });
+  await expect(chip).toHaveText("Ask about 1 card");
   await chip.getByRole("button", { name: "Ask about the whole board" }).click();
   await expect(chip).toHaveCount(0);
 

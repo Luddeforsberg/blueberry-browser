@@ -962,7 +962,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 if (drawerOpen) {
                     event.preventDefault()
                     closeDrawer(true)
-                } else if (!typing && selectedCards.length > 0) clearCards()
+                } else if ((!typing || active.closest('[data-nest-composer]')) && nodes.some((node) => node.selected)) clearCards()
                 return
             }
             if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || typing) return
@@ -972,7 +972,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [drawerOpen, closeDrawer, openDrawer, tuck, selectedCards.length, clearCards])
+    }, [drawerOpen, closeDrawer, openDrawer, tuck, nodes, clearCards])
 
     // One of Berry's answers as a note's card, in the first free place near the top of what's in sight. Main reads the
     // answer itself, by its message's id.
@@ -1169,10 +1169,11 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         )
                     }
                     onNodeDragStart={() => drawerOpen && closeDrawer(false)}
-                    onNodeDragStop={(_, node) => {
-                        // Moved by hand, it stays where it's left, even before main says so.
-                        setNodes((current) => current.map((each) => (each.id === node.id ? { ...each, data: { card: { ...each.data.card, autoPlaced: false } } } : each)))
-                        void api.moveCard(node.id, node.position.x, node.position.y)
+                    onNodeDragStop={(_, _node, dragged) => {
+                        // Moved by hand, it stays where it's left, even before main says so. Selected cards move together.
+                        const moved = new Set(dragged.map((each) => each.id))
+                        setNodes((current) => current.map((each) => (moved.has(each.id) ? { ...each, data: { card: { ...each.data.card, autoPlaced: false } } } : each)))
+                        dragged.forEach((each) => void api.moveCard(each.id, each.position.x, each.position.y))
                     }}
                     onConnectStart={(_, { nodeId }) => {
                         pulling.current = nodeId
