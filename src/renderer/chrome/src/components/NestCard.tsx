@@ -1316,7 +1316,7 @@ const VersionsCard: React.FC<{ card: NestCard; versions: NestVersions; box: Card
                                         type="button"
                                         role="tab"
                                         aria-selected={view === current}
-                                        aria-label={`Version ${view.run.letter}${view.picked ? ', picked' : ''}, ${VERSION_WORDS[view.phase] || 'Done'}`}
+                                        aria-label={`Version ${view.run.letter}${view.picked ? ', picked' : ''}, ${VERSION_WORDS[view.phase]}`}
                                         onClick={() => show(view.run.id)}
                                         className={cn(
                                             "h-7 min-w-7 px-2 rounded-control flex items-center justify-center gap-1 text-13 font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
