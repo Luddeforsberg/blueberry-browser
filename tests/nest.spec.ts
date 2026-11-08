@@ -968,9 +968,17 @@ test("Berry's answer peeks over the composer, its talk opens with / and closes w
   const note = cards.filter({ has: chrome.locator("[data-note-card]") });
   await expect(note).toContainText("Comet matters most");
   await expect(note.locator("strong")).toHaveText("Berry’s prices");
-  await chrome.keyboard.press("Escape");
-  await expect(talk).toHaveCount(0);
   await shots("note");
+  // Starting to pull a line closes the drawer. Let go on its own card, it makes nothing.
+  await cards.first().hover();
+  const handle = (await cards.first().getByLabel("Pull a new card out of Berry’s").boundingBox())!;
+  await chrome.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(handle.x + 40, handle.y + 10, { steps: 5 });
+  await expect(talk).toHaveCount(0);
+  await chrome.mouse.move(handle.x - 120, handle.y + 10, { steps: 5 });
+  await chrome.mouse.up();
+  await expect(cards).toHaveCount(3);
   await note.hover();
   await note.getByLabel("Pull a new card out of Berry’s note").click();
   const draft = cards.last();
