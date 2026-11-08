@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
-// What the migration for page cards added.
-const PAGE_COLUMNS = "ALTER TABLE cards DROP COLUMN page_url; ALTER TABLE cards DROP COLUMN page_title; ALTER TABLE cards DROP COLUMN page_dropped; ALTER TABLE cards DROP COLUMN page_job;";
+// What the migrations for page cards and fresh lines added.
+const PAGE_COLUMNS =
+  "ALTER TABLE cards DROP COLUMN page_url; ALTER TABLE cards DROP COLUMN page_title; ALTER TABLE cards DROP COLUMN page_dropped; ALTER TABLE cards DROP COLUMN page_job; " +
+  "ALTER TABLE lines DROP COLUMN fresh;";
 
 // What migrations after 9 added, so a file can be taken back to how an older version left it.
 const LATER_COLUMNS =
@@ -127,7 +129,7 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 3}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+      `PRAGMA user_version = ${version - 4}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
         "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
         PAGE_COLUMNS
     );
@@ -233,7 +235,7 @@ describe("NestStore", () => {
     const picked = { header: ["Company"], rows: [["Fjällbo"], ["Brygga"]] };
     const next = store.addCard(nest, { x: 0, y: 0, from: source.id, picked })!;
 
-    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked }]);
+    expect(store.linesTo(next.id)).toEqual([{ lineId: expect.any(String), source: expect.objectContaining({ id: source.id }), picked, fresh: false }]);
     // The board carries only how many, and a line with none picked says so.
     expect(store.board(nest)?.lines[0].picked).toBe(2);
     store.addCard(nest, { x: 0, y: 0, from: source.id });

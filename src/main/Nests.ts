@@ -570,9 +570,11 @@ export class Nests {
     return card;
   }
 
-  // Another card's answer as another input on a draft or a planned card: a handle dropped on it, or Add an input. A line
-  // only comes out of a card with something to give, or out of a planned card of the same plan into another, never makes
-  // a circle, and a card reads from 4 at most. Says why when it can’t.
+  // Another card's answer as another input on a draft, a planned card or a sent card: a handle dropped on it, or Add an
+  // input. A line only comes out of a card with something to give, or out of a planned card of the same plan into
+  // another, never makes a circle, and a card reads from 4 at most. On a sent card it's fresh: its earlier messages
+  // went without it, and its next one is the first to get it. Never while that card works, since its reply has what it
+  // read already. Says why when it can’t.
   addInput(cardId: unknown, fromId: unknown, picked?: unknown): NestSendEachResult {
     const card = typeof cardId === "string" ? this.store.card(cardId) : null;
     const source = typeof fromId === "string" ? this.store.card(fromId) : null;
@@ -582,7 +584,8 @@ export class Nests {
     if (card.file) return { ok: false, error: "A file’s card can’t read from another card." };
     if (card.page) return { ok: false, error: "A page’s card can’t read from another card." };
     if (source.page && card.plan && card.plan.state !== "held") return { ok: false, error: "A page can go to a card you send yourself, not to a card of the plan." };
-    if (card.chatId || card.each || card.table || (card.plan && !planned && card.plan.state !== "held")) return { ok: false, error: "Only a card that hasn’t been sent can get another input." };
+    if (card.each || card.table || (card.plan && !planned && card.plan.state !== "held")) return { ok: false, error: "Only a card that hasn’t been sent can get another input." };
+    if (card.chatId && this.chats.isRunning(card.chatId)) return { ok: false, error: "This card is working. Add the line once it’s done." };
     if (this.replanned(card) || this.replanned(source)) return { ok: false, error: STILL_PLANNING };
     const gives = !!source.chatId || !!source.each || !!source.table || !!source.file || !!source.page;
     if (planned ? !gives && source.plan?.state !== "planned" : !gives) {
@@ -594,7 +597,28 @@ export class Nests {
     if (this.readsFrom(source.id, card.id)) return { ok: false, error: "That would make the cards go round in a circle." };
     const rows = picked === undefined || picked === null || planned ? null : this.pickedFrom(source, picked);
     if (rows === undefined) return { ok: false, error: STALE_ROWS };
-    if (!this.store.addLine(card.nestId, source.id, card.id, rows)) return { ok: false, error: "That line couldn’t be drawn." };
+    if (!this.store.addLine(card.nestId, source.id, card.id, rows, !!card.chatId)) return { ok: false, error: "That line couldn’t be drawn." };
+    this.changed(card.nestId);
+    return { ok: true };
+  }
+
+  // A line into a card taken away: what the card already sent keeps what it got, and from now on it doesn't read from
+  // there. Only into a card the user still sends from, a draft, a planned or held card or a sent one, never a For-each
+  // card whose runs read it, one of a plan waiting to start, or a file or page card, whose line only says where it's from.
+  removeInput(lineId: unknown): NestSendEachResult {
+    const to = typeof lineId === "string" ? this.store.lineTo(lineId) : null;
+    const card = to ? this.store.card(to) : null;
+    if (!card) return { ok: false, error: "That line isn’t there any more." };
+    if (card.file || card.page) return { ok: false, error: "That line only shows where the card came from." };
+    if (card.each) return { ok: false, error: "A card sent for each row keeps the lines it was sent with." };
+    if (card.plan?.state === "armed") return { ok: false, error: "This card waits to start with these lines." };
+    if (this.replanned(card)) return { ok: false, error: STILL_PLANNING };
+    const filesBefore = this.chainFiles(card.id).map((each) => each.card.id);
+    if (!this.store.deleteLine(lineId as string)) return { ok: false, error: "That line isn’t there any more." };
+    // The card's own copies of files it only had through that line go too, so its next message goes without them. A copy
+    // of a file whose card was deleted stays, as it always has.
+    const filesAfter = new Set(this.chainFiles(card.id).map((each) => each.card.id));
+    this.store.dropCopies(card.id, filesBefore.filter((id) => !filesAfter.has(id)));
     this.changed(card.nestId);
     return { ok: true };
   }
@@ -693,6 +717,8 @@ export class Nests {
       ? this.chats.send(card.chatId, text, options)
       : this.chats.send(null, text, { ...options, mascotId: card.mascotId, started: (chatId) => this.store.setChat(cardId, chatId) });
     if (!sent) return null;
+    // Its lines all went with this message, so a fresh one reads like the rest from now on.
+    this.store.settleLines(cardId);
     this.nameFrom(card.nestId, text);
     this.store.touch(card.nestId);
     this.changed(card.nestId);
@@ -1048,7 +1074,8 @@ export class Nests {
         // A page card reads from nothing: a line into it only joins it to the card whose job it showed.
         if (card.page) continue;
         if (!card.each && this.ownPart(card) === null) continue;
-        for (const line of this.store.linesTo(card.id)) next.push({ lineId, card: line.source });
+        // A card further up gives only what it has sent with, never a line its next message is the first to get.
+        for (const line of this.store.linesTo(card.id)) if (!line.fresh) next.push({ lineId, card: line.source });
       }
       level = next;
     }
@@ -1359,7 +1386,8 @@ export class Nests {
     const text = (value: string | null) => (value === null ? null : this.clean(value));
     const table = (rows: PickedRows | null): HtmlCardTable | null => rows && { header: rows.header.map(this.clean), rows: rows.rows.map((row) => row.map(this.clean)) };
     const own = (card: NestCard) => ({ answer: text(card.chatId ? this.answerOf(card.chatId) : null), table: table(this.tableOf(card)) });
-    const lines = this.store.linesTo(maker.id);
+    // What the maker has sent with, not a line its next message is the first to get.
+    const lines = this.store.linesTo(maker.id).filter((line) => !line.fresh);
     const images: HtmlCardData["images"] = [];
     let room = MAX_HTML_IMAGE_BYTES;
     const offer = (name: string, type: string, bytes: Uint8Array) => {
@@ -1612,7 +1640,8 @@ export class Nests {
       const into = this.store.card(intoId);
       // A page card reads from nothing: a line into it only joins it to the card whose job it showed.
       if (into?.page) return [];
-      const lines = this.store.linesTo(intoId);
+      // Only what that card has sent with: a line its next message is the first to get isn't its yet.
+      const lines = this.store.linesTo(intoId).filter((line) => !line.fresh);
       const driving = into?.each ? (this.store.eachLine(intoId) ?? lines[0]?.lineId) : null;
       return lines.map((line) => ({
         lineId: line.lineId,

@@ -1414,3 +1414,82 @@ test("a tab dragged from the sidebar and a dropped link become cards, whose page
     server.close();
   }
 });
+
+test("a line dragged onto a sent card's input dot lights it up and goes in, from its next message on, and can be taken away", async () => {
+  model.reset();
+  app = await launchApp(undefined, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).nests.length).toBe(1);
+  const nestId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).nests[0].id;
+  const card = (id: string) => chrome.locator(`.react-flow__node[data-id="${id}"]`);
+  const sendOn = async (x: number, y: number, words: string, answer: string) => {
+    model.replyWith(answer);
+    const made = (await chrome.evaluate(([nest, at]) => window.chromeAPI.nests.addCard(nest, at), [nestId, { x, y }] as const))!;
+    await chrome.evaluate(([id, text]) => window.chromeAPI.nests.send(id, text), [made.id, words]);
+    await expect(card(made.id).getByRole("status")).toHaveText("Done");
+    return made.id;
+  };
+  const first = await sendOn(0, 0, "Find companies", "Lindqvist Data and Fjällbo.");
+  const second = await sendOn(0, 360, "Find their rivals", "Kvarnsten and Vinga.");
+
+  // A card pulled out of the first and sent, so it has one line in already.
+  await card(first).hover();
+  await card(first).getByLabel("Pull a new card out of Berry’s").click();
+  const writer = chrome.locator(".react-flow__node").nth(2);
+  model.replyWith("A first pitch.");
+  const prompt = writer.getByRole("textbox", { name: "What should Berry do?" });
+  await prompt.fill("Write a pitch");
+  await prompt.press("Enter");
+  await expect(writer.getByRole("status")).toHaveText("Done");
+
+  // The second card's line, pulled with the real mouse, lights the sent card up, and more so near its input dot, where
+  // the first line ends, just outside its edge.
+  await card(second).hover();
+  const handle = (await card(second).getByLabel("Pull a new card out of Berry’s").boundingBox())!;
+  const box = (await writer.boundingBox())!;
+  const dot = { x: box.x - 4, y: box.y + 60 };
+  const start = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 };
+  await chrome.mouse.move(start.x, start.y);
+  await chrome.mouse.down();
+  for (let step = 1; step <= 6; step++) await chrome.mouse.move(start.x + ((dot.x - 120 - start.x) * step) / 6, start.y + ((dot.y - start.y) * step) / 6);
+  await expect(writer.locator('[data-drop="accepts"]')).toHaveCount(1);
+  await chrome.mouse.move(dot.x, dot.y, { steps: 6 });
+  await expect(writer.locator('[data-drop="over"]')).toHaveCount(1);
+  if (SHOTS) {
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(300);
+      await chrome.screenshot({ path: join(SHOTS, `drag-highlight-${appearance}.png`) });
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  }
+  await chrome.mouse.up();
+  await expect(writer.locator("[data-drop]")).toHaveCount(0);
+
+  // It went in, not as a new card, and only the next message gets it.
+  await expect(chrome.locator(".react-flow__node")).toHaveCount(3);
+  await expect(chrome.locator(".react-flow__edge")).toHaveCount(2);
+  await expect(writer).toContainText("from your next message");
+  model.replyWith("A pitch with both.");
+  await writer.getByRole("button", { name: "Open the whole chat" }).click();
+  const reply = writer.getByPlaceholder("Reply to Berry");
+  await reply.fill("Use both lists");
+  await reply.press("Enter");
+  await expect(writer).toContainText("A pitch with both.");
+  await expect(writer).not.toContainText("from your next message");
+  const message = newestUserMessage(model.requests.at(-1)!);
+  expect(message).toContain("Lindqvist Data and Fjällbo.");
+  expect(message).toContain("Kvarnsten and Vinga.");
+  expect(message.match(/<card_thread from="Berry">/g)).toHaveLength(2);
+  expect(message.endsWith("Use both lists")).toBe(true);
+  await writer.getByRole("button", { name: "Close the chat" }).click();
+
+  // A line into it can be taken away with the × that shows on it.
+  const lines = await chrome.evaluate((nest) => window.chromeAPI.nests.board(nest), nestId);
+  const added = lines!.lines.find((line) => line.from === second)!;
+  await chrome.locator(`.react-flow__edge[data-id="${added.id}"]`).click({ force: true });
+  await chrome.getByRole("button", { name: "Take this line away" }).click();
+  await expect(chrome.locator(".react-flow__edge")).toHaveCount(1);
+});
