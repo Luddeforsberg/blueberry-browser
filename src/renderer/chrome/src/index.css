@@ -99,6 +99,18 @@
   opacity: 0.6;
 }
 
+/* What a card knows shows over it only while the pointer is on it or the keyboard is in it, not after a mere click there. */
+.nest-board [data-nest-knows] {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.nest-board .react-flow__node:hover [data-nest-knows],
+.nest-board .react-flow__node:focus-visible [data-nest-knows],
+.nest-board .react-flow__node:has(:focus-visible) [data-nest-knows] {
+  opacity: 1;
+}
+
 /* A line the keyboard reaches is drawn selected by its card instead of a square box. */
 .nest-board .react-flow__edge:focus-visible {
   outline: none;

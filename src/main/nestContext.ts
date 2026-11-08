@@ -1,6 +1,8 @@
 import type { ChatThreadMessage } from "../shared/library";
 import { findTableLines, MAX_CONTEXT_LENGTH, MAX_CROSSING_LENGTH, tableMarkdown, type Before, type Crossing, type PickedRows } from "../shared/nestTable";
+import type { CardKnows } from "../shared/nestKnows";
 import { nameForPrompt } from "./mascotNote";
+import type { SentAttachment } from "./nestFiles";
 
 export const MAX_CARD_ANSWER_LENGTH = MAX_CROSSING_LENGTH;
 
@@ -516,4 +518,46 @@ export const beforeOf = (answers: readonly CardAnswer[]): Before => {
   }, 0);
   const cut = went.some((answer) => !!answer.cut || !!answer.earlier || !!answer.leftOut || answer.cutTo != null);
   return { cards: went.length, words, leftOut: answers.length - went.length, cut };
+};
+
+// What a card knows from outside its own thread, counted from exactly the parts that go, after any page was read when
+// `sent`, and the files and notes that go with them. Nothing of what's in any of it. A page whose text didn't come is a
+// link. Before it's sent, a page with an open tab counts as one its text will be read from.
+export const knowsOf = (
+  answers: readonly CardAnswer[],
+  attachments: readonly SentAttachment[] | { files: number; notes: number; leftOutFiles: number },
+  sent: boolean,
+  at: number
+): CardKnows => {
+  const knows: CardKnows = { sent, at, cards: 0, pages: 0, links: 0, files: 0, notes: 0, cut: 0, leftOutCards: 0, leftOutFiles: 0 };
+  for (const answer of answers) {
+    if (answer.dropped) {
+      knows.leftOutCards++;
+      continue;
+    }
+    if (answer.part === "page") {
+      const page = answer.page;
+      const read = sent ? !!page?.text : !!page?.tabId;
+      if (read) knows.pages++;
+      else knows.links++;
+      if (read && page?.cut) knows.cut++;
+      continue;
+    }
+    if (answer.fromFile) knows.files++;
+    else knows.cards++;
+    const cut = answer.part === "thread" ? !!answer.cut || !!answer.earlier : cutToOf(answer) !== null || !!answer.leftOut;
+    if (cut) knows.cut++;
+  }
+  if ("files" in attachments) {
+    knows.files += attachments.files;
+    knows.notes += attachments.notes;
+    knows.leftOutFiles += attachments.leftOutFiles;
+  } else {
+    for (const attachment of attachments) {
+      if (attachment.kind === "file") knows.files++;
+      else if (attachment.kind === "note") knows.notes++;
+      else knows.leftOutFiles += attachment.names.length;
+    }
+  }
+  return knows;
 };
