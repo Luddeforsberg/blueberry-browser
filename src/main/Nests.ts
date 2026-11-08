@@ -78,6 +78,8 @@ const sha256 = (text: string) => createHash("sha256").update(text, "utf8").diges
 const STILL_PLANNING = "Berry is still changing the plan. Try again in a moment.";
 const PLAN_FAILED = "I couldn’t plan that just now. Try again, or click the board to start a card yourself.";
 const planRefused = (why: string) => `I couldn’t lay that out as cards, because ${why}. Try asking another way.`;
+// What a note's card is called to the model.
+const NOTE_NAME = "Berry's note";
 // Said in place of a reply that came with no cards and wasn't a question or an answer about the board, so Berry never
 // says it will do something it hasn't laid out.
 const NO_CARDS_MADE = "I didn’t make any cards for that, so nothing will run. Say what you’d like done, or ask me about what the cards found.";
@@ -238,7 +240,7 @@ export class Nests {
   // What a card gives across a line depends on: a file never changes, a For-each card's column and values, a sent card's
   // thread, which only grows, so its length and latest answer, or where a planned card is.
   private revisionOf(card: NestCard): string {
-    if (card.table || card.file) return "file";
+    if (card.table || card.file || card.note) return "file";
     if (card.page) {
       const input = this.pageInput(card);
       return `page ${input?.part === "page" ? `${input.url} ${input.tabId ?? ""}` : ""}`;
@@ -560,7 +562,7 @@ export class Nests {
     // of the plan, but not while Berry changes the plan, which would replace it.
     const source = from === null ? null : this.store.card(from);
     const planned = source?.plan?.state === "planned";
-    if (from !== null && !source?.chatId && !source?.each && !source?.table && !source?.file && !source?.page && !planned) return null;
+    if (from !== null && !source?.chatId && !source?.each && !source?.table && !source?.file && !source?.page && !source?.note && !planned) return null;
     if (source && this.replanned(source)) return null;
     // Rows can only be picked from the table in the source's latest answer as it is now, so nothing else gets across.
     const picked = input.picked === undefined || input.picked === null || planned ? null : this.pickedFrom(source, input.picked);
@@ -583,11 +585,12 @@ export class Nests {
     const planned = card.plan?.state === "planned";
     if (card.file) return { ok: false, error: "A file’s card can’t read from another card." };
     if (card.page) return { ok: false, error: "A page’s card can’t read from another card." };
+    if (card.note) return { ok: false, error: "A note can’t read from another card." };
     if (source.page && card.plan && card.plan.state !== "held") return { ok: false, error: "A page can go to a card you send yourself, not to a card of the plan." };
     if (card.each || card.table || (card.plan && !planned && card.plan.state !== "held")) return { ok: false, error: "Only a card that hasn’t been sent can get another input." };
     if (card.chatId && this.chats.isRunning(card.chatId)) return { ok: false, error: "This card is working. Add the line once it’s done." };
     if (this.replanned(card) || this.replanned(source)) return { ok: false, error: STILL_PLANNING };
-    const gives = !!source.chatId || !!source.each || !!source.table || !!source.file || !!source.page;
+    const gives = !!source.chatId || !!source.each || !!source.table || !!source.file || !!source.page || !!source.note;
     if (planned ? !gives && source.plan?.state !== "planned" : !gives) {
       return { ok: false, error: "That card has nothing to give yet." };
     }
@@ -665,7 +668,7 @@ export class Nests {
   setBird(cardId: string, mascotId: unknown): boolean {
     const card = this.store.card(cardId);
     const bird = this.flockId(mascotId);
-    if (!card || bird === undefined || this.replanned(card) || !this.store.setBird(cardId, bird)) return false;
+    if (!card || card.note || bird === undefined || this.replanned(card) || !this.store.setBird(cardId, bird)) return false;
     this.changed(card.nestId);
     return true;
   }
@@ -698,7 +701,7 @@ export class Nests {
   send(cardId: string, text: string): ChatThread | null {
     const card = this.store.card(cardId);
     // A planned card goes with its plan, by Run. One that was held is a draft, and the user may send it.
-    if (!card || card.each || card.table || card.file || card.page || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
+    if (!card || card.each || card.table || card.file || card.page || card.note || typeof text !== "string" || (card.plan && card.plan.state !== "held")) return null;
     const input = this.inputFor(cardId);
     if ("problem" in input) return null;
     const missing = this.takeFiles(cardId);
@@ -733,6 +736,7 @@ export class Nests {
     const prompt = typeof text === "string" ? text.trim() : "";
     if (card?.file) return { ok: false, error: "A file’s card has nothing to send." };
     if (card?.page) return { ok: false, error: "A page’s card has nothing to send." };
+    if (card?.note) return { ok: false, error: "A note has nothing to send." };
     if (!card || card.chatId || card.each || card.table) return { ok: false, error: "This card has been sent already." };
     if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     if (!prompt) return { ok: false, error: "Write what to do with each row first." };
@@ -796,6 +800,7 @@ export class Nests {
     if (card.table) return { ok: false, error: "A table from a file has nothing to send." };
     if (card.file) return { ok: false, error: "A file’s card has nothing to send." };
     if (card.page) return { ok: false, error: "A page’s card has nothing to send." };
+    if (card.note) return { ok: false, error: "A note has nothing to send." };
     if (card.plan && card.plan.state !== "held") return { ok: false, error: "This card goes when you run the plan." };
     const input = this.inputFor(card.id);
     if ("problem" in input) return { ok: false, error: input.problem };
@@ -863,9 +868,13 @@ export class Nests {
     if (this.planning.has(nestId)) return { ok: false, error: "Berry is still reading your last message." };
     const chosen = this.flockId(options?.mascotId);
     if (chosen === undefined) return { ok: false, error: "That bird isn’t in your flock any more." };
+    // The cards the user selected, which Berry then reads alone, checked against this Nest: never another's, and never
+    // what a renderer says is in them.
+    const about = this.aboutOf(nestId, options?.about);
+    if (about === undefined) return { ok: false, error: "Some of those cards aren’t on this board any more. Select them again." };
     const place = this.placing(options);
     this.nameFrom(nestId, words);
-    const open = this.store.openRequest(nestId);
+    let open = this.store.openRequest(nestId);
     const pending = board.cards.filter((card) => card.plan?.state === "planned");
     // Without a model to plan with, it's one card, as before. Not while a plan waits, whose cards point at the composer's
     // files, which that card would take.
@@ -873,13 +882,23 @@ export class Nests {
       if (pending.length > 0) return { ok: false, error: "Run or discard the plan first, since Berry needs a model to change it." };
       return this.oneCard(nestId, words, chosen, place) ? { ok: true } : { ok: false, error: "That couldn’t start." };
     }
+    if (about) {
+      // A plan waiting was made from what Berry read then, which goes with every message that changes it.
+      if (pending.length > 0) return { ok: false, error: "Run or discard the plan first, or let the selected cards go to change it." };
+      // The conversation so far goes with each message, so a question about only these cards starts afresh unless
+      // everything said in it so far was about exactly them too.
+      if (open && !this.store.openScopes(nestId).every((scope) => scope !== null && scope.length === about.size && scope.every((id) => about.has(id)))) {
+        this.store.closeRequest(nestId);
+        open = null;
+      }
+    }
 
     // Only the composer's files and notes are the planner's to point cards at, as short keys. What the user added on a
     // planned card stays that card's: it goes with the card if the new plan keeps its key, and back to the composer if not.
     const attachable = this.store.attachmentRows({ nestId }).map((row, index) => ({ ...row, key: `a${index + 1}` }));
     const attachedKeys = new Map(attachable.map((row) => [row.key, row.id]));
     const planKeys = new Map(pending.map((card, index) => [`p${index + 1}`, card.id]));
-    const { digest, sources } = this.digestOf(board, chosen, pending, attachable, planKeys);
+    const { digest, sources } = this.digestOf(board, chosen, pending, attachable, planKeys, about);
     const earlier = (open?.messages ?? []).map(({ role, text: said }) => ({ role: role === "user" ? ("user" as const) : ("assistant" as const), content: said }));
     const messages = [...earlier, { role: "user" as const, content: words }];
     messages[0] = { ...messages[0], content: `${digest}\n\n<request>\n${messages[0].content}\n</request>` };
@@ -905,7 +924,7 @@ export class Nests {
       return { ok: true };
     }
 
-    this.store.say(nestId, "user", words);
+    this.store.say(nestId, "user", words, about ? { about: [...about] } : {});
     if (!checked) this.store.say(nestId, "berry", PLAN_FAILED);
     else if (!checked.ok) this.store.say(nestId, "berry", checked.problem === NO_CARDS || checked.problem === PROMISED ? NO_CARDS_MADE : planRefused(checked.problem));
     else if (
@@ -916,16 +935,48 @@ export class Nests {
     )
       this.store.say(nestId, "berry", planRefused("a card would get more files than one card can take"));
     else if (checked.answer) {
-      this.store.say(nestId, "berry", checked.reply);
+      this.store.say(nestId, "berry", checked.reply, { kind: "answer" });
       // An answer is the end of that request, so the next message starts afresh, as one card when it's one job. Not while
       // a plan waits, which the next message still changes.
       if (pending.length === 0) this.store.closeRequest(nestId);
-    } else if (checked.ask || checked.cards.length === 0) this.store.say(nestId, "berry", checked.reply || PLAN_FAILED);
+    } else if (checked.ask || checked.cards.length === 0) this.store.say(nestId, "berry", checked.reply || PLAN_FAILED, checked.reply ? { kind: "ask" } : {});
     else if (!this.store.setPlan(nestId, this.placePlan(checked.cards, board, pending, place, attachedKeys, planKeys), this.store.openRequest(nestId)!.messages.filter((message) => message.role === "user").map((message) => message.text).join("\n")))
       this.store.say(nestId, "berry", planRefused("a line went to a card that isn’t there"));
-    else this.store.say(nestId, "berry", checked.reply || "I’ve laid it out above. Press Run when it looks right.");
+    else this.store.say(nestId, "berry", checked.reply || "I’ve laid it out above. Press Run when it looks right.", { kind: "plan", planned: checked.cards.length });
     this.changed(nestId);
     return { ok: true };
+  }
+
+  // The cards a request asks about: null for the whole board, with none selected, or undefined when any isn't a card on
+  // this Nest's board, so a request never reads a card of another Nest's.
+  private aboutOf(nestId: string, about: unknown): Set<string> | null | undefined {
+    if (about === undefined || about === null) return null;
+    if (!Array.isArray(about) || about.length > MAX_TAKEN) return undefined;
+    if (about.length === 0) return null;
+    if (!about.every((id) => typeof id === "string" && this.store.card(id)?.nestId === nestId)) return undefined;
+    return new Set(about as string[]);
+  }
+
+  // Tucks the Nest's composer down to a tab at the board's bottom edge, or brings it back.
+  setTucked(nestId: unknown, tucked: unknown): boolean {
+    if (typeof nestId !== "string" || typeof tucked !== "boolean" || !this.store.setTucked(nestId, tucked)) return false;
+    this.events.onBoard(this.board(nestId)!);
+    return true;
+  }
+
+  // One of Berry's answers about the board, as a note's card in the first free place near where the user is looking. Main
+  // reads the answer from the Nest's own conversation by its message's id, so a renderer can't put words of its own there.
+  putOnBoard(nestId: string, messageId: unknown, options: Pick<NestAskOptions, "at" | "taken">): NestTableResult {
+    if (typeof nestId !== "string" || !this.store.board(nestId)) return { ok: false, error: "That Nest isn’t there any more." };
+    const text = typeof messageId === "number" && Number.isSafeInteger(messageId) ? this.store.answer(nestId, messageId) : null;
+    if (text === null) return { ok: false, error: "Only one of Berry’s answers can go on the board." };
+    const place = this.placing(options);
+    const known = this.store.board(nestId)?.cards ?? [];
+    const taken = [...place.taken, ...known.filter((card) => !place.taken.some((rect) => rect.x === card.x && rect.y === card.y)).map(rectOfCard)];
+    const card = this.store.addNoteCard(nestId, { ...freeSpot(taken, place.at), text });
+    if (!card) return { ok: false, error: "That Nest isn’t there any more." };
+    this.changed(nestId);
+    return { ok: true, cardId: card.id };
   }
 
   // A planned card's prompt or For each row, before the plan runs. For each row only where the card gets a table.
@@ -1028,7 +1079,7 @@ export class Nests {
     const { cardId, nestId } = target as { cardId?: unknown; nestId?: unknown };
     if (typeof cardId === "string") {
       const card = this.store.card(cardId);
-      if (!card || card.chatId || card.each || card.table || card.file || card.plan?.state === "armed") return null;
+      if (!card || card.chatId || card.each || card.table || card.file || card.note || card.plan?.state === "armed") return null;
       return this.replanned(card) ? null : { cardId };
     }
     if (typeof nestId === "string") return this.store.board(nestId) && !this.planning.has(nestId) ? { nestId } : null;
@@ -1164,7 +1215,7 @@ export class Nests {
   private stateOf(source: NestCard): SourceState {
     const name = this.labelOf(source);
     // A file's rows, or a file, are there from the start.
-    if (source.table || source.file || source.page) return { kind: "answered", name };
+    if (source.table || source.file || source.page || source.note) return { kind: "answered", name };
     if (source.plan?.state === "held") return { kind: "held", name };
     if (source.plan) return { kind: "planned", name };
     if (source.each) {
@@ -1237,7 +1288,7 @@ export class Nests {
   // carry it.
   private handedOff(cardId: string): void {
     // A file's card has no bird to carry it. With several inputs, the first bird carries it.
-    const line = this.store.linesTo(cardId).find((each) => !each.source.table && !each.source.file && !each.source.page);
+    const line = this.store.linesTo(cardId).find((each) => !each.source.table && !each.source.file && !each.source.page && !each.source.note);
     const nestId = this.store.card(cardId)?.nestId;
     if (line && nestId) this.events.handOff?.(nestId, line.source.id, cardId);
   }
@@ -1259,7 +1310,7 @@ export class Nests {
     return this.store.linesTo(cardId).some(({ source }) => {
       if (source.plan) return source.plan.each || source.plan.table !== null;
       if (source.table) return source.table.count > 0;
-      if (source.file || source.page) return false;
+      if (source.file || source.page || source.note) return false;
       return this.tableOf(source) !== null;
     });
   }
@@ -1385,7 +1436,7 @@ export class Nests {
     if (!maker?.chatId) return EMPTY_HTML_DATA;
     const text = (value: string | null) => (value === null ? null : this.clean(value));
     const table = (rows: PickedRows | null): HtmlCardTable | null => rows && { header: rows.header.map(this.clean), rows: rows.rows.map((row) => row.map(this.clean)) };
-    const own = (card: NestCard) => ({ answer: text(card.chatId ? this.answerOf(card.chatId) : null), table: table(this.tableOf(card)) });
+    const own = (card: NestCard) => ({ answer: text(card.note ? card.note.text : card.chatId ? this.answerOf(card.chatId) : null), table: table(this.tableOf(card)) });
     // What the maker has sent with, not a line its next message is the first to get.
     const lines = this.store.linesTo(maker.id).filter((line) => !line.fresh);
     const images: HtmlCardData["images"] = [];
@@ -1526,9 +1577,11 @@ export class Nests {
     chosen: string | null,
     pending: readonly NestCard[],
     attachable: readonly (AttachmentRow & { key: string })[],
-    planKeys: ReadonlyMap<string, string>
+    planKeys: ReadonlyMap<string, string>,
+    // The cards the user selected, the only ones Berry then reads and a plan may read from. Null for the whole board.
+    about: ReadonlySet<string> | null = null
   ): { digest: string; sources: PlanSource[] } {
-    const sent = board.cards.filter((card) => card.chatId || card.each || card.table || card.file);
+    const sent = board.cards.filter((card) => (card.chatId || card.each || card.table || card.file || card.note) && (!about || about.has(card.id)));
     // Cleaned before the planner's room is measured, for the same reason as a card's inputs.
     const cleanTable = ({ header, rows }: PickedRows): PickedRows => ({ header: header.map(this.clean), rows: rows.map((row) => row.map(this.clean)) });
     const keyOf = new Map(sent.map((card, index) => [card.id, `e${index + 1}`]));
@@ -1541,6 +1594,11 @@ export class Nests {
         sources.push({ key, cardId: card.id, table: false });
         const by = card.file.made ? "a file a bird made" : "a file the user added";
         return { key, bird: `none, ${by}`, status: `The ${typeInWords(card.file.type)} ${card.file.name}, ${sizeInWords(card.file.size)}`, asked: null };
+      }
+      // One of Berry's own answers the user put on the board, written from cards that came from web pages.
+      if (card.note) {
+        sources.push({ key, cardId: card.id, table: false });
+        return { key, bird: "none, an answer of yours the user put on the board", status: "A note", asked: null, note: this.clean(card.note.text) };
       }
       // A file the user added, by its title and its first rows, untrusted like any file.
       if (card.table) {
@@ -1583,7 +1641,7 @@ export class Nests {
     const flock: MascotProfile[] = this.mascots.all().filter((mascot) => mascot.deletedAt === null);
     // Only a file's name, type and size, never what's in it. A note is the user's own words.
     const attached = attachable.map(({ key, kind, name, type, size, note }) => ({ key, kind, name, type, size, text: note ?? undefined }));
-    return { digest: planDigest({ flock, chosen: this.mascots.resolve(chosen), board: cards, plan, attached }), sources };
+    return { digest: planDigest({ flock, chosen: this.mascots.resolve(chosen), board: cards, plan, attached, scoped: about !== null }), sources };
   }
 
   // What a card gets from the cards its lines come from, each in the order the card shows them, fitted into one room
@@ -1614,6 +1672,8 @@ export class Nests {
     // A file goes as a file, with the card's own files, never as words here.
     if (source.file) return null;
     if (source.page) return this.pageInput(source);
+    // Berry wrote it from the board's cards, so it goes as untrusted data, like the answers it came from.
+    if (source.note) return { name, part: "note", text: source.note.text };
     if (source.table) return { name, fromFile: true, part: "table", table: this.tableOf(source)! };
     if (source.each) return source.each.runs.some((run) => run.cell !== null) ? { name, part: "table", table: combinedTable(source.each) } : null;
     const thread = source.chatId ? this.chats.thread(source.chatId) : null;
@@ -1701,6 +1761,7 @@ export class Nests {
   // What a card is called to the model and on screen: its bird's name, or a file's title.
   private labelOf(card: NestCard): string {
     if (card.page) return pageName(card.page.url);
+    if (card.note) return NOTE_NAME;
     return card.table ? card.table.name : card.file ? card.file.name : this.mascots.resolve(card.mascotId).name;
   }
 
@@ -1751,7 +1812,7 @@ export class Nests {
   // its own runs, or the card its rows come from, or a rough guess. Null on any other card.
   private perRunOf(card: NestCard): { cost: number; rough: boolean } | null {
     const costs = (chatIds: readonly (string | null)[]) => chatIds.flatMap((chatId) => (chatId ? [this.chats.costOf([chatId])] : [])).filter((cost): cost is number => cost !== null);
-    const draft = !card.chatId && !card.each && !card.table && !card.file && !card.page && card.plan?.state !== "armed";
+    const draft = !card.chatId && !card.each && !card.table && !card.file && !card.page && !card.note && card.plan?.state !== "armed";
     if (!card.each && !draft) return null;
     // A file's rows aren't read for this, since boards are sent often and a file costs nothing to read from.
     const source = card.each ? null : this.store.linesTo(card.id).find((line) => !!line.source.table || line.picked !== null || (this.tableOf(line.source)?.rows.length ?? 0) > 0)?.source;

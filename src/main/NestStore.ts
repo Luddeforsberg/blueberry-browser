@@ -2,7 +2,7 @@ import { mkdirSync } from "fs";
 import { randomUUID } from "crypto";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile } from "../shared/library";
+import type { NestAttachment, NestBoard, NestCard, NestFile, NestForEach, NestLine, NestPage, NestPlanned, NestRequest, NestRun, NestRunState, NestTableFile, NestTalkMessage } from "../shared/library";
 import type { SentAttachment } from "./nestFiles";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS, type PickedRows } from "../shared/nestTable";
 import { migrate } from "./database";
@@ -149,7 +149,37 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN page_job TEXT;`,
   // A line drawn into a card that has been sent already, until the card sends again: only its next message gets it.
   `ALTER TABLE lines ADD COLUMN fresh INTEGER NOT NULL DEFAULT 0;`,
+  // Whether the Nest's composer is tucked down to a tab at the board's bottom edge. What kind each of Berry's messages is:
+  // an answer about the board, a plan with how many cards it laid out, or a question, and on the user's, the ids of the
+  // cards they asked about when they asked about only those, as JSON. Older messages say none. A note's card holds one of Berry's
+  // answers, as it was when it went on the board.
+  `ALTER TABLE nests ADD COLUMN composer_tucked INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE talk ADD COLUMN kind TEXT CHECK (kind IN ('answer', 'plan', 'ask'));
+   ALTER TABLE talk ADD COLUMN planned INTEGER;
+   ALTER TABLE talk ADD COLUMN about TEXT;
+   ALTER TABLE cards ADD COLUMN note_text TEXT;`,
 ];
+
+// How many of a Nest's newest requests its board carries, so a Nest used for months doesn't send a longer board.
+const TALK_SHOWN = 50;
+
+interface TalkRow {
+  id: number;
+  role: "user" | "berry";
+  text: string;
+  kind: NestTalkMessage["kind"] | null;
+  planned: number | null;
+  about: string | null;
+}
+
+const toTalkMessage = ({ id, role, text, kind, planned, about }: TalkRow): NestTalkMessage => ({
+  id,
+  role,
+  text,
+  ...(kind ? { kind } : {}),
+  ...(planned !== null ? { planned } : {}),
+  ...(about !== null ? { about: (JSON.parse(about) as string[]).length } : {}),
+});
 
 // One card's input: the line into it, the card it comes from, and the rows picked from that card if any. `fresh` while the
 // card it goes to was sent before it was drawn and hasn't sent since.
@@ -219,6 +249,7 @@ interface CardRow {
   pageTitle: string | null;
   pageDropped: number;
   pageJob: string | null;
+  noteText: string | null;
 }
 
 interface RunRow {
@@ -235,7 +266,7 @@ const CARD_COLUMNS =
   "plan, plan_prompt AS planPrompt, plan_each AS planEach, plan_waits AS planWaits, plan_table AS planTable, plan_note AS planNote, auto_placed AS autoPlaced, " +
   // Not a file's whole table, which is read only when it's needed.
   "each_column AS eachColumn, table_name AS tableName, table_header AS tableHeader, table_count AS tableCount, table_preview AS tablePreview, width, height, " +
-  "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob";
+  "file_made AS fileMade, file_preview AS filePreview, page_url AS pageUrl, page_title AS pageTitle, page_dropped AS pageDropped, page_job AS pageJob, note_text AS noteText";
 const RUN_COLUMNS = "id, card_id AS cardId, row, chat_id AS chatId, state, cell";
 
 const toRun = ({ id, row, chatId, state, cell }: RunRow): NestRun => ({ id, row: JSON.parse(row) as string[], chatId, state, cell });
@@ -296,7 +327,8 @@ export class NestStore {
         .prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", json_array_length(picked, '$.rows') AS picked, fresh FROM lines WHERE nest_id = ? ORDER BY rowid")
         .all(id) as unknown as (Omit<NestLine, "fresh"> & { fresh: number })[]
     ).map(({ fresh, ...line }) => ({ ...line, picked: line.picked ?? null, ...(fresh ? { fresh: true as const } : {}) }));
-    return { ...nest, cards, lines, talk: this.talk(id), attached: this.attachmentsOf({ nestId: id }) };
+    const tucked = this.db.prepare("SELECT composer_tucked AS tucked FROM nests WHERE id = ?").get(id) as { tucked: number };
+    return { ...nest, cards, lines, talk: this.talk(id), composerTucked: tucked.tucked === 1, attached: this.attachmentsOf({ nestId: id }) };
   }
 
   // `settled` for a name that's final already, such as a chat's when the chat becomes a Nest.
@@ -338,7 +370,7 @@ export class NestStore {
     return row ? { ...this.toCard(row), nestId: row.nestId } : null;
   }
 
-  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob }: CardRow): NestCard {
+  private toCard({ id, chatId, mascotId, x, y, eachPrompt, eachHeader, plan, planPrompt, planEach, planWaits, planTable, planNote, autoPlaced, eachColumn, tableName, tableHeader, tableCount, tablePreview, width, height, fileMade, filePreview, pageUrl, pageTitle, pageDropped, pageJob, noteText }: CardRow): NestCard {
     const each: NestForEach | null =
       eachPrompt === null
         ? null
@@ -360,6 +392,7 @@ export class NestStore {
       const page: NestPage = { url: pageUrl, title: pageTitle ?? "", dropped: pageDropped === 1, tab: null, job: pageJob === null ? null : { cardId: pageJob, state: "none", current: false } };
       return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file: null, page, attachments: [] };
     }
+    if (noteText !== null) return { id, chatId: null, mascotId: null, x, y, autoPlaced: autoPlaced === 1, ...size, each: null, plan: null, table: null, file: null, note: { text: noteText }, attachments: [] };
     if (fileMade !== null) {
       const own = this.attachmentRows({ cardId: id })[0];
       const file: NestFile = { name: own?.name ?? "", type: own?.type ?? "", size: own?.size ?? 0, pages: own?.pages ?? null, preview: filePreview, made: fileMade === 1 };
@@ -781,31 +814,59 @@ export class NestStore {
         );
   }
 
-  // The Nest's newest request, if it's still open, and the one before it, folded, as the composer shows them.
-  talk(nestId: string): NestRequest[] {
-    const requests = this.db.prepare("SELECT id, open FROM requests WHERE nest_id = ? ORDER BY rowid DESC LIMIT 2").all(nestId) as { id: string; open: number }[];
-    const shown = requests[0]?.open === 1 ? requests : requests.slice(0, 1);
-    return shown.reverse().map(({ id, open }) => ({
+  // The Nest's conversation in its composer, oldest first: its newest requests, the open one last if there is one.
+  talk(nestId: string, limit = TALK_SHOWN): NestRequest[] {
+    const requests = this.db.prepare("SELECT id, open FROM requests WHERE nest_id = ? ORDER BY rowid DESC LIMIT ?").all(nestId, limit) as { id: string; open: number }[];
+    return requests.reverse().map(({ id, open }) => ({
       id,
       open: open === 1,
-      messages: this.db.prepare("SELECT role, text FROM talk WHERE request_id = ? ORDER BY rowid").all(id) as unknown as NestRequest["messages"],
+      messages: (this.db.prepare("SELECT rowid AS id, role, text, kind, planned, about FROM talk WHERE request_id = ? ORDER BY rowid").all(id) as unknown as TalkRow[]).map(toTalkMessage),
     }));
   }
 
   // The open request's messages, which the planner reads, or none.
   openRequest(nestId: string): NestRequest | null {
-    const open = this.talk(nestId).find((request) => request.open);
-    return open ?? null;
+    return this.talk(nestId, 1).find((request) => request.open) ?? null;
   }
 
-  // Adds to the open request, or starts one.
-  say(nestId: string, role: "user" | "berry", text: string): void {
+  // Adds to the open request, or starts one. Berry's say what kind they are, and the user's which cards they asked about,
+  // when it was only the ones they'd selected.
+  say(nestId: string, role: "user" | "berry", text: string, what: { kind?: NestTalkMessage["kind"]; planned?: number; about?: readonly string[] } = {}): void {
     let open = this.db.prepare("SELECT id FROM requests WHERE nest_id = ? AND open = 1").get(nestId) as { id: string } | undefined;
     if (!open) {
       open = { id: randomUUID() };
       this.db.prepare("INSERT INTO requests (id, nest_id, open) VALUES (?, ?, 1)").run(open.id, nestId);
     }
-    this.db.prepare("INSERT INTO talk (request_id, role, text) VALUES (?, ?, ?)").run(open.id, role, text);
+    this.db.prepare("INSERT INTO talk (request_id, role, text, kind, planned, about) VALUES (?, ?, ?, ?, ?, ?)").run(open.id, role, text, what.kind ?? null, what.planned ?? null, what.about ? JSON.stringify(what.about) : null);
+  }
+
+  // The cards each of the user's messages in the open request asked about, null for one that read the whole board.
+  openScopes(nestId: string): (string[] | null)[] {
+    const rows = this.db
+      .prepare("SELECT talk.about AS about FROM talk JOIN requests ON requests.id = talk.request_id WHERE requests.nest_id = ? AND requests.open = 1 AND talk.role = 'user' ORDER BY talk.rowid")
+      .all(nestId) as { about: string | null }[];
+    return rows.map(({ about }) => (about === null ? null : (JSON.parse(about) as string[])));
+  }
+
+  // One of Berry's answers about the board in this Nest, by its message's id. Null for anything else.
+  answer(nestId: string, messageId: number): string | null {
+    const row = this.db
+      .prepare("SELECT talk.text AS text FROM talk JOIN requests ON requests.id = talk.request_id WHERE talk.rowid = ? AND requests.nest_id = ? AND talk.role = 'berry' AND talk.kind = 'answer'")
+      .get(messageId, nestId) as { text: string } | undefined;
+    return row?.text ?? null;
+  }
+
+  setTucked(nestId: string, tucked: boolean): boolean {
+    return this.db.prepare("UPDATE nests SET composer_tucked = ? WHERE id = ?").run(tucked ? 1 : 0, nestId).changes > 0;
+  }
+
+  // A note's card, with no chat and no bird, holding one of Berry's answers as it is now. Null if the Nest isn't there.
+  addNoteCard(nestId: string, { x, y, text }: { x: number; y: number; text: string }): NestCard | null {
+    if (!this.db.prepare("SELECT 1 FROM nests WHERE id = ?").get(nestId)) return null;
+    const id = randomUUID();
+    this.db.prepare("INSERT INTO cards (id, nest_id, chat_id, mascot_id, x, y, auto_placed, note_text) VALUES (?, ?, NULL, NULL, ?, ?, 1, ?)").run(id, nestId, x, y, text);
+    this.touch(nestId);
+    return this.card(id);
   }
 
   // Once the plan runs or goes, the request folds away, and the next message starts another.

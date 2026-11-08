@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
-import { AppWindow, ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, Table2, X } from 'lucide-react'
-import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestPage, NestPlanned, NestTableFile } from '@shared/library'
+import { AppWindow, ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, StickyNote, Table2, X } from 'lucide-react'
+import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestNote, NestPage, NestPlanned, NestTableFile } from '@shared/library'
 import { pageName } from '@shared/nestPages'
 import { PAGE_CARD } from '@shared/nestPlace'
 import { Favicon } from './Favicon'
@@ -423,8 +423,10 @@ interface InputView {
 }
 
 // What a card goes by on a line: its bird's name, as Show Berry has it, or a file's title.
-const nameOn = (source: NestCard, mascot: MascotProfile, showBerry: boolean) =>
-    source.page ? pageName(source.page.tab?.url ?? source.page.url) : source.table ? source.table.name : source.file ? source.file.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
+export const nameOn = (source: NestCard, mascot: MascotProfile, showBerry: boolean) =>
+    source.note
+        ? `${showBerry ? 'Berry' : 'Assistant'}’s note`
+        : source.page ? pageName(source.page.tab?.url ?? source.page.url) : source.table ? source.table.name : source.file ? source.file.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
 
 const useInputs = (cardId: string): InputView[] => {
     const board = useBoard()
@@ -439,7 +441,7 @@ const useInputs = (cardId: string): InputView[] => {
             line,
             source,
             name: nameOn(source, find(source.mascotId), showBerry),
-            answered: source.table || source.file || source.page ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
+            answered: source.table || source.file || source.page || source.note ? true : source.each ? source.each.runs.some((run) => run.cell !== null) : !!answer,
             running: thread?.partial != null,
             rows: source.table ? source.table.count : source.each ? source.each.runs.length : answer ? (findTable(answer)?.rows.length ?? 0) : 0
         }
@@ -454,7 +456,7 @@ const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? ''
 
 // What a card on a line gets, in the words its header and reply field use.
 const getsWhat = ({ line, name, source }: InputView) =>
-    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : source.file || source.page ? name : `${name}’s thread`
+    line.picked ? `${plural(line.picked, 'row')} from ${name}` : source.table ? `every row of ${name}` : source.file || source.page || source.note ? name : `${name}’s thread`
 
 // What a sent card got, exactly, as main counts what crosses: "With Scout’s thread (2 answers) and 1 card before it,
 // about 1,800 words".
@@ -1256,6 +1258,39 @@ const FileCard: React.FC<{ card: NestCard; file: NestFile }> = ({ card, file }) 
     )
 }
 
+// One of Berry's answers about the board, which the user put there from the composer's talk. No bird stands on it, since
+// it has no chat: it can't be sent or read from another card, only read, made a size, deleted, and pulled out of, when
+// it gives its words to the next card as untrusted data, as any answer does.
+const NoteCard: React.FC<{ card: NestCard; note: NestNote; box: CardBox }> = ({ card, note, box }) => {
+    const board = useBoard()
+    const { showBerry } = useShell().settings
+    const name = `${showBerry ? 'Berry' : 'Assistant'}’s note`
+    return (
+        <div data-note-card className={cn(CARD_SHELL, "flex flex-col shadow-selected")} style={boxStyle(box)}>
+            <LineEnds canPull onPull={() => board.pullOut(card.id)} label={`Pull a new card out of ${name}`} />
+            <div className="nest-drag cursor-grab shrink-0 h-12 pl-5 pr-3 flex items-center gap-2">
+                <StickyNote aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                <span className="text-14 font-semibold truncate">{name}</span>
+                <span className="text-12 text-muted-foreground shrink-0">From your talk</span>
+                <span className="ml-auto flex items-center">
+                    <span data-keep-selection>
+                        <CardButton label="Continue in a new card" onClick={() => board.pullOut(card.id)}>
+                            <GitFork className="size-4" />
+                        </CardButton>
+                    </span>
+                    <CardButton label="Delete card" onClick={() => board.remove(card.id)}>
+                        <X className="size-4" />
+                    </CardButton>
+                </span>
+            </div>
+            <div className={cn("nodrag nowheel cursor-auto select-text min-h-0 overflow-y-auto px-5 pb-4", box.fill ? "flex-1" : "max-h-80")}>
+                <Markdown content={note.text} fromStranger className={cn("text-14", CARD_PROSE)} />
+            </div>
+            <ResizeCorner cardId={card.id} />
+        </div>
+    )
+}
+
 // The small pictures of page cards' tabs, as main sends them for the board on screen. They go straight to the picture
 // showing them and are never kept: a card that stops being pictured drops its own.
 const pictures = new Map<string, string>()
@@ -1667,6 +1702,8 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
 const CardKind: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) =>
     card.page ? (
         <PageCard card={card} page={card.page} />
+    ) : card.note ? (
+        <NoteCard card={card} note={card.note} box={box} />
     ) : card.file?.type === 'text/html' ? (
         <HtmlCard card={card} file={card.file} box={box} />
     ) : card.file ? (

@@ -458,6 +458,8 @@ export interface NestCard {
   file: NestFile | null;
   // Set on a page's card: a link or tab the user put on the board, or one of a working card's tabs shown around it.
   page?: NestPage | null;
+  // Set on a note's card: one of Berry's answers about the board, which the user put there. No chat and no bird.
+  note?: NestNote | null;
   // On a card whose job is running: its job's tabs show around it as page cards.
   showingTabs?: boolean;
   // Its files and notes, which go to its bird with every message. They can change only before it's sent.
@@ -505,7 +507,19 @@ export interface NestPlanned {
 export interface NestRequest {
   id: string;
   open: boolean;
-  messages: { role: "user" | "berry"; text: string }[];
+  messages: NestTalkMessage[];
+}
+
+// One message in a Nest's composer. Berry's say what kind they are: an answer about the board, which can go on the board
+// as a note, a plan with how many cards it laid out, or a question. The user's say how many cards they asked about, when
+// they asked about only the ones they'd selected.
+export interface NestTalkMessage {
+  id: number;
+  role: "user" | "berry";
+  text: string;
+  kind?: "answer" | "plan" | "ask";
+  planned?: number;
+  about?: number;
 }
 
 // A card sent with For each row: the same prompt, run once for each row, each run its own chat. Its result is the table
@@ -539,6 +553,12 @@ export interface NestFile {
   pages: number | null;
   preview: string | null;
   made: boolean;
+}
+
+// One of Berry's answers in the Nest's composer, put on the board as a card of its own. Berry wrote it from cards whose
+// answers came from web pages, so it only ever crosses a line as untrusted data, never as the user's words.
+export interface NestNote {
+  text: string;
 }
 
 // A page on a card of its own, with no chat and no bird. Its address and title are kept as they were when it went on the
@@ -598,8 +618,10 @@ export interface NestBoard {
   title: string;
   cards: NestCard[];
   lines: NestLine[];
-  // The newest request, and the one before it while the newest is open.
+  // The Nest's whole conversation in its composer, oldest first, up to the newest requests a board carries.
   talk: NestRequest[];
+  // The composer is tucked down to a tab at the board's bottom edge.
+  composerTucked?: boolean;
   // What the user just wrote, while Berry plans it.
   planning?: string | null;
   // The cheap model is naming it right now.

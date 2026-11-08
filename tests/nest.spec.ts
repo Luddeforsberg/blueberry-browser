@@ -339,7 +339,7 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
   // While Berry plans, quiet shapes stand where the cards will land and Thinking shimmers, until the plan comes.
   const ghosts = chrome.locator("[data-plan-ghost]");
   await expect(ghosts).toHaveCount(2);
-  await expect(chrome.getByLabel("Talking with Berry").getByRole("status")).toHaveText("Thinking");
+  await expect(chrome.locator("[data-peek]").getByRole("status")).toHaveText("Berry: Thinking");
   await shot("0-planning");
   planned();
 
@@ -352,9 +352,14 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
   await expect(scout).toContainText("Only goes to allabolag.se");
   await expect(scout).toContainText("A table of companies lands here");
   await expect(writer).toContainText("Starts when you say Scout’s answer is right");
-  const talk = chrome.getByLabel("Talking with Berry");
+  await expect(chrome.locator("[data-peek]")).toContainText("Berry: That’s two jobs");
+  await chrome.locator("[data-talk-button]").click();
+  const talk = chrome.getByRole("region", { name: "Talk with Berry" });
   await expect(talk).toContainText("Find Swedish SaaS companies we could sell to");
   await expect(talk).toContainText("That’s two jobs");
+  await expect(talk).toContainText("Planned 2 cards");
+  await talk.getByRole("button", { name: "Close the talk with Berry" }).click();
+  await expect(talk).toHaveCount(0);
   await expect(chrome.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await expect(chrome.getByRole("textbox", { name: "Ask in this Nest" })).toHaveAttribute("placeholder", "Change the plan, or press Run");
   expect(model.planRequests).toHaveLength(1);
@@ -389,8 +394,6 @@ test("Berry lays two jobs out as a plan, which runs only on Run, and the second 
   const looksRight = scout.getByRole("button", { name: "Looks right, continue" });
   await expect(looksRight).toBeVisible();
   await expect(chrome.getByRole("button", { name: "Run", exact: true })).toHaveCount(0);
-  // The request has folded to one line, which opens.
-  await expect(talk.getByRole("button", { expanded: false })).toContainText("Find Swedish SaaS companies");
   expect(model.requests).toHaveLength(1);
   expect(newestUserMessage(model.requests[0])).toBe("Find three Swedish B2B SaaS companies and who leads sales at each, as a table");
   await shot("3-waits-light");
@@ -888,6 +891,147 @@ test("Allow for this card's runs lets a For-each card's other runs do exactly th
   } finally {
     server.close();
   }
+});
+
+test("Berry's answer peeks over the composer, its talk opens with / and closes with Esc, selected cards are asked about alone, an answer goes on the board as a note, and the composer stays tucked", async () => {
+  test.setTimeout(90_000);
+  model.reset();
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-nest-"));
+  app = await launchApp(profile, { modelEnv: model.env });
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].setSize(1440, 900));
+  const chrome = await findView(app, "view=chrome");
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(150);
+      await chrome.screenshot({ path: join(SHOTS, `composer-${name}-${appearance}.png`) });
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  };
+  await chrome.getByRole("button", { name: "New nest" }).click();
+  const composer = chrome.getByRole("textbox", { name: "Ask in this Nest" });
+  const cards = chrome.locator(".react-flow__node");
+  model.titleWith("Rival research");
+  for (const [ask, answer] of [
+    ["Find our rivals", "Comet and Dia are the rivals."],
+    ["Find their prices", "Comet is free, and Dia is $20."],
+  ]) {
+    oneJob();
+    model.replyWith(answer);
+    await composer.fill(ask);
+    await composer.press("Enter");
+    await expect(cards.filter({ hasText: answer }).getByRole("status")).toHaveText("Done");
+  }
+  await shots("collapsed");
+
+  // A question about the board: the answer peeks in one line over the pill, and makes nothing.
+  model.planWith({ reply: "Comet matters most: it's free, from **Berry’s prices**.", ask: false, answers_board: true, cards: [] });
+  await composer.fill("Which rival matters most?");
+  await composer.press("Enter");
+  const peek = chrome.locator("[data-peek]");
+  await expect(peek).toContainText("Berry: Comet matters most");
+  await expect(cards).toHaveCount(2);
+  await shots("peek");
+
+  // From the board, / opens the whole talk with the keyboard in the composer, and Esc closes it and gives it back.
+  await cards.first().focus();
+  await chrome.keyboard.press("/");
+  const talk = chrome.getByRole("region", { name: "Talk with Berry" });
+  await expect(talk).toContainText("Which rival matters most?");
+  await expect(talk.locator("strong")).toHaveText("Berry’s prices");
+  await expect(composer).toBeFocused();
+  await expect(peek).toHaveCount(0);
+  await shots("open");
+  await chrome.keyboard.press("Escape");
+  await expect(talk).toHaveCount(0);
+  await expect(cards.first()).toBeFocused();
+  // Seen, it doesn't peek again.
+  await expect(peek).toHaveCount(0);
+
+  // Two cards selected with Shift on their headers make one chip, and the question goes about only them.
+  for (const index of [0, 1]) await cards.nth(index).locator(".nest-drag").nth(1).click({ modifiers: ["Shift"], position: { x: 160, y: 24 } });
+  const chip = chrome.locator("[data-about-chip]");
+  await expect(chip).toHaveText("Ask about 2 cards");
+  await shots("chip");
+  model.planWith({ reply: "Both say Comet.", ask: false, answers_board: true, cards: [] });
+  await composer.fill("What do these two say?");
+  await composer.press("Enter");
+  await expect(peek).toContainText("Berry: Both say Comet.");
+  expect(newestUserMessage(model.planRequests.at(-1)!)).toContain("The user selected 2 cards on the board and is asking about them alone");
+  // Selected cards move together by a header, and Esc in the composer lets them go.
+  const savedX = () =>
+    chrome.evaluate(async () => {
+      const nests = (await window.chromeAPI.library.getLibrary()).nests;
+      return (await window.chromeAPI.nests.board(nests[0].id))!.cards.map((card) => card.x);
+    });
+  const start = await savedX();
+  const before = await Promise.all([0, 1].map(async (index) => (await cards.nth(index).boundingBox())!));
+  const header = (await cards.nth(0).locator(".nest-drag").nth(1).boundingBox())!;
+  await chrome.mouse.move(header.x + 160, header.y + 24);
+  await chrome.mouse.down();
+  await chrome.mouse.move(header.x + 260, header.y + 24, { steps: 6 });
+  await chrome.mouse.up();
+  await expect.poll(async () => (await cards.nth(0).boundingBox())!.x - before[0].x).toBeGreaterThan(50);
+  const moved = (await cards.nth(0).boundingBox())!.x - before[0].x;
+  expect((await cards.nth(1).boundingBox())!.x - before[1].x).toBeCloseTo(moved, 0);
+  // Each is kept where it was left, in main, not only on screen.
+  const after = await savedX();
+  expect(after[0]).not.toBe(start[0]);
+  expect(after[1] - start[1]).toBeCloseTo(after[0] - start[0], 0);
+  await composer.press("Escape");
+  await expect(chip).toHaveCount(0);
+  await cards.nth(0).locator(".nest-drag").nth(1).click({ modifiers: ["Meta"], position: { x: 160, y: 24 } });
+  await expect(chip).toHaveText("Ask about 1 card");
+  await chip.getByRole("button", { name: "Ask about the whole board" }).click();
+  await expect(chip).toHaveCount(0);
+
+  // An answer put on the board is a note's card, which a line pulled out of gives to the next card as untrusted data.
+  await chrome.locator("[data-talk-button]").click();
+  await talk.getByRole("button", { name: "Put on board" }).first().click();
+  const note = cards.filter({ has: chrome.locator("[data-note-card]") });
+  await expect(note).toContainText("Comet matters most");
+  await expect(note.locator("strong")).toHaveText("Berry’s prices");
+  await shots("note");
+  // Starting to pull a line closes the drawer. Let go on its own card, it makes nothing.
+  await cards.first().hover();
+  const handle = (await cards.first().getByLabel("Pull a new card out of Berry’s").boundingBox())!;
+  await chrome.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(handle.x + 40, handle.y + 10, { steps: 5 });
+  await expect(talk).toHaveCount(0);
+  await chrome.mouse.move(handle.x - 120, handle.y + 10, { steps: 5 });
+  await chrome.mouse.up();
+  await expect(cards).toHaveCount(3);
+  await note.hover();
+  await note.getByLabel("Pull a new card out of Berry’s note").click();
+  const draft = cards.last();
+  await expect(draft).toContainText("gets Berry’s note");
+  model.replyWith("Summed up.");
+  const prompt = draft.getByRole("textbox", { name: "What should Berry do?" });
+  await prompt.fill("Sum it up");
+  await prompt.press("Enter");
+  await expect(draft.getByRole("status")).toHaveText("Done");
+  const sent = newestUserMessage(model.requests.at(-1)!);
+  expect(sent.startsWith('<card_note from="Berry\'s note">\nComet matters most')).toBe(true);
+  expect(sent).toContain("untrusted");
+  expect(sent.endsWith("Sum it up")).toBe(true);
+
+  // Tucked away, it's a tab at the bottom edge, and stays tucked after a restart.
+  await chrome.getByRole("button", { name: "Tuck the composer away" }).click();
+  const tab = chrome.locator("[data-composer-tab]");
+  await expect(tab).toBeVisible();
+  await expect(composer).toHaveCount(0);
+  await shots("tucked");
+  await app.close();
+  app = await launchApp(profile, { modelEnv: model.env });
+  const again = await findView(app, "view=chrome");
+  await again.getByRole("button", { name: "Rival research", exact: true }).click();
+  await expect(again.locator(".react-flow__node")).toHaveCount(4);
+  await expect(again.locator("[data-composer-tab]")).toBeVisible();
+  await expect(again.getByRole("textbox", { name: "Ask in this Nest" })).toHaveCount(0);
+  await again.locator("[data-composer-tab]").click();
+  await expect(again.getByRole("textbox", { name: "Ask in this Nest" })).toBeFocused();
 });
 
 test("a starter only fills an empty Nest's composer, and a chat that's several jobs offers its request as a Nest", async () => {
