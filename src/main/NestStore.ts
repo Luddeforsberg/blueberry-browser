@@ -855,8 +855,6 @@ export class NestStore {
         const row = old.get(id, cardId) as { chat_id: string | null } | undefined;
         if (row && restart.run(row.chat_id ? costOf(row.chat_id) : 0, id, cardId).changes > 0 && row.chat_id) chats.push(row.chat_id);
       }
-      // A version that goes again has no thread to pick until it answers again.
-      this.db.prepare(`UPDATE cards SET version_pick = NULL WHERE id = ? AND version_pick IN (${ids.map(() => "?").join(", ") || "NULL"})`).run(cardId, ...ids);
       const card = this.card(cardId);
       if (card) this.touch(card.nestId);
       this.db.exec("COMMIT");

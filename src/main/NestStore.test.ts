@@ -524,9 +524,9 @@ describe("NestStore", () => {
     again.addVersion(card.id, "", null);
     expect(again.addVersion(card.id, "", null)).toBeNull();
     expect(again.card(card.id)!.versions!.runs.map((run) => run.letter)).toEqual(["A", "B", "C", "D", "E"]);
-    // A version that goes again has nothing to pick.
+    // A version that goes again stays picked, and its new answer is what crosses once it's in.
     again.restartRuns(card.id, [first.id], () => 0);
-    expect(again.card(card.id)!.versions!.pick).toBeNull();
+    expect(again.card(card.id)!.versions!.pick).toBe(first.id);
 
     // As a file from before versions has it: a card with a prompt and runs is For each row's.
     const db = new DatabaseSync(file);

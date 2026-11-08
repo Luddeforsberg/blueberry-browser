@@ -685,6 +685,9 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const rowCount = picked ?? driving?.rows ?? 0
     const canEach = !!driving
     const [notes, setNotes] = useState<string[]>(() => draftVersions.get(card.id) ?? [''])
+    // The notes as they are now, for an answer from Suggest angles that comes back after the user changed them.
+    const notesNow = useRef(notes)
+    notesNow.current = notes
     // Versions and For each row don't go together yet, so whichever is on keeps the other off.
     const versionsOn = notes.length > 1
     const [eachOn, setEachOn] = useState(() => draftEach.get(card.id) ?? (picked !== null || !!card.plan?.each))
@@ -723,14 +726,16 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
             draftVersions.delete(card.id)
         } else setProblem(result.error)
     }
-    // Fills the empty notes, and sends nothing: the user reads them, and changes them, before Send.
+    // Fills the empty notes, and sends nothing: the user reads them, and changes them, before Send. Only notes still empty
+    // when it answers, and nothing if the number of versions changed meanwhile.
     const suggest = async () => {
         setSuggesting(true)
         setProblem(null)
         const result = await window.chromeAPI.nests.suggestAngles(card.id, text.trim(), notes)
         setSuggesting(false)
-        if (result.ok) changeNotes(result.notes)
-        else setProblem(result.error)
+        const now = notesNow.current
+        if (!result.ok) setProblem(result.error)
+        else if (result.notes.length === now.length) changeNotes(now.map((note, index) => (note.trim() ? note : result.notes[index])))
     }
 
     const several = inputs.length > 1

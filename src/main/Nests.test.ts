@@ -3186,6 +3186,54 @@ describe("Versions of a card", () => {
     expect(message).not.toContain("Alpha");
   });
 
+  it("runs every version again on Update, a few at a time, after saying so, keeping the pick and naming the card from it again", async () => {
+    const titles: string[] = [];
+    const recap: NestRecapWriter = { title: async (_, answer) => (titles.push(answer), `Title for ${answer}`), since: async () => null };
+    const context = setup(undefined, undefined, recap);
+    const { nests, chats } = context;
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("Leads, first");
+    await context.sendAndWait(scout.id, "Find");
+    const writer = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    replies.push("One", "Two", "Three", "Four");
+    nests.sendVersions(writer.id, "Write", ["", "", "", ""]);
+    await idle(nests, chats, writer.id);
+    const second = cardOf(nests, nest, writer.id).versions!.runs[1];
+    nests.pickVersion(writer.id, second.id);
+    replies.push("Leads, second");
+    await context.sendAndWait(scout.id, "Again");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+
+    expect(nests.updateCard(writer.id, false)).toEqual({ ok: false, warn: expect.stringContaining("Run all 4 versions again") });
+    held = [];
+    replies.push("Uno", "Dos", "Tres", "Cuatro");
+    const before = sent.length;
+    expect(nests.updateCard(writer.id, true)).toEqual({ ok: true });
+    await settle();
+    // Three at once, as any runs go, and the pick stays.
+    expect(sent.length - before).toBe(3);
+    expect(cardOf(nests, nest, writer.id).versions!.pick).toBe(second.id);
+    while (held.length > 0 || cardOf(nests, nest, writer.id).versions!.runs.some((run) => run.state === "waiting")) await release();
+    await idle(nests, chats, writer.id);
+    await settle();
+    expect(sent.slice(before).every((messages) => textOf(messages).includes("Leads, second"))).toBe(true);
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBeUndefined();
+    expect(cardOf(nests, nest, writer.id).title).toBe(`Title for ${chats.thread(cardOf(nests, nest, writer.id).versions!.runs[1].chatId!)!.messages[1].content}`);
+  });
+
+  it("lets Berry read a card of versions when it plans, as what crosses its lines", async () => {
+    const { nests, nest, writer, chats } = await scouted();
+    replies.push("Hej", "Dear");
+    nests.sendVersions(writer.id, "Write", ["Short", ""]);
+    await idle(nests, chats, writer.id);
+    plans.push({ reply: "On it.", ask: false, cards: [planCard("c1", { prompt: "Compare them" })] });
+    await nests.ask(nest, "Which email is better?", PLACE);
+    const read = JSON.stringify(planned.at(-1)!.messages);
+    expect(read).toContain("[Version A, Short] Write");
+    expect(read).toContain("Dear");
+  });
+
   it("fills only the empty notes from the cheap model, which reads only the prompt and the inputs' names", async () => {
     const asked: unknown[] = [];
     const recap: NestRecapWriter = {

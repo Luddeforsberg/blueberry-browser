@@ -78,7 +78,7 @@ const OPEN_Z = 10
 const DIM_Z = 5
 
 // A card the composer can ask about: one with something on it for Berry to read.
-const askable = (card: NestCard) => !!(card.chatId || card.each || card.table || card.file || card.note)
+const askable = (card: NestCard) => !!(card.chatId || card.each || card.versions || card.table || card.file || card.note)
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
 

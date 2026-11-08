@@ -153,6 +153,7 @@ const cutWords = (answer: CardAnswer): string => {
     const versions = answer.versions ?? [];
     const earlier = versions.reduce((total, version) => total + (version.earlier ?? 0), 0);
     return [
+      answer.cut ? "with some of its versions left out to fit" : null,
       earlier ? `with the earliest ${counted(earlier, "exchange")} of its versions left out to fit` : null,
       versions.some((version) => version.cut) ? "with some of it cut to fit, where it says so" : null,
     ]
@@ -299,7 +300,7 @@ export const crossingOf = (answer: CardAnswer): Crossing => {
   if (answer.part === "versions") {
     const versions = answer.versions ?? [];
     const words = versions.reduce((total, { note, exchanges }) => total + wordsIn(note) + exchanges.reduce((sum, { asked, answer: said }) => sum + wordsIn(asked) + wordsIn(said), 0), 0);
-    return { kind: "versions", versions: versions.length, words, cut: versions.some((version) => !!version.cut || !!version.earlier) };
+    return { kind: "versions", versions: versions.length, words, cut: !!answer.cut || versions.some((version) => !!version.cut || !!version.earlier) };
   }
   return { kind: "table", rows: answer.rows ?? 0, columns: answer.columns ?? 0, leftOut: answer.leftOut ?? 0 };
 };
@@ -446,14 +447,18 @@ const fitOne = (input: RawInput, share: number): CardAnswer => {
   }
   if (input.part === "note") return { name, text: input.text, part: "note", cutTo: input.text.length > share ? share : null };
   if (input.part === "versions") {
-    // The versions share the room as a card's inputs do, each a thread with its note, which always goes whole.
+    // The versions share the room as a card's inputs do, each a thread with its note and tags, all inside its share. A
+    // note is cut before the answers are, and a version with no room left for any answer is left out, and said to be.
     const shares = shareRoom(input.versions.map(versionLength), share);
-    const versions = input.versions.map((version, index) => ({
-      letter: version.letter,
-      note: version.note,
-      ...fitThread(version.exchanges, Math.max(0, shares[index] - VERSION_TAGS - version.note.length)),
-    }));
-    return { name, text: "", part: "versions", fromFile, versions };
+    const fitted = input.versions.map((version, index): VersionThread | null => {
+      const room = shares[index] - VERSION_TAGS;
+      const note = room > 0 ? cutText(version.note, Math.min(version.note.length, Math.floor(room / 4))) : "";
+      const thread = fitThread(version.exchanges, Math.max(0, room - note.length));
+      const noteCut = note.length < version.note.length;
+      return room > 0 && thread.exchanges.length > 0 ? { letter: version.letter, note, ...thread, cut: thread.cut || noteCut } : null;
+    });
+    const versions = fitted.filter((version) => version !== null);
+    return { name, text: "", part: "versions", fromFile, versions, ...(versions.length < fitted.length ? { cut: true } : {}) };
   }
   if (input.part === "row") {
     const text = tableMarkdown(input.header, [input.row]);
@@ -578,7 +583,7 @@ export const beforeOf = (answers: readonly CardAnswer[]): Before => {
     const crossing = crossingOf(answer);
     return total + (crossing.kind === "thread" || crossing.kind === "versions" ? crossing.words : wordsIn(answer.cutTo != null ? answer.text.slice(0, answer.cutTo) : answer.text));
   }, 0);
-  const cut = went.some((answer) => !!answer.cut || !!answer.earlier || !!answer.leftOut || answer.cutTo != null);
+  const cut = went.some((answer) => !!answer.cut || !!answer.earlier || !!answer.leftOut || answer.cutTo != null || !!answer.versions?.some((version) => version.cut || version.earlier));
   return { cards: went.length, words, leftOut: answers.length - went.length, cut };
 };
 
@@ -609,7 +614,7 @@ export const knowsOf = (
       answer.part === "thread"
         ? !!answer.cut || !!answer.earlier
         : answer.part === "versions"
-          ? (answer.versions ?? []).some((version) => !!version.cut || !!version.earlier)
+          ? !!answer.cut || (answer.versions ?? []).some((version) => !!version.cut || !!version.earlier)
           : cutToOf(answer) !== null || !!answer.leftOut;
     if (cut) knows.cut++;
   }
