@@ -1995,4 +1995,25 @@ test("a section drawn around a card is named, moves the card with it, and asks a
   await chrome.keyboard.press("Backspace");
   await expect(name).toHaveCount(0);
   await expect(cards).toHaveCount(2);
+
+  // At about half zoom a card is still itself, its answer showing and its buttons there. Only far out does it become its
+  // title, and a click on that opens it.
+  const zoomBoard = (to: "in" | "out") => app.evaluate(({ webContents }, way) => webContents.getAllWebContents().forEach((each) => each.send("nests:zoom", way)), to);
+  for (let step = 0; step < 4; step++) {
+    await zoomBoard("out");
+    await chrome.waitForTimeout(250);
+  }
+  await chrome.waitForTimeout(500);
+  await expect(chrome.locator("[data-far-card]")).toHaveCount(0);
+  await expect(rivals.getByText("Comet and Dia are the rivals.")).toBeVisible();
+  for (let step = 0; step < 4; step++) {
+    await zoomBoard("out");
+    await chrome.waitForTimeout(250);
+  }
+  await chrome.waitForTimeout(500);
+  await rivals.locator("[data-far-card]").click();
+  await expect(chrome.getByRole("button", { name: "Close the chat" })).toBeVisible();
+  await chrome.getByRole("button", { name: "Close the chat" }).click();
+  await chrome.getByRole("button", { name: /Back to 100%/ }).click();
+  await expect(chrome.locator("[data-far-card]")).toHaveCount(0);
 });

@@ -300,7 +300,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
 
     return (
         <div className={cn(CARD_SHELL, cardShadow(running, open), box.fill && "flex flex-col")} style={boxStyle(box)}>
-            {!open && <FarCard title={card.title ?? null} asked={asked ?? null} status={status ? { text: status.text, className: TONES[status.tone] } : null} unread={!!card.unread} />}
+            {!open && <FarCard title={card.title ?? null} asked={asked ?? null} status={status ? { text: status.text, className: TONES[status.tone] } : null} unread={!!card.unread} onOpen={() => board.setOpen(card.id)} />}
             <Perched cardId={card.id} mascot={mascot} mood={moodOf(thread)} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
@@ -1263,7 +1263,7 @@ const VersionsCard: React.FC<{ card: NestCard; versions: NestVersions; box: Card
                 className={cn(CARD_SHELL, cardShadow(running, open), box.fill && !open && "flex flex-col")}
                 style={open ? { width: Math.min(count * VERSION_COLUMN, VERSIONS_OPEN_MAX) } : boxStyle(box)}
             >
-                {!open && <FarCard title={card.title ?? null} asked={versions.prompt} status={{ text: status.text, className: TONES[status.tone] }} unread={!!card.unread} />}
+                {!open && <FarCard title={card.title ?? null} asked={versions.prompt} status={{ text: status.text, className: TONES[status.tone] }} unread={!!card.unread} onOpen={() => board.setOpen(card.id)} />}
                 <Perched cardId={card.id} mascot={mascot} mood={asking ? 'asking' : running ? 'thinking' : 'rest'} />
                 <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, 0)} />
                 <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
