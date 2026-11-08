@@ -405,9 +405,12 @@ export class NestStore {
       .all(nestId) as unknown as NestSection[];
   }
 
-  // The colours the board's sections have, less the one around a plan that hasn't run, which a new plan replaces.
-  sectionColors(nestId: string): NestSectionColor[] {
-    return (this.db.prepare("SELECT color FROM sections WHERE nest_id = ? AND planned = 0 ORDER BY rowid").all(nestId) as { color: NestSectionColor }[]).map((row) => row.color);
+  // The colours the board's sections have. A new plan replaces the section around the plan that hasn't run, so for it
+  // that one's colour is free: `besidesPlan`.
+  sectionColors(nestId: string, besidesPlan = false): NestSectionColor[] {
+    return (
+      this.db.prepare(`SELECT color FROM sections WHERE nest_id = ?${besidesPlan ? " AND planned = 0" : ""} ORDER BY rowid`).all(nestId) as { color: NestSectionColor }[]
+    ).map((row) => row.color);
   }
 
   section(id: string): (NestSection & { nestId: string }) | null {

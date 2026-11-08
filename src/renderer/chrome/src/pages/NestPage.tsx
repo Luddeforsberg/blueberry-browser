@@ -1029,13 +1029,16 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
 
     // A press on a section's name selects it and every card in it, so the composer asks about them alone. A press on the
     // name of the one selected renames it.
+    const selectSection = (rect: Rect & { id: string }) => {
+        const inside = new Set(inSectionNow(rect))
+        setSectionId(rect.id)
+        setNodes((current) => current.map((node) => (!!node.selected === inside.has(node.id) ? node : { ...node, selected: inside.has(node.id) })))
+    }
     const pressSectionName = (id: string) => {
         const pressed = board.sections.find((each) => each.id === id)
         if (!pressed) return
         if (id === sectionId) return setRenamingId(id)
-        const inside = new Set(inSectionNow(pressed))
-        setSectionId(id)
-        setNodes((current) => current.map((node) => (!!node.selected === inside.has(node.id) ? node : { ...node, selected: inside.has(node.id) })))
+        selectSection(pressed)
     }
     const sectionInside = (id: string): SectionMove => {
         const pressed = board.sections.find((each) => each.id === id)
@@ -1058,13 +1061,21 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             })
         )
     }
-    // A new section, drawn or fitted around cards, is selected with its name ready to type.
+    // A new section, drawn or fitted around cards, is selected with the cards in it and its name ready to type. Never
+    // under an open card.
     const makeSection = async (rect: Rect) => {
+        open(null)
         const made = await api.addSection(board.id, rect)
         if (!made) return setProblem('That section couldn’t be made.')
-        setSectionId(made.id)
+        selectSection(made)
         setRenamingId(made.id)
     }
+    const toggleDrawing = () => {
+        if (!drawing) open(null)
+        setDrawing(!drawing)
+    }
+    const drawingToggle = useRef(toggleDrawing)
+    drawingToggle.current = toggleDrawing
     const group = () => {
         const around = fitSection(nodes.filter((node) => node.selected).map(rectOf))
         if (around) void makeSection(around)
@@ -1082,7 +1093,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             if (active instanceof HTMLElement && (active.isContentEditable || active.matches('input, textarea, select'))) return
             if (event.key === 's' || event.key === 'S') {
                 event.preventDefault()
-                setDrawing((on) => !on)
+                drawingToggle.current()
             } else if (sectionId && (event.key === 'Backspace' || event.key === 'Delete') && !active?.closest('.react-flow__node, .react-flow__edge')) {
                 event.preventDefault()
                 setSectionId(null)
@@ -1353,10 +1364,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         onCancel={() => setDrawing(false)}
                     />
                 )}
-                {board.cards.length > 0 && (
+                {board.cards.length > 0 ? (
                     <ZoomControls onFit={fit} onActualSize={() => void flow.zoomTo(1, MOVE)}>
-                        <SectionTools drawing={drawing} onDraw={() => setDrawing((on) => !on)} canGroup={nodes.some((node) => node.selected)} onGroup={group} />
+                        <SectionTools drawing={drawing} onDraw={toggleDrawing} canGroup={nodes.some((node) => node.selected)} onGroup={group} />
                     </ZoomControls>
+                ) : (
+                    <div className="absolute top-3 right-4 flex items-center gap-1">
+                        <SectionTools drawing={drawing} onDraw={toggleDrawing} canGroup={false} onGroup={group} />
+                    </div>
                 )}
                 {board.cards.length === 0 && !planning && board.talk.length === 0 && (
                     <div className="pointer-events-none absolute inset-x-0 top-[38%] px-4 flex flex-col items-center gap-4">

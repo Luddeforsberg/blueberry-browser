@@ -880,14 +880,15 @@ describe("Berry planning in a Nest", () => {
     const [section] = nests.board(nest)!.sections;
     expect(section).toMatchObject({ name: "Find companies and write to each", color: "yellow" });
     expect([scout, writer].every((card) => inSection({ x: card.x, y: card.y, width: CARD_WIDTH, height: CARD_HEIGHT }, section))).toBe(true);
-    // A plan changed to one card has no section, and the plan's section never takes a colour from the next.
-    expect(nests.addSection(nest, { x: 0, y: 2000, width: 300, height: 200 })).toMatchObject({ name: "Section", color: "yellow" });
+    // A section drawn beside the plan's takes another colour. A plan changed to one card has no section, and the plan's
+    // section never takes a colour from the next.
+    expect(nests.addSection(nest, { x: 0, y: 2000, width: 300, height: 200 })).toMatchObject({ name: "Section", color: "green" });
     plans.push({ ...TWO_JOBS, section: "  Outreach\u200b ", cards: [planCard("c1")] });
     await nests.ask(nest, "Only the list", PLACE);
     expect(nests.board(nest)!.sections.map((each) => each.name)).toEqual(["Section"]);
     plans.push({ ...TWO_JOBS, section: "  Outreach\u200b " });
     await nests.ask(nest, "Both again", PLACE);
-    expect(nests.board(nest)!.sections).toMatchObject([{ name: "Section" }, { name: "Outreach", color: "green" }]);
+    expect(nests.board(nest)!.sections).toMatchObject([{ name: "Section" }, { name: "Outreach", color: "yellow" }]);
   });
 
   it("still says Berry is planning on the board it sends after a card was nudged out of the way", async () => {

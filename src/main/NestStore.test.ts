@@ -515,7 +515,8 @@ describe("NestStore", () => {
     store.setPlan(nest, [plan("p1"), plan("p2")], "Find and write", around("Prospects"));
     expect(store.board(nest)!.sections.map((each) => each.name)).toEqual(["Prospects"]);
     // A planned section's colour is free for the next plan, which replaces it.
-    expect(store.sectionColors(nest)).toEqual([]);
+    expect(store.sectionColors(nest, true)).toEqual([]);
+    expect(store.sectionColors(nest)).toEqual(["blue"]);
     store.setPlan(nest, [plan("p1")], "Just one");
     expect(store.board(nest)!.sections).toEqual([]);
     store.setPlan(nest, [plan("p1"), plan("p2")], "Find and write", around("Outreach"));

@@ -1825,6 +1825,8 @@ test("a section drawn around a card is named, moves the card with it, and asks a
   await field.press("Enter");
   const name = chrome.locator("[data-section-name]");
   await expect(name).toHaveText("Research");
+  // A new section is selected with the cards in it.
+  await expect(chrome.locator("[data-about-chip]")).toHaveText("Ask about Research");
   await expect.poll(async () => (await saved()).sections.map((section) => section.name)).toEqual(["Research"]);
   if (SHOTS) {
     for (const appearance of ["light", "dark"] as const) {

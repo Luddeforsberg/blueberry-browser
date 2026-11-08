@@ -1233,7 +1233,7 @@ export class Nests {
     const section = planSection(
       cards.map((card) => ({ x: card.x, y: card.y, width: CARD_WIDTH, height: PLAN_SECTION_HEIGHT })),
       name,
-      this.store.sectionColors(nestId)
+      this.store.sectionColors(nestId, true)
     );
     return this.store.setPlan(nestId, cards, said, section) !== null;
   }

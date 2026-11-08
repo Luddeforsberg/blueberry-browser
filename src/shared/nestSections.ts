@@ -10,8 +10,8 @@ export const isSectionColor = (value: unknown): value is NestSectionColor => typ
 
 export const SECTION_NAME = "Section";
 export const MAX_SECTION_NAME = 40;
-// Small enough to hold one card's head, never so small its name has no room.
-export const SECTION_SIZE = { minWidth: 240, minHeight: 160, maxWidth: 20_000, maxHeight: 20_000 };
+// Small enough to hold one card's head, never so small its name has no room, and as big as the board itself.
+export const SECTION_SIZE = { minWidth: 240, minHeight: 160, maxWidth: 2_000_000, maxHeight: 2_000_000 };
 // What a click with the section tool makes, with no drag.
 export const SECTION_DEFAULT = { width: 520, height: 360 };
 // Room kept around cards a section is fitted to: its name and the cards' birds above them, and a margin elsewhere.
