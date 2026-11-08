@@ -360,6 +360,8 @@ export type NestRetryResult = { ok: true } | { ok: false; error: string } | { ok
 // left of the board in sight and the cards already on it, measured.
 export interface NestAskOptions {
   mascotId?: string | null;
+  // The cards selected on the board, which Berry then reads alone. None, or an empty list, is the whole board.
+  about?: string[];
   at: { x: number; y: number };
   taken: { x: number; y: number; width: number; height: number }[];
 }
@@ -590,6 +592,11 @@ export interface InvokeChannels {
   // The Nest's composer: Berry starts one card at once, plans several, or asks first. Only because the user sent it.
   "nests:ask": { region: "chrome"; args: [nestId: string, text: string, options: NestAskOptions]; result: NestAskResult };
   // A planned card's prompt or For each row, only before the plan runs.
+  // Tucks the Nest's composer down to a tab at the board's bottom edge, or brings it back. Kept with the Nest.
+  "nests:set-tucked": { region: "chrome"; args: [nestId: string, tucked: boolean]; result: boolean };
+  // One of Berry's answers in the composer, by its message's id, as a note's card in the first free place in sight. Main
+  // reads the answer itself.
+  "nests:put-on-board": { region: "chrome"; args: [nestId: string, messageId: number, place: Pick<NestAskOptions, "at" | "taken">]; result: NestTableResult };
   "nests:edit-plan": { region: "chrome"; args: [cardId: string, change: { prompt?: string; each?: boolean }]; result: boolean };
   // Run: sends every planned card. Each starts once the card it reads from has answered, or once the user says so.
   "nests:run-plan": { region: "chrome"; args: [nestId: string]; result: NestRunPlanResult };
@@ -876,6 +883,8 @@ export interface NestsAPI {
   sendRun: (runId: string, text: string) => Promise<NestSendEachResult>;
   stopCard: (cardId: string) => Promise<boolean>;
   ask: (nestId: string, text: string, options: NestAskOptions) => Promise<NestAskResult>;
+  setTucked: (nestId: string, tucked: boolean) => Promise<boolean>;
+  putOnBoard: (nestId: string, messageId: number, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
   editPlan: (cardId: string, change: { prompt?: string; each?: boolean }) => Promise<boolean>;
   runPlan: (nestId: string) => Promise<NestRunPlanResult>;
   discardPlan: (nestId: string) => Promise<boolean>;

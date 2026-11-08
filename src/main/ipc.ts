@@ -79,6 +79,8 @@ export const CHANNEL_REGIONS: {
   "nests:send-run": ["chrome"],
   "nests:stop-card": ["chrome"],
   "nests:ask": ["chrome"],
+  "nests:set-tucked": ["chrome"],
+  "nests:put-on-board": ["chrome"],
   "nests:edit-plan": ["chrome"],
   "nests:run-plan": ["chrome"],
   "nests:discard-plan": ["chrome"],

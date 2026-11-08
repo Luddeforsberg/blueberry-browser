@@ -14,16 +14,17 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/base.css'
 import type { NestFocus, NestHandOff, TabInfo } from '@shared/ipc'
-import type { MascotProfile, NestBoard, NestCard, NestRequest } from '@shared/library'
+import type { MascotProfile, NestBoard, NestCard } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { ChevronRight, Scan, Table2 } from 'lucide-react'
+import { Scan, Table2 } from 'lucide-react'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from '../components/Berry'
-import { SHIMMER_QUIET, UserMessage } from '../components/ChatMessage'
+import { SHIMMER_QUIET } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
+import { AboutChip, NestComposer } from '../components/NestComposer'
 import { firstBlank, NEST_STARTERS, onLeftInComposer, takeFromComposer } from '../nestStart'
 import { Attachments, useAttaching } from '../components/NestAttachments'
 import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
@@ -70,6 +71,9 @@ const MOVE = { duration: 240 }
 // Where the open card sits, and the layer that dims the rest of the board under it.
 const OPEN_Z = 10
 const DIM_Z = 5
+
+// A card the composer can ask about: one with something on it for Berry to read.
+const askable = (card: NestCard) => !!(card.chatId || card.each || card.table || card.file || card.note)
 
 const rectOf = (node: CardNode): Rect => ({ ...node.position, width: node.measured?.width ?? CARD_WIDTH, height: node.measured?.height ?? CARD_HEIGHT })
 
@@ -127,7 +131,7 @@ const toNodes = (
 const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
     const card = board.cards.find((each) => each.id === cardId)
     const into = board.lines.filter((line) => line.to === cardId)
-    if (!card || card.chatId || card.each || card.table || card.file || card.page || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
+    if (!card || card.chatId || card.each || card.table || card.file || card.page || card.note || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
     const after = new Set<string>([cardId])
     for (let grew = true; grew; ) {
         grew = false
@@ -142,7 +146,7 @@ const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
         (each) =>
             !after.has(each.id) &&
             !into.some((line) => line.from === each.id) &&
-            (!!each.chatId || !!each.each || !!each.table || !!each.file || (!!each.page && (!card.plan || card.plan.state === 'held')) || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
+            (!!each.chatId || !!each.each || !!each.table || !!each.file || !!each.note || (!!each.page && (!card.plan || card.plan.state === 'held')) || (card.plan?.state === 'planned' && each.plan?.state === 'planned'))
     )
 }
 
@@ -161,6 +165,7 @@ const toEdges = (board: NestBoard): LineEdge[] =>
         targetHandle: 'in',
         type: 'line',
         focusable: false,
+        selectable: false,
         data: {
             draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each || card.file || card.page)),
             view: board.cards.some((card) => card.id === line.to && card.page)
@@ -382,7 +387,9 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const clearedByPress = useRef(false)
     const label = useCallback(
         (card: NestBoard['cards'][number]) =>
-            card.page
+            card.note
+                ? `${berryName}’s note`
+                : card.page
                 ? `The page ${pageName(card.page.tab?.url ?? card.page.url)}`
                 : card.table
                   ? `The table ${card.table.name}`
@@ -393,13 +400,41 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     )
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
     const edges = useMemo(() => toEdges(board), [board])
+    // Cards selected on the board, which the composer then asks about alone: Shift or ⌘ and a press on a card's header or
+    // bird, or Shift and a drag on empty board. Only those select, so a plain press on a card, or Enter on one, does what
+    // it always has. Set as each press starts, and gone with any key.
+    const selectGesture = useRef(false)
+    const selectedCards = useMemo(() => nodes.filter((node) => node.selected && askable(node.data.card)).map((node) => node.id), [nodes])
+    const clearCards = useCallback(() => setNodes((current) => current.map((node) => (node.selected ? { ...node, selected: false } : node))), [])
     const [prompt, setPrompt] = useState('')
     // A starter or a chat's request fills the composer and moves the keyboard there, never sending.
     const [composerFocus, setComposerFocus] = useState<{ key: number; range?: [number, number] }>({ key: 0 })
-    const fillComposer = useCallback((text: string, range?: [number, number]) => {
-        setPrompt(text)
-        setComposerFocus((current) => ({ key: current.key + 1, range }))
-    }, [])
+    const focusComposer = useCallback(() => setComposerFocus((current) => ({ key: current.key + 1 })), [])
+    // Tucked down to a tab at the bottom edge, as the Nest keeps it, at once. Bringing it back, the keyboard goes there.
+    const [tucked, setTuckedNow] = useState(!!board.composerTucked)
+    const tuckedNow = useRef(tucked)
+    tuckedNow.current = tucked
+    useEffect(() => setTuckedNow(!!board.composerTucked), [board.composerTucked])
+    const tuck = useCallback(
+        (on: boolean) => {
+            setTuckedNow(on)
+            if (on) setDrawerOpen(false)
+            else focusComposer()
+            void window.chromeAPI.nests.setTucked(board.id, on)
+        },
+        [board.id, focusComposer]
+    )
+    const fillComposer = useCallback(
+        (text: string, range?: [number, number]) => {
+            if (tuckedNow.current) tuck(false)
+            setPrompt(text)
+            setComposerFocus((current) => ({ key: current.key + 1, range }))
+        },
+        [tuck]
+    )
+    // The drawer with the whole talk, and what had the keyboard before it opened, which gets it back when it closes.
+    const [drawerOpen, setDrawerOpen] = useState(false)
+    const backTo = useRef<HTMLElement | null>(null)
     useEffect(() => {
         const take = () => {
             const text = takeFromComposer(board.id)
@@ -421,6 +456,23 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const open = useCallback((cardId: string | null, runId: string | null = null) => {
         setOpenId(cardId)
         setOpenRunId(cardId ? runId : null)
+        if (cardId) setDrawerOpen(false)
+    }, [])
+
+    // Opening the drawer closes the open card, so the talk never sits over the dim. The keyboard goes to the composer
+    // under it, and back where it was once it closes with Esc or its ×.
+    const openDrawer = useCallback(() => {
+        const active = document.activeElement
+        backTo.current = active instanceof HTMLElement && active !== document.body && !active.closest('[data-nest-composer]') ? active : null
+        setOpenId(null)
+        setDrawerOpen(true)
+        focusComposer()
+    }, [focusComposer])
+    const closeDrawer = useCallback((giveBack: boolean) => {
+        setDrawerOpen(false)
+        const back = backTo.current
+        backTo.current = null
+        if (giveBack && back?.isConnected) back.focus()
     }, [])
 
     // Opens where it was last looked at, or else where the cards are, with room above the first for its bird.
@@ -643,7 +695,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // so does a draft with a file or note on it.
     const dropEmptyDrafts = useCallback(() => {
         board.cards
-            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !card.file && !card.page && !draftText(card.id).trim() && card.attachments.length === 0)
+            .filter((card) => !card.chatId && !card.each && !card.plan && !card.table && !card.file && !card.page && !card.note && !draftText(card.id).trim() && card.attachments.length === 0)
             .forEach((card) => void api.deleteCard(card.id))
     }, [api, board.cards])
 
@@ -766,13 +818,53 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 clearedByPress.current = false
                 return
             }
+            // A click on the board closes the drawer, or lets selected cards go, which React Flow has just done, and
+            // nothing else.
+            if (drawerOpen) return closeDrawer(false)
             if (openId) return open(null)
+            if (nodes.some((node) => node.selected)) return
             const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
             dropEmptyDrafts()
             void add({ x: at.x - 32, y: at.y - 24 })
         },
-        [openId, open, flow, add, dropEmptyDrafts]
+        [openId, open, flow, add, dropEmptyDrafts, drawerOpen, closeDrawer, nodes]
     )
+
+    // `/` while the board has the keyboard and no field does opens the drawer, or brings the tucked composer back. Esc
+    // closes the drawer, and with it closed lets selected cards go.
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            const element = wrapper.current
+            if (!element || event.defaultPrevented || element.offsetParent === null) return
+            const active = document.activeElement
+            if (active && active !== document.body && !element.contains(active)) return
+            const typing = active instanceof HTMLElement && (active.isContentEditable || active.matches('input, textarea, select'))
+            if (event.key === 'Escape') {
+                if (drawerOpen) {
+                    event.preventDefault()
+                    closeDrawer(true)
+                } else if (!typing && selectedCards.length > 0) clearCards()
+                return
+            }
+            if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || typing) return
+            event.preventDefault()
+            if (tuckedNow.current) tuck(false)
+            else openDrawer()
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [drawerOpen, closeDrawer, openDrawer, tuck, selectedCards.length, clearCards])
+
+    // One of Berry's answers as a note's card, in the first free place near the top of what's in sight. Main reads the
+    // answer itself, by its message's id.
+    const putOnBoard = async (messageId: number): Promise<string | null> => {
+        const box = wrapper.current?.getBoundingClientRect()
+        if (!box) return 'The board isn’t there any more.'
+        const { zoom } = flow.getViewport()
+        const at = flow.screenToFlowPosition({ x: box.left + box.width / 2 - (CARD_WIDTH * zoom) / 2, y: box.top + EDGE_INSET.y })
+        const result = await api.putOnBoard(board.id, messageId, { at, taken: rects() })
+        return result.ok ? null : result.error
+    }
 
     // From the keyboard, Tab goes from card to card. On a card itself, Enter opens it and ⌫ deletes it, asking first as
     // the × does.
@@ -889,7 +981,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         dropEmptyDrafts()
         const taken = rects()
         if (!pending) setGhostsAt(freeSpot(taken, at, { width: CARD_WIDTH * 2 + CARD_GAP, height: PLANNED_HEIGHT }))
-        const result = await api.ask(board.id, text, { mascotId: chosen.id === BERRY_ID ? null : chosen.id, at, taken })
+        const result = await api.ask(board.id, text, { mascotId: chosen.id === BERRY_ID ? null : chosen.id, at, taken, ...(selectedCards.length > 0 ? { about: selectedCards } : {}) })
         if (!result.ok) {
             setPrompt(text)
             setProblem(result.error)
@@ -904,6 +996,17 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 data-tab-drop
                 className={cn("relative flex-1 min-h-0", dropping && "after:pointer-events-none after:absolute after:inset-2 after:rounded-panel after:border-2 after:border-dashed after:border-accent-ink/50")}
                 onKeyDown={onKeyDown}
+                onPointerDownCapture={(event) => {
+                    const target = event.target as Element
+                    selectGesture.current =
+                        (event.shiftKey || event.metaKey || event.ctrlKey) &&
+                        (!!target.closest('.react-flow__pane') || (!!target.closest('.nest-drag') && !target.closest('button, a, input, textarea')))
+                }}
+                onKeyDownCapture={(event) => {
+                    selectGesture.current = false
+                    // Arrow keys never move a selected card, which nothing would save.
+                    if (event.key.startsWith('Arrow') && (event.target as Element).classList.contains('react-flow__node')) event.stopPropagation()
+                }}
                 onDragEnter={(event) => {
                     if (!droppable(event)) return
                     dragDepth.current++
@@ -926,13 +1029,24 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     edges={edges}
                     nodeTypes={NODE_TYPES}
                     edgeTypes={EDGE_TYPES}
-                    onNodesChange={(changes: NodeChange<CardNode>[]) => setNodes((current) => applyNodeChanges(changes.map((change) => stopAtNeighbours(change, current)), current))}
+                    onNodesChange={(changes: NodeChange<CardNode>[]) =>
+                        setNodes((current) =>
+                            applyNodeChanges(
+                                changes.filter((change) => change.type !== 'select' || !change.selected || selectGesture.current).map((change) => stopAtNeighbours(change, current)),
+                                current
+                            )
+                        )
+                    }
+                    onNodeDragStart={() => drawerOpen && closeDrawer(false)}
                     onNodeDragStop={(_, node) => {
                         // Moved by hand, it stays where it's left, even before main says so.
                         setNodes((current) => current.map((each) => (each.id === node.id ? { ...each, data: { card: { ...each.data.card, autoPlaced: false } } } : each)))
                         void api.moveCard(node.id, node.position.x, node.position.y)
                     }}
-                    onConnectStart={(_, { nodeId }) => (pulling.current = nodeId)}
+                    onConnectStart={(_, { nodeId }) => {
+                        pulling.current = nodeId
+                        if (drawerOpen) closeDrawer(false)
+                    }}
                     onConnectEnd={connectEnd}
                     connectionLineComponent={PullingLine}
                     connectionDragThreshold={6}
@@ -947,10 +1061,12 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     zoomOnPinch
                     zoomOnDoubleClick={false}
                     panOnScroll
-                    elementsSelectable={false}
+                    elementsSelectable
+                    selectNodesOnDrag={false}
+                    elevateNodesOnSelect={false}
                     deleteKeyCode={null}
-                    selectionKeyCode={null}
-                    multiSelectionKeyCode={null}
+                    selectionKeyCode="Shift"
+                    multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
                     ariaLabelConfig={CARD_KEYS}
                     autoPanOnNodeFocus
                     proOptions={{ hideAttribution: true }}
@@ -986,9 +1102,18 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         </div>
                     </div>
                 )}
-                <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 w-[min(640px,calc(100%-32px))] flex flex-col gap-4 [&>*]:pointer-events-auto">
-                    <Talk talk={board.talk} planning={planning} />
-                    {problem && <p role="alert" className="px-3 text-13 text-destructive">{problem}</p>}
+                <NestComposer
+                    nestId={board.id}
+                    talk={board.talk}
+                    planning={planning}
+                    problem={problem}
+                    tucked={tucked}
+                    onTuck={tuck}
+                    open={drawerOpen}
+                    onOpen={openDrawer}
+                    onClose={() => closeDrawer(true)}
+                    onPutOnBoard={putOnBoard}
+                >
                     <Composer
                         label="Ask in this Nest"
                         placeholder={pending ? 'Change the plan, or press Run' : talking ? `Reply to ${berryName}` : `Ask ${chosenName}, or ask for a plan`}
@@ -1005,13 +1130,22 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         addItems={addItems}
                         addLabel="Add a file or note"
                         menuUp
-                        attachment={<Attachments attachments={board.attached} target={planning ? null : { nestId: board.id }} attaching={attaching} className="px-1 pb-1" />}
+                        attachment={
+                            <>
+                                {selectedCards.length > 0 && (
+                                    <div className="px-1 pb-1">
+                                        <AboutChip count={selectedCards.length} onClear={clearCards} />
+                                    </div>
+                                )}
+                                <Attachments attachments={board.attached} target={planning ? null : { nestId: board.id }} attaching={attaching} className="px-1 pb-1" />
+                            </>
+                        }
                         canSend={prompt.trim() !== '' && !planning}
                         onSend={() => void sendNew()}
                         mascot={chosen}
                         onChooseMascot={choose}
                     />
-                </div>
+                </NestComposer>
             </div>
         </NestBoardContext.Provider>
     )
@@ -1035,52 +1169,6 @@ export const PlanGhosts: React.FC<{ at: { x: number; y: number } }> = ({ at }) =
         </div>
     </div>
 )
-
-// What the user wrote in the composer and Berry's answers, over it. The request that's open shows whole, and the one before
-// it folds to one line that opens. While Berry reads a message, it says Thinking under it.
-const Talk: React.FC<{ talk: NestRequest[]; planning: string | null }> = ({ talk, planning }) => {
-    const berryName = useAssistantName()
-    const [unfolded, setUnfolded] = useState<string | null>(null)
-    const folded = talk.filter((request) => !request.open)
-    const open = talk.find((request) => request.open)
-    if (talk.length === 0 && !planning) return null
-    const messages = (request: NestRequest) =>
-        request.messages.map((message, index) =>
-            message.role === 'user' ? (
-                <UserMessage key={index} content={message.text} />
-            ) : (
-                <p key={index} className="max-w-[85%] text-16 whitespace-pre-wrap">{message.text}</p>
-            )
-        )
-    return (
-        <div aria-label={`Talking with ${berryName}`} className="nowheel max-h-[40vh] overflow-y-auto flex flex-col gap-3">
-            {folded.map((request) => {
-                const shown = unfolded === request.id
-                return (
-                    <div key={request.id} className="flex flex-col gap-3">
-                        <button
-                            type="button"
-                            aria-expanded={shown}
-                            onClick={() => setUnfolded(shown ? null : request.id)}
-                            className="self-start max-w-full h-7 -ml-1.5 px-1.5 rounded-control flex items-center gap-1 text-13 text-muted-foreground outline-none transition-colors hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <ChevronRight className={cn("size-4 shrink-0 transition-transform", shown && "rotate-90")} />
-                            <span className="truncate">{request.messages[0]?.text}</span>
-                        </button>
-                        {shown && messages(request)}
-                    </div>
-                )
-            })}
-            {open && messages(open)}
-            {planning && (
-                <>
-                    <UserMessage content={planning} />
-                    <p role="status" className="text-16"><span className={SHIMMER_QUIET}>Thinking</span></p>
-                </>
-            )}
-        </div>
-    )
-}
 
 // The top bar's end while a plan hasn't run: Discard plan, quiet, and Run, the one decision.
 // Run waits while Berry is changing the plan, so the plan that runs is the one on the board.

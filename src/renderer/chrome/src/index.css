@@ -79,3 +79,13 @@
   outline: 2px solid rgb(var(--accent-ink));
   outline-offset: 2px;
 }
+
+/* A card selected for the composer to ask about wears a quieter ring than focus, further out, so both can show. */
+.nest-board .react-flow__node.selected > div {
+  box-shadow: 0 0 0 4px rgb(var(--canvas)), 0 0 0 6px rgb(var(--accent-ink) / 0.5);
+}
+
+/* React Flow's box around a selection would take presses meant for the cards in it, and moving cards together isn't a thing here. */
+.nest-board .react-flow__nodesselection {
+  display: none;
+}

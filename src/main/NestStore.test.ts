@@ -9,6 +9,10 @@ import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 // What the migration for page cards added.
 const PAGE_COLUMNS = "ALTER TABLE cards DROP COLUMN page_url; ALTER TABLE cards DROP COLUMN page_title; ALTER TABLE cards DROP COLUMN page_dropped; ALTER TABLE cards DROP COLUMN page_job;";
 
+// What the migration for the composer added: whether it's tucked, what kind each message is, and note cards.
+const COMPOSER_COLUMNS =
+  "ALTER TABLE nests DROP COLUMN composer_tucked; ALTER TABLE talk DROP COLUMN kind; ALTER TABLE talk DROP COLUMN planned; ALTER TABLE talk DROP COLUMN about; ALTER TABLE cards DROP COLUMN note_text;";
+
 // What migrations after 9 added, so a file can be taken back to how an older version left it.
 const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN each_column; ALTER TABLE cards DROP COLUMN each_column_settled; ALTER TABLE runs DROP COLUMN cell; " +
@@ -17,7 +21,8 @@ const LATER_COLUMNS =
   "ALTER TABLE cards DROP COLUMN each_line; ALTER TABLE runs DROP COLUMN spent; " +
   "ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; " +
   "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
-  PAGE_COLUMNS;
+  PAGE_COLUMNS +
+  COMPOSER_COLUMNS;
 
 describe("NestStore", () => {
   it("keeps a nest's cards, their places and the lines between them across opening the file again", () => {
@@ -54,6 +59,7 @@ describe("NestStore", () => {
       ],
       lines: [{ id: expect.any(String), from: scout.id, to: writer.id, picked: null }],
       talk: [],
+      composerTucked: false,
       attached: [{ id: expect.any(String), kind: "note", name: "", type: "text/plain", size: 8, text: "Only B2B" }],
     });
     // The bytes as they were copied in, whatever happens to the file on disk.
@@ -127,9 +133,10 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 3}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+      `PRAGMA user_version = ${version - 4}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
         "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
-        PAGE_COLUMNS
+        PAGE_COLUMNS +
+        COMPOSER_COLUMNS
     );
     db.close();
 
@@ -375,5 +382,41 @@ describe("NestStore", () => {
     const next = store.addCard(nest, { x: 1200, y: 0, from: made.id })!;
     store.copyFile(next.id, made.id);
     expect(store.sentAttachments(next.id)).toMatchObject([{ name: "leads.csv", from: "made" }]);
+  });
+
+  it("keeps the composer tucked per Nest, gives a Nest from before it an open one, and keeps what each message was", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "blueberry-nests-")), "nests.db");
+    const store = new NestStore(file);
+    const nest = store.createNest("Leads");
+    const other = store.createNest("Other");
+    store.say(nest, "user", "What did Scout find?");
+    store.say(nest, "berry", "Five rivals.");
+    // As a file from before the composer could tuck has it, with the talk as it was then.
+    const db = new DatabaseSync(file);
+    const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+    db.exec(`PRAGMA user_version = ${version - 1}; ${COMPOSER_COLUMNS}`);
+    db.close();
+
+    const again = new NestStore(file);
+    expect(again.board(nest)!.composerTucked).toBe(false);
+    expect(again.board(nest)!.talk[0].messages).toEqual([
+      { id: expect.any(Number), role: "user", text: "What did Scout find?" },
+      { id: expect.any(Number), role: "berry", text: "Five rivals." },
+    ]);
+    // An answer from before kinds can't go on the board, since nothing says it was an answer.
+    expect(again.answer(nest, again.board(nest)!.talk[0].messages[1].id)).toBeNull();
+    expect(again.setTucked(nest, true)).toBe(true);
+    expect(again.setTucked("missing", true)).toBe(false);
+    again.say(nest, "user", "Which matters most?", { about: 2 });
+    again.say(nest, "berry", "Comet.", { kind: "answer" });
+
+    const reopened = new NestStore(file);
+    expect([reopened.board(nest)!.composerTucked, reopened.board(other)!.composerTucked]).toEqual([true, false]);
+    const [asked, answered] = reopened.board(nest)!.talk[0].messages.slice(2);
+    expect(asked).toEqual({ id: expect.any(Number), role: "user", text: "Which matters most?", about: 2 });
+    expect(reopened.answer(nest, answered.id)).toBe("Comet.");
+    // Only an answer, and only in its own Nest.
+    expect(reopened.answer(other, answered.id)).toBeNull();
+    expect(reopened.answer(nest, asked.id)).toBeNull();
   });
 });
