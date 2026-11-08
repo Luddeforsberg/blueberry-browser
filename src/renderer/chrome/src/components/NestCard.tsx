@@ -7,6 +7,7 @@ import { pageName } from '@shared/nestPages'
 import { PAGE_CARD } from '@shared/nestPlace'
 import { Favicon } from './Favicon'
 import { combinedTable, eachWords, findTable, lineWords, MAX_RUNS, plainCell, PREVIEW_CELL_LENGTH, rowName, rowTooLong, STALE_ROWS, type PickedRows } from '@shared/nestTable'
+import { capitalized, cardName, named, whose, type CardName } from '@shared/nestNames'
 import { BERRY_ID } from '@shared/mascots'
 import { costWords } from '@shared/modelPrices'
 import { useShell } from '../contexts/ShellContext'
@@ -337,7 +338,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                     </CardButton>
                 </span>
             </div>
-            {withWhat(inputs) && <p className="px-5 -mt-1 mb-2 text-12 text-muted-foreground">{withWhat(inputs)}</p>}
+            {withWhat(inputs) && <p className="px-5 -mt-1 mb-3 text-12 text-muted-foreground">{withWhat(inputs)}</p>}
             <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {thread &&
                 (open ? (
@@ -359,7 +360,7 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                             )}
                         >
                             {card.title && <CardTitle cardId={card.id} title={card.title} />}
-                            {asked && <p className={cn("shrink-0 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap", card.title && "-mt-2")}>{asked}</p>}
+                            {asked && <p className={cn("shrink-0 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap", card.title && "-mt-2", reply && "mb-1")}>{asked}</p>}
                             {running && !thread.partial && <Working thread={thread} />}
                             {thread.approval && <ChatApprovalCard chatId={thread.id} approval={thread.approval} mascot={mascot} />}
                             {reply && !table && <CutReply text={reply} fill={box.fill} onMore={() => board.setOpen(card.id)} />}
@@ -468,22 +469,23 @@ const LooksRight: React.FC<{ cardId: string }> = ({ cardId }) => {
 // like it run yet.
 const estimateWords = (perRun: NonNullable<NestCard['perRun']>, runs: number) => `${perRun.rough ? 'roughly' : 'about'} ${costWords(perRun.cost * runs)}`
 
-// One input of a card: the line, the card it comes from, the name it goes by there, its bird's or a file's title, whether
-// it has anything to give yet, and how many rows its table has.
+// One input of a card: the line, the card it comes from, the name it goes by there, whether it has anything to give yet,
+// and how many rows its table has.
 interface InputView {
     line: NestLine
     source: NestCard
-    name: string
+    name: CardName
     answered: boolean
     running: boolean
     rows: number
 }
 
-// What a card goes by on a line: its bird's name, as Show Berry has it, or a file's title.
-export const nameOn = (source: NestCard, mascot: MascotProfile, showBerry: boolean) =>
-    source.note
-        ? `${showBerry ? 'Berry' : 'Assistant'}’s note`
-        : source.page ? pageName(source.page.tab?.url ?? source.page.url) : source.table ? source.table.name : source.file ? source.file.name : mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant'
+// What a card goes by in a label: a note, page or file by its own name, and a bird's card by its title, or by its bird's
+// name, as Show Berry has it, while it has none.
+export const nameOn = (source: NestCard, mascot: MascotProfile, showBerry: boolean): CardName => {
+    const own = source.note ? `${showBerry ? 'Berry' : 'Assistant'}’s note` : source.page ? pageName(source.page.tab?.url ?? source.page.url) : source.table ? source.table.name : source.file ? source.file.name : null
+    return own !== null ? { text: own, titled: false } : cardName(source.title, mascot.id !== BERRY_ID ? mascot.name : showBerry ? 'Berry' : 'Assistant')
+}
 
 const useInputs = (cardId: string): InputView[] => {
     const board = useBoard()
@@ -517,19 +519,19 @@ const listed = (words: readonly string[]) => (words.length < 2 ? (words[0] ?? ''
 // What a card on a line gets, in the words its header and reply field use.
 const getsWhat = ({ line, name, source }: InputView) =>
     line.picked
-        ? `${plural(line.picked, 'row')} from ${name}`
+        ? `${plural(line.picked, 'row')} from ${named(name)}`
         : source.table
-          ? `every row of ${name}`
+          ? `every row of ${named(name)}`
           : source.file || source.page || source.note
-            ? name
+            ? named(name)
             : source.versions
               ? versionsWhat(source.versions, name)
-              : `${name}’s thread`
+              : whose(name, 'thread')
 
 // What a card of versions gives: its pick's thread, or every version while none is picked.
-const versionsWhat = (versions: NestVersions, name: string) => {
+const versionsWhat = (versions: NestVersions, name: CardName) => {
     const picked = versions.runs.find((run) => run.id === versions.pick)
-    return picked ? `${name}’s version ${picked.letter}` : `${name}’s versions`
+    return picked ? whose(name, `version ${picked.letter}`) : whose(name, 'versions')
 }
 
 // What a sent card got, exactly, as main counts what crosses: "With Scout’s thread (2 answers) and 1 card before it,
@@ -742,23 +744,23 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
     const several = inputs.length > 1
     const getsOne = (input: InputView) =>
         input.line.picked
-            ? `${plural(input.line.picked, 'row')} from ${input.name}`
+            ? `${plural(input.line.picked, 'row')} from ${named(input.name)}`
             : input.source.table
-              ? `every row of ${input.name}`
+              ? `every row of ${named(input.name)}`
               : input.source.file || input.source.page
-                ? input.name
+                ? named(input.name)
                 : input.source.each
-                ? `${input.name}’s table`
+                ? whose(input.name, 'table')
                 : input.source.versions
                   ? versionsWhat(input.source.versions, input.name)
-                  : `${input.name}’s thread`
+                  : whose(input.name, 'thread')
     const gets =
         inputs.length === 0
             ? 'New card'
             : staleInput
-              ? `${staleInput.name}’s rows have changed`
+              ? capitalized(whose(staleInput.name, 'rows have changed'))
               : silent
-                ? `${silent.name} hasn’t answered yet`
+                ? `${named(silent.name)} hasn’t answered yet`
                 : `gets ${listed(inputs.map(getsOne))}`
     // Exactly what crosses, as main counts it, input by input: what each run gets with For each row, its row from the
     // input that drives the runs and the others whole, or else what the card gets from each.
@@ -766,7 +768,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
         ? null
         : forEach
           ? [
-                driving?.line.crosses?.each ? `${eachWords(driving.line.crosses.each)}${several ? ` from ${driving.name}` : ''}` : null,
+                driving?.line.crosses?.each ? `${eachWords(driving.line.crosses.each)}${several ? ` from ${named(driving.name)}` : ''}` : null,
                 ...inputs.flatMap((input) => {
                     // Every run gets the other inputs whole, and every file any line brings.
                     const crossing = input.line.crosses
@@ -782,7 +784,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
             }).join(' · ') || null
     // Add an input: another card on the board, after the ones it has.
     const inputItems = board.inputCandidates(card.id).map((source) => ({
-        label: `Add an input: ${nameOn(source, find(source.mascotId), showBerry)}`,
+        label: `Add an input: ${named(nameOn(source, find(source.mascotId), showBerry))}`,
         icon: <GitMerge />,
         onSelect: async () => {
             const result = await window.chromeAPI.nests.addInput(card.id, source.id)
@@ -803,7 +805,7 @@ const DraftCard: React.FC<{ card: NestCard }> = ({ card }) => {
                     </CardButton>
                 </span>
             </div>
-            {crosses && <p data-crosses className="px-5 -mt-1 mb-1 text-12 text-muted-foreground">{crosses}</p>}
+            {crosses && <p data-crosses className="px-5 -mt-1 mb-1 text-12 text-muted-foreground">{capitalized(crosses)}</p>}
             <div className="nodrag cursor-auto px-2 pb-2">
                 <Composer
                     bare
@@ -1082,8 +1084,8 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
     const here = useWorkingRows(card.id, table)
     const from = driving
         ? driving.line.picked
-            ? `For each of ${plural(driving.line.picked, 'row')} from ${driving.name}`
-            : `For each row of ${driving.source.table ? driving.name : `${driving.name}’s table`}`
+            ? `For each of ${plural(driving.line.picked, 'row')} from ${named(driving.name)}`
+            : `For each row of ${driving.source.table ? named(driving.name) : whose(driving.name, 'table')}`
         : 'For each row'
     const openRunOf = (id: string) => {
         setOpenRun(id)
@@ -1126,7 +1128,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
             </div>
             <p data-crosses className="shrink-0 px-5 -mt-1 mb-2 text-12 text-muted-foreground">
                 {from} · {eachWords({ columns: each.header.length, cut: rowTooLong(each.header, each.runs.map((run) => run.row)) }).replace(/^O/, 'o')}
-                {others.length > 0 && ` · with ${listed(others.map((input) => `${input.name}’s answer`))}`}
+                {others.length > 0 && ` · with ${listed(others.map((input) => whose(input.name, 'answer')))}`}
             </p>
             <Attachments attachments={card.attachments} target={null} className="px-5 -mt-1 mb-2" />
             {shownRun?.thread ? (
@@ -1147,7 +1149,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
                         mascot={mascot}
                         bordered={false}
                         onSend={(text) => window.chromeAPI.nests.sendRun(shownRun.id, text)}
-                        note={`Gets its row${driving ? ` from ${driving.name}` : ''}${others.length > 0 ? ` and ${listed(others.map((input) => `${input.name}’s answer`))}` : ''} again when you send`}
+                        note={`Gets its row${driving ? ` from ${named(driving.name)}` : ''}${others.length > 0 ? ` and ${listed(others.map((input) => whose(input.name, 'answer')))}` : ''} again when you send`}
                     />
                 </div>
             ) : (
@@ -1934,7 +1936,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
     const mascot = find(card.mascotId)
     const name = useAssistantName(mascot)
     const inputs = useInputs(card.id)
-    const names = listed(inputs.map((input) => input.name))
+    const names = listed(inputs.map((input) => named(input.name)))
     const editable = plan.state === 'planned'
     // While Berry changes the plan, which replaces this card from what it was when Berry started, nothing on it changes.
     const waiting = editable && board.replanning
@@ -1966,8 +1968,8 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
         inputs.length === 0
             ? null
             : plan.each
-              ? `For each row of ${tableInput.name}’s table${rest.length > 0 ? `, with ${listed(rest.map((input) => `${input.name}’s answer`))}` : ''}`
-              : `Gets ${listed(inputs.map((input) => `${input.name}’s answer`))}`
+              ? `For each row of ${whose(tableInput.name, 'table')}${rest.length > 0 ? `, with ${listed(rest.map((input) => whose(input.name, 'answer')))}` : ''}`
+              : `Gets ${listed(inputs.map((input) => whose(input.name, 'answer')))}`
     const details = [mascot.sites.length > 0 ? `Only goes to ${mascot.sites.join(', ')}` : null, plan.table ? `A table of ${plan.table} lands here` : null].filter(
         (line): line is string => line !== null
     )
@@ -2012,7 +2014,7 @@ const PlannedCard: React.FC<{ card: NestCard; plan: NestPlanned }> = ({ card, pl
                 <div className="px-5 py-3 border-t flex flex-col gap-1 text-13 text-muted-foreground">
                     {details.map((line) => <p key={line}>{line}</p>)}
                     {plan.waits && inputs.length > 0 && (
-                        <p className="text-accent-ink">Starts when you say {listed(inputs.map((input) => `${input.name}’s answer`))} {inputs.length > 1 ? 'are' : 'is'} right</p>
+                        <p className="text-accent-ink">Starts when you say {listed(inputs.map((input) => whose(input.name, 'answer')))} {inputs.length > 1 ? 'are' : 'is'} right</p>
                     )}
                 </div>
             )}

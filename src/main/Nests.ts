@@ -22,6 +22,7 @@ import type { CardGrantAccess } from "./Chats";
 import { checkAddress, cleanTitle, pageName } from "../shared/nestPages";
 import type { NestSince, UsedPage, WorkTabState } from "../shared/library";
 import type { EndedReply } from "./Chats";
+import { cardName, whose } from "../shared/nestNames";
 import { changedSince, missed, NO_RECAP, sinceFallback, type CardChange, type NestRecapWriter } from "./nestReturn";
 import type { CardKnows } from "../shared/nestKnows";
 import { agreed, changedLines, fingerprint, SENT_NOTHING } from "./nestStale";
@@ -1763,10 +1764,10 @@ export class Nests {
     if (plan.each) {
       const rows = this.rowsFor(card.id);
       const source = this.drivingLine(card.id)?.source ?? this.store.linesTo(card.id)[0]?.source;
-      const name = source ? this.labelOf(source) : "Another card";
-      if ("problem" in rows) return this.store.hold(card.id, `Didn’t start, because ${name}’s answer has no table`);
+      const name = source ? cardName(source.title, this.labelOf(source)) : "another card";
+      if ("problem" in rows) return this.store.hold(card.id, `Didn’t start, because ${whose(name, "answer")} has no table`);
       if (runCountProblem(rows.rows.length)) {
-        return this.store.hold(card.id, `Didn’t start, because ${name}’s table has ${rows.rows.length} rows, and For each row runs at most ${MAX_RUNS} times`);
+        return this.store.hold(card.id, `Didn’t start, because ${whose(name, "table")} has ${rows.rows.length} rows, and For each row runs at most ${MAX_RUNS} times`);
       }
       if ("problem" in this.inputFor(card.id)) return this.store.hold(card.id, "Didn’t start, because what it reads from has changed");
       if (!this.store.startForEach(card.id, plan.prompt, rows.header, rows.rows, DEFAULT_COLUMN, rows.lineId)) return false;

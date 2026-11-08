@@ -32,6 +32,7 @@ import { useCardsInView, useSinceHighlight } from '../components/NestReturn'
 import { firstBlank, NEST_STARTERS, onLeftInComposer, takeFromComposer } from '../nestStart'
 import { Attachments, useAttaching } from '../components/NestAttachments'
 import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
+import { capitalized, cardName, whose } from '@shared/nestNames'
 import { droppedAddress, pageName } from '@shared/nestPages'
 import { TAB_DROP_EVENT } from '../components/useTabDrag'
 import { CardView, draftText, GhostSweep, LINE_AT, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type PullState, type RowSelection } from '../components/NestCard'
@@ -41,6 +42,7 @@ import {
     CARD_GAP,
     CARD_HEIGHT,
     CARD_WIDTH,
+    clearOfPeek,
     fitViewport,
     flightDuration,
     flightMode,
@@ -427,7 +429,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                   ? `The table ${card.table.name}`
                   : card.file
                     ? `The file ${card.file.name}`
-                    : `${card.mascotId ? find(card.mascotId).name : berryName}’s card`,
+                    : capitalized(whose(cardName(card.title, card.mascotId ? find(card.mascotId).name : berryName), 'card')),
         [find, berryName]
     )
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
@@ -564,6 +566,21 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             )
         },
         [flow]
+    )
+
+    // What changed since the Nest was last open peeks over the composer, so the board moves up, once, to clear any card
+    // it would cover, when it can. Only once every card has been measured, or a card's height would be a guess.
+    const uncover = useCallback(
+        (peek: DOMRect) => {
+            const box = wrapper.current?.getBoundingClientRect()
+            if (!box || flow.getNodes().some((node) => !node.measured?.height)) return false
+            const { x, y, zoom } = flow.getViewport()
+            const cards = rects().map((rect) => ({ x: rect.x * zoom + x, y: rect.y * zoom + y, width: rect.width * zoom, height: rect.height * zoom }))
+            const move = clearOfPeek(cards, { x: peek.left - box.left, y: peek.top - box.top, width: peek.width, height: peek.height }, VIEW_INSETS.top)
+            if (move < 0) void flow.setViewport({ x, y: y + move, zoom }, MOVE)
+            return true
+        },
+        [flow, rects]
     )
 
     const fit = useCallback(() => {
@@ -1400,6 +1417,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     onClose={() => closeDrawer(true)}
                     onPutOnBoard={putOnBoard}
                     since={board.since ?? null}
+                    onSinceShown={uncover}
                 >
                     <Composer
                         label="Ask in this Nest"

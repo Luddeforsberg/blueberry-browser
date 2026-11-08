@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, livePages, PERCH, pickRows, roomToGrow, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
+import { besideSpot, CARD_GAP, CARD_HEIGHT, CARD_WIDTH, cardStatus, clearOfPeek, fitViewport, flightDuration, flightMode, flightPath, forEachStatus, freeSpot, latestReply, livePages, PERCH, pickRows, roomToGrow, runPhase, settle, settleHeight, showViewport, workingLine, ZOOM, type PlacedCard } from './nestBoard'
 
 const card = (x: number, y: number) => ({ x, y, width: CARD_WIDTH, height: CARD_HEIGHT })
 
@@ -192,6 +192,32 @@ describe('fitViewport', () => {
         expect(huge.zoom).toBe(ZOOM.min)
         // Too tall even then, so it shows the top.
         expect(huge.y).toBe(100)
+    })
+})
+
+describe('clearOfPeek', () => {
+    // The peek over the composer, in the board box's pixels.
+    const peek = { x: 300, y: 600, width: 600, height: 60 }
+    const card = (x: number, y: number, height = 200) => ({ x, y, width: 440, height })
+
+    it('moves up just enough that a card under the peek ends a gap above it', () => {
+        expect(clearOfPeek([card(400, 450)], peek, 72)).toBe(600 - 12 - 650)
+        expect(clearOfPeek([card(400, 450), card(0, 200)], peek, 72)).toBe(-62)
+    })
+
+    it('leaves the board alone with nothing under the peek, beside it or above its gap', () => {
+        expect(clearOfPeek([], peek, 72)).toBe(0)
+        expect(clearOfPeek([card(400, 100)], peek, 72)).toBe(0)
+        expect(clearOfPeek([card(400, 388)], peek, 72)).toBe(0)
+        expect(clearOfPeek([card(910, 500)], peek, 72)).toBe(0)
+        expect(clearOfPeek([card(400, 700)], peek, 72)).toBe(0)
+    })
+
+    it('leaves it when clearing would lift a card under it, or another in sight, past the top', () => {
+        expect(clearOfPeek([card(400, 200, 600)], peek, 72)).toBe(0)
+        expect(clearOfPeek([card(400, 450), card(0, 100)], peek, 72)).toBe(0)
+        // A card already partly above the top doesn't hold it back.
+        expect(clearOfPeek([card(400, 450), card(0, -50)], peek, 72)).toBe(-62)
     })
 })
 

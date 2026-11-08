@@ -186,9 +186,12 @@ export const NestComposer: React.FC<{
     onPutOnBoard: (messageId: number) => Promise<string | null>
     // What changed since the Nest was last open, which peeks until it's let go.
     since: NestSince | null
+    // Where that peek is on screen, once for each new one, so the board can move the cards it covers. False while the
+    // board can't tell yet.
+    onSinceShown?: (rect: DOMRect) => boolean
     // The composer itself, drawn as the pill.
     children: React.ReactNode
-}> = ({ nestId, talk, planning, problem, tucked, onTuck, open, onOpen, onClose, onPutOnBoard, since, children }) => {
+}> = ({ nestId, talk, planning, problem, tucked, onTuck, open, onOpen, onClose, onPutOnBoard, since, onSinceShown, children }) => {
     const berryName = useAssistantName()
     const { showBerry } = useShell().settings
     const drawerId = useId()
@@ -212,6 +215,22 @@ export const NestComposer: React.FC<{
         const timer = window.setTimeout(() => setSettled(true), PEEK_SETTLES_MS)
         return () => window.clearTimeout(timer)
     }, [unseen?.id, news?.id])
+    // Once for each new summary, as it first shows, where it is: asked again each frame until the board says it could
+    // tell, since cards coming back into sight are only measured once they're drawn.
+    const sinceBox = useRef<HTMLDivElement>(null)
+    const placedSince = useRef<number | null>(null)
+    const showingSince = !tucked && !open && !planning && !unseen && news ? news.id : null
+    useEffect(() => {
+        if (showingSince === null || placedSince.current === showingSince || !onSinceShown) return undefined
+        let frame = 0
+        let tries = 30
+        const ask = () => {
+            if (sinceBox.current && onSinceShown(sinceBox.current.getBoundingClientRect())) placedSince.current = showingSince
+            else if (--tries > 0) frame = requestAnimationFrame(ask)
+        }
+        frame = requestAnimationFrame(ask)
+        return () => cancelAnimationFrame(frame)
+    }, [showingSince, onSinceShown])
 
     if (tucked) {
         return (
@@ -237,7 +256,7 @@ export const NestComposer: React.FC<{
             {open && <Drawer id={drawerId} talk={talk} planning={planning} onClose={onClose} onPutOnBoard={onPutOnBoard} />}
             {!open && !peek && news && (
                 // A few plain lines from Berry, or from code, on what changed while the Nest wasn't open. Only words.
-                <div data-since className={cn("self-start max-w-full flex items-start gap-1 pr-1 rounded-card border bg-surface shadow-selected animate-fade-in transition-opacity duration-layout", settled ? "opacity-60" : "opacity-100")}>
+                <div ref={sinceBox} data-since className={cn("self-start max-w-full flex items-start gap-1 pr-1 rounded-card border bg-surface shadow-selected animate-fade-in transition-opacity duration-layout", settled ? "opacity-60" : "opacity-100")}>
                     <p role="status" className="min-w-0 px-3 py-2 text-14 text-muted-foreground whitespace-pre-line line-clamp-3">
                         {berryName}: {news.text}
                     </p>

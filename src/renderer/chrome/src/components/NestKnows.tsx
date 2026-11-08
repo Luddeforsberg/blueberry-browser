@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import type { NestCard, NestLine } from '@shared/library'
 import { knowsWords, lineCut } from '@shared/nestKnows'
 import { eachWords, lineWords } from '@shared/nestTable'
+import { capitalized, named, whose, type CardName } from '@shared/nestNames'
 import { useShell } from '../contexts/ShellContext'
 
 // What a card knows from other cards, over its top edge on the right, away from its bird, while the pointer is on the
@@ -18,19 +19,19 @@ export const KnowsLine: React.FC<{ card: NestCard; hidden: boolean; inputs: numb
     ) : null
 
 // What goes through a line, in words: its card's part, or with For each row what each run gets from it. Plain text.
-const throughWords = (crosses: NestLine['crosses'], from: string, forEach: boolean): string => {
-    if (!crosses) return `Nothing yet: ${from} hasn’t answered.`
-    if (crosses.stale) return `${from}’s rows have changed, so nothing goes until you pick them again.`
+const throughWords = (crosses: NestLine['crosses'], from: CardName, forEach: boolean): string => {
+    if (!crosses) return `Nothing yet: ${named(from)} hasn’t answered.`
+    if (crosses.stale) return `${capitalized(whose(from, 'rows'))} have changed, so nothing goes until you pick them again.`
     const words = forEach
         ? [crosses.each ? eachWords(crosses.each) : null, lineWords({ whole: crosses.each ? null : (crosses.shared ?? null), files: crosses.files }, from)]
               .filter(Boolean)
               .join(', with ')
         : lineWords(crosses, from)
-    return words || `Nothing yet: ${from} hasn’t answered.`
+    return words ? capitalized(words) : `Nothing yet: ${named(from)} hasn’t answered.`
 }
 
 // Under a line the user pressed: where it comes from, about how much goes through it, and whether any of it is cut.
-export const LinePopover: React.FC<{ from: string; crosses: NestLine['crosses']; fresh: boolean; forEach: boolean; x: number; y: number }> = ({ from, crosses, fresh, forEach, x, y }) => (
+export const LinePopover: React.FC<{ from: CardName; crosses: NestLine['crosses']; fresh: boolean; forEach: boolean; x: number; y: number }> = ({ from, crosses, fresh, forEach, x, y }) => (
     <div
         role="status"
         className="nodrag nopan pointer-events-auto absolute w-64 rounded-control border bg-surface px-3 py-2 text-foreground shadow-raised cursor-default select-text"
@@ -38,7 +39,7 @@ export const LinePopover: React.FC<{ from: string; crosses: NestLine['crosses'];
         style={{ zIndex: 4, transform: `translate(-50%, 0) translate(${x}px, ${y + 18}px)` }}
         onClick={(event) => event.stopPropagation()}
     >
-        <p className="text-13 font-semibold truncate">From {from}</p>
+        <p className="text-13 font-semibold truncate">From {named(from)}</p>
         <p className="text-13 mt-0.5">{throughWords(crosses, from, forEach)}</p>
         {crosses && !crosses.stale && (crosses.whole || crosses.each || crosses.shared || crosses.files) && (
             <p className="text-12 text-muted-foreground mt-1">{lineCut(crosses, forEach) ? 'Some of it is cut to fit' : 'Nothing cut'}</p>

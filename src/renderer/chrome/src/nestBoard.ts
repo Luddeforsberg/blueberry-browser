@@ -154,6 +154,17 @@ export const showViewport = (rects: readonly Rect[], viewport: Viewport, box: { 
     return dx === 0 && dy === 0 ? null : { x: viewport.x + dx, y: viewport.y + dy, zoom }
 }
 
+// How far the board moves up so no card sits under the composer's peek, the cards and the peek on screen in the board's
+// own pixels. Only when that clears every card under it and lifts neither their tops nor any other that shows below `top`
+// past it, so a tall card, or a board with no room above, stays where it is. 0 when nothing's under it.
+export const clearOfPeek = (cards: readonly Rect[], peek: Rect, top: number, gap = 12): number => {
+    const under = cards.filter((card) => card.x < peek.x + peek.width && card.x + card.width > peek.x && card.y < peek.y + peek.height && card.y + card.height > peek.y - gap)
+    if (under.length === 0) return 0
+    const move = peek.y - gap - Math.max(...under.map((card) => card.y + card.height))
+    const tops = cards.filter((card) => under.includes(card) || (card.y >= top && card.y < peek.y + peek.height)).map((card) => card.y)
+    return Math.min(...tops) + move >= top ? move : 0
+}
+
 // What a hand-off along a line shows: the bird flying it, a short fade with reduced motion or Keep Berry still, or
 // nothing where nobody would see it or the birds are hidden. It's only ever drawn, after the job has started.
 export type FlightMode = 'fly' | 'fade' | 'none'
