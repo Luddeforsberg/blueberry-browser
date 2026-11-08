@@ -147,6 +147,8 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN page_title TEXT;
    ALTER TABLE cards ADD COLUMN page_dropped INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE cards ADD COLUMN page_job TEXT;`,
+  // A line drawn into a card that has been sent already, until the card sends again: only its next message gets it.
+  `ALTER TABLE lines ADD COLUMN fresh INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 // One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
@@ -289,9 +291,9 @@ export class NestStore {
     const lines = (
       // Only how many rows were picked, which could be a whole file's.
       this.db
-        .prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", json_array_length(picked, '$.rows') AS picked FROM lines WHERE nest_id = ? ORDER BY rowid")
-        .all(id) as unknown as NestLine[]
-    ).map((line) => ({ ...line, picked: line.picked ?? null }));
+        .prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", json_array_length(picked, '$.rows') AS picked, fresh FROM lines WHERE nest_id = ? ORDER BY rowid")
+        .all(id) as unknown as (Omit<NestLine, "fresh"> & { fresh: number })[]
+    ).map(({ fresh, ...line }) => ({ ...line, picked: line.picked ?? null, ...(fresh ? { fresh: true as const } : {}) }));
     return { ...nest, cards, lines, talk: this.talk(id), attached: this.attachmentsOf({ nestId: id }) };
   }
 
@@ -487,13 +489,31 @@ export class NestStore {
   }
 
   // Another input on a card, after the ones it has. The caller checks it's allowed. False if it's there already, the
-  // cards aren't both in this Nest, or it would be a line from a card to itself.
-  addLine(nestId: string, from: string, to: string, picked: PickedRows | null): boolean {
+  // cards aren't both in this Nest, or it would be a line from a card to itself. `fresh` for a card sent already.
+  addLine(nestId: string, from: string, to: string, picked: PickedRows | null, fresh = false): boolean {
     if (from === to || this.card(from)?.nestId !== nestId || this.card(to)?.nestId !== nestId) return false;
     const done =
-      this.db.prepare("INSERT OR IGNORE INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, ?)").run(randomUUID(), nestId, from, to, picked ? JSON.stringify(picked) : null)
-        .changes > 0;
+      this.db
+        .prepare("INSERT OR IGNORE INTO lines (id, nest_id, from_card, to_card, picked, fresh) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(randomUUID(), nestId, from, to, picked ? JSON.stringify(picked) : null, fresh ? 1 : 0).changes > 0;
     if (done) this.touch(nestId);
+    return done;
+  }
+
+  // The card has sent with every line into it, so none is new any more.
+  settleLines(to: string): void {
+    this.db.prepare("UPDATE lines SET fresh = 0 WHERE to_card = ? AND fresh = 1").run(to);
+  }
+
+  // Which card a line goes to, or null if it's gone.
+  lineTo(lineId: string): string | null {
+    return (this.db.prepare("SELECT to_card FROM lines WHERE id = ?").get(lineId) as { to_card: string } | undefined)?.to_card ?? null;
+  }
+
+  deleteLine(lineId: string): boolean {
+    const nestId = (this.db.prepare("SELECT nest_id FROM lines WHERE id = ?").get(lineId) as { nest_id: string } | undefined)?.nest_id;
+    const done = !!nestId && this.db.prepare("DELETE FROM lines WHERE id = ?").run(lineId).changes > 0;
+    if (done) this.touch(nestId!);
     return done;
   }
 

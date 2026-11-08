@@ -109,6 +109,7 @@ const chromeAPI: ChromeAPI = {
     showMenu: (nestId) => invoke("nests:menu", nestId),
     addCard: (nestId, card) => invoke("nests:add-card", nestId, card),
     addInput: (cardId, fromId, picked) => invoke("nests:add-input", cardId, fromId, picked),
+    removeInput: (lineId) => invoke("nests:remove-input", lineId),
     retryRuns: (cardId, which, confirmed) => invoke("nests:retry-runs", cardId, which, confirmed),
     moveCard: (cardId, x, y) => invoke("nests:move-card", cardId, x, y),
     resizeCard: (cardId, width, height) => invoke("nests:resize-card", cardId, width, height),

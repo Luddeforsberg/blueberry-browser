@@ -1632,7 +1632,7 @@ describe("Trust and real work in a Nest", () => {
 
     expect(nests.addInput(compare.id, compare.id)).toEqual({ ok: false, error: expect.stringContaining("itself") });
     expect(nests.addInput(compare.id, scout.id)).toEqual({ ok: false, error: expect.stringContaining("already") });
-    expect(nests.addInput(scout.id, compare.id)).toEqual({ ok: false, error: expect.stringContaining("hasn’t been sent") });
+    expect(nests.addInput(scout.id, compare.id)).toEqual({ ok: false, error: expect.stringContaining("nothing to give") });
     const empty = nests.addCard(nest, { x: 0, y: 600 })!;
     expect(nests.addInput(compare.id, empty.id)).toEqual({ ok: false, error: expect.stringContaining("nothing to give") });
     expect(nests.addInput(compare.id, rival.id)).toEqual({ ok: true });
@@ -1830,6 +1830,101 @@ describe("Trust and real work in a Nest", () => {
     // A card that ran once has no estimate, and nothing adds the Nest up.
     expect(cardOf(scout.id).perRun).toBeNull();
     expect(context.nests.board(nest)).not.toHaveProperty("cost");
+  });
+});
+
+describe("More inputs on a sent card", () => {
+  const PRICING = "https://strawberrybrowser.com/pricing";
+  const asks = (url: string) => tools.find((tool) => tool.name === "open_tab")!.isRisky!({ url });
+  // A sent card, and two others that have answered.
+  const board = async () => {
+    const context = setup();
+    const nest = context.nests.create();
+    const writer = context.nests.addCard(nest, { x: 0, y: 0 })!;
+    const scout = context.nests.addCard(nest, { x: 0, y: 300, mascotId: "scout" })!;
+    const rival = context.nests.addCard(nest, { x: 0, y: 600 })!;
+    replies.push("First draft", "Scout's list", "Rival's list");
+    await context.sendAndWait(writer.id, "Write a pitch");
+    await context.sendAndWait(scout.id, "Find companies");
+    await context.sendAndWait(rival.id, "Find more");
+    return { ...context, nest, writer, scout, rival };
+  };
+  const linesInto = (context: Awaited<ReturnType<typeof board>>, cardId: string) => context.nests.board(context.nest)!.lines.filter((line) => line.to === cardId);
+
+  it("gives a sent card a new input from its next message on, leaving what it already sent as it was", async () => {
+    const context = await board();
+    const { nests, chatStore, writer, scout, sendAndWait } = context;
+    expect(nests.addInput(writer.id, scout.id)).toEqual({ ok: true });
+    expect(linesInto(context, writer.id)).toEqual([expect.objectContaining({ from: scout.id, fresh: true, crosses: expect.objectContaining({ whole: expect.objectContaining({ kind: "thread" }) }) })]);
+    // Nothing ran because of it.
+    expect(sent).toHaveLength(3);
+    expect(String(sent[0].at(-1)!.content)).toBe("Write a pitch");
+
+    replies.push("Second draft");
+    await sendAndWait(writer.id, "Use Scout's list");
+    const message = newest(sent[3]);
+    expect(message.startsWith('<card_thread from="Scout">\n<asked>\nFind companies\n</asked>\n<answer>\nScout\'s list')).toBe(true);
+    expect(message).toContain("untrusted");
+    expect(message.endsWith("Use Scout's list")).toBe(true);
+    // The first message isn't given it afterwards, and nothing of it is saved in the chat.
+    expect(sent[3].filter(({ content }) => String(content).includes("<card_thread"))).toHaveLength(1);
+    const chatId = nests.card(writer.id)!.chatId!;
+    expect(chatStore.chat(chatId)!.messages.map(({ content }) => content)).toEqual(["Write a pitch", "First draft", "Use Scout's list", "Second draft"]);
+    // Once used, it's a line like any other.
+    expect(linesInto(context, writer.id)[0].fresh).toBeUndefined();
+  });
+
+  it("keeps to four inputs on a sent card, and refuses a circle, itself and a card that's working", async () => {
+    const context = await board();
+    const { nests, nest, writer, scout, rival, sendAndWait } = context;
+    const more = [1, 2, 3].map((index) => nests.addCard(nest, { x: 900, y: index * 300 })!);
+    for (const card of more) await sendAndWait(card.id, "Go");
+    expect([scout, rival, more[0], more[1]].map((source) => nests.addInput(writer.id, source.id))).toEqual([{ ok: true }, { ok: true }, { ok: true }, { ok: true }]);
+    expect(nests.addInput(writer.id, more[2].id)).toEqual({ ok: false, error: "A card can read from 4 cards at most." });
+    expect(nests.addInput(scout.id, writer.id)).toEqual({ ok: false, error: "That would make the cards go round in a circle." });
+    expect(nests.addInput(writer.id, writer.id)).toEqual({ ok: false, error: "A card can’t read from itself." });
+
+    // While its reply runs, it has read its inputs already, so a line waits until it's done.
+    held = [];
+    expect(nests.send(scout.id, "One more")).not.toBeNull();
+    await settle();
+    expect(nests.addInput(scout.id, more[2].id)).toEqual({ ok: false, error: "This card is working. Add the line once it’s done." });
+    await release();
+    held = null;
+    expect(nests.addInput(scout.id, more[2].id)).toEqual({ ok: true });
+  });
+
+  it("lets a sent card open exactly a dropped link's address once the user sends it its next message", async () => {
+    const { nests, nest, writer, sendAndWait } = await board();
+    const link = (nests.dropPage(nest, { url: PRICING }, { at: { x: 900, y: 0 }, taken: [] }) as { cardId: string }).cardId;
+    expect(await asks(PRICING)).toBe(true);
+    expect(nests.addInput(writer.id, link)).toEqual({ ok: true });
+    await sendAndWait(writer.id, "Read the pricing");
+    expect(await asks(PRICING)).toBe(false);
+    expect(await asks(`${PRICING}?ref=1`)).toBe(true);
+    expect(newest(sent.at(-1)!)).toMatch(/^<card_link from="strawberrybrowser.com pricing">/);
+  });
+
+  it("takes an input away from later messages only, and never from a card sent for each row", async () => {
+    const context = await board();
+    const { nests, nest, writer, scout, chatStore, sendAndWait } = context;
+    nests.addInput(writer.id, scout.id);
+    await sendAndWait(writer.id, "Use it");
+    expect(newest(sent.at(-1)!)).toContain('<card_thread from="Scout">');
+    expect(nests.removeInput(linesInto(context, writer.id)[0].id)).toEqual({ ok: true });
+    expect(linesInto(context, writer.id)).toEqual([]);
+    await sendAndWait(writer.id, "Now without it");
+    expect(newest(sent.at(-1)!)).toBe("Now without it");
+    expect(chatStore.chat(nests.card(writer.id)!.chatId!)!.messages).toHaveLength(6);
+    expect(nests.removeInput("no-such-line")).toEqual({ ok: false, error: "That line isn’t there any more." });
+
+    replies.push(TABLE(2));
+    const table = nests.addCard(nest, { x: 900, y: 900 })!;
+    await sendAndWait(table.id, "Find two");
+    const each = nests.addCard(nest, { x: 1400, y: 900, from: table.id })!;
+    expect(nests.sendEach(each.id, "Write to it")).toEqual({ ok: true });
+    expect(nests.removeInput(linesInto(context, each.id)[0].id)).toEqual({ ok: false, error: "A card sent for each row keeps the lines it was sent with." });
+    expect(nests.addInput(each.id, scout.id)).toEqual({ ok: false, error: "Only a card that hasn’t been sent can get another input." });
   });
 });
 

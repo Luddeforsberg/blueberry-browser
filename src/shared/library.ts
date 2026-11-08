@@ -589,6 +589,8 @@ export interface NestLine {
   picked: number | null;
   // Exactly what crosses it now, counted from what would be sent. Null until the source has something to give.
   crosses?: LineCrossing | null;
+  // Drawn into a card that was sent already, so only its next message gets it. Gone once that's sent.
+  fresh?: true;
 }
 
 export interface NestBoard {

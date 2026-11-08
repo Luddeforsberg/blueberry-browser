@@ -79,3 +79,17 @@
   outline: 2px solid rgb(var(--accent-ink));
   outline-offset: 2px;
 }
+
+/* While a line is pulled, a card that wouldn't take it steps back a little. */
+.nest-board .react-flow__node {
+  transition: opacity 240ms;
+}
+
+.nest-board .react-flow__node.nest-drop-dim {
+  opacity: 0.6;
+}
+
+/* A line the keyboard reaches is drawn selected by its card instead of a square box. */
+.nest-board .react-flow__edge:focus-visible {
+  outline: none;
+}
