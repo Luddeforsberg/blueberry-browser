@@ -26,6 +26,7 @@ import { Berry, useAssistantName } from '../components/Berry'
 import { SHIMMER_QUIET } from '../components/ChatMessage'
 import { Composer } from '../components/Composer'
 import { AboutChip, NestComposer } from '../components/NestComposer'
+import { useCardsInView, useSinceHighlight } from '../components/NestReturn'
 import { firstBlank, NEST_STARTERS, onLeftInComposer, takeFromComposer } from '../nestStart'
 import { Attachments, useAttaching } from '../components/NestAttachments'
 import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
@@ -840,10 +841,18 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [api]
     )
 
+    useCardsInView(board, openId)
+    // The cards that changed since the Nest was last open are highlighted for a moment as Berry says so.
+    const sinceCards = useSinceHighlight(board.id, board.since)
     // While a line is pulled, the cards that wouldn't take it step back a little. The one it comes from stays as it is.
     const shownNodes = useMemo(
-        () => (pullState ? nodes.map((node) => (node.id === pullState.from || pullState.accepts.has(node.id) ? node : { ...node, className: 'nest-drop-dim' })) : nodes),
-        [nodes, pullState]
+        () =>
+            nodes.map((node) => {
+                const dim = pullState && node.id !== pullState.from && !pullState.accepts.has(node.id)
+                const className = cn(dim && 'nest-drop-dim', sinceCards.has(node.id) && 'nest-since')
+                return className ? { ...node, className } : node
+            }),
+        [nodes, pullState, sinceCards]
     )
 
     const actions = useMemo<NestBoardActions>(
@@ -1256,6 +1265,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     onOpen={openDrawer}
                     onClose={() => closeDrawer(true)}
                     onPutOnBoard={putOnBoard}
+                    since={board.since ?? null}
                 >
                     <Composer
                         label="Ask in this Nest"

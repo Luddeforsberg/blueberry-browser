@@ -6,6 +6,10 @@ import { describe, expect, it } from "vitest";
 import { NestStore } from "./NestStore";
 import { PREVIEW_CELL_LENGTH, TABLE_PREVIEW_ROWS } from "../shared/nestTable";
 
+// What the migration for coming back to a board added: card titles, unread dots, and when cards and Nests were last seen.
+const RETURN_COLUMNS =
+  "ALTER TABLE cards DROP COLUMN title; ALTER TABLE cards DROP COLUMN title_settled; ALTER TABLE cards DROP COLUMN unread; ALTER TABLE cards DROP COLUMN changed_at; ALTER TABLE nests DROP COLUMN seen_at;";
+
 // What the migrations for page cards and fresh lines added.
 const PAGE_COLUMNS =
   "ALTER TABLE cards DROP COLUMN page_url; ALTER TABLE cards DROP COLUMN page_title; ALTER TABLE cards DROP COLUMN page_dropped; ALTER TABLE cards DROP COLUMN page_job; " +
@@ -13,7 +17,8 @@ const PAGE_COLUMNS =
 
 // What the migration for the composer added: whether it's tucked, what kind each message is, and note cards.
 const COMPOSER_COLUMNS =
-  "ALTER TABLE nests DROP COLUMN composer_tucked; ALTER TABLE talk DROP COLUMN kind; ALTER TABLE talk DROP COLUMN planned; ALTER TABLE talk DROP COLUMN about; ALTER TABLE cards DROP COLUMN note_text;";
+  "ALTER TABLE nests DROP COLUMN composer_tucked; ALTER TABLE talk DROP COLUMN kind; ALTER TABLE talk DROP COLUMN planned; ALTER TABLE talk DROP COLUMN about; ALTER TABLE cards DROP COLUMN note_text; " +
+  RETURN_COLUMNS;
 
 // What migrations after 9 added, so a file can be taken back to how an older version left it.
 const LATER_COLUMNS =
@@ -135,7 +140,7 @@ describe("NestStore", () => {
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
     db.exec(
-      `PRAGMA user_version = ${version - 5}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
+      `PRAGMA user_version = ${version - 6}; ALTER TABLE cards DROP COLUMN width; ALTER TABLE cards DROP COLUMN height; ` +
         "ALTER TABLE cards DROP COLUMN file_made; ALTER TABLE cards DROP COLUMN file_preview; ALTER TABLE attachments DROP COLUMN via_card; ALTER TABLE attachments DROP COLUMN made; " +
         PAGE_COLUMNS +
         COMPOSER_COLUMNS
@@ -396,7 +401,7 @@ describe("NestStore", () => {
     // As a file from before the composer could tuck has it, with the talk as it was then.
     const db = new DatabaseSync(file);
     const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-    db.exec(`PRAGMA user_version = ${version - 1}; ${COMPOSER_COLUMNS}`);
+    db.exec(`PRAGMA user_version = ${version - 2}; ${COMPOSER_COLUMNS}`);
     db.close();
 
     const again = new NestStore(file);

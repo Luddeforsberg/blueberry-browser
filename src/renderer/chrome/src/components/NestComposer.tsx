@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '@xyflow/react'
 import { Check, ChevronDown, ChevronUp, MessagesSquare, X } from 'lucide-react'
-import type { NestRequest, NestTalkMessage } from '@shared/library'
+import type { NestRequest, NestSince, NestTalkMessage } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
@@ -12,6 +12,9 @@ import { plainCell } from '@shared/nestTable'
 // The newest of Berry's messages each Nest's talk has been seen up to, by its id: opened in the drawer, or its peek let
 // go. Memory only, and a Nest first drawn this launch counts as seen, so an old reply never peeks after a restart.
 const seenUpTo = new Map<string, number>()
+
+// Each Nest's newest summary of what changed while it wasn't open that has been let go. Memory only, like the summary.
+const sinceSeen = new Map<string, number>()
 
 // How long a new reply's peek stays at full strength before it settles.
 const PEEK_SETTLES_MS = 4000
@@ -179,13 +182,22 @@ export const NestComposer: React.FC<{
     onOpen: () => void
     onClose: () => void
     onPutOnBoard: (messageId: number) => Promise<string | null>
+    // What changed since the Nest was last open, which peeks until it's let go.
+    since: NestSince | null
     // The composer itself, drawn as the pill.
     children: React.ReactNode
-}> = ({ nestId, talk, planning, problem, tucked, onTuck, open, onOpen, onClose, onPutOnBoard, children }) => {
+}> = ({ nestId, talk, planning, problem, tucked, onTuck, open, onOpen, onClose, onPutOnBoard, since, children }) => {
     const berryName = useAssistantName()
     const { showBerry } = useShell().settings
     const drawerId = useId()
     const { unseen, see } = useUnseen(nestId, talk)
+    const [, redraw] = useState(0)
+    const news = since && sinceSeen.get(nestId) !== since.id ? since : null
+    const letGo = () => {
+        if (!news) return
+        sinceSeen.set(nestId, news.id)
+        redraw((count) => count + 1)
+    }
     // Whatever's open is what's seen, including a reply that comes in while it is.
     useEffect(() => {
         if (open && unseen) see()
@@ -194,10 +206,10 @@ export const NestComposer: React.FC<{
     const [settled, setSettled] = useState(false)
     useEffect(() => {
         setSettled(false)
-        if (!unseen) return undefined
+        if (!unseen && !news) return undefined
         const timer = window.setTimeout(() => setSettled(true), PEEK_SETTLES_MS)
         return () => window.clearTimeout(timer)
-    }, [unseen?.id])
+    }, [unseen?.id, news?.id])
 
     if (tucked) {
         return (
@@ -205,13 +217,13 @@ export const NestComposer: React.FC<{
                 <button
                     type="button"
                     data-composer-tab
-                    aria-label={unseen ? `Bring back the composer. ${berryName} replied` : 'Bring back the composer'}
+                    aria-label={unseen ? `Bring back the composer. ${berryName} replied` : news ? `Bring back the composer. ${berryName} says what changed` : 'Bring back the composer'}
                     title="Bring back the composer (/)"
                     onClick={() => onTuck(false)}
                     className="pointer-events-auto relative h-7 w-16 flex items-center justify-center rounded-t-panel border border-b-0 bg-surface shadow-raised text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChevronUp className="size-4" />
-                    {unseen && <span aria-hidden data-unseen-dot className="absolute top-1.5 right-3 size-1.5 rounded-full bg-accent-ink" />}
+                    {(unseen || news) && <span aria-hidden data-unseen-dot className="absolute top-1.5 right-3 size-1.5 rounded-full bg-accent-ink" />}
                 </button>
             </div>
         )
@@ -221,6 +233,22 @@ export const NestComposer: React.FC<{
     return (
         <div data-nest-composer className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 w-[min(640px,calc(100%-32px))] flex flex-col gap-3 [&>*]:pointer-events-auto">
             {open && <Drawer id={drawerId} talk={talk} planning={planning} onClose={onClose} onPutOnBoard={onPutOnBoard} />}
+            {!open && !peek && news && (
+                // A few plain lines from Berry, or from code, on what changed while the Nest wasn't open. Only words.
+                <div data-since className={cn("self-start max-w-full flex items-start gap-1 pr-1 rounded-card border bg-surface shadow-selected animate-fade-in transition-opacity duration-layout", settled ? "opacity-60" : "opacity-100")}>
+                    <p role="status" className="min-w-0 px-3 py-2 text-14 text-muted-foreground whitespace-pre-line line-clamp-3">
+                        {berryName}: {news.text}
+                    </p>
+                    <button
+                        type="button"
+                        aria-label="Dismiss"
+                        onClick={letGo}
+                        className="shrink-0 mt-1.5 size-6 flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <X className="size-3.5" />
+                    </button>
+                </div>
+            )}
             {peek && (
                 <div data-peek className={cn("self-start max-w-full flex items-center gap-1 animate-fade-in transition-opacity duration-layout", settled && !planning ? "opacity-60" : "opacity-100")}>
                     <button

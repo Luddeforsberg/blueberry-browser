@@ -27,6 +27,7 @@ import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
 import { CARD_PROSE, CellText, TableMenu, TableResult, useCut, type PickMode, type WorkingRows } from './NestTable'
 import { formatBytes } from './downloadStatus'
+import { CardTitle, FarCard, UnreadDot } from './NestReturn'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 // `view` on a line into one of a working card's tabs, or a page its job kept: it only joins them, and carries nothing.
@@ -296,10 +297,12 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
 
     return (
         <div className={cn(CARD_SHELL, cardShadow(running, open), box.fill && "flex flex-col")} style={boxStyle(box)}>
+            {!open && <FarCard title={card.title ?? null} asked={asked ?? null} status={status ? { text: status.text, className: TONES[status.tone] } : null} unread={!!card.unread} />}
             <Perched cardId={card.id} mascot={mascot} mood={moodOf(thread)} />
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
+                {card.unread && <UnreadDot />}
                 {status && (
                     <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>
                         <span className={waitingOnModel ? SHIMMER_QUIET : undefined}>{status.text}</span>
@@ -352,7 +355,8 @@ const SentCard: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) => 
                                 box.fill && !table && "flex-1"
                             )}
                         >
-                            {asked && <p className="shrink-0 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap">{asked}</p>}
+                            {card.title && <CardTitle cardId={card.id} title={card.title} />}
+                            {asked && <p className={cn("shrink-0 text-13 text-muted-foreground line-clamp-2 whitespace-pre-wrap", card.title && "-mt-2")}>{asked}</p>}
                             {running && !thread.partial && <Working thread={thread} />}
                             {thread.approval && <ChatApprovalCard chatId={thread.id} approval={thread.approval} mascot={mascot} />}
                             {reply && !table && <CutReply text={reply} fill={box.fill} onMore={() => board.setOpen(card.id)} />}
@@ -937,6 +941,7 @@ const ForEachCard: React.FC<{ card: NestCard; each: NestForEach; box: CardBox }>
             <LineEnds canPull={answered} onPull={() => board.pullOut(card.id)} label={pullLabel(name, selected.length)} />
             <div className="nest-drag cursor-grab h-12 shrink-0 pl-[76px] pr-3 flex items-center gap-2">
                 <span className="text-14 font-semibold truncate">{name}</span>
+                {card.unread && <UnreadDot />}
                 <span role="status" className={cn("text-12 shrink-0", TONES[status.tone])}>{status.text}</span>
                 <span className="ml-auto flex items-center">
                     {active && (

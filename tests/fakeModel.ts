@@ -45,6 +45,10 @@ export const startFakeModel = async () => {
   let cell: ((data: string) => string) | null = null;
   let column = "NONE";
   const cellRequests: FakeModelRequest[] = [];
+  // A Nest card's title for what it found, and what changed while a Nest wasn't open, from the cheap model.
+  let cardTitle = "NONE";
+  let since = "NONE";
+  const recapRequests: FakeModelRequest[] = [];
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -60,6 +64,14 @@ export const startFakeModel = async () => {
       cellRequests.push(parsed);
       const data = String(parsed.messages.at(-1)?.content ?? "");
       const content = JSON.stringify(parsed.messages[0]).includes("name one column") ? column : (cell?.(data) ?? "NONE");
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ id: "fake", object: "chat.completion", created: 0, model: TITLE_MODEL, choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }] }));
+      return;
+    }
+
+    if (parsed.model === TITLE_MODEL && /for what its answer found|coming back to a board/.test(JSON.stringify(parsed.messages[0]))) {
+      recapRequests.push(parsed);
+      const content = JSON.stringify(parsed.messages[0]).includes("coming back to a board") ? since : cardTitle;
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ id: "fake", object: "chat.completion", created: 0, model: TITLE_MODEL, choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }] }));
       return;
@@ -149,7 +161,11 @@ export const startFakeModel = async () => {
     suggestionRequests,
     planRequests,
     cellRequests,
+    recapRequests,
     reset() {
+      cardTitle = "NONE";
+      since = "NONE";
+      recapRequests.length = 0;
       cell = null;
       column = "NONE";
       cellRequests.length = 0;
@@ -169,6 +185,13 @@ export const startFakeModel = async () => {
       titleRequests.length = 0;
       suggest = null;
       suggestionRequests.length = 0;
+    },
+    // What the cheap model names a Nest card for what it found, and says changed while a Nest wasn't open.
+    cardTitleWith(next: string) {
+      cardTitle = next;
+    },
+    sinceWith(next: string) {
+      since = next;
     },
     // What the title model answers. NONE means the chat has no topic yet.
     titleWith(next: string) {

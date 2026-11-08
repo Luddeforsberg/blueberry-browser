@@ -471,6 +471,11 @@ export interface NestCard {
   cost?: number | null;
   // On a draft that could run For each row, and on a For-each card for its runs again: what one run will likely cost.
   perRun?: { cost: number; rough: boolean } | null;
+  // What it found, from the cheap model after a reply, or what the user called it, `titleSettled`, which nothing replaces.
+  title?: string;
+  titleSettled?: boolean;
+  // It finished, failed or started waiting while nobody was looking at it, and hasn't been opened since.
+  unread?: boolean;
   // What it knows from other cards, counted, never what: its last message's, or what it reads when it's sent.
   knows?: CardKnows;
 }
@@ -632,6 +637,16 @@ export interface NestBoard {
   // Files and notes on the Nest's composer, for the request being written or planned. A plan gives each card the ones it
   // needs, and they go once the plan runs or goes.
   attached: NestAttachment[];
+  // What changed since the Nest was last open, from the last time it was opened this launch. Memory only.
+  since?: NestSince | null;
+}
+
+// Berry's few lines on what changed while the Nest wasn't open, written from only those cards' titles and answers, or a
+// plain line in code, and the cards they're about, which the board highlights for a moment. `id` is new each time.
+export interface NestSince {
+  id: number;
+  text: string;
+  cards: string[];
 }
 
 export interface LibrarySnapshot {

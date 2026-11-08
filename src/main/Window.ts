@@ -25,6 +25,7 @@ import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
 import { askInShape, generateTitle, hasModel, modelInputs, streamReply, writeWithCheapModel } from "./agent";
+import { cheapRecap } from "./nestReturn";
 import { downloadName, maxBytesFor, sizeInWords, typeInWords } from "./nestFiles";
 import { readFile, stat, writeFile } from "fs/promises";
 import { cheapWriter } from "./nestCells";
@@ -329,6 +330,7 @@ export class Window {
         this.syncChatTabTitle(thread);
         sendToRenderer(this.chrome.view.webContents, "chat:updated", thread);
         this.workViews.sync();
+        this.nests?.threadChanged(thread);
       },
       onListChanged: () => this.publishLibrary(),
       onDecided: (approvalId, allow) => this.phone.noteDecided(approvalId, allow),
@@ -380,7 +382,10 @@ export class Window {
         if (!job || job.outcome !== null) return null;
         return { tabs: job.tabs.flatMap((entry) => (entry.cloud ? [] : [{ id: entry.tab.id, state: entry.state, current: entry.tab.id === job.currentId }])) };
       },
-    });
+    },
+    // A card's title and what changed in a Nest, from the cheap model. Answers can repeat a code typed from the phone, so
+    // they're taken out first, as anywhere else the model reads.
+    cheapRecap(async (system, data) => (hasModel() ? writeWithCheapModel(system, this.chats.withoutCodes(data)) : "")));
 
     this.nestPictures = new NestPictures({
       chrome: () => this.chrome.view.webContents,
@@ -415,6 +420,7 @@ export class Window {
     const syncWork = () => {
       this.workViews.sync();
       this.nestPictures.sync();
+      this.nestOnScreen();
     };
     this._baseWindow.on("minimize", syncWork);
     this._baseWindow.on("restore", syncWork);
@@ -1902,8 +1908,15 @@ export class Window {
     this.permissionPrompt.sync();
   }
 
+  // Tells the Nests which one is in the front tab, if any, and whether the window is showing.
+  private nestOnScreen(): void {
+    const entry = this.activeEntry;
+    this.nests?.screen(entry instanceof InternalTab && entry.page === "nest" ? entry.param : null, this.windowShowing);
+  }
+
   private notifyTabs(): void {
     this.recordings.sync();
+    this.nestOnScreen();
     this.nestTabsSoon();
     const active = this.activeEntry;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");

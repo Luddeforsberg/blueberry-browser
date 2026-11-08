@@ -619,6 +619,12 @@ export interface InvokeChannels {
   "nests:add-table-file": { region: "chrome"; args: [nestId: string, place: Pick<NestAskOptions, "at" | "taken">]; result: NestTableResult };
   // The user's own name for a For-each card's column.
   "nests:rename-column": { region: "chrome"; args: [cardId: string, name: string]; result: boolean };
+  // The user's own name for a sent card, which the cheap model never replaces, or "" to let it name the card again.
+  "nests:rename-card": { region: "chrome"; args: [cardId: string, title: string]; result: boolean };
+  // The user opened a card, so its unread dot goes.
+  "nests:read-card": { region: "chrome"; args: [cardId: string]; result: boolean };
+  // The cards the board has in sight now, and the open one, so a card that changes there gets no dot.
+  "nests:in-view": { region: "chrome"; args: [nestId: string, cardIds: string[]]; result: void };
   // A card's table on the clipboard as cells, or saved as a CSV file where the user chooses in main's save dialog.
   "nests:copy-table": { region: "chrome"; args: [cardId: string]; result: boolean };
   // A file's whole table, which a board carries only the first rows of.
@@ -897,6 +903,9 @@ export interface NestsAPI {
   removeAttachment: (attachmentId: string, fromCardId?: string) => Promise<boolean>;
   addTableFile: (nestId: string, place: Pick<NestAskOptions, "at" | "taken">) => Promise<NestTableResult>;
   renameColumn: (cardId: string, name: string) => Promise<boolean>;
+  renameCard: (cardId: string, title: string) => Promise<boolean>;
+  readCard: (cardId: string) => Promise<boolean>;
+  inView: (nestId: string, cardIds: string[]) => Promise<void>;
   copyTable: (cardId: string) => Promise<boolean>;
   tableRows: (cardId: string) => Promise<string[][] | null>;
   saveTable: (cardId: string) => Promise<boolean>;
