@@ -161,8 +161,20 @@ module.exports = {
         "berry-peck": "berry-peck 700ms ease-in-out infinite",
         "berry-print": "berry-print 30s ease-in forwards",
         "berry-hop": "berry-hop 420ms ease-out",
+        // Context running along a Nest's line into the card that just sent, and the moment's brightening instead of it.
+        "nest-pulse": "nest-pulse 900ms ease-in-out forwards",
+        "nest-glow": "nest-glow 900ms ease-out forwards",
       },
       keyframes: {
+        "nest-pulse": {
+          "0%": { strokeDashoffset: "14", opacity: "0" },
+          "15%, 85%": { opacity: "1" },
+          "100%": { strokeDashoffset: "-100", opacity: "0" },
+        },
+        "nest-glow": {
+          "0%, 100%": { opacity: "0" },
+          "30%": { opacity: "1" },
+        },
         shimmer: {
           "0%": { backgroundPosition: "150% 0" },
           "100%": { backgroundPosition: "-50% 0" },

@@ -6,7 +6,7 @@ import type { NestAskOptions, NestAskResult, NestAttachResult, NestFromChatResul
 import { BERRY } from "../shared/mascots";
 import { combinedTable, findTable, MAX_CONTEXT_LENGTH, MAX_CROSSING_LENGTH, MAX_INPUTS, MAX_RUNS, missingRows, RUNS_AT_ONCE, runCountProblem, STALE_ROWS, type FilesCrossing, type LineCrossing, type PickedRows } from "../shared/nestTable";
 import { CARD_GAP, CARD_HEIGHT, CARD_SIZE, CARD_WIDTH, freeSpot, PAGE_CARD, type Rect } from "../shared/nestPlace";
-import { chainCrossings, fitChain, gatherChain, latestAnswer, MAX_EARLIER_CARDS, sentLength, threadOf, type CardAnswer, type ChainEdge, type RawInput } from "./nestContext";
+import { chainCrossings, fitChain, gatherChain, knowsOf, latestAnswer, MAX_EARLIER_CARDS, sentLength, threadOf, type CardAnswer, type ChainEdge, type RawInput } from "./nestContext";
 import { DEFAULT_COLUMN, fallbackCell, linkChecked, NO_WRITER, shortCell, type NestWriter } from "./nestCells";
 import { tableFromFile } from "./nestCsv";
 import { allowedBefore, armedStep, checkPlan, CLOSED_BEFORE_START, NO_CARDS, PROMISED, replyState, retryable, runsState, sourcesState, type PlanCard, type PlanSource, type SourceState } from "./nestPlan";
@@ -20,6 +20,7 @@ import { createHash } from "crypto";
 import { perRunEstimate } from "../shared/modelPrices";
 import type { CardGrantAccess } from "./Chats";
 import { checkAddress, cleanTitle, pageName } from "../shared/nestPages";
+import type { CardKnows } from "../shared/nestKnows";
 import type { UsedPage, WorkTabState } from "../shared/library";
 
 const MAX_TITLE_LENGTH = 100;
@@ -143,6 +144,11 @@ export class Nests {
   // Cards whose job's tabs show around them, while it runs, each with the tabs the user took off the board meanwhile,
   // which don't come back while it runs. Memory only.
   private readonly showing = new Map<string, Set<string>>();
+  // What each card's last message went with, counted as `Chats` built it, by card. Memory only, so after a restart a sent
+  // card says nothing until it sends again.
+  private readonly knows = new Map<string, CardKnows>();
+  // What a card not sent yet will read when it is, with the revision of its chain it was counted for.
+  private readonly willKnow = new Map<string, { nestId: string; revision: string; value: CardKnows | null }>();
 
   constructor(
     private readonly store: NestStore,
@@ -192,14 +198,69 @@ export class Nests {
     if (!board) return null;
     const cards = board.cards.map((card) => {
       if (card.page) return { ...card, page: this.livePage(card.id, card.page) };
-      const withCost = { ...card, cost: this.costOf(card), perRun: this.perRunOf(card), ...(this.showing.has(card.id) ? { showingTabs: true } : {}) };
+      const knows = this.knowsFor(id, card, board.cards, board.lines);
+      const withCost = { ...card, cost: this.costOf(card), perRun: this.perRunOf(card), ...(this.showing.has(card.id) ? { showingTabs: true } : {}), ...(knows ? { knows } : {}) };
       return card.each
         ? { ...withCost, each: { ...card.each, naming: this.columnNaming.has(card.id), runs: card.each.runs.map((run) => ({ ...run, filling: this.fills.has(run.id) })) } }
         : withCost;
     });
     const lines = board.lines.map((line) => ({ ...line, crosses: this.crossingOf(id, line, cards, board.lines) }));
     for (const [lineId, { nestId }] of this.crossings) if (nestId === id && !board.lines.some((line) => line.id === lineId)) this.crossings.delete(lineId);
+    for (const [cardId, { nestId }] of this.willKnow) if (nestId === id && !board.cards.some((card) => card.id === cardId && !card.chatId && !card.each)) this.willKnow.delete(cardId);
     return { ...board, cards, lines, planning: this.planning.get(id) ?? null, naming: this.naming.has(id) };
+  }
+
+  // What a card knows from other cards: what its last message went with, or before it's sent, what it would read now,
+  // counted by the same chain and room, worked out again only when its chain has changed. Nothing on a card that reads
+  // nothing, such as a file's.
+  private knowsFor(nestId: string, card: NestCard, cards: readonly NestCard[], lines: readonly NestLine[]): CardKnows | null {
+    if (card.page || card.file || card.note || card.table) return null;
+    if (card.chatId || card.each) return this.knows.get(card.id) ?? null;
+    const revision = `${this.chainRevision(card.id, cards, lines)}|${!!card.plan?.each}`;
+    const known = this.willKnow.get(card.id);
+    if (known?.revision === revision) return known.value;
+    const answers = card.plan?.each ? this.runKnows(card.id) : this.inputFor(card.id);
+    const copied = this.store.copiedFrom(card.id);
+    const { sends, leftOut } = this.filesFor(card.id);
+    const own = card.attachments;
+    const value =
+      "problem" in answers
+        ? null
+        : knowsOf(
+            answers.answers,
+            {
+              // Its own files, copies it has already among them, and those its lines bring that it has no copy of yet.
+              files: own.filter((each) => each.kind === "file").length + sends.filter((each) => !copied.has(each.card.id)).length,
+              notes: own.filter((each) => each.kind === "note").length,
+              leftOutFiles: leftOut.length,
+            },
+            false,
+            0
+          );
+    this.willKnow.set(card.id, { nestId, revision, value });
+    return value;
+  }
+
+  // What a planned For-each card's runs will each get, counted for its longest row, as its line says.
+  private runKnows(cardId: string): CardInput {
+    const input = this.inputFor(cardId);
+    const rows = this.rowsFor(cardId);
+    if ("problem" in input) return input;
+    if ("problem" in rows) return rows;
+    const lines = this.store.linesTo(cardId);
+    const direct = lines.map((line) => ({ lineId: line.lineId, from: line.source.id, name: this.labelOf(line.source), input: this.lineInput(line) as RawInput | null }));
+    return { answers: this.longestRun(cardId, rows, direct).map(({ answer }) => answer) };
+  }
+
+  // Hears what a card's message went with as `Chats` builds it, so what the card says it knows is what went.
+  private heard(cardId: string, nestId: string): { onContext: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void } {
+    return {
+      onContext: (answers, attachments) => {
+        if (!this.store.card(cardId)) return;
+        this.knows.set(cardId, knowsOf(answers, attachments, true, Date.now()));
+        this.changed(nestId);
+      },
+    };
   }
 
   // What crosses a line, worked out again only when a source of the card it goes to has changed, since its inputs share
@@ -412,13 +473,7 @@ export class Nests {
     const each = new Map<string, LineCrossing["each"]>();
     const shared = new Map<string, LineCrossing["whole"]>();
     if (!("problem" in rows)) {
-      // The longest row leaves the least room for the rest, so that's what's counted.
-      const sentRow = (row: string[]) => sentLength({ name: "", part: "row", header: rows.header, row }, this.clean);
-      const longest = rows.rows.reduce((most, row) => (sentRow(row) > sentRow(most) ? row : most), rows.rows[0]);
-      // The row first, as `runInputs` puts it, so a card reached two ways up the chain is reached the same way here.
-      const driving = direct.find((line) => line.lineId === rows.lineId)!;
-      const runDirect = [{ ...driving, input: { name: "", part: "row" as const, header: rows.header, row: longest } }, ...direct.filter((line) => line !== driving)];
-      const fitted = fitChain(this.chainOf(cardId, runDirect), MAX_CROSSING_LENGTH, this.clean);
+      const fitted = this.longestRun(cardId, rows, direct);
       const counted = chainCrossings(fitted);
       const row = fitted.find((each) => each.lineId === rows.lineId && each.depth === 1)!;
       const before = counted.get(rows.lineId)?.before;
@@ -689,6 +744,8 @@ export class Nests {
     if (card.page?.job && tabId) this.showing.get(card.page.job.cardId)?.add(tabId);
     this.tabOf.delete(cardId);
     this.showing.delete(cardId);
+    this.knows.delete(cardId);
+    this.willKnow.delete(cardId);
     this.chatsOf(card).forEach((chatId) => this.deleteChat(chatId));
     // A deleted chat never says it ended, so the cards after the ones just held hear it from here.
     this.advance(card.nestId);
@@ -714,6 +771,7 @@ export class Nests {
       ...this.userSaid(cardId, card.chatId, text),
       ...this.givenAddresses(cardId),
       ...this.attachmentsFor(cardId, missing),
+      ...this.heard(cardId, card.nestId),
       saveFile: this.fileSink(cardId),
     };
     const sent = card.chatId
@@ -780,6 +838,7 @@ export class Nests {
       ...this.userSaid(card.id, run.chatId, text),
       ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id),
+      ...this.heard(card.id, card.nestId),
     });
     if (!sent) return null;
     // Its value was the old answer's: it goes, and one being written for that answer never lands, so a restart before
@@ -1269,6 +1328,7 @@ export class Nests {
       ...this.userSaid(card.id, null, null),
       ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id, missing),
+      ...this.heard(card.id, nestId),
       saveFile: this.fileSink(card.id),
     });
     if (!sent) return this.store.hold(card.id, "Didn’t start");
@@ -1717,6 +1777,16 @@ export class Nests {
     return gatherChain(cardId, direct, edgesInto);
   }
 
+  // What one run of For each row gets, fitted into a run's room, for the row that leaves the least room for the rest.
+  private longestRun(cardId: string, rows: PickedRows & { lineId: string }, direct: Parameters<typeof gatherChain>[1]) {
+    const sentRow = (row: string[]) => sentLength({ name: "", part: "row", header: rows.header, row }, this.clean);
+    const longest = rows.rows.reduce((most, row) => (sentRow(row) > sentRow(most) ? row : most), rows.rows[0]);
+    // The row first, as `runInputs` puts it, so a card reached two ways up the chain is reached the same way here.
+    const driving = direct.find((line) => line.lineId === rows.lineId)!;
+    const runDirect = [{ ...driving, input: { name: "", part: "row" as const, header: rows.header, row: longest } }, ...direct.filter((line) => line !== driving)];
+    return fitChain(this.chainOf(cardId, runDirect), MAX_CROSSING_LENGTH, this.clean);
+  }
+
   // The one line For each row runs on: the first, in the card's order, that brings rows.
   private drivingLine(cardId: string): CardLine | null {
     return this.store.linesTo(cardId).find((line) => line.picked !== null || (this.tableOf(line.source)?.rows.length ?? 0) > 0) ?? null;
@@ -1800,6 +1870,7 @@ export class Nests {
       ...this.userSaid(card.id, null, null),
       ...this.givenAddresses(card.id),
       ...this.attachmentsFor(card.id),
+      ...this.heard(card.id, card.nestId),
     });
     // Its bird has gone from the flock, rows picked on another input have gone, or the chat couldn't start. The others
     // still try.

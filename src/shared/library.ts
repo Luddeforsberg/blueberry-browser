@@ -2,6 +2,7 @@
 // All of it is saved locally.
 
 import type { LineCrossing } from "./nestTable";
+import type { CardKnows } from "./nestKnows";
 
 export interface Bookmark {
   id: string;
@@ -470,6 +471,8 @@ export interface NestCard {
   cost?: number | null;
   // On a draft that could run For each row, and on a For-each card for its runs again: what one run will likely cost.
   perRun?: { cost: number; rough: boolean } | null;
+  // What it knows from other cards, counted, never what: its last message's, or what it reads when it's sent.
+  knows?: CardKnows;
 }
 
 // A file or note on a card or on a Nest's composer. A file's contents stay in main: only its name, type and size come here.

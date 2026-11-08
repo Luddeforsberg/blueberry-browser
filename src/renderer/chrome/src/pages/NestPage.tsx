@@ -171,6 +171,8 @@ const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[
         const to = board.cards.find((card) => card.id === line.to)
         const from = board.cards.find((card) => card.id === line.from)
         const canRemove = removable(to)
+        // A line into a file's, page's or note's card only says where it came from: nothing goes through it.
+        const reads = !!to && !to.file && !to.page && !to.note && !to.table
         return {
             id: line.id,
             source: line.from,
@@ -178,17 +180,21 @@ const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[
             sourceHandle: 'out',
             targetHandle: 'in',
             type: 'line',
-            focusable: canRemove,
+            focusable: canRemove || reads,
             // Never one of React Flow's selected elements: the board picks a line itself, and selection is for cards.
             selectable: false,
             // A drawing even when the keyboard can reach it, so it's never taken for one of the cards, which are groups.
             ariaRole: 'img',
-            ariaLabel: canRemove && from && to ? `The line from ${label(from)} into ${label(to)}. Press Delete to take it away.` : undefined,
+            ariaLabel: from && to ? `The line from ${label(from)} into ${label(to)}.${canRemove ? ' Press Delete to take it away.' : ''}` : undefined,
             data: {
                 draft: !(to && (to.chatId || to.each || to.file || to.page)),
                 view: !!to?.page,
                 ...(line.fresh ? { fresh: true } : {}),
-                ...(canRemove ? { removable: true } : {})
+                ...(canRemove ? { removable: true } : {}),
+                // Pressed, it says what goes through it. A light runs along it whenever its card's message goes.
+                ...(reads ? { reads: true } : {}),
+                ...(to?.each || to?.plan?.each ? { forEach: true } : {}),
+                ...(to?.knows?.sent ? { pulseAt: to.knows.at } : {})
             }
         }
     })
@@ -1136,7 +1142,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 }}
                 onFocus={(event) => {
                     const lineId = (event.target as Element).closest<SVGElement>('.react-flow__edge')?.dataset.id
-                    if (lineId && edges.some((edge) => edge.id === lineId && edge.data?.removable)) setSelectedLine(lineId)
+                    if (lineId && edges.some((edge) => edge.id === lineId && (edge.data?.removable || edge.data?.reads))) setSelectedLine(lineId)
                 }}
                 onDragEnter={(event) => {
                     if (!droppable(event)) return
@@ -1182,7 +1188,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                         setSelectedLine(null)
                         if (nodeId) setPull({ from: nodeId, over: null })
                     }}
-                    onEdgeClick={(_, edge) => setSelectedLine(edge.data?.removable ? edge.id : null)}
+                    onEdgeClick={(_, edge) => setSelectedLine(edge.data?.removable || edge.data?.reads ? edge.id : null)}
                     onConnectEnd={connectEnd}
                     connectionLineComponent={PullingLine}
                     connectionDragThreshold={6}
