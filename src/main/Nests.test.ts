@@ -734,6 +734,30 @@ describe("Nests", () => {
     expect(crosses()!.each).toEqual({ rows: 1, columns: 2, cut: true });
   });
 
+  it("says what a draft will read, then what its message went with once it's built", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0 })!;
+    replies.push("Two companies, both Swedish.");
+    await sendAndWait(scout.id, "Find companies");
+    const draft = nests.addCard(nest, { x: 500, y: 0, from: scout.id })!;
+    const knows = () => nests.board(nest)!.cards.find((card) => card.id === draft.id)!.knows;
+    expect(knows()).toMatchObject({ sent: false, cards: 1, cut: 0 });
+    // A card that reads nothing, sent, knows nothing from other cards, and says so.
+    expect(nests.board(nest)!.cards.find((card) => card.id === scout.id)!.knows).toMatchObject({ sent: true, cards: 0 });
+
+    replies.push("Done.");
+    await sendAndWait(draft.id, "Write to them");
+    expect(knows()).toMatchObject({ sent: true, cards: 1, cut: 0 });
+    // Scout's thread grows past the room, and the draft's next message is the one that says it was cut.
+    replies.push("word ".repeat(6000));
+    await sendAndWait(scout.id, "More");
+    expect(knows()).toMatchObject({ sent: true, cut: 0 });
+    replies.push("Done again.");
+    await sendAndWait(draft.id, "Once more");
+    expect(knows()).toMatchObject({ sent: true, cards: 1, cut: 1 });
+  });
+
   it("doesn't start runs left waiting when the app last closed", () => {
     const store = new NestStore(":memory:");
     const nest = store.createNest("Nest");
@@ -1045,6 +1069,20 @@ describe("Berry planning in a Nest", () => {
     expect(first.mascotId).toBe("scout");
     expect(second.plan!.each).toBe(true);
     expect(nests.editPlanned(first.id, { prompt: "Find companies in Oslo" })).toBe(true);
+  });
+
+  it("says what each run of a planned For-each card reads, one row in a run's room, not the whole table", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    // 25 long rows: too many for one card's room together, but each fits a run's whole.
+    replies.push(["| Company | Note |", "|---|---|", ...Array.from({ length: 25 }, (_, index) => `| Company ${index} | ${"x".repeat(1000)} |`)].join("\n"));
+    await sendAndWait(scout.id, "Find companies");
+    plans.push({ reply: "One more card.", ask: false, cards: [planCard("c1", { from: "e1", for_each_row: true })] });
+    await nests.ask(nest, "Write to each", PLACE);
+    const [card] = plannedCards(nests, nest);
+    expect(card.plan!.each).toBe(true);
+    expect(card.knows).toMatchObject({ sent: false, cards: 1, cut: 0 });
   });
 
   it("gives the planner the cards on the board with their threads, labelled untrusted", async () => {

@@ -2,6 +2,7 @@
 // All of it is saved locally.
 
 import type { LineCrossing } from "./nestTable";
+import type { CardKnows } from "./nestKnows";
 
 export interface Bookmark {
   id: string;
@@ -475,6 +476,8 @@ export interface NestCard {
   titleSettled?: boolean;
   // It finished, failed or started waiting while nobody was looking at it, and hasn't been opened since.
   unread?: boolean;
+  // What it knows from other cards, counted, never what: its last message's, or what it reads when it's sent.
+  knows?: CardKnows;
 }
 
 // A file or note on a card or on a Nest's composer. A file's contents stay in main: only its name, type and size come here.

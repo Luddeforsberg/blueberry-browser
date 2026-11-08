@@ -70,12 +70,49 @@ test("a card pulled out of another gets its thread, and the Nest keeps both", as
   // Nothing ran on its own: one request so far, the first card's.
   expect(model.requests).toHaveLength(1);
 
+  // Hovered, the draft says what it reads when it's sent, and pressing its line says what goes through it.
+  const shots = async (name: string) => {
+    if (!SHOTS) return;
+    for (const appearance of ["light", "dark"] as const) {
+      await chrome.evaluate((theme) => window.chromeAPI.settings.updateSettings({ appearance: theme }), appearance);
+      await chrome.waitForTimeout(150);
+      await chrome.screenshot({ path: join(SHOTS, `${name}-${appearance}.png`) });
+    }
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ appearance: "light" }));
+  };
+  const knows = draft.locator("[data-nest-knows]");
+  await draft.hover();
+  await expect(knows).toHaveText("Reads when sent: 1 card");
+  await expect(knows).toHaveCSS("opacity", "1");
+  await shots("knows-draft");
+  const line = chrome.locator(".react-flow__edge").first();
+  await line.click();
+  const through = chrome.getByRole("status").filter({ hasText: "From Berry" });
+  await expect(through).toContainText("Berry’s answer, 14 words");
+  await expect(through).toContainText("Nothing cut");
+  await shots("line-popover");
+  await line.press("Escape");
+  await expect(through).toHaveCount(0);
+  await chrome.mouse.move(0, 0);
+
   model.replyWith("Two drafts written.");
   const prompt = draft.getByRole("textbox", { name: "What should Berry do?" });
   await prompt.fill("Write a first email to each");
   await prompt.press("Enter");
+  // A light runs along the line into it as its message goes.
+  await expect(line.locator("path.animate-nest-pulse")).toHaveCount(1);
+  if (SHOTS) {
+    const box = (await line.boundingBox())!;
+    await chrome.waitForTimeout(250);
+    await chrome.screenshot({ path: join(SHOTS, "line-pulse.png"), clip: { x: box.x - 20, y: box.y - 40, width: box.width + 40, height: box.height + 80 } });
+  }
   await expect(draft.getByRole("status")).toHaveText("Done");
   await expect(draft).toContainText("Two drafts written.");
+  await expect(line.locator("path.animate-nest-pulse")).toHaveCount(0);
+  // Sent, it says what that message went with.
+  await draft.hover();
+  await expect(knows).toHaveText("Knows: 1 card");
+  await shots("knows-sent");
 
   // Opened, a card floats over the board, which dims behind it: the card takes the pointer, and a press on another card
   // only closes it.

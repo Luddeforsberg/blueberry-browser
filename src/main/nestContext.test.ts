@@ -8,11 +8,13 @@ import {
   fitTable,
   fitThread,
   gatherChain,
+  knowsOf,
   latestAnswer,
   MAX_CARD_ANSWER_LENGTH,
   MAX_EARLIER_CARDS,
   rowAnswer,
   rowsAnswer,
+  sentLength,
   shareRoom,
   tableAnswer,
   threadOf,
@@ -23,6 +25,7 @@ import {
   type RawInput,
 } from "./nestContext";
 import { combinedTable } from "../shared/nestTable";
+import { knowsWords, lineCut } from "../shared/nestKnows";
 
 describe("latestAnswer", () => {
   it("is the newest reply with words since the user last wrote, past one with only steps", () => {
@@ -479,5 +482,61 @@ describe("a page passed across a line", () => {
     expect(withCardAnswers("Go on", [dropped])).not.toContain("481516");
     const refused = mapCardText({ name: "481516.example.com", text: "", part: "page", page: { url: "https://481516.example.com/", title: "", tabId: null, room: 0, why: "Hub isn't allowed on 481516.example.com." } }, code);
     expect(withCardAnswer("Go on", refused)).not.toContain("481516");
+  });
+});
+
+describe("what a card knows", () => {
+  const none = { files: 0, notes: 0, leftOutFiles: 0 };
+
+  it("knows nothing from other cards with no inputs", () => {
+    const knows = knowsOf([], [], true, 1);
+    expect(knows).toMatchObject({ cards: 0, pages: 0, files: 0, notes: 0, cut: 0, leftOutCards: 0, leftOutFiles: 0 });
+    expect(knowsWords(knows)).toBe("Knows: nothing from other cards");
+    expect(knowsWords({ ...knows, sent: false })).toBe("Reads when sent: nothing from other cards");
+  });
+
+  it("counts one input that went whole", () => {
+    const knows = knowsOf(fitInputs([thread("Scout", ["Find them", "Three companies"])], 24_000), none, true, 1);
+    expect(knows).toMatchObject({ cards: 1, cut: 0 });
+    expect(knowsWords(knows)).toBe("Knows: 1 card");
+  });
+
+  it("fills the room exactly without calling anything cut, and one character less cuts it", () => {
+    const input = thread("Scout", ["Find them", "x".repeat(2_000)]);
+    const room = sentLength(input);
+    expect(knowsOf(fitInputs([input], room), none, true, 1)).toMatchObject({ cards: 1, cut: 0 });
+    expect(knowsOf(fitInputs([input], room - 1), none, true, 1)).toMatchObject({ cards: 1, cut: 1 });
+  });
+
+  it("counts a table cut to its rows, a file's table as a file, and cards further up left out", () => {
+    const table: RawInput = { name: "Writer", part: "table", table: { header: ["Company"], rows: Array.from({ length: 50 }, (_, index) => [`Company ${index}`]) } };
+    const csv: RawInput = { name: "leads.csv", fromFile: true, part: "table", table: { header: ["Name"], rows: [["Ada"]] } };
+    const answers = [...fitInputs([table, csv], 200), { name: "Far", part: "thread" as const, text: "", dropped: true, via: "Writer" }];
+    const knows = knowsOf(answers, [{ kind: "file", name: "pitch.pdf", type: "application/pdf", data: new Uint8Array() }, { kind: "note", text: "Be brief" }, { kind: "missing", names: ["a.png", "b.png"] }], true, 1);
+    expect(knows).toMatchObject({ cards: 1, files: 2, notes: 1, cut: 1, leftOutCards: 1, leftOutFiles: 2 });
+    expect(knowsWords(knows)).toBe("Knows: 1 card, 2 files, 1 note, 1 cut short, 1 card left out, 2 files left out");
+    expect(knowsWords(knows, true)).toMatch(/^Last run knew: /);
+  });
+
+  it("says a line is cut only for the way its card sends", () => {
+    // Whole, a table loses rows to fit; one row each, every row goes whole.
+    const table = { stale: false, whole: { kind: "table" as const, rows: 23, columns: 1, leftOut: 2 }, each: { rows: 25, columns: 1, cut: false } };
+    expect(lineCut(table, false)).toBe(true);
+    expect(lineCut(table, true)).toBe(false);
+    // Whole, a thread fits; shared by every run in a run's smaller room, it would be cut.
+    const thread = { stale: false, whole: { kind: "thread" as const, answers: 1, earlier: 0, words: 3600, cut: false }, each: null, shared: { kind: "thread" as const, answers: 1, earlier: 0, words: 2400, cut: true } };
+    expect(lineCut(thread, false)).toBe(false);
+    expect(lineCut(thread, true)).toBe(true);
+  });
+
+  it("counts a page whose text didn't come as cut short, but only once it's sent", () => {
+    const page = (text?: string): CardAnswer => ({ name: "example.com", part: "page", text: "", page: { url: "https://example.com", title: "", tabId: "t1", room: 100, ...(text !== undefined ? { text } : {}) } });
+    expect(knowsOf([page("Pricing")], none, true, 1)).toMatchObject({ pages: 1, cut: 0 });
+    // The tab couldn't be read, so only its address went.
+    expect(knowsOf([{ ...page(), page: { ...page().page!, tabId: null, why: "The user has turned off what can be seen of their pages." } }], none, true, 1)).toMatchObject({ pages: 1, cut: 1 });
+    // A link was only ever its address.
+    expect(knowsOf([{ ...page(), page: { ...page().page!, tabId: null } }], none, true, 1)).toMatchObject({ pages: 1, cut: 0 });
+    // Before it's sent, whether its text can be read isn't known, so it's only counted.
+    expect(knowsOf([page()], none, false, 0)).toMatchObject({ pages: 1, cut: 0 });
   });
 });

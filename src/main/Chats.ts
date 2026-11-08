@@ -183,6 +183,8 @@ interface Run {
   // The files and notes on a Nest's card, which go with the newest message every time it's sent, and are never saved in
   // the chat.
   attachments?: readonly SentAttachment[];
+  // Hears exactly the card answers and attachments this message went to the model with, once it's built.
+  onContext?: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void;
   // Only on a run of a For-each card, started here and not in the cloud.
   cardGrant?: CardGrantAccess;
   // Only on a Nest's card, started here and not in the cloud: where save_file keeps what the bird made.
@@ -887,6 +889,7 @@ export class Chats {
       userSaid,
       givenAddresses,
       attachments,
+      onContext,
       cardGrant,
       saveFile,
     }: {
@@ -905,6 +908,7 @@ export class Chats {
       userSaid?: string;
       givenAddresses?: readonly string[];
       attachments?: readonly SentAttachment[];
+      onContext?: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void;
       cardGrant?: CardGrantAccess;
       saveFile?: SaveFile;
     }
@@ -933,7 +937,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswers, userSaid, givenAddresses, attachments, usage: { input: 0, cached: 0, output: 0 },
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent, cardAnswers, userSaid, givenAddresses, attachments, onContext, usage: { input: 0, cached: 0, output: 0 },
       // Never for a job in the cloud or one an app started.
       ...(cardGrant && !inCloud && from === null ? { cardGrant } : {}),
       ...(saveFile && !inCloud && from === null ? { saveFile } : {}) };
@@ -1054,7 +1058,7 @@ export class Chats {
       // Sending a page with a message is the user sharing it, so one they kept back is theirs to give.
       if (page) this.letGo(page);
       run.withPage = page !== null;
-      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswers, run.attachments);
+      const messages = await this.withNewestPage(chatId, seePage, run.mascot, run.cardAnswers, run.attachments, run.onContext);
       const said = this.userWords(chatId).join("\n");
       const notes = (run.attachments ?? []).flatMap((attachment) => (attachment.kind === "note" ? [attachment.text] : []));
       const tools = this.jobTools(chatId, run, page, [run.userSaid ?? said, ...notes].join("\n"));
@@ -1373,12 +1377,25 @@ export class Chats {
 
   // Only the newest message carries the page, so older screenshots don't go to the model again.
   // A Nest's card's files and notes go first, each labelled.
-  private async withNewestPage(chatId: string, seePage: boolean, mascot: MascotProfile, answers: readonly CardAnswer[] = [], attachments: readonly SentAttachment[] = []): Promise<ReplyMessage[]> {
+  // `onContext` hears the card answers, pages read, and attachments that went with the newest message.
+  private async withNewestPage(
+    chatId: string,
+    seePage: boolean,
+    mascot: MascotProfile,
+    answers: readonly CardAnswer[] = [],
+    attachments: readonly SentAttachment[] = [],
+    onContext?: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void
+  ): Promise<ReplyMessage[]> {
     const messages = (this.store.chat(chatId)?.messages ?? []).map(toReplyMessage);
     const page = seePage ? await this.readPage(mascot) : null;
     const newest = messages[messages.length - 1];
-    if ((!page && answers.length === 0 && attachments.length === 0) || !newest || typeof newest.content !== "string") return messages;
+    if (!newest || typeof newest.content !== "string") return messages;
+    if (!page && answers.length === 0 && attachments.length === 0) {
+      onContext?.([], []);
+      return messages;
+    }
     const read = await Promise.all(answers.map((answer) => this.withPageRead(answer, mascot)));
+    onContext?.(read, attachments);
     const text = withCardAnswers(newest.content, read.map((answer) => mapCardText(answer, (said) => this.withoutCodes(said))));
     const content = page ? withPage(text, page) : text;
     if (attachments.length === 0) return [...messages.slice(0, -1), { role: "user", content }];

@@ -22,6 +22,7 @@ import { Berry, useAssistantName } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ChatError, Markdown, SHIMMER_QUIET, SHIMMER_TEXT, StatusLine, UserMessage } from './ChatMessage'
 import { AddMenu, ChatComposer, Composer } from './Composer'
 import { Attachments, useAttaching } from './NestAttachments'
+import { KnowsLine, LinePopover, LinePulse, useLinePulse } from './NestKnows'
 import { MascotChip, MascotPerch } from './MascotPerch'
 import { MemoryOffers } from './MemoryInChat'
 import { CARD_PROSE, CellText, TableMenu, TableResult, useCut, type PickMode, type WorkingRows } from './NestTable'
@@ -32,7 +33,10 @@ export type CardNode = Node<{ card: NestCard }, 'card'>
 // `view` on a line into one of a working card's tabs, or a page its job kept: it only joins them, and carries nothing.
 // `fresh` on a line into a sent card that its next message is the first to get, and `removable` on one the user may take
 // away.
-export type LineEdge = Edge<{ draft: boolean; view?: boolean; fresh?: boolean; removable?: boolean }, 'line'>
+export type LineEdge = Edge<
+    { draft: boolean; view?: boolean; fresh?: boolean; removable?: boolean; reads?: boolean; forEach?: boolean; pulseAt?: number },
+    'line'
+>
 
 // A line being pulled out of `from`: the card under the pointer, near enough to drop on, and every card that would take it.
 export interface PullState {
@@ -1696,9 +1700,11 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
     const width = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.width)
     const height = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.height)
     const box: CardBox = { width: width ?? CARD_WIDTH, fill: height != null }
+    const { pull, openId, inputsOf } = useBoard()
     return (
         <>
             <CardKind card={card} box={box} />
+            <KnowsLine card={card} hidden={!!pull || openId === id} inputs={inputsOf(id).length} />
             <DropMark cardId={id} />
         </>
     )
@@ -1767,8 +1773,8 @@ const STROKE = 1.5
 // A line between two cards, dashed while the card it goes to hasn't been sent, with a small round end at each card.
 // Also dashed while it's new on a sent card, until the next message takes it. One the user may take away shows a small ×
 // halfway along on hover, or once pressed or reached from the keyboard, when Delete takes it away too, but not while
-// another line is pulled across it.
-export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) => {
+// another line is pulled across it. Pressing any line says what goes through it, and a light runs along it as its card sends.
+export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) => {
     const board = useContext(NestBoardContext)
     const [hovered, setHovered] = useState(false)
     const from = sourceX + END + STROKE / 2
@@ -1776,6 +1782,10 @@ export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, 
     const [path, labelX, labelY] = getBezierPath({ sourceX: from, sourceY, sourcePosition, targetX: to, targetY, targetPosition })
     const selected = board?.selectedLine === id
     const removable = !!data?.removable && !!board?.removeLine
+    const pulse = useLinePulse(data?.pulseAt)
+    const { find } = useFlock()
+    const { showBerry } = useShell().settings
+    const input = selected && data?.reads ? board?.inputsOf(target).find(({ line }) => line.id === id) : undefined
     return (
         <>
             <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
@@ -1785,6 +1795,7 @@ export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, 
                     className={selected ? "stroke-accent-ink" : LINE}
                     style={{ strokeWidth: selected ? STROKE + 0.5 : STROKE, strokeDasharray: data?.view ? '1 4' : data?.draft || data?.fresh ? '5 5' : undefined, strokeLinecap: data?.view ? 'round' : undefined }}
                 />
+                {pulse && <LinePulse path={path} pulse={pulse} width={STROKE + 1.5} />}
                 <circle cx={from} cy={sourceY} r={END} className={cn(LINE, "fill-canvas")} strokeWidth={STROKE} />
                 <circle cx={to} cy={targetY} r={END} className="fill-accent-ink/60" />
             </g>
@@ -1805,6 +1816,11 @@ export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, 
                     >
                         <X className="size-3.5" />
                     </button>
+                </EdgeLabelRenderer>
+            )}
+            {input && !board?.pull && (
+                <EdgeLabelRenderer>
+                    <LinePopover from={nameOn(input.source, find(input.source.mascotId), showBerry)} crosses={input.line.crosses ?? null} fresh={!!input.line.fresh} forEach={!!data?.forEach} x={labelX} y={labelY} />
                 </EdgeLabelRenderer>
             )}
         </>
