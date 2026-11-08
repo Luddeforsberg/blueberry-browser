@@ -2921,6 +2921,31 @@ describe("When an earlier card changes", () => {
     expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
   });
 
+  it("remembers each tab's address as it went, even when one moves on while another is still being read", async () => {
+    const { nests } = setup();
+    const nest = nests.create();
+    openTabs = [fakeTab("tab-1", "https://shop.example/pricing", "Plans start at 10 euros."), fakeTab("tab-2", "https://rival.example/pricing", "Plans start at 12 euros.")];
+    let readSecond = () => {};
+    openTabs[1].getTextWithFrames = () => new Promise((resolve) => (readSecond = () => resolve(openTabs[1].text)));
+    const writer = nests.addCard(nest, { x: 500, y: 0 })!;
+    for (const tabId of ["tab-1", "tab-2"]) {
+      const page = nests.dropPage(nest, { tabId }, { at: { x: 0, y: tabId === "tab-1" ? 0 : 400 }, taken: [] }) as { cardId: string };
+      expect(nests.addInput(writer.id, page.cardId)).toEqual({ ok: true });
+    }
+    held = [];
+    expect(nests.sendCard(writer.id, "Compare the plans")).toEqual({ ok: true });
+    await settleAll();
+    // The first was read at its old address, and moves on while the second is still being read.
+    openTabs[0].url = "https://shop.example/about";
+    readSecond();
+    await release();
+    held = null;
+    await settleAll();
+    expect(newest(sent.at(-1)!)).toContain("https://shop.example/pricing");
+    expect(cardOf(nests, nest, writer.id).earlierChanged).toBe(true);
+    expect(changedLinesOf(nests, nest)).toHaveLength(1);
+  });
+
   it("still knows what a card sent with, and what it knew, when the app starts again", async () => {
     const { nests, store, chats, sendAndWait } = setup();
     const nest = nests.create();

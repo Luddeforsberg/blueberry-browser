@@ -292,12 +292,25 @@ export class Nests {
   }
 
   // Hears what a card's message went with as `Chats` builds it, so what the card says it knows is what went. A tab's
-  // text is read then, and it may have moved on since the card sent, so its address is remembered again as it went.
+  // text is read then, and it may have moved on since the card sent, so its address is remembered again as it went with
+  // the text read.
   private heard(cardId: string, nestId: string, runId: string | null = null): { onContext: (answers: readonly CardAnswer[], attachments: readonly SentAttachment[]) => void } {
     return {
       onContext: (answers, attachments) => {
         if (!this.store.setKnows(cardId, knowsOf(answers, attachments, true, Date.now()))) return;
-        this.remember(cardId, runId, (line) => !!line.source.page);
+        const read = new Map(
+          answers.flatMap((answer) => {
+            const checked = answer.part === "page" && answer.via === undefined && answer.page?.tabId ? checkAddress(answer.page.url) : null;
+            return checked?.ok ? [[answer.page!.tabId!, this.pagePrint(checked.url)] as const] : [];
+          })
+        );
+        const went = new Map(
+          this.store.linesTo(cardId).flatMap((line) => {
+            const print = line.source.page ? read.get(this.tabOf.get(line.source.id) ?? "") : undefined;
+            return print ? [[line.lineId, print] as const] : [];
+          })
+        );
+        if (went.size > 0) this.remember(cardId, runId, went);
         this.changed(nestId);
       },
     };
@@ -305,11 +318,11 @@ export class Nests {
 
   // Remembers what crossed each line into a card as it sent, as a fingerprint: on the card, or on the one run of For each
   // row that sent. A run leaves out the line its rows come from, since every run gets a row of the table the card was
-  // sent with, whatever that card says now.
-  private remember(cardId: string, runId: string | null, only: (line: CardLine) => boolean = () => true): void {
+  // sent with, whatever that card says now. `went` when it's known exactly, by line.
+  private remember(cardId: string, runId: string | null, known?: ReadonlyMap<string, string>): void {
     const lines = this.store.linesTo(cardId);
     const driving = runId ? (this.store.eachLine(cardId) ?? lines[0]?.lineId) : null;
-    const went = new Map(lines.filter((line) => line.lineId !== driving && only(line)).map((line) => [line.lineId, this.fingerprintOf(line) ?? SENT_NOTHING]));
+    const went = known ?? new Map(lines.filter((line) => line.lineId !== driving).map((line) => [line.lineId, this.fingerprintOf(line) ?? SENT_NOTHING]));
     if (went.size === 0) return;
     if (runId) this.store.keepRunSentWith(runId, went);
     else this.store.keepSentWith(cardId, went);
@@ -328,9 +341,17 @@ export class Nests {
     return !!source.each?.runs.some((run) => run.state === "waiting" || (!!run.chatId && this.chats.isRunning(run.chatId)) || this.fills.has(run.id));
   }
 
-  // What a line gives now, as a fingerprint: a file's bytes, or what its source gives of its own.
+  // A page's address as a fingerprint, with codes the user typed taken out, as it goes to the model.
+  private pagePrint(url: string): string {
+    return fingerprint({ name: "", part: "page", url: this.clean(url), title: "", tabId: null })!;
+  }
+
+  // What a line gives now, as a fingerprint: a file's bytes, a page's address, or what its source gives of its own.
   private fingerprintOf(line: CardLine): string | null {
-    if (!line.source.file) return fingerprint(this.lineInput(line));
+    if (!line.source.file) {
+      const input = this.lineInput(line);
+      return input && input !== "stale" && input.part === "page" ? this.pagePrint(input.url) : fingerprint(input);
+    }
     const id = line.source.id;
     if (!this.fileFingerprints.has(id)) this.fileFingerprints.set(id, fingerprint(null, this.store.fileOf(id)?.data ?? null));
     return this.fileFingerprints.get(id)!;
