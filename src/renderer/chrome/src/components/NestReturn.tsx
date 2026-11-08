@@ -6,8 +6,9 @@ import { cn } from '@common/lib/utils'
 // Coming back to a board: a card's title for what it found, its unread dot, what it shows zoomed out, and which cards
 // the board has in sight, so main knows which changes nobody saw. The words come from main, which checked them.
 
-// Zoomed out past this, a sent card shows only its title and status, at a size that can still be read.
-const FAR_ZOOM = 0.55
+// Zoomed out past this, a sent card shows only its title and status, at a size that can still be read. Low enough that
+// it only takes over where the card's own words are too small to read: a board of big cards sits below half all the time.
+const FAR_ZOOM = 0.3
 // How long the cards that changed since the Nest was last open stay highlighted.
 const HIGHLIGHT_MS = 4000
 // How much of a card's top must be in sight for it to count as seen: its header, where its status is.
@@ -63,12 +64,14 @@ export const CardTitle: React.FC<{ cardId: string; title: string }> = ({ cardId,
 export const UnreadDot: React.FC = () => <span data-unread role="img" aria-label="New since you looked" className="shrink-0 size-1.5 rounded-full bg-accent-ink" />
 
 // Zoomed out, a sent card is only its title, or what was asked when it has none, and its status, drawn over the card so
-// its size never changes. Its words stay about the same size on screen, and the prompt is still there on hover.
-export const FarCard: React.FC<{ title: string | null; asked: string | null; status: { text: string; className: string } | null; unread: boolean }> = ({
+// its size never changes. Its words stay about the same size on screen, and the prompt is still there on hover. A click
+// opens the card, as its own Open button would, since the cover hides it; a drag still moves it.
+export const FarCard: React.FC<{ title: string | null; asked: string | null; status: { text: string; className: string } | null; unread: boolean; onOpen: () => void }> = ({
     title,
     asked,
     status,
-    unread
+    unread,
+    onOpen
 }) => {
     const zoom = useStore((state) => state.transform[2])
     if (zoom >= FAR_ZOOM) return null
@@ -80,6 +83,7 @@ export const FarCard: React.FC<{ title: string | null; asked: string | null; sta
             data-far-card
             aria-hidden
             title={asked ?? undefined}
+            onClick={onOpen}
             className="nest-drag cursor-grab absolute inset-0 rounded-panel bg-surface px-5 overflow-hidden flex flex-col justify-center"
             style={{ gap: size(6, 16) }}
         >
