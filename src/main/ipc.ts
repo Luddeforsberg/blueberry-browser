@@ -68,6 +68,7 @@ export const CHANNEL_REGIONS: {
   "nests:menu": BOTH,
   "nests:add-card": ["chrome"],
   "nests:add-input": ["chrome"],
+  "nests:remove-input": ["chrome"],
   "nests:retry-runs": ["chrome"],
   "nests:move-card": ["chrome"],
   "nests:resize-card": ["chrome"],

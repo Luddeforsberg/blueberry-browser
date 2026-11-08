@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { BaseEdge, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, Handle, NodeResizeControl, Position, useStore, type ConnectionLineComponentProps, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react'
 import { AppWindow, ArrowLeft, Download, FileText, GitFork, GitMerge, Image, Maximize2, Minimize2, StickyNote, Table2, X } from 'lucide-react'
 import type { ChatThread, MascotProfile, NestCard, NestFile, NestFileContent, NestForEach, NestLine, NestNote, NestPage, NestPlanned, NestTableFile } from '@shared/library'
 import { pageName } from '@shared/nestPages'
@@ -29,7 +29,16 @@ import { formatBytes } from './downloadStatus'
 
 export type CardNode = Node<{ card: NestCard }, 'card'>
 // `view` on a line into one of a working card's tabs, or a page its job kept: it only joins them, and carries nothing.
-export type LineEdge = Edge<{ draft: boolean; view?: boolean }, 'line'>
+// `fresh` on a line into a sent card that its next message is the first to get, and `removable` on one the user may take
+// away.
+export type LineEdge = Edge<{ draft: boolean; view?: boolean; fresh?: boolean; removable?: boolean }, 'line'>
+
+// A line being pulled out of `from`: the card under the pointer, near enough to drop on, and every card that would take it.
+export interface PullState {
+    from: string
+    over: string | null
+    accepts: ReadonlySet<string>
+}
 
 // Rows selected in one card's table, for the table they were picked from: `text` is what that table was made from, such as
 // the answer, so a new one lets them go.
@@ -74,6 +83,13 @@ export interface NestBoardActions {
     watchPage: (cardId: string, width: number) => void
     // Threads to show instead of loading them, for the component gallery.
     samples?: Readonly<Record<string, ChatThread>>
+    // While a line is being pulled, where it can go.
+    pull?: PullState | null
+    // Why the line just dropped on a card couldn't go in, shown on that card.
+    dropProblem?: { cardId: string; text: string } | null
+    // The line the user pressed or moved the keyboard to, which Delete takes away.
+    selectedLine?: string | null
+    removeLine?: (lineId: string) => void
 }
 
 export const NestBoardContext = createContext<NestBoardActions | null>(null)
@@ -113,7 +129,7 @@ const BIRD_SIZE = 44
 // How far down the standing drawing its feet reach, so its toes grip the card's top edge.
 const STANDING_FEET = 113 / 120
 // Where lines meet a card: level with its first lines, whatever its height, so a line between two cards stays straight.
-const LINE_AT = 60
+export const LINE_AT = 60
 // How much of the latest reply a closed card shows before it's cut.
 const REPLY_HEIGHT = 240
 
@@ -446,8 +462,14 @@ const getsWhat = ({ line, name, source }: InputView) =>
 // about 1,800 words".
 // Files aren't named here: once it's sent, the card's own copies show on its paperclip line, which stays true after the
 // file's card is gone.
+// A line drawn in since the card was sent goes only from the next message on, and says so until that's sent.
 const withWhat = (inputs: readonly InputView[]): string | null => {
-    const words = inputs.filter((input) => !input.source.file).map((input) => (input.line.crosses?.whole ? lineWords({ whole: input.line.crosses.whole }, input.name) : null) ?? getsWhat(input))
+    const words = inputs
+        .filter((input) => !input.source.file || input.line.fresh)
+        .map((input) => {
+            const what = (input.line.crosses?.whole ? lineWords({ whole: input.line.crosses.whole }, input.name) : null) ?? getsWhat(input)
+            return input.line.fresh ? `${what}, from your next message` : what
+        })
     return words.length > 0 ? `With ${words.join(' · ')}` : null
 }
 
@@ -1669,7 +1691,16 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
     const width = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.width)
     const height = useStore((state) => state.nodeLookup.get(id)?.internals.userNode.height)
     const box: CardBox = { width: width ?? CARD_WIDTH, fill: height != null }
-    return card.page ? (
+    return (
+        <>
+            <CardKind card={card} box={box} />
+            <DropMark cardId={id} />
+        </>
+    )
+}
+
+const CardKind: React.FC<{ card: NestCard; box: CardBox }> = ({ card, box }) =>
+    card.page ? (
         <PageCard card={card} page={card.page} />
     ) : card.note ? (
         <NoteCard card={card} note={card.note} box={box} />
@@ -1688,6 +1719,39 @@ export const CardView: React.FC<NodeProps<CardNode>> = ({ id, data: { card } }) 
     ) : (
         <DraftCard card={card} />
     )
+
+// While a line is pulled, a card that would take it has a ring and its input dot shows, both stronger with the pointer
+// near enough to drop it there. Why a line dropped here couldn't go in shows under the card. Only drawn: the pointer goes
+// through it.
+const DropMark: React.FC<{ cardId: string }> = ({ cardId }) => {
+    const { pull, dropProblem } = useBoard()
+    const accepts = !!pull && pull.from !== cardId && pull.accepts.has(cardId)
+    const over = accepts && pull.over === cardId
+    const problem = dropProblem?.cardId === cardId ? dropProblem.text : null
+    return (
+        <>
+            {accepts && (
+                <span
+                    aria-hidden
+                    data-drop={over ? 'over' : 'accepts'}
+                    className={cn("pointer-events-none absolute -inset-px rounded-panel ring-2 transition-shadow duration-layout", over ? "ring-accent-ink" : "ring-accent-ink/40")}
+                >
+                    <span
+                        className={cn(
+                            "absolute left-0 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-accent-ink transition-all duration-layout",
+                            over ? "size-4 bg-accent-ink" : "size-3 bg-canvas"
+                        )}
+                        style={{ top: LINE_AT + 1 }}
+                    />
+                </span>
+            )}
+            {problem && (
+                <p role="alert" className="pointer-events-none absolute left-3 right-3 top-full mt-2 px-3 py-2 rounded-control border bg-surface text-12 text-destructive shadow-sm">
+                    {problem}
+                </p>
+            )}
+        </>
+    )
 }
 
 const LINE = "stroke-accent-ink/60"
@@ -1696,15 +1760,48 @@ const END = 3.5
 const STROKE = 1.5
 
 // A line between two cards, dashed while the card it goes to hasn't been sent, with a small round end at each card.
+// Also dashed while it's new on a sent card, until the next message takes it. One the user may take away shows a small ×
+// halfway along on hover, or once pressed or reached from the keyboard, when Delete takes it away too, but not while
+// another line is pulled across it.
 export const LineView: React.FC<EdgeProps<LineEdge>> = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) => {
+    const board = useContext(NestBoardContext)
+    const [hovered, setHovered] = useState(false)
     const from = sourceX + END + STROKE / 2
     const to = targetX - END
-    const [path] = getBezierPath({ sourceX: from, sourceY, sourcePosition, targetX: to, targetY, targetPosition })
+    const [path, labelX, labelY] = getBezierPath({ sourceX: from, sourceY, sourcePosition, targetX: to, targetY, targetPosition })
+    const selected = board?.selectedLine === id
+    const removable = !!data?.removable && !!board?.removeLine
     return (
         <>
-            <BaseEdge id={id} path={path} className={LINE} style={{ strokeWidth: STROKE, strokeDasharray: data?.view ? '1 4' : data?.draft ? '5 5' : undefined, strokeLinecap: data?.view ? 'round' : undefined }} />
-            <circle cx={from} cy={sourceY} r={END} className={cn(LINE, "fill-canvas")} strokeWidth={STROKE} />
-            <circle cx={to} cy={targetY} r={END} className="fill-accent-ink/60" />
+            <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+                <BaseEdge
+                    id={id}
+                    path={path}
+                    className={selected ? "stroke-accent-ink" : LINE}
+                    style={{ strokeWidth: selected ? STROKE + 0.5 : STROKE, strokeDasharray: data?.view ? '1 4' : data?.draft || data?.fresh ? '5 5' : undefined, strokeLinecap: data?.view ? 'round' : undefined }}
+                />
+                <circle cx={from} cy={sourceY} r={END} className={cn(LINE, "fill-canvas")} strokeWidth={STROKE} />
+                <circle cx={to} cy={targetY} r={END} className="fill-accent-ink/60" />
+            </g>
+            {removable && (hovered || selected) && !board?.pull && (
+                <EdgeLabelRenderer>
+                    <button
+                        type="button"
+                        aria-label="Take this line away"
+                        title="Take this line away"
+                        onMouseEnter={() => setHovered(true)}
+                        onMouseLeave={() => setHovered(false)}
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            board?.removeLine?.(id)
+                        }}
+                        className="nodrag nopan pointer-events-auto absolute size-6 flex items-center justify-center rounded-full border bg-surface text-muted-foreground shadow-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+                    >
+                        <X className="size-3.5" />
+                    </button>
+                </EdgeLabelRenderer>
+            )}
         </>
     )
 }

@@ -147,14 +147,16 @@ const MIGRATIONS = [
    ALTER TABLE cards ADD COLUMN page_title TEXT;
    ALTER TABLE cards ADD COLUMN page_dropped INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE cards ADD COLUMN page_job TEXT;`,
+  // A line drawn into a card that has been sent already, until the card sends again: only its next message gets it.
+  `ALTER TABLE lines ADD COLUMN fresh INTEGER NOT NULL DEFAULT 0;`,
   // Whether the Nest's composer is tucked down to a tab at the board's bottom edge. What kind each of Berry's messages is:
-  // an answer about the board, a plan with how many cards it laid out, or a question, and on the user's, how many cards
-  // they asked about when they asked about only those. Older messages say none. A note's card holds one of Berry's
+  // an answer about the board, a plan with how many cards it laid out, or a question, and on the user's, the ids of the
+  // cards they asked about when they asked about only those, as JSON. Older messages say none. A note's card holds one of Berry's
   // answers, as it was when it went on the board.
   `ALTER TABLE nests ADD COLUMN composer_tucked INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE talk ADD COLUMN kind TEXT CHECK (kind IN ('answer', 'plan', 'ask'));
    ALTER TABLE talk ADD COLUMN planned INTEGER;
-   ALTER TABLE talk ADD COLUMN about INTEGER;
+   ALTER TABLE talk ADD COLUMN about TEXT;
    ALTER TABLE cards ADD COLUMN note_text TEXT;`,
 ];
 
@@ -167,7 +169,7 @@ interface TalkRow {
   text: string;
   kind: NestTalkMessage["kind"] | null;
   planned: number | null;
-  about: number | null;
+  about: string | null;
 }
 
 const toTalkMessage = ({ id, role, text, kind, planned, about }: TalkRow): NestTalkMessage => ({
@@ -176,14 +178,16 @@ const toTalkMessage = ({ id, role, text, kind, planned, about }: TalkRow): NestT
   text,
   ...(kind ? { kind } : {}),
   ...(planned !== null ? { planned } : {}),
-  ...(about !== null ? { about } : {}),
+  ...(about !== null ? { about: (JSON.parse(about) as string[]).length } : {}),
 });
 
-// One card's input: the line into it, the card it comes from, and the rows picked from that card if any.
+// One card's input: the line into it, the card it comes from, and the rows picked from that card if any. `fresh` while the
+// card it goes to was sent before it was drawn and hasn't sent since.
 export interface CardLine {
   lineId: string;
   source: NestCard;
   picked: PickedRows | null;
+  fresh: boolean;
 }
 
 export interface AttachmentRow {
@@ -320,9 +324,9 @@ export class NestStore {
     const lines = (
       // Only how many rows were picked, which could be a whole file's.
       this.db
-        .prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", json_array_length(picked, '$.rows') AS picked FROM lines WHERE nest_id = ? ORDER BY rowid")
-        .all(id) as unknown as NestLine[]
-    ).map((line) => ({ ...line, picked: line.picked ?? null }));
+        .prepare("SELECT id, from_card AS \"from\", to_card AS \"to\", json_array_length(picked, '$.rows') AS picked, fresh FROM lines WHERE nest_id = ? ORDER BY rowid")
+        .all(id) as unknown as (Omit<NestLine, "fresh"> & { fresh: number })[]
+    ).map(({ fresh, ...line }) => ({ ...line, picked: line.picked ?? null, ...(fresh ? { fresh: true as const } : {}) }));
     const tucked = this.db.prepare("SELECT composer_tucked AS tucked FROM nests WHERE id = ?").get(id) as { tucked: number };
     return { ...nest, cards, lines, talk: this.talk(id), composerTucked: tucked.tucked === 1, attached: this.attachmentsOf({ nestId: id }) };
   }
@@ -507,10 +511,10 @@ export class NestStore {
 
   // Every line into a card, in the order they were drawn.
   linesTo(id: string): CardLine[] {
-    const rows = this.db.prepare("SELECT id, from_card, picked FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as { id: string; from_card: string; picked: string | null }[];
+    const rows = this.db.prepare("SELECT id, from_card, picked, fresh FROM lines WHERE to_card = ? ORDER BY rowid").all(id) as { id: string; from_card: string; picked: string | null; fresh: number }[];
     return rows.flatMap((row) => {
       const source = this.card(row.from_card);
-      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null }] : [];
+      return source ? [{ lineId: row.id, source, picked: row.picked ? (JSON.parse(row.picked) as PickedRows) : null, fresh: row.fresh === 1 }] : [];
     });
   }
 
@@ -520,13 +524,31 @@ export class NestStore {
   }
 
   // Another input on a card, after the ones it has. The caller checks it's allowed. False if it's there already, the
-  // cards aren't both in this Nest, or it would be a line from a card to itself.
-  addLine(nestId: string, from: string, to: string, picked: PickedRows | null): boolean {
+  // cards aren't both in this Nest, or it would be a line from a card to itself. `fresh` for a card sent already.
+  addLine(nestId: string, from: string, to: string, picked: PickedRows | null, fresh = false): boolean {
     if (from === to || this.card(from)?.nestId !== nestId || this.card(to)?.nestId !== nestId) return false;
     const done =
-      this.db.prepare("INSERT OR IGNORE INTO lines (id, nest_id, from_card, to_card, picked) VALUES (?, ?, ?, ?, ?)").run(randomUUID(), nestId, from, to, picked ? JSON.stringify(picked) : null)
-        .changes > 0;
+      this.db
+        .prepare("INSERT OR IGNORE INTO lines (id, nest_id, from_card, to_card, picked, fresh) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(randomUUID(), nestId, from, to, picked ? JSON.stringify(picked) : null, fresh ? 1 : 0).changes > 0;
     if (done) this.touch(nestId);
+    return done;
+  }
+
+  // The card has sent with every line into it, so none is new any more.
+  settleLines(to: string): void {
+    this.db.prepare("UPDATE lines SET fresh = 0 WHERE to_card = ? AND fresh = 1").run(to);
+  }
+
+  // Which card a line goes to, or null if it's gone.
+  lineTo(lineId: string): string | null {
+    return (this.db.prepare("SELECT to_card FROM lines WHERE id = ?").get(lineId) as { to_card: string } | undefined)?.to_card ?? null;
+  }
+
+  deleteLine(lineId: string): boolean {
+    const nestId = (this.db.prepare("SELECT nest_id FROM lines WHERE id = ?").get(lineId) as { nest_id: string } | undefined)?.nest_id;
+    const done = !!nestId && this.db.prepare("DELETE FROM lines WHERE id = ?").run(lineId).changes > 0;
+    if (done) this.touch(nestId!);
     return done;
   }
 
@@ -807,15 +829,23 @@ export class NestStore {
     return this.talk(nestId, 1).find((request) => request.open) ?? null;
   }
 
-  // Adds to the open request, or starts one. Berry's say what kind they are, and the user's how many cards they asked
-  // about, when it was only the ones they'd selected.
-  say(nestId: string, role: "user" | "berry", text: string, what: { kind?: NestTalkMessage["kind"]; planned?: number; about?: number } = {}): void {
+  // Adds to the open request, or starts one. Berry's say what kind they are, and the user's which cards they asked about,
+  // when it was only the ones they'd selected.
+  say(nestId: string, role: "user" | "berry", text: string, what: { kind?: NestTalkMessage["kind"]; planned?: number; about?: readonly string[] } = {}): void {
     let open = this.db.prepare("SELECT id FROM requests WHERE nest_id = ? AND open = 1").get(nestId) as { id: string } | undefined;
     if (!open) {
       open = { id: randomUUID() };
       this.db.prepare("INSERT INTO requests (id, nest_id, open) VALUES (?, ?, 1)").run(open.id, nestId);
     }
-    this.db.prepare("INSERT INTO talk (request_id, role, text, kind, planned, about) VALUES (?, ?, ?, ?, ?, ?)").run(open.id, role, text, what.kind ?? null, what.planned ?? null, what.about ?? null);
+    this.db.prepare("INSERT INTO talk (request_id, role, text, kind, planned, about) VALUES (?, ?, ?, ?, ?, ?)").run(open.id, role, text, what.kind ?? null, what.planned ?? null, what.about ? JSON.stringify(what.about) : null);
+  }
+
+  // The cards each of the user's messages in the open request asked about, null for one that read the whole board.
+  openScopes(nestId: string): (string[] | null)[] {
+    const rows = this.db
+      .prepare("SELECT talk.about AS about FROM talk JOIN requests ON requests.id = talk.request_id WHERE requests.nest_id = ? AND requests.open = 1 AND talk.role = 'user' ORDER BY talk.rowid")
+      .all(nestId) as { about: string | null }[];
+    return rows.map(({ about }) => (about === null ? null : (JSON.parse(about) as string[])));
   }
 
   // One of Berry's answers about the board in this Nest, by its message's id. Null for anything else.
@@ -985,6 +1015,12 @@ export class NestStore {
         )
         .run(randomUUID(), cardId, fileCardId, fileCardId, cardId).changes > 0
     );
+  }
+
+  // A card's own copies of these file's cards' files go, as a line it took them through goes.
+  dropCopies(cardId: string, fileCardIds: readonly string[]): void {
+    const drop = this.db.prepare("DELETE FROM attachments WHERE card_id = ? AND via_card = ?");
+    for (const fileCardId of fileCardIds) drop.run(cardId, fileCardId);
   }
 
   // Where a file or note is: its Nest, and its card or null for the composer.

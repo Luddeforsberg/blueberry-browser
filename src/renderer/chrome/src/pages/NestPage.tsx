@@ -3,6 +3,7 @@ import {
     applyNodeChanges,
     Background,
     BackgroundVariant,
+    SelectionMode,
     ReactFlow,
     ReactFlowProvider,
     useReactFlow,
@@ -30,7 +31,8 @@ import { Attachments, useAttaching } from '../components/NestAttachments'
 import { MAX_INPUTS, type PickedRows } from '@shared/nestTable'
 import { droppedAddress, pageName } from '@shared/nestPages'
 import { TAB_DROP_EVENT } from '../components/useTabDrag'
-import { CardView, draftText, GhostSweep, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type RowSelection } from '../components/NestCard'
+import { CardView, draftText, GhostSweep, LINE_AT, LineView, NestBoardContext, PullingLine, setDraftText, type CardNode, type LineEdge, type NestBoardActions, type PullState, type RowSelection } from '../components/NestCard'
+import { useChatThreads } from '../contexts/ChatContext'
 import {
     besideSpot,
     CARD_GAP,
@@ -64,6 +66,8 @@ const EDGE_INSET = { x: 64, y: 88 }
 const VIEW_INSETS: Insets = { top: 72, right: 48, bottom: 128, left: 48 }
 // Where a pulled line meets a new card, so the card's top sits a little above the pointer.
 const DROP_ABOVE = 60
+// How near a card's input dot, on screen, a line let go counts as dropped on that card, since its lines end just outside.
+const DOT_REACH = 40
 const DOTS = { gap: 20, size: 1.2 }
 // How tall a planned card is taken to be, as main places a plan, for the shapes shown while Berry plans.
 const PLANNED_HEIGHT = 180
@@ -126,12 +130,13 @@ const toNodes = (
         }
     })
 
-// The cards a draft or planned card could also read from: any with something to give, or for a planned card another of
-// the plan, that it doesn't read from already and that doesn't read from it. Main checks it again.
+// The cards a draft, planned or sent card could also read from: any with something to give, or for a planned card another
+// of the plan, that it doesn't read from already and that doesn't read from it. Main checks it again, and refuses a sent
+// card while it works.
 const inputCandidates = (board: NestBoard, cardId: string): NestCard[] => {
     const card = board.cards.find((each) => each.id === cardId)
     const into = board.lines.filter((line) => line.to === cardId)
-    if (!card || card.chatId || card.each || card.table || card.file || card.page || card.note || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
+    if (!card || card.each || card.table || card.file || card.page || card.note || card.plan?.state === 'armed' || into.length >= MAX_INPUTS) return []
     const after = new Set<string>([cardId])
     for (let grew = true; grew; ) {
         grew = false
@@ -156,21 +161,37 @@ const pickedOf = (selection: RowSelection | null, cardId: string): PickedRows | 
         ? { header: selection.table.header, rows: selection.rows.map((index) => selection.table.rows[index]) }
         : undefined
 
-const toEdges = (board: NestBoard): LineEdge[] =>
-    board.lines.map((line) => ({
-        id: line.id,
-        source: line.from,
-        target: line.to,
-        sourceHandle: 'out',
-        targetHandle: 'in',
-        type: 'line',
-        focusable: false,
-        selectable: false,
-        data: {
-            draft: !board.cards.some((card) => card.id === line.to && (card.chatId || card.each || card.file || card.page)),
-            view: board.cards.some((card) => card.id === line.to && card.page)
+// A line the user may take away goes into a card they still send from: a draft, a planned or held card, or a sent one.
+// Never into a For-each card, whose runs read it, a card of a plan waiting to start, or a file or page card, whose line
+// only says where it came from. Main checks it again.
+const removable = (card: NestCard | undefined) => !!card && !card.each && !card.file && !card.page && !card.note && card.plan?.state !== 'armed'
+
+const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[] =>
+    board.lines.map((line) => {
+        const to = board.cards.find((card) => card.id === line.to)
+        const from = board.cards.find((card) => card.id === line.from)
+        const canRemove = removable(to)
+        return {
+            id: line.id,
+            source: line.from,
+            target: line.to,
+            sourceHandle: 'out',
+            targetHandle: 'in',
+            type: 'line',
+            focusable: canRemove,
+            // Never one of React Flow's selected elements: the board picks a line itself, and selection is for cards.
+            selectable: false,
+            // A drawing even when the keyboard can reach it, so it's never taken for one of the cards, which are groups.
+            ariaRole: 'img',
+            ariaLabel: canRemove && from && to ? `The line from ${label(from)} into ${label(to)}. Press Delete to take it away.` : undefined,
+            data: {
+                draft: !(to && (to.chatId || to.each || to.file || to.page)),
+                view: !!to?.page,
+                ...(line.fresh ? { fresh: true } : {}),
+                ...(canRemove ? { removable: true } : {})
+            }
         }
-    }))
+    })
 
 // Where each Nest was last looked at, so going to another tab and back keeps the place. Memory only.
 const lastViewport = new Map<string, Viewport>()
@@ -399,7 +420,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [find, berryName]
     )
     const [nodes, setNodes] = useState<CardNode[]>(() => toNodes(board, null, [], label))
-    const edges = useMemo(() => toEdges(board), [board])
+    const edges = useMemo(() => toEdges(board, label), [board, label])
     // Cards selected on the board, which the composer then asks about alone: Shift or ⌘ and a press on a card's header or
     // bird, or Shift and a drag on empty board. Only those select, so a plain press on a card, or Enter on one, does what
     // it always has. Set as each press starts, and gone with any key.
@@ -446,6 +467,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     const wrapper = useRef<HTMLDivElement>(null)
     const pulling = useRef<string | null>(null)
     const api = window.chromeAPI.nests
+    // The line being pulled, and the card it would go into if let go now.
+    const [pull, setPull] = useState<{ from: string; over: string | null } | null>(null)
+    const [dropProblem, setDropProblem] = useState<{ cardId: string; text: string } | null>(null)
+    const [selectedLine, setSelectedLine] = useState<string | null>(null)
+    // Whether a sent card is working, only looked at while a line is pulled, since it can't take one then.
+    const sentChats = useMemo(() => (pull ? board.cards.flatMap((card) => (card.chatId ? [card.chatId] : [])) : []), [pull, board.cards])
+    const sentThreads = useChatThreads(sentChats)
 
     // The card whose corner is being dragged, which neither the board's updates nor settling may move or size meanwhile,
     // and where it was when the drag began, which says what's in its way.
@@ -728,6 +756,90 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         [api, board.id]
     )
 
+    // The card a line let go here goes into: the one under the pointer, or the one whose input dot it's near, where its
+    // lines end just outside its edge, or the one a line under the pointer goes into, when nearer that end.
+    const cardAt = useCallback(
+        (x: number, y: number): string | null => {
+            const hit = document.elementFromPoint(x, y) as HTMLElement | null
+            const onNode = hit?.closest<HTMLElement>('.react-flow__node')?.dataset.id
+            if (onNode) return onNode
+            const zoom = flow.getZoom()
+            const dotOf = (id: string) => {
+                const node = flow.getInternalNode(id)
+                const at = node ? flow.flowToScreenPosition(node.internals.positionAbsolute) : null
+                return at ? { x: at.x, y: at.y + LINE_AT * zoom } : null
+            }
+            let near: string | null = null
+            let nearest = DOT_REACH
+            for (const card of board.cards) {
+                const dot = dotOf(card.id)
+                const away = dot ? Math.hypot(x - dot.x, y - dot.y) : Infinity
+                if (away < nearest) {
+                    near = card.id
+                    nearest = away
+                }
+            }
+            if (near) return near
+            const lineId = hit?.closest<SVGElement>('.react-flow__edge')?.dataset.id
+            const line = board.lines.find((each) => each.id === lineId)
+            const source = line && flow.getInternalNode(line.from)
+            const into = line && dotOf(line.to)
+            if (!line || !source || !into) return null
+            const out = flow.flowToScreenPosition({ x: source.internals.positionAbsolute.x + (source.measured.width ?? CARD_WIDTH), y: source.internals.positionAbsolute.y + LINE_AT })
+            return Math.hypot(x - into.x, y - into.y) < Math.hypot(x - out.x, y - out.y) ? line.to : null
+        },
+        [flow, board.cards, board.lines]
+    )
+    // Every card a line from `from` could go into now, as main would take it, less a sent card that's working.
+    const pullState = useMemo((): PullState | null => {
+        if (!pull) return null
+        const accepts = board.cards.filter(
+            (card) =>
+                !(card.chatId && sentThreads[card.chatId]?.partial != null) &&
+                inputCandidates(board, card.id).some((each) => each.id === pull.from)
+        )
+        return { ...pull, accepts: new Set(accepts.map((card) => card.id)) }
+    }, [pull, board, sentThreads])
+    // While a line is pulled, which card it's over, once a frame.
+    useEffect(() => {
+        if (!pull) return undefined
+        let frame: number | null = null
+        const move = (event: PointerEvent) => {
+            if (frame !== null) cancelAnimationFrame(frame)
+            const { clientX, clientY } = event
+            frame = requestAnimationFrame(() => {
+                frame = null
+                const over = cardAt(clientX, clientY)
+                setPull((current) => (current && current.over !== over ? { ...current, over } : current))
+            })
+        }
+        window.addEventListener('pointermove', move)
+        return () => {
+            window.removeEventListener('pointermove', move)
+            if (frame !== null) cancelAnimationFrame(frame)
+        }
+    }, [pull, cardAt])
+    // A card's refusal stays until the next press anywhere.
+    useEffect(() => {
+        if (!dropProblem) return undefined
+        const clear = () => setDropProblem(null)
+        window.addEventListener('pointerdown', clear, { once: true })
+        return () => window.removeEventListener('pointerdown', clear)
+    }, [dropProblem])
+    const removeLine = useCallback(
+        (lineId: string) => {
+            setSelectedLine(null)
+            void api.removeInput(lineId).then((result) => setProblem(result.ok ? null : result.error))
+        },
+        [api]
+    )
+
+    // While a line is pulled, the cards that wouldn't take it step back a little. The one it comes from stays as it is.
+    const shownNodes = useMemo(
+        () => (pullState ? nodes.map((node) => (node.id === pullState.from || pullState.accepts.has(node.id) ? node : { ...node, className: 'nest-drop-dim' })) : nodes),
+        [nodes, pullState]
+    )
+
     const actions = useMemo<NestBoardActions>(
         () => ({
             openId,
@@ -782,9 +894,13 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 setNodes((current) => current.map((each) => (each.id === cardId ? { ...each, ...size, data: { card: { ...each.data.card, size } } } : each)))
                 void api.resizeCard(cardId, Math.round(size.width), Math.round(size.height))
             },
-            watchPage
+            watchPage,
+            pull: pullState,
+            dropProblem,
+            selectedLine,
+            removeLine
         }),
-        [openId, openRunId, open, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection, away, planning, pending, watchPage]
+        [openId, openRunId, open, focusId, board, rects, flow, add, api, dropEmptyDrafts, selection, away, planning, pending, watchPage, pullState, dropProblem, selectedLine, removeLine]
     )
 
     // A line pulled out to an empty spot leaves a new card there. A click on the handle never gets here: it's under the
@@ -793,14 +909,16 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
         (event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
             const from = pulling.current ?? state.fromNode?.id
             pulling.current = null
+            setPull(null)
             if (!from || state.isValid) return
             const point = 'changedTouches' in event ? event.changedTouches[0] : event
             const picked = pickedOf(selection, from)
-            // Dropped on a draft or a planned card, it's one more input there.
-            const onCard = (document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null)?.closest<HTMLElement>('.react-flow__node')?.dataset.id
-            if (onCard && onCard !== from && inputCandidates(board, onCard).some((card) => card.id === from)) {
+            // Let go on a card, it's one more input there, or the card says why it can't be.
+            const onCard = cardAt(point.clientX, point.clientY)
+            if (onCard) {
+                if (onCard === from) return
                 setSelection(null)
-                void api.addInput(onCard, from, picked).then((result) => setProblem(result.ok ? null : result.error))
+                void api.addInput(onCard, from, picked).then((result) => setDropProblem(result.ok ? null : { cardId: onCard, text: result.error }))
                 return
             }
             const at = flow.screenToFlowPosition({ x: point.clientX, y: point.clientY })
@@ -808,7 +926,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             setSelection(null)
             void add({ x: at.x, y: at.y - DROP_ABOVE }, { from, picked })
         },
-        [flow, add, dropEmptyDrafts, selection, board, api]
+        [flow, add, dropEmptyDrafts, selection, api, cardAt]
     )
 
     const paneClick = useCallback(
@@ -821,13 +939,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
             // A click on the board closes the drawer, or lets selected cards go, which React Flow has just done, and
             // nothing else.
             if (drawerOpen) return closeDrawer(false)
+            if (selectedLine) return setSelectedLine(null)
             if (openId) return open(null)
             if (nodes.some((node) => node.selected)) return
             const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY })
             dropEmptyDrafts()
             void add({ x: at.x - 32, y: at.y - 24 })
         },
-        [openId, open, flow, add, dropEmptyDrafts, drawerOpen, closeDrawer, nodes]
+        [openId, open, flow, add, dropEmptyDrafts, drawerOpen, closeDrawer, nodes, selectedLine]
     )
 
     // `/` while the board has the keyboard and no field does opens the drawer, or brings the tucked composer back. Esc
@@ -870,6 +989,14 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
     // the × does.
     const onKeyDown = (event: React.KeyboardEvent) => {
         const target = event.target as HTMLElement
+        // A line pressed or reached from the keyboard: Delete takes it away, and Escape lets it go.
+        const lineId = target.closest<SVGElement>('.react-flow__edge')?.dataset.id
+        if (lineId && (event.key === 'Backspace' || event.key === 'Delete')) {
+            event.preventDefault()
+            if (edges.some((edge) => edge.id === lineId && edge.data?.removable)) removeLine(lineId)
+            return
+        }
+        if (lineId && event.key === 'Escape') return setSelectedLine(null)
         const node = target.closest<HTMLElement>('.react-flow__node')
         if (!node || target !== node) return
         const cardId = node.dataset.id
@@ -1000,12 +1127,16 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     const target = event.target as Element
                     selectGesture.current =
                         (event.shiftKey || event.metaKey || event.ctrlKey) &&
-                        (!!target.closest('.react-flow__pane') || (!!target.closest('.nest-drag') && !target.closest('button, a, input, textarea')))
+                        (target.classList.contains('react-flow__pane') || (!!target.closest('.nest-drag') && !target.closest('button, a, input, textarea')))
                 }}
                 onKeyDownCapture={(event) => {
                     selectGesture.current = false
                     // Arrow keys never move a selected card, which nothing would save.
                     if (event.key.startsWith('Arrow') && (event.target as Element).classList.contains('react-flow__node')) event.stopPropagation()
+                }}
+                onFocus={(event) => {
+                    const lineId = (event.target as Element).closest<SVGElement>('.react-flow__edge')?.dataset.id
+                    if (lineId && edges.some((edge) => edge.id === lineId && edge.data?.removable)) setSelectedLine(lineId)
                 }}
                 onDragEnter={(event) => {
                     if (!droppable(event)) return
@@ -1025,7 +1156,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                 onDrop={(event) => void dropFiles(event)}
             >
                 <ReactFlow<CardNode, LineEdge>
-                    nodes={nodes}
+                    nodes={shownNodes}
                     edges={edges}
                     nodeTypes={NODE_TYPES}
                     edgeTypes={EDGE_TYPES}
@@ -1046,7 +1177,11 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     onConnectStart={(_, { nodeId }) => {
                         pulling.current = nodeId
                         if (drawerOpen) closeDrawer(false)
+                        setDropProblem(null)
+                        setSelectedLine(null)
+                        if (nodeId) setPull({ from: nodeId, over: null })
                     }}
+                    onEdgeClick={(_, edge) => setSelectedLine(edge.data?.removable ? edge.id : null)}
                     onConnectEnd={connectEnd}
                     connectionLineComponent={PullingLine}
                     connectionDragThreshold={6}
@@ -1066,6 +1201,7 @@ const Board: React.FC<{ board: NestBoard }> = ({ board }) => {
                     elevateNodesOnSelect={false}
                     deleteKeyCode={null}
                     selectionKeyCode="Shift"
+                    selectionMode={SelectionMode.Partial}
                     multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
                     ariaLabelConfig={CARD_KEYS}
                     autoPanOnNodeFocus

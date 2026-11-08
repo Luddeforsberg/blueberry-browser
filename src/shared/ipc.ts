@@ -572,6 +572,7 @@ export interface InvokeChannels {
   "nests:add-card": { region: "chrome"; args: [nestId: string, card: NestNewCard]; result: NestCard | null };
   // Another card as one more input on a draft or a planned card, with the rows picked from it if any. Main checks it.
   "nests:add-input": { region: "chrome"; args: [cardId: string, fromId: string, picked?: PickedRows]; result: NestSendEachResult };
+  "nests:remove-input": { region: "chrome"; args: [lineId: string]; result: NestSendEachResult };
   // Retry the runs of a For-each card that didn't finish, or start the ones that didn't start. `warn` asks to confirm first.
   "nests:retry-runs": { region: "chrome"; args: [cardId: string, which: "unfinished" | "unstarted", confirmed: boolean]; result: NestRetryResult };
   "nests:move-card": { region: "chrome"; args: [cardId: string, x: number, y: number]; result: boolean };
@@ -869,6 +870,7 @@ export interface NestsAPI {
   showMenu: (nestId: string) => Promise<"rename" | null>;
   addCard: (nestId: string, card: NestNewCard) => Promise<NestCard | null>;
   addInput: (cardId: string, fromId: string, picked?: PickedRows) => Promise<NestSendEachResult>;
+  removeInput: (lineId: string) => Promise<NestSendEachResult>;
   retryRuns: (cardId: string, which: "unfinished" | "unstarted", confirmed: boolean) => Promise<NestRetryResult>;
   moveCard: (cardId: string, x: number, y: number) => Promise<boolean>;
   // The size the user made a card from its corner.
