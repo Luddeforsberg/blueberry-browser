@@ -48,6 +48,9 @@ describe("what changed since you were here", () => {
     expect(parseSince("- Scout found **12** candidates\n2. [Writer](https://evil.example) didn’t finish\n• Hub waits for you\nA fourth line")).toBe(
       "Scout found 12 candidates\nWriter didn’t finish\nHub waits for you"
     );
+    expect(parseSince("Berry: “14 candidates, 6 strong” found two more\nScout: Rivals didn’t finish\nDone: 3 drafts", ["Berry", "Scout"])).toBe(
+      "“14 candidates, 6 strong” found two more\nRivals didn’t finish\nDone: 3 drafts"
+    );
     expect(parseSince("a".repeat(160))).toBe("a".repeat(160));
     expect(parseSince(`${"word ".repeat(40)}`)!.length).toBeLessThanOrEqual(160);
     expect(parseSince(`${"word ".repeat(40)}`)!.endsWith("…")).toBe(true);

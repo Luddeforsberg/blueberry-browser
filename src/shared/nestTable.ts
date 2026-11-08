@@ -1,5 +1,6 @@
 // Markdown tables in a Nest card's answer: which one is the card's result, its rows, and how rows go back to markdown
 // when they're passed to another card. Shared by main, which decides what's sent, and the chrome, which draws it.
+import { named, whose, type Who } from "./nestNames";
 
 export interface Table {
   header: string[];
@@ -424,21 +425,21 @@ const beforeLost = (before: Before | undefined) => (before && before.leftOut > 0
 
 // "Scout’s answer, about 900 words", "Scout’s thread (2 answers) and 1 card before it, about 1,800 words", "12 rows,
 // 3 columns from Writer", with anything left out or cut said plainly.
-export const crossingWords = (crossing: Crossing, who: string): string => {
+export const crossingWords = (crossing: Crossing, who: Who): string => {
   const { before } = crossing;
   const cardsBefore = before && before.cards > 0 ? counted(before.cards, "card") + " before it" : null;
   if (crossing.kind === "page") return `1 ${crossing.read ? "page" : "link"}: ${crossing.name}`;
-  if (crossing.kind === "note") return `${who}, ${aboutWords(crossing.words)}${lossWords([], crossing.cut)}`;
+  if (crossing.kind === "note") return `${named(who)}, ${aboutWords(crossing.words)}${lossWords([], crossing.cut)}`;
   if (crossing.kind === "versions") {
-    const own = `${who}’s ${counted(crossing.versions, "version")}, none picked`;
+    const own = `${whose(who, counted(crossing.versions, "version"))}, none picked`;
     return `${own}${cardsBefore ? ` and ${cardsBefore}` : ""}, ${aboutWords(crossing.words + (before?.words ?? 0))}${lossWords(beforeLost(before), crossing.cut || !!before?.cut)}`;
   }
   if (crossing.kind === "thread") {
-    const own = crossing.answers === 1 ? `${who}’s answer` : `${who}’s thread (${counted(crossing.answers, "answer")})`;
+    const own = crossing.answers === 1 ? whose(who, "answer") : `${whose(who, "thread")} (${counted(crossing.answers, "answer")})`;
     const lost = [...(crossing.earlier > 0 ? [counted(crossing.earlier, "earlier answer")] : []), ...beforeLost(before)];
     return `${own}${cardsBefore ? ` and ${cardsBefore}` : ""}, ${aboutWords(crossing.words + (before?.words ?? 0))}${lossWords(lost, crossing.cut || !!before?.cut)}`;
   }
-  const shape = `${counted(crossing.rows, "row")}, ${counted(crossing.columns, "column")} from ${who}`;
+  const shape = `${counted(crossing.rows, "row")}, ${counted(crossing.columns, "column")} from ${named(who)}`;
   const lost = [...(crossing.leftOut > 0 ? [counted(crossing.leftOut, "more row")] : []), ...beforeLost(before)];
   return `${shape}${cardsBefore ? `, and ${cardsBefore}, ${aboutWords(before!.words)}` : ""}${lossWords(lost, !!before?.cut)}`;
 };
@@ -457,7 +458,7 @@ export const filesWords = ({ names, leftOut }: FilesCrossing): string => {
 };
 
 // What crosses a line, in words: the card's part, and the files that come with it.
-export const lineWords = (crossing: Pick<LineCrossing, "whole" | "files">, who: string): string | null => {
+export const lineWords = (crossing: Pick<LineCrossing, "whole" | "files">, who: Who): string | null => {
   const files = crossing.files && (crossing.files.names.length > 0 || crossing.files.leftOut.length > 0) ? filesWords(crossing.files) : null;
   const own = crossing.whole ? crossingWords(crossing.whole, who) : null;
   if (own && files) return `${own}, and ${files}`;

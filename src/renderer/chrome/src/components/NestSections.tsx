@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useReactFlow, useStore } from '@xyflow/react'
 import { Group, SquareDashed, X } from 'lucide-react'
 import type { NestSection } from '@shared/library'
-import { drawnSection, nameSize, resizeSection, SECTION_COLORS, type NestSectionColor, type SectionCorner } from '@shared/nestSections'
+import { drawnSection, NAME_BOX, resizeSection, SECTION_COLORS, sectionNameSize, type NestSectionColor, type SectionCorner } from '@shared/nestSections'
+import { PERCH } from '../nestBoard'
 import type { Rect } from '@shared/nestPlace'
 import { cn } from '@common/lib/utils'
 
@@ -31,8 +32,6 @@ const COLOR_NAME: Record<NestSectionColor, string> = { yellow: 'Yellow', green: 
 
 // How far a press on a name may move and still be a click, in screen pixels.
 const CLICK = 4
-// Where the bottom of a section's name sits, from the section's top edge. A bigger name, zoomed out, grows up from here.
-const NAME_BOTTOM = 36
 const CORNERS: SectionCorner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 
 const rectOf = (section: NestSection): Rect => ({ x: section.x, y: section.y, width: section.width, height: section.height })
@@ -144,13 +143,16 @@ export const SectionLayer: React.FC<SectionLayerProps> = ({ sections, selectedId
         element.addEventListener('pointercancel', up)
     }
 
-    const fontSize = nameSize(zoom)
     // Controls that stay one size on screen, whatever the zoom.
     const steady = 1 / zoom
     return (
         <div className="pointer-events-none absolute left-0 top-0" style={{ zIndex: -1 }}>
             {shown.map((section) => {
                 const selected = section.id === selectedId
+                // The name grows zoomed out, but stops short of the highest bird in the section.
+                const tops = inside(section.id).cards.map((card) => card.y)
+                const fontSize = sectionNameSize(zoom, tops.length > 0 ? Math.min(...tops) - PERCH.size - section.y : null, section.height)
+                const inset = fontSize * NAME_BOX.inset
                 return (
                     <div
                         key={section.id}
@@ -158,7 +160,7 @@ export const SectionLayer: React.FC<SectionLayerProps> = ({ sections, selectedId
                         className={cn('absolute left-0 top-0 rounded-panel border', FILL[section.color], selected && 'ring-2 ring-accent-ink')}
                         style={{ transform: `translate(${section.x}px, ${section.y}px)`, width: section.width, height: section.height }}
                     >
-                        <div className="absolute left-3 flex items-end" style={{ top: NAME_BOTTOM, transform: 'translateY(-100%)', maxWidth: 'calc(100% - 24px)' }}>
+                        <div className="absolute flex" style={{ top: inset, left: inset, maxWidth: `calc(100% - ${2 * inset}px)` }}>
                             {section.id === renamingId ? (
                                 <SectionNameField section={section} fontSize={fontSize} onDone={() => onRenaming(null)} />
                             ) : (

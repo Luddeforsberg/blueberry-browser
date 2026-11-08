@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CARD_HEIGHT, CARD_WIDTH } from "./nestPlace";
-import { cardsIn, drawnSection, fitSection, inSection, nameSize, nextColor, planSection, resizeSection, SECTION_DEFAULT, SECTION_PAD, SECTION_SIZE, sectionName, sectionsIn } from "./nestSections";
+import { cardsIn, drawnSection, fitSection, inSection, NAME_BOX, nameSize, nextColor, planSection, resizeSection, SECTION_DEFAULT, SECTION_PAD, SECTION_SIZE, sectionName, sectionNameSize, sectionsIn } from "./nestSections";
 
 const section = { x: 0, y: 0, width: 1000, height: 600 };
 // A card whose centre is at (cx, cy), at the usual size.
@@ -111,5 +111,33 @@ describe("nameSize", () => {
     expect(nameSize(0.25) * 0.25).toBe(26);
     expect(nameSize(0.5) * 0.5).toBeGreaterThan(13);
     expect(nameSize(0.5) * 0.5).toBeLessThan(26);
+  });
+});
+
+describe("sectionNameSize", () => {
+  const box = NAME_BOX.inset + NAME_BOX.height;
+  const tall = 10_000;
+  it("grows as nameSize does while there's room above the highest bird and in the section", () => {
+    expect(sectionNameSize(0.5, null, tall)).toBe(nameSize(0.5));
+    expect(sectionNameSize(0.5, 1000, tall)).toBe(nameSize(0.5));
+    expect(sectionNameSize(1, 60, tall)).toBe(13);
+  });
+
+  it("stops where its box, inset included, would reach the highest bird", () => {
+    const size = sectionNameSize(0.5, 60, tall);
+    expect(size).toBeLessThan(nameSize(0.5));
+    expect(size * box).toBeCloseTo(60);
+  });
+
+  it("fits its box and an inset under it in the section, the smallest one at the furthest zoom too", () => {
+    const size = sectionNameSize(0.25, null, SECTION_SIZE.minHeight);
+    expect(size * (box + NAME_BOX.inset)).toBeLessThanOrEqual(SECTION_SIZE.minHeight);
+    expect(size * 0.25).toBeGreaterThanOrEqual(13);
+  });
+
+  it("is never under 13px on screen, even with no room", () => {
+    expect(sectionNameSize(0.25, 60, tall) * 0.25).toBe(13);
+    expect(sectionNameSize(0.25, 0, tall) * 0.25).toBe(13);
+    expect(sectionNameSize(0.25, -40, tall) * 0.25).toBe(13);
   });
 });

@@ -92,6 +92,19 @@ export const nameSize = (zoom: number): number => {
   return onScreen / zoom;
 };
 
+// A section's name in its box, in the name's own size: how far it sits in from the section's top and left edges, so the
+// inset grows with the name and it never reaches the edge, and how tall it is with its padding, at a line height of 1.25.
+export const NAME_BOX = { inset: 0.6, height: 1.55 };
+
+// The name's size, as `nameSize` has it, but never so big that its box reaches `room` board pixels down from the
+// section's top, where the highest bird in it stands, so no card covers it, or that its box and an inset under it are
+// taller than the section, and never under 13px on screen, which the smallest section has room for. Null room, for a
+// section with no cards, leaves only its height.
+export const sectionNameSize = (zoom: number, room: number | null, height: number): number => {
+  const fits = Math.min(height / (2 * NAME_BOX.inset + NAME_BOX.height), room === null ? Infinity : room / (NAME_BOX.inset + NAME_BOX.height));
+  return Math.max(13 / zoom, Math.min(nameSize(zoom), fits));
+};
+
 // The section a plan's cards go in: one fitted around them when the plan is two cards or more, named by the plan or else
 // by the request, with the next free colour. One card gets none.
 export const planSection = (cards: readonly Rect[], name: string, taken: readonly NestSectionColor[]): Omit<NestSection, "id"> | null => {

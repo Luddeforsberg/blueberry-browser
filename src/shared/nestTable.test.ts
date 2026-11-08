@@ -215,6 +215,7 @@ describe("what crosses a line, in words", () => {
   it("says a card's answer in words, rounded, and a thread by its answers, with what was left out or cut", () => {
     const thread = (words: number, extra: object = {}) => ({ kind: "thread" as const, answers: 1, earlier: 0, words, cut: false, ...extra });
     expect(crossingWords(thread(1), "Scout")).toBe("Scout’s answer, 1 word");
+    expect(crossingWords(thread(14, { answers: 2 }), { text: "“14 candidates”", titled: true })).toBe("the “14 candidates” thread (2 answers), 14 words");
     expect(crossingWords(thread(19), "Scout")).toBe("Scout’s answer, 19 words");
     expect(crossingWords(thread(904), "Scout")).toBe("Scout’s answer, about 900 words");
     expect(crossingWords(thread(2437, { cut: true }), "Scout")).toBe("Scout’s answer, about 2,400 words, with some of it cut to fit");

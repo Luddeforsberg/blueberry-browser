@@ -2,6 +2,7 @@ import type { ChatThread } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 import { latestAnswer } from "./nestContext";
 import { MAX_INPUTS } from "../shared/nestTable";
+import { named, whose, type Who } from "../shared/nestNames";
 import { sectionName } from "../shared/nestSections";
 
 // Berry plans a request in a Nest's composer as cards: this checks what the model laid out, and decides when each card of
@@ -164,14 +165,14 @@ export type SourceState =
   // No line.
   | { kind: "none" }
   // A card of the plan that hasn't started yet.
-  | { kind: "planned"; name: string }
+  | { kind: "planned"; name: Who }
   // A card of the plan that didn't start, and says why.
-  | { kind: "held"; name: string }
-  | { kind: "running"; name: string }
-  | { kind: "answered"; name: string }
-  | { kind: "failed"; name: string }
-  | { kind: "stopped"; name: string }
-  | { kind: "silent"; name: string };
+  | { kind: "held"; name: Who }
+  | { kind: "running"; name: Who }
+  | { kind: "answered"; name: Who }
+  | { kind: "failed"; name: Who }
+  | { kind: "stopped"; name: Who }
+  | { kind: "silent"; name: Who };
 
 // What a card of a plan that's been run does now: start, keep waiting, wait for the user to say its source's answer is
 // right, or not start, saying why. Only a plan the user ran gets here, so starting is always because they pressed Run, and
@@ -188,13 +189,13 @@ export const armedStep = (source: SourceState, waits: boolean, confirmed = false
     case "answered":
       return !waits || confirmed ? { do: "start" } : { do: "confirm" };
     case "held":
-      return { do: "hold", note: `Didn’t start, because ${source.name}’s card didn’t start` };
+      return { do: "hold", note: `Didn’t start, because ${whose(source.name, "card")} didn’t start` };
     case "failed":
-      return { do: "hold", note: `Didn’t start, because ${source.name} didn’t finish` };
+      return { do: "hold", note: `Didn’t start, because ${named(source.name)} didn’t finish` };
     case "stopped":
-      return { do: "hold", note: `Didn’t start, because ${source.name} was stopped` };
+      return { do: "hold", note: `Didn’t start, because ${named(source.name)} was stopped` };
     case "silent":
-      return { do: "hold", note: `Didn’t start, because ${source.name} didn’t answer` };
+      return { do: "hold", note: `Didn’t start, because ${named(source.name)} didn’t answer` };
   }
 };
 
@@ -202,7 +203,7 @@ export const CLOSED_BEFORE_START = "Didn’t start, because Blueberry closed bef
 
 // How a sent card's chat stands for the cards after it, from its thread as it is now.
 export const replyState = (
-  name: string,
+  name: Who,
   running: boolean,
   thread: Pick<ChatThread, "error" | "messages"> | null
 ): Extract<SourceState, { kind: "running" | "answered" | "failed" | "stopped" | "silent" }> => {
@@ -218,7 +219,7 @@ export const replyState = (
 // The same for a For-each card: still going while any run is, then stopped if any run was, failed if any run didn't
 // finish, and otherwise answered.
 export const runsState = (
-  name: string,
+  name: Who,
   runs: readonly { state: "waiting" | "started" | "stopped" | "failed"; running: boolean; thread: Pick<ChatThread, "error" | "messages"> | null }[]
 ): SourceState => {
   if (runs.some((run) => run.state === "waiting" || run.running)) return { kind: "running", name };
