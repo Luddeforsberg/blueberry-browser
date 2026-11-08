@@ -8,12 +8,12 @@ import { useShell } from '../contexts/ShellContext'
 // card or the keyboard is in it. Counts only, as main counted them. Nothing while a line is pulled or the card is open,
 // and nothing on a card no line goes into that got nothing, which would only say so on every card.
 const knowsNothing = (knows: NonNullable<NestCard['knows']>) =>
-    knows.cards + knows.pages + knows.links + knows.files + knows.notes + knows.leftOutCards + knows.leftOutFiles === 0
+    knows.cards + knows.pages + knows.files + knows.notes + knows.leftOutCards + knows.leftOutFiles === 0
 
 export const KnowsLine: React.FC<{ card: NestCard; hidden: boolean; inputs: number }> = ({ card, hidden, inputs }) =>
     card.knows && !hidden && !(inputs === 0 && knowsNothing(card.knows)) ? (
         <p data-nest-knows className="pointer-events-none absolute right-3 bottom-full mb-1.5 max-w-[calc(100%-96px)] truncate rounded-control bg-canvas/80 px-1 text-12 text-muted-foreground">
-            {knowsWords(card.knows, !!card.each)}
+            {knowsWords(card.knows, !!card.each || !!card.plan?.each)}
         </p>
     ) : null
 
@@ -41,7 +41,7 @@ export const LinePopover: React.FC<{ from: string; crosses: NestLine['crosses'];
         <p className="text-13 font-semibold truncate">From {from}</p>
         <p className="text-13 mt-0.5">{throughWords(crosses, from, forEach)}</p>
         {crosses && !crosses.stale && (crosses.whole || crosses.each || crosses.shared || crosses.files) && (
-            <p className="text-12 text-muted-foreground mt-1">{lineCut(crosses) ? 'Some of it is cut to fit' : 'Nothing cut'}</p>
+            <p className="text-12 text-muted-foreground mt-1">{lineCut(crosses, forEach) ? 'Some of it is cut to fit' : 'Nothing cut'}</p>
         )}
         {fresh && <p className="text-12 text-muted-foreground mt-1">Goes from your next message</p>}
     </div>

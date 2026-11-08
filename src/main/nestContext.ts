@@ -521,26 +521,24 @@ export const beforeOf = (answers: readonly CardAnswer[]): Before => {
 };
 
 // What a card knows from outside its own thread, counted from exactly the parts that go, after any page was read when
-// `sent`, and the files and notes that go with them. Nothing of what's in any of it. A page whose text didn't come is a
-// link. Before it's sent, a page with an open tab counts as one its text will be read from.
+// `sent`, and the files and notes that go with them. Nothing of what's in any of it. A page whose tab's text was to be
+// read and didn't come, or came cut, is cut short. Before it's sent, whether a tab's text can be read isn't known yet,
+// so a page is only counted.
 export const knowsOf = (
   answers: readonly CardAnswer[],
   attachments: readonly SentAttachment[] | { files: number; notes: number; leftOutFiles: number },
   sent: boolean,
   at: number
 ): CardKnows => {
-  const knows: CardKnows = { sent, at, cards: 0, pages: 0, links: 0, files: 0, notes: 0, cut: 0, leftOutCards: 0, leftOutFiles: 0 };
+  const knows: CardKnows = { sent, at, cards: 0, pages: 0, files: 0, notes: 0, cut: 0, leftOutCards: 0, leftOutFiles: 0 };
   for (const answer of answers) {
     if (answer.dropped) {
       knows.leftOutCards++;
       continue;
     }
     if (answer.part === "page") {
-      const page = answer.page;
-      const read = sent ? !!page?.text : !!page?.tabId;
-      if (read) knows.pages++;
-      else knows.links++;
-      if (read && page?.cut) knows.cut++;
+      knows.pages++;
+      if (sent && (answer.page?.cut || answer.page?.why)) knows.cut++;
       continue;
     }
     if (answer.fromFile) knows.files++;

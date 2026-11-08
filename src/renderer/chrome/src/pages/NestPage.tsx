@@ -193,7 +193,7 @@ const toEdges = (board: NestBoard, label: (card: NestCard) => string): LineEdge[
                 ...(canRemove ? { removable: true } : {}),
                 // Pressed, it says what goes through it. A light runs along it whenever its card's message goes.
                 ...(reads ? { reads: true } : {}),
-                ...(to?.each ? { forEach: true } : {}),
+                ...(to?.each || to?.plan?.each ? { forEach: true } : {}),
                 ...(to?.knows?.sent ? { pulseAt: to.knows.at } : {})
             }
         }

@@ -216,18 +216,18 @@ export class Nests {
   private knowsFor(nestId: string, card: NestCard, cards: readonly NestCard[], lines: readonly NestLine[]): CardKnows | null {
     if (card.page || card.file || card.note || card.table) return null;
     if (card.chatId || card.each) return this.knows.get(card.id) ?? null;
-    const revision = this.chainRevision(card.id, cards, lines);
+    const revision = `${this.chainRevision(card.id, cards, lines)}|${!!card.plan?.each}`;
     const known = this.willKnow.get(card.id);
     if (known?.revision === revision) return known.value;
-    const input = this.inputFor(card.id);
+    const answers = card.plan?.each ? this.runKnows(card.id) : this.inputFor(card.id);
     const copied = this.store.copiedFrom(card.id);
     const { sends, leftOut } = this.filesFor(card.id);
     const own = card.attachments;
     const value =
-      "problem" in input
+      "problem" in answers
         ? null
         : knowsOf(
-            input.answers,
+            answers.answers,
             {
               // Its own files, copies it has already among them, and those its lines bring that it has no copy of yet.
               files: own.filter((each) => each.kind === "file").length + sends.filter((each) => !copied.has(each.card.id)).length,
@@ -239,6 +239,17 @@ export class Nests {
           );
     this.willKnow.set(card.id, { nestId, revision, value });
     return value;
+  }
+
+  // What a planned For-each card's runs will each get, counted for its longest row, as its line says.
+  private runKnows(cardId: string): CardInput {
+    const input = this.inputFor(cardId);
+    const rows = this.rowsFor(cardId);
+    if ("problem" in input) return input;
+    if ("problem" in rows) return rows;
+    const lines = this.store.linesTo(cardId);
+    const direct = lines.map((line) => ({ lineId: line.lineId, from: line.source.id, name: this.labelOf(line.source), input: this.lineInput(line) as RawInput | null }));
+    return { answers: this.longestRun(cardId, rows, direct).map(({ answer }) => answer) };
   }
 
   // Hears what a card's message went with as `Chats` builds it, so what the card says it knows is what went.
@@ -462,13 +473,7 @@ export class Nests {
     const each = new Map<string, LineCrossing["each"]>();
     const shared = new Map<string, LineCrossing["whole"]>();
     if (!("problem" in rows)) {
-      // The longest row leaves the least room for the rest, so that's what's counted.
-      const sentRow = (row: string[]) => sentLength({ name: "", part: "row", header: rows.header, row }, this.clean);
-      const longest = rows.rows.reduce((most, row) => (sentRow(row) > sentRow(most) ? row : most), rows.rows[0]);
-      // The row first, as `runInputs` puts it, so a card reached two ways up the chain is reached the same way here.
-      const driving = direct.find((line) => line.lineId === rows.lineId)!;
-      const runDirect = [{ ...driving, input: { name: "", part: "row" as const, header: rows.header, row: longest } }, ...direct.filter((line) => line !== driving)];
-      const fitted = fitChain(this.chainOf(cardId, runDirect), MAX_CROSSING_LENGTH, this.clean);
+      const fitted = this.longestRun(cardId, rows, direct);
       const counted = chainCrossings(fitted);
       const row = fitted.find((each) => each.lineId === rows.lineId && each.depth === 1)!;
       const before = counted.get(rows.lineId)?.before;
@@ -1770,6 +1775,16 @@ export class Nests {
       }));
     };
     return gatherChain(cardId, direct, edgesInto);
+  }
+
+  // What one run of For each row gets, fitted into a run's room, for the row that leaves the least room for the rest.
+  private longestRun(cardId: string, rows: PickedRows & { lineId: string }, direct: Parameters<typeof gatherChain>[1]) {
+    const sentRow = (row: string[]) => sentLength({ name: "", part: "row", header: rows.header, row }, this.clean);
+    const longest = rows.rows.reduce((most, row) => (sentRow(row) > sentRow(most) ? row : most), rows.rows[0]);
+    // The row first, as `runInputs` puts it, so a card reached two ways up the chain is reached the same way here.
+    const driving = direct.find((line) => line.lineId === rows.lineId)!;
+    const runDirect = [{ ...driving, input: { name: "", part: "row" as const, header: rows.header, row: longest } }, ...direct.filter((line) => line !== driving)];
+    return fitChain(this.chainOf(cardId, runDirect), MAX_CROSSING_LENGTH, this.clean);
   }
 
   // The one line For each row runs on: the first, in the card's order, that brings rows.

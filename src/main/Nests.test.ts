@@ -1066,6 +1066,20 @@ describe("Berry planning in a Nest", () => {
     expect(nests.editPlanned(first.id, { prompt: "Find companies in Oslo" })).toBe(true);
   });
 
+  it("says what each run of a planned For-each card reads, one row in a run's room, not the whole table", async () => {
+    const { nests, sendAndWait } = setup();
+    const nest = nests.create();
+    const scout = nests.addCard(nest, { x: 0, y: 0, mascotId: "scout" })!;
+    // 25 long rows: too many for one card's room together, but each fits a run's whole.
+    replies.push(["| Company | Note |", "|---|---|", ...Array.from({ length: 25 }, (_, index) => `| Company ${index} | ${"x".repeat(1000)} |`)].join("\n"));
+    await sendAndWait(scout.id, "Find companies");
+    plans.push({ reply: "One more card.", ask: false, cards: [planCard("c1", { from: "e1", for_each_row: true })] });
+    await nests.ask(nest, "Write to each", PLACE);
+    const [card] = plannedCards(nests, nest);
+    expect(card.plan!.each).toBe(true);
+    expect(card.knows).toMatchObject({ sent: false, cards: 1, cut: 0 });
+  });
+
   it("gives the planner the cards on the board with their threads, labelled untrusted", async () => {
     const { nests, sendAndWait } = setup();
     const nest = nests.create();
