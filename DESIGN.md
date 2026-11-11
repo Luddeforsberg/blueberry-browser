@@ -1,27 +1,31 @@
 # Blueberry design
 
-Blueberry is an AI browser that should feel like a good Mac app with one capable colleague inside it. The direction is **Bloom**: the window is made of the fruit. The frame is the dusty, matte skin of a blueberry, solid web pages float on it in one rounded card, and the blueberry itself is the one thing in the chrome with real colour.
+Blueberry is an AI browser that should feel like a good desktop app with a small flock of capable birds inside it. The direction is **Valley**. The chrome is plain and solid. All the colour lives in one place, a lake valley drawn in fine grain, where the birds live. A new tab opens onto the valley, and what the birds are doing shows in it.
 
 This document is the source of truth for the UI. Values marked *to tune* are starting points, to be adjusted on real windows without changing the intent.
 
 ## 1. Principles
 
 1. **The page comes first.** Web pages stay solid and get the space. The chrome stays quiet around them.
-2. **One colleague at a time.** Berry comes first and is enough on its own. You can grow a flock of birds for jobs you repeat, but you always talk to one, and it's always clear which. Small birds saying something on the art blueberry don't break this, even several Berrys beside the big one on the composer: they aren't more colleagues, only one way to draw each idea being said.
-3. **Calm by default.** Nothing moves, glows or asks for attention without a reason.
-4. **Trust you can see.** The UI always shows what Berry can see and what it is doing, and it asks before anything that matters.
+2. **One colleague at a time.** Berry comes first and is enough on its own. You can grow a flock of birds for jobs you repeat, but you always talk to one, and it's always clear which: the one perched on the box you type in. Each bird is drawn once in a window.
+3. **Calm by default.** Nothing moves, glows or asks for attention without a reason. Nothing moves while you type.
+4. **Trust you can see.** The UI always shows what a bird can see and what it is doing, and it asks before anything that matters.
 5. **A normal browser first.** Tabs, navigation and bookmarks must be excellent with no account and no AI.
-6. **Crafted and warm.** Warmth comes from Berry's voice, its character and the motion. It never becomes corporate or childish.
+6. **Crafted and warm.** Warmth comes from the birds' voice, their character and the valley. It never becomes corporate or childish.
+7. **Colour has one home.** The chrome is neutral, and ink is its only accent. Colour belongs to the valley, the birds, the sites' own icons, and a status when it means something.
+8. **Words carry every state.** The valley and the birds mirror what's going on. They are never the only way to know it: a line of words says the same, and the sidebar stays the record.
 
 ### What we reject
 
+- Glass, blur, tints and gradients in the chrome. Purple gradients, sparkle icons and a lone box on an empty field.
+- An outline or a shadow round the web page.
+- Spiky or angular mountains, an outline or rim round a bird, and a dusty, washed-out palette. The valley is vivid.
 - Humanoid companions, or a team you have to manage. The flock is birds you made yourself, and none appears until you ask.
 - Promo cards and upsells on the new tab. The ideas there only link to real features, and suggestions only come from what the user really did.
-- Stacks of identical rounded, shadowed cards with an avatar, a title, pill chips and pill buttons. Where a page lists birds, they stand on something real: a wire, a divider or the fruit.
-- Glass that makes text harder to read, or glass on web pages.
-- Beige neutrals and blue-tinted dark mode.
+- Stacks of identical rounded, shadowed cards with an avatar, a title, pill chips and pill buttons. Where a page lists birds, they stand on something real: a wire, a divider or the valley's banks.
+- Points, streaks, unlocks or anything else that turns work into a game.
 - Bounce in the chrome, and decorative loops that run when no work is happening.
-- Berry guilt-tripping, fishing for attention, or claiming feelings or a life outside the browser.
+- A bird guilt-tripping, fishing for attention, or claiming feelings or a life outside the browser.
 - Jokes near permissions, payments, sent messages, data or real failures.
 - Reading a page unless the user asked.
 
@@ -32,10 +36,14 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 | Region | Vertical (default) | Horizontal |
 |---|---|---|
 | Tabs | Left sidebar (see below) | Top row |
-| Address bar and navigation | Row above the page | Row below the tabs |
-| Bookmarks | A round cluster at the top of the sidebar | A bar under the address bar |
+| Address field and navigation | Top bar above the page | Row below the tabs |
+| Bookmarks | Tiles at the top of the sidebar | A bar under the address row |
 | Chat panel | Right, pushes the page | Same |
-| Web page | In one rounded card with the toolbar, floating on the frame | Same |
+| Web page | Fills everything the chrome leaves | Same |
+
+**The chrome is one surface.** The sidebar, the top bar and the chat panel are the same solid `background`, with nothing between them: no line, no gap and no change of tone. The page is whatever they leave.
+
+**The page** has one rounded corner of 16px, at its top left, where it meets the sidebar and the top bar. Every other corner is square. It has no outline and no shadow, and it meets the chrome by tone alone. With the sidebar collapsed, and in the horizontal layout, the page has no rounded corner of its own.
 
 Sizes (*to tune*):
 
@@ -43,169 +51,175 @@ Sizes (*to tune*):
 |---|---|
 | Sidebar | 280px default, resizable 200–360px, collapses fully |
 | Chat panel | 400px default, resizable 320–480px |
-| Address row | 40px |
-| Top row in vertical mode | 56px, so the window buttons line up with the address row |
-| Frame around the page card | 8px where no panel sits beside it |
-| Bookmarks bar (horizontal only) | 36px, with a hairline under it |
-| Sidebar row | 34px |
+| Top bar | 48px |
+| Address field | 32px tall, a full pill |
+| Bookmarks bar (horizontal only) | 36px |
+| Sidebar row | 34px, a full pill |
 | Horizontal tab row | 40px |
 | Minimum window | 900×600 |
 | Minimum page width | 480px |
 
 - **When space runs out:** the sidebar collapses first, then the chat panel closes. The page keeps its minimum width.
 - **A crowded tab row:** tabs share the row evenly, and the active one gets room for its close button and the bird on top, so its title is never cut shorter than the others'. Below about 72px a tab shows only its icon, and its close button on hover or while active.
-- **Collapsed sidebar:** it returns when the pointer reaches the frame gutter at the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below).
-- **Sidebar contents, top to bottom:** window controls with search and the collapse button, then the bookmark cluster, then New tab, Needs you, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account lives in it. Collapsed, the toolbar shows the button that brings the sidebar back.
-- **Sidebar rows:** every row starts with a 20px slot, so all their text starts at one straight edge. A chat's slot has its bird at rest, Berry's too, or a chat icon with Hide Berry on. Only one row is highlighted: when Needs you, Routines, Flock or Settings is open, its tab under Tabs has the highlight and its row only turns `foreground`. A chat is never under Tabs, only its row under Chats, highlighted while it's open. While its tab is open, hovering the row also shows a close ×, which closes the tab as any tab's does and keeps the chat. Collapsing Chats still leaves the open chat's row. The horizontal tab row has no chats list, so chats stay in it as tabs.
-- **Buttons on the sidebar and chat panel** sit on the toolbar's address row, the docked sidebar, the floating one and the panel alike, so every button along the top shares one line.
-- **Bookmark cluster:** pinned sites and bookmarks as 44px round buttons, in rows of four and three offset like a bunch of fruit. A site keeps the icon its page named when it was saved, and one with no icon shows its first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. With nothing saved, the cluster and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
-- **Address row:** left-aligned plain text on the card, with no pill until it is hovered or focused.
+- **Collapsed sidebar:** it returns when the pointer reaches the window's left edge. It slides in over the page and slides away when the pointer leaves, so it is an overlay view (see below). Collapsed, the top bar shows the button that brings it back.
+- **Sidebar contents, top to bottom:** window controls on a Mac, then the collapse button, search and downloads on one row, then the pinned tiles, then New tab, Needs you, Routines and Flock, then chats, then tabs. Settings stays at the bottom, and the account lives in it. Downloads sit in that top row in both layouts' sidebars and nowhere else, so they are in one place on every screen. With no sidebar they sit at the end of the address row.
+- **Sidebar rows:** every row starts with a 20px slot, so all their text starts at one straight edge. A chat's slot is empty. A chat with a bird other than Berry shows that bird at 16px straight after its title, and a chat whose job is running shows the berry at the row's end. With Hide Berry on, neither bird shows.
+- **One raised row:** the open tab is the only row on `selected`, with a hairline shadow. When Needs you, Routines, Flock or Settings is open, its tab under Tabs is the raised one and its own row only turns `foreground`. A chat is never under Tabs, only its row under Chats, raised while it's open. While the chat panel shows a chat beside a page, that chat's row is semibold and not raised, which is the only semibold row. While its tab is open, hovering a chat's row also shows a close ×, which closes the tab as any tab's does and keeps the chat. Collapsing Chats still leaves the open chat's row. The horizontal tab row has no chats list, so chats stay in it as tabs.
+- **A job's tabs** sit under their chat, indented, at 13px with their favicon. See Main chat.
+- **Buttons on the sidebar and chat panel** sit on the top bar's line, on the docked sidebar, the floating one and the panel alike, so every button along the top shares one line.
+- **Pinned tiles:** pinned sites and bookmarks as each site's own icon on a 28px tile with an 8px radius, in rows of four, with nothing round them. A site keeps the icon its page named when it was saved, and one with no icon shows its first letter. Pinned sites come first, and a site saved both ways shows once, as a pin. In a short window the first row shows and a last tile says how many more, such as "+5", which opens the rest. With nothing saved, the tiles and the bookmarks bar keep their place and say "Pin or bookmark a page to keep it here." in muted text.
+- **Address field:** a solid pill on every page. On a web page it's `surface` with an `outline` edge, the lock, the site in `foreground` and the rest of the address in `muted-foreground`. Empty, it says "Go to an address". On the new tab it takes the scene's tone: see The valley.
 - **Bookmark star:** outlined when unsaved, filled light yellow using `bookmark` when the current page is saved, with no selected or hover background behind the saved star.
-- **Pin button:** beside the star, and usable on the same pages. Neither shows on our own pages, which can't be saved. A pinned page fills the pin and uses the normal toggled background. The File menu has Pin This Page, and right-clicking a saved site offers Unpin and Remove Bookmark, whichever apply.
+- **Pin button:** beside the star, and usable on the same pages. Neither shows on our own pages, which can't be saved. A pinned page fills the pin and uses the open-toggle fill. The File menu has Pin This Page, and right-clicking a saved site offers Unpin and Remove Bookmark, whichever apply.
+- **The chat toggle** sits at the right end of the address row. Open, it has the open-toggle fill. With the panel open, **New chat** sits in the top bar at the panel's left content edge.
 - **Spaces and folders:** not part of this design yet.
 
 ### View stack
 
 From bottom to top:
 
-1. **Chrome view:** one transparent, window-sized renderer that draws all our UI.
+1. **Chrome view:** one window-sized renderer that draws all our UI.
 2. **Tab views:** one solid view per tab. Only the active tab is visible.
-3. **Overlay views:** small transparent views for anything that floats over a page, such as address suggestions, menus and the revealed sidebar. The bird working on a page isn't one, because a view takes clicks: see Over a web page.
+3. **Overlay views:** small views for anything that floats over a page, such as address suggestions, menus and the revealed sidebar. The bird working on a page isn't one, because a view takes clicks: see Over a web page.
 
 Rules:
 
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view.** The chrome view is underneath tab views and cannot draw over them. The one exception is the bird on the page.
 - **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks. Rounded cut-outs on views also still capture clicks.
-- **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on the same `canvas` card as the toolbar, in the same position as the web page card, so the sidebar stays visibly separate from the page.
+- **The page's rounded corner** is the tab view's own corner, so the chrome shows through it. Nothing is drawn over the page to make it.
+- **Internal pages** (new tab, main chat, Needs you, Routines, Flock, Gallery, Downloads, History, Settings) open as tabs drawn by the chrome renderer, with no tab view. Their content sits on `canvas` in exactly the page's place and shape, so the sidebar stays visibly separate from the page.
 
-## 3. Glass
+## 3. Surfaces
 
-There is one glass strength, not a user setting.
+Everything is solid. There is no glass, blur or native window material anywhere in the window, so colour and contrast never depend on the desktop behind it.
 
-| Level | Used for | How it is made |
+| Surface | Used for | Token |
 |---|---|---|
-| Solid | Web pages, always | An opaque view |
-| Frame | Window frame, sidebar, chat panel | The `frame` gradient with a fine grain, painted opaque over the native window material |
-| Card | The card internal pages sit on | `canvas` at 85% with `backdrop-filter` over the frame |
-| Panel | The Recent panel over the art blueberry, bookmark buttons | `surface` at 60–90% with `backdrop-filter` |
-| Floating | Anything over a web page | Overlay view with `backdrop-filter` plus the glass tint |
+| Chrome | Sidebar, top bar, chat panel | `background` |
+| Paper | Internal pages, and the place a web page fills | `canvas` |
+| Raised | The composer, inputs, lists that open, anything over the valley | `surface` |
+| Tray | The tray under the composer, code blocks, the exact words of an approval | `tray` |
+| The valley | The new tab, and the right side of the main chat while a job works there | See The valley |
 
-The frame is opaque so its colour and text contrast don't depend on the desktop behind it. The glass tint is 88% of `background`, in both light and dark mode (*to tune*).
-
-### Fallbacks
-
-Use the solid `background` colour instead of glass when:
-
-- The system asks for reduced transparency (`nativeTheme.prefersReducedTransparency`).
-- Windows is older than Windows 11 22H2, where `backgroundMaterial` is unsupported.
-- Native glass looks wrong on a platform and has not been fixed.
-
-In these cases the frame is solid `background` too, without the gradient or grain, and cards use solid `surface` or `canvas`.
-
-Text must meet the contrast rules with and without glass.
+- **Words never sit on the valley without help.** Anything with words or controls over it is a solid `surface`, or sits on the top bar's scrim.
+- **Over a web page,** anything that floats is an overlay view on solid `surface` with the floating shadow, so a page can't change how it reads.
+- **The window** is opaque `background`. Nothing uses `backdrop-filter`, `vibrancy` or `backgroundMaterial`. The composer of the bird on the desktop is the one exception, because it is a window of its own outside ours: see On your desktop.
 
 ## 4. Tokens
 
-Components use tokens only, never raw colours. Keep the existing names in `index.css` and add the new ones.
+Components use tokens only, never raw colours. Keep the existing names in `index.css` and `tokens.css`, with these values, and add the new ones. `frame` and `glass-tint` are gone.
 
 ### 70/20/10
 
-For our own chrome (web pages do not count), this is a guideline and not a measurement:
+For our own chrome (web pages and the valley do not count), this is a guideline and not a measurement:
 
 - **70, base:** `background`, `canvas` and `surface`.
-- **20, gray:** `muted` and `border`.
-- **10, ink and Berry:** the accent and the character. Nothing else in the chrome has colour, except status colours when they mean something.
+- **20, grey:** `muted`, `tray`, `border` and `outline`.
+- **10, ink:** `primary` and `foreground` on the one decision, the focus ring and what's selected. Nothing else in the chrome has colour, except the birds, a site's own icon, and status colours when they mean something.
 
 ### Colour
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `frame` | `#c3cbf0` to `#e7e6f7` to `#d4cfec` | `#38383b` to `#262628` | Gradient for the frame, sidebar, chat panel |
-| `background` | `#dcdff5` | `#2b2b2b` | Solid frame when glass is off, the glass tint |
-| `canvas` | `#fcfcff` | `#1f1f1f` | Internal pages, the card a web page sits on |
-| `surface` | `#ffffff` | `#242424` | Composer, inputs, raised content |
-| `tray` | `#f2f3fb` | `#181818` | Page card on the composer, code blocks |
-| `card` | `#f3f4fb` | `#2a2a2a` | Raised content on `canvas` |
-| `selected` | `#ffffff` | `#565656` | Selected rows in the sidebar, selected segments |
-| `muted` | `#eceefa` | `#303030` | Address bar, bubbles, hover, selected rows on `canvas` |
-| `border` | `#e1e3f2` | `#404040` | Separators |
-| `foreground` | `#191b33` | `#f2f2f2` | Main text |
-| `muted-foreground` | `#4c5070` | `#b0b0b0` | Secondary text |
-| `primary` | `#2a3380` | `#4e5fb4` | Primary button fill |
-| `primary-foreground` | `#ffffff` | `#ffffff` | Primary button text |
-| `accent-ink` | `#2f3aa8` | `#a3aefb` | Links, focus rings, selected states |
+| `background` | `#e9e9ec` | `#1f1f21` | The chrome: sidebar, top bar, chat panel |
+| `canvas` | `#ffffff` | `#19191b` | Internal pages, the place a web page fills |
+| `surface` | `#ffffff` | `#2f2f34` | Composer, inputs, raised content, anything over the valley |
+| `tray` | `#f2f2f5` | `#252529` | The tray under the composer, code blocks, exact words |
+| `card` | `#f4f4f7` | `#26262a` | Raised content on `canvas`, the job line |
+| `selected` | `#ffffff` | `#39393f` | The raised row in the sidebar, selected segments |
+| `muted` | `#f1f1f4` | `#2f2f34` | The user's bubble, quiet fills on `canvas` |
+| `hover` | `foreground` at 7% | `foreground` at 9% | Hover, on any surface |
+| `pressed` | `#d9d9df` | `#48484f` | Pressed, and an open button or toggle |
+| `border` | `#e4e4ea` | `#3a3a40` | Separators |
+| `outline` | `#bbbbbf` | `#6a6a70` | The edge of an outlined control |
+| `control-fill` | Not used | `foreground` at 8% | Controls inside a dark `surface`, in place of an outline |
+| `foreground` | `#18181a` | `#f2f2f3` | Main text, ink |
+| `muted-foreground` | `#55555b` | `#a6a6ac` | Secondary text |
+| `primary` | `#18181a` | `#f2f2f3` | The filled button, Stop, send once there's something to send |
+| `primary-foreground` | `#ffffff` | `#18181a` | Text on `primary` |
+| `accent-ink` | `#18181a` | `#f2f2f3` | Links, focus rings, ticks and selected marks. It is ink: the interface has no accent colour |
+| `berry-blue` | `#3558dc` | `#8fa6ff` | The reading ring, and the label that says a bird is being answered. Never a button |
+| `attention` | `#fff3d6` | `#3d3210` | The surface of a line that needs you |
 | `bookmark` | `#facc15` | `#fde047` | Saved page's filled bookmark star |
 | `success` | `#17653c` | `#6fcf97` | Status |
 | `warning` | `#744b00` | `#e0b050` | Status |
-| `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions |
-| `glass-tint` | `background` at 88% | `background` at 88% | All glass |
+| `destructive` | `#ab241c` | `#f59e96` | Status, destructive actions, the recording |
 
-Contrast is calculated against each mode's most difficult frame colour, and against a `surface` card at 80% over the art blueberry's darkest colour in light mode and lightest in dark mode. Re-measure on real windows. What the birds on the fruit say is `primary-foreground` directly on it, over a pool of `berry-fruit-crown` shadow. Measured on real windows, white reaches at least 6.4:1 on the brightest pixel behind the words in light mode and 9.2:1 in dark.
+Measured contrast (WCAG), to be measured again on real windows:
 
-| Text colour | Light on frame | Dark on frame | Light on berry card | Dark on berry card |
-|---|---|---|---|---|
-| `foreground` | 10.5:1 | 10.4:1 | 11.0:1 | 10.7:1 |
-| `muted-foreground` | 4.9:1 | 5.4:1 | 5.1:1 | 5.5:1 |
-| `accent-ink` | 5.7:1 | 5.6:1 | Not used | Not used |
-
-White on `primary` is 11.2:1 in light mode and 5.8:1 in dark mode.
-
-The dark frame stays neutral, because blue-tinted dark mode is rejected. Only the blueberry keeps its colour there.
-
-Berry has separate tokens and never uses the UI accent:
-
-| Token | Light | Dark |
+| Text | Light | Dark |
 |---|---|---|
-| `berry-ink` (body) | `#181c2e` | `#2a2f4d` |
-| `berry-wing` | `#2e3454` | `#3d4470` |
-| `berry-nape` | `#9ea6be` | `#a8b0c8` |
-| `berry-eye` | `#f4f1e6` | `#f4f1e6` |
-| `berry-pupil` | `#141624` | `#141624` |
-| `berry-beak` | `#3e4466` | `#4e5680` |
-| `berry-fruit-mid` | `#4e5fb4` | Same |
-| `berry-fruit-dark` (shade) | `#2a3380` | Same |
-| `berry-fruit-bloom` | `#a4afe0` | Same |
-| `berry-fruit-crown` | `#161c4c` | Same |
+| `foreground` on `background` | 14.6:1 | 14.7:1 |
+| `muted-foreground` on `background` | 6.1:1 | 6.8:1 |
+| `muted-foreground` on `canvas` | 7.4:1 | 7.2:1 |
+| `muted-foreground` on `tray` and on dark `surface` | 6.6:1 | 5.5:1 |
+| `muted-foreground` on `selected` | 7.4:1 | 4.7:1 |
+| `foreground` on `attention` | 16.1:1 | 11.3:1 |
+| `primary-foreground` on `primary` | 17.7:1 | 15.8:1 |
+| `berry-blue` on `canvas`, and on dark `surface` | 5.9:1 | 5.7:1 |
 
-`berry-gear` and `berry-gear-shade` colour a mascot's accessory, with `berry-pupil` as its edge. Jackdaw's are `#d9a312` and `#a87c08` in light, `#ffd23f` and `#d9a312` in dark.
+- **The dark chrome is neutral,** because blue-tinted dark mode is rejected. Only the valley and the birds keep their colour there.
+- **Outlines:** in light mode, controls that sit in a row share one treatment, an `outline` edge. `outline` is 1.9:1 on white, so it never carries meaning alone: every outlined control has a word or an icon in `foreground`. In dark mode the same controls inside a `surface` are filled with `control-fill` and have no edge, so the box reads as one surface with a few quiet buttons, not a set of light rings.
 
-Dark `berry-ink` stays a dark bird, and a thin light rim (`berry-rim`, white at 45% with a 0.75px blur) holds its outline on dark backgrounds. The body is below the 3:1 for meaningful graphics, so the rim, eyes, hood and berry carry the shape, and nothing may rely on Berry alone: moods have text labels. The presets are bright enough in dark mode and have no rim.
+The birds have their own tokens and never use the interface's. They are the same in light and dark, because they have to work on the valley at any hour:
 
-The flock's presets replace `berry-ink`, `wing`, `nape`, `beak`, `gear` and `gear-shade` on that mascot's drawing, through `data-mascot`. The eye and the blueberry never change. Body contrast is against `canvas`.
+| Token | Berry | Use |
+|---|---|---|
+| `berry-ink` | `#3558dc` | The body |
+| `berry-nape` | `#6f8ef0` | The body's lit side, upper left |
+| `berry-shade` | `#16277f` | The body's far side, lower right |
+| `berry-wing` | `#1b309a` | The wing |
+| `berry-crest` | `#12227a`, `#2c44b8` at night and in dark mode | The crest and the tail |
+| `berry-beak` | `#ff9a2e`, `#e07a1f` for the lower half | The beak |
+| `berry-legs` | `#d9731c` | Legs and feet |
+| `berry-eye` | `#ffffff` | The eye |
+| `berry-pupil` | `#10142e` | The pupil, and the soft shadow under a bird's feet |
+| `berry-note` | `#fffaf0`, edge `#c9b89a` | The folded note a bird brings home |
+| `berry-fruit-mid` | `#3558dc` | The berry, the status mark for work going on |
+| `berry-fruit-dark` | `#1f37a6` | The berry's shade |
+| `berry-fruit-bloom` | `#8fa9f8` | The berry's bloom, upper left |
 
-| Preset | Body light | Nape light | Gear light | Body contrast | Body dark | Nape dark | Gear dark | Body contrast |
-|---|---|---|---|---|---|---|---|---|
-| Robin | `#8f3b22` | `#f28a4c` | `#1f8f86` | 7.3:1 | `#b5553a` | `#f79a60` | `#3fc2b6` | 3.4:1 |
-| Canary | `#b77f00` | `#ffc93c` | `#c8314f` | 3.4:1 | `#e0a810` | `#ffe07a` | `#f0607e` | 7.7:1 |
-| Parakeet | `#1f8a4c` | `#9ad94f` | `#d9542b` | 4.3:1 | `#35b56c` | `#bcec70` | `#f47a52` | 6.3:1 |
-| Flamingo | `#d13f7c` | `#ffb0cc` | `#1b8fa3` | 4.4:1 | `#ec6a9d` | `#ffc9dc` | `#4cc6d9` | 5.6:1 |
-| Kingfisher | `#0f7ea3` | `#f58b3c` | `#e8a900` | 4.5:1 | `#2ba8cf` | `#fb9f58` | `#ffd23f` | 6.0:1 |
+`berry-gear` and `berry-gear-shade` colour a mascot's accessory, with `berry-pupil` as its edge.
+
+The flock's presets replace `berry-ink`, `nape`, `shade`, `wing`, `crest`, `beak`, `gear` and `gear-shade` on that mascot's drawing, through `data-mascot`. The eye, the legs and the note never change. All values are *to tune* on the valley's four lights:
+
+| Preset | Body | Lit side | Wing | Crest and tail | Beak | Gear | Body on white |
+|---|---|---|---|---|---|---|---|
+| Berry | `#3558dc` | `#6f8ef0` | `#1b309a` | `#12227a` | `#ff9a2e` | None | 5.9:1 |
+| Robin | `#f08a3c` | `#ffc08a` | `#b9501f` | `#7a2e14` | `#ffd65a` | `#1f8f86` | 2.5:1 |
+| Canary | `#f2b632` | `#ffe08a` | `#c08a12` | `#7a5606` | `#e8662a` | `#c8314f` | 1.8:1 |
+| Parakeet | `#3aa465` | `#86d49a` | `#1f7343` | `#123f25` | `#ff9a2e` | `#d9542b` | 3.1:1 |
+| Flamingo | `#ec6a9d` | `#ffc0d6` | `#c23f78` | `#7d2149` | `#ff9a2e` | `#1b8fa3` | 3.0:1 |
+| Kingfisher | `#22a6c9` | `#8fdcf0` | `#127a99` | `#0b4c61` | `#f58b3c` | `#e8a900` | 2.9:1 |
+
+Several bodies are under 3:1 on white, so the darker wing, crest and tail carry the shape, and nothing may rely on a bird alone: its name is always beside it, and moods have text labels.
 
 ### Spacing, radius, elevation
 
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px.
-- **Radius:** 8px for controls, 12px for sidebar rows and inputs, 22px for cards, panels and the page card, including the web page view itself, 26px for the composer, and full for buttons and segmented controls.
-- **Elevation:** the page card floats on the frame with a soft shadow all round, tinted periwinkle in light mode. Things that float, the composer, the Recent panel and selected rows in the sidebar also get a shadow. A bird standing on the composer leaves a small soft `berry-pupil` shadow under its feet, only on the box.
-- **Recording ring:** while the user is showing Berry something, the page card's shadow becomes a 2px `destructive` ring with a soft glow, on every tab including our own pages. It comes before the reading ring.
-- **Reading ring:** while Berry is reading the open page, because a message was just sent with the page attached, the page card's shadow becomes a 2px periwinkle ring with a soft glow. It fades in and out with the layout duration, and also shows while Berry is using the tab in a running reply. Nothing else marks it from inside the page, because the bird does that now. With Show the bird on pages off, a matching inset glow pulses slowly inside the page instead, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
+- **Radius:** 8px for tiles and small controls, 12px for blocks and inputs on a page, 16px for the page's one corner, 18px for cards, 24px for lists that open and the tray's lower corners, 28px for the composer, and full for buttons, rows, pills and the address field.
+- **Elevation:** almost none. The page has no shadow. The raised sidebar row has a hairline shadow. Over the valley, the composer and its tray share one soft shadow underneath, so the two read as one object, and a list that opens gets the same. Menus and anything in an overlay view get the floating shadow. A bird standing on something leaves a small soft `berry-pupil` shadow under its feet.
+- **Recording ring:** while the user is showing Berry something, a 3px `destructive` ring goes round the page, on every tab including our own pages. It comes before the reading ring.
+- **Reading ring:** while a bird is reading the open page, because a message was just sent with the page attached, a 3px `berry-blue` ring goes round the page. It fades in and out with the layout duration, and also shows while a bird is using the tab in a running reply. Nothing else marks it from inside the page, because the bird does that now. With Show the bird on pages off, a matching inset glow pulses slowly inside the page instead, added as a style so it never takes a click. In the tab list, that tab's title shimmers beside the working berry.
+- **How a ring is drawn:** the page has no gutter, so while a ring shows, the layout owner insets the tab view by the ring's width on every side and the chrome draws the ring's colour in the gap. That keeps it in the chrome, where no page can reach or cover it. On our own pages it's an inset line. The working view's picture wears the same ring.
 
 ## 5. Typography
 
-The system font only: SF Pro on macOS and Segoe UI Variable on Windows. No fonts are bundled or downloaded.
+One neutral grotesk, **Host Grotesk**, bundled with the app as a variable font and never downloaded. A small monospace, **IBM Plex Mono**, is bundled for keyboard shortcuts and the exact words of an approval, and nothing else. Both fall back to the system font: SF Pro on macOS and Segoe UI Variable on Windows.
 
 | Size | Weight | Used for |
 |---|---|---|
 | 11px | Regular | Captions, the smallest text allowed |
-| 12px | Regular | Secondary text |
-| 13px | Regular | Bookmarks bar, card text |
-| 14px | Regular, semibold | Sidebar, tabs, address bar, settings |
+| 12px | Regular | Secondary text, exact words in monospace |
+| 13px | Regular | Bookmarks bar, card text, a job's tabs, the tray |
+| 14px | Regular, semibold | Sidebar, tabs, address field, settings, steps |
 | 16px | Regular | Chat and the composer |
 | 20px | Semibold | Page titles |
 | 34px | Semibold, tight tracking | Onboarding, and the heading of a page on the public site, 48px there on a wide screen |
 
 - The public site's lede is 20px regular on a wide screen, and the phone page's headings are 28px. Nothing else in the chrome uses them.
-- Use regular and semibold only.
+- Use regular and semibold only. Regular is weight 400 in light mode and 330 in dark mode (*to tune*), because light text on dark reads heavier. Semibold is 600 in both.
 - Use tabular figures wherever numbers line up, such as times and counts.
 - Render chat markdown with our own type styles.
 
@@ -218,15 +232,19 @@ The chrome is crisp: quick to start, gently settling, with no bounce.
 | Hover, press, small feedback | about 100ms |
 | Panels and layout changes | about 240ms |
 | Longest allowed in the chrome | about 320ms |
+| A bird's flight | 600–900ms, by distance |
 
 - **Easing:** start with `cubic-bezier(.32, .72, 0, 1)` (*to tune*).
 - **Interruptible:** every transition can reverse from wherever it is.
-- **Web pages:** never animate page content, only the frame around it and the bird working on the page.
-- **Bounce and squash:** reserved for Berry.
+- **Web pages:** never animate page content, only the chrome around it and the bird working on the page.
+- **Bounce and squash:** reserved for the birds.
 - **Loops:** only while real work is happening, stopping as soon as it ends.
+- **Nothing moves while you type.** While a composer has the keyboard and has text in it, no bird flies or changes place and the valley doesn't change. A change that's due plays once the box has been idle for about 5 seconds, or when the page next opens.
+- **One flight at a time** in a window. Others wait their turn or arrive with a quick fade.
+- **The valley is still.** It's painted once for its light and size. Water, clouds and grass never loop.
 - **Thinking:** a soft shimmer sweeps across the word while a reply is on its way. Reduced motion leaves the word still.
-- **Moving tab views:** if animating tab view bounds is not smooth, animate the chrome and let the page snap into place at the end.
-- **Reduced motion:** follow `systemPreferences.getAnimationSettings().prefersReducedMotion` and the CSS media query. Movement becomes short fades or instant changes.
+- **Moving tab views:** if animating tab view bounds is not smooth, animate the chrome and let the page snap into place at the end. A ring's inset snaps.
+- **Reduced motion:** follow `systemPreferences.getAnimationSettings().prefersReducedMotion` and the CSS media query. Movement becomes short fades or instant changes, and a bird is simply in its new place.
 
 ## 7. Component states
 
@@ -235,44 +253,46 @@ Every interactive component defines these, shown in light and dark in the compon
 | State | Treatment |
 |---|---|
 | Default | Neutral, with no colour unless it is the primary action |
-| Hover | `muted` background |
-| Pressed | Slightly darker than hover, in about 100ms |
-| Focused | A visible 2px `accent-ink` ring, never removed. The composer is the exception: it only darkens its border, and the caret marks focus |
-| Selected | A `selected` row in the sidebar, or a `muted` row on `canvas`. The text stays regular, so rows don't shift |
+| Hover | `hover` background |
+| Pressed | `pressed`, in about 100ms |
+| Open | A button or toggle that is open or on has the `pressed` fill |
+| Focused | A visible 2px `accent-ink` ring, never removed. On an outlined control the ring takes the outline's place, so the control keeps its size. The composer is the exception: the caret marks focus, and its edge only firms up while it's answering a bird's question |
+| Selected | The one raised `selected` row in the sidebar, or a `muted` row on `canvas`. The text stays regular, so rows don't shift |
 | Disabled | Reduced emphasis, with a reason where possible, and based on real state. A primary button stays a faded primary, never grey |
 | Loading | Only while work is really happening |
 | Error | Status colour plus an icon or text, with a way forward |
 
-Tabs also show: page loading, audio playing, crashed, and Berry working in this tab.
+Tabs also show: page loading, audio playing, crashed, and a bird working in this tab.
 
 - **Buttons have three roles:** primary, filled with `primary`, for the one decision; outline beside it; and quiet text for everything else. The only other button is the recording's red Stop, where the colour is the status.
-- **Favicons:** a page with no icon shows the first letter of its site in a small round `muted-foreground` tint, so sites still look different.
+- **Send and Stop:** send is an outline at rest and fills with `primary` once there is something to send. While a job runs it becomes Stop, a filled square, and that is the only Stop on the screen.
+- **Favicons:** a page with no icon shows the first letter of its site on a small `muted-foreground` tint, so sites still look different. A dark icon on a dark surface gets a hairline edge.
 - **Scrollbars:** a thin `border` thumb, shown only while the pointer is over what scrolls or it's scrolling.
 
-## 8. Berry, the mascot
+## 8. Berry and the flock
 
-Berry is a small jackdaw in ink who nearly always has a blueberry in its beak. Berry is "it", and it refers to itself as "I".
+Berry is a small round bird the colour of a blueberry, with the fruit's crown as its crest. Berry is "it", and it refers to itself as "I".
 
 ### Character
 
-- **Bird:** a big head on a plump, smooth body with short legs, drawn in profile with one clean outline. A dark body, a grey nape, a short beak and one pale eye with a big pupil and a catchlight make it a friendly jackdaw, and the eye carries most of the expression. Berry only faces you, with two eyes, when it is asking for a decision.
-- **Blueberry:** its signature, and what ties Berry to the name. It stays in Berry's beak, even in the smallest icon, and leaves only when Berry is thinking, finishes a job, makes a mistake or sleeps. It has a dusty bloom lit from the upper left, a slightly squashed shape, and a dark crown with uneven lobes set off-centre. It is never a blue circle with a star.
-- **Style:** flat ink for the bird. The berry is the one thing in the chrome with depth and colour, and on its own it serves as the status marker for work in progress, always beside words.
-- **Implementation:** one SVG drawing per mood behind a `<Mascot mood size>` interface, animated with CSS, so artwork can be replaced without touching screens. Each mood should be recognisable from its outline. Rive is the next step for the large animated moments.
+- **Bird:** a round body like the fruit, in saturated blue, lit from the upper left. A darker wing low on its side, a short darker tail, and a crest of three points on top, which is the blueberry's crown. A small orange beak in two tones, orange legs, and one white eye with a big dark pupil and a catchlight, which carries most of the expression. It's drawn in profile, facing right unless the place calls for left. Berry only faces you, with two eyes, when it is asking for a decision.
+- **No outline.** Shape comes from colour: the wing, crest and tail are darker steps of the body. At night and in dark mode the crest and tail lighten a step so they don't vanish.
+- **Grain:** at 32px and up, in the valley and on a composer, the body carries the valley's fine grain, following the light. Smaller, and on a web page, it's flat colour.
+- **The berry:** a small round blueberry with its bloom lit from the upper left. On its own it is the status mark for work in progress, always beside words: on the step a bird is on, on a running chat's row, at the start of a job line. It is never a blue circle with a star.
+- **The note:** a bird that has finished a job comes home with a small folded note in its beak. That is the only thing a bird carries.
+- **Implementation:** one SVG drawing per mood behind a `<Mascot mood size look>` interface, animated with CSS, so artwork can be replaced without touching screens. Each mood should be recognisable from its outline. The illustrator's drawings replace the first ones there: see `docs/illustration-brief.md`.
 
 ### The flock's look
 
-Every mascot is this same drawing with one preset and one accessory: nothing, a crown, a cap, glasses, headphones or a bow. The accessory belongs to the head, so it moves with it in every mood, and has a front view for Asking. Shapes are big and edged, so colour and accessory tell mascots apart at 16px, where the mood can't. There is no colour picker, because every preset has to work in both modes and beside the blueberry. Everything said here about Berry's character, voice and moods goes for them too.
+Every mascot is this same drawing with one preset and one accessory: nothing, a crown, a cap, glasses, headphones or a bow. The crest belongs to the bird and every one has it. The accessory belongs to the head, so it moves with it in every mood, and has a front view for Asking. Shapes are big and edged, so colour and accessory tell mascots apart at 16px, where the mood can't. There is no colour picker, because every preset has to work on the valley's four lights and on both modes' surfaces. Everything said here about Berry's character, voice and moods goes for them too.
 
 ### Sizes
 
 | Size | Drawing |
 |---|---|
-| 16–20px | Simplified: just the head and the berry, with one larger eye. This shows identity only. |
-| 24–31px | The same simplified drawing. 24px is the smallest size that may show a mood, through head tilt and eye alone. |
-| 32px and up | Full drawing. |
-
-The blueberry's crown turns into a smudge below about 20px, so at those sizes its colour and shape carry it.
+| 16–20px | Simplified: body, crest, beak and one larger eye, in flat colour. This shows identity only. |
+| 24–31px | The same simplified drawing, with the wing. 24px is the smallest size that may show a mood, through head tilt and eye alone. |
+| 32px and up | Full drawing, with legs and grain. |
 
 ### Personality and voice
 
@@ -296,57 +316,66 @@ Every mood has a text label for assistive technology.
 
 | Mood | Meaning | Pose |
 |---|---|---|
-| At rest | Present, nothing happening | Perched, berry in beak, blinks now and then |
-| Sitting | On a tab or the edge of a card | Legs hanging over the edge and swinging, berry in beak |
-| Curious | Looking at something you asked about | Leans in, head cocked |
-| Thinking | Working something out | Head back, eyes up, tossing the berry |
-| Fetching | Working out on the web | In flight, wings beating, berry in beak |
-| Asking | Needs your decision | Faces you square on, berry held out |
-| Delivered | Finished | Sets the berry down, chest out, heavy-lidded and a bit smug |
-| Oops | Something went wrong | Slumped, berry rolled away, a feather falls |
-| Off duty | Nothing to do for a long time | Fluffed up asleep, berry beside it |
+| At rest | Present, nothing happening | Perched, blinks now and then |
+| Sitting | On a tab or the edge of a card | Legs hanging over the edge and swinging |
+| Curious | Looking at something you asked about, or at what you're typing | Leans in, head cocked, eye on it |
+| Thinking | Working something out | Head back, eye up, crest twitching |
+| Fetching | Working out on the web | In flight, wings beating |
+| Asking | Needs your decision | Faces you square on, two eyes, head a little to one side |
+| Delivered | Finished | Chest out, the folded note in its beak, heavy-lidded and a bit smug |
+| Oops | Something went wrong | Slumped, crest drooping, a feather falls |
+| Off duty | Nothing to do for a long time | Fluffed up asleep, crest flat |
 
 ### When you click it
 
-Clicking a bird anywhere in the chrome gets a small reaction: a hop, a curious look, tossing the berry or a ruffle that loses a feather, in turn. Five clicks in a couple of seconds and it turns its back on you for a moment and ignores you. Only a bird at rest changes pose. One sitting on a tab or already curious hops and ruffles, and one with a status mood gives a small squash, so a mood that means something stays on screen and its label never changes. It's decoration: it says nothing, changes nothing, and any button it's on still takes the click. Reduced motion only gets the curious look, and Keep Berry still gets nothing. The bird working on a web page doesn't react, because nothing there can be clicked.
+Clicking a bird anywhere in the chrome gets a small reaction: a hop, a curious look, a shake of the crest or a ruffle that loses a feather, in turn. Five clicks in a couple of seconds and it turns its back on you for a moment and ignores you. Only a bird at rest changes pose. One sitting on a tab or already curious hops and ruffles, and one with a status mood gives a small squash, so a mood that means something stays on screen and its label never changes. It says nothing and changes nothing, and any button it's on still takes the click. A bird resting in the valley is a button of its own, so pressing it does what its label says. Reduced motion only gets the curious look, and Keep Berry still gets nothing. The bird working on a web page doesn't react, because nothing there can be clicked.
 
-### Where Berry appears
+### Where a bird appears
+
+**A bird is drawn once in a window.** The chosen bird is in exactly one of these places, and flies between them:
+
+| Place | What it does |
+|---|---|
+| On the composer | The chosen bird perches on the top edge of the box you'd type in, towards its right end, so it covers no text or control: the new tab's box, the main chat's composer, the chat panel's composer. It is the picture of who you're talking to, so the picker beside it shows the name only |
+| In the valley | The rest of the flock, on the banks, and wherever their work has taken them. See The valley |
+| In the working view | While it works in tabs behind the main chat, it's in the picture, and off the composer. See The working view |
+| Over a web page | Only while working in a page the user can see, drawn in the page. See Over a web page |
+| Browsing | With no composer on screen, small, sitting on the active tab's lower edge with its legs hanging, in a slot the tab keeps free between its title and its close button, so it covers no text. On a narrow row of tabs, the active one stays wide enough for the slot |
+
+Elsewhere a bird's picture marks whose something is, never a second copy of the one you're talking to:
 
 | Place | What it does |
 |---|---|
 | Onboarding | Large, guides setup |
-| New tab | Large, standing on the composer's top edge with its toes gripping it. Smaller, standing on the art blueberry to say a suggestion |
-| Browsing | Small, sitting on the active tab's lower edge with its legs hanging, in a slot the tab keeps free between its title and its close button, so it covers no text. On a narrow row of tabs, the active one stays wide enough for the slot |
-| Chat | Working and waiting states beside its replies |
+| A reply in a chat | At 30px beside each reply, hanging outside the column in the main chat, and Asking beside a request |
+| Sidebar | At 16px after the title of a chat with a bird other than Berry |
 | Routines | Flies off when a routine runs and returns with the result |
 | Settings | Its own section |
 | Flock | Its own page, standing on a wire with the flock, and standing on the line over what it remembers |
 | Gallery | Standing on the line under each row, Asking on the review screen, Delivered once added |
 | Needs you | Asking at 24px on each row, and off duty when nothing's waiting |
-| Over a web page | Only while working in a page the user can see, in front of them or in the working view, drawn in the page. See Over a web page |
 | Show Berry how | Curious in the toolbar while it watches, and standing on the line over its notes |
-| The working view | In the picture while it works, and on the window's top edge when it isn't. See The working view |
 | On your desktop | Only if it's turned on, tucked behind any edge of the screen while you're in other apps. See On your desktop |
 
-### Where Berry goes
+### Where a bird goes
 
-Berry belongs to real parts of the interface, so it only ever sits in the places listed above. It never wanders on its own. It flies when the active tab changes and that takes it somewhere new, and at most once every 15 seconds: quicker tab changes move it with a quick fade. Web pages sit above the chrome, so a flight towards a web page passes behind it.
+A bird belongs to real parts of the interface, so it only ever sits in the places listed above. It never wanders on its own. It flies when something real moves it: you chose it, it started or finished a job, or the active tab changed and that takes it somewhere new. That is at most once every 15 seconds: quicker changes move it with a quick fade. Web pages sit above the chrome, so a flight towards a web page passes behind it.
 
-### When Berry may interrupt
+### When a bird may interrupt
 
-Berry only speaks about work the user started: a finished task, a routine result, or something it can't go on without. Everything waiting is on one page, Needs you, so the flock can work on while the user carries on with their day. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear on the new tab page, said by a bird standing on the art blueberry, where the user is already choosing what to do next. A bird looks up and hops once when the pointer or keyboard comes to its words, and otherwise nothing about them moves, asks or waits. Berry does not read a page unless asked. Sending a chat message while the "Can see" toggle is on counts as asking.
+A bird only speaks about work the user started: a finished task, a routine result, or something it can't go on without. Everything waiting is on one page, Needs you, so the flock can work on while the user carries on with their day. Suggestions are the one exception to staying quiet, and they never interrupt: they only appear on the new tab page, in the tray under the box, where the user is already choosing what to do next. Nothing about them moves, asks or waits. A bird does not read a page unless asked. Sending a chat message while the page is attached counts as asking.
 
 | Level | Behaviour |
 |---|---|
 | Mood change | Nothing else moves or appears |
-| Dot on the perch | Something is ready, with one small hop at most |
-| Count on Needs you | Anything waiting, with the berry beside the number on the sidebar row, or words in the toolbar with no sidebar. Answering is what clears it, not looking |
-| Asking in the chat | Only when Berry needs a decision to continue, and the same item is on Needs you |
+| A place in the valley | A bird's place on the new tab shows what its work is doing, with a slip of words beside it. It changes when the page opens or the box is idle, never while you type |
+| Count on Needs you | Anything waiting, as a number in an ink pill on the sidebar row, or words in the toolbar with no sidebar. Answering is what clears it, not looking |
+| Asking in the chat | Only when a bird needs a decision to continue, and the same item is on Needs you. Everywhere, this state is called **Needs you** |
 | Silent system notification | Something new is waiting, or a routine has news, and the app isn't in front |
 | Message on the user's phone | Something is waiting and they're away, only if they connected a bot. See Needs you |
 | Bird on the desktop | A mood, and one short line beside it, only if it's turned on. It replaces the notification for Needs you. See On your desktop |
 
-Berry never opens a modal, takes keyboard focus or makes a sound. A notification never comes during fullscreen or while a tab plays sound, and it says who and what kind of thing it is, never the question, the site or anything typed. A phone message does say those, because it's how the user answers, and Settings says Telegram can read it. Anything waiting holds until the user is done.
+A bird never opens a modal, takes keyboard focus or makes a sound. A notification never comes during fullscreen or while a tab plays sound, and it says who and what kind of thing it is, never the question, the site or anything typed. A phone message does say those, because it's how the user answers, and Settings says Telegram can read it. Anything waiting holds until the user is done.
 
 ### Reduced motion
 
@@ -354,32 +383,129 @@ Poses switch with a quick fade, with no flying or hopping. Nothing relies on see
 
 ### Turning it off
 
-Available from Settings and by right-clicking the perch:
+Available from Settings and by right-clicking a perched bird:
 
-- **Still:** keeps the bird, stops all animation and flight. It moves between places with a quick fade.
-- **Hide Berry:** removes the character everywhere, replacing it with a plain icon and neutral copy.
+- **Still:** keeps the birds, stops all animation and flight. They move between places with a quick fade.
+- **Hide Berry:** removes the birds everywhere, replacing them with a plain icon and neutral copy. The valley stays, as scenery, and every slip of words stays where it is.
 
 Every feature keeps working either way, and turning it off never prompts the user to reconsider.
 
-## 9. Key screens
+## 9. The valley
+
+One place: a lake in a valley between soft, rolling ridges, with a large meadow bank at the near left and a small one at the near right. It is the same place every time. Only the light changes, with the time of day. It is drawn in fine stipple grain in full colour, and it is vivid.
+
+It appears in two places and nowhere else: filling the new tab, and on the right of the main chat while a bird works in tabs there. A web page never gets it.
+
+### Composition
+
+Everything is placed around the box you type in, so the art is quietest where you type:
+
+- **The sky** takes the upper part. One bright thing sits in its upper left, away from the perched bird: a cloud by day and at dawn, the sun with a glow at dusk, the moon with a soft halo at night. Stars at night are few and loosely clustered, and none sit near the box or under the top bar.
+- **Five ridges** pass behind one another across the middle, rising towards both sides by different amounts so they cross. They are lit from the upper left: faces turned to the light are paler and faces turned away are deeper. Mist gathers at each ridge's foot, so the far ones fade into the sky. No spikes and no angles.
+- **A band of pale air** lies across the scene, brightest at the top edge of the box and behind the whole perched bird, so the bird stands against light and the box's edge is clear in every light.
+- **The lake** fills the middle below the ridges and mirrors them, darker towards you, with a few soft streaks of light.
+- **The banks** are the near corners: a large one at the left that leads the eye up towards the box, a small one at the right. They are where the flock rests, and they stay inside the frame at every window size.
+- **One grain** on every shape, fine, following the light.
+
+### The four lights
+
+The light is chosen by the clock when the page opens, and never changes while it's on screen (*hours to tune*): dawn from 05:00, day from 08:00, dusk from 17:30, night from 20:30. It follows the clock, and the chrome follows the system's light or dark setting, so any light can meet either mode.
+
+| | Dawn | Day | Dusk | Night |
+|---|---|---|---|---|
+| Sky, top to horizon | `#3a62b6` to `#ffe9cf` | `#1a46a6` to `#e1edfa` | `#1b1d6a` to `#ffb06e` | `#03061a` to `#27418c` |
+| Ridges, far to near | `#bab8e2` to `#535ea8` | `#a7c4ef` to `#355fb3` | `#865ca4` to `#282466` | `#2a3779` to `#0f163e` |
+| Banks, shade to light | `#183f2e` to `#e2dcae` | `#174a28` to `#d2e88e` | `#0b1719` to `#b08458` | `#020c07` to `#20573a` |
+| Water | `#4a5fae` | `#2a5fb8` | `#2a246e` | `#0a1440` |
+| Pale air | `#fbe8e0` | `#e8f1fb` | `#f6b8b0` | `#3a4f9e` |
+| Bright thing | A pink-lit cloud | A white cloud | The sun, well clear of the ridges | A dim moon |
+| `scene-scrim` | `#1e3478` | `#102c70` | `#141450` | `#04071c` |
+| `scene-field` | `#3e589c` | `#2c4a92` | `#342e78` | `#1e244c` |
+
+### The top bar over the valley
+
+On the new tab the valley runs up behind the top bar. The bar's part over the page sits on a scrim of `scene-scrim`, solid at the top and gone 104px down, so its white icons and the window buttons read in every light. The address field there is solid `scene-field`, with its placeholder in white at 80%: 5.0:1 at dawn, 6.0:1 by day, 8.0:1 at dusk and 10.0:1 at night. In the horizontal layout the tab row stays `background`, and the address row and bookmarks bar sit on the scrim.
+
+### What's drawn on it
+
+Only these, all on solid `surface` when they hold words:
+
+- **The composer and its tray.** See New tab.
+- **The flock,** as `<Mascot>` elements standing on the banks, the box, the cloud or a ridge, so each can be pressed, moves with the usual moods, and has a label. They are not painted into the picture.
+- **Slips:** a small `surface` label beside a bird or holding its place, in the words of a job's status. See New tab.
+- **Places on the shore,** later: see Routines on the shore under New tab.
+
+### How it's made
+
+The valley is one component, `<Valley light>`, so its artwork can be replaced without touching screens, like the mascot. It takes the light and the box it's composed around.
+
+- **For now it's painted in code,** by the painter this design was mocked with, in 2px cells. The illustrator's layers replace it later with no change to any screen: see `docs/illustration-brief.md`.
+- **It never blocks typing.** The scene's sky colour shows at once, and the painting fades in when it's ready. It's painted off the main thread, once for a light and size, and kept. Resizing stretches the old picture until the new one is ready.
+- **It doesn't scroll or move.** It is still.
+- **Hide Berry** keeps the valley and removes the birds. There is no setting to turn the valley off yet.
+
+## 10. Key screens
+
+This redesign has redrawn the new tab, the main chat, the working view and the chat panel. The other screens below are carried over: their behaviour stands as written, and their look follows sections 1 to 9. Where one of them still names something from the old look, the foundations win, and the screen gets its own pass here before it's rebuilt. The composer of the bird on the desktop keeps its native material until then.
 
 ### Onboarding
 
 Short, skippable steps: meet Berry, choose layout and appearance, bring in history, and what Berry can and can't see, which also says Berry needs an AI key to answer. No account is requested.
 
-**Bringing in history** is the third of four, with no card: Berry, a question, the browsers found to choose from if there's more than one, and plain lines saying what happens. Only addresses, page titles and visit times from the last 90 days come across, from every profile of that browser, and never passwords or cookies. It stays on this computer, apart from the summary Suggestions sends, and the lines say exactly what that is. **Bring it in** or **Skip**. It then says how many visits came across, or that it couldn't read them, and a failure can be tried again or skipped. If no browser is found the step isn't there and isn't counted, which is what a Safari user gets, because reading Safari needs Full Disk Access. Finishing lands on the new tab, where the birds speak about what came across.
+**Bringing in history** is the third of four, with no card: Berry, a question, the browsers found to choose from if there's more than one, and plain lines saying what happens. Only addresses, page titles and visit times from the last 90 days come across, from every profile of that browser, and never passwords or cookies. It stays on this computer, apart from the summary Suggestions sends, and the lines say exactly what that is. **Bring it in** or **Skip**. It then says how many visits came across, or that it couldn't read them, and a failure can be tried again or skipped. If no browser is found the step isn't there and isn't counted, which is what a Safari user gets, because reading Safari needs Full Disk Access. Finishing lands on the new tab, where the ideas under the box come from what came across.
 
 ### New tab
 
-Berry, large, stands on the top edge of a 752px composer, right of centre, so it covers no text or control. It's drawn inside the composer's wrapper, so the two scroll as one. It only flies as a separate layer on its way there. Below rises the art blueberry, the page's one big moment: thousands of tiny berries spiral out of a sunken crown like seeds in a sunflower head, swelling in the light and shrinking in shadow, under heavy grain, with dust drifting off the edge so it has no hard outline. It is 1240px across at any window size, painted once and never moves. Birds stand on it to say suggestions if there are any. Otherwise the same birds offer up to three real chats and routines, each by the bird that runs it, or Berry offers two ideas linking to real features if there are none of those either. Recent pages follow in a frosted panel if there are any. When the sidebar is closed, links to Needs you, Routines, Flock and Settings sit under the composer, on a frosted strip the birds pass behind. Faint, irregular trails of alternating bird footprints sit in the background behind the art blueberry, with varied lengths, directions and faded sections instead of a repeating tile, and two small birds walk around behind the page leaving new prints that slowly fade. They pause to peck now and then. Each print is the size of the bird's foot and lands under it, and a stride is what its legs really cover. Still, Hide Berry and reduced motion remove the birds and keep the old trails, and so do suggestions, so that the birds saying something you've repeated have the page to themselves. Nothing appears in the recent list unless it is real. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
+The valley fills the page and runs up behind the top bar. In it, a little above the middle, is the box you type in, 680px wide, with the chosen bird perched on its top edge towards the right. This is where every job starts, so the box is what you see first. The chat panel doesn't open here, because this page has its own composer. It returns on the next page if it was open.
+
+**The box** is the one composer, tall, on solid `surface` with a 28px radius:
+
+- **The placeholder names the bird:** "Ask Berry or search", and "Ask Tova or search" once Tova is chosen. "Or search" is true because the bird searches the web when the question needs it. A plain engine search is still the address field's job.
+- **Its controls,** in one row under the text: the bird picker with the name only and a chevron, **In the cloud** with a switch, only for a bird that's set up to work there, and send at the right end. `+` is there only where there's something to add, as in the chat panel, where it brings the page back. A control with nothing to do isn't shown. In light mode they share one outline. In dark mode they are filled with `control-fill` and have no edge.
+- **The perched bird** is drawn inside the composer's wrapper, so the two move as one. It looks towards the caret while you type, without moving from its place, and flies off when you send. With Keep Berry still it only stands there.
 
 `Enter` opens anything that looks like an address and asks Berry about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. Searching is the address bar's job.
 
+**The tray** is attached under the box: 8px narrower than it, tucked under its lower edge, on `tray`, with 24px lower corners. The box and the tray share one shadow, so they read as one object. It holds one line and two quiet buttons:
+
+- **The line** is the most useful thing to do next, in this order: a bird that needs you; then the top suggestion; then a chat or routine to pick up; then, with none of those, one idea that links to a real feature. Its one action is an outlined button at its right: **Fill in**, **Set it up**, **Meet Pip**, **Open**.
+- **More ideas** says how many more there are, such as "2 more ideas", and opens the tray downwards into a list on `surface`: every idea, the first one included, each with the reason it's there under it, its action, and × for Not now. While it's open the button has the open fill and says "Fewer". The list is part of the tray, not a card of its own.
+- **Recent pages** opens the same way, to real pages only, each as its title, then its site.
+- **A bird that needs you** takes the line over, on `attention`: "Pip needs you: send the shortlist to Anna?", with **Review Pip's request**, filled, and **Later**, outlined. Review opens that chat at the request. Later puts the line back as it was, and the request stays on Needs you.
+- While the box has text in it, the line fades to `muted-foreground` and nothing in the tray changes.
+- With the sidebar closed, links to Needs you, Routines, Flock and Settings sit under the tray as quiet pills on `surface`.
+
+**The flock in the valley.** The birds you aren't talking to rest on the banks: the one you used last on the left bank at about two thirds of the perched bird's size, the next on the right bank at half. Any others are in the picker and on the Flock page. Each is a button with its name, such as "Switch to Tova", shown on hover and focus on a small `surface` label. Pressing one, or choosing it in the picker, makes it fly to the box and take the perch, and the bird that was there flies to the bank. The placeholder changes with it.
+
+**Where a bird is says what its work is doing,** and a slip of words says the same:
+
+| State | The bird | Its slip |
+|---|---|---|
+| Free | Rests on its bank | None |
+| Working on this computer | Small, over the far ridge | On its place on the bank: "Tova · on this Mac · Comparing pricing · 3 of 5 sites · Open" |
+| Working in the cloud | Sits on the cloud. By dusk and at night, with no cloud, it's small over the far ridge like the others | Beside it: "Pip · in the cloud · Scouting new rounds · 2 of 4 sources · Open" |
+| Needs you | Lands on the left end of the box | The tray's line, on `attention` |
+| Done, and you haven't seen it | Back on its bank with the note in its beak | "Tova · done · Apollo is cheapest in year one · Open" |
+
+- **A slip is the truth and the bird is its picture.** A slip always has the same four parts in the same order as the job line in a chat: the bird, where it runs, what it's doing, and how far it's got. **Open** goes to that chat. Every slip is in the tab order.
+- **The chosen bird stays on the box** even while one of its jobs runs, so you can always ask it something else. Its job's slip sits on the bank, without a second drawing of the bird.
+- **At most three slips** show. With more, the last says "and 2 more", and opens Needs you if anything is waiting, or the first of those chats.
+- **Done is seen once.** Opening the chat, or the next time the page opens after the slip has been on screen, the note is gone and the bird is free.
+- **It mirrors, it doesn't decide.** The sidebar's chats and Needs you are the record. The valley shows the same state and can never be the only place something is.
+- **When it changes:** when the page opens, or once the box has been idle for about 5 seconds. Never while you type, and one flight at a time.
+- **Hide Berry** removes the birds and lists the same slips under the tray, as plain lines. **Reduced motion** and **Keep Berry still** put each bird in its place with no flight.
+
+**In a small window** the box keeps its place and width down to the window's minimum, the perched bird gets smaller, the cloud keeps clear of the page's left edge, and the banks keep the resting birds inside the frame.
+
+**Routines on the shore,** later, not built yet. Each routine gets a small built place on the far shore or the lake: a jetty, a boathouse, a birdhouse on a post, a buoy. Each has its name on a small label, always showing. A lit window means it ran today, its bird on it means it's running now, and hover or focus shows when it last ran and when it's next due, with Open. At most six show, and the rest are only on Routines. They are in the tab order after the slips. Nothing is earned, unlocked or upgraded: a deleted routine's place simply goes.
+
+**The valley through the year,** later, not built yet. The same place with a small drawn calendar: spring flowers on the banks, taller summer reeds, autumn seed heads, winter frost on the shaded shore. It needs only the date, never a location.
+
 **Suggestions** are what Blueberry noticed you trying to get done, offered as work it can take over: fares compared across three sites, a search repeated on different days, a score checked every Monday, a chat that got no answer, a routine that keeps failing. The cheap model decides what to offer, from a digest of the last two weeks, and code checks every claim it makes. Each says plainly why it's there, and anything it says about the user, every count, day and time, has to be in what it cites.
 
-**How they look:** not cards. Each is a bird at 76px standing on the fruit's real outline, in up to three columns of 224px, or stacked below it in a narrow space. The words are directly on the fruit, below its outline at every point of their column, so outer columns sit lower and the group follows the curve. The reason comes first in `primary-foreground`, then one semibold sentence the bird says. Under them is one action in words with an arrow, and Not now, shown on hover or focus. Berry says Prompt and Routine ideas. A Mascot idea is said by that new bird in its own colours, facing you in Asking, as if it has turned up to meet you. The last of several faces inwards. Hide Berry removes the birds and keeps everything else in place.
+**How they look:** not cards. The top suggestion is the tray's line, with a small bulb before it, one sentence, and its action. Opened, each idea is a row: the sentence in `foreground`, the reason under it in `muted-foreground`, its action as an outlined button, and × for Not now, with a target of at least 24px. An idea for a bird other than the chosen one says so on its button and shows that bird in it: "Fill in as Tova". A Mascot idea shows the new bird in its own colours. Hide Berry removes the birds and keeps everything else in place.
 
-- **Prompt:** "Put it in the box" puts a ready prompt in the composer with the cursor at the end. Enter sends it.
+- **Prompt:** "Fill in" puts a ready prompt in the box with the cursor at the end, and chooses that idea's bird. Enter sends it.
 - **Routine:** "Set it up" opens the routine form filled in with a name, instructions and a schedule that finishes 15 minutes before the user usually looks.
 - **Mascot:** "Meet" and its name opens the new-mascot form filled in with a look, name, instructions and limits. It starts limited to the sites in its evidence, with only Go to pages switched on.
 
@@ -408,7 +534,7 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 | Drag | Takes hold, and carries on across to where it goes, in time with the real drag |
 | Choose an option, press a key | Lands and pecks, or a hop on the spot |
 | Go somewhere | Takes off, and comes back where it was once the new page is there |
-| Between steps | Thinking, with the berry going up and down |
+| Between steps | Thinking, with its crest twitching |
 | A job waits for an answer | Asking, facing you, with "Waiting for you". On an approval about one element it stands on that element, so asking to click Place order puts it on Place order. It flies there as the card appears and the card doesn't wait for it, and again whenever the tab comes into view while the card waits, in front of the user or in the working view. If that element is gone or out of view, it asks from where it is |
 | A frame from another site | Its script can say anything about itself, so nothing's asked of it. The bird stands near the top of that frame in the page around it |
 
@@ -454,7 +580,7 @@ Other AI browsers want you to come to them. This lets you start a job from any a
 
 ### Find in page
 
-`⌘F` (`Ctrl+F` on Windows) opens a bar in the top right corner of the page, in an overlay view of its own, using the Floating glass level. It has a field, a count such as "2 of 14" or "No results", previous and next, and close. `Enter` and `Shift+Enter` step through matches, and `Esc` closes it and puts the keyboard back on the page. The bar belongs to one page: going to another tab closes it, and opening it again keeps the last search, selected so typing replaces it. Internal pages can be searched too, and because the chrome view draws them, matches in the sidebar count as well.
+`⌘F` (`Ctrl+F` on Windows) opens a bar in the top right corner of the page, in an overlay view of its own, on solid `surface` with the floating shadow. It has a field, a count such as "2 of 14" or "No results", previous and next, and close. `Enter` and `Shift+Enter` step through matches, and `Esc` closes it and puts the keyboard back on the page. The bar belongs to one page: going to another tab closes it, and opening it again keeps the last search, selected so typing replaces it. Internal pages can be searched too, and because the chrome view draws them, matches in the sidebar count as well.
 
 ### Zoom and printing
 
@@ -466,16 +592,30 @@ Right-clicking a web page opens a native menu with what was clicked in mind: spe
 
 ### Main chat
 
-A full page for talking to Berry about anything, not about a particular web page. A chat starts from the new tab page and then lives as a tab, which the sidebar shows only as the chat's row under Chats, with past chats. There's no empty chat page.
+A full page for talking to a bird about anything, not about a particular web page. A chat starts from the new tab page and then lives as a tab, which the sidebar shows only as the chat's row under Chats, with past chats. There's no empty chat page.
 
-- A centred conversation and composer of 752px, with the composer fixed at the bottom.
-- Messages and the composer are the same components as the chat panel, so the two sizes look like one chat.
+- **Paper.** The conversation is on `canvas`, with no art behind it. A centred column and composer of 680px, with the composer fixed at the bottom. The valley appears only beside it, and only while a job works in tabs: see The working view.
+- **The composer is the new tab's box,** with the same picker and send, and the chosen bird perched on its top edge. **In the cloud** is only in the new tab's box, where a job starts. It has no tray. Its placeholder is "Reply to Berry", with the bird's name.
+- **Messages and the composer are the same components as the chat panel,** so the two sizes look like one chat.
+- **Your messages** are bubbles on `muted`, at the right. **A bird's replies** are plain text on the paper, with its bird at 30px hanging just outside the column's left edge, at the reply's first line. That is true for Berry too, so it's always clear who wrote what.
+- **Straight after you send,** the reply starts with the berry and a few words in `muted-foreground`, such as "Writing a shorter version…", and send becomes Stop, so a message never looks lost.
 - A chat is named automatically once it has a topic, and until then shows its first message. A name the user chose is never replaced.
 - In the sidebar, hovering or focusing a chat swaps its age for a button with Rename and Delete, also on right-click, and a close × beside it while the chat is open as a tab. Rename edits in place, and Delete asks first because it can't be undone.
-- Berry's working state says what it is doing and offers to show the work in a tab. Steps, once the agent reports them, form a trail: a footprint for each finished step and the berry on the current one. A click the user allowed names what the card named, such as "Clicked “Place order” on shop.example", cut to 48 characters. That name is page text, so it's only drawn: the model, the cloud and other apps only ever get "Clicked something".
-- A web search shows as "Searched the web for “…”", with the query cut to 48 characters, so the user sees what went out. The query is the model's words, so it's only drawn too: the model and the cloud get "Searched the web". A search that could carry data asks first, on a card naming the whole query.
+- **The trail.** Steps, once the agent reports them, form a trail under the status line: a tick for each finished step and the berry on the current one. A click the user allowed names what the card named, such as "Clicked “Place order” on shop.example", cut to 48 characters. That name is page text, so it's only drawn: the model, the cloud and other apps only ever get "Clicked something".
+- A web search shows as "Searched the web for “…”", with the query cut to 48 characters, so the user sees what went out. The query is the model's words, so it's only drawn too: the model and the cloud get "Searched the web". A search that could carry data asks first, on a request naming the whole query.
 - **A shorter trail,** the same in the main chat, the panel and Routines. While a job runs, only its latest three steps show, with the current one last, under a quiet line such as "17 earlier steps" that opens to all of them. Once it has finished, the whole trail is one line, such as "20 steps on webhallen.com", which opens the same way. A job cut short, with an error or no answer, or a run that failed, stopped or was interrupted, keeps its latest three showing, so you can see where it ended. A lone step just shows. Anything it asked the user, anywhere it stayed off, or where it was stopped, stays showing on any trail. Folding the trail changes nothing about what's saved or told to the model. A stopped reply always ends with the step "Stopped here", even when it had done nothing yet, so it never ends in nothing. That step is saved with the reply, and the model reads it next time as it reads every step.
-- **A job's tabs aren't the user's.** While a job runs, the tabs it opened show under its chat in the sidebar, indented, at 13px with their favicon, and not under Tabs. The horizontal tab row has no chats, so they stay in it. When the reply ends, done, stopped or failed, they close by themselves. Two stay, as the user's: one they took over by clicking, typing or navigating there, and the one the reply points to, which is the job's last tab when the reply names its site or address, decided in code. One handed to the user, one another job is using, and the one the user is looking at are left alone. Under the reply, a quiet line, "Pages it used (3)", opens to each page's title and site, and pressing one opens it as the user's own tab. The addresses are saved with the reply, with only the site and path of one that came back from a handoff, and none a code was typed into.
+- **A job's tabs aren't the user's.** While a job runs, the tabs it opened show under its chat in the sidebar, indented, at 13px with their favicon, and not under Tabs. The one it's on is in `foreground` and the others in `muted-foreground`. The horizontal tab row has no chats, so they stay in it. When the reply ends, done, stopped or failed, they close by themselves. Two stay, as the user's: one they took over by clicking, typing or navigating there, and the one the reply points to, which is the job's last tab when the reply names its site or address, decided in code. One handed to the user, one another job is using, and the one the user is looking at are left alone. Under the reply, a quiet line, "Pages it used (3)", opens to each page's title, then its site, and pressing one opens it as the user's own tab. That is the one list of a reply's pages. The addresses are saved with the reply, with only the site and path of one that came back from a handoff, and none a code was typed into.
+
+**The job line.** While a job runs, one line sits just above the composer, on `card`, as wide as the composer:
+
+- **What it says,** in the same four parts and the same order as a slip on the new tab: the berry, then "Berry · on this Mac · reading clay.com · 1:24". The time is in tabular figures. A cloud job says "in the cloud".
+- **Hide work** or **Show work** is at its right end, only while the job has tabs to show. See The working view.
+- **Stop is not on it.** The composer's filled square is the one Stop, and it works in every state of a job, while it waits for you too.
+- **Needs you:** the line turns `attention` and says "needs you" in place of what it was doing.
+- **In the sidebar,** the running chat's row has the berry at its end.
+- It goes when the job ends. There are no metrics, costs or token counts.
+
+**A question.** When a bird can't go on without something only the user knows, it asks in the conversation, Asking, in one sentence at 16px, with a line under it: "Answer in the box below, or skip and I'll write a general one." There is one place to answer, the composer: it gets a 2px `foreground` edge, a small `berry-blue` label above its text that says what it's answering, such as "Answering Berry: who it's from and what you offer", and the question's hint as its placeholder. Sending answers it. **Skip** is the link in the bird's line. A question waits like an approval, in any Ask before acting setting. Passwords, codes and card details are never asked for here.
 
 ### Saying what it'll do
 
@@ -488,18 +628,20 @@ On a job of more than one step, Berry first says in one sentence what it'll do, 
 
 ### The working view
 
-While a job uses tabs, a job behind the chat can be watched. Other AI browsers show a little window too. In ours **you watch the bird work inside it**. It's on the right of the main chat, drawn on the page's own `canvas`, with no card or panel around it, only words and thin lines. The side chat panel doesn't have it, because the page is already beside it. A job with no tab shows nothing.
+While a job uses tabs, a job behind the chat can be watched. Other AI browsers show a little window too. In ours **you watch the bird work in the valley**: the right side of the main chat opens onto it, and the bird works in a window held in its sky. The side chat panel doesn't have it, because the page is already beside it. A job with no tab shows nothing, and the chat stays all paper.
 
-- **The window:** a picture of the tab it used last, the page's own shape, 38% of the page's width between 300px and 600px, big enough to film, with the site along its top like the page card's address row. It wears the reading ring while the job works. The job's other tabs are 104px thumbnails under a line, with their site beneath and no bird, as there's only one. Pressing any of them goes to that tab, which doesn't take it over.
-- **The bird in the picture** is the real one, drawn in the real page with the same pacing as if the user were looking, because a tab with a picture on screen counts as watched. It's drawn larger there, so it's 42px in the picture. The line near it isn't drawn, since the words under the window say the same at a size you can read. Thinking stays still between steps in a picture.
-- **The edge of the window:** nobody stands on it while the bird is in the picture, because two of the same bird would be two colleagues. A bird that isn't in the picture stands there instead, on a tab handed to the user, once the job has ended, or with Show the bird on pages or Keep Berry still on.
-- **The words under it:** what it's doing now at 16px, shimmering, in the bird's words, or a step in the present tense if there's no bird to say it. Then who, how long it's been going in tabular figures, and **Stop**, which does what Stop in the chat does. The sites it has been on come last, if there are two or more. There are no metrics, costs or token counts.
-- **Waiting:** "Waiting for your OK" or "Has a question for you", with **Answer in the chat**, which goes to it. The buttons themselves are only ever in the chat. A tab handed to the user says "Waiting for you" with no link, because it's answered in the tab, which the window goes to.
+- **The valley side** is 44% of the page, between 440px and 560px (*to tune*), at the page's right edge, top to bottom, in the light the clock gives. The rest of the flock rests on its banks as on the new tab, without slips.
+- **The conversation keeps its place.** While a job has tabs, the column and the composer sit in the space left of the valley side, whether it's showing or hidden, so hiding and showing never move or rewrap what you're reading. When the job ends, the valley closes and the column goes back to the centre, once, with the layout duration.
+- **The window:** a picture of the tab it used last, the page's own shape, as wide as the valley side less 50px each side, big enough to film, with the site along its top: its icon, the site in semibold and the rest of the address. It wears the reading ring while the job works.
+- **The card under it,** on `surface` with an 18px radius: what it's doing now at 16px, shimmering, in the bird's words, or a step in the present tense if there's no bird to say it. Then the sites it has been on, if there are two or more. Then the job's other tabs as 104px thumbnails under a line, with their site beneath and no bird, as there's only one. Pressing the window or a thumbnail goes to that tab, which doesn't take it over. The card has no Stop and no time: those are on the job line and the composer.
+- **The bird in the picture** is the real one, drawn in the real page with the same pacing as if the user were looking, because a tab with a picture on screen counts as watched. It's drawn larger there, so it's 42px in the picture, and it stands beside what it's reading, not over it. The line near it isn't drawn, since the card says the same at a size you can read. Thinking stays still between steps in a picture. While it's in the picture, nobody is on the composer.
+- **Hide work** is on the job line. It closes the valley side and leaves the job line, which then says **Show work**. The bird stands on the right end of that line while the work is hidden. The choice is remembered, so a later job starts the way you left it.
+- **Needs you:** the card says "Needs you", with **Answer in the chat**, which goes to it. The buttons themselves are only ever in the chat. The bird isn't in the picture then, because it's beside its request, Asking. A tab handed to the user says "Waiting for you" with no link, because it's answered in the tab, which the window goes to.
 - **A tab the user has:** handed over or taken over, the window is only its address row, 40px tall, with the site and "You have this tab", and the bird stands on its top edge. There's no picture to show, so there's no empty box.
-- **The end:** the ring fades, the bird flies up out of the picture, and it stands on the edge, Delivered if it finished and at rest if it didn't, over the last picture and "Done", "Stopped here" or "It didn’t finish". It stays quiet like that until the next message, when it goes, or until the user leaves the chat, and it isn't there when they come back. Since a job's tabs close when it ends, it only stays where one of them did.
-- **No room:** below 960px of page, one line above the composer says the same with the bird, the site and the time, and pressing it goes to the tab. There's no picture and nothing is captured. It goes when the job ends.
-- **Show Berry off:** plain words and no bird on the edge. In the picture it's the plain pointer, as on a page.
-- **In the cloud:** the window is the cloud tab's own live view, or the test browser's pictures fitted whole at the top, locked as it is before Take over, and pressing it opens that cloud tab. No bird is drawn in a cloud page, so it stands on the edge throughout, and other cloud tabs are plain thumbnails.
+- **The end:** the ring fades, the bird flies out of the picture and back to the composer, Delivered if it finished and at rest if it didn't, and the valley side closes. The answer then has the whole column. Nothing of the last page stays on screen: it's under "Pages it used".
+- **No room:** below 960px of page there's no valley side, only the job line, and Show work goes to the tab. Nothing is captured.
+- **Show Berry off:** plain words and no bird. In the picture it's the plain pointer, as on a page.
+- **In the cloud:** the window is the cloud tab's own live view, or the test browser's pictures fitted whole at the top, locked as it is before Take over, and pressing it opens that cloud tab. No bird is drawn in a cloud page, so it stands on the window's top edge throughout, and other cloud tabs are plain thumbnails.
 
 **Pictures protect the user.** They go only to the chrome renderer, through its own channel, and never to the model, a tool, a saved chat or the disk. A tab handed to the user, or taken over by them, shows "You have this tab" with no picture. Capture stops first, and one already on its way is thrown away. The same goes for a page off a mascot's sites, with page access off, for a page that may show a code from the phone, and for one that has crashed or couldn't load. Only tabs this job has used are ever pictured, and only while the chat is the tab in front and the window is showing. Berry's own `screenshot` tool is separate and still hides the bird.
 
@@ -510,11 +652,11 @@ While a job uses tabs, a job behind the chat can be watched. Other AI browsers s
 You press **Show Berry how**, do a job once, press Stop, and Berry turns it into a routine. Nobody writes a prompt. The other AI browsers that watch you do it all the time. This watches only between start and Stop, and you read everything it saw before anything happens.
 
 - **Starting:** beside **New routine** on Routines, in the Go menu, and in the page menu on a plain page. With Hide Berry it says **Record a routine**.
-- **While it watches:** in the toolbar, beside the address, a `destructive` dot that pulses, the bird in Curious, "Berry's watching", how long in tabular figures, how many notes when there's room, and **Stop**, filled in `destructive`. Beside the chat panel on a narrow page it's the dot, "Watching" and Stop, and the bookmark star and pin give way to it. The recording ring goes round the page card. Both are on every tab, ours too, in both layouts. They're in the chrome, so no page can reach or cover them, and nothing is drawn on the page. With Hide Berry it says "Recording".
+- **While it watches:** in the toolbar, beside the address, a `destructive` dot that pulses, the bird in Curious, "Berry's watching", how long in tabular figures, how many notes when there's room, and **Stop**, filled in `destructive`. Beside the chat panel on a narrow page it's the dot, "Watching" and Stop, and the bookmark star and pin give way to it. The recording ring goes round the page. Both are on every tab, ours too, in both layouts. They're in the chrome, so no page can reach or cover them, and nothing is drawn on the page. With Hide Berry it says "Recording".
 - **What's watched:** only the tab in front, and only what the user does there. Going somewhere, clicking something with a name, what's typed once they've finished with a field, or on Enter or Tab in an editor like a spreadsheet's, choices, boxes and pressing Enter. Copying is noted with the text that was selected, and pasting with only the field it went in, as what's pasted is read from the field like anything typed. Selecting text isn't a click. Not scrolling, not pointer movement, no pictures, never the clipboard, and never a key as it's pressed. Events a page makes for itself don't count, and nor does anything on a tab a job is using or one held for a sign-in. Our own pages aren't watched. A frame from another site is only noted as used, because nothing outside it can see in.
 - **What's never kept, even for a moment:** the value of a password, hidden, one-time code or payment field, or any field in a form with a password in it. A field that has been one stays one, so "show password" doesn't change it, and something shaped like a card number counts wherever it's typed. It says "Typed in the password field", or "Copied from the password field", with a lock, and nothing a page calls it. An address loses its query, fragment, any login and anything in its path that looks like a token. A query stays only when it's plainly what was just typed, or from the address bar under a name that means a search, and it's on the review as a search.
 - **The limit:** 150 notes or half an hour, whichever comes first. It then stops by itself, opens the review and says why.
-- **The review:** "What I watched", a tab of its own and never restored. It's Berry's notes, not cards: the heading with the bird at 88px in Curious standing on the line under it, then the notes under each site, split by `border`. Each has a footprint, or a lock for a secret, the sentence at 16px with what was typed in semibold, the address at 12px if it went somewhere, and **Leave out**, always showing. At the bottom of the page, under a line, are **Turn this into a routine** and **Throw it all away**, with what will be sent in words. Closing the tab throws it away, and starting another does too.
+- **The review:** "What I watched", a tab of its own and never restored. It's Berry's notes, not cards: the heading with the bird at 88px in Curious standing on the line under it, then the notes under each site, split by `border`. Each has a tick, or a lock for a secret, the sentence at 16px with what was typed in semibold, the address at 12px if it went somewhere, and **Leave out**, always showing. At the bottom of the page, under a line, are **Turn this into a routine** and **Throw it all away**, with what will be sent in words. Closing the tab throws it away, and starting another does too.
 - **Confirming:** the notes go as words, with anything a page wrote marked as data to be named and never followed. The cheap model writes a name, numbered steps and what might change. It can't set sites or tools, a change has to be something the user really entered, and steps naming another site are thrown out for the user's own notes as they stand. With no model, or if it can't be used, the plain version is what fills the form. If the call fails, it says so and the notes stay. Once the form is filled in, the trail is gone.
 - **The form:** the same routine form, with two more parts. **What might change** is one row for each value, where changing it changes the instructions above and **Ask me each run** makes the run ask through the usual question. **Sites it may use** starts with the sites in the notes, and a run can't go anywhere else. Where one company runs many products, such as Google or Microsoft, the site is the whole host, so a Google Sheet is docs.google.com and not all of Google. When starts as **When I ask**, which only Run now starts, so nothing runs by itself until the user picks a time. **Save and run it now** is the main button, with **Save** beside it.
 - **The run** is any routine's run, with the same approvals, Needs you and steps. Sites only take away, on top of the mascot's limits. Off them it shows "Stayed off example.com".
@@ -522,9 +664,10 @@ You press **Show Berry how**, do a job once, press Stop, and Berry turns it into
 ### Chat panel
 
 - Opens on the right with `⌘E` (`Ctrl+E` on Windows) and pushes the page.
-- A card on the composer, with the page's icon, title and address, shows the page Berry can see. Removing it takes the page away from Berry, and the composer's + brings it back. No card means Berry sees no page. While the card is there, Berry may also read your other open tabs when the question needs it, and every look shows as a step. With no card, Berry can only open and use tabs of its own, each after asking, and they open behind the chat. Tabs Berry opens from the panel open behind the page too. Going to one to watch changes nothing, and Berry carries on. Clicking or typing in it, or sending it somewhere from the address bar or Back and Forward, takes it over: Berry can't reach it any more, stops, and says so.
-- An approval request is the mascot speaking, in line with the conversation and with no card or shadow. Its bird in Asking sits beside it, hanging outside the column in the main chat as on a reply, and at the start of the line in the panel and on Routines. It leads with what it would like to do at 16px, with each address cut down to its site in semibold, such as "I'd like to open **github.com** in a new tab". That is the exact words with only the addresses shortened, and with Hide Berry it says "Assistant wants to". Under it, at 12px in a block of `muted` (`tray` in dark mode, where it's the darker one) with the `control` radius and never cut, are the exact words from the tool, which are what's being allowed, as on the phone page. Where no address was shortened, the sentence already is the exact words, so there's no block. **Allow**, filled, and **Don't allow**, outlined, are on one line below, in that order everywhere: here, on Needs you, on the phone page and in Telegram. By default one appears only for what could delete, send, buy or change text, such as a Delete button or typing in a form, and for an address carrying data in its query. A query and hash of up to 100 characters don't ask on YouTube, Google, Bing, DuckDuckGo, Wikipedia, GitHub, Reddit or Amazon, or on the exact site of a page the job already has open. Going to a plain link or typing a search doesn't ask. Settings can make Berry ask always or never. Don't allow tells Berry no.
-- When Berry can't go on without something only the user knows, it asks the same way, with a text box, Answer and Skip. It carries on with the answer, and a question waits like an approval, in any Ask before acting setting. Passwords, codes and card details are never asked for here.
+- The panel is part of the chrome, on `background`, with nothing between it and the top bar. Its composer is the new tab's box at the panel's width, with the picker inside it and the chosen bird perched on its top edge, so there is one composer everywhere. **In the cloud** isn't in it, because a cloud job can't see the page beside it.
+- A line just above the composer, with the page's icon, "Berry sees this page" and the page's title, shows the page the bird can see. Removing it takes the page away from Berry, and the composer's + brings it back. No line means Berry sees no page. While the line is there, Berry may also read your other open tabs when the question needs it, and every look shows as a step. With no line, Berry can only open and use tabs of its own, each after asking, and they open behind the chat. Tabs Berry opens from the panel open behind the page too. Going to one to watch changes nothing, and Berry carries on. Clicking or typing in it, or sending it somewhere from the address bar or Back and Forward, takes it over: Berry can't reach it any more, stops, and says so.
+- An approval request is the mascot speaking, in line with the conversation and with no card or shadow. Its bird in Asking sits beside it, hanging outside the column in the main chat as on a reply, and at the start of the line in the panel and on Routines. It leads with what it would like to do at 16px, with each address cut down to its site in semibold, such as "I'd like to open **github.com** in a new tab". That is the exact words with only the addresses shortened, and with Hide Berry it says "Assistant wants to". Under it, at 12px in monospace in a block of `tray` with a 12px radius and never cut, are the exact words from the tool, which are what's being allowed, as on the phone page. Where no address was shortened, the sentence already is the exact words, so there's no block. **Allow**, filled, and **Don't allow**, outlined, are on one line below, in that order everywhere: here, on Needs you, on the phone page and in Telegram. By default one appears only for what could delete, send, buy or change text, such as a Delete button or typing in a form, and for an address carrying data in its query. A query and hash of up to 100 characters don't ask on YouTube, Google, Bing, DuckDuckGo, Wikipedia, GitHub, Reddit or Amazon, or on the exact site of a page the job already has open. Going to a plain link or typing a search doesn't ask. Settings can make Berry ask always or never. Don't allow tells Berry no. When the address carries data, a second sentence says what, built in code from the address itself and never in the model's words, such as "The address carries seats=10 and credits=50000.", and the same parts are marked in the exact words. Stop stays in the composer while a request waits.
+- When a bird can't go on without something only the user knows, it asks in the conversation and the composer is where it's answered: see A question under Main chat. It carries on with the answer.
 - When a page stops it with a sign-in, a code or a captcha, Berry hands the tab to the user the same way, saying "I need you to sign in on **github.com**" and "Your password or code goes in the page, and I never see it.", with Go to the tab, I'm done and Not now. See Needs you.
 - Using Berry needs no account. Only publishing a mascot does.
 
@@ -533,7 +676,7 @@ You press **Show Berry how**, do a job once, press Stop, and Berry turns it into
 A list with schedule, last result and status, plus a page for each routine with its instructions and run history. **New routine** and **Edit** open a form in the page, never a modal: a name, instructions in plain words, and when, as when I ask, once, daily, weekly on chosen days or monthly, at a time. **Show Berry how** beside New routine starts one from doing the job instead. See Show Berry how. A day the month doesn't have means its last day. What's typed survives going to another tab. A finished main chat where Berry did some work offers **Save as routine**, not one that only asked a question or answered from what it knows, which fills in the form with what the user asked for, to change before saving.
 
 - **A run** works like a chat with no page: the same tools, the same Ask before acting setting and the same step limit. It opens its own tabs behind the current view and closes them when it ends, except any the user has been to, which are theirs. It can't reach any other tab, including popups its pages open, which also stay behind and close with it. Its tabs are muted.
-- **Run history** shows each run as a card: when it started, its status in words, a footprint for each step and Berry's report. A run that's going has **Stop**. One that failed, was stopped or was interrupted has **Run again**. Each routine keeps its last 50 runs.
+- **Run history** shows each run as a card: when it started, its status in words, a tick for each step and Berry's report. A run that's going has **Stop**. One that failed, was stopped or was interrupted has **Run again**. Each routine keeps its last 50 runs.
 - **Status** is one of Running now, Needs your OK, Finished, Failed, Stopped, Interrupted, Waiting to start, Paused or Scheduled.
 - **Approvals** use the same card and exact words as a chat. The card waits on the Routines page and on Needs you, and so do questions and tabs handed to the user. Nothing is ever allowed for later: closing the app stops the run with nothing done, and the next launch shows it as Interrupted, saying what it was waiting to do.
 - **Timing:** a routine runs only while a window is open. A time missed with the app closed or the computer asleep runs once on the next chance, however many were missed, and says it was late. Times missed while paused are not made up. A time that comes while the same routine is still going is skipped. A run starts only while fewer than two are working, and the rest wait to start. A run waiting on the user doesn't count, so other routines carry on, and once allowed it goes straight on, even if two others have started meanwhile.
@@ -548,7 +691,7 @@ Opens as a tab from the sidebar, the Go menu, or the new tab page when there's n
 - **Making one:** a form in the page, never a modal, numbered 1 to 4, with the preview beside it, or above it in a narrow window. Look, name and what it's for take under a minute, and the limits are optional. **Surprise me** picks a look and a name. Looks are chosen by pressing the bird wearing them. What's typed survives going to another tab.
 - **The preview:** the moment this page is for. The mascot, at 160px, hops when its look changes, gets curious while you name it, thinks while you say what it's for, and faces you while you set limits. Its nine moods sit below it, and pressing one shows it. Saving flies it off, and it lands on the wire with a hop. This is the one place a bird moves with no work behind it, and Still and reduced motion stop it as they do everywhere.
 - **Limits only take away.** Any site, or only named sites with their subdomains. Reading is always on, with switches for going to pages, clicking and typing. The page says plainly that no limit changes when it asks: approvals work the same for every mascot, and a mascot has no setting that could skip one.
-- **Refusals:** something off its sites never reaches a card, because there's nothing to decide. It shows in the steps as "Stayed off example.com". With an off-limits page open, the composer says the mascot can't see it in place of the page card, and the reading ring doesn't show. Refused pages aren't read or sent, including the page that would go with a message, embedded frames from other sites, and a page that sends the tab somewhere else while the mascot acts. A click can't open what it couldn't go to.
+- **Refusals:** something off its sites never reaches a card, because there's nothing to decide. It shows in the steps as "Stayed off example.com". With an off-limits page open, the composer says the mascot can't see it in place of that line, and the reading ring doesn't show. Refused pages aren't read or sent, including the page that would go with a message, embedded frames from other sites, and a page that sends the tab somewhere else while the mascot acts. A click can't open what it couldn't go to.
 - **Choosing one:** the shared composer has a chip with the bird and its name. Pressing it opens the flock in a row inside the composer, in the flow rather than floating, so it works beside a web page. The bird on the new tab composer and the active tab becomes the chosen one. Once a chat has begun it keeps its mascot, and the chip just says who.
 - **Who's working:** a reply names any mascot but Berry above it. A chat in the sidebar shows its bird, and a running chat shows the working berry where its age goes. A tab anyone is working in shows that bird as the tab's icon, Berry's too, or the working berry when Berry is hidden, with a shimmering title. When there's no sidebar to show it and the work is in another tab, the toolbar says who's working, and pressing that goes to the tab. Berry's old chats stay plain.
 - **Works in the cloud:** while the cloud is on or a runner has accepted, a switch under the limits. Choosing that bird turns on Do this in the cloud in the composer, and the user can still turn it off for one message. It's the user's own setting, so it isn't published, shared with the phone, or copied from the Gallery.
@@ -599,7 +742,7 @@ From a mascot of your own, **Publish** opens a page in the Flock tab. It's plain
 
 ### The public site and the phone page
 
-The pages at `site/` are web pages, not the window, so they don't copy its shape. The frame and the page card mean "a browser around a page", and on the web or a phone the page is all there is: drawn as a card floating on lavender, it looks like a picture of an app rather than one. So there's no frame and no card anywhere on them.
+The pages at `site/` are web pages, not the window, so they don't copy its shape. The chrome and the page mean "a browser around a page", and on the web or a phone the page is all there is: drawn as a card floating on lavender, it looks like a picture of an app rather than one. So there's no frame and no card anywhere on them.
 
 - **On `canvas`:** the whole page, edge to edge, in light and dark. The lavender `frame` and `background` aren't used at all, not even as a band behind the header, because the only colour with a job here is the blueberry's, and a tinted band would be decoration behind content. The phone page's `theme-color` and its Home Screen colours are `canvas` too, so the status bar runs into the app bar.
 - **One grid and one left edge:** the site's column is 1040px wide with 20px gutters on a phone, 32px from 600px and 48px from 960px. The header, the heading, the birds and every section start at its left edge. Nothing is centred but the column itself.
@@ -659,7 +802,7 @@ Reopening brings back the open tabs, their order, the active tab, each tab's bac
 
 ### A page in trouble
 
-When a page crashes, stops responding or can't load, its view hides and the chrome draws Berry in its Oops mood, what happened in plain words and a Reload button, centred on the page card. A page that can't load also shows its address, and its tab is titled with the host. A load that was stopped or became a download isn't trouble. Its tab shows a warning icon, and the rest of the window keeps working. A page that recovers from being stuck comes back by itself. Going anywhere else from that tab clears it too. Reload, the toolbar button and `⌘R` do the same thing, and a stuck page gets a new process. Berry's tools on that tab get an error saying so, within 10 seconds at most for a page stuck with no sign of it.
+When a page crashes, stops responding or can't load, its view hides and the chrome draws Berry in its Oops mood, what happened in plain words and a Reload button, centred on the page. A page that can't load also shows its address, and its tab is titled with the host. A load that was stopped or became a download isn't trouble. Its tab shows a warning icon, and the rest of the window keeps working. A page that recovers from being stuck comes back by itself. Going anywhere else from that tab clears it too. Reload, the toolbar button and `⌘R` do the same thing, and a stuck page gets a new process. Berry's tools on that tab get an error saying so, within 10 seconds at most for a page stuck with no sign of it.
 
 ### Damaged saved data
 
@@ -710,9 +853,9 @@ A chat sent to the cloud runner is an ordinary chat in the list, with "In the cl
 - **Bars at the bottom:** **Send** on Start, and the box to go on in a conversation, sit on a `canvas` bar the width of the screen with a `border` line over it, pinned to the bottom above the home indicator, as a messaging app's are. No rounded corners but the controls' own.
 - **Signing in:** in the top third, where the keyboard leaves it in view. Berry stands at 104px on a wire over "Your flock, from your phone" at 28px, one line on what it's for, email, password and **Sign in**. The same account as Settings.
 - **The list:** "Blueberry" in the app bar with one quiet status, a 6px dot in `success` and "Ready", or a grey one and "Not set up" with a line in `warning` saying where to set it up, and a quiet gear for Settings. Below it, only the composer with Berry standing on it, which opens Start, and the conversations: **Needs you**, each row the asking sentence in 16px, and **In the cloud**, one row per conversation, its first prompt cut to two lines, with the bird at 28px in its newest job's mood and its name and status in 12px. A failed job's reason is in `warning`.
-- **A conversation:** each job in turn, as the chat lays it out: the prompt as the user's bubble, the bird's name, then what it's asking, its steps as footprints with the berry on the one it's on, and the reply. While the newest goes, **In the cloud** with a cloud icon over the live view in a `tray` box with a 16px radius, and **Stop** in the app bar. Once it's over, a composer like the chat's, "Ask Scout to go on", sends a follow-up as the same bird, which must still be in the flock.
+- **A conversation:** each job in turn, as the chat lays it out: the prompt as the user's bubble, the bird's name, then what it's asking, its steps with a tick on each finished one and the berry on the one it's on, and the reply. While the newest goes, **In the cloud** with a cloud icon over the live view in a `tray` box with a 16px radius, and **Stop** in the app bar. Once it's over, a composer like the chat's, "Ask Scout to go on", sends a follow-up as the same bird, which must still be in the flock.
 - **Asking:** the sentence, with sites for addresses, then the exact `describe` words in full in a `tray` block, never cut, with **Allow** filled and **Don't allow**. A question has an answer field, **Answer** and **Skip**, and an answer shaped like a code isn't sent: it says codes only go into the page itself.
-- **Handed to the user:** "Scout needs you to sign in on shop.example", with **Take over** and **Not now**. Take over unlocks the live view, which gets taller and the periwinkle reading ring, and the line under it says a code goes into the page itself, straight to the site. Then **I'm done** gives it back. There's no field on the page for a password or code.
+- **Handed to the user:** "Scout needs you to sign in on shop.example", with **Take over** and **Not now**. Take over unlocks the live view, which gets taller and the reading ring, and the line under it says a code goes into the page itself, straight to the site. Then **I'm done** gives it back. There's no field on the page for a password or code.
 - **Locked:** otherwise the live view takes no touch, and the line under it says so with a lock: if the bird needs the user there, it asks.
 - **Starting a job:** the prompt box first and focused, then **Who goes**, the flock standing on a wire, the chosen one's name in semibold over a 2px `accent-ink` line, and its limits in words, all muted. One line says whose flock it is and when the Mac last shared it, or that only Berry is here until it does. **Send** is pinned to the bottom of the screen, within reach of a thumb.
 - **After an answer,** one quiet line says what happened, such as "Allowed. Scout carries on.", for a few seconds.
@@ -740,7 +883,7 @@ The toolbar has one Downloads button, which opens this page. While anything is r
 
 When a site asks for the camera, microphone, location, notifications, MIDI, the screen or similar, a card appears in the page's top left corner, in an overlay view as tall as the card. It names the exact site and what it wants, with Block and Allow. No request is granted before the user answers.
 
-- **Solid, not glass:** it uses `surface` instead of the floating glass, so a page can't change how it reads.
+- **Solid:** it uses `surface`, so a page can't change how it reads.
 - **No Berry:** this is the user's decision. Berry doesn't appear on it and can't answer it, even in a tab it's using.
 - **Its buttons wake after 500ms,** so a page can't open it under a click already on its way.
 - **No button has focus,** so typing meant for the page can't answer it.
@@ -748,33 +891,32 @@ When a site asks for the camera, microphone, location, notifications, MIDI, the 
 - **Remembered per site:** by exact origin, both Allow and Block. The screen and opening other apps are the exception: Allow lasts for one request, and only Block is remembered.
 - **Embedded frames from another site never ask,** because the user can't see who they are. Device pickers for USB, HID and serial don't exist yet, so those are refused.
 
-## 10. Accessibility
+## 11. Accessibility
 
-- **Standard:** WCAG 2.2 AA for all our UI, with contrast checked on real glass.
-- **Keyboard:** everything works without a mouse. Tab views are separate native views, so focus does not move between chrome and page by itself. Provide shortcuts to jump between sidebar, address bar, page and chat, such as `F6`. Tabs reorder by dragging, or with `Alt` and an arrow key along the list.
-- **Screen readers:** everything is labelled, and Berry's status changes are announced politely. Decorative movement is hidden.
-- **System settings:** follow reduced motion, reduced transparency, increased contrast and light or dark.
-- **Colour:** never the only signal.
+- **Standard:** WCAG 2.2 AA for all our UI. Everything is on a solid surface, so contrast is measured against the token it sits on, and against the scrim and `scene-field` in each of the valley's four lights.
+- **Keyboard:** everything works without a mouse. Tab views are separate native views, so focus does not move between chrome and page by itself. Provide shortcuts to jump between sidebar, address field, page and chat, such as `F6`. Tabs reorder by dragging, or with `Alt` and an arrow key along the list.
+- **The valley** is decoration to assistive technology, and hidden from it. Everything that means something in it is a real control with a name, in the tab order: the box, the tray, each resting bird ("Switch to Tova"), each slip, and later each routine's place.
+- **Screen readers:** everything is labelled, and a bird's status changes are announced politely. Decorative movement is hidden.
+- **System settings:** follow reduced motion, increased contrast and light or dark.
+- **Colour:** never the only signal. A bird's place and colour are never the only signal either: a slip or a line of words says the same.
 - **Targets:** at least 24px.
-- **Berry:** no feature depends on Berry being visible.
+- **The birds:** no feature depends on a bird being visible.
 
-## 11. macOS and Windows
+## 12. macOS and Windows
 
 macOS is the primary platform for design and polish. Windows must keep working: CI builds and tests on it from the start, and it gets a visual pass on a real Windows PC before release. Linux is not part of this design.
 
 | | macOS | Windows |
 |---|---|---|
-| Glass | `vibrancy` plus tint | `backgroundMaterial` plus tint on Windows 11 22H2 and later, otherwise solid |
-| Window controls | Traffic lights, top left | System buttons, top right, with that space kept clear |
-| Font | SF Pro | Segoe UI Variable |
+| Window | Opaque `background`, no vibrancy | Opaque `background`, no `backgroundMaterial` |
+| Window controls | Traffic lights, top left, in the sidebar's top row | System buttons, top right of the top bar, with that space kept clear. On the new tab they sit on the scrim, in white |
+| Font | Host Grotesk, falling back to SF Pro | Host Grotesk, falling back to Segoe UI Variable |
 | Shortcuts | `⌘` | `Ctrl` |
-| Menus | System menu bar | In-window menu button, left of the system buttons in the top row, with the same menu |
+| Menus | System menu bar | In-window menu button, left of the system buttons in the top bar, with the same menu |
 | Corners | System rounded | Rounded on Windows 11, square on older versions |
-| Reduced transparency | Reduce Transparency | Transparency effects off |
+| "This Mac" | "on this Mac" | "on this PC" |
 
-If Windows glass disappoints, use the solid fallback rather than a weaker imitation.
-
-## 12. Rules for agents
+## 13. Rules for agents
 
 ### Do
 
@@ -783,21 +925,25 @@ If Windows glass disappoints, use the solid fallback rather than a weaker imitat
 - Get sizes from the layout owner.
 - Put anything that floats over a page in an overlay view sized to its content, except the bird on the page, which is drawn in it.
 - Keep AI calls and agent actions in the main process, behind the typed IPC contract.
-- Show real state: navigation, loading and what Berry can see.
+- Show real state: navigation, loading, what a bird can see and what it's doing.
+- Say a job's state in the same words everywhere: the bird, where it runs, what it's doing, how far it's got. A slip, the job line, the working view's card and the sidebar are one thing shown four ways.
+- Keep the valley and the birds behind `<Valley>` and `<Mascot>`, so artwork can be replaced without touching screens.
 - Add every new component to the gallery, in every state, in light and dark.
-- Test with reduced motion, reduced transparency and keyboard only.
-- Check contrast on glass with light and dark backgrounds behind it.
-- Run UI changes and look at them, including both layouts.
+- Test with reduced motion and keyboard only.
+- Check contrast on every surface, and over the valley in all four lights.
+- Run UI changes and look at them, including both layouts, light and dark, and the smallest window.
 
 ### Don't
 
-- Don't put glass on web pages or inject styles into them for chrome effects. The bird on the page is the one thing drawn there, and it has no controls.
+- Don't use glass, blur, a gradient or a tint in the chrome, or draw an outline or shadow round the page.
+- Don't put words or controls on the valley without a solid surface under them.
+- Don't inject styles into web pages for chrome effects. The bird on the page is the one thing drawn there, and it has no controls.
 - Don't use raw hex values or hard-coded sizes in components.
 - Don't add a colour, weight, font or shadow that isn't in this document.
-- Don't add bounce to the chrome or loops without real work behind them. The exceptions are Berry's world on the new tab page, the legs of a sitting bird, and the preview on the Flock page.
-- Don't let Berry joke about permissions, payments, messages, data or failures.
-- Don't let Berry open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestions on the new tab page. The composer on the desktop takes the keyboard only because the user pressed for it.
+- Don't draw the bird you're talking to twice in a window.
+- Don't let anything in the valley be the only place a state shows.
+- Don't move anything while the user types.
+- Don't add bounce to the chrome or loops without real work behind them. The exceptions are the legs of a sitting bird and the preview on the Flock page.
+- Don't let a bird joke about permissions, payments, messages, data or failures.
+- Don't let a bird open modals, take focus, make sounds or speak about work the user didn't start, apart from suggestions on the new tab page. The composer on the desktop takes the keyboard only because the user pressed for it.
 - Don't read page content unless the user asked.
-- Don't send browsing data to third-party services for UI features such as favicons.
-- Don't make any feature depend on Berry being visible.
-- Don't add a settings slider for glass strength.
