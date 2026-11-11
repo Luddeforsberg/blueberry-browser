@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Menu } from 'lucide-react'
 import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
@@ -19,7 +19,7 @@ import { useRecording } from './components/ShowBerry'
 import { cn } from '@common/lib/utils'
 import { siteAllowed } from '@shared/mascots'
 
-// Regions sit exactly where main's layout puts them, so the tab view lines up with the page card.
+// Regions sit exactly where main's layout puts them, so the tab view lines up with the page's place.
 const Region: React.FC<{
     rect: Rect
     className?: string
@@ -47,28 +47,36 @@ const Shell: React.FC = () => {
     const sentFrom = useRef<string | null>(null)
     if (!isLoading) sentFrom.current = activeTab?.id ?? null
 
-    if (!settings.onboarded) return <Onboarding />
-    const { page, floatingSidebar } = layout
-    const trouble = activeTab?.trouble ?? activeTab?.loadError
     // Sending a message is what lets Berry read the open page, so the ring only shows while it does.
     // It also shows on any tab Berry is using in the reply it's working on.
     const recording = recordingState.status === 'recording'
     const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && activeTab.id === sentFrom.current && siteAllowed(activeTab.url, find(mascotId).sites)))
+    const ring = settings.onboarded && (recording || reading)
+    // The ring is drawn here, in the chrome, where no page can reach or cover it, so main insets the page to make room.
+    useEffect(() => {
+        void window.chromeAPI.layout.setRing(ring)
+    }, [ring])
+
+    if (!settings.onboarded) return <Onboarding />
+    const { page, pageFrame, floatingSidebar } = layout
+    const trouble = activeTab?.trouble ?? activeTab?.loadError
+    // The new tab's valley runs up behind the top bar, which then sits on its scrim.
+    const behindTopBar = activeTab?.page === 'new-tab'
+    const internal = behindTopBar ? { ...page, y: layout.toolbar.y, height: page.y + page.height - layout.toolbar.y } : page
+    const corner = layout.pageCorner > 0 ? "rounded-tl-page" : undefined
 
     return (
         <div className="relative h-full bg-background">
-            {/* One card holds the toolbar, bookmarks bar and page, so they read as one surface. */}
-            <Region
-                rect={{ ...layout.toolbar, height: page.y + page.height - layout.toolbar.y }}
-                reading={reading}
-                className={cn(
-                    "rounded-panel transition-shadow duration-layout",
-                    "bg-canvas",
-                    recording ? "shadow-recording" : reading ? "shadow-reading" : "shadow-none"
-                )}
-            />
-            {/* Internal pages draw here. For web pages it shows until the tab view paints, or when a page has crashed. */}
-            <Region rect={page} className="overflow-hidden rounded-b-panel">
+            {ring && (
+                <Region
+                    rect={pageFrame}
+                    reading={reading}
+                    className={cn(corner, recording ? "bg-destructive" : "bg-berry-blue")}
+                />
+            )}
+            {/* Internal pages draw here, on `canvas` in the page's place and shape. For web pages it shows until the tab
+                view paints, or when a page has crashed. */}
+            <Region rect={internal} className={cn("overflow-hidden bg-canvas", corner)}>
                 {activeTab?.page && <InternalPageView tab={activeTab} />}
                 {trouble && <PageTrouble trouble={trouble} onReload={() => void reload()} />}
             </Region>
@@ -79,9 +87,9 @@ const Shell: React.FC = () => {
                 </Region>
             )}
             {floatingSidebar.width > 0 && (
-                // The frame gutter left of the page: reaching it brings the collapsed sidebar back.
+                // The window's left edge beside the top bar. Over the page, main watches for the pointer instead.
                 <Region
-                    rect={{ x: 0, y: page.y, width: page.x, height: page.height }}
+                    rect={{ x: 0, y: 0, width: 4, height: layout.toolbar.y + layout.toolbar.height }}
                     onMouseEnter={() => void window.chromeAPI.layout.showFloatingSidebar()}
                 />
             )}

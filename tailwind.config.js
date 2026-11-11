@@ -84,6 +84,8 @@ module.exports = {
         sky: "rgb(var(--scene-sky) / <alpha-value>)",
         scrim: "rgb(var(--scene-scrim) / <alpha-value>)",
         field: "rgb(var(--scene-field) / <alpha-value>)",
+        // Icons and words on the scrim, white in every light.
+        ink: "rgb(var(--scene-ink) / <alpha-value>)",
       },
       card: {
         DEFAULT: "rgb(var(--card) / <alpha-value>)",

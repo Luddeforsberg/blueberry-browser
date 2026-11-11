@@ -64,6 +64,7 @@ const chromeAPI: ChromeAPI = {
     toggleChat: () => invoke("layout:toggle-chat"),
     resize: (panel, width) => invoke("layout:resize", panel, width),
     showAppMenu: () => invoke("layout:app-menu"),
+    setRing: (ring) => invoke("layout:set-ring", ring),
     showFloatingSidebar: () => invoke("overlay:show-sidebar"),
     hideFloatingSidebar: () => invoke("overlay:hide"),
     onFloatingSidebarVisibility: (callback) => subscribe("overlay:visibility", callback),

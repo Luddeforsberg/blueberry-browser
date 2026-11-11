@@ -130,6 +130,8 @@ export class EventManager {
 
     this.handle("layout:app-menu", () => this.mainWindow.showAppMenu());
 
+    this.handle("layout:set-ring", (ring) => this.mainWindow.setRing(ring === true));
+
     this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
 
     this.handle("overlay:hide", () => this.mainWindow.hideFloatingSidebar());

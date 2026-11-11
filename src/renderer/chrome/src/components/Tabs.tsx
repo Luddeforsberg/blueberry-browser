@@ -51,15 +51,15 @@ const TabItem: React.FC<{
         onDragStart={(e) => e.preventDefault()}
         style={style}
         className={cn(
-            "group/tab flex items-center h-[34px] pr-1.5 gap-2 rounded-card transition-colors app-region-no-drag",
-            iconOnly ? "pl-1.5 gap-1" : "pl-3",
+            "group/tab flex items-center h-[34px] pr-1.5 gap-2 rounded-full transition-colors app-region-no-drag",
+            iconOnly ? "pl-1.5 gap-1" : "pl-2.5",
             row && "flex-1 min-w-[60px] max-w-56",
             // Only the active tab always shows its close button, 32px, and the bird perches on it, 44px more, so it starts
             // that much wider than the others, which start from their 18px of padding, and its title gets as much room.
             row && tab.isActive && (perch
                 ? "basis-[94px] min-w-36 max-w-[calc(theme(maxWidth.56)+76px)]"
                 : "basis-[50px] max-w-[calc(theme(maxWidth.56)+32px)]"),
-            tab.isActive ? "bg-selected shadow-selected" : "hover:bg-foreground/5",
+            tab.isActive ? "bg-selected shadow-selected" : "text-muted-foreground hover:bg-hover hover:text-foreground",
             shifting && "transition-transform",
             dragged && "relative z-10 shadow-float"
         )}
@@ -77,7 +77,7 @@ const TabItem: React.FC<{
                 onNudge(e.key === back ? -1 : 1, e.currentTarget)
             }}
             className={cn(
-                "flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring",
+                "flex flex-1 min-w-0 items-center gap-2.5 h-full text-left outline-none rounded-full focus-visible:ring-2 focus-visible:ring-ring",
                 iconOnly && "justify-center"
             )}
         >
@@ -92,8 +92,8 @@ const TabItem: React.FC<{
             onClick={onClose}
             onPointerDown={(e) => e.stopPropagation()}
             className={cn(
-                "size-6 shrink-0 flex items-center justify-center rounded-control outline-none transition-opacity",
-                "hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
+                "size-6 shrink-0 flex items-center justify-center rounded-full outline-none transition-opacity",
+                "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
                 "opacity-0 group-hover/tab:opacity-100",
                 // In the row, a tab that isn't active only makes room for it on hover or focus, so its title gets the space.
                 row && !tab.isActive && "hidden group-hover/tab:flex group-focus-within/tab:flex",
@@ -172,8 +172,8 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     aria-label="New tab"
                     onClick={() => createTab()}
                     className={cn(
-                        "flex items-center gap-2 h-8 rounded-control text-14 text-muted-foreground app-region-no-drag",
-                        "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                        "flex items-center gap-2 h-8 rounded-full text-14 text-muted-foreground app-region-no-drag",
+                        "hover:bg-hover outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                         vertical ? "w-full px-2 mt-0.5" : "w-8 shrink-0 justify-center"
                     )}
                 >

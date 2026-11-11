@@ -34,6 +34,7 @@ export const CHANNEL_REGIONS: {
   "layout:toggle-chat": ["chrome"],
   "layout:resize": ["chrome"],
   "layout:app-menu": ["chrome"],
+  "layout:set-ring": ["chrome"],
   "overlay:show-sidebar": ["chrome"],
   "overlay:hide": ["overlay"],
   "theme:get": ["chrome", "overlay", "find", "prompt", "desktop", "composer"],

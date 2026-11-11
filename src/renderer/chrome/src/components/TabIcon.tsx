@@ -1,22 +1,22 @@
 import React from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { Bird, CircleAlert, Cloud, Compass, Download, Eye, Feather, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings } from 'lucide-react'
+import { Bird, CircleAlert, Cloud, Download, Eye, Feather, History, LayoutGrid, MessageCircle, Mountain, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import { BerryDot } from '@common/components/Mascot'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
 import { Favicon } from './Favicon'
 
 const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
-    'new-tab': Compass,
+    'new-tab': Mountain,
     chat: MessageCircle,
     routines: RefreshCw,
-    settings: Settings,
+    settings: SlidersHorizontal,
     downloads: Download,
     gallery: LayoutGrid,
     history: History,
     flock: Bird,
     'mascot-gallery': Feather,
-    'needs-you': Hand,
+    'needs-you': CircleAlert,
     recording: Eye,
     cloud: Cloud
 }

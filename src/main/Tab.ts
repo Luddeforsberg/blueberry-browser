@@ -4,10 +4,6 @@ import { PageActor, type ActorOptions } from "./PageActor";
 import { savedEntries, type SavedWebTab } from "./Session";
 import type { PageTarget } from "./pageTarget";
 
-// The page card radius from DESIGN.md.
-// Matches the card the page sits in, `rounded-panel` in the chrome.
-const PAGE_RADIUS = 22;
-
 // An id of our own, away from the page's world (0) and Electron's low numbers.
 const AGENT_WORLD = 1000;
 // Where the watching for Show Berry runs. It's apart from the tools' world, so no tool can reach what it's holding.
@@ -92,6 +88,8 @@ export class Tab implements PageTarget {
   private _url: string;
   private _favicon: string | null = null;
   private _isVisible: boolean = false;
+  // The radius last given to the view, so it only changes when the layout does.
+  private corner: number | null = null;
   private _berryWorking = false;
   private workingStyle: Promise<string | null> | null = null;
   private _hasLoaded = false;
@@ -155,7 +153,7 @@ export class Tab implements PageTarget {
   private createView(): WebContentsView {
     // Create the WebContentsView for web content only
     const view = new WebContentsView(this.opened ? { webContents: this.opened } : { webPreferences: TAB_WEB_PREFERENCES });
-    view.setBorderRadius(PAGE_RADIUS);
+    this.corner = null;
     view.setVisible(this.shouldDraw);
     this.setupEventListeners(view.webContents);
     return view;
@@ -535,11 +533,17 @@ export class Tab implements PageTarget {
   }
 
   // Hides before moving and moves before showing, so the view never crosses the page the user is looking at.
-  place({ page, parkedPage }: Pick<Layout, "page" | "parkedPage">): void {
+  // The page's rounded corner is the view's own, so the chrome shows through it. Electron rounds every corner of a view
+  // alike, so the other three are rounded too.
+  place({ page, parkedPage, pageCorner }: Pick<Layout, "page" | "parkedPage" | "pageCorner">): void {
     const view = this.webContentsView;
     if (!view) return;
     const draw = this.shouldDraw;
     if (!draw) view.setVisible(false);
+    if (this.corner !== pageCorner) {
+      view.setBorderRadius(pageCorner);
+      this.corner = pageCorner;
+    }
     view.setBounds(this.isParked ? parkedPage : page);
     if (draw) view.setVisible(true);
   }

@@ -5,14 +5,17 @@ export type { Layout, LayoutMode, Rect };
 // DESIGN.md section 2, to tune.
 export const SIDEBAR_WIDTH = { default: 280, min: 200, max: 360 };
 export const CHAT_WIDTH = { default: 400, min: 320, max: 480 };
-export const ADDRESS_ROW_HEIGHT = 40;
-// In horizontal mode there is no sidebar to hold the bookmarks, so the toolbar has a bar for them too.
-export const TOOLBAR_HEIGHT_WITH_BOOKMARKS = 76;
+// The top bar above the page, which holds the address row, and the window buttons along it.
+export const TOP_BAR_HEIGHT = 48;
+// In horizontal mode the address row sits under the tabs, with a bar for bookmarks under it, as there's no sidebar.
+const HORIZONTAL_ADDRESS_ROW_HEIGHT = 44;
+const BOOKMARKS_BAR_HEIGHT = 36;
 export const TAB_ROW_HEIGHT = 40;
-// The page card floats on the frame, with this much of it showing around the card.
-export const PAGE_INSET = 8;
-// The window buttons line up with the address row, which sits one inset down.
-export const VERTICAL_TOP_ROW_HEIGHT = ADDRESS_ROW_HEIGHT + 2 * PAGE_INSET;
+export const VERTICAL_TOP_ROW_HEIGHT = TOP_BAR_HEIGHT;
+// The page's one rounded corner, where it meets the sidebar and the top bar.
+export const PAGE_CORNER = 16;
+// The reading and recording rings. While one shows, the page is inset by this much and the chrome draws it in the gap.
+export const RING_WIDTH = 3;
 export const FLOATING_INSET = 8;
 // The find bar's card with 12px on every side, for its shadow.
 export const FIND_BAR = { width: 384, height: 72 };
@@ -36,6 +39,8 @@ export interface LayoutOptions {
   sidebarWidth: number;
   chatWidth: number;
   platform: NodeJS.Platform;
+  // A ring round the page, which only the chrome can draw, so the page makes room for it.
+  ring?: boolean;
 }
 
 const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -233,7 +238,7 @@ export function computeLayout(
   const vertical = mode === "vertical";
 
   const pageWidth = (sidebar: boolean, chat: boolean) =>
-    window.width - (sidebar ? sidebarWidth : PAGE_INSET) - (chat ? chatWidth : PAGE_INSET);
+    window.width - (sidebar ? sidebarWidth : 0) - (chat ? chatWidth : 0);
 
   // When space runs out, the sidebar collapses first and the chat closes next.
   let sidebar = vertical && options.sidebarOpen;
@@ -245,9 +250,6 @@ export function computeLayout(
   const right = chat ? chatWidth : 0;
   const { height } = window;
   const middleWidth = Math.max(window.width - left - right, 0);
-  const cardX = sidebar ? left : PAGE_INSET;
-  const cardRight = window.width - (chat ? right : PAGE_INSET);
-  const cardWidth = Math.max(cardRight - cardX, 0);
 
   // The top row holds the window buttons: the toolbar when vertical, the tab row when horizontal.
   // Off a Mac, the menu button is part of what's kept clear, so whatever sits in the top right corner leaves room for it.
@@ -274,11 +276,20 @@ export function computeLayout(
       };
 
   const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: middleWidth, height: TAB_ROW_HEIGHT };
-  const toolbarY = vertical ? PAGE_INSET : TAB_ROW_HEIGHT;
-  const toolbarHeight = vertical ? ADDRESS_ROW_HEIGHT : TOOLBAR_HEIGHT_WITH_BOOKMARKS;
+  const toolbarY = vertical ? 0 : TAB_ROW_HEIGHT;
+  const addressRowHeight = vertical ? TOP_BAR_HEIGHT : HORIZONTAL_ADDRESS_ROW_HEIGHT;
+  const toolbarHeight = vertical ? TOP_BAR_HEIGHT : HORIZONTAL_ADDRESS_ROW_HEIGHT + BOOKMARKS_BAR_HEIGHT;
   const pageY = toolbarY + toolbarHeight;
-  const pageHeight = Math.max(height - pageY - PAGE_INSET, 0);
-  const findBarWidth = Math.min(FIND_BAR.width, cardWidth);
+  // The page is whatever the chrome leaves, with no gutter. A ring takes its width from every side.
+  const frame: Rect = { x: left, y: pageY, width: middleWidth, height: Math.max(height - pageY, 0) };
+  const inset = options.ring ? RING_WIDTH : 0;
+  const page: Rect = {
+    x: frame.x + inset,
+    y: frame.y + inset,
+    width: Math.max(frame.width - 2 * inset, 0),
+    height: Math.max(frame.height - 2 * inset, 0),
+  };
+  const findBarWidth = Math.min(FIND_BAR.width, page.width);
 
   return {
     mode,
@@ -299,27 +310,25 @@ export function computeLayout(
       : EMPTY,
     // In the page's top right corner.
     findBar: {
-      x: cardX + cardWidth - findBarWidth,
-      y: pageY,
+      x: page.x + page.width - findBarWidth,
+      y: page.y,
       width: findBarWidth,
-      height: Math.min(FIND_BAR.height, pageHeight),
+      height: Math.min(FIND_BAR.height, page.height),
     },
     tabStrip,
-    toolbar: { x: cardX, y: toolbarY, width: cardWidth, height: toolbarHeight },
-    addressRow: { x: cardX, y: toolbarY, width: cardWidth, height: ADDRESS_ROW_HEIGHT },
+    toolbar: { x: left, y: toolbarY, width: middleWidth, height: toolbarHeight },
+    addressRow: { x: left, y: toolbarY, width: middleWidth, height: addressRowHeight },
     chat: chat ? { x: window.width - right, y: 0, width: right, height } : EMPTY,
-    page: {
-      x: cardX,
-      y: pageY,
-      width: cardWidth,
-      height: pageHeight,
-    },
+    pageFrame: frame,
+    page,
+    // Only where the page meets the sidebar and the top bar. Collapsed, and in the horizontal layout, it has none.
+    pageCorner: sidebar ? PAGE_CORNER : 0,
     // A view wholly outside the window gets no size and draws nothing, so one corner pixel stays inside.
     parkedPage: {
       x: window.width - 1,
       y: height - 1,
-      width: cardWidth,
-      height: pageHeight,
+      width: page.width,
+      height: page.height,
     },
   };
 }

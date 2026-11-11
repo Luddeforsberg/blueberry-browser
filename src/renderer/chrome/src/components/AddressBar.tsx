@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useContext } from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { Search } from 'lucide-react'
+import { Lock, Search } from 'lucide-react'
 import { useBrowser } from '../contexts/BrowserContext'
 import { cn } from '@common/lib/utils'
 import { toUrl } from '@common/lib/url'
+import { OverScene } from './ToolBarButton'
 
 export const FOCUS_ADDRESS_EVENT = 'blueberry:focus-address'
 
@@ -11,11 +12,12 @@ const splitUrl = (url: string) => {
     try {
         const parsed = new URL(url)
         return {
+            secure: parsed.protocol === 'https:',
             domain: parsed.hostname.replace(/^www\./, ''),
-            path: parsed.pathname + parsed.search + parsed.hash
+            path: parsed.pathname === '/' && !parsed.search && !parsed.hash ? '' : parsed.pathname + parsed.search + parsed.hash
         }
     } catch {
-        return { domain: url, path: '' }
+        return { secure: false, domain: url, path: '' }
     }
 }
 
@@ -34,11 +36,16 @@ const PAGE_LABELS: Record<InternalPage, string | null> = {
     cloud: 'Cloud tab'
 }
 
+const PLACEHOLDER = 'Go to an address'
+
 // Internal pages have no address worth editing, so the field starts empty there.
 const editableUrl = (tab: TabInfo | null) => (tab && !tab.page ? tab.url : '')
 
-export const AddressBar: React.FC = () => {
+// A solid pill on every page. On a web page it's `surface` with an `outline` edge. Over the new tab's valley it takes
+// the scene's field. `trailing` sits inside its right end, such as the bookmark star and the pin.
+export const AddressBar: React.FC<{ trailing?: React.ReactNode }> = ({ trailing }) => {
     const { activeTab, navigateToUrl } = useBrowser()
+    const scene = useContext(OverScene)
     const [url, setUrl] = useState('')
     const [isFocused, setIsFocused] = useState(false)
 
@@ -67,10 +74,16 @@ export const AddressBar: React.FC = () => {
         setIsFocused(false)
     }
 
+    // On the scene the pill is the scene's own field. Focus is a 2px ring in place of the edge, so it keeps its size.
+    const pill = cn(
+        "w-full min-w-0 h-8 flex items-center gap-2 rounded-full app-region-no-drag",
+        scene ? "bg-scene-field text-scene-ink" : "bg-surface shadow-[inset_0_0_0_1px_rgb(var(--outline))] dark:shadow-none"
+    )
+
     if (isFocused) {
         return (
-            <form onSubmit={handleSubmit} className="relative w-full min-w-0 app-region-no-drag">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <form onSubmit={handleSubmit} className={cn(pill, "pl-3.5 pr-3 ring-2", scene ? "ring-scene-ink" : "ring-ring")}>
+                <Search aria-hidden className={cn("size-3.5 shrink-0", scene ? "text-scene-ink/80" : "text-muted-foreground")} />
                 <input
                     type="text"
                     aria-label="Address"
@@ -80,10 +93,10 @@ export const AddressBar: React.FC = () => {
                     onBlur={cancel}
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}
                     className={cn(
-                        "w-full h-8 pl-8 pr-3 rounded-card bg-surface text-14 text-foreground",
-                        "outline-none ring-2 ring-ring placeholder:text-muted-foreground"
+                        "flex-1 min-w-0 h-full bg-transparent text-14 outline-none",
+                        scene ? "text-scene-ink placeholder:text-scene-ink/80" : "text-foreground placeholder:text-muted-foreground"
                     )}
-                    placeholder="Search or enter a URL"
+                    placeholder={PLACEHOLDER}
                     disabled={!activeTab}
                     spellCheck={false}
                     autoFocus
@@ -92,42 +105,46 @@ export const AddressBar: React.FC = () => {
         )
     }
 
-    const { domain, path } = splitUrl(activeTab?.url ?? '')
+    const { secure, domain, path } = splitUrl(activeTab?.url ?? '')
     const pageLabel = activeTab?.page ? PAGE_LABELS[activeTab.page] : null
+    const web = !!activeTab?.url && !activeTab.page
 
     return (
-        <button
-            type="button"
-            aria-label="Address"
-            onClick={() => setIsFocused(true)}
-            className={cn(
-                "w-full min-w-0 h-8 px-2.5 flex items-center gap-2 rounded-card cursor-text group/address-bar",
-                "hover:bg-foreground/5 text-left app-region-no-drag outline-none transition-colors",
-                "focus-visible:ring-2 focus-visible:ring-ring"
-            )}
-        >
-            <span className="text-14 truncate">
-                {pageLabel ? (
-                    <>
-                        <span className="text-foreground">{pageLabel}</span>
-                        {activeTab?.page === 'chat' && activeTab.pageParam && (
-                            <span className="text-muted-foreground">{` / ${activeTab.title}`}</span>
-                        )}
-                    </>
-                ) : activeTab?.url && !activeTab.page ? (
-                    <>
-                        <span className="text-foreground">{domain}</span>
-                        <span className="group-hover/address-bar:hidden text-muted-foreground">
-                            {activeTab.title && !activeTab.loadError && ` / ${activeTab.title}`}
-                        </span>
-                        <span className="group-hover/address-bar:inline hidden text-muted-foreground">
-                            {path}
-                        </span>
-                    </>
-                ) : (
-                    <span className="text-muted-foreground">Search or enter a URL</span>
+        <div className={cn(pill, "pr-1.5")}>
+            <button
+                type="button"
+                aria-label="Address"
+                onClick={() => setIsFocused(true)}
+                className={cn(
+                    "flex-1 min-w-0 h-full pl-3.5 flex items-center gap-2 rounded-full cursor-text text-left outline-none",
+                    "focus-visible:ring-2",
+                    scene ? "focus-visible:ring-scene-ink" : "focus-visible:ring-ring"
                 )}
-            </span>
-        </button>
+            >
+                {web && secure ? (
+                    <Lock aria-label="Secure connection" className="size-3.5 shrink-0 text-muted-foreground" />
+                ) : !web && !pageLabel ? (
+                    <Search aria-hidden className={cn("size-3.5 shrink-0", scene ? "text-scene-ink/80" : "text-muted-foreground")} />
+                ) : null}
+                <span className="min-w-0 truncate text-14">
+                    {pageLabel ? (
+                        <>
+                            <span className="text-foreground">{pageLabel}</span>
+                            {activeTab?.page === 'chat' && activeTab.pageParam && (
+                                <span className="text-muted-foreground">{` / ${activeTab.title}`}</span>
+                            )}
+                        </>
+                    ) : web ? (
+                        <>
+                            <span className="text-foreground">{domain}</span>
+                            <span className="text-muted-foreground">{path}</span>
+                        </>
+                    ) : (
+                        <span className={scene ? "text-scene-ink/80" : "text-muted-foreground"}>{PLACEHOLDER}</span>
+                    )}
+                </span>
+            </button>
+            {trailing}
+        </div>
     )
 }

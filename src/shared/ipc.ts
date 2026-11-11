@@ -287,7 +287,11 @@ export interface Layout {
   // The toolbar's row of buttons and address, which the sidebar's and chat panel's own buttons line up with.
   addressRow: Rect;
   chat: Rect;
+  // What the chrome leaves for the page. The page fills it, less a ring's width on every side while one shows.
+  pageFrame: Rect;
   page: Rect;
+  // The radius of the page's corner where it meets the sidebar, or 0 with no sidebar beside it.
+  pageCorner: number;
   // The page's size, all but one pixel outside the window, for a tab Berry works in behind the user's.
   parkedPage: Rect;
 }
@@ -315,11 +319,17 @@ export interface TabInfo {
   loadError: TabLoadError | null;
 }
 
+// The valley's light, chosen by the clock when the new tab opens (DESIGN.md section 9).
+export type ValleyLight = "dawn" | "day" | "dusk" | "night";
+
 export interface ThemeState {
   isDark: boolean;
-  // False when the system asks for reduced transparency, or the platform has no window material.
+  // Only the desktop bird's composer has native material. False when the system asks for reduced transparency, or the
+  // platform has none.
   glass: boolean;
   platform: "mac" | "windows" | "other";
+  // A light forced with BLUEBERRY_VALLEY_LIGHT in an unpackaged app, to test and photograph it. Otherwise the clock's.
+  valleyLight: ValleyLight | null;
 }
 
 // Where find in page has got to. `active` counts from 1.
@@ -435,6 +445,8 @@ export interface InvokeChannels {
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   // Off a Mac, the menu button opens the app's own menu under itself, since the window has no menu bar.
   "layout:app-menu": { region: "chrome"; args: []; result: void };
+  // Whether the chrome is drawing the reading or recording ring, so the page makes room for it.
+  "layout:set-ring": { region: "chrome"; args: [ring: boolean]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer"; args: []; result: ThemeState };
@@ -659,6 +671,7 @@ export interface LayoutAPI {
   toggleChat: () => Promise<void>;
   resize: (panel: ResizablePanel, width: number) => Promise<void>;
   showAppMenu: () => Promise<void>;
+  setRing: (ring: boolean) => Promise<void>;
   showFloatingSidebar: () => Promise<void>;
   hideFloatingSidebar: () => Promise<void>;
   onFloatingSidebarVisibility: (callback: (visible: boolean) => void) => Unsubscribe;

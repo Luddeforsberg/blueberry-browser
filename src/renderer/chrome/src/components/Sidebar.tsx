@@ -1,11 +1,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Bird, ChevronDown, Cloud, Ellipsis, Hand, MessageCircle, PanelLeft, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { Bird, ChevronDown, CircleAlert, Cloud, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
 import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
+import { usePanelChatId } from '../contexts/ChatContext'
+import { DownloadsButton } from './DownloadsButton'
+import { BERRY_ID } from '@shared/mascots'
 import { Tabs } from './Tabs'
 import { LEADING_SLOT } from './TabIcon'
 import { FOCUS_ADDRESS_EVENT } from './AddressBar'
@@ -16,8 +19,9 @@ import { cn } from '@common/lib/utils'
 import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
 
+// Every row is a full pill, 34px tall, and starts with a 20px slot so all their text starts at one straight edge.
 const ROW = cn(
-    "w-full flex items-center gap-3 h-[34px] px-3 rounded-card text-14 text-left outline-none transition-colors",
+    "w-full flex items-center gap-2.5 h-[34px] px-2.5 rounded-full text-14 text-left outline-none transition-colors",
     "app-region-no-drag focus-visible:ring-2 focus-visible:ring-ring"
 )
 
@@ -34,11 +38,11 @@ const SidebarRow: React.FC<{
         <button
             type="button"
             onClick={onClick}
-            className={cn(ROW, "hover:bg-foreground/5", muted && !open && "text-muted-foreground")}
+            className={cn(ROW, "hover:bg-hover", muted && !open && "text-muted-foreground")}
         >
             <span className={LEADING_SLOT}>{leading}</span>
             <span className="flex-1 truncate">{label}</span>
-            {trailing && <span className="shrink-0 text-12 text-muted-foreground tabular-nums">{trailing}</span>}
+            {trailing && <span className="shrink-0 flex items-center text-12 text-muted-foreground tabular-nums">{trailing}</span>}
         </button>
     </li>
 )
@@ -54,8 +58,8 @@ const Section: React.FC<{
     const [open, setOpen] = useState(true)
 
     return (
-        <section aria-labelledby={id} className="mt-3">
-            <h2 id={id} className="flex items-center h-8 px-3 text-14 text-muted-foreground">
+        <section aria-labelledby={id} className="mt-4">
+            <h2 id={id} className="flex items-center h-8 px-2.5 text-13 text-muted-foreground">
                 {collapsible ? (
                     <button
                         type="button"
@@ -75,24 +79,32 @@ const Section: React.FC<{
     )
 }
 
-// Rows of four and three take turns, offset like a bunch of fruit, on a grid where each site takes two columns.
-const CLUSTER_PERIOD = 7
-const CLUSTER_OFFSET_AT = 4
-const clusterColumn = (index: number) => {
-    const place = index % CLUSTER_PERIOD
-    return place === 0 ? 1 : place === CLUSTER_OFFSET_AT ? 2 : undefined
-}
+// Below this window height only the first row of tiles shows, and the last tile says how many more.
+const SHORT_WINDOW = 760
+const TILES_PER_ROW = 4
 
-// Pinned sites and bookmarks, grown together in a round cluster at the top of the sidebar.
-const Cluster: React.FC = () => {
+// Pinned sites and bookmarks as each site's own icon on a 28px tile, in rows of four, with nothing round them.
+const PinnedTiles: React.FC = () => {
     const { createTab } = useBrowser()
     const sites = useSavedSites()
+    const [showAll, setShowAll] = useState(false)
+    const [short, setShort] = useState(() => window.innerHeight < SHORT_WINDOW)
+    useEffect(() => {
+        const update = () => setShort(window.innerHeight < SHORT_WINDOW)
+        window.addEventListener('resize', update)
+        return () => window.removeEventListener('resize', update)
+    }, [])
+    const cut = short && !showAll && sites.length > TILES_PER_ROW
+    const shown = cut ? sites.slice(0, TILES_PER_ROW - 1) : sites
+    const tile = "size-7 flex items-center justify-center rounded-control outline-none app-region-no-drag focus-visible:ring-2 focus-visible:ring-ring"
 
+    if (sites.length === 0) {
+        return <p className="px-2.5 pb-3 text-13 text-muted-foreground">{NO_SAVED_SITES}</p>
+    }
     return (
-        <ul aria-label="Bookmarks" className="grid grid-cols-8 gap-y-1.5 px-1 pb-3">
-            {sites.length === 0 && <li className="col-span-8 px-2 py-1 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
-            {sites.map((site, index) => (
-                <li key={site.id} className="col-span-2 flex justify-center" style={{ gridColumnStart: clusterColumn(index) }}>
+        <ul aria-label="Bookmarks" className="grid grid-cols-4 justify-items-center gap-y-2.5 pt-1.5 pb-3">
+            {shown.map((site) => (
+                <li key={site.id} className="size-8 flex items-center justify-center">
                     <button
                         type="button"
                         aria-label={site.title}
@@ -102,16 +114,32 @@ const Cluster: React.FC = () => {
                             event.preventDefault()
                             void window.chromeAPI.library.showBookmarkMenu(site.id)
                         }}
-                        className={cn(
-                            "size-11 flex items-center justify-center rounded-full text-14 font-semibold text-muted-foreground shadow-selected outline-none transition-colors app-region-no-drag",
-                            "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
-                            "bg-surface"
-                        )}
+                        className={cn(tile, "overflow-hidden")}
                     >
-                        <Favicon src={site.favicon ?? siteIcon(site.url)} fallback={site.title.charAt(0)} />
+                        <Favicon
+                            src={site.favicon ?? siteIcon(site.url)}
+                            className="size-7 rounded-control"
+                            fallback={
+                                <span aria-hidden className="size-7 flex items-center justify-center rounded-control bg-muted-foreground/15 text-12 font-semibold text-muted-foreground">
+                                    {site.title.charAt(0).toUpperCase()}
+                                </span>
+                            }
+                        />
                     </button>
                 </li>
             ))}
+            {cut && (
+                <li className="size-8 flex items-center justify-center">
+                    <button
+                        type="button"
+                        aria-label={`Show ${sites.length - shown.length} more`}
+                        onClick={() => setShowAll(true)}
+                        className={cn(tile, "text-12 text-muted-foreground shadow-[inset_0_0_0_1px_rgb(var(--outline))] hover:bg-hover hover:text-foreground")}
+                    >
+                        +{sites.length - shown.length}
+                    </button>
+                </li>
+            )}
         </ul>
     )
 }
@@ -125,11 +153,13 @@ const age = (time: number) => {
 }
 
 const ICON = "size-4 shrink-0"
+// The shortcut that opens a new tab, as it's pressed on this computer.
+const NEW_TAB_KEYS = { mac: '⌘T', windows: 'Ctrl T', other: 'Ctrl T' }
 
 // A chat row's own buttons, over its right end, until the row has the pointer or the keyboard.
 const ROW_ACTION = cn(
     "absolute top-1 size-[26px] flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors app-region-no-drag",
-    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
 )
 
 // A page the chat's running job opened, under the chat rather than with the user's tabs. It closes when the job ends,
@@ -142,7 +172,7 @@ const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 type="button"
                 aria-current={tab.isActive ? 'page' : undefined}
                 onClick={() => !tab.isActive && void switchTab(tab.id)}
-                className={cn(ROW, "h-[30px] pl-9 gap-2.5 text-13 text-muted-foreground", tab.isActive ? "bg-selected shadow-selected text-foreground" : "hover:bg-foreground/5 hover:text-foreground")}
+                className={cn(ROW, "h-7 pl-[42px] gap-2 text-13", tab.isActive ? "text-foreground" : "text-muted-foreground hover:bg-hover hover:text-foreground")}
             >
                 <Favicon src={tab.favicon} site={tab.url} className="size-3.5" />
                 <span className="flex-1 truncate">{tab.title || 'New tab'}</span>
@@ -160,7 +190,9 @@ export const ChatRow: React.FC<{
     jobTabs?: TabInfo[]
     // Closes its tab, when it has one open, and keeps the chat, as closing any tab does.
     onClose?: () => void
-}> = ({ chat, selected, onOpen, jobTabs = [], onClose }) => {
+    // The chat panel shows it beside a page: the one semibold row, and not raised.
+    inPanel?: boolean
+}> = ({ chat, selected, onOpen, jobTabs = [], onClose, inPanel = false }) => {
     const [editing, setEditing] = useState(false)
     // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
     const finished = useRef(false)
@@ -215,21 +247,29 @@ export const ChatRow: React.FC<{
                 type="button"
                 aria-current={selected ? 'page' : undefined}
                 onClick={onOpen}
-                className={cn(ROW, onClose ? "pr-[60px]" : "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
+                className={cn(
+                    ROW,
+                    onClose ? "pr-[60px]" : "pr-9",
+                    selected ? "bg-selected shadow-selected" : "hover:bg-hover",
+                    inPanel && !selected && "font-semibold"
+                )}
             >
-                {/* Only another bird, or one at work, is worth saying, so a Berry chat's name starts with its title. */}
-                <span className={LEADING_SLOT} aria-hidden={(!chat.mascotId && !chat.running) || undefined}>
-                    {showBerry ? <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} /> : <MessageCircle className={cn(ICON, "text-muted-foreground")} />}
-                </span>
-                <span className="flex-1 truncate">{chat.title}</span>
+                {/* A chat's slot is empty, so its title starts on the same edge as every other row's. */}
+                <span aria-hidden className={LEADING_SLOT} />
+                <span className="min-w-0 truncate">{chat.title}</span>
+                {/* Another bird shows straight after the title. Berry's own chats stay plain. */}
+                {showBerry && chat.mascotId && chat.mascotId !== BERRY_ID && (
+                    <span className="shrink-0 -ml-1 flex"><Berry size={16} mascot={mascot} /></span>
+                )}
+                <span className="flex-1" />
                 {chat.cloud && (
                     <span className="shrink-0 text-muted-foreground" title="In the cloud">
                         <Cloud role="img" aria-label="In the cloud" className="size-3.5" />
                     </span>
                 )}
                 {chat.running && (
-                    <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
-                        <BerryDot working />
+                    <span className="shrink-0 -mr-6 flex group-hover/chat:invisible group-focus-within/chat:invisible">
+                        {showBerry ? <BerryDot working /> : <MessageCircle className="size-3.5 text-muted-foreground" />}
                         <span className="sr-only">{mascot.name} is working</span>
                     </span>
                 )}
@@ -284,6 +324,7 @@ const useMoreBelow = () => {
 // `floating` is the collapsed sidebar shown over the page, where the button pins it open again.
 export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) => {
     const { layout, theme, toggleSidebar } = useShell()
+    const panelChatId = usePanelChatId()
     const { activeTab, closeTab, createTab, tabs } = useBrowser()
     const library = useLibrary()
     const browser = window.chromeAPI.browser
@@ -300,6 +341,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 chat={chat}
                 selected={isOpen('chat', chat.id)}
                 jobTabs={tabs.filter((jobTab) => jobTab.jobChatId === chat.id)}
+                inPanel={layout.chatOpen && panelChatId === chat.id}
                 onOpen={() => void browser.openPage('chat', { param: chat.id, title: chat.title })}
                 onClose={tab && (() => void closeTab(tab.id))}
             />
@@ -307,7 +349,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
     }
     const openChat = library.chats.find((chat) => isOpen('chat', chat.id))
 
-    // The buttons on top sit on the toolbar's row, wherever this sidebar starts: the floating one is inset in its view.
+    // The buttons on top sit on the top bar's line, wherever this sidebar starts: the floating one is inset in its view.
     const nav = useRef<HTMLElement>(null)
     const [top, setTop] = useState(0)
     useLayoutEffect(() => setTop(nav.current?.getBoundingClientRect().top ?? 0), [])
@@ -316,8 +358,10 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
 
     return (
         <nav ref={nav} aria-label="Sidebar" className="h-full flex flex-col">
+            {/* Window buttons on a Mac, then collapse, search and downloads on one row. Downloads are only ever here, or
+                at the end of the address row when there's no sidebar. */}
             <div
-                className="flex items-center justify-end gap-0.5 px-2.5 pb-2 box-content app-region-drag shrink-0"
+                className="flex items-center gap-1 px-2.5 box-content app-region-drag shrink-0"
                 style={{
                     // Padding, so the space above can still drag the window.
                     paddingTop: Math.max(above, 0),
@@ -326,18 +370,16 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                     paddingLeft: theme.platform === 'mac' ? layout.controls.width : undefined
                 }}
             >
-                {!floating && (
-                    <ToolBarButton
-                        Icon={Search}
-                        label="Search"
-                        onClick={() => window.dispatchEvent(new Event(FOCUS_ADDRESS_EVENT))}
-                    />
-                )}
                 <ToolBarButton
                     Icon={PanelLeft}
                     label={floating ? 'Keep sidebar open' : 'Hide sidebar'}
                     onClick={toggleSidebar}
                 />
+                {!floating && (
+                    <ToolBarButton Icon={Search} label="Search" onClick={() => window.dispatchEvent(new Event(FOCUS_ADDRESS_EVENT))} />
+                )}
+                <div className="flex-1" />
+                <DownloadsButton />
             </div>
 
             {/* While rows go on below, the cut one fades out, so none looks as if it's under Settings. */}
@@ -345,17 +387,22 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 ref={list}
                 onScroll={check}
                 className={cn(
-                    "flex-1 min-h-0 overflow-y-auto px-2 pt-2 pb-2",
+                    "flex-1 min-h-0 overflow-y-auto px-2.5 pt-1 pb-2",
                     moreBelow && "[mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent)]"
                 )}
             >
                 <div>
-                    <Cluster />
+                    <PinnedTiles />
                     <ul aria-label="Places">
-                        <SidebarRow leading={<Plus className={ICON} />} label="New tab" onClick={() => createTab()} />
+                        <SidebarRow
+                            leading={<Plus className={ICON} />}
+                            label="New tab"
+                            trailing={<kbd className="font-mono text-11 text-muted-foreground">{NEW_TAB_KEYS[theme.platform]}</kbd>}
+                            onClick={() => createTab()}
+                        />
                         <SidebarRow
                             muted={library.needsYou.length === 0}
-                            leading={<Hand className={ICON} />}
+                            leading={<CircleAlert className={ICON} />}
                             label="Needs you"
                             trailing={<NeedsYouCount />}
                             open={isOpen('needs-you')}
@@ -391,10 +438,10 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 </div>
             </div>
 
-            <ul className="shrink-0 p-2">
+            <ul className="shrink-0 mx-2.5 mb-2.5 pt-1.5 border-t">
                 <SidebarRow
                     muted
-                    leading={<Settings className={ICON} />}
+                    leading={<SlidersHorizontal className={ICON} />}
                     label="Settings"
                     open={isOpen('settings')}
                     onClick={() => void browser.openPage('settings')}

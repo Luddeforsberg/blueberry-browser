@@ -25,8 +25,7 @@ export const NeedsYouCount: React.FC = () => {
     const count = useLibrary().needsYou.length
     if (count === 0) return null
     return (
-        <span className="flex items-center gap-1.5 text-13 text-foreground">
-            <BerryDot />
+        <span className="min-w-5 h-[17px] px-[7px] flex items-center justify-center rounded-full bg-primary text-11 leading-none font-semibold text-primary-foreground tabular-nums">
             {count}
             <span className="sr-only"> waiting for you</span>
         </span>

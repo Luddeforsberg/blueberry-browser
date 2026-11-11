@@ -129,6 +129,9 @@
 
 /* DESIGN.md section 9: the valley's four lights. The scrim behind the top bar and the address field over it. */
 @layer base {
+  [data-light] {
+    --scene-ink: 255 255 255;
+  }
   [data-light="dawn"] {
     --scene-sky: 58 98 182;
     --scene-horizon: 255 233 207;

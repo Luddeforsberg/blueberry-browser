@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, systemPreferences, type WebContents } from "electron";
+import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, screen, session, systemPreferences, type WebContents } from "electron";
 import { release } from "os";
 import { TAB_WEB_PREFERENCES, Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -63,6 +63,7 @@ import type {
   Settings,
   TabInfo,
   ThemeState,
+  ValleyLight,
   Visit,
 } from "../shared/ipc";
 import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult } from "../shared/library";
@@ -84,6 +85,13 @@ const supportsGlass = (): boolean => {
 // A page opened by another with `window.open`, and the tab that opened it.
 type Popup = { page: WebContents; opener: Tab };
 
+// BLUEBERRY_VALLEY_LIGHT picks the new tab's light in an unpackaged app, so each can be tested and photographed.
+const VALLEY_LIGHTS: ValleyLight[] = ["dawn", "day", "dusk", "night"];
+const forcedValleyLight = (): ValleyLight | null => {
+  const wanted = process.env.BLUEBERRY_VALLEY_LIGHT;
+  return !app.isPackaged && VALLEY_LIGHTS.includes(wanted as ValleyLight) ? (wanted as ValleyLight) : null;
+};
+
 // The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach. On the new tab they sit
 // on the valley's scrim, in white.
 const CAPTION_SYMBOL = { light: "#18181a", dark: "#f2f2f3", scene: "#ffffff" };
@@ -100,6 +108,9 @@ const MENU_CLICK_GRACE_MS = 1000;
 const AWAY_AFTER_IDLE_SECONDS = 60;
 const MAX_SUGGESTION_VISITS = 5000;
 const MAX_SUGGESTION_CHATS = 100;
+// How near the window's left edge the pointer brings the collapsed sidebar back, and how often that's looked at.
+const LEFT_EDGE_WIDTH = 4;
+const EDGE_WATCH_MS = 100;
 // A page in the chrome that's stuck doesn't get to hold up the bird.
 const TAKE_OFF_ASK_MS = 300;
 
@@ -120,6 +131,8 @@ export class Window {
   private floatingSidebarVisible = false;
   private sidebarOpen = true;
   private chatOpen = false;
+  private ring = false;
+  private edgeWatch: NodeJS.Timeout | null = null;
   private windowClosed = false;
   // Tabs Berry opened behind the chat. Where it goes in them isn't the user's history until they go there too.
   private readonly backgroundTabs = new Set<string>();
@@ -484,12 +497,14 @@ export class Window {
       this.desktopBerry.mainWindowBlurred();
     });
     this._baseWindow.on("focus", () => this.desktopBerry.mainWindowFocused());
+    this.edgeWatch = setInterval(() => this.watchLeftEdge(), EDGE_WATCH_MS);
     this._baseWindow.on("minimize", () => this.desktopBerry.mainWindowGone());
 
     const onThemeUpdated = () => this.notifyTheme();
     nativeTheme.on("updated", onThemeUpdated);
 
     this._baseWindow.on("closed", () => {
+      if (this.edgeWatch) clearInterval(this.edgeWatch);
       this.desktopBerry.destroy();
       this.workViews.destroy();
       this.recordings.destroy();
@@ -753,6 +768,7 @@ export class Window {
     return {
       isDark: nativeTheme.shouldUseDarkColors,
       glass: this.glassSupported && !nativeTheme.prefersReducedTransparency,
+      valleyLight: forcedValleyLight(),
       platform:
         process.platform === "darwin"
           ? "mac"
@@ -1398,6 +1414,13 @@ export class Window {
     return after;
   }
 
+  // The chrome draws the reading and recording rings, and the page is inset to make room for them.
+  setRing(ring: boolean): void {
+    if (this.ring === ring) return;
+    this.ring = ring;
+    this.updateAllBounds();
+  }
+
   resizePanel(panel: ResizablePanel, width: number): void {
     if (panel === "sidebar") this.updateSettings({ sidebarWidth: width });
     else if (panel === "chat") this.updateSettings({ chatWidth: width });
@@ -1412,6 +1435,17 @@ export class Window {
     this.overlay.view.setVisible(true);
     this.floatingSidebarVisible = true;
     sendToRenderer(this.overlay.view.webContents, "overlay:visibility", true);
+  }
+
+  // The page reaches the window's left edge with the sidebar collapsed, and the chrome can't see the pointer over a page,
+  // so main looks for it there. Only while the window is in front and the sidebar has somewhere to come back.
+  private watchLeftEdge(): void {
+    if (this.floatingSidebarVisible || !this._baseWindow.isFocused() || this.layout.floatingSidebar.width === 0) return;
+    const pointer = screen.getCursorScreenPoint();
+    const { x, y, height } = this._baseWindow.getContentBounds();
+    if (pointer.x >= x && pointer.x < x + LEFT_EDGE_WIDTH && pointer.y >= y + this.layout.page.y && pointer.y < y + height) {
+      this.showFloatingSidebar();
+    }
   }
 
   hideFloatingSidebar(): void {
@@ -1505,6 +1539,7 @@ export class Window {
         sidebarWidth: this.settings.sidebarWidth,
         chatWidth: this.settings.chatWidth,
         platform: process.platform,
+        ring: this.ring,
       }
     );
   }

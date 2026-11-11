@@ -77,6 +77,9 @@ export const useChat = () => {
     return context
 }
 
+// The chat the panel shows, where there is a panel. The floating sidebar has none.
+export const usePanelChatId = () => useContext(ChatContext)?.chatId ?? null
+
 // The chat panel's conversation. New chat leaves this one in the sidebar and starts another.
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [chatId, setChatId] = useState<string | null>(null)

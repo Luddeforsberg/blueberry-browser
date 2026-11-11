@@ -29,14 +29,25 @@ describe("computeLayout", () => {
     expect(parkedPage.height).toBe(page.height);
   });
 
-  it("puts the sidebar left, the chat right, and the page card between them under the toolbar", () => {
+  it("puts the sidebar left, the chat right, and the page between them under the top bar, with no gutter", () => {
     const layout = computeLayout({ width: 1280, height: 800 }, both);
 
     expect(layout.sidebar).toEqual({ x: 0, y: 0, width: 240, height: 800 });
     expect(layout.chat).toEqual({ x: 920, y: 0, width: 360, height: 800 });
-    expect(layout.toolbar).toEqual({ x: 240, y: 8, width: 680, height: 40 });
+    expect(layout.toolbar).toEqual({ x: 240, y: 0, width: 680, height: 48 });
     expect(layout.addressRow).toEqual(layout.toolbar);
-    expect(layout.page).toEqual({ x: 240, y: 48, width: 680, height: 744 });
+    expect(layout.page).toEqual({ x: 240, y: 48, width: 680, height: 752 });
+    expect(layout.pageFrame).toEqual(layout.page);
+    // Rounded where it meets the sidebar and the top bar.
+    expect(layout.pageCorner).toBe(16);
+  });
+
+  it("insets the page by the ring's width on every side while a ring shows", () => {
+    const layout = computeLayout({ width: 1280, height: 800 }, { ...both, ring: true });
+
+    expect(layout.pageFrame).toEqual({ x: 240, y: 48, width: 680, height: 752 });
+    expect(layout.page).toEqual({ x: 243, y: 51, width: 674, height: 746 });
+    expect(layout.parkedPage).toMatchObject({ width: 674, height: 746 });
   });
 
   it("puts the find bar in the page's top right corner, and never outside the page", () => {
@@ -44,10 +55,10 @@ describe("computeLayout", () => {
     expect(findBar).toEqual({ x: page.x + page.width - 384, y: page.y, width: 384, height: 72 });
 
     const tiny = computeLayout({ width: 300, height: 90 }, { sidebarOpen: false, chatOpen: false, ...mac });
-    expect(tiny.findBar).toEqual({ x: 8, y: 48, width: 284, height: 34 });
+    expect(tiny.findBar).toEqual({ x: 0, y: 48, width: 300, height: 42 });
   });
 
-  it("floats the page card with the frame showing around it when both panels are gone", () => {
+  it("gives the page the whole window under the top bar, with no rounded corner, when both panels are gone", () => {
     const layout = computeLayout(
       { width: 1280, height: 800 },
       { sidebarOpen: false, chatOpen: false, ...mac }
@@ -55,8 +66,9 @@ describe("computeLayout", () => {
 
     expect(layout.sidebar.width).toBe(0);
     expect(layout.chat.width).toBe(0);
-    expect(layout.toolbar).toEqual({ x: 8, y: 8, width: 1264, height: 40 });
-    expect(layout.page).toEqual({ x: 8, y: 48, width: 1264, height: 744 });
+    expect(layout.toolbar).toEqual({ x: 0, y: 0, width: 1280, height: 48 });
+    expect(layout.page).toEqual({ x: 0, y: 48, width: 1280, height: 752 });
+    expect(layout.pageCorner).toBe(0);
   });
 
   it("collapses the sidebar before closing the chat when space runs out", () => {
@@ -77,13 +89,13 @@ describe("computeLayout", () => {
   it("keeps the window buttons clear on each platform", () => {
     const size = { width: 1280, height: 800 };
 
-    expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 56 });
+    expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 48 });
     // Off a Mac, the menu button is kept clear too, left of the system's buttons.
     expect(computeLayout(size, { ...both, platform: "win32" }).controls).toEqual({
       x: 1102,
       y: 0,
       width: 178,
-      height: 56,
+      height: 48,
     });
   });
 
@@ -91,7 +103,7 @@ describe("computeLayout", () => {
     const size = { width: 1280, height: 800 };
 
     expect(computeLayout(size, both).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
-    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 12, width: 32, height: 32 });
+    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 8, width: 32, height: 32 });
     expect(computeLayout(size, { ...both, platform: "win32", mode: "horizontal" }).menuButton).toEqual({ x: 1106, y: 4, width: 32, height: 32 });
     // Linux has no window buttons here, so it's in the corner.
     expect(computeLayout(size, { ...both, platform: "linux" })).toMatchObject({
@@ -139,10 +151,11 @@ describe("computeLayout", () => {
     expect(layout.sidebarOpen).toBe(false);
     expect(layout.floatingSidebar.width).toBe(0);
     expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 920, height: 40 });
-    expect(layout.toolbar).toEqual({ x: 8, y: 40, width: 912, height: 76 });
+    expect(layout.toolbar).toEqual({ x: 0, y: 40, width: 920, height: 80 });
     // The bookmarks bar is under the address row, so the panel's buttons line up with the row alone.
-    expect(layout.addressRow).toEqual({ x: 8, y: 40, width: 912, height: 40 });
-    expect(layout.page).toEqual({ x: 8, y: 116, width: 912, height: 676 });
+    expect(layout.addressRow).toEqual({ x: 0, y: 40, width: 920, height: 44 });
+    expect(layout.page).toEqual({ x: 0, y: 120, width: 920, height: 680 });
+    expect(layout.pageCorner).toBe(0);
     expect(layout.controls.height).toBe(40);
   });
 
