@@ -83,7 +83,9 @@ export const Toolbar: React.FC = () => {
             <ToolBarButton
                 label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
                 active={canSave}
-                className={cn("size-6", bookmarked && 'hover:bg-transparent')}
+                toggled={bookmarked}
+                // A saved star is filled yellow, with no open fill behind it.
+                className={cn("size-6", bookmarked && 'bg-transparent hover:bg-transparent')}
                 onClick={() => void window.chromeAPI.library.toggleBookmark()}
             >
                 <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />

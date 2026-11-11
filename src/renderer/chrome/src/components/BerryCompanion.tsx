@@ -11,13 +11,14 @@ import { Berry } from './Berry'
 const BASE_SIZE = 112
 // How far down the drawing Berry's seat is in the sitting pose.
 const SEAT = 46 / 64
-const HOME_SIZE = 112
+// Perched on a composer, unless the composer asks for another size with `data-berry-perch-size`.
+const HOME_SIZE = 76
 // How far down the standing drawing its feet reach, so the toes grip the composer's top edge.
 const STANDING_FEET = 113 / 120
 const FEET_X = 57 / 120
-// Between the composer's text, which starts on the left, and its controls on the right.
-const HOME_INSET = 250
-const HOME_RIGHT = HOME_INSET - HOME_SIZE / 2
+// Towards the box's right end, clear of its text and its controls: its middle 0.95 of its size in from the edge.
+const homeRight = (size: number) => size * (0.95 - (1 - FEET_X))
+const homeSize = (element: HTMLElement) => Number(element.dataset.berryPerchSize) || HOME_SIZE
 // In the slot the active tab keeps free for it, between its title and its close button.
 const TAB_SIZE = 32
 const TAB_INSET = 54
@@ -44,7 +45,8 @@ const targetFor = (element: HTMLElement): Target => {
     if ('berrySpot' in element.dataset) return { x: rect.left, y: rect.top, size: rect.width, mood: 'rest' }
 
     if ('berryHome' in element.dataset) {
-        return { x: rect.right - HOME_RIGHT - HOME_SIZE, y: rect.top - HOME_SIZE * STANDING_FEET, size: HOME_SIZE, mood: 'rest' }
+        const size = homeSize(element)
+        return { x: rect.right - homeRight(size) - size, y: rect.top - size * STANDING_FEET + 2, size, mood: 'rest' }
     }
     // On the tab's lower edge with its legs over it, in both layouts, so it covers no title.
     return { x: rect.right - TAB_INSET - TAB_SIZE / 2, y: rect.bottom - 2 - TAB_SIZE * SEAT, size: TAB_SIZE, mood: 'sitting' }
@@ -216,7 +218,7 @@ export const BerryCompanion: React.FC = () => {
     const bird = (
         <div ref={body} className={atSpot || home || mood === 'sitting' ? '[&_svg_*]:pointer-events-auto' : undefined} style={{ transformOrigin: home ? `${FEET_X * 100}% ${STANDING_FEET * 100}%` : `50% ${SEAT * 100}%` }}>
             <div style={{ transform: flipped ? 'scaleX(-1)' : undefined }}>
-                <Berry mood={mood} size={home ? HOME_SIZE : BASE_SIZE} mascot={mascot} />
+                <Berry mood={mood} size={home ? homeSize(home) : BASE_SIZE} mascot={mascot} grain={!!home} />
             </div>
         </div>
     )
@@ -235,10 +237,10 @@ export const BerryCompanion: React.FC = () => {
                 <div
                     data-berry-perched
                     className="absolute pointer-events-none"
-                    style={{ right: HOME_RIGHT, top: -HOME_SIZE * STANDING_FEET, width: HOME_SIZE, height: HOME_SIZE, opacity: away ? 0 : undefined }}
+                    style={{ right: homeRight(homeSize(home)), top: -homeSize(home) * STANDING_FEET + 2, width: homeSize(home), height: homeSize(home), opacity: away ? 0 : undefined }}
                 >
                     {/* The shadow its feet leave on the box, cut off at the edge so it only falls on the box. */}
-                    <div aria-hidden className="absolute h-2 overflow-hidden" style={{ left: HOME_SIZE * FEET_X - 24, width: 48, top: HOME_SIZE * STANDING_FEET }}>
+                    <div aria-hidden className="absolute h-2 overflow-hidden" style={{ left: homeSize(home) * FEET_X - 20, width: 40, top: homeSize(home) * STANDING_FEET - 2 }}>
                         <div className="absolute inset-x-1 -top-1 h-2 rounded-full bg-berry-pupil/30 blur-[2px]" />
                     </div>
                     {bird}

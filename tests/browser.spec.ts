@@ -383,7 +383,7 @@ test("the panel shares the page with the model, and the main chat doesn't", asyn
   expect(JSON.stringify(model.requests.at(-1)?.messages)).not.toContain("hello from the page");
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+  const message = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
   await message.fill("Something else");
   await message.press("Enter");
   await expect.poll(() => model.requests.length).toBe(3);
@@ -410,7 +410,7 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   await expect(panel.getByText("matches on")).toHaveCount(0);
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+  const message = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
   await message.fill("Something else");
   await message.press("Enter");
   await expect.poll(() => model.requests.length).toBe(3);
@@ -444,7 +444,7 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   await askBeforeActing("always");
   await openFixture();
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+  const message = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
   const card = chrome.getByRole("region", { name: "Approval needed" });
 
   model.callTools({ name: "list_tabs", args: {} });
@@ -470,7 +470,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   await askBeforeActing("risky");
   await openFixture();
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+  const message = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
   const card = chrome.getByRole("region", { name: "Approval needed" });
   const url = `${origin}/real-input`;
   const framed = `http://localhost:${new URL(origin).port}`;
@@ -595,7 +595,7 @@ const placedView = (url: string) =>
 test("a tab behind the chat has a real size and can be seen, without showing over the page", async () => {
   await askBeforeActing("never");
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+  const message = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
   const url = `${origin}/form`;
 
   model.callTools({ name: "open_tab", args: { url } });
@@ -931,7 +931,7 @@ test("a missing API key says what to do", async () => {
   await app.close();
   app = await launchApp();
   chrome = await findView(app, "view=chrome");
-  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  const input = chrome.getByRole("textbox", { name: "Ask Berry or search" });
   await input.fill("Plan a trip");
   await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
 
@@ -943,7 +943,7 @@ const chatInSidebar = (title: string) =>
   chrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: new RegExp(`^${title}`) });
 
 const startChat = async (text: string) => {
-  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  const input = chrome.getByRole("textbox", { name: "Ask Berry or search" });
   await input.fill(text);
   await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
@@ -1118,7 +1118,7 @@ test("a reply takes over from Thinking in place, and isn't redrawn when it ends"
   const releaseStart = model.holdBeforeFirstToken();
   const releaseRest = model.holdAfterFirstToken();
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-  const message = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+  const message = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
   await message.fill("hello");
   await message.press("Enter");
 
@@ -1179,7 +1179,7 @@ test("the appearance setting switches the chrome between light and dark", async 
   await expect(html).not.toHaveClass(/dark/);
 });
 
-test("the page card follows the sidebar and chat as they open and close", async () => {
+test("the page follows the sidebar and chat as they open and close, with no gutter", async () => {
   // The window may not get the size it asks for on a small screen, such as a CI runner, and Windows can add a few
   // pixels for its frame. The rest of this works from the size it really got.
   const [width, height] = await app.evaluate(({ BaseWindow }) => {
@@ -1193,19 +1193,20 @@ test("the page card follows the sidebar and chat as they open and close", async 
   const size = () => page.evaluate(() => [window.innerWidth, window.innerHeight]);
 
   // Sidebar open and chat closed, which is how the app starts.
-  await expect.poll(size).toEqual([width - 280 - 8, height - 56]);
+  // Under the 48px top bar, the page fills what the chrome leaves.
+  await expect.poll(size).toEqual([width - 280, height - 48]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
-  await expect.poll(size).toEqual([width - 280 - 400, height - 56]);
+  await expect.poll(size).toEqual([width - 280 - 400, height - 48]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
-  await expect.poll(size).toEqual([width - 8 - 400, height - 56]);
+  await expect.poll(size).toEqual([width - 400, height - 48]);
 
   // A tab opened now gets the same space as the others.
   const second = await openFixture("/second");
   await expect
     .poll(() => second.evaluate(() => window.innerWidth))
-    .toBe(width - 8 - 400);
+    .toBe(width - 400);
 });
 
 test("the chrome fills the window as it resizes", async () => {
@@ -1256,7 +1257,8 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect
     .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
-    .toEqual([width - 16, height - 40 - 76 - 8]);
+    // The tab row, then the address row and the bookmarks bar, and the page with no gutter.
+    .toEqual([width, height - 40 - 44 - 36]);
   expect(
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
   ).toBe(true);
@@ -1330,10 +1332,10 @@ test("the sidebar and chat resize within their limits, by pointer or keyboard", 
   const pageWidth = () => page.evaluate(() => window.innerWidth);
 
   await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 300));
-  await expect.poll(pageWidth).toBe(width - 300 - 8);
+  await expect.poll(pageWidth).toBe(width - 300);
 
   await chrome.evaluate(() => window.chromeAPI.layout.resize("sidebar", 9999));
-  await expect.poll(pageWidth).toBe(width - 360 - 8);
+  await expect.poll(pageWidth).toBe(width - 360);
 
   const handle = chrome.getByRole("separator", { name: "Resize sidebar" });
   await handle.focus();
@@ -1362,8 +1364,9 @@ test("the collapsed sidebar floats over the page when the pointer reaches the le
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
   expect(await overlayVisible()).toBe(false);
 
-  const { y, height } = await chrome.evaluate(async () => (await window.chromeAPI.layout.getLayout()).page);
-  await chrome.mouse.move(3, y + height / 2);
+  // The page reaches the window's edge, where main watches the real pointer. Beside the top bar the chrome sees it.
+  const { y, height } = await chrome.evaluate(async () => (await window.chromeAPI.layout.getLayout()).toolbar);
+  await chrome.mouse.move(2, y + height / 2);
   await expect.poll(overlayVisible).toBe(true);
 
   const overlay = await findView(app, "view=overlay");
@@ -1386,7 +1389,7 @@ test("the app starts on the new tab page, and typing an address opens it in that
   expect(first).toMatchObject({ page: "new-tab", isActive: true });
   await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
 
-  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  const input = chrome.getByRole("textbox", { name: "Ask Berry or search" });
   await input.fill(`${origin}/typed`);
   await input.press("Enter");
 
@@ -1400,12 +1403,13 @@ test("recent on the new tab page lists pages really visited", async () => {
   await expect.poll(async () => (await activeTab()).title).toBe("Fixture");
 
   await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-  const recent = chrome.getByRole("region", { name: "Recent" });
+  await chrome.getByRole("button", { name: "Recent pages" }).click();
+  const recent = chrome.getByRole("list", { name: "Recent pages" });
   await expect(recent.getByRole("button", { name: /Fixture/ })).toBeVisible();
 });
 
 test("asking Berry from the new tab page opens a chat that the sidebar lists", async () => {
-  const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
+  const input = chrome.getByRole("textbox", { name: "Ask Berry or search" });
   await input.fill("Plan a trip to Porto");
   await input.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
 
@@ -1515,7 +1519,7 @@ test("the new tab composer sends only when there is text, and asks Berry unless 
   const send = chrome.getByRole("button", { name: "Send" });
   await expect(send).toBeDisabled();
 
-  await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" }).fill("Plan a trip to Porto");
+  await chrome.getByRole("textbox", { name: "Ask Berry or search" }).fill("Plan a trip to Porto");
   await send.click();
 
   await expect.poll(async () => (await activeTab()).page).toBe("chat");
@@ -1752,7 +1756,7 @@ test("Hide Berry swaps the character for a plain icon and neutral words", async 
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ showBerry: false }));
 
   await expect(chrome.getByRole("img", { name: /^Berry, / })).toHaveCount(0);
-  await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask a question" })).toBeVisible();
+  await expect(chrome.getByRole("textbox", { name: "Ask or search" })).toBeVisible();
 });
 
 test("Berry stands on the new tab composer, inside it, then sits on the active tab", async () => {
@@ -1772,7 +1776,8 @@ test("Berry stands on the new tab composer, inside it, then sits on the active t
     const bird = document.querySelector("[data-berry-perched]")!.getBoundingClientRect();
     return Math.abs(bird.top + bird.height * (113 / 120) - document.querySelector("[data-berry-home]")!.getBoundingClientRect().top);
   });
-  expect(feetGap).toBeLessThan(1);
+  // Its toes grip the edge, a couple of pixels into it.
+  expect(feetGap).toBeLessThan(3);
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
   await expect(sitting).toBeVisible();
@@ -1781,18 +1786,19 @@ test("Berry stands on the new tab composer, inside it, then sits on the active t
   await expect(sitting).toBeVisible();
 });
 
-test("the new tab page paints the art blueberry, and web pages don't carry it", async () => {
+test("the new tab page paints the valley off the main thread, and web pages don't carry it", async () => {
   const painted = () =>
     chrome.evaluate(() => {
-      const canvas = document.querySelector<HTMLCanvasElement>("[data-berry-art]")!;
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-valley] canvas")!;
+      if (canvas.width < 2) return 0;
       const { data } = canvas.getContext("2d")!.getImageData(canvas.width / 2, canvas.height / 2, 1, 1);
       return data[3];
     });
-  await expect(chrome.locator("[data-berry-art]")).toHaveCount(1);
+  await expect(chrome.locator("[data-valley]")).toHaveCount(1);
   await expect.poll(painted).toBe(255);
 
   await openFixture();
-  await expect(chrome.locator("[data-berry-art]")).toHaveCount(0);
+  await expect(chrome.locator("[data-valley]")).toHaveCount(0);
 });
 
 test("bookmarks are in the sidebar when vertical and under the address bar when horizontal", async () => {
@@ -1844,25 +1850,6 @@ test("right-clicking Berry opens its menu on the composer and active tab", async
     await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label)))
       .toEqual(["Keep Berry Still", "Hide Berry"]);
   }
-});
-
-test("birds walk behind the new tab page unless Berry is kept still", async () => {
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
-
-  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: true }));
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(0);
-  await expect(chrome.locator("#berry-backdrop path").first()).toBeAttached();
-
-  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: false }));
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
-});
-
-test("reduced motion stops background birds immediately", async () => {
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
-  await chrome.emulateMedia({ reducedMotion: "reduce" });
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(0);
-  await chrome.emulateMedia({ reducedMotion: "no-preference" });
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
 });
 
 test("the component gallery shows Berry in every mood", async () => {

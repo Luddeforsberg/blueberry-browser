@@ -99,7 +99,7 @@ export const CHANNEL_REGIONS: {
   "suggestions:list": ["chrome"],
   "suggestions:dismiss": ["chrome"],
   "suggestions:used": ["chrome"],
-  "downloads:list": ["chrome"],
+  "downloads:list": BOTH,
   "downloads:act": ["chrome"],
   "downloads:choose-folder": ["chrome"],
   "permissions:saved": ["chrome"],

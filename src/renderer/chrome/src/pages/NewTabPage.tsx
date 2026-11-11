@@ -1,43 +1,130 @@
-import React, { useEffect, useState } from 'react'
-import { Bird, Hand, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Bird, CircleAlert, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
-import type { Suggestion } from '@shared/library'
-import { BerryDot } from '@common/components/Mascot'
+import type { MascotProfile, Suggestion } from '@shared/library'
+import { BERRY_ID } from '@shared/mascots'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { Favicon } from '../components/Favicon'
-import { useAssistantName } from '../components/Berry'
+import { Berry, useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
+import { NewTabTray, type TrayLine } from '../components/NewTabTray'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
-import { ArtBlueberry } from '../components/ArtBlueberry'
-import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
-import { setFlockView, suggestedMascot } from '../flockView'
+import { blankMascot, setFlockView, suggestedMascot } from '../flockView'
 import { setRoutinesView, suggestedForm } from '../routinesView'
+import { Valley } from '../valley/Valley'
+import { lightFor } from '../valley/light'
+import type { ValleyBanks, ValleyBox } from '../valley/painter'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { cn } from '@common/lib/utils'
 
-const TRAY_BUTTON = cn(
-    "flex items-center gap-2 h-8 px-2.5 rounded-control text-14 text-muted-foreground outline-none transition-colors",
-    "hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-)
+const RECENT_PAGES = 5
+// The perched bird, smaller in a small window. The resting birds are two thirds and half of it.
+const PERCH = { large: 76, small: 56 }
+const SMALL_BELOW = 760
+// Where the feet are in a standing drawing, as shares of its size.
+const FEET_X = 57 / 120
+const FEET_Y = 113 / 120
 
-const WORK_CARDS = 3
+// Saved suggestions at once, and new ones when they're written. A list that arrives after an update, or after the page
+// has gone, is dropped, and so is an answer to Not now that an update has overtaken.
+const useSuggestions = () => {
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+    const version = useRef(0)
+    const alive = useRef(true)
+    useEffect(() => {
+        alive.current = true
+        const { list, onUpdated } = window.chromeAPI.suggestions
+        const asked = version.current
+        const off = onUpdated((next) => {
+            version.current++
+            if (alive.current) setSuggestions(next)
+        })
+        void list().then((first) => {
+            if (alive.current && version.current === asked) setSuggestions(first)
+        })
+        return () => {
+            alive.current = false
+            off()
+        }
+    }, [])
+    const dismiss = (id: string) => {
+        setSuggestions((current) => current.filter((suggestion) => suggestion.id !== id))
+        const asked = ++version.current
+        void window.chromeAPI.suggestions.dismiss(id).then((next) => {
+            if (alive.current && version.current === asked) setSuggestions(next)
+        })
+    }
+    return { suggestions, dismiss }
+}
 
-const timeOf = (visitedAt: number) =>
-    new Date(visitedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+// Real pages only, asked once when the page opens.
+const useRecent = () => {
+    const [recent, setRecent] = useState<Visit[]>([])
+    useEffect(() => {
+        let alive = true
+        window.chromeAPI.browser
+            .getRecent()
+            .then((visits) => alive && setRecent(visits.slice(0, RECENT_PAGES)))
+            .catch(() => alive && setRecent([]))
+        return () => {
+            alive = false
+        }
+    }, [])
+    return recent
+}
 
-// A heading, one smart input and recent work. Recent only lists pages really visited.
+// The birds you aren't talking to, the one used last first. Any past the two banks are in the picker and on Flock.
+const restingBirds = (flock: MascotProfile[], chosenId: string, chats: { mascotId: string | null; updatedAt: number }[]) => {
+    const lastUsed = (id: string) =>
+        Math.max(0, ...chats.filter((chat) => (chat.mascotId ?? BERRY_ID) === id).map((chat) => chat.updatedAt))
+    return flock
+        .filter((mascot) => mascot.id !== chosenId)
+        .map((mascot, index) => ({ mascot, used: lastUsed(mascot.id), index }))
+        .sort((a, b) => b.used - a.used || a.index - b.index)
+        .slice(0, 2)
+        .map(({ mascot }) => mascot)
+}
+
+// A resting bird is a button of its own, and pressing it makes it the one on the box. Its name shows on hover and focus.
+const RestingBird: React.FC<{ mascot: MascotProfile; size: number; at: { x: number; y: number }; faceLeft: boolean; onChoose: () => void }> = ({ mascot, size, at, faceLeft, onChoose }) => {
+    const name = useAssistantName(mascot)
+    return (
+        <button
+            type="button"
+            aria-label={`Switch to ${name}`}
+            onClick={onChoose}
+            className="group absolute outline-none rounded-full focus-visible:ring-2 focus-visible:ring-scene-ink"
+            style={{ left: at.x - size * FEET_X, top: at.y + 3 - size * FEET_Y, width: size, height: size }}
+        >
+            <span aria-hidden className="absolute h-1.5 rounded-full bg-berry-pupil/30 blur-[2px]" style={{ left: size * FEET_X - size * 0.22, width: size * 0.44, top: size * FEET_Y - 2 }} />
+            <span className="block" style={{ transform: faceLeft ? 'scaleX(-1)' : undefined }}>
+                <Berry size={size} mascot={mascot} grain />
+            </span>
+            <span
+                aria-hidden
+                className={cn(
+                    "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 h-7 px-3 flex items-center whitespace-nowrap rounded-full bg-surface text-13 text-foreground shadow-float",
+                    "opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                )}
+            >
+                Switch to {name}
+            </span>
+        </button>
+    )
+}
+
+// The valley, and in it the box where every job starts, with the chosen bird perched on its top edge.
 export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [text, setText] = useState('')
-    const [recent, setRecent] = useState<Visit[]>([])
-    const [suggestions, setSuggestions] = useState<Suggestion[]>([])
     // A prompt put in the composer: moves the keyboard there, and goes away once it's been sent.
     const [filled, setFilled] = useState<{ id: string; times: number } | null>(null)
     const browser = window.chromeAPI.browser
     const library = useLibrary()
-    const { layout, theme } = useShell()
-    const { chosen, choose, find } = useFlock()
+    const { layout, theme, settings } = useShell()
+    const { flock, chosen, choose } = useFlock()
+    const { suggestions, dismiss } = useSuggestions()
+    const recent = useRecent()
     const [cloudState] = useCloud()
     // Only with a runner linked in Settings > Cloud, which has accepted, so nothing waits in a queue nobody takes from.
     const [runnerState] = useRunner()
@@ -48,17 +135,28 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [cloudChoice, setCloudChoice] = useState<boolean | null>(null)
     useEffect(() => setCloudChoice(null), [chosen.id])
     const inCloud = (canUseRunner || canUseCloud) && (cloudChoice ?? chosen.worksInCloud === true)
+    const light = lightFor(tab.id, theme.valleyLight)
 
-    useEffect(() => {
-        browser.getRecent().then(setRecent).catch(() => setRecent([]))
-    }, [browser])
-
-    // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
-    useEffect(() => {
-        const { list, onUpdated } = window.chromeAPI.suggestions
-        void list().then(setSuggestions)
-        return onUpdated(setSuggestions)
+    // The box the valley is composed around, in the page's own pixels.
+    const page = useRef<HTMLDivElement>(null)
+    const boxRef = useRef<HTMLDivElement>(null)
+    const [box, setBox] = useState<ValleyBox | null>(null)
+    const [width, setWidth] = useState(0)
+    useLayoutEffect(() => {
+        const node = page.current
+        if (!node) return
+        const measure = () => {
+            const frame = node.getBoundingClientRect()
+            const rect = boxRef.current?.getBoundingClientRect()
+            setWidth(frame.width)
+            if (rect) setBox({ top: rect.top - frame.top, left: rect.left - frame.left, right: rect.right - frame.left })
+        }
+        const observer = new ResizeObserver(measure)
+        observer.observe(node)
+        measure()
+        return () => observer.disconnect()
     }, [])
+    const perch = width > 0 && width < SMALL_BELOW ? PERCH.small : PERCH.large
 
     const takeUp = (suggestion: Suggestion) => {
         if (suggestion.kind === 'prompt') {
@@ -72,8 +170,6 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             void browser.openPage('flock')
         }
     }
-
-    const dismiss = (id: string) => void window.chromeAPI.suggestions.dismiss(id).then(setSuggestions)
 
     const askBerry = async (message: string) => {
         if (filled) void window.chromeAPI.suggestions.used(filled.id)
@@ -89,14 +185,10 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         await browser.closeTab(tab.id)
     }
 
-    const ask = () => {
-        if (text.trim()) void askBerry(text.trim())
-    }
-
-    // Plain Enter opens an address and asks Berry anything else. ⌘Enter always asks.
+    // Plain Enter opens an address and asks the bird anything else. ⌘Enter always asks.
     const submit = (alwaysAsk: boolean) => {
         if (!text.trim()) return
-        if (alwaysAsk || !looksLikeUrl(text)) ask()
+        if (alwaysAsk || !looksLikeUrl(text)) void askBerry(text.trim())
         else void browser.navigateTab(tab.id, toUrl(text))
     }
 
@@ -107,79 +199,67 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
 
     const name = useAssistantName(chosen)
-    const isBerry = name !== 'Assistant'
+    const hidden = !settings.showBerry
+    const prompt = hidden ? 'Ask or search' : `Ask ${name} or search`
 
-    const TRAY = [
-        { label: 'Needs you', Icon: Hand, onClick: () => browser.openPage('needs-you') },
-        { label: 'Routines', Icon: RefreshCw, onClick: () => browser.openPage('routines') },
-        { label: 'Flock', Icon: Bird, onClick: () => browser.openPage('flock') }
+    // With no suggestion, a chat or routine to pick up, and with none of those, one idea that links to a real feature.
+    const latestChat = [...library.chats].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    const [routine] = library.routines
+    const fallback: TrayLine = latestChat
+        ? { kind: 'chat', words: latestChat.title, action: 'Open', actionLabel: `Open the chat: ${latestChat.title}`, onUse: () => void browser.openPage('chat', { param: latestChat.id, title: latestChat.title }) }
+        : routine
+          ? { kind: 'routine', words: `${routine.name} · ${routine.schedule}`, action: 'Open', actionLabel: `Open the routine: ${routine.name}`, onUse: () => void browser.openPage('routines') }
+          : flock.length === 1
+            ? {
+                  kind: 'idea',
+                  words: 'Make a bird for a job you repeat',
+                  action: 'Set it up',
+                  onUse: () => {
+                      setFlockView({ page: 'form', values: blankMascot() })
+                      void browser.openPage('flock')
+                  }
+              }
+            : { kind: 'idea', words: 'Put a job you repeat on a schedule', action: 'Set it up', onUse: () => void browser.openPage('routines') }
+
+    const LINKS = [
+        { label: 'Needs you', Icon: CircleAlert, page: 'needs-you' as const },
+        { label: 'Routines', Icon: RefreshCw, page: 'routines' as const },
+        { label: 'Flock', Icon: Bird, page: 'flock' as const },
+        { label: 'Settings', Icon: SlidersHorizontal, page: 'settings' as const }
     ]
+    const resting = hidden ? [] : restingBirds(flock, chosen.id, library.chats)
 
-    // Real work only: chats and routines from the library. With none, the birds offer what there is to try.
-    const work: FruitIdea[] = [
-        ...library.chats.map((chat) => ({
-            id: chat.id,
-            mascot: find(chat.mascotId),
-            mood: 'rest' as const,
-            words: <p className="font-semibold">{chat.title}</p>,
-            action: 'Open the chat',
-            actionLabel: `Open the chat: ${chat.title}`,
-            onUse: () => void browser.openPage('chat', { param: chat.id, title: chat.title })
-        })),
-        ...library.routines.map((routine) => ({
-            id: routine.id,
-            mascot: find(routine.mascotId),
-            mood: routine.status === 'running' ? 'fetching' as const : 'rest' as const,
-            words: (
-                <>
-                    <p className="flex items-center gap-2 font-semibold">
-                        {routine.name}
-                        {routine.status === 'running' && <BerryDot working />}
-                        {routine.status === 'running' && <span className="sr-only">Running now</span>}
-                    </p>
-                    <p className="opacity-90">{routine.schedule}</p>
-                    {routine.lastResult && <p className="opacity-90 line-clamp-2">{routine.lastResult}</p>}
-                </>
-            ),
-            action: 'See the routine',
-            actionLabel: `See the routine: ${routine.name}`,
-            onUse: () => void browser.openPage('routines')
-        }))
-    ].slice(0, WORK_CARDS)
+    const banks = (land: ValleyBanks | null) =>
+        land &&
+        resting.map((mascot, index) => (
+            <RestingBird
+                key={mascot.id}
+                mascot={mascot}
+                size={Math.round(perch * (index === 0 ? 0.66 : 0.5))}
+                at={index === 0 ? land.left : land.right}
+                faceLeft={index === 1}
+                onChoose={() => choose(mascot.id)}
+            />
+        ))
 
-    const IDEAS: FruitIdea[] = [
-        {
-            id: 'idea-routines',
-            mascot: find(null),
-            mood: 'rest',
-            words: <p><span className="font-semibold">Put something on a schedule.</span> <span className="opacity-90">{isBerry ? 'Hand me a task that repeats, and I’ll report back when it’s done.' : 'Set up a task that repeats, with results waiting for you.'}</span></p>,
-            action: 'See routines',
-            onUse: () => void browser.openPage('routines')
-        },
-        {
-            id: 'idea-settings',
-            mascot: find(null),
-            mood: 'rest',
-            words: <p><span className="font-semibold">Make the browser yours.</span> <span className="opacity-90">Choose your tab layout and theme, and what stays on this computer.</span></p>,
-            action: 'Open settings',
-            onUse: () => void browser.openPage('settings')
-        }
-    ]
-
-    const glass = "bg-surface"
     return (
-        <div className="relative h-full overflow-y-auto">
-            <div className="relative min-h-full overflow-hidden">
-                {/* The space above is 22vh, less on a shorter window, so five recent pages still fit at 900px tall. */}
-                <div className="relative max-w-[800px] mx-auto px-6 pt-[clamp(104px,calc(100vh-796px),22vh)] pb-6">
-                    <h1 className="sr-only">Where shall we start today?</h1>
-                    {/* Room for Berry, who stands on the composer's top edge. */}
-                    {isBerry && <div className="h-[84px]" />}
+        <div ref={page} data-light={light} className="relative h-full overflow-hidden">
+            <h1 className="sr-only">Where shall we start today?</h1>
+            <Valley light={light} box={box}>
+                {banks}
+            </Valley>
+            {/* The top bar's part over the page sits on this, so its white icons and the window buttons read in every light. */}
+            <div aria-hidden className="absolute inset-x-0 top-0 h-[104px] pointer-events-none bg-gradient-to-b from-scene-scrim/95 via-scene-scrim/65 via-45% to-scene-scrim/0" />
 
-                    <div data-berry-home className="relative z-10 rounded-composer">
+            <div className="absolute inset-x-0 top-[38.5%] flex flex-col items-center px-8 pointer-events-none">
+                {/* The bird perches on this, outside the shadow the box and its tray share, so they read as one object. */}
+                <div data-berry-home data-berry-perch-size={perch} className="relative w-full max-w-[680px] pointer-events-auto">
+                <div className="drop-shadow-lift">
+                    <div ref={boxRef} className="relative z-10 rounded-composer shadow-lift">
                         <Composer
-                            label={`Search, enter a URL, or ask ${isBerry ? name : 'a question'}`}
-                            placeholder={isBerry ? `Ask ${name} anything, or enter a URL…` : 'Ask anything, or enter a URL…'}
+                            tall
+                            label={prompt}
+                            placeholder={prompt}
                             value={text}
                             onChange={(next) => {
                                 setText(next)
@@ -194,76 +274,41 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             onSend={() => submit(false)}
                             mascot={chosen}
                             onChooseMascot={choose}
-                            cloud={canUseRunner || canUseCloud ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
+                            cloud={
+                                canUseRunner || canUseCloud
+                                    ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud), asSwitch: chosen.worksInCloud === true }
+                                    : undefined
+                            }
                         />
                     </div>
-                    {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
-                    {!layout.sidebarOpen && (
-                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-card", "bg-canvas")}>
-                            {TRAY.map(({ label, Icon, onClick }) => (
-                                <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
-                                    <Icon className="size-4" />
-                                    {label}
-                                </button>
-                            ))}
-                            <div className="flex-1" />
-                            <button type="button" onClick={() => void browser.openPage('settings')} className={TRAY_BUTTON}>
-                                <SlidersHorizontal className="size-4" />
-                                Settings
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Suggestions sit nearer the composer, so they're in view on an ordinary window. It stays where it is. */}
-                    <div className="relative mt-14">
-                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2 pointer-events-none" />
-
-                        {suggestions.length > 0 ? (
-                            <section aria-labelledby="suggestions-heading" className="relative">
-                                <h2 id="suggestions-heading" className="sr-only">Things you repeat</h2>
-                                <BirdSuggestions suggestions={suggestions} onUse={takeUp} onDismiss={dismiss} />
-                            </section>
-                        ) : work.length > 0 ? (
-                            <section aria-labelledby="work-heading" className="relative">
-                                <h2 id="work-heading" className="sr-only">Your work</h2>
-                                <BirdsOnFruit ideas={work} />
-                            </section>
-                        ) : (
-                            <section aria-labelledby="ideas-heading" className="relative">
-                                <h2 id="ideas-heading" className="sr-only">Some ideas</h2>
-                                <BirdsOnFruit ideas={IDEAS} />
-                            </section>
-                        )}
-
-                {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-panel shadow-float", glass)}>
-                        <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
-                            Recent
-                        </h2>
-                        <ul>
-                            {recent.slice(0, 5).map((visit) => (
-                                <li key={visit.url}>
-                                    <button
-                                        type="button"
-                                        onClick={() => void browser.navigateTab(tab.id, visit.url)}
-                                        className={cn(
-                                            "w-full h-9 px-2 flex items-center gap-3 rounded-control text-14 text-left",
-                                            "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                                        )}
-                                    >
-                                        <Favicon src={visit.favicon} site={visit.url} />
-                                        <span className="flex-1 truncate">{visit.title}</span>
-                                        <span className="text-12 text-muted-foreground tabular-nums">
-                                            {timeOf(visit.visitedAt)}
-                                        </span>
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                )}
-                    </div>
+                    <NewTabTray
+                        suggestions={suggestions}
+                        fallback={fallback}
+                        recent={recent}
+                        typing={text.length > 0}
+                        onUse={takeUp}
+                        onDismiss={dismiss}
+                        onOpenRecent={(visit) => void browser.navigateTab(tab.id, visit.url)}
+                    />
                 </div>
+                </div>
+
+                {/* The sidebar holds these when it's open. */}
+                {!layout.sidebarOpen && (
+                    <nav aria-label="Places" className="mt-4 flex flex-wrap justify-center gap-2 pointer-events-auto">
+                        {LINKS.map(({ label, Icon, page: target }) => (
+                            <button
+                                key={label}
+                                type="button"
+                                onClick={() => void browser.openPage(target)}
+                                className="h-[34px] px-3.5 flex items-center gap-2 rounded-full bg-surface text-13 text-foreground shadow-float outline-none transition-colors hover:bg-tray focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <Icon aria-hidden className="size-4 text-muted-foreground" />
+                                {label}
+                            </button>
+                        ))}
+                    </nav>
+                )}
             </div>
         </div>
     )

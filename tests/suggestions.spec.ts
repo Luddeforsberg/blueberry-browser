@@ -22,13 +22,16 @@ test("only cards whose evidence checks out show, a card fills things in, and one
   let app = await launchApp(profile, { modelEnv: model.env });
   try {
     let chrome = await findView(app, "view=chrome");
-    const composer = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
-    const cards = chrome.getByRole("region", { name: "Things you repeat" }).getByRole("listitem");
+    const composer = chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ });
+    const cards = chrome.getByRole("list", { name: "Ideas" }).getByRole("listitem");
+    // The tray's line is the top idea, and More ideas opens the tray onto every one of them.
+    const moreIdeas = () => chrome.getByRole("button", { name: /more ideas?$/ }).click({ timeout: 20_000 });
 
     // The page doesn't wait for the model, and only what checks out comes from it.
-    await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible({ timeout: 20_000 });
+    await moreIdeas();
+    await expect(cards.getByText(DEMO_LINES.routine)).toBeVisible({ timeout: 20_000 });
     await expect(cards).toHaveCount(3);
-    for (const line of Object.values(DEMO_LINES)) await expect(chrome.getByText(line)).toBeVisible();
+    for (const line of Object.values(DEMO_LINES)) await expect(cards.getByText(line)).toBeVisible();
     for (const line of REFUSED_LINES) await expect(chrome.getByText(line)).toHaveCount(0);
     // Not just left off the page: only these got past the checks.
     const saved = JSON.parse(readFileSync(join(profile, "suggestions.json"), "utf8")) as { proposals: Array<{ card: { title: string } }> };
@@ -44,7 +47,7 @@ test("only cards whose evidence checks out show, a card fills things in, and one
 
     // A prompt waits in the composer with the cursor ready, and nothing has gone to the main model.
     const prompt = cards.first();
-    const words = await prompt.locator("p span").nth(1).textContent();
+    const words = await prompt.locator("p").first().textContent();
     await prompt.getByRole("button").first().click();
     await expect(composer).not.toHaveValue("");
     await expect(composer).toBeFocused();
@@ -61,14 +64,16 @@ test("only cards whose evidence checks out show, a card fills things in, and one
     expect(library.routines).toHaveLength(0);
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+    await moreIdeas();
     await chrome.getByRole("button", { name: "Meet Linus", exact: true }).click();
     await expect(chrome.getByRole("heading", { name: "New mascot" })).toBeVisible();
     await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Linus");
     await expect(chrome.getByLabel("Sites it may use")).toHaveValue("github.com, linear.app");
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-    await chrome.getByRole("button", { name: `Dismiss: ${words}` }).click();
-    await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
+    await moreIdeas();
+    await chrome.getByRole("button", { name: `Not now: ${words}` }).click();
+    await expect(chrome.getByRole("button", { name: `Not now: ${words}` })).toHaveCount(0);
 
     await app.close();
     const asked = model.suggestionRequests.length;
@@ -76,8 +81,9 @@ test("only cards whose evidence checks out show, a card fills things in, and one
     chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
 
+    await chrome.getByRole("button", { name: /more ideas?$/ }).click();
     await expect(chrome.getByRole("button", { name: "Meet Linus", exact: true })).toBeVisible();
-    await expect(chrome.getByRole("button", { name: `Dismiss: ${words}` })).toHaveCount(0);
+    await expect(chrome.getByRole("button", { name: `Not now: ${words}` })).toHaveCount(0);
     expect(model.suggestionRequests).toHaveLength(asked);
   } finally {
     await app.close();

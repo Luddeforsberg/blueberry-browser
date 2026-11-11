@@ -31,7 +31,7 @@ test("a bird that works in the cloud turns Do this in the cloud on, and it can s
     };
 
     // Berry doesn't work in the cloud, so it's off until chosen.
-    await chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ }).fill("Find me a cable");
+    await chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ }).fill("Find me a cable");
     await expect(send("Send")).toBeVisible();
     await more.click();
     await expect(item).toHaveAttribute("aria-checked", "false");
@@ -46,10 +46,11 @@ test("a bird that works in the cloud turns Do this in the cloud on, and it can s
     await expect(send("Send to the cloud")).toBeVisible();
     await chrome.screenshot({ path: join(SHOTS, "2-on-normal-width.png") });
 
-    // Off for this message, and choosing Scout again goes back to its own default.
-    await more.click();
-    await expect(item).toHaveAttribute("aria-checked", "true");
-    await item.click();
+    // For a bird that works there it's a switch in the row, off for this message, and choosing Scout again goes back
+    // to its own default.
+    const toggle = chrome.getByRole("switch", { name: "In the cloud" });
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await toggle.click();
     await expect(send("Send")).toBeVisible();
     // Any change of bird goes back to following it, wherever it was chosen, as the chat panel shares the choice.
     await choose("Berry");

@@ -35,9 +35,11 @@ test("onboarding brings in another browser's history, and the birds speak about 
     await chrome.getByRole("button", { name: "Continue" }).click();
     await chrome.getByRole("button", { name: "Start browsing" }).click();
 
-    const cards = chrome.getByRole("region", { name: "Things you repeat" }).getByRole("listitem");
+    // The tray's line is the top idea, and More ideas opens the tray onto all three.
+    await chrome.getByRole("button", { name: "2 more ideas" }).click({ timeout: 20_000 });
+    const cards = chrome.getByRole("list", { name: "Ideas" }).getByRole("listitem");
     await expect(cards).toHaveCount(3, { timeout: 20_000 });
-    await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible();
+    await expect(cards.getByText(DEMO_LINES.routine)).toBeVisible();
 
     // What the step says goes out is what went out.
     expect(model.suggestionRequests).toHaveLength(1);

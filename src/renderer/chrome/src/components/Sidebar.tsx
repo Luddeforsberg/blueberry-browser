@@ -99,7 +99,11 @@ const PinnedTiles: React.FC = () => {
     const tile = "size-7 flex items-center justify-center rounded-control outline-none app-region-no-drag focus-visible:ring-2 focus-visible:ring-ring"
 
     if (sites.length === 0) {
-        return <p className="px-2.5 pb-3 text-13 text-muted-foreground">{NO_SAVED_SITES}</p>
+        return (
+            <ul aria-label="Bookmarks" className="px-2.5 pb-3 text-13 text-muted-foreground">
+                <li>{NO_SAVED_SITES}</li>
+            </ul>
+        )
     }
     return (
         <ul aria-label="Bookmarks" className="grid grid-cols-4 justify-items-center gap-y-2.5 pt-1.5 pb-3">

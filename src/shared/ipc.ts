@@ -539,7 +539,8 @@ export interface InvokeChannels {
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };
-  "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
+  // The overlay too, since downloads sit in the sidebar's top row, the floating one's as well.
+  "downloads:list": { region: "chrome" | "overlay"; args: []; result: DownloadInfo[] };
   "downloads:act": { region: "chrome"; args: [id: string, action: DownloadAction]; result: boolean };
   "downloads:choose-folder": { region: "chrome"; args: []; result: void };
   "permissions:saved": { region: "chrome"; args: []; result: SavedSitePermission[] };

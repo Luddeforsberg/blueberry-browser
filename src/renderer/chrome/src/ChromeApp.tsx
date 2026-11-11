@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { Menu } from 'lucide-react'
-import type { Rect } from '@shared/ipc'
+import type { Rect, ValleyLight } from '@shared/ipc'
+import { lightFor } from './valley/light'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
 import { LibraryProvider, useFlock } from './contexts/LibraryContext'
 import { InternalPageView } from './pages/InternalPageView'
@@ -14,7 +15,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { Onboarding } from './components/Onboarding'
 import { BerryCompanion } from './components/BerryCompanion'
 import { PageTrouble } from './components/PageTrouble'
-import { ToolBarButton } from './components/ToolBarButton'
+import { OverScene, ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
 import { cn } from '@common/lib/utils'
 import { siteAllowed } from '@shared/mascots'
@@ -26,8 +27,10 @@ const Region: React.FC<{
     children?: React.ReactNode
     onMouseEnter?: () => void
     reading?: boolean
-}> = ({ rect, className, children, onMouseEnter, reading }) => (
+    light?: ValleyLight
+}> = ({ rect, className, children, onMouseEnter, reading, light }) => (
     <div
+        data-light={light}
         className={cn("absolute", className)}
         style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
         onMouseEnter={onMouseEnter}
@@ -38,7 +41,7 @@ const Region: React.FC<{
 )
 
 const Shell: React.FC = () => {
-    const { layout, settings } = useShell()
+    const { layout, settings, theme } = useShell()
     const { activeTab, reload } = useBrowser()
     const recordingState = useRecording()
     const { isLoading, pageAccess, mascotId } = useChat()
@@ -86,21 +89,21 @@ const Shell: React.FC = () => {
                     <ResizeHandle panel="sidebar" />
                 </Region>
             )}
-            {floatingSidebar.width > 0 && (
-                // The window's left edge beside the top bar. Over the page, main watches for the pointer instead.
-                <Region
-                    rect={{ x: 0, y: 0, width: 4, height: layout.toolbar.y + layout.toolbar.height }}
-                    onMouseEnter={() => void window.chromeAPI.layout.showFloatingSidebar()}
-                />
-            )}
             {layout.mode === 'horizontal' && (
                 <Region rect={layout.tabStrip}>
                     <TabStrip />
                 </Region>
             )}
-            <Region rect={layout.toolbar}>
+            <Region rect={layout.toolbar} light={behindTopBar && activeTab ? lightFor(activeTab.id, theme.valleyLight) : undefined}>
                 <Toolbar />
             </Region>
+            {floatingSidebar.width > 0 && (
+                // The window's left edge beside the top bar, over it. Over the page, main watches for the pointer instead.
+                <Region
+                    rect={{ x: 0, y: 0, width: 4, height: layout.toolbar.y + layout.toolbar.height }}
+                    onMouseEnter={() => void window.chromeAPI.layout.showFloatingSidebar()}
+                />
+            )}
             {layout.chatOpen && (
                 <Region rect={layout.chat}>
                     <ChatPanel />
@@ -110,7 +113,10 @@ const Shell: React.FC = () => {
             {layout.menuButton.width > 0 && (
                 // Off a Mac the window has no menu bar, so this opens the same menu.
                 <Region rect={layout.menuButton}>
-                    <ToolBarButton Icon={Menu} label="Menu" onClick={() => void window.chromeAPI.layout.showAppMenu()} />
+                    {/* White on the new tab's scrim, like the rest of the top bar, but not in the tab row above it. */}
+                    <OverScene.Provider value={behindTopBar && layout.mode === 'vertical'}>
+                        <ToolBarButton Icon={Menu} label="Menu" onClick={() => void window.chromeAPI.layout.showAppMenu()} />
+                    </OverScene.Provider>
                 </Region>
             )}
             <BerryCompanion />

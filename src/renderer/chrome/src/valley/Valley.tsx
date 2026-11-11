@@ -102,7 +102,7 @@ export const Valley: React.FC<{
     }, [shown])
 
     return (
-        <div ref={root} data-light={light} aria-hidden className={cn("absolute inset-0 overflow-hidden", className)}>
+        <div ref={root} data-valley data-light={light} aria-hidden className={cn("absolute inset-0 overflow-hidden", className)}>
             {/* The sky's colour shows at once, and the painting fades in when it's ready. */}
             <div className="absolute inset-0 bg-gradient-to-b from-scene-sky to-scene-horizon" />
             <canvas

@@ -216,7 +216,7 @@ export class Window {
       activeContents: () => (this.settings.onboarded ? this.activeTab?.webContents ?? null : null),
       page: () => this.layout.page,
     });
-    const offDownloads = downloads.onChange((list) => sendToRenderer(this.chrome.view.webContents, "downloads:updated", list));
+    const offDownloads = downloads.onChange((list) => this.broadcast("downloads:updated", list));
     const offSaved = sitePermissions.onChange(() =>
       sendToRenderer(this.chrome.view.webContents, "permissions:saved-updated", sitePermissions.saved)
     );

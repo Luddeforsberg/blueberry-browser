@@ -72,8 +72,8 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   model.callTools({ name: "open_tab", args: { url: offLimits } });
   model.replyWith("Aye, ", "I can't go there.");
   await chrome.getByRole("button", { name: "Chat" }).nth(1).click();
-  await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).fill("Open that page");
-  await chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" }).press("Enter");
+  await chrome.getByRole("textbox", { name: "Ask Scout or search" }).fill("Open that page");
+  await chrome.getByRole("textbox", { name: "Ask Scout or search" }).press("Enter");
   await expect(chrome.getByText("Aye, I can't go there.")).toBeVisible();
   await expect(chrome.getByText("Stayed off localhost")).toBeVisible();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(0);

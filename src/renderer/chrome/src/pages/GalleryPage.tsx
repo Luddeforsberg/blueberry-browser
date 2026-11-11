@@ -9,7 +9,6 @@ import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
-import { ArtBlueberry } from '../components/ArtBlueberry'
 import { Valley } from '../valley/Valley'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
@@ -27,7 +26,7 @@ import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
-import { BirdSuggestions } from '../components/BirdsOnFruit'
+import { NewTabTray } from '../components/NewTabTray'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
@@ -36,7 +35,6 @@ import type { RoutineRun } from '@shared/library'
 import { DownloadRow } from '../components/DownloadRow'
 import { RecordingNotice, TrailNotes } from '../components/ShowBerry'
 import { DownloadsProgress } from '../components/DownloadsButton'
-import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 
@@ -184,7 +182,6 @@ export const GalleryPage: React.FC = () => {
     const [choice, setChoice] = useState<'one' | 'two'>('one')
     const [still, setStill] = useState(false)
     const [routineForm, setRoutineForm] = useState(() => blankForm('Flight price watch'))
-    const { theme } = useShell()
 
     return (
         <div className="h-full overflow-y-auto">
@@ -262,12 +259,22 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
-                <Section title="Suggestions">
-                    <div className="relative h-[420px] rounded-panel overflow-hidden">
-                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
-                        <div className="relative max-w-[752px] mx-auto">
-                            <BirdSuggestions suggestions={SAMPLE_SUGGESTIONS} onUse={() => undefined} onDismiss={() => undefined} />
-                        </div>
+                <Section title="The new tab's tray">
+                    <div className="max-w-[680px] flex flex-col gap-6">
+                        {[SAMPLE_SUGGESTIONS, []].map((suggestions, index) => (
+                            <div key={index}>
+                                <div className="h-16 rounded-composer bg-surface shadow-lift relative z-10" />
+                                <NewTabTray
+                                    suggestions={suggestions}
+                                    fallback={{ kind: 'chat', words: 'Which of these are hiring', action: 'Open', onUse: () => undefined }}
+                                    recent={[{ url: 'https://en.wikipedia.org/wiki/Jackdaw', title: 'Jackdaw', favicon: null, visitedAt: Date.now() }]}
+                                    typing={false}
+                                    onUse={() => undefined}
+                                    onDismiss={() => undefined}
+                                    onOpenRecent={() => undefined}
+                                />
+                            </div>
+                        ))}
                     </div>
                 </Section>
 

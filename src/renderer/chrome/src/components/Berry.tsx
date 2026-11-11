@@ -5,7 +5,7 @@ import { Mascot, type Mood } from '@common/components/Mascot'
 import { useShell } from '../contexts/ShellContext'
 
 // Berry, or one of the flock, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
-export const Berry: React.FC<{ mood?: Mood; size: number; className?: string; mascot?: MascotProfile }> = ({ mascot, ...props }) => {
+export const Berry: React.FC<{ mood?: Mood; size: number; className?: string; mascot?: MascotProfile; grain?: boolean }> = ({ mascot, ...props }) => {
     const { settings } = useShell()
 
     return (

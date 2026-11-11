@@ -5,19 +5,15 @@ import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { BERRY_ID } from '@shared/mascots'
 import { Berry, useAssistantName } from './Berry'
+import { BOX_CONTROL } from './Composer'
 import { blankMascot, setFlockView } from '../flockView'
 
-// Says who a message goes to, on the composer. It only opens the flock where the choice is still open.
-export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; onPress?: () => void }> = ({ mascot, open, onPress }) => {
+// Says who a message goes to, on the composer: the name only, since the bird itself is perched on the box. It only
+// opens the flock where the choice is still open.
+export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; tall?: boolean; onPress?: () => void }> = ({ mascot, open, tall, onPress }) => {
     const name = useAssistantName(mascot)
-    const inner = (
-        <>
-            <Berry size={24} mascot={mascot} />
-            <span className="max-w-24 truncate text-13">{name}</span>
-        </>
-    )
     if (!onPress) {
-        return <span aria-label={`This chat is with ${name}`} className="h-9 px-2 flex items-center gap-1.5 text-muted-foreground cursor-default">{inner}</span>
+        return <span aria-label={`This chat is with ${name}`} className={cn("px-2 flex items-center text-14 text-muted-foreground cursor-default", tall ? "h-10" : "h-9")}>{name}</span>
     }
     return (
         <button
@@ -25,10 +21,10 @@ export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; onPres
             aria-label={`Talking to ${name}. Choose who to ask`}
             aria-expanded={open}
             onClick={onPress}
-            className="h-9 pl-1.5 pr-2 flex items-center gap-1.5 rounded-full outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(BOX_CONTROL, tall ? "h-10 pl-[15px] pr-3" : "h-9 pl-3.5 pr-2.5", "gap-1.5 text-14", open && "bg-pressed dark:bg-pressed")}
         >
-            {inner}
-            <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-180")} />
+            <span className="max-w-32 truncate">{name}</span>
+            <ChevronDown aria-hidden className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-180")} />
         </button>
     )
 }
