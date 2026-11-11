@@ -10,6 +10,7 @@ import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
 import { ArtBlueberry } from '../components/ArtBlueberry'
+import { Valley } from '../valley/Valley'
 import { ChatComposer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
 import { PageTrouble } from '../components/PageTrouble'
@@ -270,9 +271,16 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
-                <Section title="Art blueberry">
-                    <div className="relative h-72 rounded-panel overflow-hidden">
-                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
+                <Section title="The valley">
+                    <div className="grid grid-cols-2 gap-4 max-w-[760px]">
+                        {(['dawn', 'day', 'dusk', 'night'] as const).map((light) => (
+                            <figure key={light} className="flex flex-col gap-1.5">
+                                <div className="relative h-[225px] rounded-panel overflow-hidden">
+                                    <Valley light={light} box={{ top: 90, left: 50, right: 310 }} />
+                                </div>
+                                <figcaption className="text-12 text-muted-foreground">{light}</figcaption>
+                            </figure>
+                        ))}
                     </div>
                 </Section>
 

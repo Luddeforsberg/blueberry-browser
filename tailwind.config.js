@@ -82,6 +82,7 @@ module.exports = {
       // The valley's scrim and field, set by its light.
       scene: {
         sky: "rgb(var(--scene-sky) / <alpha-value>)",
+        horizon: "rgb(var(--scene-horizon) / <alpha-value>)",
         scrim: "rgb(var(--scene-scrim) / <alpha-value>)",
         field: "rgb(var(--scene-field) / <alpha-value>)",
         // Icons and words on the scrim, white in every light.
