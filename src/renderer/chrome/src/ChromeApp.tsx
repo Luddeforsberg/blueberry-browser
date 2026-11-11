@@ -38,7 +38,7 @@ const Region: React.FC<{
 )
 
 const Shell: React.FC = () => {
-    const { layout, theme, settings } = useShell()
+    const { layout, settings } = useShell()
     const { activeTab, reload } = useBrowser()
     const recordingState = useRecording()
     const { isLoading, pageAccess, mascotId } = useChat()
@@ -56,15 +56,15 @@ const Shell: React.FC = () => {
     const reading = !!activeTab && !activeTab.page && (activeTab.berryWorking || (isLoading && pageAccess && activeTab.id === sentFrom.current && siteAllowed(activeTab.url, find(mascotId).sites)))
 
     return (
-        <div className={cn("relative h-full", theme.glass ? "bg-frame" : "bg-background")}>
+        <div className="relative h-full bg-background">
             {/* One card holds the toolbar, bookmarks bar and page, so they read as one surface. */}
             <Region
                 rect={{ ...layout.toolbar, height: page.y + page.height - layout.toolbar.y }}
                 reading={reading}
                 className={cn(
                     "rounded-panel transition-shadow duration-layout",
-                    theme.glass ? "bg-canvas/85 backdrop-blur-2xl" : "bg-canvas",
-                    recording ? "shadow-recording" : reading ? "shadow-reading" : "shadow-page"
+                    "bg-canvas",
+                    recording ? "shadow-recording" : reading ? "shadow-reading" : "shadow-none"
                 )}
             />
             {/* Internal pages draw here. For web pages it shows until the tab view paints, or when a page has crashed. */}

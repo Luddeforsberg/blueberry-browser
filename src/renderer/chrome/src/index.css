@@ -1,3 +1,5 @@
+@import "@fontsource-variable/host-grotesk/wght.css";
+@import "@fontsource/ibm-plex-mono/400.css";
 @import "../../common/tokens.css";
 
 @tailwind base;
@@ -11,7 +13,7 @@
 }
 
 @layer base {
-  /* Transparent, so the window material shows wherever the app draws glass. */
+  /* Transparent, since the views that float over a page draw only their card. The window and the chrome are solid. */
   html,
   body {
     background: transparent;
@@ -21,6 +23,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     @apply font-sans text-13 text-foreground;
+    font-weight: var(--weight-regular);
     height: 100vh;
     overflow: hidden;
   }
@@ -34,12 +37,6 @@
 
   .app-region-no-drag {
     -webkit-app-region: no-drag;
-  }
-
-  /* The frame: the dusty skin of a blueberry, with the fine grain of its bloom. */
-  .bg-frame {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"), var(--frame);
-    background-blend-mode: soft-light;
   }
 }
 

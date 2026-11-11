@@ -167,7 +167,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         }
     ]
 
-    const glass = theme.glass ? "bg-surface/90 backdrop-blur-xl" : "bg-surface"
+    const glass = "bg-surface"
     return (
         <div className="relative h-full overflow-y-auto">
             <div className="relative min-h-full overflow-hidden">
@@ -201,7 +201,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     </div>
                     {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
                     {!layout.sidebarOpen && (
-                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-card", theme.glass ? "bg-canvas/70 backdrop-blur-xl" : "bg-canvas")}>
+                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-card", "bg-canvas")}>
                             {TRAY.map(({ label, Icon, onClick }) => (
                                 <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
                                     <Icon className="size-4" />
@@ -238,7 +238,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
 
                 {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-panel shadow-card", glass)}>
+                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-panel shadow-float", glass)}>
                         <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
                             Recent
                         </h2>

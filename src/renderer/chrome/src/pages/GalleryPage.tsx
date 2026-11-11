@@ -463,9 +463,9 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Find bar">
                     <div className="flex flex-col gap-3 max-w-sm">
-                        <FindBarCard glass={false} value="" onChange={() => undefined} result={null} onStep={() => undefined} onClose={() => undefined} />
-                        <FindBarCard glass={false} value="berry" onChange={() => undefined} result={{ active: 2, total: 14 }} onStep={() => undefined} onClose={() => undefined} />
-                        <FindBarCard glass={false} value="blueberry" onChange={() => undefined} result={{ active: 0, total: 0 }} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard value="" onChange={() => undefined} result={null} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard value="berry" onChange={() => undefined} result={{ active: 2, total: 14 }} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard value="blueberry" onChange={() => undefined} result={{ active: 0, total: 0 }} onStep={() => undefined} onClose={() => undefined} />
                     </div>
                 </Section>
 

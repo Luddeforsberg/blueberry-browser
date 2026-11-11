@@ -73,7 +73,8 @@ export type BrowserTab = Tab | InternalTab;
 // Only one of these pages is open at a time, so opening it again switches to it.
 const SINGLE_INSTANCE_PAGES: InternalPage[] = ["routines", "settings", "downloads", "history", "flock", "mascot-gallery", "needs-you", "recording"];
 
-// Window materials need macOS, or Windows 11 22H2 (build 22621) and later.
+// Window materials need macOS, or Windows 11 22H2 (build 22621) and later. Only the desktop bird's composer uses one:
+// this window is solid.
 const supportsGlass = (): boolean => {
   if (process.platform === "darwin") return true;
   if (process.platform !== "win32") return false;
@@ -83,8 +84,11 @@ const supportsGlass = (): boolean => {
 // A page opened by another with `window.open`, and the tab that opened it.
 type Popup = { page: WebContents; opener: Tab };
 
-// The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach.
-const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
+// The foreground tokens from DESIGN.md, for the Windows caption buttons, which CSS can't reach. On the new tab they sit
+// on the valley's scrim, in white.
+const CAPTION_SYMBOL = { light: "#18181a", dark: "#f2f2f3", scene: "#ffffff" };
+// The `background` token, so the window is the chrome's colour before the chrome has drawn.
+const WINDOW_BACKGROUND = { light: "#e9e9ec", dark: "#1f1f21" };
 
 // macOS draws its window buttons 14px tall, so this centres them in the top row.
 const MAC_BUTTONS_HEIGHT = 14;
@@ -171,15 +175,8 @@ export class Window {
       autoHideMenuBar: false,
       titleBarStyle: "hidden",
       trafficLightPosition: this.windowButtonPosition(),
-      ...(process.platform === "darwin" && this.glassSupported
-        ? { vibrancy: "sidebar" as const }
-        : {}),
-      ...(process.platform === "win32"
-        ? {
-            titleBarOverlay: this.titleBarOverlay(),
-            ...(this.glassSupported ? { backgroundMaterial: "mica" as const } : {}),
-          }
-        : {}),
+      backgroundColor: this.windowBackground,
+      ...(process.platform === "win32" ? { titleBarOverlay: this.titleBarOverlay() } : {}),
     });
 
     this.chrome = createChromeView("chrome");
@@ -567,11 +564,17 @@ export class Window {
   }
 
   private titleBarOverlay() {
+    const entry = this.activeEntry;
+    const overScene = this.mode === "vertical" && entry instanceof InternalTab && entry.page === "new-tab";
     return {
       color: "#00000000",
-      symbolColor: nativeTheme.shouldUseDarkColors ? CAPTION_SYMBOL.dark : CAPTION_SYMBOL.light,
+      symbolColor: overScene ? CAPTION_SYMBOL.scene : nativeTheme.shouldUseDarkColors ? CAPTION_SYMBOL.dark : CAPTION_SYMBOL.light,
       height: this.topRowHeight,
     };
+  }
+
+  private get windowBackground(): string {
+    return nativeTheme.shouldUseDarkColors ? WINDOW_BACKGROUND.dark : WINDOW_BACKGROUND.light;
   }
 
   private get mode(): LayoutMode {
@@ -1539,12 +1542,15 @@ export class Window {
     this.recordings.sync();
     const active = this.activeEntry;
     if (active) this._baseWindow.setTitle(active.title || "Blueberry Browser");
+    // The caption buttons turn white over the new tab's valley.
+    if (process.platform === "win32") this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
     this.syncMenu();
     this.broadcast("tabs:updated", this.tabInfos);
     this.saveSessionSoon();
   }
 
   private notifyTheme(): void {
+    this._baseWindow.setBackgroundColor(this.windowBackground);
     if (process.platform === "win32") {
       this._baseWindow.setTitleBarOverlay(this.titleBarOverlay());
     }

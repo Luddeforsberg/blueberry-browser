@@ -147,7 +147,7 @@ const WorkWindow: React.FC<{
             aria-label={`Go to the tab on ${tab.site}`}
             className={cn(
                 "group block w-full overflow-hidden rounded-card bg-surface text-left outline-none transition-shadow duration-layout focus-visible:ring-2 focus-visible:ring-ring",
-                live ? "shadow-reading" : "shadow-page"
+                live ? "shadow-reading" : "shadow-[0_0_0_1px_rgb(var(--border))]"
             )}
         >
             {isUsers(tab) ? (

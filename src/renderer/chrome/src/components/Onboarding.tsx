@@ -47,7 +47,7 @@ const LAYOUTS: { value: LayoutMode; label: string }[] = [
 // Short steps on first launch. Every one can be skipped, and no account is asked for. With no browser to bring history
 // from, that step isn't there at all.
 export const Onboarding: React.FC = () => {
-    const { settings, theme, updateSettings } = useShell()
+    const { settings, updateSettings } = useShell()
     const [step, setStep] = useState(0)
     const { sources, source, choose, busy, bringIn, message, done } = useHistoryImport()
     const steps = ['meet', 'yours', ...(source ? ['import'] : []), 'see']
@@ -57,10 +57,7 @@ export const Onboarding: React.FC = () => {
 
     return (
         <div
-            className={cn(
-                "absolute inset-0 flex flex-col items-center app-region-drag",
-                theme.glass ? "bg-frame" : "bg-background"
-            )}
+            className="absolute inset-0 flex flex-col items-center app-region-drag bg-background"
         >
             <main className="flex-1 flex flex-col items-center justify-center max-w-md text-center app-region-no-drag">
                 {name === 'meet' && (

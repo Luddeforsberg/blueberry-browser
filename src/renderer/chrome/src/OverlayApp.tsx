@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserProvider } from './contexts/BrowserContext'
 import { LibraryProvider } from './contexts/LibraryContext'
-import { ShellProvider, useShell } from './contexts/ShellContext'
+import { ShellProvider } from './contexts/ShellContext'
 import { Sidebar } from './components/Sidebar'
 import { cn } from '@common/lib/utils'
 
@@ -11,7 +11,6 @@ const SLIDE_MS = 240
 // The collapsed sidebar, floating over the page in its own view. It slides in when main shows the
 // view, and slides out before hiding when the pointer leaves it.
 const FloatingSidebar: React.FC = () => {
-    const { theme } = useShell()
     // `hidden` is off-screen with no transition: main hid the view, so the next show must slide from there.
     const [slide, setSlide] = useState<'in' | 'out' | 'hidden'>('hidden')
     const card = useRef<HTMLDivElement>(null)
@@ -51,10 +50,9 @@ const FloatingSidebar: React.FC = () => {
                 ref={card}
                 data-slide={slide}
                 className={cn(
-                    "h-full rounded-panel border shadow-float overflow-hidden",
+                    "h-full rounded-panel bg-background shadow-float overflow-hidden",
                     slide === 'hidden' ? "transition-none" : "transition-transform duration-layout",
-                    slide !== 'in' && "-translate-x-[calc(100%+24px)]",
-                    theme.glass ? "bg-glass-tint backdrop-blur-xl" : "bg-background"
+                    slide !== 'in' && "-translate-x-[calc(100%+24px)]"
                 )}
             >
                 <Sidebar floating />

@@ -86,7 +86,6 @@ const clusterColumn = (index: number) => {
 // Pinned sites and bookmarks, grown together in a round cluster at the top of the sidebar.
 const Cluster: React.FC = () => {
     const { createTab } = useBrowser()
-    const { theme } = useShell()
     const sites = useSavedSites()
 
     return (
@@ -106,7 +105,7 @@ const Cluster: React.FC = () => {
                         className={cn(
                             "size-11 flex items-center justify-center rounded-full text-14 font-semibold text-muted-foreground shadow-selected outline-none transition-colors app-region-no-drag",
                             "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
-                            theme.glass ? "bg-surface/60" : "bg-surface"
+                            "bg-surface"
                         )}
                     >
                         <Favicon src={site.favicon ?? siteIcon(site.url)} fallback={site.title.charAt(0)} />

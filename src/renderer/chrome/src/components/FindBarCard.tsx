@@ -10,14 +10,13 @@ const countText = (value: string, result: FindResult | null): string => {
 }
 
 export const FindBarCard: React.FC<{
-    glass: boolean
     value: string
     onChange: (value: string) => void
     result: FindResult | null
     onStep: (forward: boolean) => void
     onClose: () => void
     inputRef?: React.Ref<HTMLInputElement>
-}> = ({ glass, value, onChange, result, onStep, onClose, inputRef }) => {
+}> = ({ value, onChange, result, onStep, onClose, inputRef }) => {
     const hasMatches = !!value && !!result && result.total > 0
 
     return (
@@ -31,8 +30,7 @@ export const FindBarCard: React.FC<{
                 }
             }}
             className={cn(
-                "h-12 flex items-center gap-0.5 pl-2 pr-2 rounded-panel border shadow-selected",
-                glass ? "bg-glass-tint backdrop-blur-xl" : "bg-background"
+                "h-12 flex items-center gap-0.5 pl-2 pr-2 rounded-panel bg-surface shadow-float"
             )}
         >
             <input

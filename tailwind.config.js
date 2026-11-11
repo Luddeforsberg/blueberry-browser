@@ -24,7 +24,14 @@ module.exports = {
       selected: "rgb(var(--selected) / <alpha-value>)",
       surface: "rgb(var(--surface) / <alpha-value>)",
       foreground: "rgb(var(--foreground) / <alpha-value>)",
-      "glass-tint": "var(--glass-tint)",
+      // Hover is the ink at a few percent, on any surface. Pressed is the fill of an open button or toggle.
+      hover: "rgb(var(--foreground) / var(--hover-alpha))",
+      pressed: "rgb(var(--pressed) / <alpha-value>)",
+      outline: "rgb(var(--outline) / <alpha-value>)",
+      // Controls inside a dark `surface`, in place of an outline. Transparent in light mode.
+      "control-fill": "var(--control-fill)",
+      attention: "rgb(var(--attention) / <alpha-value>)",
+      "berry-blue": "rgb(var(--berry-blue) / <alpha-value>)",
       success: "rgb(var(--success) / <alpha-value>)",
       warning: "rgb(var(--warning) / <alpha-value>)",
       bookmark: "rgb(var(--bookmark) / <alpha-value>)",
@@ -55,17 +62,28 @@ module.exports = {
       },
       berry: {
         ink: "rgb(var(--berry-ink) / <alpha-value>)",
-        wing: "rgb(var(--berry-wing) / <alpha-value>)",
         nape: "rgb(var(--berry-nape) / <alpha-value>)",
+        shade: "rgb(var(--berry-shade) / <alpha-value>)",
+        wing: "rgb(var(--berry-wing) / <alpha-value>)",
+        crest: "rgb(var(--berry-crest) / <alpha-value>)",
+        beak: "rgb(var(--berry-beak) / <alpha-value>)",
+        "beak-lower": "rgb(var(--berry-beak-lower) / <alpha-value>)",
+        legs: "rgb(var(--berry-legs) / <alpha-value>)",
         eye: "rgb(var(--berry-eye) / <alpha-value>)",
         pupil: "rgb(var(--berry-pupil) / <alpha-value>)",
-        beak: "rgb(var(--berry-beak) / <alpha-value>)",
+        note: "rgb(var(--berry-note) / <alpha-value>)",
+        "note-edge": "rgb(var(--berry-note-edge) / <alpha-value>)",
         gear: "rgb(var(--berry-gear) / <alpha-value>)",
         "gear-shade": "rgb(var(--berry-gear-shade) / <alpha-value>)",
         "fruit-mid": "rgb(var(--berry-fruit-mid) / <alpha-value>)",
         "fruit-dark": "rgb(var(--berry-fruit-dark) / <alpha-value>)",
         "fruit-bloom": "rgb(var(--berry-fruit-bloom) / <alpha-value>)",
-        "fruit-crown": "rgb(var(--berry-fruit-crown) / <alpha-value>)",
+      },
+      // The valley's scrim and field, set by its light.
+      scene: {
+        sky: "rgb(var(--scene-sky) / <alpha-value>)",
+        scrim: "rgb(var(--scene-scrim) / <alpha-value>)",
+        field: "rgb(var(--scene-field) / <alpha-value>)",
       },
       card: {
         DEFAULT: "rgb(var(--card) / <alpha-value>)",
@@ -76,34 +94,44 @@ module.exports = {
       ...theme("colors"),
       DEFAULT: theme("colors.border"),
     }),
+    // DESIGN.md section 4: tiles and small controls, blocks and inputs on a page, the page's one corner, cards, lists
+    // that open and the tray's lower corners, and the composer.
     borderRadius: {
       none: "0",
       control: "8px",
       card: "12px",
-      panel: "22px",
-      composer: "26px",
+      page: "16px",
+      panel: "18px",
+      list: "24px",
+      composer: "28px",
       full: "9999px",
     },
-    // DESIGN.md section 4: floating content, composer, selected rows, and the page's left edge.
+    // Almost none: the raised row's hairline, the composer's lift, and the floating shadow for menus and overlays.
     boxShadow: {
       none: "none",
       raised: "var(--shadow-raised)",
       selected: "var(--shadow-selected)",
-      page: "var(--shadow-page)",
-      card: "var(--shadow-card)",
+      lift: "var(--shadow-lift-edge)",
       reading: "var(--shadow-reading)",
       recording: "var(--shadow-recording)",
-      float: "0 8px 24px rgb(0 0 0 / 0.16)",
+      float: "var(--shadow-float)",
     },
+    dropShadow: {
+      none: "0 0 #0000",
+      lift: "var(--shadow-lift)",
+    },
+    // Host Grotesk and IBM Plex Mono are bundled, never downloaded, and fall back to the system's own.
     fontFamily: {
       sans: [
+        '"Host Grotesk Variable"',
         "-apple-system",
         "BlinkMacSystemFont",
+        '"SF Pro Text"',
         '"Segoe UI Variable Text"',
         '"Segoe UI"',
         "sans-serif",
       ],
-      mono: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
+      mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
     },
     fontSize: {
       11: ["11px", "16px"],
@@ -116,7 +144,7 @@ module.exports = {
       34: ["34px", { lineHeight: "40px", letterSpacing: "-0.02em" }],
     },
     fontWeight: {
-      regular: "400",
+      regular: "var(--weight-regular)",
       semibold: "600",
     },
     transitionDuration: {
@@ -135,7 +163,7 @@ module.exports = {
       },
       backgroundImage: {
         shimmer:
-          "linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--accent-ink)) 38%, rgb(var(--foreground)) 50%, rgb(var(--accent-ink)) 62%, rgb(var(--muted-foreground) / 0.55) 80%)",
+          "linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--foreground)) 50%, rgb(var(--muted-foreground) / 0.55) 80%)",
       },
       animation: {
         "fade-in": "fade-in 240ms cubic-bezier(.32, .72, 0, 1) forwards",

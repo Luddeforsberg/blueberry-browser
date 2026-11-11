@@ -5,7 +5,7 @@ import type { MascotAccessory, MascotDraft, MascotPalette, MascotProfile, Mascot
 export const BERRY_ID = "berry";
 
 export const PALETTES: { id: MascotPalette; label: string }[] = [
-  { id: "jackdaw", label: "Jackdaw" },
+  { id: "jackdaw", label: "Berry" },
   { id: "robin", label: "Robin" },
   { id: "canary", label: "Canary" },
   { id: "parakeet", label: "Parakeet" },
