@@ -254,43 +254,43 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div className="absolute inset-x-0 top-[38.5%] flex flex-col items-center px-8 pointer-events-none">
                 {/* The bird perches on this, outside the shadow the box and its tray share, so they read as one object. */}
                 <div data-berry-home data-berry-perch-size={perch} className="relative w-full max-w-[680px] pointer-events-auto">
-                <div className="drop-shadow-lift">
-                    <div ref={boxRef} className="relative z-10 rounded-composer shadow-lift">
-                        <Composer
-                            tall
-                            label={prompt}
-                            placeholder={prompt}
-                            value={text}
-                            onChange={(next) => {
-                                setText(next)
-                                // Emptied, it's no longer that prompt being sent.
-                                if (!next.trim()) setFilled(null)
-                            }}
-                            onKeyDown={handleKeyDown}
-                            spellCheck={false}
-                            autoFocus
-                            focusKey={filled?.times}
-                            canSend={text.trim().length > 0}
-                            onSend={() => submit(false)}
-                            mascot={chosen}
-                            onChooseMascot={choose}
-                            cloud={
-                                canUseRunner || canUseCloud
-                                    ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud), asSwitch: chosen.worksInCloud === true }
-                                    : undefined
-                            }
+                    <div className="drop-shadow-lift">
+                        <div ref={boxRef} className="relative z-10 rounded-composer shadow-lift">
+                            <Composer
+                                tall
+                                label={prompt}
+                                placeholder={prompt}
+                                value={text}
+                                onChange={(next) => {
+                                    setText(next)
+                                    // Emptied, it's no longer that prompt being sent.
+                                    if (!next.trim()) setFilled(null)
+                                }}
+                                onKeyDown={handleKeyDown}
+                                spellCheck={false}
+                                autoFocus
+                                focusKey={filled?.times}
+                                canSend={text.trim().length > 0}
+                                onSend={() => submit(false)}
+                                mascot={chosen}
+                                onChooseMascot={choose}
+                                cloud={
+                                    canUseRunner || canUseCloud
+                                        ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud), asSwitch: chosen.worksInCloud === true }
+                                        : undefined
+                                }
+                            />
+                        </div>
+                        <NewTabTray
+                            suggestions={suggestions}
+                            fallback={fallback}
+                            recent={recent}
+                            typing={text.length > 0}
+                            onUse={takeUp}
+                            onDismiss={dismiss}
+                            onOpenRecent={(visit) => void browser.navigateTab(tab.id, visit.url)}
                         />
                     </div>
-                    <NewTabTray
-                        suggestions={suggestions}
-                        fallback={fallback}
-                        recent={recent}
-                        typing={text.length > 0}
-                        onUse={takeUp}
-                        onDismiss={dismiss}
-                        onOpenRecent={(visit) => void browser.navigateTab(tab.id, visit.url)}
-                    />
-                </div>
                 </div>
 
                 {/* The sidebar holds these when it's open. */}

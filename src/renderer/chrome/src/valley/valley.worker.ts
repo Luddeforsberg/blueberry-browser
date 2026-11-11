@@ -16,5 +16,5 @@ self.onmessage = (event: MessageEvent<PaintRequest>) => {
     const canvas = new OffscreenCanvas(painted.width, painted.height)
     canvas.getContext('2d')!.putImageData(new ImageData(painted.data, painted.width, painted.height), 0, 0)
     const bitmap = canvas.transferToImageBitmap()
-    ;(self as unknown as Worker).postMessage({ id, bitmap, banks: painted.banks }, [bitmap])
+    self.postMessage({ id, bitmap, banks: painted.banks }, { transfer: [bitmap] })
 }

@@ -47,8 +47,7 @@ export const Composer: React.FC<{
     // Whether this job is done in the cloud, where that's set up. A switch in the row for a bird that works there,
     // otherwise an item in the + menu, and a mark on Send while on.
     cloud?: { on: boolean; onToggle: () => void; asSwitch?: boolean }
-    className?: string
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, tall, canSend, onSend, onStop, mascot, onChooseMascot, cloud, className }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, attachment, onAdd, addLabel, noAdd, bare, tall, canSend, onSend, onStop, mascot, onChooseMascot, cloud }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
@@ -138,8 +137,7 @@ export const Composer: React.FC<{
             className={cn(
                 "relative w-full cursor-text bg-surface",
                 // On a page or the panel it's lifted a little and edged in light mode. Over the valley the page lifts it.
-                tall ? "rounded-composer pt-5 pr-3 pb-3 pl-6" : "rounded-list pt-3.5 pr-2.5 pb-2.5 pl-4 shadow-raised ring-1 ring-border dark:ring-0",
-                className
+                tall ? "rounded-composer pt-5 pr-3 pb-3 pl-6" : "rounded-list pt-3.5 pr-2.5 pb-2.5 pl-4 shadow-raised ring-1 ring-border dark:ring-0"
             )}
         >
             {choosing && mascot && onChooseMascot && (
