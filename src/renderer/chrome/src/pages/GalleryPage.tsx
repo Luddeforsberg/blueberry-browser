@@ -3,7 +3,7 @@ import { Pin, Star } from 'lucide-react'
 import type { GalleryMascot, MascotProfile, MemoryFact, NeedsYouItem, Suggestion, WorkTab, WorkView } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
-import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
+import { BerryDot, Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
@@ -210,11 +210,6 @@ export const GalleryPage: React.FC = () => {
                     </div>
                     <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
-                    </div>
-                    <div className="mt-4 flex items-end gap-6 text-12 text-muted-foreground">
-                        <WalkingBird size={40} foot={1} stepMs={0} />
-                        <WalkingBird size={40} foot={0} stepMs={0} pecking />
-                        <span>The small birds behind the new tab page, walking and pecking.</span>
                     </div>
                     <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
                         <BerryDot /> <BerryDot working /> The berry as a status marker, at rest and during real work.

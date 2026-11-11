@@ -43,52 +43,38 @@ interface MascotProps {
   lively?: boolean;
   // Leaves out the blink where a bird is always on screen and nothing's happening. A click still gets its reaction.
   noBlink?: boolean;
+  // The valley's fine grain on the body, following the light. Only in the valley and on a composer, and only at 32px
+  // and up: smaller, and on a web page, it's flat colour.
+  grain?: boolean;
   className?: string;
   onContextMenu?: (event: React.MouseEvent) => void;
 }
 
-// Below this, the full drawing turns to mush, so Berry is just its head and the berry it carries.
-const SIMPLIFIED_BELOW = 32;
+// DESIGN.md section 8: under 24px a bird only says who it is, under 32px it's the simplified drawing.
+const MOOD_FROM = 24;
+const FULL_FROM = 32;
 
 // Animated parts turn and scale around their own box, not the whole drawing's.
-// How far a walking bird's legs swing either way, in degrees.
-const LEG_SWING = 30;
-
 const ownBox = (origin: string): React.CSSProperties => ({ transformBox: "fill-box", transformOrigin: origin });
 
-// A dusty blueberry, lit from the upper left, with its crown off-centre. Never a star.
-const Fruit: React.FC<{ x: number; y: number; r?: number; className?: string; style?: React.CSSProperties }> = ({
-  x,
-  y,
-  r = 11,
-  className,
-  style,
-}) => {
+// A round blueberry with its bloom lit from the upper left. On its own it's the mark for work in progress. Never a star.
+const Fruit: React.FC<{ x: number; y: number; r?: number }> = ({ x, y, r = 10 }) => {
   const id = useId().replace(/:/g, "");
-
   return (
     <g transform={`translate(${x} ${y}) scale(${r / 10})`}>
-      <g className={className} style={style}>
-        <defs>
-          <radialGradient id={id} cx="36%" cy="30%" r="80%">
-            <stop offset="0%" stopColor="rgb(var(--berry-fruit-bloom))" />
-            <stop offset="42%" stopColor="rgb(var(--berry-fruit-mid))" />
-            <stop offset="100%" stopColor="rgb(var(--berry-fruit-dark))" />
-          </radialGradient>
-        </defs>
-        <ellipse rx={10} ry={9.4} fill={`url(#${id})`} />
-        <path
-          d="M1.6 -5.2 L3.2 -6.2 L4.6 -5.4 L6 -5.3 L5.4 -3.9 L6.2 -2.8 L4.5 -2.7 L3.4 -1.5 L2.6 -2.9 L1.1 -3.5 Z"
-          strokeWidth={1}
-          strokeLinejoin="round"
-          className="fill-berry-fruit-crown stroke-berry-fruit-crown"
-        />
-      </g>
+      <defs>
+        <radialGradient id={id} cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="rgb(var(--berry-fruit-bloom))" />
+          <stop offset="55%" stopColor="rgb(var(--berry-fruit-mid))" />
+          <stop offset="100%" stopColor="rgb(var(--berry-fruit-dark))" />
+        </radialGradient>
+      </defs>
+      <circle r={10} fill={`url(#${id})`} />
     </g>
   );
 };
 
-// The blueberry on its own, marking something as new or in progress. Always beside words.
+// The blueberry on its own, marking something in progress. Always beside words.
 export const BerryDot: React.FC<{ size?: number; working?: boolean; className?: string }> = ({
   size = 10,
   working = false,
@@ -105,67 +91,54 @@ export const BerryDot: React.FC<{ size?: number; working?: boolean; className?: 
   </svg>
 );
 
-// Where the head turns from, at the base of the neck.
-const NECK = "60 50";
-
-// The parts of Berry in profile. Head and torso share a colour, so together they read as one outline.
-const HEAD = "M86 40 C84 24 68 15 54 19 C43 22 37 32 37 44 C37 56 48 64 62 64 C76 64 88 54 86 40 Z";
-const NAPE = "M54 19 C43 22 37 32 37 44 C42 52 52 52 57 45 C52 37 52 27 60 18 C58 18 56 18 54 19 Z";
-const TORSO = "M40 40 C28 52 23 65 22 78 L5 103 C3 107 6 111 11 109 L35 93 C46 101 65 100 75 87 C85 74 86 60 82 51 C72 38 52 34 40 40 Z";
-const WING = "M43 54 C55 47 68 53 66 66 C64 79 47 90 29 89 C30 75 34 62 43 54 Z";
-const BEAK = "M84 35 C89 36 94 39 98 44 C94 46 89 47 84 47 C86 43 86 39 84 35 Z";
-const BEAK_OPEN = "M84 33 C90 32 96 34 100 38 C95 41 89 42 84 42 C85 39 85 36 84 33 Z M84 43 C88 45 92 47 95 50 C91 51 87 50 83 48 Z";
+// The bird is drawn on a 100-unit grid, the painter's, and placed in a 120-unit box so its feet land where every place
+// that stands it on something expects them: 57 across and 113 down.
+const FRAME = "translate(-2 5) scale(1.15)";
+// Where the head turns from, low at the back of the round body.
+const NECK = "52 50";
+// The body: one round shape, like the fruit, lit from the upper left.
+const BODY = { cx: 48, cy: 54, rx: 31, ry: 29 };
+const TAIL = "M22 56 L3 49 L7 67 L24 70 Z";
+const WING = { cx: 37, cy: 62, rx: 16, ry: 10.5, turn: 20 };
+// The blueberry's crown: three points on top. Every bird has it.
+const CREST = "M35 29 L32 13 L40.5 22 L45 9 L49.5 22 L58 13 L55 29 Z";
+const CREST_FLAT = "M33 31 L24 25 L36 25 L38 19 L46 24 L55 21 L55 30 Z";
+const CREST_DROOP = "M35 30 L22 24 L37 23 L36 14 L47 22 L54 17 L55 30 Z";
+const BEAK_UPPER = "M76 46 L94 54 L76 54 Z";
+const BEAK_LOWER = "M76 54 L94 54 L76 61 Z";
+// Two short legs with a foot forward, in the bird's own orange.
+const LEGS = "M41 80 L41 94 L48 94 M55 80 L55 94 L62 94";
+const LEG_STROKE = { strokeWidth: 4.4, strokeLinecap: "round", strokeLinejoin: "round", fill: "none", className: "stroke-berry-legs" } as const;
+// A feather from the wing, for when something went wrong.
+const FEATHER = "M14 40 C9 47 9 54 12 60 C17 54 18 47 14 40 Z";
+const EYE = { x: 60, y: 45, r: 7.2 };
 
 type Eyes = "open" | "wide" | "smug" | "down" | "up" | "closed";
 
-// A big pupil and one catchlight: calm and friendly, not a stare.
-const PUPIL: Record<Exclude<Eyes, "closed">, { x: number; y: number; r: number }> = {
-  open: { x: 2, y: 0.6, r: 5.6 },
-  wide: { x: 2, y: 0.4, r: 5 },
-  smug: { x: 2.4, y: 0.4, r: 5.4 },
-  down: { x: 1.6, y: 2.2, r: 5.4 },
-  up: { x: 1.8, y: -2.2, r: 5.4 },
-};
-
-const Eye: React.FC<{ x: number; y: number; r?: number; look: Eyes }> = ({ x, y, r = 8.6, look }) => {
+// One white eye with a big dark pupil and a catchlight, which carries most of the expression.
+const Eye: React.FC<{ x?: number; y?: number; r?: number; look: Eyes; facing?: boolean }> = ({ x = EYE.x, y = EYE.y, r = EYE.r, look, facing = false }) => {
+  const s = r / EYE.r;
   if (look === "closed") {
-    return (
-      <path
-        d={`M${x - r} ${y} Q${x} ${y + r * 0.8} ${x + r} ${y}`}
-        strokeWidth={2.6}
-        strokeLinecap="round"
-        fill="none"
-        className="stroke-berry-eye"
-      />
-    );
+    return <path d={`M${x - r} ${y} Q${x} ${y + r * 0.75} ${x + r} ${y}`} strokeWidth={2.4} strokeLinecap="round" fill="none" className="stroke-berry-pupil" />;
   }
-
-  const pupil = PUPIL[look];
-  const scale = r / 8.6;
-  const px = x + pupil.x * scale;
-  const pr = pupil.r * scale;
-
-  // Heavy-lidded: only the lower half of the eye shows.
-  if (look === "smug") {
-    return (
-      <g>
-        <path d={`M${x - r} ${y} A${r} ${r} 0 0 0 ${x + r} ${y} Z`} className="fill-berry-eye" />
-        <path d={`M${px - pr} ${y} A${pr} ${pr} 0 0 0 ${px + pr} ${y} Z`} className="fill-berry-pupil" />
-      </g>
-    );
-  }
-
+  const along = facing ? 0 : 2 * s;
+  const shift = { open: [along, 0.5], wide: [along, 0], smug: [along, 1.2], down: [along * 0.6, 2.2], up: [along * 0.8, -2.4] }[look];
+  const pr = (look === "wide" ? 4.4 : 3.8) * s;
+  const px = x + shift[0];
+  const py = y + shift[1] * s;
   return (
     <g>
       <circle cx={x} cy={y} r={r} className="fill-berry-eye" />
-      <circle cx={px} cy={y + pupil.y * scale} r={pr} className="fill-berry-pupil" />
-      <circle cx={px - 2.4 * scale} cy={y + (pupil.y - 2.6) * scale} r={1.9 * scale} className="fill-berry-eye" />
+      <circle cx={px} cy={py} r={pr} className="fill-berry-pupil" />
+      <circle cx={px + 1.4 * s} cy={py - 1.5 * s} r={1.2 * s} className="fill-berry-eye" />
+      {/* Heavy-lidded: the body's own colour comes down over the top half. */}
+      {look === "smug" && <path d={`M${x - r - 0.6} ${y + 0.4} A${r + 0.6} ${r + 0.6} 0 0 1 ${x + r + 0.6} ${y + 0.4} Z`} className="fill-berry-ink" />}
     </g>
   );
 };
 
 // A dark edge, so an accessory stands off any body colour and any background.
-const GEAR_EDGE = { strokeWidth: 2, strokeLinejoin: "round", strokeLinecap: "round", className: "fill-berry-gear stroke-berry-pupil" } as const;
+const GEAR_EDGE = { strokeWidth: 1.6, strokeLinejoin: "round", strokeLinecap: "round", className: "fill-berry-gear stroke-berry-pupil" } as const;
 
 const GearContext = createContext<MascotAccessory>("none");
 
@@ -177,40 +150,41 @@ const Gear: React.FC<{ front?: boolean }> = ({ front = false }) => {
     case "none":
       return null;
     case "crown":
-      return (
-        <g transform={front ? "translate(-1 -11)" : "rotate(6 61 15)"}>
-          <path d="M46 25 L42 6 L53 14 L61 1 L69 14 L80 6 L76 25 Q61 19 46 25 Z" {...GEAR_EDGE} />
-          <circle cx={61} cy={17} r={3} className="fill-berry-gear-shade" />
+      return front ? (
+        <path d="M40 22 L37 9 L44 15 L50 6 L56 15 L63 9 L60 22 Q50 19 40 22 Z" {...GEAR_EDGE} />
+      ) : (
+        <g transform="rotate(12 64 24)">
+          <path d="M55 31 L52 17 L59 23 L65 13 L71 23 L78 17 L75 31 Q65 28 55 31 Z" {...GEAR_EDGE} />
         </g>
       );
     case "cap":
       return front ? (
         <>
-          <path d="M34 25 C34 2 86 2 86 25 C72 19 48 19 34 25 Z" {...GEAR_EDGE} />
-          <path d="M38 24 C50 18 70 18 82 24 C76 30 44 30 38 24 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
+          <path d="M28 30 C28 10 72 10 72 30 C60 25 40 25 28 30 Z" {...GEAR_EDGE} />
+          <path d="M32 29 C44 24 56 24 68 29 C62 34 38 34 32 29 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
         </>
       ) : (
         <>
-          <path d="M76 25 C88 23 99 26 106 32 C105 35 101 35 97 33 C90 31 84 30 77 30 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
-          <path d="M37 33 C38 12 68 5 84 26 C70 22 52 24 37 33 Z" {...GEAR_EDGE} />
+          <path d="M70 31 C80 30 89 32 95 37 C94 40 90 40 86 38 C80 36 75 35 70 35 Z" {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
+          <path d="M44 35 C46 17 70 13 80 33 C68 30 56 31 44 35 Z" {...GEAR_EDGE} />
         </>
       );
     case "glasses":
       return front ? (
         <g fill="none" strokeLinecap="round">
-          {["M41 30 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M61 30 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M59 28 L61 28"].map((d) => (
+          {["M31 44 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M51 44 a9 9 0 1 0 18 0 a9 9 0 1 0 -18 0 M49 43 L51 43"].map((d) => (
             <React.Fragment key={d}>
-              <path d={d} strokeWidth={5} className="stroke-berry-pupil" />
-              <path d={d} strokeWidth={3} className="stroke-berry-gear" />
+              <path d={d} strokeWidth={4.4} className="stroke-berry-pupil" />
+              <path d={d} strokeWidth={2.6} className="stroke-berry-gear" />
             </React.Fragment>
           ))}
         </g>
       ) : (
         <g fill="none" strokeLinecap="round">
-          {["M58 35 a11 11 0 1 0 22 0 a11 11 0 1 0 -22 0 M58 33 L43 29"].map((d) => (
+          {["M50.5 45 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 M50.5 44 L38 40"].map((d) => (
             <React.Fragment key={d}>
-              <path d={d} strokeWidth={5} className="stroke-berry-pupil" />
-              <path d={d} strokeWidth={3} className="stroke-berry-gear" />
+              <path d={d} strokeWidth={4.4} className="stroke-berry-pupil" />
+              <path d={d} strokeWidth={2.6} className="stroke-berry-gear" />
             </React.Fragment>
           ))}
         </g>
@@ -218,74 +192,141 @@ const Gear: React.FC<{ front?: boolean }> = ({ front = false }) => {
     case "headphones":
       return front ? (
         <>
-          <path d="M33 36 C29 -2 91 -2 87 36" fill="none" strokeWidth={7} strokeLinecap="round" className="stroke-berry-pupil" />
-          <path d="M33 36 C29 -2 91 -2 87 36" fill="none" strokeWidth={4} strokeLinecap="round" className="stroke-berry-gear" />
-          <rect x={26} y={30} width={13} height={22} rx={6} {...GEAR_EDGE} />
-          <rect x={81} y={30} width={13} height={22} rx={6} {...GEAR_EDGE} />
+          <path d="M22 50 C18 12 82 12 78 50" fill="none" strokeWidth={6} strokeLinecap="round" className="stroke-berry-pupil" />
+          <path d="M22 50 C18 12 82 12 78 50" fill="none" strokeWidth={3.4} strokeLinecap="round" className="stroke-berry-gear" />
+          <rect x={14} y={42} width={12} height={20} rx={5.5} {...GEAR_EDGE} />
+          <rect x={74} y={42} width={12} height={20} rx={5.5} {...GEAR_EDGE} />
         </>
       ) : (
         <>
-          <path d="M49 34 C43 12 68 2 80 22" fill="none" strokeWidth={7} strokeLinecap="round" className="stroke-berry-pupil" />
-          <path d="M49 34 C43 12 68 2 80 22" fill="none" strokeWidth={4} strokeLinecap="round" className="stroke-berry-gear" />
-          <ellipse cx={50} cy={41} rx={9} ry={12} {...GEAR_EDGE} />
-          <ellipse cx={50} cy={41} rx={4} ry={6.5} className="fill-berry-gear-shade" />
+          <path d="M43 44 C38 22 62 12 74 30" fill="none" strokeWidth={6} strokeLinecap="round" className="stroke-berry-pupil" />
+          <path d="M43 44 C38 22 62 12 74 30" fill="none" strokeWidth={3.4} strokeLinecap="round" className="stroke-berry-gear" />
+          <ellipse cx={44} cy={48} rx={8} ry={10.5} {...GEAR_EDGE} />
+          <ellipse cx={44} cy={48} rx={3.6} ry={5.6} className="fill-berry-gear-shade" />
         </>
       );
     case "bow":
       return (
-        <g transform={front ? "translate(8 -7)" : undefined}>
-          <path d="M52 19 L35 8 C31 14 31 24 35 30 Z" {...GEAR_EDGE} />
-          <path d="M52 19 L69 8 C73 14 73 24 69 30 Z" {...GEAR_EDGE} />
-          <circle cx={52} cy={19} r={4.5} {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
+        <g transform={front ? "translate(-12 -4)" : "translate(10 -2)"}>
+          <path d="M62 22 L48 13 C45 18 45 26 48 31 Z" {...GEAR_EDGE} />
+          <path d="M62 22 L76 13 C79 18 79 26 76 31 Z" {...GEAR_EDGE} />
+          <circle cx={62} cy={22} r={4} {...GEAR_EDGE} className="fill-berry-gear-shade stroke-berry-pupil" />
         </g>
       );
   }
 };
 
-const Head: React.FC<{ turn?: number; eyes?: Eyes; berry?: boolean; open?: boolean; blink?: boolean }> = ({
+// The body's light, from the lit side at the upper left through the body to its far side at the lower right, and the
+// grain that follows it. Defined once per drawing. Only masks, in white and black, so drawings that end up sharing an id,
+// such as the site's, which are rendered one at a time, still each take their own colours.
+const Shading: React.FC<{ id: string; grain: number | null }> = ({ id, grain }) => (
+  <defs>
+    <radialGradient id={`${id}-fall`} gradientUnits="userSpaceOnUse" cx={38} cy={40} r={50}>
+      <stop offset="0.35" stopColor="#fff" />
+      <stop offset="1" stopColor="#000" />
+    </radialGradient>
+    <radialGradient id={`${id}-glow`} gradientUnits="userSpaceOnUse" cx={36} cy={38} r={30}>
+      <stop offset="0" stopColor="#fff" />
+      <stop offset="1" stopColor="#000" />
+    </radialGradient>
+    <mask id={`${id}-body`} maskUnits="userSpaceOnUse" x={-20} y={-20} width={160} height={160}>
+      <rect x={-20} y={-20} width={160} height={160} fill={`url(#${id}-fall)`} />
+    </mask>
+    <mask id={`${id}-lit`} maskUnits="userSpaceOnUse" x={-20} y={-20} width={160} height={160}>
+      <rect x={-20} y={-20} width={160} height={160} fill={`url(#${id}-glow)`} />
+    </mask>
+    {grain && (
+      // Cells two screen pixels wide, scattered by a fixed hash, so the grain is the same on every bird and every run.
+      <pattern id={`${id}-grain`} patternUnits="userSpaceOnUse" width={grain * GRAIN_TILE} height={grain * GRAIN_TILE}>
+        {GRAIN_CELLS.map(([i, j, light]) => (
+          <rect key={`${i}-${j}`} x={i * grain} y={j * grain} width={grain} height={grain} fill={light ? "#fff" : "#000"} fillOpacity={light ? 0.13 : 0.16} />
+        ))}
+      </pattern>
+    )}
+  </defs>
+);
+
+const GRAIN_TILE = 14;
+const hash = (x: number, y: number) => {
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+};
+const GRAIN_CELLS: Array<[number, number, boolean]> = Array.from({ length: GRAIN_TILE * GRAIN_TILE }, (_, k): [number, number, number] => [
+  k % GRAIN_TILE,
+  Math.floor(k / GRAIN_TILE),
+  hash(k % GRAIN_TILE, Math.floor(k / GRAIN_TILE)),
+])
+  .filter(([, , h]) => h < 0.22 || h > 0.74)
+  .map(([i, j, h]) => [i, j, h < 0.22]);
+
+const ShadeContext = createContext<{ id: string; grain: boolean }>({ id: "", grain: false });
+
+// The round body with its light, and the grain over it where there is any.
+const Body: React.FC<{ cx?: number; cy?: number; rx?: number; ry?: number }> = ({ cx = BODY.cx, cy = BODY.cy, rx = BODY.rx, ry = BODY.ry }) => {
+  const { id, grain } = useContext(ShadeContext);
+  const shape = { cx, cy, rx, ry };
+  return (
+    <>
+      <ellipse {...shape} className="fill-berry-shade" />
+      <ellipse {...shape} className="fill-berry-ink" mask={`url(#${id}-body)`} />
+      <ellipse {...shape} className="fill-berry-nape" mask={`url(#${id}-lit)`} />
+      {grain && <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={`url(#${id}-grain)`} />}
+    </>
+  );
+};
+
+const Wing: React.FC<{ dx?: number; dy?: number; turn?: number }> = ({ dx = 0, dy = 0, turn = WING.turn }) => {
+  const { id, grain } = useContext(ShadeContext);
+  const shape = { cx: WING.cx + dx, cy: WING.cy + dy, rx: WING.rx, ry: WING.ry, transform: `rotate(${turn} ${WING.cx + dx} ${WING.cy + dy})` };
+  return (
+    <>
+      <ellipse {...shape} className="fill-berry-wing" />
+      {grain && <ellipse {...shape} fill={`url(#${id}-grain)`} />}
+    </>
+  );
+};
+
+const Tail: React.FC = () => <path d={TAIL} className="fill-berry-crest" />;
+const Legs: React.FC = () => <path d={LEGS} {...LEG_STROKE} />;
+
+// The head's parts. They share the body's round shape, so they turn together around the neck. `data-part` is how the
+// bird drawn on web pages finds the head it pecks and nods with.
+const Head: React.FC<{ turn?: number; eyes?: Eyes; crest?: string; blink?: boolean; twitch?: boolean; note?: boolean }> = ({
   turn = 0,
   eyes = "open",
-  berry = false,
-  open = false,
+  crest = CREST,
   blink = false,
+  twitch = false,
+  note = false,
 }) => (
-  // `data-part` is how the bird drawn on web pages finds the head it pecks with.
   <g data-part="head" transform={`rotate(${turn} ${NECK})`}>
-    <path d={HEAD} className="fill-berry-ink" />
-    <path d={NAPE} className="fill-berry-nape" />
+    <path d={crest} className={cn("fill-berry-crest", twitch && "motion-safe:animate-berry-twitch")} style={twitch ? ownBox("50% 100%") : undefined} />
+    <path d={BEAK_UPPER} className="fill-berry-beak" />
+    <path d={BEAK_LOWER} className="fill-berry-beak-lower" />
+    {note && <Note />}
     <g className={cn(blink && "motion-safe:animate-berry-blink")} style={blink ? ownBox("center") : undefined}>
-      <Eye x={69} y={35} look={eyes} />
+      <Eye look={eyes} />
     </g>
-    {berry && <Fruit x={97} y={53} />}
-    <path d={open ? BEAK_OPEN : BEAK} className="fill-berry-beak" />
     <Gear />
   </g>
 );
 
-const Torso: React.FC = () => (
-  <>
-    <path d={TORSO} className="fill-berry-ink" />
-    <path d={WING} className="fill-berry-wing" />
-  </>
+// The folded note a bird brings home in its beak: the only thing a bird carries.
+const Note: React.FC = () => (
+  <g transform="translate(90 57) rotate(12)">
+    <rect x={-3} y={-8} width={20} height={14} rx={1} strokeWidth={1.4} className="fill-berry-note stroke-berry-note-edge" />
+    <path d="M-3 -8 L7 -1 L17 -8" fill="none" strokeWidth={1.4} strokeLinejoin="round" className="stroke-berry-note-edge" />
+  </g>
 );
 
-const FEATHER = "M16 30 C10 38 10 46 14 54 C20 46 21 38 16 30 Z";
-
-// Short legs with three-toed feet. The hind toe points back along the bird.
-const LEGS = "M52 97 L51 112 M45 114 L51 112 L58 114 M63 95 L63 110 M57 112 L63 110 L70 112";
-const LEG_PROPS = { strokeWidth: 3, strokeLinecap: "round", strokeLinejoin: "round", fill: "none", className: "stroke-berry-ink" } as const;
-const Legs: React.FC = () => <path d={LEGS} {...LEG_PROPS} />;
-
-// The seat is at 86 of 120, so the belly rests on the edge and the legs hang over it.
-const SEAT_LIFT = -11;
-const Sitting: React.FC<{ animate: boolean }> = ({ animate }) => (
-  <g transform={`translate(0 ${SEAT_LIFT})`}>
-    <g {...LEG_PROPS}>
-      <path d="M52 97 L50 117 M46 119 L50 117 L55 119" className={cn("stroke-berry-ink", animate && "motion-safe:animate-berry-swing")} style={ownBox("50% 0%")} />
-      <path d="M63 95 L63 115 M59 117 L63 115 L68 117" className={cn("stroke-berry-ink", animate && "motion-safe:animate-berry-swing-back")} style={ownBox("50% 0%")} />
-    </g>
-    <Torso />
-    <Head berry blink={animate} />
+// Perched: tail, legs, the round body, the wing low on its side, and the head.
+const Standing: React.FC<{ head: React.ReactNode; lean?: number; legs?: React.ReactNode }> = ({ head, lean = 0, legs = <Legs /> }) => (
+  <g transform={lean ? `rotate(${lean} 51 94)` : undefined}>
+    <Tail />
+    {legs}
+    <Body />
+    <Wing />
+    {head}
   </g>
 );
 
@@ -293,128 +334,95 @@ const Sitting: React.FC<{ animate: boolean }> = ({ animate }) => (
 const Pose: React.FC<{ mood: Mood; animate: boolean; noBlink?: boolean }> = ({ mood, animate, noBlink = false }) => {
   switch (mood) {
     case "rest":
-      return (
-        <>
-          <Legs />
-          <Torso />
-          <Head berry blink={animate && !noBlink} />
-        </>
-      );
+      return <Standing head={<Head blink={animate && !noBlink} />} />;
 
     case "sitting":
-      return <Sitting animate={animate} />;
+      // Settled on an edge with its legs hanging over it and swinging. The seat, the body's bottom, is 86 down.
+      return (
+        <g transform="translate(0 -12.6)">
+          <Tail />
+          <g {...LEG_STROKE}>
+            <path d="M42 78 L40 96 L46 98" className={cn("stroke-berry-legs", animate && "motion-safe:animate-berry-swing")} style={ownBox("50% 0%")} />
+            <path d="M55 78 L55 96 L61 98" className={cn("stroke-berry-legs", animate && "motion-safe:animate-berry-swing-back")} style={ownBox("50% 0%")} />
+          </g>
+          <Body />
+          <Wing />
+          <Head blink={animate} />
+        </g>
+      );
 
     case "curious":
-      // Leans in with the head cocked hard over.
-      return (
-        <>
-          <Legs />
-          <g transform="rotate(9 58 112)">
-            <Torso />
-          </g>
-          <g transform="translate(9 2)">
-            <Head turn={-20} eyes="wide" berry blink={animate} />
-          </g>
-        </>
-      );
+      // Leans in, head cocked, eye on it.
+      return <Standing lean={8} head={<Head turn={-14} eyes="wide" />} />;
 
     case "thinking":
-      // Head back, eyes up, tossing the berry while working it out.
-      return (
-        <>
-          <Legs />
-          <Torso />
-          <Head turn={-22} eyes="up" open />
-          <Fruit x={102} y={10} r={10} className={cn(animate && "motion-safe:animate-berry-toss")} />
-        </>
-      );
+      // Head back, eye up, crest twitching.
+      return <Standing lean={-4} head={<Head turn={-16} eyes="up" twitch={animate} />} />;
 
     case "fetching":
-      // Stretched out level, wings beating, feet tucked.
+      // In flight: stretched forward, feet tucked, wings beating.
       return (
         <g className={cn(animate && "motion-safe:animate-berry-bob")}>
-          <g className={cn(animate && "motion-safe:animate-berry-flap")} style={ownBox("70% 100%")}>
-            <path d="M54 50 C52 34 58 14 74 3 C78 1 80 5 79 8 C82 8 84 12 82 15 C85 17 85 21 83 23 C85 26 84 30 80 32 C78 41 74 50 68 56 Z" className="fill-berry-ink" />
-          </g>
-          <g transform="rotate(24 50 70)">
-            <path d={TORSO} className="fill-berry-ink" />
-            <path d="M52 97 L50 102 M63 95 L61 100" {...LEG_PROPS} />
-          </g>
-          <g className={cn(animate && "motion-safe:animate-berry-flap")} style={ownBox("70% 100%")}>
-            <path d="M64 62 C52 46 40 24 22 6 C18 3 15 7 16 11 C12 11 10 16 13 19 C9 21 9 26 13 27 C11 31 13 35 18 36 C17 39 20 42 24 42 C26 49 34 62 41 69 C49 72 57 70 64 62 Z" className="fill-berry-wing" />
-          </g>
-          <g transform="translate(14 8) rotate(6 60 50)">
-            <Head berry />
+          <g transform="rotate(14 50 56) translate(0 -6)">
+            <Tail />
+            <path d="M44 80 L50 86 M54 80 L60 85" {...LEG_STROKE} />
+            <g className={cn(animate && "motion-safe:animate-berry-flap")} style={ownBox("85% 95%")}>
+              <path d="M52 46 C44 30 30 18 12 14 C18 22 20 30 30 40 C22 38 16 40 10 44 C22 50 34 52 48 54 Z" className="fill-berry-wing" />
+            </g>
+            <Body />
+            <Head />
           </g>
         </g>
       );
 
     case "asking":
-      // Square on, looking right at you, berry held out.
+      // Square on, two eyes, head a little to one side.
       return (
-        <>
-          <path d="M50 96 L49 112 M43 114 L49 112 L55 114 M70 96 L71 112 M65 114 L71 112 L77 114" {...LEG_PROPS} />
-          <ellipse cx={60} cy={74} rx={29} ry={30} className="fill-berry-ink" />
-          <path d="M34 56 C26 66 25 84 30 94 C37 90 41 76 39 62 Z" className="fill-berry-wing" />
-          <path d="M86 56 C94 66 95 84 90 94 C83 90 79 76 81 62 Z" className="fill-berry-wing" />
-          <g transform="rotate(-5 60 36)">
-            <circle cx={60} cy={36} r={26} className="fill-berry-nape" />
-            <path d="M42 17 C51 8 69 8 78 17 C82 27 80 42 74 52 C69 60 51 60 46 52 C40 42 38 27 42 17 Z" className="fill-berry-ink" />
-            <Fruit x={60} y={66} />
-            <path d="M54 38 C57 36 63 36 66 38 C65.6 43 63 49 61 51 C60.4 52 59.6 52 59 51 C57 49 54.4 43 54 38 Z" className="fill-berry-beak" />
-            <Eye x={50} y={30} r={6.8} look="wide" />
-            <Eye x={70} y={30} r={6.8} look="wide" />
+        <g transform="rotate(-5 50 54)">
+          <path d="M42 80 L42 94 L37 95 M42 94 L46 96 M58 80 L58 94 L54 96 M58 94 L63 95" {...LEG_STROKE} />
+          <ellipse cx={22} cy={64} rx={7} ry={12} transform="rotate(14 22 64)" className="fill-berry-wing" />
+          <ellipse cx={78} cy={64} rx={7} ry={12} transform="rotate(-14 78 64)" className="fill-berry-wing" />
+          <Body cx={50} cy={54} rx={30} ry={29} />
+          <g data-part="head">
+            <path d="M38 30 L36 13 L44 23 L50 9 L56 23 L64 13 L62 30 Z" className="fill-berry-crest" />
+            <Eye x={40} y={45} r={6.6} look="wide" facing />
+            <Eye x={60} y={45} r={6.6} look="wide" facing />
+            <path d="M44 52 L56 52 L50 59 Z" className="fill-berry-beak" />
+            <path d="M46 56 L54 56 L50 62 Z" className="fill-berry-beak-lower" />
             <Gear front />
           </g>
-        </>
+        </g>
       );
 
     case "delivered":
-      // Chest out, chin up, the job set down in front of it.
-      return (
-        <>
-          <g transform="translate(-10 0)">
-            <Legs />
-            <Torso />
-            <Head turn={-12} eyes="smug" />
-          </g>
-          <Fruit x={92} y={104} className={cn(animate && "motion-safe:animate-berry-settle")} />
-        </>
-      );
+      // Chest out, the folded note in its beak, heavy-lidded and a bit smug.
+      return <Standing lean={-6} head={<Head turn={-8} eyes="smug" note />} />;
 
     case "oops":
-      // Slumped, head hanging, berry rolled out of reach.
+      // Slumped, crest drooping, a feather falls.
       return (
         <>
-          <g transform="translate(-8 4)">
-            <Legs />
-            <g transform="rotate(8 50 80) translate(0 3)">
-              <Torso />
-            </g>
-            <g transform="translate(-2 12)">
-              <Head turn={22} eyes="down" />
-            </g>
+          <g transform="translate(0 4)">
+            <Standing
+              lean={6}
+              legs={<path d="M40 76 L38 90 L45 90 M54 76 L54 90 L61 90" {...LEG_STROKE} />}
+              head={<Head turn={20} eyes="down" crest={CREST_DROOP} />}
+            />
           </g>
-          <Fruit x={104} y={106} r={9} />
-          <path
-            d={FEATHER}
-            className={cn("fill-berry-wing", animate && "motion-safe:animate-berry-feather")}
-            style={ownBox("center")}
-          />
+          <path d={FEATHER} className={cn("fill-berry-wing", animate && "motion-safe:animate-berry-feather")} style={ownBox("center")} />
         </>
       );
 
     case "off-duty":
-      // A fluffed-up ball with the head sunk in and the berry safe beside it.
+      // Fluffed up asleep, crest flat.
       return (
         <>
-          <path d="M26 88 L8 106 C5 110 9 114 14 112 L38 100 Z" className="fill-berry-ink" />
-          <ellipse cx={52} cy={80} rx={36} ry={32} className="fill-berry-ink" />
-          <path d="M30 66 C42 58 58 64 58 78 C58 92 44 104 26 102 C22 90 22 76 30 66 Z" className="fill-berry-wing" />
-          <g transform="translate(4 22)">
-            <Head turn={16} eyes="closed" />
+          <Tail />
+          <Body cx={47} cy={64} rx={35} ry={30} />
+          <Wing dy={8} turn={12} />
+          <g transform="translate(-2 14)">
+            <Head turn={14} eyes="closed" crest={CREST_FLAT} />
           </g>
-          <Fruit x={102} y={104} r={10} />
         </>
       );
   }
@@ -423,44 +431,22 @@ const Pose: React.FC<{ mood: Mood; animate: boolean; noBlink?: boolean }> = ({ m
 // The two reactions that are poses, and only from at rest, so a mood that means something is never covered up.
 const POSE_FOR: Partial<Record<Reaction, Mood>> = { look: "curious", toss: "thinking" };
 
-// Just the head and the berry, so Berry is still Berry at icon sizes. Pose and eye carry the mood.
-const SimplifiedPose: React.FC<{ mood: Mood }> = ({ mood }) => {
+// Body, crest, beak and one larger eye, in flat colour: at icon sizes that's what tells birds apart. From 24px the wing
+// is added and head tilt and the eye carry the mood. Under that it only shows who it is.
+const SimplifiedPose: React.FC<{ mood: Mood; wing: boolean }> = ({ mood, wing }) => {
   const eyes: Eyes =
-    mood === "off-duty" ? "closed" : mood === "oops" ? "down" : mood === "thinking" ? "up" : mood === "delivered" ? "smug" : mood === "asking" ? "wide" : "open";
-  const turn = mood === "curious" ? -18 : mood === "thinking" ? -12 : mood === "oops" || mood === "off-duty" ? 12 : 0;
-
+    mood === "off-duty" ? "closed" : mood === "oops" ? "down" : mood === "thinking" ? "up" : mood === "delivered" ? "smug" : mood === "asking" || mood === "curious" ? "wide" : "open";
+  const tilt = mood === "curious" ? -10 : mood === "thinking" ? -12 : mood === "oops" ? 12 : mood === "off-duty" ? 8 : 0;
   return (
-    <g transform="translate(-34 0) scale(1.42)">
-      <Head turn={turn} eyes={eyes} berry />
+    <g transform={`rotate(${tilt} 50 60)`}>
+      <Tail />
+      <ellipse cx={BODY.cx} cy={BODY.cy + 4} rx={BODY.rx + 3} ry={BODY.ry + 3} className="fill-berry-ink" />
+      {wing && <ellipse cx={WING.cx} cy={WING.cy + 4} rx={WING.rx} ry={WING.ry} transform={`rotate(${WING.turn} ${WING.cx} ${WING.cy + 4})`} className="fill-berry-wing" />}
+      <path d={mood === "off-duty" ? CREST_FLAT : CREST} transform="translate(0 2)" className="fill-berry-crest" />
+      <path d="M76 46 L96 55 L76 63 Z" className="fill-berry-beak" />
+      <Eye x={60} y={46} r={9.5} look={eyes} />
+      <Gear />
     </g>
-  );
-};
-
-// One of the small birds that walk behind the new tab page. Purely decoration, so it has no label.
-// Its legs are posed by the walk itself, so they swing exactly in time with its steps.
-export const WalkingBird: React.FC<{ size: number; foot: -1 | 0 | 1; stepMs: number; pecking?: boolean }> = ({
-  size,
-  foot,
-  stepMs,
-  pecking = false,
-}) => {
-  const leg = (turn: number): React.CSSProperties => ({
-    ...ownBox("50% 0%"),
-    transform: `rotate(${turn}deg)`,
-    transition: `transform ${stepMs}ms linear`,
-  });
-
-  return (
-    <svg aria-hidden viewBox="0 0 120 120" width={size} height={size} className="overflow-visible">
-      <g {...LEG_PROPS}>
-        <path d="M52 96 L52 112 L59 112" className="stroke-berry-ink" style={leg(foot * LEG_SWING)} />
-        <path d="M63 94 L63 112 L70 112" className="stroke-berry-ink" style={leg(foot * -LEG_SWING)} />
-      </g>
-      <Torso />
-      <g className={cn(pecking && "motion-safe:animate-berry-peck")} style={{ transformOrigin: "60px 50px" }}>
-        <Head />
-      </g>
-    </svg>
   );
 };
 
@@ -473,13 +459,20 @@ export const Mascot: React.FC<MascotProps> = ({
   still = false,
   lively = false,
   noBlink = false,
+  grain = false,
   className,
   onContextMenu,
 }) => {
   const label = `${name}, ${MOOD_LABELS[mood]}`;
   const drawing = useRef<SVGSVGElement>(null);
+  const id = useId().replace(/:/g, "");
   const { reaction, react } = useMascotReaction(drawing, mood, lively && !still);
-  const drawn = (mood === "rest" && reaction && POSE_FOR[reaction]) || mood;
+  // Under 24px a bird shows identity only, so it's always at rest there.
+  const shown = size < MOOD_FROM ? "rest" : mood;
+  const drawn = (shown === "rest" && reaction && POSE_FOR[reaction]) || shown;
+  const full = size >= FULL_FROM;
+  // Two screen pixels in the drawing's own units, which are 1.15 of the 120-unit box.
+  const grainCell = grain && full ? (2 * 120) / (size * 1.15) : null;
 
   if (hidden) {
     return (
@@ -504,17 +497,22 @@ export const Mascot: React.FC<MascotProps> = ({
       onClick={lively ? react : undefined}
       onContextMenu={onContextMenu}
       data-reaction={reaction ?? undefined}
-      data-mascot={look?.palette}
-      className={cn("shrink-0 overflow-visible berry-rim", className)}
+      data-mascot={look?.palette ?? "jackdaw"}
+      className={cn("shrink-0 overflow-visible", className)}
     >
       <GearContext.Provider value={look?.accessory ?? "none"}>
-        {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
-        <g key={drawn} className={cn(!still && "animate-berry-pose")}>
-          {size < SIMPLIFIED_BELOW ? <SimplifiedPose mood={drawn} /> : <Pose mood={drawn} animate={!still} noBlink={noBlink} />}
-        </g>
-        {reaction === "ruffle" && size >= SIMPLIFIED_BELOW && (
-          <path d={FEATHER} className="fill-berry-wing motion-safe:animate-berry-feather" style={ownBox("center")} />
-        )}
+        <ShadeContext.Provider value={{ id, grain: grainCell !== null }}>
+          <Shading id={id} grain={grainCell} />
+          {/* Remounts on every mood, so poses change with a quick fade rather than a jump. */}
+          <g transform={FRAME}>
+            <g key={drawn} className={cn(!still && "animate-berry-pose")}>
+              {full ? <Pose mood={drawn} animate={!still} noBlink={noBlink} /> : <SimplifiedPose mood={drawn} wing={size >= MOOD_FROM} />}
+            </g>
+            {reaction === "ruffle" && full && (
+              <path d={FEATHER} className="fill-berry-wing motion-safe:animate-berry-feather" style={ownBox("center")} />
+            )}
+          </g>
+        </ShadeContext.Provider>
       </GearContext.Provider>
     </svg>
   );

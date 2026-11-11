@@ -177,12 +177,10 @@ module.exports = {
         "berry-pose": "berry-pose 160ms ease-out",
         "berry-settle": "berry-settle 420ms ease-out",
         "berry-blink": "berry-blink 6s linear infinite",
-        "berry-toss": "berry-toss 1400ms ease-in-out infinite",
+        "berry-twitch": "berry-twitch 700ms ease-in-out infinite alternate",
         "berry-flap": "berry-flap 150ms ease-in-out infinite alternate",
         "berry-swing": "berry-swing 2600ms ease-in-out infinite alternate",
         "berry-swing-back": "berry-swing 2600ms ease-in-out -900ms infinite alternate",
-        "berry-peck": "berry-peck 700ms ease-in-out infinite",
-        "berry-print": "berry-print 30s ease-in forwards",
         "berry-hop": "berry-hop 420ms ease-out",
       },
       keyframes: {
@@ -208,17 +206,14 @@ module.exports = {
           "0%, 95%, 100%": { transform: "scaleY(1)" },
           "97.5%": { transform: "scaleY(0.08)" },
         },
-        "berry-toss": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(14px)" },
+        "berry-twitch": {
+          "0%, 60%": { transform: "rotate(0deg)" },
+          "80%": { transform: "rotate(-7deg)" },
+          "100%": { transform: "rotate(5deg)" },
         },
         "berry-swing": {
           "0%": { transform: "rotate(-12deg)" },
           "100%": { transform: "rotate(14deg)" },
-        },
-        "berry-peck": {
-          "0%, 55%, 100%": { transform: "rotate(0deg)" },
-          "25%": { transform: "rotate(38deg)" },
         },
         "berry-hop": {
           "0%": { transform: "translateY(0) scale(1, 1)" },
@@ -227,13 +222,9 @@ module.exports = {
           "85%": { transform: "translateY(0) scale(1.04, 0.96)" },
           "100%": { transform: "translateY(0) scale(1, 1)" },
         },
-        "berry-print": {
-          "0%": { opacity: "0.3" },
-          "100%": { opacity: "0" },
-        },
         "berry-flap": {
-          "0%": { transform: "rotate(-16deg)" },
-          "100%": { transform: "rotate(24deg)" },
+          "0%": { transform: "rotate(-22deg)" },
+          "100%": { transform: "rotate(18deg)" },
         },
         "berry-feather": {
           "0%": { transform: "translate(0, 0) rotate(0deg)", opacity: "1" },

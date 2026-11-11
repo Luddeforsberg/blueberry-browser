@@ -29,8 +29,8 @@ const SHEET = `
   .pose {
     position: absolute; display: none; overflow: visible;
     width: var(--size); height: var(--size); left: calc(var(--size) * -0.475); top: calc(var(--size) * -0.95);
-    /* A thin pale edge and a small shadow, so a dark bird stays a bird on a dark page. */
-    filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.85)) drop-shadow(0 2px 3px rgb(20 22 36 / 0.3));
+    /* No edge round a bird. A small soft shadow under it keeps it off the page. */
+    filter: drop-shadow(0 2px 3px rgb(16 20 46 / 0.3));
   }
   .pose.shown { display: block; }
   .pose.seated { top: calc(var(--size) * -0.717); }

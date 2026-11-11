@@ -4,7 +4,7 @@
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
-  { id: "jackdaw", label: "Jackdaw" },
+  { id: "jackdaw", label: "Berry" },
   { id: "robin", label: "Robin" },
   { id: "canary", label: "Canary" },
   { id: "parakeet", label: "Parakeet" },

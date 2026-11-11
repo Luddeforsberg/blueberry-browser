@@ -128,7 +128,7 @@ const block = (selector) => {
   return tokens.slice(at, tokens.indexOf("}", at)).match(/--(?:berry-[a-z-]+|surface|foreground|muted-foreground): [^;]+;/g).join(" ");
 };
 const animations = createRequire(import.meta.url)(join(root, "tailwind.config.js")).theme.extend;
-const keyframes = ["berry-flap", "berry-bob", "berry-blink", "berry-toss", "berry-swing"].map((name) => {
+const keyframes = ["berry-flap", "berry-bob", "berry-blink", "berry-twitch", "berry-swing"].map((name) => {
   const steps = Object.entries(animations.keyframes[name]).map(([at, style]) => `${at} { ${Object.entries(style).map(([key, value]) => `${key}: ${value}`).join("; ")}; }`);
   return `@keyframes ${name} { ${steps.join(" ")} }`;
 });
@@ -147,7 +147,6 @@ const sheet = [
     const [, kind, token] = /^(fill|stroke)-(berry-[a-z-]+)$/.exec(name);
     return `.${name} { ${kind}: rgb(var(--${token})); }`;
   }),
-  ".berry-rim { filter: var(--berry-rim); }",
   ...keyframes,
   "@media (prefers-reduced-motion: no-preference) {",
   ...moving,

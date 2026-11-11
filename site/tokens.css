@@ -3,95 +3,106 @@
   :root {
     color-scheme: light;
 
-    --background: 220 223 245;
-    --canvas: 252 252 255;
+    --background: 233 233 236;
+    --canvas: 255 255 255;
     --surface: 255 255 255;
-    --tray: 242 243 251;
-    --card: 243 244 251;
+    --tray: 242 242 245;
+    --card: 244 244 247;
     --selected: 255 255 255;
-    --muted: 236 238 250;
-    --border: 225 227 242;
-    --foreground: 25 27 51;
-    --muted-foreground: 76 80 112;
-    --primary: 42 51 128;
+    --muted: 241 241 244;
+    --hover-alpha: 0.07;
+    --pressed: 217 217 223;
+    --border: 228 228 234;
+    --outline: 187 187 191;
+    --control-fill: transparent;
+    --foreground: 24 24 26;
+    --muted-foreground: 85 85 91;
+    --primary: 24 24 26;
     --primary-foreground: 255 255 255;
-    --accent-ink: 47 58 168;
+    --accent-ink: 24 24 26;
+    --berry-blue: 53 88 220;
+    --attention: 255 243 214;
     --bookmark: 250 204 21;
     --success: 23 101 60;
     --warning: 116 75 0;
     --destructive: 171 36 28;
     --destructive-foreground: 255 255 255;
-    --shadow-raised: 0 1px 3px rgb(46 52 120 / 0.08), 0 12px 40px rgb(46 52 120 / 0.16);
-    --shadow-selected: 0 2px 10px rgb(58 64 140 / 0.14);
-    --shadow-page: 0 1px 18px rgb(58 64 140 / 0.1);
-    --shadow-card: 0 14px 40px rgb(12 16 70 / 0.3);
-    --frame: linear-gradient(165deg, #c3cbf0 0%, #d6d9f4 30%, #e7e6f7 58%, #d4cfec 100%);
+    /* Regular is lighter on dark, where light text reads heavier. */
+    --weight-regular: 400;
+    --shadow-selected: 0 1px 2px rgb(0 0 0 / 0.1);
+    /* The composer on a page, and anything raised on `canvas`. */
+    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.08), 0 8px 20px -10px rgb(0 0 0 / 0.2);
+    /* The composer and its tray over the valley: one soft shadow under the pair, so they read as one object. */
+    --shadow-lift: 0 18px 26px rgb(10 30 90 / 0.26);
+    --shadow-lift-edge: 0 1px 1px rgb(10 30 80 / 0.06), 0 3px 8px -3px rgb(10 30 80 / 0.16);
+    --shadow-float: 0 1px 2px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.16);
 
-    /* Berry's own colours, never the UI accent. */
-    --berry-ink: 24 28 46;
-    --berry-wing: 46 52 84;
-    --berry-nape: 158 166 190;
-    --berry-eye: 244 241 230;
-    --berry-pupil: 20 22 36;
-    --berry-beak: 62 68 102;
+    /* Berry's own colours, never the interface's, and the same in light and dark. */
+    --berry-ink: 53 88 220;
+    --berry-nape: 111 142 240;
+    --berry-shade: 22 39 127;
+    --berry-wing: 27 48 154;
+    --berry-crest: 18 34 122;
+    --berry-beak: 255 154 46;
+    --berry-beak-lower: 224 122 31;
     --berry-gear: 217 163 18;
     --berry-gear-shade: 168 124 8;
-    --berry-rim: none;
   }
 
   .dark {
     color-scheme: dark;
 
-    --background: 43 43 43;
-    --canvas: 31 31 31;
-    --surface: 36 36 36;
-    --tray: 24 24 24;
-    --card: 42 42 42;
-    --selected: 86 86 86;
-    --muted: 48 48 48;
-    --border: 64 64 64;
-    --foreground: 242 242 242;
-    --muted-foreground: 176 176 176;
-    --primary: 78 95 180;
-    --primary-foreground: 255 255 255;
-    --accent-ink: 163 174 251;
+    --background: 31 31 33;
+    --canvas: 25 25 27;
+    --surface: 47 47 52;
+    --tray: 37 37 41;
+    --card: 38 38 42;
+    --selected: 57 57 63;
+    --muted: 47 47 52;
+    --hover-alpha: 0.09;
+    --pressed: 72 72 79;
+    --border: 58 58 64;
+    --outline: 106 106 112;
+    --control-fill: rgb(242 242 243 / 0.08);
+    --foreground: 242 242 243;
+    --muted-foreground: 166 166 172;
+    --primary: 242 242 243;
+    --primary-foreground: 24 24 26;
+    --accent-ink: 242 242 243;
+    --berry-blue: 143 166 255;
+    --attention: 61 50 16;
     --bookmark: 253 224 71;
     --success: 111 207 151;
     --warning: 224 176 80;
     --destructive: 245 158 150;
-    --destructive-foreground: 31 31 31;
-    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.25), 0 10px 32px rgb(0 0 0 / 0.25);
-    --shadow-selected: inset 0 0 0 1px rgb(255 255 255 / 0.08);
-    --shadow-page: 0 1px 18px rgb(0 0 0 / 0.24);
-    --shadow-card: 0 14px 40px rgb(0 0 0 / 0.4);
-    --frame: linear-gradient(165deg, #38383b 0%, #2e2e30 40%, #262628 100%);
+    --destructive-foreground: 25 25 27;
+    --weight-regular: 330;
+    --shadow-selected: 0 1px 2px rgb(0 0 0 / 0.1);
+    --shadow-raised: none;
+    --shadow-lift: 0 18px 28px rgb(0 0 0 / 0.5);
+    --shadow-lift-edge: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 3px 8px -3px rgb(0 0 0 / 0.5);
+    --shadow-float: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.45);
 
-    /* A dark bird, with a thin light rim so it holds its shape on a dark background. */
-    --berry-ink: 42 47 77;
-    --berry-wing: 61 68 112;
-    --berry-nape: 168 176 200;
-    --berry-eye: 244 241 230;
-    --berry-pupil: 20 22 36;
-    --berry-beak: 78 86 128;
-    --berry-rim: drop-shadow(0 0 0.75px rgb(255 255 255 / 0.45));
-    --berry-gear: 255 210 63;
-    --berry-gear-shade: 217 163 18;
+    /* At night and in dark mode the crest and tail lighten a step, so they don't vanish. */
+    --berry-crest: 44 68 184;
   }
 
   :root,
   .dark {
-    --glass-tint: rgb(var(--background) / 0.88);
+    /* The rest of the bird, and the berry on its own, the same in light and dark. */
+    --berry-legs: 217 115 28;
+    --berry-eye: 255 255 255;
+    --berry-pupil: 16 20 46;
+    --berry-note: 255 250 240;
+    --berry-note-edge: 201 184 154;
+    --berry-fruit-mid: 53 88 220;
+    --berry-fruit-dark: 31 55 166;
+    --berry-fruit-bloom: 143 169 248;
 
-    /* The blueberry looks the same in light and dark. */
-    --berry-fruit-mid: 78 95 180;
-    --berry-fruit-dark: 42 51 128;
-    --berry-fruit-bloom: 164 175 224;
-    --berry-fruit-crown: 22 28 76;
-
-    /* The ring around a page while Berry is reading it. */
-    --shadow-reading: 0 0 0 2px rgb(127 139 216), 0 0 24px rgb(127 139 216 / 0.5);
-    /* The ring around the page card while the user is showing Berry something. */
-    --shadow-recording: 0 0 0 2px rgb(var(--destructive)), 0 0 18px rgb(var(--destructive) / 0.3);
+    /* The rings round the page, drawn in the gap the layout leaves when the page is inset by their width. */
+    --ring-width: 3px;
+    --shadow-reading: 0 0 0 var(--ring-width) rgb(var(--berry-blue));
+    --shadow-recording: 0 0 0 var(--ring-width) rgb(var(--destructive));
 
     /* Names kept from the starter theme, as aliases of the tokens above. */
     --card-foreground: var(--foreground);
@@ -116,96 +127,113 @@
   }
 }
 
-/* The flock's colours, set on one mascot's drawing. The blueberry and the eye never change. */
+/* DESIGN.md section 9: the valley's four lights. The scrim behind the top bar and the address field over it. */
+@layer base {
+  [data-light] {
+    --scene-ink: 255 255 255;
+  }
+  [data-light="dawn"] {
+    --scene-sky: 58 98 182;
+    --scene-horizon: 255 233 207;
+    --scene-scrim: 30 52 120;
+    --scene-field: 62 88 156;
+  }
+  [data-light="day"] {
+    --scene-sky: 26 70 166;
+    --scene-horizon: 225 237 250;
+    --scene-scrim: 16 44 112;
+    --scene-field: 44 74 146;
+  }
+  [data-light="dusk"] {
+    --scene-sky: 27 29 106;
+    --scene-horizon: 255 176 110;
+    --scene-scrim: 20 20 80;
+    --scene-field: 52 46 120;
+  }
+  [data-light="night"] {
+    --scene-sky: 3 6 26;
+    --scene-horizon: 39 65 140;
+    --scene-scrim: 4 7 28;
+    --scene-field: 30 36 76;
+    --berry-crest: 44 68 184;
+  }
+}
+
+/* The flock's colours, set on one mascot's drawing. The eye, the legs and the note never change. */
 @layer base {
   [data-mascot="robin"] {
-    --berry-ink: 143 59 34;
-    --berry-wing: 106 38 18;
-    --berry-nape: 242 138 76;
-    --berry-beak: 59 33 26;
+    --berry-ink: 240 138 60;
+    --berry-nape: 255 192 138;
+    --berry-shade: 138 52 16;
+    --berry-wing: 185 80 31;
+    --berry-crest: 122 46 20;
+    --berry-beak: 255 214 90;
+    --berry-beak-lower: 232 178 58;
     --berry-gear: 31 143 134;
     --berry-gear-shade: 20 102 95;
   }
+  [data-light="night"] [data-mascot="robin"],
   .dark [data-mascot="robin"] {
-    --berry-ink: 181 85 58;
-    --berry-wing: 138 58 34;
-    --berry-nape: 247 154 96;
-    --berry-beak: 232 201 176;
-    --berry-gear: 63 194 182;
-    --berry-gear-shade: 31 143 134;
-    --berry-rim: none;
+    --berry-crest: 160 70 28;
   }
   [data-mascot="canary"] {
-    --berry-ink: 183 127 0;
-    --berry-wing: 143 97 0;
-    --berry-nape: 255 201 60;
-    --berry-beak: 217 96 26;
+    --berry-ink: 242 182 50;
+    --berry-nape: 255 224 138;
+    --berry-shade: 154 108 10;
+    --berry-wing: 192 138 18;
+    --berry-crest: 122 86 6;
+    --berry-beak: 232 102 42;
+    --berry-beak-lower: 201 82 28;
     --berry-gear: 200 49 79;
     --berry-gear-shade: 150 34 57;
   }
+  [data-light="night"] [data-mascot="canary"],
   .dark [data-mascot="canary"] {
-    --berry-ink: 224 168 16;
-    --berry-wing: 181 132 0;
-    --berry-nape: 255 224 122;
-    --berry-beak: 240 138 58;
-    --berry-gear: 240 96 126;
-    --berry-gear-shade: 200 49 79;
-    --berry-rim: none;
+    --berry-crest: 168 120 14;
   }
   [data-mascot="parakeet"] {
-    --berry-ink: 31 138 76;
-    --berry-wing: 20 98 55;
-    --berry-nape: 154 217 79;
-    --berry-beak: 224 127 36;
+    --berry-ink: 58 164 101;
+    --berry-nape: 134 212 154;
+    --berry-shade: 22 80 46;
+    --berry-wing: 31 115 67;
+    --berry-crest: 18 63 37;
+    --berry-beak: 255 154 46;
+    --berry-beak-lower: 224 122 31;
     --berry-gear: 217 84 43;
     --berry-gear-shade: 166 60 27;
   }
+  [data-light="night"] [data-mascot="parakeet"],
   .dark [data-mascot="parakeet"] {
-    --berry-ink: 53 181 108;
-    --berry-wing: 31 138 76;
-    --berry-nape: 188 236 112;
-    --berry-beak: 243 154 67;
-    --berry-gear: 244 122 82;
-    --berry-gear-shade: 217 84 43;
-    --berry-rim: none;
+    --berry-crest: 42 122 74;
   }
   [data-mascot="flamingo"] {
-    --berry-ink: 209 63 124;
-    --berry-wing: 160 42 92;
-    --berry-nape: 255 176 204;
-    --berry-beak: 58 31 44;
+    --berry-ink: 236 106 157;
+    --berry-nape: 255 192 214;
+    --berry-shade: 143 42 88;
+    --berry-wing: 194 63 120;
+    --berry-crest: 125 33 73;
+    --berry-beak: 255 154 46;
+    --berry-beak-lower: 224 122 31;
     --berry-gear: 27 143 163;
     --berry-gear-shade: 19 106 121;
   }
+  [data-light="night"] [data-mascot="flamingo"],
   .dark [data-mascot="flamingo"] {
-    --berry-ink: 236 106 157;
-    --berry-wing: 200 69 125;
-    --berry-nape: 255 201 220;
-    --berry-beak: 246 219 229;
-    --berry-gear: 76 198 217;
-    --berry-gear-shade: 27 143 163;
-    --berry-rim: none;
+    --berry-crest: 168 56 106;
   }
   [data-mascot="kingfisher"] {
-    --berry-ink: 15 126 163;
-    --berry-wing: 10 92 120;
-    --berry-nape: 245 139 60;
-    --berry-beak: 35 38 46;
+    --berry-ink: 34 166 201;
+    --berry-nape: 143 220 240;
+    --berry-shade: 13 95 120;
+    --berry-wing: 18 122 153;
+    --berry-crest: 11 76 97;
+    --berry-beak: 245 139 60;
+    --berry-beak-lower: 214 111 34;
     --berry-gear: 232 169 0;
     --berry-gear-shade: 181 132 0;
   }
+  [data-light="night"] [data-mascot="kingfisher"],
   .dark [data-mascot="kingfisher"] {
-    --berry-ink: 43 168 207;
-    --berry-wing: 26 129 163;
-    --berry-nape: 251 159 88;
-    --berry-beak: 233 237 242;
-    --berry-gear: 255 210 63;
-    --berry-gear-shade: 232 169 0;
-    --berry-rim: none;
-  }
-
-  /* On every drawing of a bird, so the rim goes wherever it's drawn. */
-  .berry-rim {
-    filter: var(--berry-rim);
+    --berry-crest: 26 111 138;
   }
 }
