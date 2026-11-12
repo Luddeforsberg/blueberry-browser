@@ -41,8 +41,9 @@ const PLACEHOLDER = 'Go to an address'
 // Internal pages have no address worth editing, so the field starts empty there.
 const editableUrl = (tab: TabInfo | null) => (tab && !tab.page ? tab.url : '')
 
-// A solid pill on every page. On a web page it's `surface` with an `outline` edge. Over the new tab's valley it takes
-// the scene's field. `trailing` sits inside its right end, such as the bookmark star and the pin.
+// A tonal pill, `address-field` at rest with no edge, that turns `surface` with the focus ring only while it's being
+// typed in. Over the new tab's valley it takes the scene's field. `trailing` sits inside its right end, such as the
+// bookmark star and the pin.
 export const AddressBar: React.FC<{ trailing?: React.ReactNode }> = ({ trailing }) => {
     const { activeTab, navigateToUrl } = useBrowser()
     const scene = useContext(OverScene)
@@ -74,15 +75,14 @@ export const AddressBar: React.FC<{ trailing?: React.ReactNode }> = ({ trailing 
         setIsFocused(false)
     }
 
-    // On the scene the pill is the scene's own field. Focus is a 2px ring in place of the edge, so it keeps its size.
     const pill = cn(
         "w-full min-w-0 h-8 flex items-center gap-2 rounded-full app-region-no-drag",
-        scene ? "bg-scene-field text-scene-ink" : "bg-surface shadow-[inset_0_0_0_1px_rgb(var(--outline))] dark:shadow-none"
+        scene ? "bg-scene-field text-scene-ink" : "bg-address-field"
     )
 
     if (isFocused) {
         return (
-            <form onSubmit={handleSubmit} className={cn(pill, "pl-3.5 pr-3 ring-2", scene ? "ring-scene-ink" : "ring-ring")}>
+            <form onSubmit={handleSubmit} className={cn(pill, "pl-3.5 pr-3 ring-2", scene ? "ring-scene-ink" : "bg-surface ring-ring")}>
                 <Search aria-hidden className={cn("size-3.5 shrink-0", scene ? "text-scene-ink/80" : "text-muted-foreground")} />
                 <input
                     type="text"

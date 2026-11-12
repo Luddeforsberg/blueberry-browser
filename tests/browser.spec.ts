@@ -1301,9 +1301,13 @@ test("in the tab row at the smallest window, the active tab has as much room for
   await expect(history.getByRole("button", { name: "Close History" })).toBeVisible();
 });
 
-test("off a Mac, the menu button opens the app's own menu just under itself", async () => {
+test("off a Mac, More in the sidebar and the horizontal menu button open the app's own menu just under themselves", async () => {
   const button = chrome.getByRole("button", { name: "Menu", exact: true });
-  if (process.platform === "darwin") return void (await expect(button).toHaveCount(0));
+  const more = chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "More", exact: true });
+  if (process.platform === "darwin") {
+    await expect(button).toHaveCount(0);
+    return void (await expect(more).toHaveCount(0));
+  }
   await app.evaluate(({ Menu }) => {
     const menu = Menu.getApplicationMenu()!;
     menu.popup = (options) => {
@@ -1311,7 +1315,15 @@ test("off a Mac, the menu button opens the app's own menu just under itself", as
     };
   });
 
-  for (const layoutMode of ["vertical", "horizontal"] as const) {
+  // Vertical, it's More in the sidebar's top row, and the top bar has no menu button.
+  await expect(button).toHaveCount(0);
+  const box = (await more.boundingBox())!;
+  await more.click();
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as { popped?: unknown }).popped))
+    .toEqual({ x: Math.round(box.x), y: Math.round(box.y + box.height), window: true });
+
+  for (const layoutMode of ["horizontal"] as const) {
     await chrome.evaluate((layoutMode) => window.chromeAPI.settings.updateSettings({ layoutMode }), layoutMode);
     const { menuButton, controls } = await chrome.evaluate(() => window.chromeAPI.layout.getLayout());
     // Where the layout puts it, inside the room kept clear left of the window buttons.
@@ -1373,6 +1385,8 @@ test("the collapsed sidebar floats over the page when the pointer reaches the le
   await expect(
     overlay.getByRole("list", { name: "Tabs" }).getByRole("button", { name: "Fixture", exact: true })
   ).toBeVisible();
+  // Off a Mac its top row has More, as the docked sidebar's does.
+  await expect(overlay.getByRole("button", { name: "More", exact: true })).toHaveCount(process.platform === "darwin" ? 0 : 1);
 
   await overlay.evaluate(() => window.chromeAPI.layout.hideFloatingSidebar());
   await expect.poll(overlayVisible).toBe(false);
@@ -1770,7 +1784,7 @@ test("Berry stands on the new tab composer, inside it, then sits on the active t
   const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
 
   // It's a child of the composer's wrapper, so scrolling can't separate them, with its feet on the top edge.
-  const standing = chrome.locator("[data-berry-home] [data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
+  const standing = chrome.locator('[data-berry-home] [data-berry-perched] svg[aria-label="Berry, at rest"]');
   await expect(standing).toBeVisible();
   const feetGap = await chrome.evaluate(() => {
     const bird = document.querySelector("[data-berry-perched]")!.getBoundingClientRect();
@@ -1778,9 +1792,32 @@ test("Berry stands on the new tab composer, inside it, then sits on the active t
   });
   // Its toes grip the edge, a couple of pixels into it.
   expect(feetGap).toBeLessThan(3);
+  // Pressing it opens the bird picker, as the name beside Send does.
+  const perched = chrome.getByRole("button", { name: "Berry: choose who to ask" });
+  await expect(perched).toHaveAttribute("title", "Berry");
+  await standing.click();
+  await expect(chrome.getByRole("list", { name: "Your flock" })).toBeVisible();
+  await expect(chrome.getByRole("button", { name: /Choose who to ask/ })).toHaveAttribute("aria-expanded", "true");
 
+  // In the sidebar it sits at 16px in the active tab's trailing slot, where its × shows on hover.
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
   await expect(sitting).toBeVisible();
+  const inSlot = () =>
+    chrome.evaluate(() => {
+      const bird = document.querySelector("[data-berry-companion]")!.getBoundingClientRect();
+      const slot = document.querySelector("[data-berry-tab]:has([aria-current=page]) [data-berry-slot]")!.getBoundingClientRect();
+      return Math.abs(bird.left - slot.left) < 1 && Math.abs(bird.top - slot.top) < 1 && Math.abs(bird.width - 16) < 1;
+    });
+  await expect.poll(inSlot).toBe(true);
+  // It gives way to the × while the pointer is on the tab.
+  await chrome.locator("[data-berry-tab]:has([aria-current=page])").hover({ position: { x: 40, y: 10 } });
+  await expect(sitting).toBeHidden();
+  await expect(chrome.getByRole("button", { name: "Close Settings" })).toBeVisible();
+  await chrome.mouse.move(600, 400);
+  await expect(sitting).toBeVisible();
+
+  // On the horizontal tab row it sits on the tab's lower edge.
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
   await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(3);
   await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
   await expect(sitting).toBeVisible();
@@ -1803,6 +1840,10 @@ test("the new tab page paints the valley off the main thread, and web pages don'
 
 test("bookmarks are in the sidebar when vertical and under the address bar when horizontal", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
+  // With nothing saved, the sidebar shows nothing there.
+  await expect(sidebar.getByRole("list", { name: "Bookmarks" })).toHaveCount(0);
+  await openFixture();
+  await chrome.getByRole("button", { name: "Pin this page", exact: true }).click();
   await expect(sidebar.getByRole("list", { name: "Bookmarks" })).toBeVisible();
   await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveCount(1);
 
@@ -1842,7 +1883,7 @@ test("right-clicking Berry opens its menu on the composer and active tab", async
   for (const page of ["new-tab", "settings"] as const) {
     if (page === "settings") await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
     const bird = page === "new-tab"
-      ? chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" })
+      ? chrome.locator('[data-berry-perched] svg[aria-label="Berry, at rest"]')
       : chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
     await expect(bird).toBeVisible();
     await app.evaluate(({ Menu }) => Menu.setApplicationMenu(null));

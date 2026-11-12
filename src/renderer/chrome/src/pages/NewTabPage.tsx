@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Bird, CircleAlert, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { CircleAlert, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import type { MascotProfile, Suggestion } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
@@ -8,6 +8,7 @@ import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { Composer } from '../components/Composer'
 import { NewTabTray, type TrayLine } from '../components/NewTabTray'
+import { FlockIcon } from '../components/icons'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 import { blankMascot, setFlockView, suggestedMascot } from '../flockView'
@@ -224,7 +225,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const LINKS = [
         { label: 'Needs you', Icon: CircleAlert, page: 'needs-you' as const },
         { label: 'Routines', Icon: RefreshCw, page: 'routines' as const },
-        { label: 'Flock', Icon: Bird, page: 'flock' as const },
+        { label: 'Flock', Icon: FlockIcon, page: 'flock' as const },
         { label: 'Settings', Icon: SlidersHorizontal, page: 'settings' as const }
     ]
     const resting = hidden ? [] : restingBirds(flock, chosen.id, library.chats)
@@ -274,9 +275,15 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 onSend={() => submit(false)}
                                 mascot={chosen}
                                 onChooseMascot={choose}
+                                split
+                                // Only where it's set up. The runner keeps going with the Mac off, and a cloud tab doesn't.
                                 cloud={
                                     canUseRunner || canUseCloud
-                                        ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud), asSwitch: chosen.worksInCloud === true }
+                                        ? {
+                                              on: inCloud,
+                                              onToggle: () => setCloudChoice(!inCloud),
+                                              hint: canUseRunner ? 'Keeps going with your Mac off' : 'In a browser in the cloud, while this app is open'
+                                          }
                                         : undefined
                                 }
                             />

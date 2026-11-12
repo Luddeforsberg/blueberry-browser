@@ -258,7 +258,7 @@ export interface MascotProfile extends MascotDraft {
   galleryId?: string;
   // Its row on the Gallery's server, if the user published it. Saving here doesn't change that row.
   publishedId?: string;
-  // Choosing it turns on Do this in the cloud. Only the user's own choice here, so it's never published or shared.
+  // Choosing it turns on In the cloud. Only the user's own choice here, so it's never published or shared.
   worksInCloud?: boolean;
 }
 

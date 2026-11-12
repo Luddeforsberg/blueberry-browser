@@ -402,7 +402,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                     <section className="flex items-center gap-3">
                         <div className="flex-1">
                             <h2 id="mascot-works-in-cloud" className="text-14 font-semibold">Works in the cloud</h2>
-                            <p className="mt-1 text-12 text-muted-foreground">Choosing it turns on Do this in the cloud. You can still turn that off for one message.</p>
+                            <p className="mt-1 text-12 text-muted-foreground">Choosing it turns on In the cloud. You can still turn that off for one message.</p>
                         </div>
                         <Switch labelledBy="mascot-works-in-cloud" checked={values.worksInCloud} onChange={(on) => set({ worksInCloud: on })} />
                     </section>

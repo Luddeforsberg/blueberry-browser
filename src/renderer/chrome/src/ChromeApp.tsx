@@ -15,7 +15,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { Onboarding } from './components/Onboarding'
 import { BerryCompanion } from './components/BerryCompanion'
 import { PageTrouble } from './components/PageTrouble'
-import { OverScene, ToolBarButton } from './components/ToolBarButton'
+import { ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
 import { cn } from '@common/lib/utils'
 import { siteAllowed } from '@shared/mascots'
@@ -111,12 +111,10 @@ const Shell: React.FC = () => {
                 </Region>
             )}
             {layout.menuButton.width > 0 && (
-                // Off a Mac the window has no menu bar, so this opens the same menu.
+                // Off a Mac the window has no menu bar, so this opens the same menu. Only in the horizontal layout: the
+                // vertical one has More in the sidebar.
                 <Region rect={layout.menuButton}>
-                    {/* White on the new tab's scrim, like the rest of the top bar, but not in the tab row above it. */}
-                    <OverScene.Provider value={behindTopBar && layout.mode === 'vertical'}>
-                        <ToolBarButton Icon={Menu} label="Menu" onClick={() => void window.chromeAPI.layout.showAppMenu()} />
-                    </OverScene.Provider>
+                    <ToolBarButton Icon={Menu} label="Menu" onClick={() => void window.chromeAPI.layout.showAppMenu()} />
                 </Region>
             )}
             <BerryCompanion />

@@ -128,7 +128,7 @@ export class EventManager {
 
     this.handle("layout:resize", (panel, width) => this.mainWindow.resizePanel(panel, width));
 
-    this.handle("layout:app-menu", () => this.mainWindow.showAppMenu());
+    this.handle("layout:app-menu", (at) => this.mainWindow.showAppMenu(at));
 
     this.handle("layout:set-ring", (ring) => this.mainWindow.setRing(ring === true));
 

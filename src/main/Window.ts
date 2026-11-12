@@ -60,6 +60,7 @@ import type {
   LayoutMode,
   ResizablePanel,
   MascotSaveResult,
+  Point,
   Settings,
   TabInfo,
   ThemeState,
@@ -1349,11 +1350,20 @@ export class Window {
     if (!canceled && filePaths[0]) this.updateSettings({ downloadFolder: filePaths[0] });
   }
 
-  // The window has no menu bar off a Mac, so the menu button opens the same menu, just under itself.
-  showAppMenu(): void {
+  // The window has no menu bar off a Mac, so a button opens the same menu, just under itself: the sidebar's More, which
+  // says where it is, or the horizontal top row's menu button.
+  showAppMenu(at?: unknown): void {
+    if (process.platform === "darwin") return;
     const { menuButton } = this.layout;
-    if (menuButton.width === 0) return;
-    Menu.getApplicationMenu()?.popup({ window: this._baseWindow, x: menuButton.x, y: menuButton.y + menuButton.height });
+    const [width, height] = this._baseWindow.getContentSize();
+    const { x, y } = (at ?? {}) as Partial<Point>;
+    const place =
+      typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)
+        ? { x: Math.round(Math.min(Math.max(x, 0), width)), y: Math.round(Math.min(Math.max(y, 0), height)) }
+        : menuButton.width > 0
+          ? { x: menuButton.x, y: menuButton.y + menuButton.height }
+          : null;
+    if (place) Menu.getApplicationMenu()?.popup({ window: this._baseWindow, ...place });
   }
 
   showBerryMenu(): void {

@@ -34,11 +34,12 @@ export const ToolBarButton: React.FC<ToolBarButtonProps> = ({
             disabled={!active}
             className={cn(
                 "size-8 flex shrink-0 items-center justify-center rounded-full app-region-no-drag outline-none transition-colors",
-                "focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:hover:bg-transparent",
+                "focus-visible:ring-2 focus-visible:ring-ring disabled:hover:bg-transparent",
+                // On the scene everything is white, and a button that can't be used now is white at 45%.
                 scene
-                    ? "text-scene-ink hover:bg-scene-ink/15 active:bg-scene-ink/25 focus-visible:ring-scene-ink"
+                    ? "text-scene-ink disabled:opacity-[.45] hover:bg-scene-ink/15 active:bg-scene-ink/25 focus-visible:ring-scene-ink"
                     : cn(
-                          "text-muted-foreground hover:text-foreground hover:bg-hover active:bg-pressed disabled:hover:text-muted-foreground",
+                          "text-muted-foreground disabled:opacity-40 hover:text-foreground hover:bg-hover active:bg-pressed disabled:hover:text-muted-foreground",
                           toggled && "bg-pressed text-foreground hover:bg-pressed"
                       ),
                 scene && toggled && "bg-scene-ink/25",

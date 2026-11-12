@@ -91,7 +91,8 @@ test("pinning a page keeps it across restarts, and the sidebar has Settings and 
   chrome = await findView(app, "view=chrome");
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
   const cluster = sidebar.getByRole("list", { name: "Bookmarks" });
-  await expect(cluster).toHaveText("Pin or bookmark a page to keep it here.");
+  // With nothing saved, the sidebar shows nothing there.
+  await expect(cluster).toHaveCount(0);
   await expect(sidebar.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   await expect(sidebar.getByText("Sam Rivera")).toHaveCount(0);
   await expect(sidebar.getByText("sam@example.com")).toHaveCount(0);
@@ -99,8 +100,9 @@ test("pinning a page keeps it across restarts, and the sidebar has Settings and 
 
   await visit();
   await chrome.getByRole("button", { name: "Pin this page", exact: true }).click();
-  // This server has no icon, so the site shows its first letter.
-  await expect(cluster.getByRole("button", { name: "Saved page" })).toHaveText("S");
+  // This server has no icon and is an IP address, so the site has a globe rather than a letter.
+  await expect(cluster.getByRole("button", { name: "Saved page" })).toHaveText("");
+  await expect(cluster.getByRole("button", { name: "Saved page" }).locator("svg")).toBeVisible();
 
   await app.close();
   app = await launchApp(profile);
@@ -133,7 +135,7 @@ test("pinning a page keeps it across restarts, and the sidebar has Settings and 
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
   expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).pinned).toEqual([]);
-  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveText("Pin or bookmark a page to keep it here.");
+  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveCount(0);
 });
 
 test("bookmarked pages show a filled yellow star in both layouts and themes", async () => {

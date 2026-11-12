@@ -90,28 +90,36 @@ describe("computeLayout", () => {
     const size = { width: 1280, height: 800 };
 
     expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 48 });
-    // Off a Mac, the menu button is kept clear too, left of the system's buttons.
     expect(computeLayout(size, { ...both, platform: "win32" }).controls).toEqual({
+      x: 1142,
+      y: 0,
+      width: 138,
+      height: 48,
+    });
+    // In the horizontal layout off a Mac, the menu button is kept clear too, left of the system's buttons.
+    expect(computeLayout(size, { ...both, platform: "win32", mode: "horizontal" }).controls).toEqual({
       x: 1102,
       y: 0,
       width: 178,
-      height: 48,
+      height: 40,
     });
   });
 
-  it("puts the menu button left of the window buttons off a Mac, centred in the top row", () => {
+  it("puts the menu button left of the window buttons in the horizontal layout off a Mac, and in the sidebar otherwise", () => {
     const size = { width: 1280, height: 800 };
+    const horizontal = { ...both, mode: "horizontal" as const };
 
-    expect(computeLayout(size, both).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
-    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 8, width: 32, height: 32 });
-    expect(computeLayout(size, { ...both, platform: "win32", mode: "horizontal" }).menuButton).toEqual({ x: 1106, y: 4, width: 32, height: 32 });
+    expect(computeLayout(size, horizontal).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    // Vertical, it's More in the sidebar's top row, which the chrome places.
+    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    expect(computeLayout(size, { ...horizontal, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 4, width: 32, height: 32 });
     // Linux has no window buttons here, so it's in the corner.
-    expect(computeLayout(size, { ...both, platform: "linux" })).toMatchObject({
+    expect(computeLayout(size, { ...horizontal, platform: "linux" })).toMatchObject({
       controls: { x: 1240, width: 40 },
       menuButton: { x: 1244, width: 32 },
     });
     // Inside what the chrome keeps clear, at the smallest window too.
-    const smallest = computeLayout({ width: 900, height: 600 }, { ...both, platform: "win32" });
+    const smallest = computeLayout({ width: 900, height: 600 }, { ...horizontal, platform: "win32" });
     expect(smallest.menuButton.x).toBeGreaterThanOrEqual(smallest.controls.x);
     expect(smallest.menuButton.x + smallest.menuButton.width).toBeLessThanOrEqual(900 - 138);
   });

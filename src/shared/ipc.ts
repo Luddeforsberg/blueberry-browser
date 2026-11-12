@@ -444,7 +444,8 @@ export interface InvokeChannels {
   "layout:toggle-chat": { region: "chrome"; args: []; result: void };
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   // Off a Mac, the menu button opens the app's own menu under itself, since the window has no menu bar.
-  "layout:app-menu": { region: "chrome"; args: []; result: void };
+  // Where to open it, in the window, for the sidebar's More. With none, under the horizontal top row's menu button.
+  "layout:app-menu": { region: "chrome" | "overlay"; args: [at?: Point]; result: void };
   // Whether the chrome is drawing the reading or recording ring, so the page makes room for it.
   "layout:set-ring": { region: "chrome"; args: [ring: boolean]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
@@ -671,7 +672,7 @@ export interface LayoutAPI {
   toggleSidebar: () => Promise<void>;
   toggleChat: () => Promise<void>;
   resize: (panel: ResizablePanel, width: number) => Promise<void>;
-  showAppMenu: () => Promise<void>;
+  showAppMenu: (at?: Point) => Promise<void>;
   setRing: (ring: boolean) => Promise<void>;
   showFloatingSidebar: () => Promise<void>;
   hideFloatingSidebar: () => Promise<void>;

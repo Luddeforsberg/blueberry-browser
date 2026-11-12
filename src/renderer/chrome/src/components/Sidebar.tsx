@@ -1,10 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Bird, ChevronDown, CircleAlert, Cloud, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ChevronDown, CircleAlert, Cloud, Ellipsis, MessageCircle, PanelLeft, Plus, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import type { ChatThreadSummary } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
-import { NO_SAVED_SITES, useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
+import { useFlock, useLibrary, useSavedSites } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { usePanelChatId } from '../contexts/ChatContext'
 import { DownloadsButton } from './DownloadsButton'
@@ -18,6 +18,7 @@ import { ToolBarButton } from './ToolBarButton'
 import { cn } from '@common/lib/utils'
 import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
+import { FlockIcon } from './icons'
 
 // Every row is a full pill, 34px tall, and starts with a 20px slot so all their text starts at one straight edge.
 const ROW = cn(
@@ -98,13 +99,7 @@ const PinnedTiles: React.FC = () => {
     const shown = cut ? sites.slice(0, TILES_PER_ROW - 1) : sites
     const tile = "size-7 flex items-center justify-center rounded-control outline-none app-region-no-drag focus-visible:ring-2 focus-visible:ring-ring"
 
-    if (sites.length === 0) {
-        return (
-            <ul aria-label="Bookmarks" className="px-2.5 pb-3 text-13 text-muted-foreground">
-                <li>{NO_SAVED_SITES}</li>
-            </ul>
-        )
-    }
+    if (sites.length === 0) return null
     return (
         <ul aria-label="Bookmarks" className="grid grid-cols-4 justify-items-center gap-y-2.5 pt-1.5 pb-3">
             {shown.map((site) => (
@@ -120,15 +115,7 @@ const PinnedTiles: React.FC = () => {
                         }}
                         className={cn(tile, "overflow-hidden")}
                     >
-                        <Favicon
-                            src={site.favicon ?? siteIcon(site.url)}
-                            className="size-7 rounded-control"
-                            fallback={
-                                <span aria-hidden className="size-7 flex items-center justify-center rounded-control bg-muted-foreground/15 text-12 font-semibold text-muted-foreground">
-                                    {site.title.charAt(0).toUpperCase()}
-                                </span>
-                            }
-                        />
+                        <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} tile className="size-7 rounded-control" />
                     </button>
                 </li>
             ))}
@@ -146,14 +133,6 @@ const PinnedTiles: React.FC = () => {
             )}
         </ul>
     )
-}
-
-const age = (time: number) => {
-    const minutes = Math.floor((Date.now() - time) / 60000)
-    if (minutes < 1) return 'now'
-    if (minutes < 60) return `${minutes}m`
-    if (minutes < 1440) return `${Math.floor(minutes / 60)}h`
-    return `${Math.floor(minutes / 1440)}d`
 }
 
 const ICON = "size-4 shrink-0"
@@ -185,7 +164,7 @@ const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     )
 }
 
-// A chat in the sidebar. Hover or keyboard focus swaps its age for a button with Rename and Delete.
+// A chat in the sidebar. Hover or keyboard focus shows a button with Rename and Delete.
 export const ChatRow: React.FC<{
     chat: ChatThreadSummary
     selected: boolean
@@ -277,11 +256,6 @@ export const ChatRow: React.FC<{
                         <span className="sr-only">{mascot.name} is working</span>
                     </span>
                 )}
-                {!selected && !chat.running && (
-                    <span className="shrink-0 -mr-6 text-12 text-muted-foreground tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">
-                        {age(chat.updatedAt)}
-                    </span>
-                )}
             </button>
             <button
                 type="button"
@@ -302,6 +276,20 @@ export const ChatRow: React.FC<{
                 </ul>
             )}
         </li>
+    )
+}
+
+// Off a Mac the window has no menu bar, so More opens the same menu, under itself.
+const MoreButton: React.FC = () => {
+    const anchor = useRef<HTMLSpanElement>(null)
+    const open = () => {
+        const rect = anchor.current?.getBoundingClientRect()
+        void window.chromeAPI.layout.showAppMenu(rect && { x: rect.left, y: rect.bottom })
+    }
+    return (
+        <span ref={anchor} className="flex">
+            <ToolBarButton Icon={Ellipsis} label="More" onClick={open} />
+        </span>
     )
 }
 
@@ -384,6 +372,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 )}
                 <div className="flex-1" />
                 <DownloadsButton />
+                {theme.platform !== 'mac' && <MoreButton />}
             </div>
 
             {/* While rows go on below, the cut one fades out, so none looks as if it's under Settings. */}
@@ -422,7 +411,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                         />
                         <SidebarRow
                             muted
-                            leading={<Bird className={ICON} />}
+                            leading={<FlockIcon className={ICON} />}
                             label="Flock"
                             open={isOpen('flock')}
                             onClick={() => void browser.openPage('flock')}

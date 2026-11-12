@@ -83,25 +83,29 @@ const TabItem: React.FC<{
         >
             <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
             <span className={cn("flex-1 min-w-0 text-14 truncate", iconOnly && "sr-only", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New tab'}</span>
-            {perch && <span aria-hidden className="w-8 shrink-0" />}
+            {perch && row && <span aria-hidden className="w-8 shrink-0" />}
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>
-        <button
-            type="button"
-            aria-label={`Close ${tab.title || 'tab'}`}
-            onClick={onClose}
-            onPointerDown={(e) => e.stopPropagation()}
-            className={cn(
-                "size-6 shrink-0 flex items-center justify-center rounded-full outline-none transition-opacity",
-                "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
-                "opacity-0 group-hover/tab:opacity-100",
-                // In the row, a tab that isn't active only makes room for it on hover or focus, so its title gets the space.
-                row && !tab.isActive && "hidden group-hover/tab:flex group-focus-within/tab:flex",
-                tab.isActive && "opacity-100"
-            )}
-        >
-            <X className="size-3" />
-        </button>
+        <span className="relative shrink-0 flex">
+            <button
+                type="button"
+                aria-label={`Close ${tab.title || 'tab'}`}
+                onClick={onClose}
+                onPointerDown={(e) => e.stopPropagation()}
+                className={cn(
+                    "size-6 shrink-0 flex items-center justify-center rounded-full outline-none transition-opacity",
+                    "hover:bg-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
+                    "opacity-0 group-hover/tab:opacity-100",
+                    // In the row, a tab that isn't active only makes room for it on hover or focus, so its title gets the space.
+                    row && !tab.isActive && "hidden group-hover/tab:flex group-focus-within/tab:flex",
+                    // In the sidebar the bird sits where the active tab's × is, and gives way to it on hover.
+                    tab.isActive && !(perch && !row) && "opacity-100"
+                )}
+            >
+                <X className="size-3" />
+            </button>
+            {perch && !row && <span aria-hidden data-berry-slot className="absolute left-1 top-1 size-4 pointer-events-none" />}
+        </span>
     </li>
     )
 }

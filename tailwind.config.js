@@ -30,6 +30,8 @@ module.exports = {
       outline: "rgb(var(--outline) / <alpha-value>)",
       // Controls inside a dark `surface`, in place of an outline. Transparent in light mode.
       "control-fill": "var(--control-fill)",
+      // The address field at rest, a little darker than the chrome it sits on.
+      "address-field": "var(--address-field)",
       attention: "rgb(var(--attention) / <alpha-value>)",
       "berry-blue": "rgb(var(--berry-blue) / <alpha-value>)",
       success: "rgb(var(--success) / <alpha-value>)",

@@ -14,7 +14,8 @@
     --pressed: 217 217 223;
     --border: 228 228 234;
     --outline: 187 187 191;
-    --control-fill: transparent;
+    --control-fill: rgb(24 24 27 / 0.06);
+    --address-field: rgb(24 24 27 / 0.06);
     --foreground: 24 24 26;
     --muted-foreground: 85 85 91;
     --primary: 24 24 26;
@@ -64,6 +65,7 @@
     --border: 58 58 64;
     --outline: 106 106 112;
     --control-fill: rgb(242 242 243 / 0.08);
+    --address-field: rgb(255 255 255 / 0.07);
     --foreground: 242 242 243;
     --muted-foreground: 166 166 172;
     --primary: 242 242 243;
@@ -98,6 +100,16 @@
     --berry-fruit-mid: 53 88 220;
     --berry-fruit-dark: 31 55 166;
     --berry-fruit-bloom: 143 169 248;
+
+    /* A site with no icon: its letter in white on one of these, picked from its name, so it looks the same everywhere. */
+    --site-1: 229 72 77;
+    --site-2: 230 100 20;
+    --site-3: 171 100 0;
+    --site-4: 48 164 108;
+    --site-5: 18 165 148;
+    --site-6: 13 116 206;
+    --site-7: 62 99 221;
+    --site-8: 142 78 198;
 
     /* The rings round the page, drawn in the gap the layout leaves when the page is inset by their width. */
     --ring-width: 3px;

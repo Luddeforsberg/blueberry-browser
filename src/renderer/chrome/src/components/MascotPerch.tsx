@@ -9,9 +9,28 @@ import { BOX_CONTROL } from './Composer'
 import { blankMascot, setFlockView } from '../flockView'
 
 // Says who a message goes to, on the composer. On the new tab's tall box it's the name only, since the bird itself is
-// perched on the box. It only opens the flock where the choice is still open.
-export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; tall?: boolean; onPress?: () => void }> = ({ mascot, open, tall, onPress }) => {
+// perched on the box, and `quiet` is plain text beside Send with no pill. It only opens the flock where the choice is
+// still open.
+export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; tall?: boolean; quiet?: boolean; onPress?: () => void }> = ({ mascot, open, tall, quiet, onPress }) => {
     const name = useAssistantName(mascot)
+    if (quiet && onPress) {
+        return (
+            <button
+                type="button"
+                aria-label={`Talking to ${name}. Choose who to ask`}
+                aria-expanded={open}
+                onClick={onPress}
+                className={cn(
+                    "h-9 pl-2.5 pr-2 shrink-0 flex items-center gap-1 rounded-full text-13 text-muted-foreground outline-none transition-colors",
+                    "hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                    open && "text-foreground"
+                )}
+            >
+                <span className="max-w-32 truncate">{name}</span>
+                <ChevronDown aria-hidden className={cn("size-3 transition-transform", open && "rotate-180")} />
+            </button>
+        )
+    }
     if (!onPress) {
         return (
             <span aria-label={`This chat is with ${name}`} className={cn("px-2 flex items-center gap-1.5 text-14 text-muted-foreground cursor-default", tall ? "h-10" : "h-9")}>

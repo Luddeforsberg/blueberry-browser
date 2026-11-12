@@ -64,9 +64,9 @@ test("a bird sitting on the tab can be clicked, and keeps sitting", async () => 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
     const bird = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
     await expect(bird).toBeVisible();
-    await bird.click({ position: { x: 15, y: 16 } });
+    await bird.click();
     await expect(bird).toHaveAttribute("data-reaction", "hop");
-    await bird.click({ position: { x: 15, y: 16 } });
+    await bird.click();
     await expect(bird).toHaveAttribute("data-reaction", "ruffle");
   } finally {
     await app.close();

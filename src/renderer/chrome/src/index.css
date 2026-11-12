@@ -66,3 +66,10 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--muted-foreground));
 }
+
+/* A sidebar tab's bird sits where its close button is, and gives way to it while the pointer is on the tab or the
+   keyboard is on the button. */
+body:has([data-berry-tab]:hover [data-berry-slot]) [data-berry-companion],
+body:has(:focus-visible + [data-berry-slot]) [data-berry-companion] {
+  visibility: hidden;
+}

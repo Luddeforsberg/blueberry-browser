@@ -1,20 +1,21 @@
 import React from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { Bird, CircleAlert, Cloud, Download, Eye, Feather, History, LayoutGrid, MessageCircle, Mountain, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import { CircleAlert, Cloud, Download, Eye, Feather, History, LayoutGrid, MessageCircle, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import { BerryDot } from '@common/components/Mascot'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
 import { Favicon } from './Favicon'
+import { FlockIcon, ValleyIcon } from './icons'
 
 const PAGE_ICONS: Record<InternalPage, React.FC<{ className?: string }>> = {
-    'new-tab': Mountain,
+    'new-tab': ValleyIcon,
     chat: MessageCircle,
     routines: RefreshCw,
     settings: SlidersHorizontal,
     downloads: Download,
     gallery: LayoutGrid,
     history: History,
-    flock: Bird,
+    flock: FlockIcon,
     'mascot-gallery': Feather,
     'needs-you': CircleAlert,
     recording: Eye,

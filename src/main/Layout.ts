@@ -27,8 +27,9 @@ export const MIN_WINDOW = { width: 900, height: 600 };
 // Room kept clear for the system's window buttons.
 const MAC_CONTROLS_WIDTH = 80;
 const WINDOWS_CONTROLS_WIDTH = 138;
-// Off a Mac the menu bar is hidden, so a button left of the window buttons opens the app's menu. It's the size of a
-// toolbar button, with this much room on each side.
+// Off a Mac the menu bar is hidden, so a button opens the app's menu. In the vertical layout it's More in the sidebar's
+// top row. In the horizontal one it's left of the window buttons, the size of a toolbar button, with this much room on
+// each side.
 const MENU_BUTTON_SIZE = 32;
 const MENU_BUTTON_GAP = 4;
 
@@ -252,12 +253,14 @@ export function computeLayout(
   const middleWidth = Math.max(window.width - left - right, 0);
 
   // The top row holds the window buttons: the toolbar when vertical, the tab row when horizontal.
-  // Off a Mac, the menu button is part of what's kept clear, so whatever sits in the top right corner leaves room for it.
+  // Off a Mac in the horizontal layout, the menu button is part of what's kept clear, so whatever sits in the top right
+  // corner leaves room for it.
   const topRow = vertical ? VERTICAL_TOP_ROW_HEIGHT : TAB_ROW_HEIGHT;
   const mac = platform === "darwin";
+  const menuInRow = !mac && !vertical;
   // Linux has no window buttons of its own here, only the menu button.
   const systemButtons = platform === "win32" ? WINDOWS_CONTROLS_WIDTH : 0;
-  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP;
+  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + (menuInRow ? MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP : 0);
   const controls: Rect = mac
     ? { x: 0, y: 0, width: controlsWidth, height: topRow }
     : {
@@ -266,7 +269,7 @@ export function computeLayout(
         width: Math.min(controlsWidth, window.width),
         height: topRow,
       };
-  const menuButton: Rect = mac
+  const menuButton: Rect = !menuInRow
     ? EMPTY
     : {
         x: Math.max(window.width - systemButtons - MENU_BUTTON_GAP - MENU_BUTTON_SIZE, 0),

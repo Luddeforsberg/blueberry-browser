@@ -75,7 +75,7 @@ export const Toolbar: React.FC = () => {
     // Saying it's watching matters more, and these are in the File menu too.
     const giveWay = useRecording().status === 'recording' && layout.page.width < NARROW_PAGE
     const leftClear = vertical && !layout.sidebarOpen && theme.platform === 'mac' ? layout.controls.width : 12
-    const rightClear = vertical && !layout.chatOpen && theme.platform !== 'mac' ? layout.controls.width : 12
+    const rightClear = vertical && !layout.chatOpen && theme.platform !== 'mac' ? Math.max(layout.controls.width, 12) : 12
 
     // Our own pages can't be saved, so they don't offer to. The star and the pin sit inside the address field's end.
     const saving = !giveWay && !activeTab?.page && (
@@ -94,10 +94,11 @@ export const Toolbar: React.FC = () => {
                 label={isPinned ? 'Unpin this page' : 'Pin this page'}
                 active={canSave}
                 toggled={isPinned}
-                className="size-6"
+                // Like the star, the pin says it's pinned by itself, filled in ink, with nothing behind it.
+                className={cn("size-6", isPinned && 'bg-transparent hover:bg-transparent')}
                 onClick={() => void window.chromeAPI.library.togglePin()}
             >
-                <Pin className={isPinned ? 'size-3.5 fill-current' : 'size-3.5'} />
+                <Pin className={isPinned ? 'size-3.5 fill-current text-foreground' : 'size-3.5'} />
             </ToolBarButton>
         </>
     )

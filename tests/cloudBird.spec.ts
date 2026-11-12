@@ -10,7 +10,7 @@ import { startFakeModel } from "./fakeModel";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const SHOTS = join(homedir(), "blueberry-audit", "shots-composer");
 
-test("a bird that works in the cloud turns Do this in the cloud on, and it can still be turned off for one message", async () => {
+test("a bird that works in the cloud turns In the cloud on, and it can still be turned off for one message", async () => {
   test.setTimeout(60_000);
   const model = await startFakeModel();
   const app = await launchApp(undefined, { modelEnv: { ...model.env, BLUEBERRY_CLOUD_LOCAL: "1", BLUEBERRY_CLOUD_CHROME: CHROME } });
@@ -22,8 +22,9 @@ test("a bird that works in the cloud turns Do this in the cloud on, and it can s
     );
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
 
-    const more = chrome.getByRole("button", { name: "More options" });
+    const add = chrome.getByRole("button", { name: "Add to message" });
     const item = chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" });
+    const chipOff = chrome.getByRole("button", { name: "Turn off In the cloud" });
     const send = (name: string) => chrome.getByRole("button", { name, exact: true });
     const choose = async (name: string) => {
       await chrome.getByRole("button", { name: /Choose who to ask/ }).click();
@@ -33,24 +34,31 @@ test("a bird that works in the cloud turns Do this in the cloud on, and it can s
     // Berry doesn't work in the cloud, so it's off until chosen.
     await chrome.getByRole("textbox", { name: /^Ask (.+ )?or search$/ }).fill("Find me a cable");
     await expect(send("Send")).toBeVisible();
-    await more.click();
+    await expect(chipOff).toHaveCount(0);
+    // It's in the + menu, which the keyboard opens, moves in and leaves with Escape, back on +.
+    await add.focus();
+    await chrome.keyboard.press("ArrowDown");
+    await expect(item).toBeFocused();
     await expect(item).toHaveAttribute("aria-checked", "false");
     await chrome.screenshot({ path: join(SHOTS, "1-menu.png") });
     await chrome.keyboard.press("Escape");
     await expect(item).toHaveCount(0);
-    // Back on the button that opened it, so the keyboard isn't lost.
-    await expect(more).toBeFocused();
+    await expect(add).toBeFocused();
 
     // Scout does, so choosing it turns it on.
     await choose("Scout");
     await expect(send("Send to the cloud")).toBeVisible();
     await chrome.screenshot({ path: join(SHOTS, "2-on-normal-width.png") });
 
-    // For a bird that works there it's a switch in the row, off for this message, and choosing Scout again goes back
-    // to its own default.
-    const toggle = chrome.getByRole("switch", { name: "In the cloud" });
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
-    await toggle.click();
+    // On, a chip after + says so, and its x turns it off for this message. Choosing Scout again goes back to its own
+    // default.
+    await chipOff.click();
+    await expect(send("Send")).toBeVisible();
+    await expect(chipOff).toHaveCount(0);
+    await add.click();
+    await item.click();
+    await expect(send("Send to the cloud")).toBeVisible();
+    await chipOff.click();
     await expect(send("Send")).toBeVisible();
     // Any change of bird goes back to following it, wherever it was chosen, as the chat panel shares the choice.
     await choose("Berry");

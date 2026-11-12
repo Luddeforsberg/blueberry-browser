@@ -5,7 +5,8 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { BERRY_ID } from '@shared/mascots'
-import { Berry } from './Berry'
+import { Berry, useAssistantName } from './Berry'
+import { CHOOSE_BIRD_EVENT } from './Composer'
 
 // Drawn at one size and scaled, so it keeps the full drawing wherever it lands.
 const BASE_SIZE = 112
@@ -48,7 +49,10 @@ const targetFor = (element: HTMLElement): Target => {
         const size = homeSize(element)
         return { x: rect.right - homeRight(size) - size, y: rect.top - size * STANDING_FEET + 2, size, mood: 'rest' }
     }
-    // On the tab's lower edge with its legs over it, in both layouts, so it covers no title.
+    // In a sidebar tab's trailing slot, 16px, where its × shows on hover.
+    const slot = element.querySelector('[data-berry-slot]')?.getBoundingClientRect()
+    if (slot) return { x: slot.left, y: slot.top, size: slot.width, mood: 'sitting' }
+    // On the tab row's lower edge with its legs over it, so it covers no title.
     return { x: rect.right - TAB_INSET - TAB_SIZE / 2, y: rect.bottom - 2 - TAB_SIZE * SEAT, size: TAB_SIZE, mood: 'sitting' }
 }
 
@@ -213,6 +217,8 @@ export const BerryCompanion: React.FC = () => {
         }
     }, [settings.showBerry, update])
 
+    const name = useAssistantName(mascot)
+
     if (!settings.showBerry) return null
 
     const bird = (
@@ -243,7 +249,18 @@ export const BerryCompanion: React.FC = () => {
                     <div aria-hidden className="absolute h-2 overflow-hidden" style={{ left: homeSize(home) * FEET_X - 20, width: 40, top: homeSize(home) * STANDING_FEET - 2 }}>
                         <div className="absolute inset-x-1 -top-1 h-2 rounded-full bg-berry-pupil/30 blur-[2px]" />
                     </div>
-                    {bird}
+                    {/* Pressing the bird opens the bird picker, a shortcut for the name beside Send, which the keyboard
+                        reaches instead. Only the drawing takes the pointer, so the sky around it stays the page's. */}
+                    <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={`${name}: choose who to ask`}
+                        title={name}
+                        onClick={() => window.dispatchEvent(new Event(CHOOSE_BIRD_EVENT))}
+                        className="block pointer-events-none outline-none [&_svg_*]:cursor-pointer"
+                    >
+                        {bird}
+                    </button>
                 </div>,
                 home
             )}
