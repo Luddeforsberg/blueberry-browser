@@ -1,6 +1,7 @@
 import type { ValleyLight } from '@shared/ipc'
 
-// The valley, painted in code in 2px cells, as the approved mocks were (DESIGN.md section 9). Pure, so it runs in a
+// The valley, painted in code as the approved mocks were (DESIGN.md section 9): every pixel's colour on its own, with a
+// grain and dither in 2px cells. Pure, so it runs in a
 // worker off the main thread. The illustrator's layers replace it later, behind the same <Valley>.
 //
 // The colours are the artwork's own, not the interface's tokens, and come from the mock's painter unchanged.
@@ -262,16 +263,20 @@ const scene = (W: number, H: number, box: ValleyBox, light: ValleyLight) => {
     return { pick, meadow }
 }
 
-// Paints one cell per 2x2 pixels, which is all the grain needs, so the picture is a quarter of the window's pixels and is
-// shown at twice the size without smoothing.
-export const paintValley = (width: number, height: number, box: ValleyBox, light: ValleyLight) => {
+// Paints every device pixel, as the mock's `render` does: the colour and the edges are worked out at the pixel's own
+// place in CSS pixels, and the 2px cell it's in only sets the dither's threshold and the grain. On a screen scaled above
+// 100% the cells stay 2 CSS pixels wide, so the grain is the same size at any scale. `width` and `height` are CSS pixels.
+export const paintValley = (width: number, height: number, box: ValleyBox, light: ValleyLight, dpr = 1) => {
     const W = Math.max(Math.round(width), 2), H = Math.max(Math.round(height), 2)
-    const cw = Math.ceil(W / 2), chh = Math.ceil(H / 2)
+    const scale = dpr > 0 && Number.isFinite(dpr) ? dpr : 1
+    const pw = Math.max(Math.round(W * scale), 2), ph = Math.max(Math.round(H * scale), 2)
     const { pick, meadow } = scene(W, H, box, light)
-    const data = new Uint8ClampedArray(cw * chh * 4)
-    for (let j = 0, i = 0; j < chh; j++) {
-        for (let k = 0; k < cw; k++, i += 4) {
-            const c = pick(k * 2 + 1, j * 2 + 1, k, j), g = (hash(k, j, 9) - 0.5) * 6
+    const data = new Uint8ClampedArray(pw * ph * 4)
+    for (let py = 0, i = 0; py < ph; py++) {
+        const y = (py + 0.5) / scale, j = Math.floor(y / 2)
+        for (let px = 0; px < pw; px++, i += 4) {
+            const x = (px + 0.5) / scale, k = Math.floor(x / 2)
+            const c = pick(x, y, k, j), g = (hash(k, j, 9) - 0.5) * 6
             data[i] = c[0] + g
             data[i + 1] = c[1] + g
             data[i + 2] = c[2] + g
@@ -280,5 +285,5 @@ export const paintValley = (width: number, height: number, box: ValleyBox, light
     }
     const at = valleyBanks(W)
     const banks: ValleyBanks = { left: { x: at.left, y: meadow(at.left) }, right: { x: at.right, y: meadow(at.right) } }
-    return { data, width: cw, height: chh, banks }
+    return { data, width: pw, height: ph, banks }
 }

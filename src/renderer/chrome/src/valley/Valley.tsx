@@ -10,29 +10,33 @@ import type { PaintRequest } from './valley.worker'
 interface Painted {
     bitmap: ImageBitmap
     banks: ValleyBanks
+    // The size it was painted for, in CSS pixels, which the banks are measured in.
+    width: number
+    height: number
 }
 
 // Painted once for a light, a size and a box, and kept for as long as the window is open.
 const cache = new Map<string, Painted>()
 const MAX_KEPT = 8
-const keyOf = ({ width, height, box, light }: Omit<PaintRequest, 'id'>) =>
-    `${light}:${width}x${height}:${Math.round(box.top)}:${Math.round(box.left)}:${Math.round(box.right)}`
+const keyOf = ({ width, height, box, light, dpr }: Omit<PaintRequest, 'id'>) =>
+    `${light}:${width}x${height}@${dpr}:${Math.round(box.top)}:${Math.round(box.left)}:${Math.round(box.right)}`
 
 let worker: Worker | null = null
 let nextId = 0
-const waiting = new Map<number, (painted: Painted) => void>()
+const waiting = new Map<number, { size: { width: number; height: number }; done: (painted: Painted) => void }>()
 
 const paint = (request: Omit<PaintRequest, 'id'>, done: (painted: Painted) => void) => {
     if (!worker) {
         worker = new Worker(new URL('./valley.worker.ts', import.meta.url), { type: 'module' })
-        worker.onmessage = (event: MessageEvent<{ id: number } & Painted>) => {
+        worker.onmessage = (event: MessageEvent<{ id: number; bitmap: ImageBitmap; banks: ValleyBanks }>) => {
             const { id, bitmap, banks } = event.data
-            waiting.get(id)?.({ bitmap, banks })
+            const asked = waiting.get(id)
             waiting.delete(id)
+            asked?.done({ bitmap, banks, ...asked.size })
         }
     }
     const id = ++nextId
-    waiting.set(id, done)
+    waiting.set(id, { size: { width: request.width, height: request.height }, done })
     worker.postMessage({ ...request, id })
 }
 
@@ -68,7 +72,7 @@ export const Valley: React.FC<{
     const first = useRef(true)
     useEffect(() => {
         if (!size || size.width < 2 || size.height < 2 || boxTop === undefined || boxLeft === undefined || boxRight === undefined) return
-        const request = { ...size, light, box: { top: boxTop, left: boxLeft, right: boxRight } }
+        const request = { ...size, light, box: { top: boxTop, left: boxLeft, right: boxRight }, dpr: window.devicePixelRatio || 1 }
         const kept = cache.get(keyOf(request))
         if (kept) {
             setShown(kept)
@@ -108,19 +112,19 @@ export const Valley: React.FC<{
             <canvas
                 ref={canvas}
                 className={cn(
-                    "absolute inset-0 size-full [image-rendering:pixelated] transition-opacity duration-layout",
+                    "absolute inset-0 size-full transition-opacity duration-layout",
                     shown ? "opacity-100" : "opacity-0"
                 )}
             />
-            {children?.(shown && size ? scaleBanks(shown.banks, shown.bitmap, size) : null)}
+            {children?.(shown && size ? scaleBanks(shown, size) : null)}
         </div>
     )
 }
 
 // A picture painted for another size is stretched over this one, so the banks move with it.
-const scaleBanks = (banks: ValleyBanks, bitmap: ImageBitmap, size: { width: number; height: number }): ValleyBanks => {
-    const sx = size.width / (bitmap.width * 2)
-    const sy = size.height / (bitmap.height * 2)
+const scaleBanks = ({ banks, width, height }: Painted, size: { width: number; height: number }): ValleyBanks => {
+    const sx = size.width / width
+    const sy = size.height / height
     return {
         left: { x: banks.left.x * sx, y: banks.left.y * sy },
         right: { x: banks.right.x * sx, y: banks.right.y * sy }
