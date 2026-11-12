@@ -38,6 +38,10 @@ test("a bird that works in the cloud turns In the cloud on, and it can still be 
     // It's in the + menu, which the keyboard opens, moves in and leaves with Escape, back on +.
     await add.focus();
     await chrome.keyboard.press("ArrowDown");
+    await expect(chrome.getByRole("menuitem", { name: "Add an open tab" })).toBeFocused();
+    await chrome.keyboard.press("ArrowDown");
+    await expect(chrome.getByRole("menuitem", { name: "Add a recent page" })).toBeFocused();
+    await chrome.keyboard.press("ArrowDown");
     await expect(item).toBeFocused();
     await expect(item).toHaveAttribute("aria-checked", "false");
     await chrome.screenshot({ path: join(SHOTS, "1-menu.png") });

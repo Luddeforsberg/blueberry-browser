@@ -101,7 +101,8 @@
     --berry-fruit-dark: 31 55 166;
     --berry-fruit-bloom: 143 169 248;
 
-    /* A site with no icon: its letter in white on one of these, picked from its name, so it looks the same everywhere. */
+    /* A site with no icon: its letter in `site-ink` on one of these, picked from its name, so it looks the same everywhere. */
+    --site-ink: 255 255 255;
     --site-1: 229 72 77;
     --site-2: 230 100 20;
     --site-3: 171 100 0;

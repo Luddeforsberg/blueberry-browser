@@ -144,10 +144,10 @@ test("with no key the cloud is off, and a saved key never comes back to the page
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
-    // With no cloud the + menu has no cloud item, and says what it will add later.
+    // With no cloud the + menu has no cloud item.
     await chrome.getByRole("button", { name: "Add to message" }).click();
+    await expect(chrome.getByRole("menuitem", { name: "Add an open tab" })).toBeVisible();
     await expect(chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" })).toHaveCount(0);
-    await expect(chrome.getByText("Adding an open tab or a recent page comes in a later version.")).toBeVisible();
     await chrome.keyboard.press("Escape");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
     await expect(chrome.getByText("Off. Add a Browserbase key to turn it on.")).toBeVisible();

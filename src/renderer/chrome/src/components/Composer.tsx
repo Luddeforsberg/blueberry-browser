@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Cloud, Plus, Square, X } from 'lucide-react'
+import { AppWindow, ArrowUp, ChevronRight, Clock, Cloud, Plus, Square, X } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
 import { cn } from '@common/lib/utils'
 import { MascotChip, MascotPerch } from './MascotPerch'
@@ -26,8 +26,9 @@ interface Cloud {
 // The `+` menu's items, which the arrow keys move between.
 const MENU_ITEM = '[role="menuitemcheckbox"], [role="menuitem"]'
 
-// `+` and what it opens: Do this in the cloud where the cloud is set up. Adding an open tab or a recent page to a message
-// isn't possible yet, so with no cloud it says so, rather than opening an empty menu.
+// `+` and what it opens: Add an open tab and Add a recent page, then Do this in the cloud where the cloud is set up.
+// The two Add items show as the design has them, but a new tab's message can't carry a page yet, so they're marked
+// unavailable and do nothing until that's built.
 const AddMenu: React.FC<{ size: string; cloud?: Cloud }> = ({ size, cloud }) => {
     const [open, setOpen] = useState(false)
     const wrap = useRef<HTMLDivElement>(null)
@@ -68,12 +69,20 @@ const AddMenu: React.FC<{ size: string; cloud?: Cloud }> = ({ size, cloud }) => 
     }
 
     return (
-        <div ref={wrap} className="relative" onKeyDown={open ? onKeyDown : undefined}>
+        <div
+            ref={wrap}
+            className="relative"
+            onKeyDown={open ? onKeyDown : undefined}
+            // Tabbing out of it closes it, as a click elsewhere does.
+            onBlur={(event) => {
+                if (open && !wrap.current?.contains(event.relatedTarget as Node | null)) setOpen(false)
+            }}
+        >
             <button
                 ref={button}
                 type="button"
                 aria-label="Add to message"
-                aria-haspopup={cloud ? 'menu' : 'dialog'}
+                aria-haspopup="menu"
                 aria-expanded={open}
                 onClick={() => setOpen(!open)}
                 onKeyDown={(event) => {
@@ -94,33 +103,52 @@ const AddMenu: React.FC<{ size: string; cloud?: Cloud }> = ({ size, cloud }) => 
             {open && (
                 <div
                     ref={panel}
-                    role={cloud ? 'menu' : 'dialog'}
+                    role="menu"
                     aria-label="Add to message"
                     className="absolute left-0 top-full mt-2 z-20 w-[268px] p-1.5 rounded-list bg-surface shadow-float cursor-default"
                 >
-                    {cloud ? (
+                    {[
+                        { label: 'Add an open tab', Icon: AppWindow },
+                        { label: 'Add a recent page', Icon: Clock }
+                    ].map(({ label, Icon }) => (
                         <button
+                            key={label}
                             type="button"
-                            role="menuitemcheckbox"
-                            aria-checked={cloud.on}
-                            aria-describedby="add-menu-cloud-hint"
-                            onClick={() => {
-                                cloud.onToggle()
-                                close(true)
-                            }}
-                            className="w-full px-2.5 py-2 flex flex-col gap-0.5 rounded-[10px] text-left outline-none transition-colors hover:bg-hover focus-visible:bg-hover"
+                            role="menuitem"
+                            aria-disabled="true"
+                            aria-haspopup="menu"
+                            title="Coming soon"
+                            className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-[10px] text-14 text-left outline-none transition-colors hover:bg-hover focus-visible:bg-hover"
                         >
-                            <span className="flex items-center gap-2.5 text-14">
-                                <Cloud aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                                <span className="flex-1">Do this in the cloud</span>
-                                <span aria-hidden className={cn("relative w-7 h-4 shrink-0 rounded-full transition-colors", cloud.on ? "bg-berry-blue" : "bg-muted-foreground/70")}>
-                                    <span className={cn("absolute left-0 top-0.5 size-3 rounded-full bg-surface transition-transform", cloud.on ? "translate-x-3.5" : "translate-x-0.5")} />
-                                </span>
-                            </span>
-                            <span id="add-menu-cloud-hint" className="pl-[26px] text-12 text-muted-foreground">{cloud.hint}</span>
+                            <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="flex-1">{label}</span>
+                            <ChevronRight aria-hidden className="size-3 shrink-0 text-muted-foreground" />
                         </button>
-                    ) : (
-                        <p className="px-2.5 py-2 text-13 text-muted-foreground">Adding an open tab or a recent page comes in a later version.</p>
+                    ))}
+                    {cloud && (
+                        <>
+                            <div role="separator" className="h-px mx-2 my-1.5 bg-border" />
+                            <button
+                                type="button"
+                                role="menuitemcheckbox"
+                                aria-checked={cloud.on}
+                                aria-describedby="add-menu-cloud-hint"
+                                onClick={() => {
+                                    cloud.onToggle()
+                                    close(true)
+                                }}
+                                className="w-full px-2.5 py-2 flex flex-col gap-0.5 rounded-[10px] text-left outline-none transition-colors hover:bg-hover focus-visible:bg-hover"
+                            >
+                                <span className="flex items-center gap-2.5 text-14">
+                                    <Cloud aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                                    <span className="flex-1">Do this in the cloud</span>
+                                    <span aria-hidden className={cn("relative w-7 h-4 shrink-0 rounded-full transition-colors", cloud.on ? "bg-berry-blue" : "bg-muted-foreground/70")}>
+                                        <span className={cn("absolute left-0 top-0.5 size-3 rounded-full bg-surface transition-transform", cloud.on ? "translate-x-3.5" : "translate-x-0.5")} />
+                                    </span>
+                                </span>
+                                <span id="add-menu-cloud-hint" className="pl-[26px] text-12 text-muted-foreground">{cloud.hint}</span>
+                            </button>
+                        </>
                     )}
                 </div>
             )}
@@ -304,7 +332,7 @@ export const Composer: React.FC<{
                         "relative shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
                         "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
                         inCloud
-                            ? "bg-berry-blue text-white dark:text-background hover:bg-berry-blue/90"
+                            ? "bg-berry-blue text-primary-foreground hover:bg-berry-blue/90"
                             : onStop || canSend
                               ? "bg-primary text-primary-foreground hover:bg-primary/90"
                               : "text-muted-foreground shadow-[inset_0_0_0_1px_rgb(var(--outline))] dark:shadow-none dark:bg-control-fill"

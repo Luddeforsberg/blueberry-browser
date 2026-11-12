@@ -62,9 +62,9 @@ export const SiteTile: React.FC<{ site: string; tile?: boolean; className?: stri
         <span
             aria-hidden
             data-letter={siteLetter(site)}
-            style={{ backgroundColor: colourOf(hostOf(site).replace(/^www\./, "")) }}
+            style={{ backgroundColor: colourOf(hostOf(site).replace(/^www\./, "")), color: "rgb(var(--site-ink))" }}
             className={cn(
-                "shrink-0 flex items-center justify-center leading-none font-bold text-white before:content-[attr(data-letter)]",
+                "shrink-0 flex items-center justify-center leading-none font-bold before:content-[attr(data-letter)]",
                 tile ? "size-7 rounded-control text-12" : "size-4 rounded-[5px] text-[9px]",
                 className
             )}
