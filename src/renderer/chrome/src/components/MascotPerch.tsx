@@ -1,40 +1,12 @@
 import React from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
-import type { MascotProfile } from '@shared/library'
+import { Plus } from 'lucide-react'
 import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { BERRY_ID } from '@shared/mascots'
 import { Berry, useAssistantName } from './Berry'
 import { blankMascot, setFlockView } from '../flockView'
 
-// Says who a message goes to, on the composer. It only opens the flock where the choice is still open.
-export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; onPress?: () => void }> = ({ mascot, open, onPress }) => {
-    const name = useAssistantName(mascot)
-    const inner = (
-        <>
-            <Berry size={24} mascot={mascot} />
-            <span className="max-w-24 truncate text-13">{name}</span>
-        </>
-    )
-    if (!onPress) {
-        return <span aria-label={`This chat is with ${name}`} className="h-9 px-2 flex items-center gap-1.5 text-ink-2 cursor-default">{inner}</span>
-    }
-    return (
-        <button
-            type="button"
-            aria-label={`Talking to ${name}. Choose who to ask`}
-            aria-expanded={open}
-            onClick={onPress}
-            className="h-9 pl-1.5 pr-2 flex items-center gap-1.5 rounded-full outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
-        >
-            {inner}
-            <ChevronDown className={cn("size-3.5 text-ink-2 transition-transform", open && "rotate-180")} />
-        </button>
-    )
-}
-
-// The flock on a perch, to choose who does something. In the flow rather than floating, so it works in the chat panel
-// beside a web page, which nothing in the chrome can draw over.
+// Your mascots in a row, to choose who runs a routine. In the flow rather than floating, so it fits in the form.
 export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) => void; onClose?: () => void }> = ({ selectedId, onChoose, onClose }) => {
     const { flock, find } = useFlock()
     const berryName = useAssistantName()
@@ -43,7 +15,7 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
 
     return (
         <ul
-            aria-label="Your flock"
+            aria-label="Your mascots"
             onKeyDown={(event) => {
                 if (event.key === 'Escape') onClose?.()
             }}

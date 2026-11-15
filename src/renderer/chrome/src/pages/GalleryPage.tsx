@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Pin, Star } from 'lucide-react'
+import { CircleDot, Pin, Star } from 'lucide-react'
 import type { GalleryMascot, MascotProfile, MemoryFact, NeedsYouItem, Suggestion, WorkTab, WorkView } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
@@ -11,8 +11,7 @@ import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
-import { ArtBlueberry } from '../components/ArtBlueberry'
-import { ChatComposer } from '../components/Composer'
+import { ChatComposer, Composer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
 import { PageTrouble } from '../components/PageTrouble'
 import { TabIcon } from '../components/TabIcon'
@@ -28,7 +27,7 @@ import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
-import { BirdSuggestions } from '../components/BirdsOnFruit'
+import { IdeaRow } from './NewTabPage'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
@@ -37,7 +36,6 @@ import type { RoutineRun } from '@shared/library'
 import { DownloadRow } from '../components/DownloadRow'
 import { RecordingNotice, TrailNotes } from '../components/ShowBerry'
 import { DownloadsProgress } from '../components/DownloadsButton'
-import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
 
@@ -195,7 +193,6 @@ export const GalleryPage: React.FC = () => {
     const [choice, setChoice] = useState<'one' | 'two'>('one')
     const [still, setStill] = useState(false)
     const [routineForm, setRoutineForm] = useState(() => blankForm('Flight price watch'))
-    const { theme } = useShell()
 
     return (
         <div className="h-full overflow-y-auto">
@@ -271,7 +268,7 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="The flock">
                     <div className="mt-4 max-w-xl p-2 rounded-prompt border bg-sheet">
-                        <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} onClose={() => undefined} />
+                        <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} />
                     </div>
                     <div className="mt-6 max-w-[248px]">
                         <ul><MascotCard mascot={SAMPLE_MASCOT} landed={false} onEdit={() => undefined} /></ul>
@@ -288,19 +285,24 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
-                <Section title="Suggestions">
-                    <div className="relative h-[420px] rounded-sheet overflow-hidden">
-                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
-                        <div className="relative max-w-[752px] mx-auto">
-                            <BirdSuggestions suggestions={SAMPLE_SUGGESTIONS} onUse={() => undefined} onDismiss={() => undefined} />
+                <Section title="Prompt box">
+                    <div className="flex flex-col gap-6 p-6 rounded-tile bg-well">
+                        <div className="max-w-[640px] pb-[150px]">
+                            <Composer size="hero" label="Empty" placeholder="Ask Berry, or type an address" value="" onChange={() => undefined} onKeyDown={() => undefined} canSend={false} onSend={() => undefined} mascot={BERRY} onChooseMascot={() => undefined} cloud={{ on: false, onToggle: () => undefined }} addMenu={[{ label: 'Show Berry how', Icon: CircleDot, onSelect: () => undefined }]} />
+                        </div>
+                        <div className="max-w-[640px]">
+                            <Composer size="hero" label="Ready, limited" placeholder="Ask Scout" value="What happened in Malmö today?" onChange={() => undefined} onKeyDown={() => undefined} canSend onSend={() => undefined} mascot={SAMPLE_MASCOT} onChooseMascot={() => undefined} cloud={{ on: true, onToggle: () => undefined }} limits="Only visits github.com. Can’t type or click." />
+                        </div>
+                        <div className="max-w-[420px]">
+                            <Composer label="In a chat, while it replies" placeholder="Tell Berry something" value="" onChange={() => undefined} onKeyDown={() => undefined} canSend={false} onSend={() => undefined} onStop={() => undefined} onAdd={() => undefined} mascot={BERRY} />
                         </div>
                     </div>
                 </Section>
 
-                <Section title="Art blueberry">
-                    <div className="relative h-72 rounded-sheet overflow-hidden">
-                        <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
-                    </div>
+                <Section title="Things you repeat">
+                    <ul className="max-w-[640px]">
+                        {SAMPLE_SUGGESTIONS.map((suggestion) => <IdeaRow key={suggestion.id} suggestion={suggestion} onUse={() => undefined} onDismiss={() => undefined} />)}
+                    </ul>
                 </Section>
 
                 <Section title="Chat">

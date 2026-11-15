@@ -114,6 +114,15 @@ module.exports = {
           "0%": { backgroundPosition: "150% 0" },
           "100%": { backgroundPosition: "-50% 0" },
         },
+        // A menu opening, and a mascot changing with the motion held still.
+        "menu-in": {
+          "0%": { transform: "scale(.96) translateY(-4px)", opacity: "0" },
+          "100%": { transform: "none", opacity: "1" },
+        },
+        "mascot-fade": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
         "mascot-pop": {
           "0%": { transform: "scale(.5)", opacity: ".2" },
           "55%": { transform: "scale(1.14)", opacity: "1" },

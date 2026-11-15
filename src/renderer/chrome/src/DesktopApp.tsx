@@ -276,7 +276,6 @@ export const DesktopComposerApp: React.FC = () => {
                     value={draft}
                     onChange={setDraft}
                     focusKey={focusKey}
-                    noAdd
                     bare
                     onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey) {

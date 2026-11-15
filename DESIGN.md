@@ -382,6 +382,9 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 - **The greeting,** "Where to?", at 30px, with the chosen mascot at 40px beside it. It's a mark, not a control.
 - **The prompt box,** 640px.
 - **Under the box,** two short lists with mono labels. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with the asking mascot, one sentence and **Review**, filled. **Since you left** follows: up to three real things, newest first, such as a chat that finished, a routine's result or what's scheduled next. Each is the mascot's face in its mood, one sentence with the name in medium, and a time in mono. Nothing appears unless it's real.
+- **Waiting for you reads as a sentence:** the asking mascot's name in medium, "wants to" and what it would do with addresses cut to their site, then the job's name in `ink-2`. A question or a sign-in is already a sentence, so it's shown as it is.
+- **Things you repeat,** the suggestions, come last when there are any: the same rows, with what to do, outlined, and a × on hover to dismiss. Taking one up only fills in the box or a form, as before.
+- **With no sidebar,** in the horizontal layout or with it collapsed, a row of quiet buttons under the lists leads to Needs you, Routines, your mascots and Settings, since nothing else on screen does.
 
 `Enter` opens anything that looks like an address and asks the mascot about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. The chat panel doesn't open here, because this page has its own box.
 
@@ -390,7 +393,7 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 One component everywhere: the new tab, the chat as a page, the chat panel. It is a card set into a shell. Mock for the chips and the menu: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 
 - **The card** holds, from the top: chips for what it's been given to read, what you type (18px on the new tab, 15px in a chat), and one row of tools. From the left: **+**, a 32px rounded square on `sheet-2`, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
-- **What it's given to read** is chips at the top of the card: a page, by its icon and site, marked "this page" when it's the one in front, or a file. Each has a ×. No chip means the mascot sees no page. **+** adds one from a menu: This page, An open tab, A file, and Show Berry how, which starts showing a job instead of describing it.
+- **What it's given to read** is chips at the top of the card: a page, by its icon and site, marked "this page" when it's the one in front, or a file. Each has a ×. No chip means the mascot sees no page. **+** adds one from a menu: This page, An open tab, A file, and Show Berry how, which starts showing a job instead of describing it. On the new tab today the menu has only Show Berry how, since there's no page in front and the others aren't built. In a chat, + adds the page in front, as it did.
 - **The placeholder names who you're asking:** "Ask Berry, or type an address".
 - **The cloud switch** is there while the cloud can be used. Choosing a mascot set to work in the cloud starts it on Cloud, and the user can switch it back for one message. It goes away for a mascot that only reads the page in front, since that page isn't in the cloud.
 - **The line under the card,** in the shell, is for the chosen mascot's limits and nothing else: in words, with a lock, for as long as that mascot is chosen. Berry, and any mascot with no limits, has no line. What's waiting for you is in the list under the box and on Chats.
@@ -400,7 +403,7 @@ One component everywhere: the new tab, the chat as a page, the chat panel. It is
 
 Mock: [switching.html](./docs/design/mocks/switching.html), which is live.
 
-**One place:** the pill beside Send, on a box that's starting something new. It opens a menu under itself: one row per mascot with its face, its name and what it may do in a mono line, a tick on the current one, and a last line saying `@` in the box does the same. Typing `@` filters by name.
+**One place:** the pill beside Send, on a box that's starting something new. It opens a menu under itself: one row per mascot with its face, its name and what it may do in a mono line, a tick on the current one, and a last line saying `@` in the box does the same. Typing `@` filters by name. Until `@` is built, that last line is **New mascot** instead, which opens the form for one. The menu opens above the pill in a chat, where the box sits at the bottom.
 
 **What changes:**
 
@@ -483,7 +486,6 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 
 - Onboarding
 - The horizontal layout
-- Suggestions on the new tab
 - Find in page, zoom and printing, the page menu
 - Show Berry how
 - Routines
@@ -513,7 +515,7 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Steps and pills that say what was typed.
 - Waiting for you on the new tab.
 - `@` in the box to choose a mascot.
-- The cloud switch going away for a mascot that only reads the page in front.
+- An open tab in the prompt box, from +.
 
 **Still open:**
 
