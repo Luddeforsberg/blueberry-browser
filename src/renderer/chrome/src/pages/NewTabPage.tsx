@@ -251,8 +251,11 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 aria-hidden
                 className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_62%_70%_at_50%_44%,transparent_0,transparent_46%,#000_100%)]"
             />
-            <div className="absolute inset-0 overflow-y-auto">
-                <div className="min-h-full flex flex-col items-center px-6 pt-[clamp(48px,calc(100vh-640px),138px)] pb-12">
+            {/* Placed by the page area's own height, not the window's: the box's middle at 43% of it, and the greeting
+                never nearer the top than 48px. 127px is from the greeting's top to the middle of the empty box. The lists
+                flow on under it. */}
+            <div className="absolute inset-0 overflow-y-auto [container-type:size]">
+                <div className="min-h-full flex flex-col items-center px-6 pt-[max(48px,calc(43cqh-127px))] pb-12">
                     {/* A mark, not a control. Blueberry on the desktop flies out from here. */}
                     <h1 className="mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
                         <span data-berry-perched className="-mt-1.5 flex" style={away ? { opacity: 0 } : undefined}>

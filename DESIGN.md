@@ -382,6 +382,8 @@ Back, forward and reload in `ink-3`, then the address field, then the chat panel
 
 No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
+- **Placed by the page area's height,** not the window's: the middle of the empty box sits at 43% of it, and the greeting never comes nearer the top than 48px. The lists flow on under the box, so on a short page they scroll, and from about 740px a waiting row and three more fit with nothing pushed off the bottom.
+
 - **The greeting,** "Where to?", at 30px, with the chosen mascot at 40px beside it. It's a mark, not a control.
 - **The prompt box,** 640px.
 - **Under the box,** two short lists with mono labels. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with the asking mascot, one sentence and **Review**, filled. **Lately** follows: up to three real things, newest first, such as a chat that finished, a routine's result or what's scheduled next. Each is the mascot's face in its mood, one sentence with the name in medium, and a time in mono. Nothing appears unless it's real.
