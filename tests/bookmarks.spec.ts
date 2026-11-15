@@ -90,8 +90,10 @@ test("pinning a page keeps it across restarts, and the sidebar has Settings and 
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  const cluster = sidebar.getByRole("list", { name: "Bookmarks" });
-  await expect(cluster).toHaveText("Pin or bookmark a page to keep it here.");
+  const favourites = sidebar.getByRole("list", { name: "Favourites" });
+  // With nothing pinned there's only the plus, and it can't pin our own pages.
+  await expect(favourites.getByRole("listitem")).toHaveCount(1);
+  await expect(sidebar.getByText("Bookmark a page to keep it here.")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   await expect(sidebar.getByText("Sam Rivera")).toHaveCount(0);
   await expect(sidebar.getByText("sam@example.com")).toHaveCount(0);
@@ -99,44 +101,45 @@ test("pinning a page keeps it across restarts, and the sidebar has Settings and 
 
   await visit();
   await chrome.getByRole("button", { name: "Pin this page", exact: true }).click();
-  // This server has no icon, so the site shows its first letter.
-  await expect(cluster.getByRole("button", { name: "Saved page" })).toHaveText("S");
+  const pin = favourites.getByRole("button", { name: /^Saved page/ });
+  // A dot says it's open.
+  await expect(pin).toHaveAccessibleName("Saved page, open");
+  await expect(chrome.getByRole("button", { name: "This page is pinned", exact: true })).toBeDisabled();
 
   await app.close();
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
-  const pin = chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "Saved page" });
-  await pin.click();
+  const pinAgain = chrome.getByRole("list", { name: "Favourites" }).getByRole("button", { name: /^Saved page/ });
+  await pinAgain.click();
   await expect.poll(async () => (await active()).url).toBe(url);
   await expect.poll(async () => (await active()).title).toBe("Saved page");
-  await expect(chrome.getByRole("button", { name: "Unpin this page", exact: true })).toHaveAttribute("aria-pressed", "true");
 
-  // Saved both ways it's still one button, and unpinning leaves the bookmark.
+  // Saved both ways it's one tile and no bookmark row, and unpinning leaves the bookmark.
   await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
   await expect(chrome.getByRole("button", { name: "Remove bookmark", exact: true })).toBeVisible();
-  await expect(pin).toHaveCount(1);
+  const bookmark = chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "Saved page" });
+  await expect(pinAgain).toHaveCount(1);
+  await expect(bookmark).toHaveCount(0);
   await app.evaluate(({ Menu }) => {
     Menu.prototype.popup = function () { this.items.find((item) => item.label === "Unpin")?.click(); };
   });
-  await pin.click({ button: "right" });
+  await pinAgain.click({ button: "right" });
   await expect(chrome.getByRole("button", { name: "Pin this page", exact: true })).toBeVisible();
-  await expect(pin).toHaveCount(1);
+  await expect(pinAgain).toHaveCount(0);
+  await expect(bookmark).toHaveCount(1);
   await chrome.getByRole("button", { name: "Remove bookmark", exact: true }).click();
-  await expect(pin).toHaveCount(0);
+  await expect(bookmark).toHaveCount(0);
 
   await menuAction("Pin This Page");
-  await expect(pin).toBeVisible();
-  await chrome.getByRole("button", { name: "Unpin this page", exact: true }).click();
-  await expect(pin).toHaveCount(0);
+  await expect(pinAgain).toBeVisible();
 
   await app.close();
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
-  expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).pinned).toEqual([]);
-  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveText("Pin or bookmark a page to keep it here.");
+  expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).pinned).toHaveLength(1);
 });
 
-test("bookmarked pages show a filled yellow star in both layouts and themes", async () => {
+test("bookmarked pages show a filled star in ink, in both layouts and themes", async () => {
   await visit();
   for (const layoutMode of ["vertical", "horizontal"] as const) {
     for (const appearance of ["light", "dark"] as const) {
@@ -145,13 +148,12 @@ test("bookmarked pages show a filled yellow star in both layouts and themes", as
       await expect(emptyStar.locator("svg")).toHaveCSS("fill", "none");
       await emptyStar.click();
       const savedStar = chrome.getByRole("button", { name: "Remove bookmark", exact: true });
-      const color = appearance === "light" ? "rgb(250, 204, 21)" : "rgb(253, 224, 71)";
+      // Colour belongs to the mascots, so a saved page is marked in `ink`.
+      const color = appearance === "light" ? "rgb(21, 21, 20)" : "rgb(238, 237, 232)";
       await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
       await expect(savedStar.locator("svg")).toHaveCSS("stroke", color);
-      await expect(savedStar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await savedStar.hover();
       await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
-      await expect(savedStar).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await chrome.screenshot({ path: `/tmp/blueberry-star-${layoutMode}-${appearance}.png` });
       await savedStar.click();
       await expect(emptyStar.locator("svg")).toHaveCSS("fill", "none");

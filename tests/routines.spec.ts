@@ -38,7 +38,7 @@ test.afterEach(async () => {
 });
 
 const createRoutine = async (chrome: Page) => {
-  await chrome.getByRole("button", { name: "Routines", exact: true }).click();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
   await chrome.getByRole("button", { name: "New routine" }).click();
   await chrome.getByRole("button", { name: "Save" }).click();
   await expect(chrome.getByRole("alert")).toHaveText("Give the routine a name.");
@@ -78,7 +78,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   await expect(cards.getByText(question)).toBeVisible();
   await expect(chrome.getByText("Needs your OK").first()).toBeVisible();
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), (await tabs()).find((tab) => !tab.page || tab.page === "new-tab")!.id);
-  await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible();
+  await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible();
   await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.map(({ approval }) => approval.text)).toEqual([question]);
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id!), routinesTab?.id);
   expect(requested).toEqual([]);
@@ -117,10 +117,11 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   // Next launch: it wasn't done, and it says what wasn't.
   app = await launchApp(profile, { modelEnv: model.env });
   chrome = await findView(app, "view=chrome");
-  const news = chrome.getByRole("button", { name: /Routines.*Has news/ });
+  // Its row on Chats says there's news, and opens it.
+  await chrome.getByRole("tab", { name: /^Chats/ }).click();
+  const news = chrome.getByRole("tabpanel", { name: "Chats" }).getByRole("button", { name: /Flight watch.*Has news/ });
   await expect(news).toBeVisible();
   await news.click();
-  await chrome.getByRole("button", { name: /Flight watch/ }).click();
   await expect(chrome.getByText("Interrupted").first()).toBeVisible();
   await expect(chrome.getByText(`so it wasn’t done: “${question}”`)).toBeVisible();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(0);

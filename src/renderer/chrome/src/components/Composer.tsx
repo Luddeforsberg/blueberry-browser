@@ -372,7 +372,8 @@ export const Composer: React.FC<{
                 {/* The chosen mascot's limits, and nothing else, for as long as it's chosen. */}
                 <div
                     aria-hidden={!limits}
-                    className={cn('grid transition-[grid-template-rows] duration-panel ease-crisp', limits ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
+                    // Hidden too once it has slid away, so it's out of reach of the keyboard and screen readers.
+                    className={cn('grid transition-[grid-template-rows,visibility] duration-panel ease-crisp', limits ? 'grid-rows-[1fr] visible' : 'grid-rows-[0fr] invisible')}
                 >
                     <div className="min-h-0 overflow-hidden">
                         <p className="min-h-[38px] px-3.5 py-[11px] flex items-start gap-2.5 text-12 text-ink-2">

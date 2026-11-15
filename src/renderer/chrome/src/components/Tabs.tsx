@@ -142,7 +142,8 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
                             onClick={() => !tab.isActive && void switchTab(tab.id)}
                             className={cn(row, "h-[27px] text-12", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink")}
                         >
-                            <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
+                            {/* The group's own row is what moves while the job works. */}
+                            <span className={LEADING_SLOT}><TabIcon tab={tab} still /></span>
                             <span className="flex-1 truncate">{tab.title || 'New tab'}</span>
                         </button>
                     </li>
@@ -211,16 +212,21 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                         {...itemProps(tab.id, index)}
                     />
                 ))}
-                {vertical && jobs.map((chatId) => (
-                    <JobGroup
-                        key={chatId}
-                        chatId={chatId}
-                        chatTab={allTabs.find((tab) => tab.page === 'chat' && tab.pageParam === chatId)}
-                        tabs={allTabs.filter((tab) => tab.jobChatId === chatId)}
-                        onClose={(id) => void closeTab(id)}
-                    />
-                ))}
             </ul>
+            {/* A list of their own, because a job's tabs aren't the user's. */}
+            {vertical && jobs.length > 0 && (
+                <ul aria-label="Running jobs" className="flex flex-col">
+                    {jobs.map((chatId) => (
+                        <JobGroup
+                            key={chatId}
+                            chatId={chatId}
+                            chatTab={allTabs.find((tab) => tab.page === 'chat' && tab.pageParam === chatId)}
+                            tabs={allTabs.filter((tab) => tab.jobChatId === chatId)}
+                            onClose={(id) => void closeTab(id)}
+                        />
+                    ))}
+                </ul>
+            )}
             {showNew && (
                 <button
                     type="button"

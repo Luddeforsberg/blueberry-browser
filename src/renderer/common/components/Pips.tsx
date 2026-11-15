@@ -54,7 +54,7 @@ export const PIP_PATTERNS = Object.keys(MOVING) as PipPattern[];
 export const PIP_MARKS = Object.keys(MARKS) as PipMark[];
 
 // An off dot still shows, faintly, so the grid keeps its shape.
-export const PIP_OFF = 0.16;
+const PIP_OFF = 0.16;
 
 // The frames of a pattern, and how long each shows. Mascot's working face runs on the same ones.
 export const pipFrames = (pattern: PipPattern): { frames: Frame[]; ms: number } => ({ frames: MOVING[pattern], ms: SPEED_MS[pattern] });

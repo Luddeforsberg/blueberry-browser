@@ -19,19 +19,6 @@ const askedAgo = (at: number) => {
     return `${Math.floor(minutes / 60)} h ago`
 }
 
-// The count on the sidebar row. It holds nothing at all when nothing is waiting.
-export const NeedsYouCount: React.FC = () => {
-    const count = useLibrary().needsYou.length
-    if (count === 0) return null
-    return (
-        <span className="flex items-center gap-1.5 text-13 text-ask">
-            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ask" />
-            {count}
-            <span className="sr-only"> waiting for you</span>
-        </span>
-    )
-}
-
 // For when there's no sidebar to say it.
 export const NeedsYouNotice: React.FC = () => {
     const { activeTab } = useBrowser()
@@ -46,23 +33,6 @@ export const NeedsYouNotice: React.FC = () => {
             <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ask" />
             {count === 1 ? '1 thing needs you' : `${count} things need you`}
         </button>
-    )
-}
-
-// On a tab the user has been handed, in any layout, since that's where they'll be when they finish.
-export const HandoffNotice: React.FC = () => {
-    const { activeTab } = useBrowser()
-    const { find } = useFlock()
-    const item = useLibrary().needsYou.find(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
-    const mascot = item ? find(item.mascotId) : undefined
-    const name = useAssistantName(mascot)
-    if (!item) return null
-    return (
-        <div className="h-8 shrink min-w-0 flex items-center gap-2 pl-2 text-13 app-region-no-drag">
-            <Berry mood="asking" size={24} mascot={mascot} className="shrink-0" />
-            <span className="truncate">{name} can’t see this tab</span>
-            <Button size="xs" className="px-3" onClick={() => void window.chromeAPI.chat.decide(item.id, item.approval.id, true)}>I’m done</Button>
-        </div>
     )
 }
 

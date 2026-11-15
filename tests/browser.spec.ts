@@ -923,6 +923,7 @@ test("chats are still there after a restart", async () => {
 
   app = await launchApp(profile, { modelEnv: model.env });
   chrome = await findView(app, "view=chrome");
+  await showChats();
   await chatInSidebar("Remember this").click();
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
 });
@@ -938,9 +939,10 @@ test("a missing API key says what to do", async () => {
   await expect(chrome.getByRole("alert")).toContainText("Berry needs an AI key to answer.");
 });
 
-// A row's name starts with the chat's title, and a chat that isn't open adds its age.
+// Chats are on the sidebar's Chats face. A row's name starts with the chat's title.
 const chatInSidebar = (title: string) =>
-  chrome.getByRole("region", { name: "Chats" }).getByRole("button", { name: new RegExp(`^${title}`) });
+  chrome.getByRole("tabpanel", { name: "Chats" }).getByRole("button", { name: new RegExp(`^${title}`) });
+const showChats = () => chrome.getByRole("tab", { name: /^Chats/ }).click();
 
 const startChat = async (text: string) => {
   const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
@@ -970,6 +972,7 @@ const clickMenuItem = (label: string) =>
 test("a chat is named once it has a topic, and keeps its first message until then", async () => {
   await startChat("hey");
   await expect.poll(() => model.titleRequests.length).toBe(1);
+  await showChats();
   await expect(chatInSidebar("hey")).toBeVisible();
 
   model.titleWith("Weekend in Porto");
@@ -1004,6 +1007,7 @@ for (const change of ["renamed", "generated"] as const) {
       model.titleWith(title);
       await chrome.evaluate((id) => window.chromeAPI.chat.send(id, "Plan a weekend in Porto", { seePage: false }), chat.id);
     }
+    await showChats();
     await expect(chatInSidebar(title)).toBeVisible();
     await app.evaluate(({ Menu }) => {
       const items = Menu.getApplicationMenu()!.items.flatMap((item) => item.submenu?.items ?? []);
@@ -1020,6 +1024,7 @@ test("a chat can be renamed from its menu, and is never renamed for you after th
   await startChat("hey");
   await expect.poll(() => model.titleRequests.length).toBe(1);
   await captureMenus();
+  await showChats();
 
   const options = chrome.getByRole("button", { name: "More options for hey" });
   await expect(options).toHaveCSS("opacity", "0");
@@ -1059,6 +1064,7 @@ test("deleting a chat asks first, then removes it and its tab", async () => {
   });
   const options = chrome.getByRole("button", { name: "More options for Delete me" });
 
+  await showChats();
   await chatInSidebar("Delete me").hover();
   await options.click();
   await clickMenuItem("Delete…");
@@ -1088,6 +1094,7 @@ test("deleting the panel's chat starts it fresh", async () => {
     dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
   });
 
+  await showChats();
   await chatInSidebar("Delete me").hover();
   await chrome.getByRole("button", { name: "More options for Delete me" }).click();
   await clickMenuItem("Delete…");
@@ -1193,19 +1200,20 @@ test("the page card follows the sidebar and chat as they open and close", async 
   const size = () => page.evaluate(() => [window.innerWidth, window.innerHeight]);
 
   // Sidebar open and chat closed, which is how the app starts.
-  await expect.poll(size).toEqual([width - 280 - 8, height - 56]);
+  await expect.poll(size).toEqual([width - 248 - 8, height - 56]);
 
+  // The chat panel is a second sheet, with the gutter on both sides of it.
   await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
-  await expect.poll(size).toEqual([width - 280 - 400, height - 56]);
+  await expect.poll(size).toEqual([width - 248 - 8 - 348 - 8, height - 56]);
 
   await chrome.evaluate(() => window.chromeAPI.layout.toggleSidebar());
-  await expect.poll(size).toEqual([width - 8 - 400, height - 56]);
+  await expect.poll(size).toEqual([width - 8 - 8 - 348 - 8, height - 56]);
 
   // A tab opened now gets the same space as the others.
   const second = await openFixture("/second");
   await expect
     .poll(() => second.evaluate(() => window.innerWidth))
-    .toBe(width - 8 - 400);
+    .toBe(width - 8 - 8 - 348 - 8);
 });
 
 test("the chrome fills the window as it resizes", async () => {
@@ -1256,7 +1264,7 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect
     .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
-    .toEqual([width - 16, height - 40 - 76 - 8]);
+    .toEqual([width - 16, height - 40 - 84 - 8]);
   expect(
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
   ).toBe(true);
@@ -1353,7 +1361,7 @@ test("the sidebar and chat resize within their limits, by pointer or keyboard", 
     "aria-valuenow",
     "400"
   );
-  await expect.poll(pageWidth).toBe(width - 250 - 400);
+  await expect.poll(pageWidth).toBe(width - 250 - 8 - 400 - 8);
 });
 
 test("the collapsed sidebar floats over the page when the pointer reaches the left edge", async () => {
@@ -1384,7 +1392,7 @@ test("the collapsed sidebar floats over the page when the pointer reaches the le
 test("the app starts on the new tab page, and typing an address opens it in that tab", async () => {
   const [first] = await getTabs();
   expect(first).toMatchObject({ page: "new-tab", isActive: true });
-  await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
+  await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
 
   const input = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Berry" });
   await input.fill(`${origin}/typed`);
@@ -1393,15 +1401,6 @@ test("the app starts on the new tab page, and typing an address opens it in that
   await expect.poll(async () => (await activeTab()).url).toBe(`${origin}/typed`);
   expect((await activeTab()).id).toBe(first.id);
   expect((await activeTab()).page).toBeNull();
-});
-
-test("recent on the new tab page lists pages really visited", async () => {
-  await openFixture("/visited");
-  await expect.poll(async () => (await activeTab()).title).toBe("Fixture");
-
-  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-  const recent = chrome.getByRole("region", { name: "Recent" });
-  await expect(recent.getByRole("button", { name: /Fixture/ })).toBeVisible();
 });
 
 test("asking Berry from the new tab page opens a chat that the sidebar lists", async () => {
@@ -1414,37 +1413,35 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
   await expect(chrome.getByText("Plan a trip to Porto").first()).toBeVisible();
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
 
-  await expect(chatInSidebar("Plan a trip to Porto")).toHaveAttribute("aria-current", "page");
-  // The chat is its row under Chats and nothing under Tabs, so it's listed and highlighted once.
+  // An open chat is a tab like any page, and the current one, under Tabs.
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  await expect(sidebar.getByRole("list", { name: "Tabs", exact: true }).getByText("Plan a trip to Porto")).toHaveCount(0);
+  const tab = sidebar.getByRole("list", { name: "Tabs", exact: true }).getByRole("button", { name: "Plan a trip to Porto", exact: true });
+  await expect(tab).toHaveAttribute("aria-current", "page");
   await expect(sidebar.locator("[aria-current=page]")).toHaveCount(1);
 
-  // Collapsed, Chats still shows the open one, since nothing else does.
-  const chats = chrome.getByRole("button", { name: "Chats", exact: true });
-  await chats.click();
-  await expect(chats).toHaveAttribute("aria-expanded", "false");
+  // On Chats it's under Earlier, and highlighted there too while it's open.
+  await showChats();
   await expect(chatInSidebar("Plan a trip to Porto")).toHaveAttribute("aria-current", "page");
-  await chats.click();
 
-  // Its row closes the tab, as closing a tab does, and keeps the chat. Another tab is open, since closing the last
-  // one closes the window.
+  // Closing its tab keeps the chat. Another tab is open, since closing the last one closes the window.
+  await chrome.getByRole("tab", { name: "Tabs" }).click();
   await chrome.evaluate(() => window.chromeAPI.browser.createTab());
-  await chatInSidebar("Plan a trip to Porto").hover();
+  await tab.hover();
   await chrome.getByRole("button", { name: "Close Plan a trip to Porto" }).click();
   await expect.poll(async () => (await getTabs()).some((tab) => tab.page === "chat")).toBe(false);
+  await showChats();
   await expect(chatInSidebar("Plan a trip to Porto")).toBeVisible();
-  await expect(chrome.getByRole("button", { name: "Close Plan a trip to Porto" })).toHaveCount(0);
+  await expect(chatInSidebar("Plan a trip to Porto")).not.toHaveAttribute("aria-current", "page");
 });
 
 test("the sidebar opens Routines and Settings as tabs, once each", async () => {
-  const places = chrome.getByRole("list", { name: "Places" });
-
-  await places.getByRole("button", { name: "Routines" }).click();
+  // Routines from the arrow on Chats, which is there with nothing scheduled too, and Settings from the dock.
+  await showChats();
+  await chrome.getByRole("button", { name: "Open Routines" }).click();
   await expect(chrome.getByRole("heading", { name: "Routines", level: 1 })).toBeVisible();
 
-  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: /^Settings/ }).click();
-  await places.getByRole("button", { name: "Routines" }).click();
+  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Settings", exact: true }).last().click();
+  await chrome.getByRole("button", { name: "Open Routines" }).click();
 
   const pages = (await getTabs()).map((tab) => tab.page).filter(Boolean);
   expect(pages.filter((page) => page === "routines")).toHaveLength(1);
@@ -1499,7 +1496,7 @@ test("first launch shows onboarding until it's finished or skipped", async () =>
   await chrome.getByRole("radio", { name: "Tabs along the top" }).click();
   await chrome.getByRole("button", { name: "Skip setup" }).click();
 
-  await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
+  await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
   expect(await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).toMatchObject({
     onboarded: true,
     layoutMode: "horizontal",
@@ -1508,7 +1505,7 @@ test("first launch shows onboarding until it's finished or skipped", async () =>
   await app.close();
   app = await launchApp(profile, { firstLaunch: true });
   chrome = await findView(app, "view=chrome");
-  await expect(chrome.getByRole("heading", { name: "Where shall we start today?" })).toBeVisible();
+  await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
 });
 
 test("the new tab composer sends only when there is text, and asks Berry unless it's an address", async () => {
@@ -1557,11 +1554,11 @@ test("the new tab page has no chat panel, and it comes back on the next page", a
 
 test("settings sits at the bottom of the sidebar", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  // Last, because the Settings tab has the same name once it's open.
+  // In the dock, last, because the Settings tab has the same name once it's open.
   const row = sidebar.getByRole("button", { name: "Settings", exact: true }).last();
 
   const [rowBox, sidebarBox] = await Promise.all([row.boundingBox(), sidebar.boundingBox()]);
-  expect(rowBox!.y + rowBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 16);
+  expect(rowBox!.y + rowBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 24);
 
   await row.click();
   expect((await activeTab()).page).toBe("settings");
@@ -1722,12 +1719,6 @@ test("the floating sidebar slides in, and slides out before hiding", async () =>
   await expect.poll(slideRuns).toBeGreaterThan(before);
 });
 
-test("the sidebar's search button focuses the address bar", async () => {
-  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Search" }).click();
-
-  await expect(chrome.getByRole("textbox", { name: "Address" })).toBeFocused();
-});
-
 test("a card on the composer shows the page Berry can see, and removing it takes the page away", async () => {
   await openFixture();
   await openChat();
@@ -1755,46 +1746,6 @@ test("Hide Berry swaps the character for a plain icon and neutral words", async 
   await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask a question" })).toBeVisible();
 });
 
-test("Berry stands on the new tab composer, inside it, then sits on the active tab", async () => {
-  const seatGap = (selector: string) =>
-    chrome.evaluate((selector) => {
-      const berry = document.querySelector("[data-berry-companion]")!.getBoundingClientRect();
-      const perch = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-      const seat = berry.top + berry.height * (46 / 64);
-      return { y: Math.abs(seat - perch.bottom), inside: berry.left >= perch.left && berry.right <= perch.right };
-    }, selector);
-  const sitting = chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
-
-  // It's a child of the composer's wrapper, so scrolling can't separate them, with its feet on the top edge.
-  const standing = chrome.locator("[data-berry-home] [data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
-  await expect(standing).toBeVisible();
-  const feetGap = await chrome.evaluate(() => {
-    const bird = document.querySelector("[data-berry-perched]")!.getBoundingClientRect();
-    return Math.abs(bird.top + bird.height * (113 / 120) - document.querySelector("[data-berry-home]")!.getBoundingClientRect().top);
-  });
-  expect(feetGap).toBeLessThan(1);
-
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-  await expect(sitting).toBeVisible();
-  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).y).toBeLessThan(3);
-  await expect.poll(async () => (await seatGap("[data-berry-tab]:has([aria-current=page])")).inside).toBe(true);
-  await expect(sitting).toBeVisible();
-});
-
-test("the new tab page paints the art blueberry, and web pages don't carry it", async () => {
-  const painted = () =>
-    chrome.evaluate(() => {
-      const canvas = document.querySelector<HTMLCanvasElement>("[data-berry-art]")!;
-      const { data } = canvas.getContext("2d")!.getImageData(canvas.width / 2, canvas.height / 2, 1, 1);
-      return data[3];
-    });
-  await expect(chrome.locator("[data-berry-art]")).toHaveCount(1);
-  await expect.poll(painted).toBe(255);
-
-  await openFixture();
-  await expect(chrome.locator("[data-berry-art]")).toHaveCount(0);
-});
-
 test("bookmarks are in the sidebar when vertical and under the address bar when horizontal", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
   await expect(sidebar.getByRole("list", { name: "Bookmarks" })).toBeVisible();
@@ -1805,64 +1756,17 @@ test("bookmarks are in the sidebar when vertical and under the address bar when 
   await expect(chrome.getByRole("list", { name: "Bookmarks" })).toBeVisible();
 });
 
-test("the page's card rings while Berry reads it, and not once the page is taken away", async () => {
-  let release = model.holdAfterFirstToken();
-  const ring = chrome.locator("[data-berry-reading]");
-
-  await openFixture();
-  await openChat();
-  const panel = chrome.getByRole("complementary", { name: "Berry" });
-  await expect(ring).toHaveCount(0);
-
-  await askInPanel("What's on this page?");
-  await expect(ring).toHaveCount(1);
-  release();
-  await expect(ring).toHaveCount(0);
-
-  await panel.getByRole("group", { name: "Berry can see 127.0.0.1" }).hover();
-  await panel.getByRole("button", { name: "Remove this page" }).click();
-  release = model.holdAfterFirstToken();
-  await askInPanel("And in general?");
-  await expect(panel.getByRole("button", { name: "Stop" })).toBeVisible();
-  await expect(ring).toHaveCount(0);
-  release();
-});
-
-test("right-clicking Berry opens its menu on the composer and active tab", async () => {
+test("right-clicking Berry beside the greeting opens its menu", async () => {
   // Capture the native menu without opening a popup outside Playwright's renderer.
   await app.evaluate(({ Menu }) => {
     Menu.prototype.popup = function () { Menu.setApplicationMenu(this); };
   });
-  for (const page of ["new-tab", "settings"] as const) {
-    if (page === "settings") await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-    const bird = page === "new-tab"
-      ? chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" })
-      : chrome.locator("[data-berry-companion]").getByRole("img", { name: "Berry, sitting" });
-    await expect(bird).toBeVisible();
-    await app.evaluate(({ Menu }) => Menu.setApplicationMenu(null));
-    await bird.click({ button: "right", timeout: 2000 });
-    await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label)))
-      .toEqual(["Keep Berry Still", "Hide Berry"]);
-  }
-});
-
-test("birds walk behind the new tab page unless Berry is kept still", async () => {
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
-
-  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: true }));
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(0);
-  await expect(chrome.locator("#berry-backdrop path").first()).toBeAttached();
-
-  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ keepBerryStill: false }));
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
-});
-
-test("reduced motion stops background birds immediately", async () => {
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
-  await chrome.emulateMedia({ reducedMotion: "reduce" });
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(0);
-  await chrome.emulateMedia({ reducedMotion: "no-preference" });
-  await expect(chrome.locator("[data-berry-walkers]")).toHaveCount(1);
+  const bird = chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
+  await expect(bird).toBeVisible();
+  await app.evaluate(({ Menu }) => Menu.setApplicationMenu(null));
+  await bird.click({ button: "right", timeout: 2000 });
+  await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label)))
+    .toEqual(["Keep Berry Still", "Hide Berry"]);
 });
 
 test("the component gallery shows Berry in every mood", async () => {

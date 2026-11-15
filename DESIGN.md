@@ -7,7 +7,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 **Where this stands**
 
 - **It replaces Bloom.** The old document is at [docs/design/DESIGN-bloom.md](./docs/design/DESIGN-bloom.md), kept only for how screens that aren't redrawn yet behave. Nothing in it binds this one.
-- **The app still wears Bloom.** Nothing here is built. This document lands with the first build (tokens, type, the mascot and the pips), not before it, so nobody is sent to tokens that don't exist.
+- **The first build is in.** Tokens, type, the mascots, the pips, the window (sidebar, dock, toolbar and address field) and the new tab wear Pips. The main chat, the chat panel, replies and approvals, the working view and the mascot on web pages still wear Bloom's layout in Pips colours, until they're built.
 - **The mocks** are in [docs/design/mocks](./docs/design/mocks), and each section below names its own. Where a mock and this document disagree, this document is right.
 - **Some of it is new.** Where the better design needed something the app doesn't do yet, it's drawn anyway and listed in section 12, to be built.
 - **Not everything is drawn.** Section 11 lists what isn't.

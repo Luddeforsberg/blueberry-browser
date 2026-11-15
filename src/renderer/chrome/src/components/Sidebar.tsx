@@ -12,11 +12,12 @@ import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
 import { setRoutinesView } from '../routinesView'
+import { BERRY_ID } from '@shared/mascots'
 
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-export const ROW = cn('w-full h-[30px] px-2 flex items-center gap-[9px] rounded-row text-13 text-ink-2 text-left transition-colors app-region-no-drag', FOCUS)
+const ROW = cn('w-full h-[30px] px-2 flex items-center gap-[9px] rounded-row text-13 text-ink-2 text-left transition-colors app-region-no-drag', FOCUS)
 // A row's own slot for its icon or face, so titles line up whatever starts the row.
 const LEAD = 'size-5 shrink-0 flex items-center justify-center'
 const ICON = 'size-4 shrink-0'
@@ -127,9 +128,11 @@ const Bookmarks: React.FC = () => {
                 bookmarks
             </Label>
             {open && (shown.length === 0 ? (
-                <p className="h-[27px] px-2 flex items-center text-12 text-faint">Bookmark a page to keep it here.</p>
+                <ul aria-label="Bookmarks">
+                    <li className="h-[27px] px-2 flex items-center text-12 text-faint">Bookmark a page to keep it here.</li>
+                </ul>
             ) : (
-                <ul>
+                <ul aria-label="Bookmarks">
                     {shown.map((site) => (
                         <li key={site.id}>
                             <button
@@ -170,7 +173,7 @@ const TabsFace: React.FC = () => {
                 >
                     tabs
                 </Label>
-                <Tabs mode="vertical" labelledBy="sidebar-tabs" showNew={false} />
+                <Tabs mode="vertical" label="Tabs" showNew={false} />
             </section>
         </>
     )
@@ -248,11 +251,12 @@ export const ChatRow: React.FC<{
                 onClick={onOpen}
                 className={cn(ROW, 'pr-8', selected ? 'bg-sheet text-ink shadow-rim' : 'hover:bg-hover hover:text-ink', chat.running && 'text-ink')}
             >
-                <span className={LEAD}>
+                {/* The row is named by its chat, so the face is left out of it and the mascot comes after. */}
+                <span aria-hidden className={LEAD}>
                     <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} />
                 </span>
                 <span className="flex-1 truncate">{chat.title}</span>
-                {chat.running && <span className="sr-only">, {name} is working</span>}
+                <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}</span>
                 {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.5} />}
                 {trailing && (
                     <span className="-mr-6 shrink-0 font-mono text-11 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
@@ -290,7 +294,6 @@ const ChatsFace: React.FC = () => {
     const routines = [...library.routines]
         .sort((a, b) => (a.paused ? Infinity : (a.nextRunAt ?? Infinity)) - (b.paused ? Infinity : (b.nextRunAt ?? Infinity)))
         .slice(0, 3)
-    const nothing = library.needsYou.length + library.chats.length + library.routines.length === 0
 
     return (
         <>
@@ -346,41 +349,46 @@ const ChatsFace: React.FC = () => {
                 </section>
             )}
 
-            {routines.length > 0 && (
-                <section aria-labelledby="sidebar-routines">
-                    <Label
-                        id="sidebar-routines"
-                        className={library.needsYou.length + working.length === 0 ? 'mt-0' : undefined}
-                        trailing={
-                            <LabelButton label="Open Routines" onClick={() => void browser.openPage('routines')}>
-                                <ChevronRight className="size-[13px]" strokeWidth={1.5} />
-                            </LabelButton>
-                        }
-                    >
-                        routines
-                    </Label>
-                    <ul>
-                        {routines.map((routine) => (
-                            <li key={routine.id}>
-                                <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover hover:text-ink')}>
-                                    <span className={LEAD}>
-                                        <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
-                                    </span>
-                                    <span className="flex-1 truncate">{routine.name}</span>
+            {/* Always here, with nothing scheduled too, because its arrow is the sidebar's way to Routines. */}
+            <section aria-labelledby="sidebar-routines">
+                <Label
+                    id="sidebar-routines"
+                    className={library.needsYou.length + working.length === 0 ? 'mt-0' : undefined}
+                    trailing={
+                        <LabelButton label="Open Routines" onClick={() => void browser.openPage('routines')}>
+                            <ChevronRight className="size-[13px]" strokeWidth={1.5} />
+                        </LabelButton>
+                    }
+                >
+                    routines
+                </Label>
+                <ul>
+                    {routines.map((routine) => (
+                        <li key={routine.id}>
+                            <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover hover:text-ink')}>
+                                <span className={LEAD}>
+                                    <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
+                                </span>
+                                <span className="flex-1 truncate">{routine.name}</span>
+                                {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
+                                {routine.unseen ? (
+                                    <span className="shrink-0 font-mono text-11 text-ink">news<span className="sr-only">. Has news</span></span>
+                                ) : (
                                     <span className="shrink-0 font-mono text-11 text-ink-3 tabular-nums">
                                         {routine.paused ? 'paused' : routine.nextRunAt ? shortWhen(routine.nextRunAt) : ''}
                                     </span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
+                                )}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+                {routines.length === 0 && <p className="h-[30px] px-2 flex items-center text-12 text-faint">Nothing scheduled yet.</p>}
+            </section>
 
             {earlier.length > 0 && (
                 <section aria-labelledby="sidebar-earlier">
-                    {library.needsYou.length + working.length + routines.length > 0 && <Rule />}
-                    <Label id="sidebar-earlier" className={library.needsYou.length + working.length + routines.length === 0 ? 'mt-0' : undefined}>earlier</Label>
+                    <Rule />
+                    <Label id="sidebar-earlier">earlier</Label>
                     <ul>
                         {(allEarlier ? earlier : earlier.slice(0, EARLIER_SHOWN)).map((chat) => (
                             <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={shortWhen(chat.updatedAt)} />
@@ -395,7 +403,6 @@ const ChatsFace: React.FC = () => {
                 </section>
             )}
 
-            {nothing && <p className="px-2 text-12 text-faint">What your mascots are doing, did and will do shows here.</p>}
         </>
     )
 }
@@ -406,7 +413,7 @@ const ChatsFace: React.FC = () => {
 const useMascotState = () => {
     const library = useLibrary()
     return (mascot: MascotProfile) => {
-        const ownChats = library.chats.filter((chat) => (chat.mascotId ?? 'berry') === mascot.id)
+        const ownChats = library.chats.filter((chat) => (chat.mascotId ?? BERRY_ID) === mascot.id)
         const asking = library.needsYou.filter((item) => item.mascotId === mascot.id)
         const running = ownChats.filter((chat) => chat.running && !asking.some((item) => item.id === chat.id))
         const mood = asking.length > 0 ? 'asking' : running.length > 0 ? 'fetching' : 'rest'
@@ -440,7 +447,8 @@ const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ 
             className="absolute inset-x-0 bottom-[54px] z-20 p-3 rounded-sheet bg-sheet text-ink shadow-lift animate-[fade-in_150ms_cubic-bezier(.2,.8,.2,1)] app-region-no-drag"
         >
             <div className="flex items-center gap-2.5">
-                <Berry mood={mood} size={36} mascot={mascot} />
+                {/* Still, as only the working mascot's own row moves in the sidebar. */}
+                <Berry mood={mood} size={36} mascot={mascot} still />
                 <span className="min-w-0">
                     <span className="block font-medium truncate">{name}</span>
                     <span className="block font-mono text-11 text-ink-3 truncate">{limitsInBrief(mascot)}</span>
@@ -451,7 +459,7 @@ const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ 
                 {asking.map((item) => (
                     <li key={item.id}>
                         <button type="button" onClick={() => (item.routineId ? openRoutine({ id: item.routineId }) : openChat({ id: item.id, title: item.job }))} className={cn(line, 'text-ink hover:bg-hover', FOCUS)}>
-                            <Pips pattern="waiting" className="text-ask" />
+                            <Pips pattern="waiting" className="text-ask" still />
                             <span className="flex-1 truncate">Needs you on {item.job}</span>
                         </button>
                     </li>
@@ -459,7 +467,7 @@ const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ 
                 {running.map((chat) => (
                     <li key={chat.id}>
                         <button type="button" onClick={() => openChat(chat)} className={cn(line, 'text-ink hover:bg-hover', FOCUS)}>
-                            <Pips pattern="think" />
+                            <Pips pattern="think" still />
                             <span className="flex-1 truncate">{chat.title}</span>
                             <span className="font-mono text-11 text-ink-3 tabular-nums">{shortAge(chat.updatedAt)}</span>
                         </button>
@@ -528,7 +536,7 @@ const Dock: React.FC = () => {
         <div ref={dock} className="relative shrink-0 mx-0.5">
             {shown && <MascotCard key={shown.id} mascot={shown} onClose={closeCard} />}
             <div className="h-[46px] px-[9px] flex items-center gap-[7px] rounded-tile bg-tray">
-                <ul aria-label="Your mascots" className="flex-1 min-w-0 flex items-center gap-[7px] overflow-x-auto [&::-webkit-scrollbar]:hidden">
+                <ul aria-label="Your mascots" className="flex-1 min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-x-auto [&::-webkit-scrollbar]:hidden">
                     {flock.map((mascot) => (
                         <li key={mascot.id} className="shrink-0">
                             <DockMascot mascot={mascot} mood={stateOf(mascot).mood} open={open === mascot.id} onPress={() => setOpen(open === mascot.id ? null : mascot.id)} />
@@ -587,7 +595,7 @@ const FaceSwitch: React.FC<{ face: Face; onChange: (face: Face) => void }> = ({ 
                     {each === 'chats' && waiting > 0 && (
                         <>
                             <span aria-hidden className="size-1.5 rounded-full bg-ask" />
-                            <span className="sr-only">, {waiting} need you</span>
+                            <span className="sr-only">, {waiting} {waiting === 1 ? 'needs' : 'need'} you</span>
                         </>
                     )}
                 </button>

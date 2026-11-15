@@ -58,7 +58,7 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   await chrome.getByRole("button", { name: "New mascot" }).click();
   await chrome.getByRole("button", { name: "Add mascot" }).click();
   await expect(chrome.getByRole("alert")).toHaveText("Give it a name.");
-  await chrome.getByRole("button", { name: "Kingfisher" }).click();
+  await chrome.getByRole("button", { name: "Blueberry" }).click();
   await chrome.getByRole("button", { name: "Crown" }).click();
   await chrome.getByLabel("Name").fill("Scout");
   await chrome.getByLabel("What it’s for").fill("Always answer like a sea captain.");

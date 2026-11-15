@@ -10,6 +10,7 @@ import { toUrl } from '@common/lib/url'
 import { useAssistantName } from './Berry'
 import { TabIcon } from './TabIcon'
 import { setRoutinesView } from '../routinesView'
+import { BERRY_ID } from '@shared/mascots'
 
 // DESIGN.md section 10, Toolbar and the address field. The field is also where a mascot's status is, for the tab in
 // front: at rest, a mascot working here, waiting for you, your turn, and the address being edited.
@@ -75,7 +76,7 @@ const useJobHere = (tab: TabInfo | null) => {
     const { find } = useFlock()
     const working = !!tab?.berryWorking
     // A job's own tab names its chat. On one of the user's tabs, it's the one running chat of that mascot, if there's one.
-    const running = chats.filter((chat) => chat.running && (chat.mascotId ?? 'berry') === (tab?.workingMascotId ?? 'berry'))
+    const running = chats.filter((chat) => chat.running && (chat.mascotId ?? BERRY_ID) === (tab?.workingMascotId ?? BERRY_ID))
     const chatId = tab?.jobChatId ?? (working && running.length === 1 ? running[0].id : null)
     const asking = needsYou.find((item) => !item.approval.handoff && (item.id === chatId || (item.tabId !== null && item.tabId === tab?.id))) ?? null
     const turn = needsYou.find((item) => !!tab && item.approval.handoff?.tabId === tab.id) ?? null

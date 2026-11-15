@@ -238,6 +238,10 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         else void browser.navigateTab(tab.id, toUrl(message))
     }
 
+    // Out on the desktop, so there's an empty place here rather than a second one.
+    const [away, setAway] = useState(false)
+    useEffect(() => window.chromeAPI.desktop.onAway(setAway), [])
+
     const name = useAssistantName(shown)
     const asking = new Set(library.needsYou.map(({ id }) => id))
     const since = useSinceYouLeft(asking)
@@ -253,7 +257,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <div className="min-h-full flex flex-col items-center px-6 pt-[clamp(48px,calc(100vh-640px),138px)] pb-12">
                     {/* A mark, not a control. Blueberry on the desktop flies out from here. */}
                     <h1 className="mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
-                        <span data-berry-perched className="-mt-1.5 flex">
+                        <span data-berry-perched className="-mt-1.5 flex" style={away ? { opacity: 0 } : undefined}>
                             <span key={face.arrival} className={cn('flex origin-[50%_70%]', face.arrival > 0 && (still ? 'animate-[mascot-fade_150ms_ease-out]' : 'animate-mascot-pop'))}>
                                 <Berry size={40} mascot={shown} mood={face.mood} shut={face.shut} />
                             </span>

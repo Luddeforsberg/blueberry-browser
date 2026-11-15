@@ -52,7 +52,7 @@ test("a bird does a job in a cloud tab, asking before it clicks, and the user ca
     expect(sent).not.toBeNull();
 
     // The same approval as anywhere, in Needs you and on the chat.
-    await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible({ timeout: 20_000 });
+    await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible({ timeout: 20_000 });
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("chat", { param: id }), sent!.id);
     const card = chrome.getByRole("region", { name: "Approval needed" });
     await expect(card.locator("p").getByText(`Click the button “Place order” on ${shop}`)).toBeVisible();
@@ -144,7 +144,7 @@ test("with no key the cloud is off, and a saved key never comes back to the page
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
-    await expect(chrome.getByRole("button", { name: "More options" })).toHaveCount(0);
+    await expect(chrome.getByRole("radiogroup", { name: "Where it runs" })).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
     await expect(chrome.getByText("Off. Add a Browserbase key to turn it on.")).toBeVisible();
     await expect(chrome.getByRole("button", { name: "End cloud session" })).toHaveCount(0);
@@ -158,8 +158,7 @@ test("with no key the cloud is off, and a saved key never comes back to the page
     expect(state).not.toContain("bb_live_not_a_real_key");
     expect(state).not.toContain("project-not-real");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("new-tab"));
-    await chrome.getByRole("button", { name: "More options" }).click();
-    await expect(chrome.getByRole("menuitemcheckbox", { name: "Do this in the cloud" })).toBeVisible();
+    await expect(chrome.getByRole("radio", { name: "Cloud" })).toBeVisible();
 
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Cloud" }));
     await chrome.getByRole("button", { name: "Forget key" }).click();

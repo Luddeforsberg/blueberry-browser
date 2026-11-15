@@ -27,7 +27,7 @@ test("an approval answered from Needs you lets the job carry on", async () => {
   const app = await launchApp(undefined, { modelEnv: model.env });
   try {
     const chrome = await findView(app, "view=chrome");
-    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
     await expect(chrome.getByText("Nothing needs you right now.")).toBeVisible();
 
     const address = `${site.origin}/orders?from=inbox`;
@@ -39,7 +39,7 @@ test("an approval answered from Needs you lets the job carry on", async () => {
     // The row names the site, and the exact address is right there before Allow.
     await expect(row.getByRole("heading")).toHaveText("Open 127.0.0.1 in a new tab");
     await expect(row.getByText(`Open ${address} in a new tab`)).toBeAttached();
-    await expect(chrome.getByRole("button", { name: /Needs you.*1 waiting/ })).toBeVisible();
+    await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible();
     await row.getByRole("button", { name: "Allow", exact: true }).click();
 
     await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content).toBe("All done");
@@ -64,7 +64,7 @@ test("a sign-in goes to the user, nothing typed reaches the model, and I'm done 
     model.callTools({ name: "open_tab", args: { url: address } });
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     const sent = await chrome.evaluate((origin) => window.chromeAPI.chat.send(null, `Check my orders on ${origin}`, { seePage: false }), site.origin);
-    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
 
     const row = chrome.getByRole("listitem", { name: "Berry is asking" });
     await expect(row.getByRole("heading")).toHaveText("Berry needs you to sign in on 127.0.0.1");
@@ -145,7 +145,7 @@ test("from the phone: pair, press Allow, and a code goes in the page without eve
     const known = telegram.sent.length;
     telegram.strangerSends("Hello");
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ phoneAlways: true }));
-    await chrome.getByRole("button", { name: "Needs you" }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("needs-you"));
     await expect(chrome.getByText("Replies from your phone are on")).toBeVisible();
     expect(telegram.sent.length).toBe(known);
 
