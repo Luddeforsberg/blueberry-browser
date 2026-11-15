@@ -21,7 +21,11 @@ export interface ChatStep {
   // What the chat shows in its place, naming what the user allowed, such as a button. It has page text in it, so it's
   // only ever drawn here: history, the cloud and other apps get `text`.
   shown?: string;
+  // What kind of thing it did, which picks its pips (DESIGN.md section 6). Only for the screen: with none, it's plain.
+  kind?: StepKind;
 }
+
+export type StepKind = "open" | "read" | "scan" | "search" | "click" | "type" | "ask" | "wait";
 
 // An action waiting for the user to allow it.
 export interface ChatApproval {

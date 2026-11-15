@@ -5,7 +5,7 @@ import * as dotenv from "dotenv";
 import { join } from "path";
 import type { PageTool } from "./browserTools";
 import type { ActionApproval } from "../shared/ipc";
-import type { ChatThreadMessage } from "../shared/library";
+import type { ChatThreadMessage, StepKind } from "../shared/library";
 
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
@@ -26,8 +26,8 @@ export interface ReplyOptions {
   // Resolves with the user's answer, and rejects if the reply is stopped first.
   approve: (description: string) => Promise<boolean>;
   // Called as each tool starts, with what the chat should show. The result is called when it ends. `shown` is set for a
-  // call the user allowed, naming what they allowed, and is only for the screen.
-  onStep: (text: string, shown?: string) => () => void;
+  // call the user allowed, naming what they allowed, and is only for the screen, as `kind` is.
+  onStep: (text: string, shown?: string, kind?: StepKind) => () => void;
   // Told the tokens each model call used, as they're reported.
   onUsage?: (tokens: number) => void;
   // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
@@ -291,7 +291,7 @@ export async function* streamReply(
       humanInTheLoopMiddleware({ interruptOn, interruptMode: "per_call" }),
     ],
     tools: tools.map((pageTool) => {
-      const { name, description, schema, label, run, describe, returnsImage } = pageTool;
+      const { name, description, schema, label, run, describe, returnsImage, kind } = pageTool;
       return tool(
         async (args: unknown, config: { toolCall?: { id?: string } }) => {
           const refused = await refusedOutright(pageTool, args);
@@ -304,7 +304,7 @@ export async function* streamReply(
           if (describe && allowedAs !== undefined && (await describe(args)) !== allowedAs) return CHANGED;
           if (describe && allowedAs === undefined && (await needsAsking(pageTool, args))) return CHANGED;
           const shown = (allowedAs !== undefined && pageTool.allowedLabel?.(args)) || pageTool.shownLabel?.(args) || undefined;
-          const finish = onStep(label(args), shown);
+          const finish = onStep(label(args), shown, kind);
           try {
             const result = await run(args);
             // A failure is words. The image goes with a reminder, because it can have instructions drawn in it too.

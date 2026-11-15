@@ -18,7 +18,7 @@ import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { CdpTab } from "./CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, UsedPage, WorkTabState } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, StepKind, UsedPage, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
@@ -1040,7 +1040,7 @@ export class Chats {
       tools,
       actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
       approve: (text) => this.askToAllow(id, run, text),
-      onStep: (text, shown) => this.startStep(id, run, text, shown),
+      onStep: (text, shown, kind) => this.startStep(id, run, text, shown, kind),
       onUsage,
       mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
       userPresent: run.userPresent,
@@ -1155,8 +1155,8 @@ export class Chats {
     if (thread) this.events.onThread(thread);
   }
 
-  private startStep(chatId: string, run: Run, text: string, shown?: string): () => void {
-    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}) };
+  private startStep(chatId: string, run: Run, text: string, shown?: string, kind?: StepKind): () => void {
+    const step: ChatStep = { text, done: false, ...(shown ? { shown } : {}), ...(kind ? { kind } : {}) };
     run.steps.push(step);
     run.breakBeforeText = run.partial !== "";
     this.publish(chatId, run);
