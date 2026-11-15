@@ -6,6 +6,7 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Tabs } from './Tabs'
+import { useSiteDrag } from './useSiteDrag'
 import { ToolBarButton } from './ToolBarButton'
 import { Pips } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
@@ -64,60 +65,72 @@ const savedSiteMenu = (event: React.MouseEvent, site: Bookmark) => {
     void window.chromeAPI.library.showBookmarkMenu(site.id)
 }
 
-// Pinned sites as tiles, four to a row. A dot under one says it's open, and pressing it goes there. The last is a plus
-// that pins the page in front. Where the plus would start a row by itself, the rows take five.
-const Favourites: React.FC = () => {
+type SiteDragging = ReturnType<typeof useSiteDrag>
+
+// Bookmarks kept on top, as tiles four to a row. The one whose site is in front looks selected, like the tab, and
+// pressing one goes to its tab if it's open. With none, there's nothing here, until a bookmark is dragged up.
+const Favourites: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, start, zone } }) => {
     const { pinned } = useLibrary()
     const { activeTab, tabs, createTab, switchTab } = useBrowser()
-    const canPin = !!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url) && !pinned.some((pin) => pin.url === activeTab.url)
-    const plusLabel = canPin ? 'Pin this page' : activeTab && !activeTab.page && pinned.some((pin) => pin.url === activeTab.url) ? 'This page is pinned' : 'Open a web page to pin it here'
-    const plusAlone = pinned.length > 0 && pinned.length % 4 === 0
+
+    if (pinned.length === 0) {
+        if (drag?.from !== 'bookmarks') return null
+        return (
+            <div
+                ref={zone('favourites')}
+                className={cn(
+                    'h-10 mb-1.5 flex items-center justify-center rounded-tile border border-dashed text-12 transition-colors',
+                    drag.over?.list === 'favourites' ? 'border-ink-3 bg-hover text-ink' : 'border-line text-ink-3'
+                )}
+            >
+                Drop to keep on top
+            </div>
+        )
+    }
 
     return (
-        <ul aria-label="Favourites" className={cn('grid gap-1.5 mb-1.5', plusAlone ? 'grid-cols-5' : 'grid-cols-4')}>
+        <ul ref={zone('favourites')} aria-label="Favourites" className="grid grid-cols-4 gap-1.5 mb-1.5">
             {pinned.map((site) => {
-                const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
+                const selected = !!activeTab && !activeTab.page && sameSite(activeTab.url, site.url)
                 return (
-                    <li key={site.id}>
+                    <li key={site.id} data-saved-site={site.id} onDragStart={(event) => event.preventDefault()}>
                         <button
                             type="button"
-                            aria-label={open ? `${site.title}, open` : site.title}
+                            aria-label={site.title}
+                            aria-current={selected ? 'page' : undefined}
                             title={site.title}
-                            onClick={() => (open ? void switchTab(open.id) : createTab(site.url))}
+                            onPointerDown={(event) => start(event, site, 'favourites')}
+                            onClick={() => {
+                                const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
+                                if (open) void switchTab(open.id)
+                                else createTab(site.url)
+                            }}
                             onContextMenu={(event) => savedSiteMenu(event, site)}
-                            className={cn('relative w-full h-10 flex items-center justify-center rounded-tile bg-tray transition-colors hover:bg-press app-region-no-drag', FOCUS)}
+                            className={cn(
+                                'w-full h-10 flex items-center justify-center rounded-tile transition-colors app-region-no-drag',
+                                selected ? 'bg-sheet shadow-rim' : 'bg-tray hover:bg-press',
+                                drag?.site.id === site.id && 'opacity-40',
+                                FOCUS
+                            )}
                         >
                             <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-5 rounded-[6px]" />
-                            {open && <span aria-hidden className="absolute bottom-[3px] size-1 rounded-full bg-ink-3" />}
                         </button>
                     </li>
                 )
             })}
-            <li>
-                <button
-                    type="button"
-                    aria-label={plusLabel}
-                    title={plusLabel}
-                    disabled={!canPin}
-                    onClick={() => void window.chromeAPI.library.togglePin()}
-                    className={cn('w-full h-10 flex items-center justify-center rounded-tile shadow-[inset_0_0_0_1px_var(--line)] text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:text-faint disabled:hover:bg-transparent app-region-no-drag', FOCUS)}
-                >
-                    <Plus className={ICON} strokeWidth={1.5} />
-                </button>
-            </li>
         </ul>
     )
 }
 
-// Bookmarks that aren't pinned, in a section that folds. With nothing saved it keeps its place and says so.
-const Bookmarks: React.FC = () => {
+// Bookmarks not kept on top, in a section that folds. With nothing saved it keeps its place and says so.
+const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, start, zone } }) => {
     const { pinned, bookmarks } = useLibrary()
     const { createTab } = useBrowser()
     const [open, setOpen] = useState(true)
     const shown = bookmarks.filter((bookmark) => !pinned.some((pin) => pin.url === bookmark.url))
 
     return (
-        <section aria-labelledby="sidebar-bookmarks">
+        <section ref={zone('bookmarks')} aria-labelledby="sidebar-bookmarks">
             <Label
                 id="sidebar-bookmarks"
                 trailing={
@@ -135,12 +148,13 @@ const Bookmarks: React.FC = () => {
             ) : (
                 <ul aria-label="Bookmarks">
                     {shown.map((site) => (
-                        <li key={site.id}>
+                        <li key={site.id} data-saved-site={site.id} onDragStart={(event) => event.preventDefault()}>
                             <button
                                 type="button"
+                                onPointerDown={(event) => start(event, site, 'bookmarks')}
                                 onClick={() => createTab(site.url)}
                                 onContextMenu={(event) => savedSiteMenu(event, site)}
-                                className={cn(ROW, 'h-[27px] text-12 hover:bg-hover hover:text-ink')}
+                                className={cn(ROW, 'h-[27px] text-12 hover:bg-hover hover:text-ink', drag?.site.id === site.id && 'opacity-40')}
                             >
                                 <span className={LEAD}><Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} /></span>
                                 <span className="flex-1 truncate">{site.title}</span>
@@ -153,12 +167,38 @@ const Bookmarks: React.FC = () => {
     )
 }
 
-const TabsFace: React.FC = () => {
-    const { tabs, createTab } = useBrowser()
+// What follows the pointer while a saved site is dragged, and the line where it would land. Fixed, so neither moves
+// anything else.
+const SiteDragGhost: React.FC<{ drag: SiteDragging['drag'] }> = ({ drag }) => {
+    const { pinned } = useLibrary()
+    if (!drag) return null
+    // The empty place on top lights up instead.
+    const mark = drag.over && !(drag.over.list === 'favourites' && pinned.length === 0) ? drag.over.mark : null
     return (
         <>
-            <Favourites />
-            <Bookmarks />
+            {mark && (
+                <div aria-hidden className="fixed z-50 rounded-full bg-ink pointer-events-none" style={{ left: mark.left, top: mark.top, width: mark.right - mark.left, height: mark.bottom - mark.top }} />
+            )}
+            <div
+                aria-hidden
+                className="fixed z-50 h-[27px] max-w-[200px] px-2 flex items-center gap-[9px] rounded-row bg-sheet shadow-lift text-12 text-ink pointer-events-none"
+                style={{ left: drag.x + 10, top: drag.y + 6 }}
+            >
+                <Favicon src={drag.site.favicon ?? siteIcon(drag.site.url)} site={drag.site.url} />
+                <span className="truncate">{drag.site.title}</span>
+            </div>
+        </>
+    )
+}
+
+const TabsFace: React.FC = () => {
+    const { tabs, createTab } = useBrowser()
+    const dragging = useSiteDrag((id, list, index) => void window.chromeAPI.library.placeSavedSite(id, list, index))
+    return (
+        <>
+            <Favourites dragging={dragging} />
+            <Bookmarks dragging={dragging} />
+            <SiteDragGhost drag={dragging.drag} />
             <Rule />
             <section aria-labelledby="sidebar-tabs">
                 <Label

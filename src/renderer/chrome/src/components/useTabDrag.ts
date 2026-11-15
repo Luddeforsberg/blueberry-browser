@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 // How far the pointer travels before a press on a tab becomes a drag.
-const DRAG_THRESHOLD = 4
+export const DRAG_THRESHOLD = 4
 // Matches the default transition, so the tab settles into its slot before the list reorders.
 const SETTLE_MS = 100
 

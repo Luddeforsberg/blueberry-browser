@@ -40,7 +40,7 @@ export const CHANNEL_REGIONS: {
   "theme:get": ["chrome", "overlay", "find", "prompt", "desktop", "composer"],
   "library:get": BOTH,
   "bookmarks:toggle": ["chrome"],
-  "bookmarks:toggle-pin": ["chrome"],
+  "bookmarks:place": BOTH,
   "bookmarks:menu": BOTH,
   "library:chat": ["chrome"],
   "settings:get": BOTH,

@@ -48,8 +48,8 @@ export class AppMenu {
             click: () => this.mainWindow.toggleBookmark(),
           },
           {
-            label: "Pin This Page",
-            click: () => this.mainWindow.togglePin(),
+            label: "Keep This Page on Top",
+            click: () => this.mainWindow.keepOnTop(),
           },
           {
             label: "Close Tab",

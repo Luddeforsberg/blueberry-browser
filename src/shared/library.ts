@@ -9,8 +9,10 @@ export interface Bookmark {
   favicon?: string;
 }
 
-// Pins are kept the same way as bookmarks, in a file of their own.
+// Pins are kept the same way as bookmarks, in a file of their own. A site is in one or the other: a favourite is a
+// bookmark kept on top, as a tile.
 export type PinnedSite = Bookmark;
+export type SavedSiteList = "favourites" | "bookmarks";
 
 // Something Berry did on the way to a reply.
 export interface ChatStep {

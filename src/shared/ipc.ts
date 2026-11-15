@@ -1,7 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
-import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
@@ -442,7 +442,8 @@ export interface InvokeChannels {
   "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
-  "bookmarks:toggle-pin": { region: "chrome"; args: []; result: void };
+  // Moves a saved site on top as a tile, or into the bookmarks, at a place in that list. Dragging and the menu both use it.
+  "bookmarks:place": { region: "chrome" | "overlay"; args: [bookmarkId: string, list: SavedSiteList, index: number]; result: void };
   "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
@@ -699,7 +700,7 @@ export interface ChatAPI {
 
 export interface LibraryAPI {
   toggleBookmark: () => Promise<void>;
-  togglePin: () => Promise<void>;
+  placeSavedSite: (bookmarkId: string, list: SavedSiteList, index: number) => Promise<void>;
   showBookmarkMenu: (bookmarkId: string) => Promise<void>;
   getLibrary: () => Promise<LibrarySnapshot>;
   getChat: (chatId: string) => Promise<ChatThread | null>;

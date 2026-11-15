@@ -94,7 +94,7 @@ const openJob = (item: NeedsYouItem) => {
 
 export const AddressBar: React.FC = () => {
     const { activeTab, navigateToUrl } = useBrowser()
-    const { bookmarks } = useLibrary()
+    const { bookmarks, pinned } = useLibrary()
     const [url, setUrl] = useState('')
     const [isFocused, setIsFocused] = useState(false)
     const job = useJobHere(activeTab)
@@ -190,7 +190,8 @@ export const AddressBar: React.FC = () => {
     const pageLabel = activeTab?.page ? PAGE_LABELS[activeTab.page] : null
     const { secure, site, path } = splitUrl(activeTab?.url ?? '')
     const web = !!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url)
-    const bookmarked = web && bookmarks.some((bookmark) => bookmark.url === activeTab.url)
+    // A favourite is a bookmark kept on top.
+    const bookmarked = web && [...bookmarks, ...pinned].some((bookmark) => bookmark.url === activeTab.url)
     return (
         <div className={cn(FIELD, 'bg-tray text-13 text-ink-3')}>
             <button type="button" aria-label="Address" onClick={() => setIsFocused(true)} className={cn('flex-1 min-w-0 h-full flex items-center gap-2 pl-3 pr-2 text-left cursor-text rounded-row', FOCUS)}>

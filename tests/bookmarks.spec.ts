@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 /// <reference path="../src/preload/chrome.d.ts" />
-import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import { expect, test, type ElectronApplication, type Locator, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,7 +9,9 @@ import { findView, launchApp } from "./app";
 
 let app: ElectronApplication;
 let chrome: Page;
-const server = createServer((_, response) => response.end("<!doctype html><title>Saved page</title>Hello"));
+const server = createServer((request, response) =>
+  response.end(`<!doctype html><title>${request.url === "/second" ? "Second page" : "Saved page"}</title>Hello`)
+);
 let url: string;
 
 async function menuAction(label: string): Promise<void> {
@@ -21,11 +23,35 @@ async function menuAction(label: string): Promise<void> {
   }, label);
 }
 
-async function visit(address = url): Promise<void> {
+async function visit(address = url, title = "Saved page"): Promise<void> {
   await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), address);
   await (await findView(app, address)).waitForLoadState();
-  await expect.poll(async () => (await active()).title).toBe("Saved page");
+  await expect.poll(async () => (await active()).title).toBe(title);
 }
+
+// Answers the next native menu with the item of that label, without opening it outside Playwright.
+const answerMenu = (label: string) =>
+  app.evaluate(({ Menu }, label) => {
+    Menu.prototype.popup = function () {
+      const item = this.items.find((item) => item.label === label);
+      if (!item) throw new Error(`Missing menu item: ${label}`);
+      item.click();
+    };
+  }, label);
+
+// A real press, moved in steps so the drag starts, released where it's asked to be.
+const drag = async (from: Locator, to: { x: number; y: number }, whileOver?: () => Promise<void>) => {
+  const box = (await from.boundingBox())!;
+  await chrome.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await chrome.mouse.down();
+  await chrome.mouse.move(to.x, to.y, { steps: 8 });
+  await whileOver?.();
+  await chrome.mouse.up();
+};
+const leftOf = async (target: Locator) => {
+  const box = (await target.boundingBox())!;
+  return { x: box.x + 4, y: box.y + box.height / 2 };
+};
 
 const active = () => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.find((tab) => tab.isActive)!));
 
@@ -72,10 +98,7 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   await expect(saved).toBeVisible();
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "vertical", appearance: "light" }));
   await chrome.screenshot({ path: "/tmp/blueberry-bookmarks-vertical.png" });
-  // Capture and select the native menu without opening a popup outside Playwright.
-  await app.evaluate(({ Menu }) => {
-    Menu.prototype.popup = function () { this.items.find((item) => item.label === "Remove Bookmark")?.click(); };
-  });
+  await answerMenu("Remove Bookmark");
   await saved.click({ button: "right" });
   await expect(saved).toHaveCount(0);
   await app.close();
@@ -84,59 +107,86 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).bookmarks).toEqual([]);
 });
 
-test("pinning a page keeps it across restarts, and the sidebar has Settings and no account", async () => {
+test("a bookmark kept on top is a tile, by its menu or by dragging, and the sidebar has Settings and no account", async () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-pins-"));
   await app.close();
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
-  const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  const favourites = sidebar.getByRole("list", { name: "Favourites" });
-  // With nothing pinned there's only the plus, and it can't pin our own pages.
-  await expect(favourites.getByRole("listitem")).toHaveCount(1);
-  await expect(sidebar.getByText("Bookmark a page to keep it here.")).toBeVisible();
-  await expect(sidebar.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
-  await expect(sidebar.getByText("Sam Rivera")).toHaveCount(0);
-  await expect(sidebar.getByText("sam@example.com")).toHaveCount(0);
-  await expect(chrome.getByRole("button", { name: "Pin this page", exact: true })).toHaveCount(0);
+  // Functions, since chrome is a new page after each restart.
+  const sidebar = () => chrome.getByRole("navigation", { name: "Sidebar" });
+  const favourites = () => sidebar().getByRole("list", { name: "Favourites" });
+  const bookmarks = () => sidebar().getByRole("list", { name: "Bookmarks" });
+  // With nothing on top there's no place for it at all.
+  await expect(favourites()).toHaveCount(0);
+  await expect(sidebar().getByText("Bookmark a page to keep it here.")).toBeVisible();
+  await expect(sidebar().getByRole("button", { name: "Settings", exact: true })).toBeVisible();
+  await expect(sidebar().getByText("Sam Rivera")).toHaveCount(0);
+  await expect(sidebar().getByText("sam@example.com")).toHaveCount(0);
 
+  // The menu: Keep on Top makes the bookmark a tile, and it's still bookmarked.
   await visit();
-  await chrome.getByRole("button", { name: "Pin this page", exact: true }).click();
-  const pin = favourites.getByRole("button", { name: /^Saved page/ });
-  // A dot says it's open.
-  await expect(pin).toHaveAccessibleName("Saved page, open");
-  await expect(chrome.getByRole("button", { name: "This page is pinned", exact: true })).toBeDisabled();
-
-  await app.close();
-  app = await launchApp(profile);
-  chrome = await findView(app, "view=chrome");
-  const pinAgain = chrome.getByRole("list", { name: "Favourites" }).getByRole("button", { name: /^Saved page/ });
-  await pinAgain.click();
-  await expect.poll(async () => (await active()).url).toBe(url);
-  await expect.poll(async () => (await active()).title).toBe("Saved page");
-
-  // Saved both ways it's one tile and no bookmark row, and unpinning leaves the bookmark.
   await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
-  await expect(chrome.getByRole("button", { name: "Remove bookmark", exact: true })).toBeVisible();
-  const bookmark = chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "Saved page" });
-  await expect(pinAgain).toHaveCount(1);
-  await expect(bookmark).toHaveCount(0);
-  await app.evaluate(({ Menu }) => {
-    Menu.prototype.popup = function () { this.items.find((item) => item.label === "Unpin")?.click(); };
-  });
-  await pinAgain.click({ button: "right" });
-  await expect(chrome.getByRole("button", { name: "Pin this page", exact: true })).toBeVisible();
-  await expect(pinAgain).toHaveCount(0);
-  await expect(bookmark).toHaveCount(1);
-  await chrome.getByRole("button", { name: "Remove bookmark", exact: true }).click();
-  await expect(bookmark).toHaveCount(0);
-
-  await menuAction("Pin This Page");
-  await expect(pinAgain).toBeVisible();
+  const row = () => bookmarks().getByRole("button", { name: "Saved page" });
+  const tile = () => favourites().getByRole("button", { name: "Saved page" });
+  await answerMenu("Keep on Top");
+  await row().click({ button: "right" });
+  await expect(tile()).toBeVisible();
+  await expect(row()).toHaveCount(0);
+  await expect(chrome.getByRole("button", { name: "Remove bookmark", exact: true })).toHaveAttribute("aria-pressed", "true");
+  // The tile of the page in front looks selected, and not once another tab is.
+  await expect(tile()).toHaveAttribute("aria-current", "page");
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await expect(tile()).not.toHaveAttribute("aria-current");
 
   await app.close();
   app = await launchApp(profile);
   chrome = await findView(app, "view=chrome");
-  expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).pinned).toHaveLength(1);
+  await tile().click();
+  await expect.poll(async () => (await active()).url).toBe(url);
+  await expect(tile()).toHaveAttribute("aria-current", "page");
+
+  // Dragged down into the bookmarks, it's a plain bookmark, and the place on top goes.
+  await drag(tile(), await leftOf(sidebar().getByText("Bookmark a page to keep it here.")));
+  await expect(row()).toBeVisible();
+  await expect(favourites()).toHaveCount(0);
+  // Dragged back up, a place shows to drop it on.
+  const dropPlace = () => sidebar().getByText("Drop to keep on top");
+  await expect(dropPlace()).toHaveCount(0);
+  await drag(row(), { x: 120, y: 0 }, async () => {
+    await expect(dropPlace()).toBeVisible();
+    const box = (await dropPlace().boundingBox())!;
+    await chrome.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+  });
+  await expect(tile()).toBeVisible();
+  await expect(row()).toHaveCount(0);
+  await expect(dropPlace()).toHaveCount(0);
+
+  // Tiles reorder among themselves.
+  await visit(`${url}second`, "Second page");
+  await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
+  await answerMenu("Keep on Top");
+  await bookmarks().getByRole("button", { name: "Second page" }).click({ button: "right" });
+  const order = async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).pinned.map(({ title }) => title);
+  await expect.poll(order).toEqual(["Saved page", "Second page"]);
+  await drag(favourites().getByRole("button", { name: "Second page" }), await leftOf(tile()));
+  await expect.poll(order).toEqual(["Second page", "Saved page"]);
+
+  // A tile's menu moves it to the bookmarks, and the app's menu keeps the page in front on top.
+  await answerMenu("Move to Bookmarks");
+  await tile().click({ button: "right" });
+  await expect(row()).toBeVisible();
+  await expect(tile()).toHaveCount(0);
+  await visit();
+  await menuAction("Keep This Page on Top");
+  await expect(tile()).toBeVisible();
+  await expect(row()).toHaveCount(0);
+
+  await app.close();
+  app = await launchApp(profile);
+  chrome = await findView(app, "view=chrome");
+  const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
+  expect(library.pinned.map(({ title }) => title)).toEqual(["Second page", "Saved page"]);
+  expect(library.bookmarks).toEqual([]);
 });
 
 test("bookmarked pages show a filled star in ink, in both layouts and themes", async () => {

@@ -65,7 +65,7 @@ import type {
   ThemeState,
   Visit,
 } from "../shared/ipc";
-import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult } from "../shared/library";
+import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult, SavedSiteList } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 export type BrowserTab = Tab | InternalTab;
@@ -160,6 +160,12 @@ export class Window {
     private readonly sessionStore: SessionStore
   ) {
     nativeTheme.themeSource = settingsStore.get().appearance;
+    // Before a site could only be in one list, it could be saved both ways. It stays on top.
+    try {
+      for (const pin of pinnedStore.get()) bookmarkStore.removeUrl(pin.url);
+    } catch (error) {
+      console.error("Failed to tidy saved sites:", error);
+    }
     const restored = settingsStore.get().onStartup === "restore" ? sessionStore.load() : null;
 
     this._baseWindow = new BaseWindow({
@@ -1277,29 +1283,52 @@ export class Window {
     return true;
   }
 
+  // A favourite is a bookmark kept on top, so the star counts both, and taking it off takes the site away from both.
   toggleBookmark(): void {
     const tab = this.activeTab;
     if (!tab) return;
-    this.saveBookmarks(() => this.bookmarkStore.toggle(tab.url, tab.title, tab.favicon));
+    const saved = this.bookmarkStore.has(tab.url) || this.pinnedStore.has(tab.url);
+    this.saveBookmarks(() => {
+      if (!saved) return this.bookmarkStore.add(tab.url, tab.title, tab.favicon);
+      this.bookmarkStore.removeUrl(tab.url);
+      this.pinnedStore.removeUrl(tab.url);
+    });
   }
 
-  togglePin(): void {
+  keepOnTop(): void {
     const tab = this.activeTab;
-    if (!tab) return;
-    this.saveBookmarks(() => this.pinnedStore.toggle(tab.url, tab.title, tab.favicon));
+    if (!tab || this.pinnedStore.has(tab.url)) return;
+    const saved = this.bookmarkStore.get().find((bookmark) => bookmark.url === tab.url);
+    if (saved) this.placeSavedSite(saved.id, "favourites", this.pinnedStore.get().length);
+    else this.saveBookmarks(() => this.pinnedStore.add(tab.url, tab.title, tab.favicon));
   }
 
-  // One button can stand for a site that's both pinned and bookmarked, so it offers whatever applies.
-  showBookmarkMenu(id: string): void {
-    const pins = this.pinnedStore.get();
-    const bookmarks = this.bookmarkStore.get();
-    const site = [...pins, ...bookmarks].find((candidate) => candidate.id === id);
+  // A saved site lives in one list or the other: on top as a tile, or in the bookmarks.
+  placeSavedSite(id: string, list: SavedSiteList, index: number): void {
+    const site = [...this.pinnedStore.get(), ...this.bookmarkStore.get()].find((candidate) => candidate.id === id);
     if (!site) return;
-    const pin = pins.find((candidate) => candidate.url === site.url);
-    const bookmark = bookmarks.find((candidate) => candidate.url === site.url);
+    const [into, outOf] = list === "favourites" ? [this.pinnedStore, this.bookmarkStore] : [this.bookmarkStore, this.pinnedStore];
+    this.saveBookmarks(() => {
+      into.place(site, index);
+      outOf.removeUrl(site.url);
+    });
+  }
+
+  showBookmarkMenu(id: string): void {
+    const pin = this.pinnedStore.get().find((candidate) => candidate.id === id);
+    const site = pin ?? this.bookmarkStore.get().find((candidate) => candidate.id === id);
+    if (!site) return;
     Menu.buildFromTemplate([
-      ...(pin ? [{ label: "Unpin", click: () => this.saveBookmarks(() => this.pinnedStore.remove(pin.id)) }] : []),
-      ...(bookmark ? [{ label: "Remove Bookmark", click: () => this.saveBookmarks(() => this.bookmarkStore.remove(bookmark.id)) }] : []),
+      pin
+        ? { label: "Move to Bookmarks", click: () => this.placeSavedSite(id, "bookmarks", 0) }
+        : { label: "Keep on Top", click: () => this.placeSavedSite(id, "favourites", this.pinnedStore.get().length) },
+      {
+        label: "Remove Bookmark",
+        click: () => this.saveBookmarks(() => {
+          this.bookmarkStore.removeUrl(site.url);
+          this.pinnedStore.removeUrl(site.url);
+        }),
+      },
     ]).popup({ window: this._baseWindow });
   }
 
