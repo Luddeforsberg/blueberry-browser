@@ -395,8 +395,8 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
 One component everywhere: the new tab, the chat as a page, the chat panel. It is a card set into a shell. Mock for the chips and the menu: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 
-- **The card** holds, from the top: chips for what it's been given to read, what you type (18px on the new tab, 15px in a chat), and one row of tools. From the left: **+**, a 32px rounded square on `sheet-2`, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
-- **What it's given to read** is chips at the top of the card: a page, by its icon and site, marked "this page" when it's the one in front, or a file. Each has a ×. No chip means the mascot sees no page. **+** adds one from a menu: This page, An open tab, A file, and Show Berry how, which starts showing a job instead of describing it. On the new tab today the menu has only Show Berry how, since there's no page in front and the others aren't built. In a chat, + adds the page in front, as it did.
+- **The card** holds, from the top: chips for what it's been given to read, what you type (18px on the new tab, 15px in a chat), and one row of tools. From the left: **+**, a 32px rounded square on `sheet-2`, where there's something to add, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
+- **What it's given to read** is chips at the top of the card: a page, by its icon and site, marked "this page" when it's the one in front, or a file. Each has a ×. No chip means the mascot sees no page. **+** adds one from a menu: This page, An open tab and A file. In a chat, + adds the page in front, as it did. **The new tab has no + until attachments come,** since with no page in front there's nothing yet for it to add, and attaching a tab or a file is a change of its own, because it changes what a mascot can read. Show Berry how starts from the Routines page.
 - **The placeholder names who you're asking:** "Ask Berry, or type an address".
 - **The cloud switch** is there while the cloud can be used. Choosing a mascot set to work in the cloud starts it on Cloud, and the user can switch it back for one message. It goes away for a mascot that only reads the page in front, since that page isn't in the cloud.
 - **The line under the card,** in the shell, is for the chosen mascot's limits and nothing else: in words, with a lock, for as long as that mascot is chosen. Berry, and any mascot with no limits, has no line. What's waiting for you is in the list under the box and on Chats.
@@ -512,13 +512,13 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Allowing for the rest of a job, or always on a site, and the list of what's allowed on a mascot's card.
 - The reason under an approval, which needs the tool layer to say why it asked.
 - Answers to press on a question.
-- Files in the prompt box.
+- Files in the prompt box, and the new tab's **+** with them.
 - Take over on one of the user's own tabs, which needs a way to put a tab out of a job's reach that the job didn't open.
 - The mascot standing on what it's acting on, in place of the bird that flew.
 - Steps and pills that say what was typed.
 - Waiting for you on the new tab.
 - `@` in the box to choose a mascot.
-- An open tab in the prompt box, from +.
+- An open tab in the prompt box, from **+**, which comes to the new tab with attachments.
 
 **Still open:**
 

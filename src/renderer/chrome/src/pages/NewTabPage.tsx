@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CircleDot, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { TabInfo } from '@shared/ipc'
 import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
@@ -11,7 +11,6 @@ import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { Composer, type PillFace } from '../components/Composer'
-import { useRecording } from '../components/ShowBerry'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 import { setFlockView, suggestedMascot } from '../flockView'
@@ -181,7 +180,6 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { layout } = useShell()
     const { chosen, choose } = useFlock()
     const { shown, face, switching, still } = useMascotSwitch(chosen)
-    const recording = useRecording()
     const [cloudState] = useCloud()
     // Only with a runner linked in Settings > Cloud, which has accepted, so nothing waits in a queue nobody takes from.
     const [runnerState] = useRunner()
@@ -293,14 +291,6 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             onChooseMascot={choose}
                             limits={limitsOf(shown)}
                             cloud={cloudFits ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
-                            addMenu={[
-                                {
-                                    label: name === 'Assistant' ? 'Record a routine' : `Show ${name} how`,
-                                    Icon: CircleDot,
-                                    onSelect: () => void window.chromeAPI.recording.start(),
-                                    disabled: recording.status === 'recording' ? 'It’s already watching' : undefined
-                                }
-                            ]}
                         />
                     </div>
 

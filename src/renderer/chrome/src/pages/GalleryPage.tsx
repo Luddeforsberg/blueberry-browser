@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { CircleDot, Pin, Star } from 'lucide-react'
+import { Pin, Star } from 'lucide-react'
 import type { GalleryMascot, MascotProfile, MemoryFact, NeedsYouItem, Suggestion, WorkTab, WorkView } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
@@ -288,7 +288,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Prompt box">
                     <div className="flex flex-col gap-6 p-6 rounded-tile bg-well">
                         <div className="max-w-[640px] pb-[150px]">
-                            <Composer size="hero" label="Empty" placeholder="Ask Berry, or type an address" value="" onChange={() => undefined} onKeyDown={() => undefined} canSend={false} onSend={() => undefined} mascot={BERRY} onChooseMascot={() => undefined} cloud={{ on: false, onToggle: () => undefined }} addMenu={[{ label: 'Show Berry how', Icon: CircleDot, onSelect: () => undefined }]} />
+                            <Composer size="hero" label="Empty" placeholder="Ask Berry, or type an address" value="" onChange={() => undefined} onKeyDown={() => undefined} canSend={false} onSend={() => undefined} mascot={BERRY} onChooseMascot={() => undefined} cloud={{ on: false, onToggle: () => undefined }} />
                         </div>
                         <div className="max-w-[640px]">
                             <Composer size="hero" label="Ready, limited" placeholder="Ask Scout" value="What happened in Malmö today?" onChange={() => undefined} onKeyDown={() => undefined} canSend onSend={() => undefined} mascot={SAMPLE_MASCOT} onChooseMascot={() => undefined} cloud={{ on: true, onToggle: () => undefined }} limits="Only visits github.com. Can’t type or click." />

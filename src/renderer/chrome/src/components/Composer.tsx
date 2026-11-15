@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus, type LucideIcon } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
@@ -12,14 +12,6 @@ import { blankMascot, setFlockView } from '../flockView'
 // DESIGN.md section 10, The prompt box: one component everywhere, a card set into a shell.
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-
-export interface AddItem {
-    label: string
-    Icon: LucideIcon
-    onSelect: () => void
-    // Off, with the reason in its title.
-    disabled?: string
-}
 
 // What the mascot in the pill shows while one gives way to another (see useMascotSwitch on the new tab).
 export interface PillFace {
@@ -205,10 +197,9 @@ export const Composer: React.FC<{
     size?: 'hero' | 'chat'
     // Shown above the text, such as the page Berry can see.
     attachment?: React.ReactNode
-    // The + button adds this. With a menu instead, it opens the menu. With neither, there's no +.
+    // The + button adds this. Without it, there's no +.
     onAdd?: () => void
     addLabel?: string
-    addMenu?: AddItem[]
     // With no box of its own, because the window it's in is the box.
     bare?: boolean
     canSend: boolean
@@ -227,12 +218,11 @@ export const Composer: React.FC<{
     cloud?: { on: boolean; onToggle: () => void }
     // The chosen mascot's limits, in words, in the shell under the card. Null or empty slides it away.
     limits?: string | null
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, size = 'chat', attachment, onAdd, addLabel, addMenu, bare, canSend, onSend, onStop, mascot, onChooseMascot, chosenId, face, quietPlaceholder, cloud, limits }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, size = 'chat', attachment, onAdd, addLabel, bare, canSend, onSend, onStop, mascot, onChooseMascot, chosenId, face, quietPlaceholder, cloud, limits }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
-    const [open, setOpen] = useState<'add' | 'mascot' | null>(null)
+    const [choosing, setChoosing] = useState(false)
     const box = useRef<HTMLDivElement>(null)
     const pill = useRef<HTMLButtonElement>(null)
-    const plus = useRef<HTMLButtonElement>(null)
     const hero = size === 'hero'
     const small = !hero
     // The last words, kept while the line slides away.
@@ -242,13 +232,13 @@ export const Composer: React.FC<{
     }, [limits])
 
     useEffect(() => {
-        if (!open) return
+        if (!choosing) return
         const close = (event: PointerEvent) => {
-            if (!box.current?.contains(event.target as Node)) setOpen(null)
+            if (!box.current?.contains(event.target as Node)) setChoosing(false)
         }
         window.addEventListener('pointerdown', close)
         return () => window.removeEventListener('pointerdown', close)
-    }, [open])
+    }, [choosing])
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current
@@ -265,9 +255,8 @@ export const Composer: React.FC<{
     }, [focusKey])
 
     const closeMenu = (refocus: boolean) => {
-        const was = open
-        setOpen(null)
-        if (refocus) (was === 'add' ? plus : pill).current?.focus()
+        setChoosing(false)
+        if (refocus) pill.current?.focus()
     }
 
     const sendButton = (
@@ -316,19 +305,15 @@ export const Composer: React.FC<{
         )
     }
 
-    const plusButton = (onAdd || (addMenu && addMenu.length > 0)) && (
+    const plusButton = onAdd && (
         <button
-            ref={plus}
             type="button"
-            aria-label={addMenu ? 'Add' : (addLabel ?? 'Add to chat')}
-            title={addMenu ? undefined : addLabel}
-            aria-haspopup={addMenu ? 'menu' : undefined}
-            aria-expanded={addMenu ? open === 'add' : undefined}
-            onClick={addMenu ? () => setOpen(open === 'add' ? null : 'add') : onAdd}
+            aria-label={addLabel ?? 'Add to chat'}
+            title={addLabel}
+            onClick={onAdd}
             className={cn(
                 'shrink-0 flex items-center justify-center bg-sheet-2 text-ink transition-[background-color,transform] duration-fast hover:bg-press active:scale-[.96]',
                 small ? 'size-7 rounded-row' : 'size-8 rounded-tile',
-                open === 'add' && 'bg-press',
                 FOCUS
             )}
         >
@@ -358,9 +343,9 @@ export const Composer: React.FC<{
                                 small={small}
                                 chooser={
                                     onChooseMascot && {
-                                        open: open === 'mascot',
-                                        onToggle: () => setOpen(open === 'mascot' ? null : 'mascot'),
-                                        onOpen: () => setOpen('mascot'),
+                                        open: choosing,
+                                        onToggle: () => setChoosing(!choosing),
+                                        onOpen: () => setChoosing(true),
                                         button: pill
                                     }
                                 }
@@ -383,47 +368,17 @@ export const Composer: React.FC<{
                     </div>
                 </div>
             </div>
-            {open === 'mascot' && mascot && onChooseMascot && (
+            {choosing && mascot && onChooseMascot && (
                 <MascotMenu
                     chosenId={chosenId ?? mascot.id}
                     above={!hero}
                     onChoose={(id) => {
                         onChooseMascot(id)
-                        setOpen(null)
+                        setChoosing(false)
                         textareaRef.current?.focus()
                     }}
                     onClose={closeMenu}
                 />
-            )}
-            {open === 'add' && addMenu && (
-                <div
-                    role="menu"
-                    aria-label="Add"
-                    onKeyDown={(event) => {
-                        if (event.key === 'Escape') closeMenu(true)
-                    }}
-                    className={cn('absolute left-0 z-30 w-[232px] p-1.5 rounded-menu bg-sheet text-13 text-ink shadow-lift animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)]', hero ? 'top-full mt-2 origin-top-left' : 'bottom-full mb-2 origin-bottom-left')}
-                >
-                    {addMenu.map(({ label: itemLabel, Icon, onSelect, disabled }) => (
-                        <button
-                            key={itemLabel}
-                            type="button"
-                            role="menuitem"
-                            autoFocus={itemLabel === addMenu[0].label}
-                            aria-disabled={!!disabled}
-                            title={disabled}
-                            onClick={() => {
-                                if (disabled) return
-                                onSelect()
-                                setOpen(null)
-                            }}
-                            className={cn('w-full h-10 px-2.5 flex items-center gap-[11px] rounded-[14px] text-left outline-none', disabled ? 'text-faint cursor-default' : 'hover:bg-sheet-2 focus-visible:bg-sheet-2')}
-                        >
-                            <Icon className={cn('size-4 shrink-0', disabled ? 'text-faint' : 'text-ink-2')} strokeWidth={1.5} />
-                            {itemLabel}
-                        </button>
-                    ))}
-                </div>
             )}
         </div>
     )
