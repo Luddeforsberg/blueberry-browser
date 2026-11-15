@@ -27,7 +27,8 @@ import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
 import { RoutineForm } from '../components/RoutineForm'
-import { IdeaRow } from './NewTabPage'
+import { SuggestionItem } from '../components/SuggestionItem'
+import type { SuggestionRow } from '../newTabSuggestions'
 import { RoutineRunCard } from '../components/RoutineRunCard'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
@@ -161,6 +162,18 @@ const SAMPLE_SUGGESTIONS: Suggestion[] = [
         title: 'Pip, your pull request runner',
         why: 'You’ve gone back and forth between GitHub and Linear on 4 of the last 5 days',
         draft: { name: 'Pip', look: { palette: 'kingfisher', accessory: 'glasses' }, instructions: 'Keep an eye on my pull requests.', sites: ['github.com', 'linear.app'], tools: ['visit'] }
+    }
+]
+
+// Every kind of row under the new tab's box, from the samples above, a finished chat and a mascot to try.
+const SAMPLE_ROWS: SuggestionRow[] = [
+    { kind: 'pick-up', key: 'sample-chat', chat: { id: 'sample-chat', title: 'Compare standing desks under 6 000 kr', updatedAt: Date.now() - 3 * 86_400_000, mascotId: null, from: null } },
+    ...SAMPLE_SUGGESTIONS.map((suggestion): SuggestionRow => ({ kind: 'suggestion', key: suggestion.id, suggestion })),
+    {
+        kind: 'try',
+        key: 'sample-try',
+        prompt: 'Prep me for a call with Spotify’s ads team.',
+        mascot: { id: 'sample-prep', name: 'Meeting Prep', look: { palette: 'robin', accessory: 'glasses' }, instructions: '', sites: [], tools: ['visit'], deletedAt: null }
     }
 ]
 
@@ -299,10 +312,17 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
-                <Section title="Things you repeat">
-                    <ul className="max-w-[640px]">
-                        {SAMPLE_SUGGESTIONS.map((suggestion) => <IdeaRow key={suggestion.id} suggestion={suggestion} onUse={() => undefined} onDismiss={() => undefined} />)}
-                    </ul>
+                <Section title="Suggestions">
+                    <div className="max-w-[640px] flex flex-col gap-4">
+                        <ul aria-label="Every kind">
+                            {SAMPLE_ROWS.map((row) => (
+                                <SuggestionItem key={row.key} row={row} onPress={() => undefined} onDismiss={row.kind === 'suggestion' ? () => undefined : undefined} />
+                            ))}
+                        </ul>
+                        <ul aria-label="Its prompt in the box">
+                            <SuggestionItem row={SAMPLE_ROWS[SAMPLE_ROWS.length - 1]} used onPress={() => undefined} />
+                        </ul>
+                    </div>
                 </Section>
 
                 <Section title="Chat">

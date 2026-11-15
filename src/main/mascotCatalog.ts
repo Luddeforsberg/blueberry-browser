@@ -147,3 +147,7 @@ export const parseGalleryMascot = (input: unknown): GalleryMascot | null => {
 // The ones that come with the app, so the Gallery always has something to show. What people publish is in `Gallery.ts`.
 export const starterMascots = (): GalleryMascot[] =>
   STARTERS.flatMap((entry) => parseGalleryMascot({ ...entry, example: STARTER_EXAMPLES[entry.id] }) ?? []);
+
+// Each starter's example prompt, by its id, which is the `galleryId` on a copy of it.
+export const starterExamplePrompts = (): Record<string, string> =>
+  Object.fromEntries(starterMascots().flatMap((entry) => (entry.example ? [[entry.id, entry.example.prompt]] : [])));

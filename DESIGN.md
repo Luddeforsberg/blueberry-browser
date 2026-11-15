@@ -382,14 +382,26 @@ Back, forward and reload in `ink-3`, then the address field, then the chat panel
 
 No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
-- **Placed by the page area's height,** not the window's: the middle of the empty box sits at 43% of it, and the greeting never comes nearer the top than 48px. The lists flow on under the box, so on a short page they scroll, and from about 740px a waiting row and three more fit with nothing pushed off the bottom.
+- **Placed by the page area's height,** not the window's: the middle of the empty box sits at 43% of it, and the greeting never comes nearer the top than 48px. The lists flow on under the box, so on a short page they scroll, and from about 740px a waiting row and four suggestions fit with nothing pushed off the bottom.
 
 - **The greeting,** "Where to?", at 30px, with the chosen mascot at 40px beside it. It's a mark, not a control.
 - **The prompt box,** 640px.
-- **Under the box,** two short lists with mono labels. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with the asking mascot, one sentence and **Review**, filled. **Lately** follows: up to three real things, newest first, such as a chat that finished, a routine's result or what's scheduled next. Each is the mascot's face in its mood, one sentence with the name in medium, and a time in mono. Nothing appears unless it's real.
+- **Under the box,** 26px down, at most two lists with mono labels. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with the asking mascot, one sentence and **Review**, filled. **Suggestions** follows, 16px under it. Mock: [under-the-prompt-box.html](./docs/design/mocks/under-the-prompt-box.html).
 - **Waiting for you reads as a sentence:** the asking mascot's name in medium, "wants to" and what it would do with addresses cut to their site, then the job's name in `ink-2`. A question or a sign-in is already a sentence, so it's shown as it is.
-- **Things you repeat,** the suggestions, come last when there are any: the same rows, with what to do, outlined, and a × on hover to dismiss. Taking one up only fills in the box or a form, as before.
-- **With no sidebar,** in the horizontal layout or with it collapsed, a row of quiet buttons under the lists leads to Needs you, Routines, your mascots and Settings, since nothing else on screen does.
+- **Suggestions is one list of at most four rows,** in this order: the newest finished chat to **pick up**, one at most; then what Blueberry noticed, in the order it comes; then mascots to **try**, filling what's left, with the ones not chosen when the page opened first. It doesn't reorder while the page is open. Nothing is made up: every row is a real chat, a suggestion that passed its checks, or a mascot with an example from a real run. With nothing to show there's no list and no label.
+- **A row** is 34px, with a 9px radius: the mascot's face at 22px, one line with a title in medium `ink` and a reason in `ink-2`, cut with an ellipsis, and one mono word in `ink-3` at the right for its kind. The whole row is the button, with no pill.
+
+| Kind | Word | Face | Title, then reason | Pressing it |
+|---|---|---|---|---|
+| A chat to pick up | `pick up` | its mascot, delivered | its title, then who finished it and when | opens the chat |
+| A prompt you repeat | `you repeat` | Berry | the suggestion, then why | puts the prompt in the box |
+| A routine | `routine` | its mascot | the suggestion, then why | opens a filled-in routine to save |
+| A mascot | `new mascot` | the draft's look, curious | the suggestion, then why | opens a filled-in mascot to save |
+| A mascot to try | `try` | it, at rest | its example prompt, then its name and limits in brief | chooses it, with the switch, and puts the example in the box |
+
+- **Its states:** at rest it's plain; hovered it takes `hover` on the row's radius; focused it has the standard ring; and **used**, while the box holds what it put there, it's a sheet with its rim, until the box is emptied or changed.
+- **A suggestion can be dismissed:** a × at the row's end, its own button beside the row's, shows on hover and while the row has the keyboard. Chats to pick up and mascots to try have none.
+- **With no sidebar,** in the horizontal layout or with it collapsed, a row of quiet buttons under the suggestions leads to Needs you, Routines, your mascots and Settings, since nothing else on screen does.
 
 `Enter` opens anything that looks like an address and asks the mascot about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. The chat panel doesn't open here, because this page has its own box.
 
@@ -518,7 +530,6 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Take over on one of the user's own tabs, which needs a way to put a tab out of a job's reach that the job didn't open.
 - The mascot standing on what it's acting on, in place of the bird that flew.
 - Steps and pills that say what was typed.
-- Waiting for you on the new tab.
 - `@` in the box to choose a mascot.
 - An open tab in the prompt box, from **+**, which comes to the new tab with attachments.
 

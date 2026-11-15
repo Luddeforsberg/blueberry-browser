@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { limitsInBrief, shortAge, shortWhen } from "./shortWords";
+import { finishedWhen, limitsInBrief, shortAge, shortWhen } from "./shortWords";
 
 // A Sunday afternoon.
 const NOW = new Date(2026, 10, 15, 14, 30).getTime();
@@ -21,6 +21,15 @@ describe("shortWhen", () => {
     expect(shortWhen(at(21), NOW)).toBe("Sat");
     expect(shortWhen(at(8), NOW)).toBe("8 Nov");
     expect(shortWhen(at(22), NOW)).toBe("22 Nov");
+  });
+});
+
+describe("finishedWhen", () => {
+  it("reads on from finished it", () => {
+    expect(finishedWhen(at(15, 8, 5), NOW)).toBe("at 08:05");
+    expect(finishedWhen(at(14, 23, 59), NOW)).toBe("yesterday");
+    expect(finishedWhen(at(9), NOW)).toBe("on Mon");
+    expect(finishedWhen(at(8), NOW)).toBe("on 8 Nov");
   });
 });
 

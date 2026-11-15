@@ -105,6 +105,8 @@ test("choosing a mascot on the new tab changes the pill, the greeting and the li
 });
 
 test("a new profile starts with four mascots beside Berry, once, and a deleted one stays gone", async () => {
+  // Two launches, and a fresh profile adding its starters.
+  test.setTimeout(60_000);
   const profile = mkdtempSync(join(tmpdir(), "blueberry-starters-"));
   let app = await launchApp(profile, { starters: true });
   try {
@@ -116,6 +118,22 @@ test("a new profile starts with four mascots beside Berry, once, and a deleted o
     await chrome.getByRole("button", { name: /Choose who to ask/ }).click();
     await expect(chrome.getByRole("menuitemradio")).toHaveCount(starters.length);
     await chrome.keyboard.press("Escape");
+
+    // The starters with an example from a real run are there to try. Pressing one chooses it and puts its example in
+    // the box, and the rows stay where they were.
+    const suggestions = chrome.getByRole("region", { name: "suggestions" }).getByRole("listitem");
+    await expect(suggestions).toHaveCount(2);
+    await expect(suggestions.nth(0)).toContainText("Competitor Watch");
+    await expect(suggestions.nth(1)).toContainText("Meeting Prep");
+    await suggestions.nth(1).getByRole("button").click();
+    await expect(chrome.getByRole("button", { name: /Choose who to ask/ })).toHaveAccessibleName("Asking Meeting Prep. Choose who to ask");
+    const box = chrome.getByRole("textbox", { name: /Search, enter a URL, or ask/ });
+    await expect(box).toHaveValue("Prep me for a call with Spotify's ads team.");
+    await expect(box).toBeFocused();
+    await expect(suggestions.nth(0)).toContainText("Competitor Watch");
+    // Nothing went anywhere: the box waits for the user.
+    expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats).toEqual([]);
+    await box.fill("");
 
     const plainWords = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Plain Words")!;
     await chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id);

@@ -507,6 +507,8 @@ export interface InvokeChannels {
   // Asks first, in main.
   "mascots:delete": { region: "chrome"; args: [id: string]; result: boolean };
   "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
+  // The bundled starters' example prompts, by Gallery id, from real runs. For the new tab's try rows. Nothing from the server.
+  "mascots:examples": { region: "chrome"; args: []; result: Record<string, string> };
   "mascots:gallery-linked": { region: "chrome"; args: [galleryId: string]; result: GalleryLinked };
   // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
   // `version` is the one the review showed, so what's added is what was read.
@@ -747,6 +749,7 @@ export interface MascotsAPI {
   save: (id: string | null, draft: MascotDraft & { worksInCloud?: boolean }) => Promise<MascotSaveResult>;
   delete: (id: string) => Promise<boolean>;
   gallery: () => Promise<GalleryListing>;
+  examples: () => Promise<Record<string, string>>;
   galleryLinked: (galleryId: string) => Promise<GalleryLinked>;
   addFromGallery: (galleryId: string, version: string, name: string | null) => Promise<MascotSaveResult>;
   publish: (mascotId: string, choices: PublishChoices) => Promise<PublishResult>;

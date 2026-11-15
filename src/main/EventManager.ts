@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
 import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
+import { starterExamplePrompts } from "./mascotCatalog";
 import type { ChromeRegion, InvokeChannel, InvokeChannels } from "../shared/ipc";
 
 type Result<C extends InvokeChannel> =
@@ -245,6 +246,7 @@ export class EventManager {
     this.handle("mascots:save", (id, draft) => this.mainWindow.saveMascot(id, draft));
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
     this.handle("mascots:gallery", () => this.mainWindow.gallery.list());
+    this.handle("mascots:examples", () => starterExamplePrompts());
     this.handle("mascots:gallery-linked", (id) => this.mainWindow.gallery.linked(id));
     this.handle("mascots:add-from-gallery", (galleryId, version, name) => this.mainWindow.addFromGallery(galleryId, version, name));
     this.handle("mascots:publish", (mascotId, choices) => this.mainWindow.gallery.publish(mascotId, choices));

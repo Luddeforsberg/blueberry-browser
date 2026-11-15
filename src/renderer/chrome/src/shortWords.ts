@@ -18,6 +18,14 @@ export const shortWhen = (time: number, now = Date.now()): string => {
     return new Date(time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
+// When something finished, to follow "finished it": "at 08:00" today, "yesterday", "on Mon" within the week, and
+// "on 8 Nov" further back.
+export const finishedWhen = (time: number, now = Date.now()): string => {
+    const when = shortWhen(time, now)
+    if (/^\d\d:\d\d$/.test(when)) return `at ${when}`
+    return when === 'yesterday' ? when : `on ${when}`
+}
+
 // How long something has been going: "now", "4m", "2h", "3d".
 export const shortAge = (since: number, now = Date.now()): string => {
     const minutes = Math.floor((now - since) / 60_000)
