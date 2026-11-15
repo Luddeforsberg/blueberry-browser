@@ -315,7 +315,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
                         {since.length > 0 && (
                             <section aria-labelledby="new-tab-since">
-                                <Label id="new-tab-since">since you left</Label>
+                                <Label id="new-tab-since">lately</Label>
                                 <ul>
                                     {since.map((item) => (
                                         <li key={item.id}>

@@ -65,15 +65,16 @@ const savedSiteMenu = (event: React.MouseEvent, site: Bookmark) => {
 }
 
 // Pinned sites as tiles, four to a row. A dot under one says it's open, and pressing it goes there. The last is a plus
-// that pins the page in front.
+// that pins the page in front. Where the plus would start a row by itself, the rows take five.
 const Favourites: React.FC = () => {
     const { pinned } = useLibrary()
     const { activeTab, tabs, createTab, switchTab } = useBrowser()
     const canPin = !!activeTab && !activeTab.page && /^https?:\/\//i.test(activeTab.url) && !pinned.some((pin) => pin.url === activeTab.url)
     const plusLabel = canPin ? 'Pin this page' : activeTab && !activeTab.page && pinned.some((pin) => pin.url === activeTab.url) ? 'This page is pinned' : 'Open a web page to pin it here'
+    const plusAlone = pinned.length > 0 && pinned.length % 4 === 0
 
     return (
-        <ul aria-label="Favourites" className="grid grid-cols-4 gap-1.5 mb-1.5">
+        <ul aria-label="Favourites" className={cn('grid gap-1.5 mb-1.5', plusAlone ? 'grid-cols-5' : 'grid-cols-4')}>
             {pinned.map((site) => {
                 const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
                 return (
@@ -451,7 +452,7 @@ const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ 
                 <Berry mood={mood} size={36} mascot={mascot} still />
                 <span className="min-w-0">
                     <span className="block font-medium truncate">{name}</span>
-                    <span className="block font-mono text-11 text-ink-3 truncate">{limitsInBrief(mascot)}</span>
+                    <span className="block font-mono text-11 leading-[15px] text-ink-3">{limitsInBrief(mascot)}</span>
                 </span>
             </div>
             <div aria-hidden className="h-px mt-2.5 mb-1 bg-line" />
