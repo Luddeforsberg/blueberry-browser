@@ -266,7 +266,7 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
-                <Section title="The flock">
+                <Section title="Your mascots">
                     <div className="mt-4 max-w-xl p-2 rounded-prompt border bg-sheet">
                         <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} />
                     </div>
@@ -374,7 +374,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Memory">
                     <div className="max-w-xl flex flex-col gap-6">
                         <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} onAnswer={() => undefined} />
-                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} startOpen errors={{ 'gallery-fact-1': 'This bird already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} startOpen errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
                         <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
                         <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
                         <RememberedFacts used={SAMPLE_FACTS} />

@@ -33,7 +33,7 @@ const AllClear: React.FC = () => {
                 <p className="text-15">Nothing needs you right now.</p>
                 <p className="mt-1 text-13 text-ink-2">
                     {working.size === 0
-                        ? 'The flock is resting. If a job gets stuck, it waits here.'
+                        ? 'Your mascots are resting. If a job gets stuck, it waits here.'
                         : `${working.size === 1 ? `${anyone} is` : `${working.size} of them are`} working. If a job gets stuck, it waits here.`}
                 </p>
             </div>

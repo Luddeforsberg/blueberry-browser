@@ -118,7 +118,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         onChange={(showBerry) => updateSettings({ showBerry })}
                                     />
                                 </SettingsRow>
-                                <SettingsRow id="setting-still-berry" title="Keep Berry still" description="Keeps the bird and stops all its animation." more="This is automatic with Reduce Motion.">
+                                <SettingsRow id="setting-still-berry" title="Keep Berry still" description="Keeps the mascots and stops all their animation." more="This is automatic with Reduce Motion.">
                                     <Switch
                                         labelledBy="setting-still-berry"
                                         checked={settings.keepBerryStill}
@@ -130,8 +130,8 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     title="Berry on your desktop"
                                     description={
                                         shortcutTaken
-                                            ? `Another app already uses ${DESKTOP_SHORTCUT}, so press the bird to give it a job instead.`
-                                            : `When you leave Blueberry, the bird waits at the edge of your screen, and ${DESKTOP_SHORTCUT} gives it a job from any app.`
+                                            ? `Another app already uses ${DESKTOP_SHORTCUT}, so press the mascot to give it a job instead.`
+                                            : `When you leave Blueberry, the mascot waits at the edge of your screen, and ${DESKTOP_SHORTCUT} gives it a job from any app.`
                                     }
                                     more={`${shortcutTaken ? '' : 'Drag it to any edge. '}It can’t see your screen or other apps, and jobs ask just as a chat does. Closing Blueberry’s window takes it away and stops what’s running.`}
                                 >
@@ -141,7 +141,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         onChange={(desktopBerry) => updateSettings({ desktopBerry })}
                                     />
                                 </SettingsRow>
-                                <SettingsRow id="setting-bird-on-pages" title="Show the bird on pages" description="While a mascot works in the page you’re looking at, it’s drawn there doing it." more="Turn this off if a site reacts badly. Mascots work the same either way.">
+                                <SettingsRow id="setting-bird-on-pages" title="Show the mascot on pages" description="While a mascot works in the page you’re looking at, it’s drawn there doing it." more="Turn this off if a site reacts badly. Mascots work the same either way.">
                                     <Switch
                                         labelledBy="setting-bird-on-pages"
                                         checked={settings.birdOnPages}
@@ -211,8 +211,8 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <SettingsRow
                                     id="setting-memory-offers"
                                     title="Offers to remember"
-                                    description="After a job, a bird may offer to remember how you like something done."
-                                    more="To word the offer, what you typed in that chat or routine and the names of the sites it used go to the AI service, never page text or the reply. Nothing is kept unless you press Remember, and each bird’s page in Flock shows all it has. Off means no more offers, and what’s kept stays in use until you forget it there."
+                                    description="After a job, a mascot may offer to remember how you like something done."
+                                    more="To word the offer, what you typed in that chat or routine and the names of the sites it used go to the AI service, never page text or the reply. Nothing is kept unless you press Remember, and each mascot’s page in Your mascots shows all it has. Off means no more offers, and what’s kept stays in use until you forget it there."
                                 >
                                     <Switch
                                         labelledBy="setting-memory-offers"

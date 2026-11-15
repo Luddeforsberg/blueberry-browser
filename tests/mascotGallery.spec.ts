@@ -14,7 +14,7 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
   const app = await launchApp(profile, { modelEnv: model.env });
   try {
     const chrome = await findView(app, "view=chrome");
-    await chrome.getByRole("button", { name: "Flock", exact: true }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
     await chrome.getByRole("button", { name: "Browse the Gallery" }).click();
     const gallery = chrome.getByRole("list", { name: "Gallery", exact: true });
     await expect(gallery.getByRole("listitem", { name: "Prospector" })).toContainText("Can search the web and go anywhere");
@@ -44,11 +44,11 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
     const rename = chrome.getByLabel("You already have a Meeting Prep. Name this one");
     await expect(rename).toHaveValue("Meeting Prep 2");
     await rename.fill("meeting prep");
-    await chrome.getByRole("button", { name: "Add to flock" }).click();
+    await chrome.getByRole("button", { name: "Add mascot" }).click();
     await expect(chrome.getByRole("alert")).toContainText("Give this one its own name");
     await rename.fill("Briefer");
-    await chrome.getByRole("button", { name: "Add to flock" }).click();
-    await expect(chrome.getByRole("heading", { name: "Briefer is in your flock" })).toBeVisible();
+    await chrome.getByRole("button", { name: "Add mascot" }).click();
+    await expect(chrome.getByRole("heading", { name: "Briefer is one of your mascots" })).toBeVisible();
 
     const saved = JSON.parse(readFileSync(join(profile, "mascots.json"), "utf8")) as Record<string, unknown>[];
     const copy = saved.find(({ name }) => name === "Briefer");
@@ -72,7 +72,7 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
 
     // The card says it's added and goes straight to a chat, and adding it again isn't offered.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
-    await expect(card).toContainText("In your flock");
+    await expect(card).toContainText("One of yours");
     await expect(card.getByRole("button", { name: "Chat with Briefer" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Add Meeting Prep" })).toHaveCount(0);
 

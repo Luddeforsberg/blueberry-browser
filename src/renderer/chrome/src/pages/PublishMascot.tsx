@@ -189,8 +189,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     if (!mascot) {
         return (
             <>
-                <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft />Flock</Button>
-                <p className="mt-4 text-13 text-ink-2">This mascot is no longer in your flock.</p>
+                <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft />Your mascots</Button>
+                <p className="mt-4 text-13 text-ink-2">This mascot is no longer one of yours.</p>
             </>
         )
     }
@@ -198,7 +198,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     if (account.status === 'signed-in' && mascot.publishedId && !editing) {
         return (
             <div id="publish-top" className="max-w-2xl mx-auto">
-                <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Flock</Button>
+                <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Your mascots</Button>
                 {/* It lands on the line under the heading with the job done, and the link is the next thing to do. */}
                 <header className="mt-3 flex items-end gap-6 border-b">
                     <div className="min-w-0 flex-1 pb-5 [overflow-wrap:anywhere]">
@@ -257,7 +257,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
 
     return (
         <div id="publish-top" className="max-w-2xl mx-auto">
-            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Flock</Button>
+            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Your mascots</Button>
             <h1 className="mt-3 text-18 font-medium [overflow-wrap:anywhere]">{mascot.publishedId ? `Edit ${mascot.name}’s listing` : `Publish ${mascot.name}`}</h1>
 
             {account.status === 'signed-out' && (

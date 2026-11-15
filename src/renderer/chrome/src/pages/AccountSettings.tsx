@@ -27,7 +27,7 @@ const PublishedList: React.FC = () => {
 
     if (list === undefined) return null
     if (list === null) return <SettingsRow id="setting-published" title="What you’ve published" description="Couldn’t reach the Gallery to see." />
-    if (list.length === 0) return <SettingsRow id="setting-published" title="What you’ve published" description="Nothing yet. A mascot’s card in your flock has Publish." />
+    if (list.length === 0) return <SettingsRow id="setting-published" title="What you’ve published" description="Nothing yet. A mascot’s card on Your mascots has Publish." />
     return (
         <div className="py-4">
             <h3 className="text-13 font-medium">What you’ve published</h3>

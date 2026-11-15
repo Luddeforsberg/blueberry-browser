@@ -65,7 +65,7 @@ export const McpSettings: React.FC = () => {
             <SettingsRow
                 id="setting-mcp"
                 title="Use Blueberry from Claude"
-                description="Claude Code and Claude Desktop on this computer can give your birds jobs."
+                description="Claude Code and Claude Desktop on this computer can give your mascots jobs."
                 more="They run here, signed in as you, within each bird’s limits, and ask you before anything risky, the same as a job you start. Claude can’t allow anything for you."
             >
                 <Switch labelledBy="setting-mcp" checked={mcp.on} onChange={(on) => void api.setOn(on).then(setMcp)} />
@@ -73,7 +73,7 @@ export const McpSettings: React.FC = () => {
             <SettingsRow
                 id="setting-mcp-reads"
                 title="What Claude can see"
-                description="Your open tabs, pages you ask about, your history, bookmarks and what your birds remember."
+                description="Your open tabs, pages you ask about, your history, bookmarks and what your mascots remember."
                 more="It never gets passwords, codes you entered, cookies or recordings, and it can’t change your settings or memory."
             />
 

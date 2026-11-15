@@ -91,7 +91,7 @@ test("a bird offers to remember after a job, keeps it only on Remember, uses it 
 
   // Another bird never gets it.
   await chrome.evaluate(() => window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find things.", sites: [], tools: [] }));
-  await chrome.getByRole("button", { name: "Flock", exact: true }).click();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
   await expect(chrome.getByRole("button", { name: "What Scout remembers" })).toHaveText("Memory");
 
   // What it remembers can be read, edited under the same rules, and forgotten.

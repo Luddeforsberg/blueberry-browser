@@ -169,9 +169,9 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
     }, [])
     return (
         <>
-            <h1 className="text-18 font-medium">Flock</h1>
+            <h1 className="text-18 font-medium">Your mascots</h1>
             <p className="mt-1 text-13 text-ink-2">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
-            <ul ref={list} aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid gap-y-10" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${COLUMN}px,1fr))` }}>
+            <ul ref={list} aria-label="Your mascots" className="mt-6 pt-2 [overflow-x:clip] grid gap-y-10" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${COLUMN}px,1fr))` }}>
                 {flock.map((mascot, index) => (
                     <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} flipped={index % 3 === 2} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} onMemory={() => onMemory(mascot)} />
                 ))}
@@ -440,7 +440,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                 {error && <ChatError message={error} />}
 
                 <div className="flex items-center gap-3">
-                    <Button type="submit">{values.id ? 'Save' : 'Add to flock'}</Button>
+                    <Button type="submit">{values.id ? 'Save' : 'Add mascot'}</Button>
                     <Button type="button" variant="ghost" onClick={() => onDone()}>Cancel</Button>
                     {values.id && <Button type="button" variant="ghost" className="ml-auto text-ask" onClick={() => void remove()}>Delete</Button>}
                 </div>

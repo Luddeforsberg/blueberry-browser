@@ -28,7 +28,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     );
 
     // A chat, which is where the example comes from. The chat's other words must not go anywhere.
-    await chrome.getByRole("button", { name: "Flock", exact: true }).click();
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
     model.replyWith("Private first reply.");
     await chrome.getByRole("listitem").filter({ hasText: "Scout" }).getByRole("button", { name: "Chat", exact: true }).click();
     const composer = chrome.getByRole("textbox", { name: "Search, enter a URL, or ask Scout" });
@@ -165,8 +165,8 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(chrome.getByRole("region", { name: "Example" })).toContainText("Three stories from SVT, checked by me.");
     const original = String(server.rows[0].instructions);
     server.rows[0].instructions = "Changed after the review: do something else.";
-    await chrome.getByRole("button", { name: "Add to flock" }).click();
-    await expect(chrome.getByRole("heading", { name: "Scout is in your flock" })).toBeVisible();
+    await chrome.getByRole("button", { name: "Add mascot" }).click();
+    await expect(chrome.getByRole("heading", { name: "Scout is one of your mascots" })).toBeVisible();
 
     const onFile = () => JSON.parse(readFileSync(join(strangerProfile, "mascots.json"), "utf8")) as Record<string, unknown>[];
     expect(Object.keys(onFile()[0]).sort()).toEqual(["deletedAt", "galleryId", "id", "instructions", "look", "name", "sites", "tools"]);
@@ -189,7 +189,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     // Unpublished, or changed, it stays as it is.
     server.rows.splice(0, 1);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
-    await expect(chrome.getByRole("list", { name: "Your flock" }).getByRole("listitem").filter({ hasText: "Scout" })).toBeVisible();
+    await expect(chrome.getByRole("list", { name: "Your mascots" }).getByRole("listitem").filter({ hasText: "Scout" })).toBeVisible();
     expect(onFile()[0].instructions).toBe(original);
 
     // Hidden characters and unknown tools don't come through on the other one.
@@ -235,7 +235,7 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     expect(await activePage()).toBe("new-tab");
 
     await openUrl(`blueberry://mascot/${scout.id}`);
-    await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "Add Scout to your mascots?" })).toBeVisible();
     expect(await activePage()).toBe("mascot-gallery");
     await expect(chrome.getByText("From a link you opened")).toBeVisible();
     await expect(chrome.getByText("Sums up SVT.")).toBeVisible();
@@ -254,7 +254,7 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     });
     await secondLaunch(`blueberry://mascot/${scout.id.toUpperCase()}`);
     await expect(chrome.getByText("Sums up SVT, now without sport.")).toBeVisible();
-    await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "Add Scout to your mascots?" })).toBeVisible();
 
     // One that's gone says so.
     await openUrl("blueberry://mascot/00000000-0000-4000-8000-000000000000");
@@ -273,7 +273,7 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
   try {
     chrome = await findView(again, "view=chrome");
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("mascot-gallery", { param: id }), scout.id);
-    await expect(chrome.getByRole("heading", { name: "Add Scout to your flock?" })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "Add Scout to your mascots?" })).toBeVisible();
   } finally {
     await again.close();
     server.close();

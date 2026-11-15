@@ -58,7 +58,7 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
         <div className="py-4 border-b last:border-b-0">
             <h3 id="setting-cloud-logins" className="text-13 font-medium">Signed in to</h3>
             <p className="mt-0.5 text-13 text-ink-2">
-                Bring your sign-in to a site along, and a bird in the cloud can use it as you.{' '}
+                Bring your sign-in to a site along, and a mascot in the cloud can use it as you.{' '}
                 <More about="setting-cloud-logins" text="Only that site’s cookies are copied, after Touch ID, and they stay in the cloud browser. Nothing else from this browser goes there." />
             </p>
 
@@ -176,7 +176,7 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
         <div className="flex items-center gap-6">
             <div className="flex-1 min-w-0">
                 <h4 id="setting-cloud-relay" className="text-13 font-medium">From ChatGPT or Claude</h4>
-                <p className="mt-0.5 text-13 text-ink-2">Give your flock jobs from ChatGPT or Claude on the web or your phone, with your Mac off. <More about="setting-cloud-relay" text="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you." /></p>
+                <p className="mt-0.5 text-13 text-ink-2">Give your mascots jobs from ChatGPT or Claude on the web or your phone, with your Mac off. <More about="setting-cloud-relay" text="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you." /></p>
             </div>
             <CopyLink link={address} label="Copy the address for ChatGPT or Claude" />
         </div>

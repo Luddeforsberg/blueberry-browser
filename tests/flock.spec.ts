@@ -51,12 +51,12 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   app = await launchApp(profile, { modelEnv: model.env });
   let chrome = await findView(app, "view=chrome");
 
-  await chrome.getByRole("button", { name: "Flock", exact: true }).click();
-  await expect(chrome.getByRole("list", { name: "Your flock" }).getByRole("heading", { name: "Berry" })).toBeVisible();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+  await expect(chrome.getByRole("list", { name: "Your mascots" }).getByRole("heading", { name: "Berry" })).toBeVisible();
   await expect(chrome.getByRole("button", { name: "Edit Berry" })).toHaveCount(0);
 
   await chrome.getByRole("button", { name: "New mascot" }).click();
-  await chrome.getByRole("button", { name: "Add to flock" }).click();
+  await chrome.getByRole("button", { name: "Add mascot" }).click();
   await expect(chrome.getByRole("alert")).toHaveText("Give it a name.");
   await chrome.getByRole("button", { name: "Kingfisher" }).click();
   await chrome.getByRole("button", { name: "Crown" }).click();
@@ -64,7 +64,7 @@ test("a mascot is made, chats inside its limits, and is still itself after a res
   await chrome.getByLabel("What it’s for").fill("Always answer like a sea captain.");
   await chrome.getByRole("radio", { name: "Only these sites" }).click();
   await chrome.getByLabel("Sites it may use").fill("127.0.0.1");
-  await chrome.getByRole("button", { name: "Add to flock" }).click();
+  await chrome.getByRole("button", { name: "Add mascot" }).click();
   await expect(chrome.getByRole("heading", { name: "Scout" })).toBeVisible();
 
   // In a chat as Scout, an address off its site is refused with no card, and never loads.

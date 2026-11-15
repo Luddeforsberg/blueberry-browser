@@ -70,7 +70,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
         <div className="max-w-[672px] mx-auto">
             <Button size="xs" variant="ghost" className="-ml-2.5 text-ink-2" onClick={onBack}>
                 <ArrowLeft />
-                Your flock
+                Your mascots
             </Button>
             <div className="mt-2 flex items-end justify-between gap-6 border-b">
                 <div className="min-w-0 pb-4">

@@ -52,7 +52,7 @@ export const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) =
 const InFlock: React.FC = () => (
     <span className="flex items-center gap-1 text-12 text-ink-2">
         <Check aria-hidden className="size-3.5" />
-        In your flock
+        One of yours
     </span>
 )
 
@@ -147,7 +147,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
             <header className="mt-3 flex items-end gap-6 border-b">
                 <div className="min-w-0 flex-1 pb-5 [overflow-wrap:anywhere]">
                     {linked && <p className="mb-1 text-13 text-ink-2">From a link you opened</p>}
-                    <h1 className="text-18 font-medium">{copy ? `${copy.name} is in your flock` : `Add ${name} to your flock?`}</h1>
+                    <h1 className="text-18 font-medium">{copy ? `${copy.name} is one of your mascots` : `Add ${name} to your mascots?`}</h1>
                     <p className="mt-1 text-13">{entry.description}</p>
                     <p className="mt-1 text-13 text-ink-2">
                         By {entry.author}.
@@ -211,13 +211,13 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
                     </>
                 ) : (
                     <>
-                        <Button onClick={() => void add()}>Add to flock</Button>
+                        <Button onClick={() => void add()}>Add mascot</Button>
                         <Button variant="ghost" onClick={onBack}>Cancel</Button>
                     </>
                 )}
             </div>
             <p className="mt-3 text-12 text-ink-2">
-                {copy ? 'It’s your own copy. Nothing in the Gallery can change it, and in your flock you can edit it or take off its limits.' : 'You get your own copy. Nothing in the Gallery can change it later, and in your flock you can edit it or take off its limits.'}
+                {copy ? 'It’s your own copy. Nothing in the Gallery can change it, and on Your mascots you can edit it or take off its limits.' : 'You get your own copy. Nothing in the Gallery can change it later, and on Your mascots you can edit it or take off its limits.'}
             </p>
         </article>
     )
@@ -314,11 +314,11 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <h1 className="text-18 font-medium">Gallery</h1>
                                 <p className="mt-1 text-13 text-ink-2">
                                     {listing?.status === 'live'
-                                        ? 'Birds made for one job. A few are ours. The rest were written by strangers and nobody has checked them, so each one shows you what it’s told, word for word, before you add it. What you add is your own copy.'
-                                        : 'Birds made for one job. Each one shows you what it’s told, word for word, before you add it, and what you add is your own copy.'}
+                                        ? 'Mascots made for one job. A few are ours. The rest were written by strangers and nobody has checked them, so each one shows you what it’s told, word for word, before you add it. What you add is your own copy.'
+                                        : 'Mascots made for one job. Each one shows you what it’s told, word for word, before you add it, and what you add is your own copy.'}
                                 </p>
                             </div>
-                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Flock</Button>
+                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Your mascots</Button>
                         </div>
                         <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-1">
                             <label className="flex-1 min-w-[200px] max-w-xs h-8 flex items-center gap-2 text-ink-2">
