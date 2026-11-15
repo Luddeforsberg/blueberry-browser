@@ -17,9 +17,9 @@ export const DownloadRow: React.FC<{
 
     return (
         <li aria-label={download.filename} className="min-h-14 px-5 py-3 flex items-center gap-3">
-            <File className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <File className="size-4 shrink-0 text-ink-2" aria-hidden />
             <div className="flex-1 min-w-0">
-                <div className={cn("text-14 truncate", !openable && !active && "text-muted-foreground")} title={download.filename}>
+                <div className={cn("text-13 truncate", !openable && !active && "text-ink-2")} title={download.filename}>
                     {download.filename}
                 </div>
                 {active && fraction !== null && (
@@ -29,14 +29,14 @@ export const DownloadRow: React.FC<{
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={Math.round(fraction * 100)}
-                        className="mt-1 h-1 rounded-full bg-muted overflow-hidden"
+                        className="mt-1 h-1 rounded-full bg-sheet-2 overflow-hidden"
                     >
-                        <div className="h-full bg-accent-ink transition-[width] duration-layout" style={{ width: `${fraction * 100}%` }} />
+                        <div className="h-full bg-ink transition-[width] duration-panel" style={{ width: `${fraction * 100}%` }} />
                     </div>
                 )}
                 <div className="mt-0.5 text-12 truncate tabular-nums">
                     <span className={status.className}>{status.text}</span>
-                    {download.source && <span className="text-muted-foreground"> · {download.source}</span>}
+                    {download.source && <span className="text-ink-2"> · {download.source}</span>}
                 </div>
             </div>
             <div className="shrink-0 flex items-center gap-1">

@@ -82,7 +82,7 @@ export const Composer: React.FC<{
             }}
             className={cn(
                 "relative w-full cursor-text",
-                bare ? "p-1.5 pl-2" : "p-2 pl-3 rounded-composer border bg-surface shadow-raised transition-colors focus-within:border-muted-foreground/30"
+                bare ? "p-1.5 pl-2" : "p-2 pl-3 rounded-prompt border bg-sheet shadow-lift transition-colors focus-within:border-ink-2/30"
             )}
         >
             {choosing && mascot && onChooseMascot && (
@@ -110,7 +110,7 @@ export const Composer: React.FC<{
                     spellCheck={spellCheck}
                     onChange={(event) => onChange(event.target.value)}
                     onKeyDown={onKeyDown}
-                    className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-16 outline-none", bare ? "placeholder:text-foreground/70" : "placeholder:text-muted-foreground")}
+                    className={cn("flex-1 min-w-0 block px-2 py-[7px] resize-none bg-transparent text-15 outline-none", bare ? "placeholder:text-ink/70" : "placeholder:text-ink-2")}
                 />
                 {mascot && (
                     <MascotChip mascot={mascot} open={choosing} onPress={onChooseMascot && (() => setChoosing(!choosing))} />
@@ -127,14 +127,14 @@ export const Composer: React.FC<{
                             onClick={menu ? () => setMenuOpen(!menuOpen) : onAdd}
                             className={cn(
                                 "size-9 rounded-full flex items-center justify-center outline-none transition-colors",
-                                "hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                                menuOpen && "bg-muted"
+                                "hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus",
+                                menuOpen && "bg-sheet-2"
                             )}
                         >
                             <Plus className="size-5" />
                         </button>
                         {menu && menuOpen && (
-                            <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-card border bg-surface shadow-float cursor-default">
+                            <div role="menu" aria-label="More options" className="absolute right-0 top-full mt-2 z-20 w-60 p-1 rounded-tile border bg-sheet shadow-lift cursor-default">
                                 <button
                                     type="button"
                                     role="menuitemcheckbox"
@@ -145,11 +145,11 @@ export const Composer: React.FC<{
                                         setMenuOpen(false)
                                         textareaRef.current?.focus()
                                     }}
-                                    className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-control text-14 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+                                    className="w-full h-9 px-2.5 flex items-center gap-2.5 rounded-row text-13 text-left outline-none transition-colors hover:bg-hover focus-visible:bg-hover"
                                 >
-                                    <Cloud className="size-4 shrink-0 text-muted-foreground" />
+                                    <Cloud className="size-4 shrink-0 text-ink-2" />
                                     <span className="flex-1">Do this in the cloud</span>
-                                    {menu.on && <Check className="size-4 shrink-0 text-accent-ink" />}
+                                    {menu.on && <Check className="size-4 shrink-0 text-ink" />}
                                 </button>
                             </div>
                         )}
@@ -164,14 +164,14 @@ export const Composer: React.FC<{
                     className={cn(
                         bare ? "size-8 mb-0.5 disabled:opacity-40" : "size-9",
                         "relative shrink-0 rounded-full flex items-center justify-center outline-none transition-colors",
-                        "bg-primary text-primary-foreground hover:brightness-110",
-                        "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-surface",
+                        "bg-ink text-ground hover:brightness-110",
+                        "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus focus-visible:ring-offset-sheet",
                         "disabled:hover:brightness-100"
                     )}
                 >
                     {onStop ? <Square className="size-3.5" fill="currentColor" /> : <ArrowUp className="size-[18px]" />}
                     {!onStop && cloud?.on && (
-                        <span aria-hidden className="absolute -top-1 -right-1 size-[18px] rounded-full bg-surface border flex items-center justify-center text-accent-ink">
+                        <span aria-hidden className="absolute -top-1 -right-1 size-[18px] rounded-full bg-sheet border flex items-center justify-center text-ink">
                             <Cloud className="size-3" strokeWidth={2.5} />
                         </span>
                     )}

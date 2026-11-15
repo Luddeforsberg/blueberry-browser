@@ -34,7 +34,7 @@ export const ResizeHandle: React.FC<{ panel: ResizablePanel }> = ({ panel }) => 
             tabIndex={0}
             className={cn(
                 "absolute inset-y-0 w-1.5 cursor-col-resize app-region-no-drag outline-none",
-                "hover:bg-border focus-visible:bg-accent-ink transition-colors",
+                "hover:bg-line focus-visible:bg-ink transition-colors",
                 panel === 'sidebar' ? "right-0" : "left-0"
             )}
             onPointerDown={(e) => {

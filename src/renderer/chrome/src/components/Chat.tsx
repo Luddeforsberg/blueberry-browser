@@ -94,7 +94,7 @@ export const Chat: React.FC = () => {
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
                         {name !== 'Assistant' && <BerrySpot size={72} />}
-                        <p className="text-14 text-muted-foreground">
+                        <p className="text-13 text-ink-2">
                             Ask about this page, or anything else.
                         </p>
                     </div>
@@ -132,9 +132,9 @@ export const Chat: React.FC = () => {
                     placeholder={name === 'Assistant' ? 'Ask a question' : `Ask ${name}`}
                     attachment={
                         heldByUser ? (
-                            <p className="px-2 py-1 text-12 text-muted-foreground">{name} can’t see this tab while it’s with you.</p>
+                            <p className="px-2 py-1 text-12 text-ink-2">{name} can’t see this tab while it’s with you.</p>
                         ) : host && !canUseSite ? (
-                            <p className="px-2 py-1 text-12 text-muted-foreground">{name} isn’t allowed on {host}, so it can’t see this page.</p>
+                            <p className="px-2 py-1 text-12 text-ink-2">{name} isn’t allowed on {host}, so it can’t see this page.</p>
                         ) : enabled && host ? (
                             <PageCard
                                 title={activeTab?.title || host}

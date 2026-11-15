@@ -30,13 +30,13 @@ const PublishedList: React.FC = () => {
     if (list.length === 0) return <SettingsRow id="setting-published" title="What you’ve published" description="Nothing yet. A mascot’s card in your flock has Publish." />
     return (
         <div className="py-4">
-            <h3 className="text-14 font-semibold">What you’ve published</h3>
+            <h3 className="text-13 font-medium">What you’ve published</h3>
             <ul aria-label="What you’ve published" className="mt-2 divide-y">
                 {list.map((mascot) => (
                     <li key={mascot.id} className="flex items-center gap-3 py-2">
                         <div className="flex-1 min-w-0">
-                            <p className="text-14 [overflow-wrap:anywhere]">{mascot.name}</p>
-                            <p className="text-12 text-muted-foreground [overflow-wrap:anywhere] tabular-nums">
+                            <p className="text-13 [overflow-wrap:anywhere]">{mascot.name}</p>
+                            <p className="text-12 text-ink-2 [overflow-wrap:anywhere] tabular-nums">
                                 By {mascot.author} · {mascot.addCount === 1 ? '1 add' : `${mascot.addCount} adds`}
                                 {mascot.hidden && ' · Taken out of the Gallery by Blueberry'}
                             </p>
@@ -46,7 +46,7 @@ const PublishedList: React.FC = () => {
                     </li>
                 ))}
             </ul>
-            {problem && <p role="alert" className="mt-2 text-13 text-destructive">{problem}</p>}
+            {problem && <p role="alert" className="mt-2 text-13 text-ask">{problem}</p>}
         </div>
     )
 }
@@ -71,7 +71,7 @@ export const AccountSettings: React.FC = () => {
             <SettingsRow id="setting-account" title={`Signed in as ${account.email}`} description="Only you see this address. It’s never published, and it’s kept encrypted on this computer.">
                 <Button variant="outline" onClick={() => void window.chromeAPI.account.signOut().then(setAccount)}>Sign out</Button>
             </SettingsRow>
-            {account.problem && <p role="alert" className="py-4 text-13 text-warning">{account.problem}</p>}
+            {account.problem && <p role="alert" className="py-4 text-13 text-ask">{account.problem}</p>}
             <PublishedList />
         </>
     )

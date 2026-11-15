@@ -26,7 +26,7 @@ const BookmarksBar: React.FC = () => {
             }}
             className="h-9 shrink-0 flex items-center gap-0.5 px-2 border-b overflow-x-auto [&::-webkit-scrollbar]:hidden"
         >
-            {sites.length === 0 && <li className="shrink-0 px-2 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
+            {sites.length === 0 && <li className="shrink-0 px-2 text-13 text-ink-2">{NO_SAVED_SITES}</li>}
             {sites.map((site) => (
                 <li key={site.id} className="shrink-0">
                     <button
@@ -36,7 +36,7 @@ const BookmarksBar: React.FC = () => {
                             event.preventDefault()
                             void window.chromeAPI.library.showBookmarkMenu(site.id)
                         }}
-                        className="h-7 px-2 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                        className="h-7 px-2 flex items-center gap-2 rounded-row text-13 outline-none transition-colors app-region-no-drag hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
                     >
                         <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} />
                         {site.title}
@@ -112,7 +112,7 @@ export const Toolbar: React.FC = () => {
                             className={bookmarked ? 'bg-transparent hover:bg-transparent' : undefined}
                             onClick={() => void window.chromeAPI.library.toggleBookmark()}
                         >
-                            <Star className={bookmarked ? 'size-4 fill-current text-bookmark' : 'size-4'} />
+                            <Star className={bookmarked ? 'size-4 fill-current text-ink' : 'size-4'} />
                         </ToolBarButton>
 
                         <ToolBarButton

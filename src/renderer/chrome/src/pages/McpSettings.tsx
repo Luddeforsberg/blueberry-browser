@@ -34,23 +34,23 @@ const Snippet: React.FC<{ snippet: McpSnippet }> = ({ snippet }) => {
         <div className="py-4 border-b">
             <div className="flex items-center gap-6">
                 <div className="flex-1 min-w-0">
-                    <h3 id={id} className="text-14 font-semibold">{snippet.app}</h3>
-                    <p className="mt-0.5 text-13 text-muted-foreground">{snippet.where}</p>
+                    <h3 id={id} className="text-13 font-medium">{snippet.app}</h3>
+                    <p className="mt-0.5 text-13 text-ink-2">{snippet.where}</p>
                 </div>
                 <Button variant="outline" size="sm" aria-describedby={id} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
             </div>
-            <pre aria-labelledby={id} className="mt-3 max-h-32 overflow-auto rounded-control bg-tray px-3 py-2.5 text-12 text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]">{snippet.text}</pre>
+            <pre aria-labelledby={id} className="mt-3 max-h-32 overflow-auto rounded-row bg-tray px-3 py-2.5 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{snippet.text}</pre>
         </div>
     )
 }
 
 const ActivityRow: React.FC<{ entry: McpActivity }> = ({ entry }) => (
     <li className="flex items-baseline gap-3 py-2 border-b last:border-b-0 text-13">
-        <span className="shrink-0 w-12 tabular-nums text-muted-foreground">{timeOf(entry.at)}</span>
-        <span className="shrink-0 w-28 truncate text-muted-foreground">{entry.client}</span>
+        <span className="shrink-0 w-12 tabular-nums text-ink-2">{timeOf(entry.at)}</span>
+        <span className="shrink-0 w-28 truncate text-ink-2">{entry.client}</span>
         <span className="min-w-0 flex-1 truncate">
-            <span className={entry.failed ? 'text-warning' : undefined}>{entry.tool.replace(/_/g, ' ')}</span>
-            <span className="text-muted-foreground"> · {entry.summary}</span>
+            <span className={entry.failed ? 'text-ask' : undefined}>{entry.tool.replace(/_/g, ' ')}</span>
+            <span className="text-ink-2"> · {entry.summary}</span>
         </span>
     </li>
 )
@@ -79,7 +79,7 @@ export const McpSettings: React.FC = () => {
 
             {mcp.problem && (
                 <div className="py-4 border-b">
-                    <p role="alert" className="text-13 text-warning">{mcp.problem}</p>
+                    <p role="alert" className="text-13 text-ask">{mcp.problem}</p>
                 </div>
             )}
 
@@ -90,14 +90,14 @@ export const McpSettings: React.FC = () => {
                         <Button variant="outline" onClick={() => void api.revoke().then(setMcp)}>Revoke</Button>
                     </SettingsRow>
                     <div className="py-4">
-                        <h3 id="setting-mcp-activity" className="text-14 font-semibold">Recent calls</h3>
-                        <p className="mt-0.5 text-13 text-muted-foreground">Since Blueberry opened, newest first. Nothing here is saved.</p>
+                        <h3 id="setting-mcp-activity" className="text-13 font-medium">Recent calls</h3>
+                        <p className="mt-0.5 text-13 text-ink-2">Since Blueberry opened, newest first. Nothing here is saved.</p>
                         {mcp.activity.length > 0 ? (
                             <ul aria-labelledby="setting-mcp-activity" className="mt-2">
                                 {mcp.activity.map((entry) => <ActivityRow key={entry.id} entry={entry} />)}
                             </ul>
                         ) : (
-                            <p className="mt-3 text-13 text-muted-foreground">No calls yet.</p>
+                            <p className="mt-3 text-13 text-ink-2">No calls yet.</p>
                         )}
                     </div>
                 </>

@@ -57,7 +57,7 @@ export const Markdown: React.FC<{ content: string; fromStranger?: boolean; class
                 code: ({ node, className, children, ...props }) => {
                     const inline = !className
                     return inline ? (
-                        <code className="bg-muted px-1 py-0.5 rounded-control" {...props}>
+                        <code className="bg-sheet-2 px-1 py-0.5 rounded-row" {...props}>
                             {children}
                         </code>
                     ) : (
@@ -69,7 +69,7 @@ export const Markdown: React.FC<{ content: string; fromStranger?: boolean; class
                 a: ({ children, href }) => (
                     <a
                         href={href}
-                        className="text-accent-ink hover:underline"
+                        className="text-ink hover:underline"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -85,7 +85,7 @@ export const Markdown: React.FC<{ content: string; fromStranger?: boolean; class
 )
 
 export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
-    <div className="max-w-[85%] ml-auto px-4 py-2.5 rounded-panel bg-muted text-16 text-foreground whitespace-pre-wrap animate-fade-in">
+    <div className="max-w-[85%] ml-auto px-4 py-2.5 rounded-sheet bg-sheet-2 text-15 text-ink whitespace-pre-wrap animate-fade-in">
         {content}
     </div>
 )
@@ -121,7 +121,7 @@ export const AssistantMessage: React.FC<{
             <Berry mood={isStreaming ? 'thinking' : 'rest'} size={28} mascot={mascot} className="absolute -left-11 top-0" />
         )}
         {mascot && mascot.id !== BERRY_ID && (
-            <p className="flex items-center gap-2 text-13 font-semibold">
+            <p className="flex items-center gap-2 text-13 font-medium">
                 {!avatar && <Berry mood={isStreaming ? 'thinking' : 'rest'} size={24} mascot={mascot} />}
                 {mascot.name}
             </p>
@@ -135,7 +135,7 @@ export const AssistantMessage: React.FC<{
             isStreaming &&
             !waiting &&
             steps.every((step) => step.done) && (
-                <div role="status" className="flex items-center h-7 text-14 text-muted-foreground">
+                <div role="status" className="flex items-center h-7 text-13 text-ink-2">
                     <ThinkingWord />
                 </div>
             )
@@ -156,12 +156,12 @@ const siteOf = (url: string) => {
 const PagesItUsed: React.FC<{ pages: UsedPage[] }> = ({ pages }) => {
     const [open, setOpen] = useState(false)
     return (
-        <div className="flex flex-col items-start gap-1.5 text-13 text-muted-foreground">
+        <div className="flex flex-col items-start gap-1.5 text-13 text-ink-2">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen(!open)}
-                className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
             >
                 <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
                 Pages it used ({pages.length})
@@ -174,9 +174,9 @@ const PagesItUsed: React.FC<{ pages: UsedPage[] }> = ({ pages }) => {
                                 type="button"
                                 title={page.url}
                                 onClick={() => void window.chromeAPI.browser.createTab(page.url)}
-                                className="max-w-full flex items-baseline gap-2 rounded-control text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                className="max-w-full flex items-baseline gap-2 rounded-row text-left outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                             >
-                                <span className="truncate text-foreground">{page.title}</span>
+                                <span className="truncate text-ink">{page.title}</span>
                                 <span className="shrink-0">{siteOf(page.url)}</span>
                             </button>
                         </li>
@@ -189,7 +189,7 @@ const PagesItUsed: React.FC<{ pages: UsedPage[] }> = ({ pages }) => {
 
 // What a job said it's doing, in the bird's own words, while it works. Its answer replaces it.
 export const StatusLine: React.FC<{ text: string }> = ({ text }) => (
-    <p role="status" className="text-14 text-muted-foreground line-clamp-2">{text}</p>
+    <p role="status" className="text-13 text-ink-2 line-clamp-2">{text}</p>
 )
 
 // Left foot, right foot.
@@ -209,13 +209,13 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
     const [open, setOpen] = useState(false)
     const { shown, line } = trailFor(steps, { running, cutShort, open })
     return (
-        <div className="flex flex-col items-start gap-2.5 text-14 text-muted-foreground">
+        <div className="flex flex-col items-start gap-2.5 text-13 text-ink-2">
             {line && (
                 <button
                     type="button"
                     aria-expanded={open}
                     onClick={() => setOpen(!open)}
-                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                 >
                     <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
                     {line}
@@ -225,7 +225,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
                 <ol aria-label="Steps" className="flex flex-col gap-2.5">
                     {shown.map(({ step, index }) => (
                         <li key={index} className="flex items-center gap-3">
-                            <span className="size-4 shrink-0 flex items-center justify-center text-primary">
+                            <span className="size-4 shrink-0 flex items-center justify-center text-ink">
                                 {step.done ? (
                                     <StepFootprint index={index} />
                                 ) : (
@@ -246,7 +246,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
 
 // Berry's working state while a reply is on its way, where there's no room for Berry beside the reply.
 export const ThinkingMessage: React.FC<{ mascot?: MascotProfile }> = ({ mascot }) => (
-    <div role="status" className="flex items-center gap-2.5 text-14 text-muted-foreground animate-fade-in">
+    <div role="status" className="flex items-center gap-2.5 text-13 text-ink-2 animate-fade-in">
         <Berry mood="thinking" size={22} mascot={mascot} />
         <ThinkingWord />
     </div>
@@ -275,7 +275,7 @@ const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot, ava
                     autoFocus
                     value={answer}
                     onChange={(event) => setAnswer(event.target.value)}
-                    className="min-w-0 flex-1 h-8 rounded-card border bg-surface px-3 text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 />
                 <Button size="sm" type="submit" disabled={!answer.trim()}>Answer</Button>
                 <Button size="sm" variant="outline" type="button" onClick={() => send(false)}>Skip</Button>
@@ -302,7 +302,7 @@ const HandoffActions: React.FC<{
     )
 }
 
-const Site: React.FC<{ children: React.ReactNode }> = ({ children }) => <strong className="font-semibold">{children}</strong>
+const Site: React.FC<{ children: React.ReactNode }> = ({ children }) => <strong className="font-medium">{children}</strong>
 
 // Berry has handed a tab to the user, and waits here until they say they're done. The words come from code, so only
 // who's speaking changes.
@@ -352,5 +352,5 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
 
 // Why a reply failed, worded with what to do about it.
 export const ChatError: React.FC<{ message: string }> = ({ message }) => (
-    <p role="alert" className="text-14 text-destructive animate-fade-in">{message}</p>
+    <p role="alert" className="text-13 text-ask animate-fade-in">{message}</p>
 )

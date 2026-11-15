@@ -76,8 +76,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             message.role === 'user' ? (
                                 <div key={index} className="flex flex-col">
                                     {/* Another app wrote the first message, so it says whose words they are. */}
-                                    {index === 0 && thread.from && <p className="mb-1.5 text-12 text-muted-foreground text-right">From {thread.from}</p>}
-                                    {index === 0 && thread.runner && <p className="mb-1.5 text-12 text-muted-foreground text-right">In the cloud</p>}
+                                    {index === 0 && thread.from && <p className="mb-1.5 text-12 text-ink-2 text-right">From {thread.from}</p>}
+                                    {index === 0 && thread.runner && <p className="mb-1.5 text-12 text-ink-2 text-right">In the cloud</p>}
                                     <UserMessage content={message.content} />
                                 </div>
                             ) : (
@@ -111,7 +111,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             thread.messages.at(-1)?.role === 'assistant' &&
                             thread.messages.some((message) => message.role === 'assistant' && (message.steps?.length ?? 0) > 0) && (
                             <div>
-                                <Button size="sm" variant="ghost" className="-ml-3 text-muted-foreground" onClick={saveAsRoutine}>
+                                <Button size="sm" variant="ghost" className="-ml-3 text-ink-2" onClick={saveAsRoutine}>
                                     Save as routine
                                 </Button>
                             </div>

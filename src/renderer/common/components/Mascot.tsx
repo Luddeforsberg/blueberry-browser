@@ -487,7 +487,7 @@ export const Mascot: React.FC<MascotProps> = ({
         role="img"
         aria-label="Assistant"
         onContextMenu={onContextMenu}
-        className={cn("text-muted-foreground", className)}
+        className={cn("text-ink-2", className)}
         style={{ width: size, height: size }}
       />
     );

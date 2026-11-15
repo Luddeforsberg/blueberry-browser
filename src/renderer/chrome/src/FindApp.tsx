@@ -37,7 +37,6 @@ export const FindApp: React.FC = () => {
     return (
         <div className="p-3">
             <FindBarCard
-                glass={theme.glass}
                 inputRef={input}
                 value={value}
                 onChange={(text) => {

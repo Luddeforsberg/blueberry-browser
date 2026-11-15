@@ -172,7 +172,7 @@ const WORK_SAMPLES: Array<{ label: string; view: WorkView; asking?: boolean }> =
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <section className="mt-10">
-        <h2 className="text-20 font-semibold">{title}</h2>
+        <h2 className="text-18 font-medium">{title}</h2>
         <div className="mt-4">{children}</div>
     </section>
 )
@@ -188,7 +188,7 @@ export const GalleryPage: React.FC = () => {
     return (
         <div className="h-full overflow-y-auto">
             <div className="max-w-4xl mx-auto px-8 py-10">
-                <h1 className="text-20 font-semibold">Component gallery</h1>
+                <h1 className="text-18 font-medium">Component gallery</h1>
 
                 <Section title="Berry">
                     <label className="flex items-center gap-2 text-13">
@@ -197,26 +197,26 @@ export const GalleryPage: React.FC = () => {
                     </label>
                     <div className="mt-4 grid grid-cols-4 gap-6">
                         {MOODS.map((mood) => (
-                            <figure key={mood} className="flex flex-col items-center gap-2 p-4 rounded-card bg-muted">
+                            <figure key={mood} className="flex flex-col items-center gap-2 p-4 rounded-tile bg-sheet-2">
                                 <Mascot mood={mood} size={96} still={still} />
                                 <div className="flex items-end gap-3">
                                     <Mascot mood={mood} size={32} still={still} />
                                     <Mascot mood={mood} size={24} still={still} />
                                     <Mascot mood={mood} size={16} still={still} />
                                 </div>
-                                <figcaption className="text-12 text-muted-foreground">{MOOD_LABELS[mood]}</figcaption>
+                                <figcaption className="text-12 text-ink-2">{MOOD_LABELS[mood]}</figcaption>
                             </figure>
                         ))}
                     </div>
-                    <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
+                    <div className="mt-4 flex items-center gap-3 text-12 text-ink-2">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
                     </div>
-                    <div className="mt-4 flex items-end gap-6 text-12 text-muted-foreground">
+                    <div className="mt-4 flex items-end gap-6 text-12 text-ink-2">
                         <WalkingBird size={40} foot={1} stepMs={0} />
                         <WalkingBird size={40} foot={0} stepMs={0} pecking />
                         <span>The small birds behind the new tab page, walking and pecking.</span>
                     </div>
-                    <div className="mt-4 flex items-center gap-3 text-12 text-muted-foreground">
+                    <div className="mt-4 flex items-center gap-3 text-12 text-ink-2">
                         <BerryDot /> <BerryDot working /> The berry as a status marker, at rest and during real work.
                     </div>
                 </Section>
@@ -226,7 +226,7 @@ export const GalleryPage: React.FC = () => {
                         {PALETTES.map(({ id, label }, index) => {
                             const look = { palette: id, accessory: ACCESSORIES[index % ACCESSORIES.length].id }
                             return (
-                                <figure key={id} className="flex flex-col items-center gap-2 p-4 rounded-card bg-muted">
+                                <figure key={id} className="flex flex-col items-center gap-2 p-4 rounded-tile bg-sheet-2">
                                     <Mascot look={look} size={96} still={still} />
                                     <div className="flex flex-wrap justify-center items-end gap-1">
                                         {MOODS.map((mood) => (
@@ -243,12 +243,12 @@ export const GalleryPage: React.FC = () => {
                                             <Mascot key={accessory} look={{ palette: id, accessory }} size={16} still={still} />
                                         ))}
                                     </div>
-                                    <figcaption className="text-12 text-muted-foreground">{label}</figcaption>
+                                    <figcaption className="text-12 text-ink-2">{label}</figcaption>
                                 </figure>
                             )
                         })}
                     </div>
-                    <div className="mt-4 max-w-xl p-2 rounded-composer border bg-surface">
+                    <div className="mt-4 max-w-xl p-2 rounded-prompt border bg-sheet">
                         <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} onClose={() => undefined} />
                     </div>
                     <div className="mt-6 max-w-[248px]">
@@ -267,7 +267,7 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Suggestions">
-                    <div className="relative h-[420px] rounded-panel overflow-hidden">
+                    <div className="relative h-[420px] rounded-sheet overflow-hidden">
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
                         <div className="relative max-w-[752px] mx-auto">
                             <BirdSuggestions suggestions={SAMPLE_SUGGESTIONS} onUse={() => undefined} onDismiss={() => undefined} />
@@ -276,7 +276,7 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Art blueberry">
-                    <div className="relative h-72 rounded-panel overflow-hidden">
+                    <div className="relative h-72 rounded-sheet overflow-hidden">
                         <ArtBlueberry dark={theme.isDark} className="absolute left-1/2 top-0 max-w-none -translate-x-1/2" />
                     </div>
                 </Section>
@@ -331,7 +331,7 @@ export const GalleryPage: React.FC = () => {
                         {WORK_SAMPLES.map(({ label, view, asking }) => (
                             <div key={label} className="w-[320px]">
                                 <WorkingView view={view} frames={SAMPLE_FRAMES} mascot={BERRY} approval={asking ? SAMPLE_ASKING : null} aspect={10 / 7} onStop={() => {}} onShowAsking={() => {}} />
-                                <p className="mt-2 text-11 text-muted-foreground">{label}</p>
+                                <p className="mt-2 text-11 text-ink-2">{label}</p>
                             </div>
                         ))}
                     </div>
@@ -379,7 +379,7 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="History">
-                    <ul className="max-w-xl rounded-panel border bg-surface p-2">
+                    <ul className="max-w-xl rounded-sheet border bg-sheet p-2">
                         <HistoryRow
                             entry={{ id: 1, url: 'https://en.wikipedia.org/wiki/Jackdaw', title: 'Jackdaw', favicon: null, visitedAt: Date.now() }}
                             onOpen={() => undefined}
@@ -390,11 +390,11 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="A page in trouble">
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="h-72 rounded-panel border"><PageTrouble trouble="crashed" onReload={() => undefined} /></div>
-                        <div className="h-72 rounded-panel border"><PageTrouble trouble="unresponsive" onReload={() => undefined} /></div>
-                        <div className="h-72 rounded-panel border"><PageTrouble trouble={{ url: 'https://example.com/missing', description: 'ERR_NAME_NOT_RESOLVED' }} onReload={() => undefined} /></div>
+                        <div className="h-72 rounded-sheet border"><PageTrouble trouble="crashed" onReload={() => undefined} /></div>
+                        <div className="h-72 rounded-sheet border"><PageTrouble trouble="unresponsive" onReload={() => undefined} /></div>
+                        <div className="h-72 rounded-sheet border"><PageTrouble trouble={{ url: 'https://example.com/missing', description: 'ERR_NAME_NOT_RESOLVED' }} onReload={() => undefined} /></div>
                     </div>
-                    <div className="mt-3 flex items-center gap-3 text-12 text-muted-foreground">
+                    <div className="mt-3 flex items-center gap-3 text-12 text-ink-2">
                         <TabIcon tab={{ page: null, favicon: null, isLoading: false, berryWorking: false, trouble: 'crashed' }} /> Its tab shows this until it’s reloaded.
                     </div>
                 </Section>
@@ -403,7 +403,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="max-w-sm">
                         <ApprovalCard
                             avatar={<Mascot mood="asking" size={32} />}
-                            question={<>I’d like to open <strong className="font-semibold">github.com</strong> in a new tab</>}
+                            question={<>I’d like to open <strong className="font-medium">github.com</strong> in a new tab</>}
                             exactly="Open https://github.com/acme/checkout/pull/412?diff=split in a new tab"
                             onConfirm={() => undefined}
                             onDeny={() => undefined}
@@ -430,7 +430,7 @@ export const GalleryPage: React.FC = () => {
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(0, 1)} />
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(1, 2)} />
                     </div>
-                    <ul className="mt-4 rounded-panel border bg-surface divide-y overflow-hidden">
+                    <ul className="mt-4 rounded-sheet border bg-sheet divide-y overflow-hidden">
                         {SAMPLE_DOWNLOADS.map((download) => (
                             <DownloadRow key={download.id} download={download} onAction={() => undefined} />
                         ))}
@@ -441,7 +441,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <ToolBarButton Icon={Star} label="Bookmark this page" onClick={() => undefined} />
                         <ToolBarButton label="Remove bookmark" toggled className="bg-transparent hover:bg-transparent" onClick={() => undefined}>
-                            <Star className="size-4 fill-current text-bookmark" />
+                            <Star className="size-4 fill-current text-ink" />
                         </ToolBarButton>
                         <ToolBarButton Icon={Star} label="Bookmark this page (unavailable on internal pages)" active={false} />
                     </div>
@@ -463,9 +463,9 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Find bar">
                     <div className="flex flex-col gap-3 max-w-sm">
-                        <FindBarCard glass={false} value="" onChange={() => undefined} result={null} onStep={() => undefined} onClose={() => undefined} />
-                        <FindBarCard glass={false} value="berry" onChange={() => undefined} result={{ active: 2, total: 14 }} onStep={() => undefined} onClose={() => undefined} />
-                        <FindBarCard glass={false} value="blueberry" onChange={() => undefined} result={{ active: 0, total: 0 }} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard value="" onChange={() => undefined} result={null} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard value="berry" onChange={() => undefined} result={{ active: 2, total: 14 }} onStep={() => undefined} onClose={() => undefined} />
+                        <FindBarCard value="blueberry" onChange={() => undefined} result={{ active: 0, total: 0 }} onStep={() => undefined} onClose={() => undefined} />
                     </div>
                 </Section>
 
@@ -473,7 +473,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-3">
                         <Button>Primary</Button>
                         <Button variant="outline">Outline</Button>
-                        <Button variant="ghost" className="text-muted-foreground">Quiet</Button>
+                        <Button variant="ghost" className="text-ink-2">Quiet</Button>
                         <Button disabled>Disabled</Button>
                         <Button variant="destructive">Stop recording</Button>
                     </div>
@@ -496,10 +496,10 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="Status">
                     <ul className="flex gap-6 text-13">
-                        <li className="text-accent-ink">Running now</li>
-                        <li className="text-success">Finished</li>
-                        <li className="text-warning">Needs your OK</li>
-                        <li className="text-destructive">Failed</li>
+                        <li className="text-ink">Running now</li>
+                        <li className="text-ink-2">Finished</li>
+                        <li className="text-ask">Needs your OK</li>
+                        <li className="text-ask">Failed</li>
                     </ul>
                 </Section>
             </div>

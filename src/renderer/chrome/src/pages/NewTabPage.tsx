@@ -19,8 +19,8 @@ import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { cn } from '@common/lib/utils'
 
 const TRAY_BUTTON = cn(
-    "flex items-center gap-2 h-8 px-2.5 rounded-control text-14 text-muted-foreground outline-none transition-colors",
-    "hover:text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+    "flex items-center gap-2 h-8 px-2.5 rounded-row text-13 text-ink-2 outline-none transition-colors",
+    "hover:text-ink hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
 )
 
 const WORK_CARDS = 3
@@ -122,7 +122,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             id: chat.id,
             mascot: find(chat.mascotId),
             mood: 'rest' as const,
-            words: <p className="font-semibold">{chat.title}</p>,
+            words: <p className="font-medium">{chat.title}</p>,
             action: 'Open the chat',
             actionLabel: `Open the chat: ${chat.title}`,
             onUse: () => void browser.openPage('chat', { param: chat.id, title: chat.title })
@@ -133,7 +133,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             mood: routine.status === 'running' ? 'fetching' as const : 'rest' as const,
             words: (
                 <>
-                    <p className="flex items-center gap-2 font-semibold">
+                    <p className="flex items-center gap-2 font-medium">
                         {routine.name}
                         {routine.status === 'running' && <BerryDot working />}
                         {routine.status === 'running' && <span className="sr-only">Running now</span>}
@@ -153,7 +153,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             id: 'idea-routines',
             mascot: find(null),
             mood: 'rest',
-            words: <p><span className="font-semibold">Put something on a schedule.</span> <span className="opacity-90">{isBerry ? 'Hand me a task that repeats, and I’ll report back when it’s done.' : 'Set up a task that repeats, with results waiting for you.'}</span></p>,
+            words: <p><span className="font-medium">Put something on a schedule.</span> <span className="opacity-90">{isBerry ? 'Hand me a task that repeats, and I’ll report back when it’s done.' : 'Set up a task that repeats, with results waiting for you.'}</span></p>,
             action: 'See routines',
             onUse: () => void browser.openPage('routines')
         },
@@ -161,13 +161,13 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             id: 'idea-settings',
             mascot: find(null),
             mood: 'rest',
-            words: <p><span className="font-semibold">Make the browser yours.</span> <span className="opacity-90">Choose your tab layout and theme, and what stays on this computer.</span></p>,
+            words: <p><span className="font-medium">Make the browser yours.</span> <span className="opacity-90">Choose your tab layout and theme, and what stays on this computer.</span></p>,
             action: 'Open settings',
             onUse: () => void browser.openPage('settings')
         }
     ]
 
-    const glass = theme.glass ? "bg-surface/90 backdrop-blur-xl" : "bg-surface"
+    const glass = theme.glass ? "bg-sheet/90 backdrop-blur-xl" : "bg-sheet"
     return (
         <div className="relative h-full overflow-y-auto">
             <div className="relative min-h-full overflow-hidden">
@@ -178,7 +178,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     {/* Room for Berry, who stands on the composer's top edge. */}
                     {isBerry && <div className="h-[84px]" />}
 
-                    <div data-berry-home className="relative z-10 rounded-composer">
+                    <div data-berry-home className="relative z-10 rounded-prompt">
                         <Composer
                             label={`Search, enter a URL, or ask ${isBerry ? name : 'a question'}`}
                             placeholder={isBerry ? `Ask ${name} anything, or enter a URL…` : 'Ask anything, or enter a URL…'}
@@ -201,7 +201,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     </div>
                     {/* The sidebar holds these when it's open. Frosted, so a bird walking behind the page can't cross a label. */}
                     {!layout.sidebarOpen && (
-                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-card", theme.glass ? "bg-canvas/70 backdrop-blur-xl" : "bg-canvas")}>
+                        <div className={cn("relative z-10 flex items-center gap-1 h-11 px-2 mt-1 rounded-tile", theme.glass ? "bg-sheet/70 backdrop-blur-xl" : "bg-sheet")}>
                             {TRAY.map(({ label, Icon, onClick }) => (
                                 <button key={label} type="button" onClick={() => void onClick()} className={TRAY_BUTTON}>
                                     <Icon className="size-4" />
@@ -238,8 +238,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
 
                 {recent.length > 0 && (
-                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-panel shadow-card", glass)}>
-                        <h2 id="recent-heading" className="px-2 py-1 text-14 text-muted-foreground">
+                    <section aria-labelledby="recent-heading" className={cn("relative mt-8 p-2 rounded-sheet shadow-card-lift", glass)}>
+                        <h2 id="recent-heading" className="px-2 py-1 text-13 text-ink-2">
                             Recent
                         </h2>
                         <ul>
@@ -249,13 +249,13 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         type="button"
                                         onClick={() => void browser.navigateTab(tab.id, visit.url)}
                                         className={cn(
-                                            "w-full h-9 px-2 flex items-center gap-3 rounded-control text-14 text-left",
-                                            "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+                                            "w-full h-9 px-2 flex items-center gap-3 rounded-row text-13 text-left",
+                                            "hover:bg-hover outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus"
                                         )}
                                     >
                                         <Favicon src={visit.favicon} site={visit.url} />
                                         <span className="flex-1 truncate">{visit.title}</span>
-                                        <span className="text-12 text-muted-foreground tabular-nums">
+                                        <span className="text-12 text-ink-2 tabular-nums">
                                             {timeOf(visit.visitedAt)}
                                         </span>
                                     </button>

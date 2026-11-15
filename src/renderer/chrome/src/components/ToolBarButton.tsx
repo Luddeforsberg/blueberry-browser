@@ -29,11 +29,11 @@ export const ToolBarButton: React.FC<ToolBarButtonProps> = ({
             aria-pressed={toggled || undefined}
             disabled={!active}
             className={cn(
-                "size-8 flex shrink-0 items-center justify-center rounded-control",
-                "text-muted-foreground hover:text-foreground app-region-no-drag outline-none transition-colors",
-                "focus-visible:ring-2 focus-visible:ring-ring",
-                "hover:bg-muted active:brightness-95 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
-                toggled && "bg-muted text-foreground",
+                "size-8 flex shrink-0 items-center justify-center rounded-row",
+                "text-ink-2 hover:text-ink app-region-no-drag outline-none transition-colors",
+                "focus-visible:ring-2 focus-visible:ring-focus",
+                "hover:bg-hover active:bg-press disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-2",
+                toggled && "bg-sheet-2 text-ink",
                 className
             )}
             onClick={onClick}

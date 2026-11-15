@@ -25,7 +25,7 @@ const startChat = (id: string, choose: (id: string) => void) => {
 
 // The page's main idea: what a mascot may do, in words, read from its real limits. Open means it isn't limited.
 export const Permissions: React.FC<{ draft: GalleryMascot['draft']; large?: boolean }> = ({ draft, large }) => (
-    <ul aria-label="What it’s allowed to do" className={cn("flex", large ? "flex-col gap-1.5 text-14" : "flex-wrap gap-x-4 gap-y-0.5 text-12 text-muted-foreground")}>
+    <ul aria-label="What it’s allowed to do" className={cn("flex", large ? "flex-col gap-1.5 text-13" : "flex-wrap gap-x-4 gap-y-0.5 text-12 text-ink-2")}>
         {permissionsInWords(draft).map(({ text, open }) => {
             const Icon = open ? LockOpen : Lock
             return (
@@ -42,15 +42,15 @@ export const Permissions: React.FC<{ draft: GalleryMascot['draft']; large?: bool
 // image or dress up a link.
 export const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) => (
     <>
-        <h3 className="text-12 text-muted-foreground">I asked this</h3>
-        <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.prompt}</p>
-        <h3 className="mt-4 text-12 text-muted-foreground">And here’s what it gave me</h3>
-        <Markdown content={example.answer} fromStranger className="mt-1 text-14 [overflow-wrap:anywhere]" />
+        <h3 className="text-12 text-ink-2">I asked this</h3>
+        <p className="mt-1 text-13 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.prompt}</p>
+        <h3 className="mt-4 text-12 text-ink-2">And here’s what it gave me</h3>
+        <Markdown content={example.answer} fromStranger className="mt-1 text-13 [overflow-wrap:anywhere]" />
     </>
 )
 
 const InFlock: React.FC = () => (
-    <span className="flex items-center gap-1 text-12 text-success">
+    <span className="flex items-center gap-1 text-12 text-ink-2">
         <Check aria-hidden className="size-3.5" />
         In your flock
     </span>
@@ -83,13 +83,13 @@ export const GalleryCard: React.FC<{ entry: GalleryMascot; copy: MascotProfile |
             </div>
             <div className="min-w-0 flex-1 py-5 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <div className="min-w-[240px] flex-1 [overflow-wrap:anywhere]">
-                    <h2 className="inline text-16 font-semibold">{name}</h2>
-                    <span className="ml-2 text-12 text-muted-foreground">By {entry.author}{entry.example && ' · with an example'}</span>
-                    <p className="mt-0.5 text-14">{entry.description}</p>
+                    <h2 className="inline text-15 font-medium">{name}</h2>
+                    <span className="ml-2 text-12 text-ink-2">By {entry.author}{entry.example && ' · with an example'}</span>
+                    <p className="mt-0.5 text-13">{entry.description}</p>
                     <div className="mt-1.5"><Permissions draft={entry.draft} /></div>
                 </div>
                 <div className="ml-auto shrink-0 flex items-center gap-3">
-                    {entry.addCount !== undefined && (!copy || copy.publishedId === entry.id) && <span className="text-12 text-muted-foreground tabular-nums">{entry.addCount === 1 ? '1 add' : `${entry.addCount} adds`}</span>}
+                    {entry.addCount !== undefined && (!copy || copy.publishedId === entry.id) && <span className="text-12 text-ink-2 tabular-nums">{entry.addCount === 1 ? '1 add' : `${entry.addCount} adds`}</span>}
                     {!onReview ? null : copy ? (
                         <>
                             <InFlock />
@@ -146,10 +146,10 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
             {/* The bird stands on the line under the heading, and the page carries on below it. */}
             <header className="mt-3 flex items-end gap-6 border-b">
                 <div className="min-w-0 flex-1 pb-5 [overflow-wrap:anywhere]">
-                    {linked && <p className="mb-1 text-13 text-muted-foreground">From a link you opened</p>}
-                    <h1 className="text-20 font-semibold">{copy ? `${copy.name} is in your flock` : `Add ${name} to your flock?`}</h1>
-                    <p className="mt-1 text-14">{entry.description}</p>
-                    <p className="mt-1 text-13 text-muted-foreground">
+                    {linked && <p className="mb-1 text-13 text-ink-2">From a link you opened</p>}
+                    <h1 className="text-18 font-medium">{copy ? `${copy.name} is in your flock` : `Add ${name} to your flock?`}</h1>
+                    <p className="mt-1 text-13">{entry.description}</p>
+                    <p className="mt-1 text-13 text-ink-2">
                         By {entry.author}.
                         {entry.publishedAt !== undefined && ' Someone using Blueberry wrote this, and we haven’t checked it, so read what it’s told.'}
                     </p>
@@ -162,17 +162,17 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
             </header>
 
             <section className="py-5 border-b">
-                <h2 className="text-14 font-semibold">What it’s allowed to do</h2>
+                <h2 className="text-13 font-medium">What it’s allowed to do</h2>
                 <div className="mt-2"><Permissions draft={entry.draft} large /></div>
-                <p className="mt-2 text-13 text-muted-foreground">
+                <p className="mt-2 text-13 text-ink-2">
                     {entry.draft.sites.length > 0 && 'A site includes its subdomains, and it can’t use any other site. '}
                     Your Ask before acting setting applies to it as it does to Berry, with the same approval cards.
                 </p>
             </section>
 
             <section className="py-5 border-b">
-                <h2 className="text-14 font-semibold">What it’s told, word for word</h2>
-                <p className="mt-2 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{entry.draft.instructions}</p>
+                <h2 className="text-13 font-medium">What it’s told, word for word</h2>
+                <p className="mt-2 text-13 whitespace-pre-wrap [overflow-wrap:anywhere]">{entry.draft.instructions}</p>
             </section>
 
             {entry.example && (
@@ -182,7 +182,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
             )}
 
             {entry.link && (
-                <p className="py-3 border-b flex flex-wrap items-center gap-2 text-13 text-muted-foreground">
+                <p className="py-3 border-b flex flex-wrap items-center gap-2 text-13 text-ink-2">
                     <span className="[overflow-wrap:anywhere]">{entry.link}</span>
                     <CopyLink link={entry.link} />
                 </p>
@@ -190,13 +190,13 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
 
             {clash && (
                 <section className="pt-5">
-                    <label htmlFor="gallery-own-name" className="text-14 font-semibold">You already have a {name}. Name this one</label>
+                    <label htmlFor="gallery-own-name" className="text-13 font-medium">You already have a {name}. Name this one</label>
                     <input
                         id="gallery-own-name"
                         maxLength={MAX_MASCOT_NAME}
                         value={ownName}
                         onChange={(event) => setOwnName(event.target.value)}
-                        className="mt-2 block w-full max-w-xs h-9 px-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="mt-2 block w-full max-w-xs h-9 px-3 rounded-tile border bg-sheet text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
                     />
                 </section>
             )}
@@ -216,7 +216,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
                     </>
                 )}
             </div>
-            <p className="mt-3 text-12 text-muted-foreground">
+            <p className="mt-3 text-12 text-ink-2">
                 {copy ? 'It’s your own copy. Nothing in the Gallery can change it, and in your flock you can edit it or take off its limits.' : 'You get your own copy. Nothing in the Gallery can change it later, and in your flock you can edit it or take off its limits.'}
             </p>
         </article>
@@ -230,11 +230,11 @@ const LinkMissing: React.FC<{ status: GalleryListing['status']; onRetry: () => v
             <ArrowLeft />
             Gallery
         </Button>
-        <p className="mt-3 text-13 text-muted-foreground">From a link you opened</p>
-        <h1 className="mt-1 text-20 font-semibold">
+        <p className="mt-3 text-13 text-ink-2">From a link you opened</p>
+        <h1 className="mt-1 text-18 font-medium">
             {status === 'live' ? 'This mascot isn’t in the Gallery any more' : status === 'unreachable' ? 'Couldn’t reach the Gallery' : 'This Blueberry isn’t connected to the Gallery'}
         </h1>
-        <p role="status" className="mt-1 text-14 text-muted-foreground">
+        <p role="status" className="mt-1 text-13 text-ink-2">
             {status === 'live'
                 ? 'Its author may have taken it down. Nothing was added.'
                 : status === 'unreachable'
@@ -300,7 +300,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         <div className="h-full overflow-y-auto">
             <div className="max-w-5xl mx-auto px-8 py-10">
                 {linkShowing && !linked ? (
-                    <p role="status" className="max-w-2xl mx-auto text-14 text-muted-foreground">Getting the mascot from the Gallery…</p>
+                    <p role="status" className="max-w-2xl mx-auto text-13 text-ink-2">Getting the mascot from the Gallery…</p>
                 ) : linked?.entry ? (
                     <Review key={linked.entry.id} entry={linked.entry} copy={copyOf(linked.entry)} linked onBack={back} />
                 ) : linked ? (
@@ -311,8 +311,8 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     <>
                         <div className="flex items-start justify-between gap-4">
                             <div className="max-w-2xl">
-                                <h1 className="text-20 font-semibold">Gallery</h1>
-                                <p className="mt-1 text-14 text-muted-foreground">
+                                <h1 className="text-18 font-medium">Gallery</h1>
+                                <p className="mt-1 text-13 text-ink-2">
                                     {listing?.status === 'live'
                                         ? 'Birds made for one job. A few are ours. The rest were written by strangers and nobody has checked them, so each one shows you what it’s told, word for word, before you add it. What you add is your own copy.'
                                         : 'Birds made for one job. Each one shows you what it’s told, word for word, before you add it, and what you add is your own copy.'}
@@ -321,7 +321,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <Button variant="ghost" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Flock</Button>
                         </div>
                         <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-1">
-                            <label className="flex-1 min-w-[200px] max-w-xs h-8 flex items-center gap-2 text-muted-foreground">
+                            <label className="flex-1 min-w-[200px] max-w-xs h-8 flex items-center gap-2 text-ink-2">
                                 <Search aria-hidden className="size-4 shrink-0" />
                                 <input
                                     type="search"
@@ -329,7 +329,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     placeholder="Search mascots or sites"
                                     value={view.query}
                                     onChange={(event) => setGalleryView({ query: event.target.value })}
-                                    className="min-w-0 flex-1 h-8 bg-transparent text-14 text-foreground placeholder:text-muted-foreground outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring"
+                                    className="min-w-0 flex-1 h-8 bg-transparent text-13 text-ink placeholder:text-ink-2 outline-none rounded-row focus-visible:ring-2 focus-visible:ring-focus"
                                 />
                             </label>
                             {categories.length > 0 && (
@@ -352,13 +352,13 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             )}
                         </div>
                         {listing?.status === 'unreachable' && (
-                            <p role="status" className="mt-4 flex flex-wrap items-center gap-3 text-14 text-warning">
+                            <p role="status" className="mt-4 flex flex-wrap items-center gap-3 text-13 text-ask">
                                 Couldn’t reach the Gallery’s server, so only the mascots that come with Blueberry are showing.
                                 <Button variant="outline" size="sm" onClick={load}>Try again</Button>
                             </p>
                         )}
                         {entries && shown.length === 0 ? (
-                            <p className="mt-16 text-14 text-muted-foreground text-center">
+                            <p className="mt-16 text-13 text-ink-2 text-center">
                                 {entries.length === 0 ? 'The Gallery couldn’t be loaded.' : 'No mascot matches that. Try a site or another category.'}
                             </p>
                         ) : (

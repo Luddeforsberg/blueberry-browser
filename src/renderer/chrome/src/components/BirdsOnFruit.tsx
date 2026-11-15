@@ -72,13 +72,13 @@ const IdeaWords: React.FC<{
         <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ clipPath: `circle(${FRUIT_RADIUS}px at ${fruitCentre.x}px ${fruitCentre.y}px)` }}>
             <div className="absolute -inset-x-5 -inset-y-4 rounded-[40px] bg-berry-fruit-crown/85 blur-xl" />
         </div>
-        <div className="relative text-14 text-primary-foreground [overflow-wrap:anywhere]">{idea.words}</div>
-        <div className="relative mt-1.5 -ml-2 flex flex-wrap items-center gap-x-1 text-13 text-primary-foreground">
+        <div className="relative text-13 text-ground [overflow-wrap:anywhere]">{idea.words}</div>
+        <div className="relative mt-1.5 -ml-2 flex flex-wrap items-center gap-x-1 text-13 text-ground">
             <button
                 type="button"
                 aria-label={idea.actionLabel}
                 onClick={idea.onUse}
-                className="group/use h-7 px-2 flex items-center gap-1.5 rounded-control font-semibold outline-none transition-colors hover:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground"
+                className="group/use h-7 px-2 flex items-center gap-1.5 rounded-row font-medium outline-none transition-colors hover:bg-ground/15 focus-visible:ring-2 focus-visible:ring-ground"
             >
                 {idea.action}
                 <ArrowRight aria-hidden className="size-3.5 transition-transform group-hover/use:translate-x-0.5" />
@@ -88,7 +88,7 @@ const IdeaWords: React.FC<{
                     type="button"
                     aria-label={idea.dismiss.label}
                     onClick={idea.dismiss.onDismiss}
-                    className="h-7 px-2 rounded-control opacity-0 outline-none transition-[opacity,background-color] duration-100 group-hover:opacity-85 group-focus-within:opacity-85 hover:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground"
+                    className="h-7 px-2 rounded-row opacity-0 outline-none transition-[opacity,background-color] duration-100 group-hover:opacity-85 group-focus-within:opacity-85 hover:bg-ground/15 focus-visible:ring-2 focus-visible:ring-ground"
                 >
                     Not now
                 </button>
@@ -159,7 +159,7 @@ const suggestionIdea = (suggestion: Suggestion, onUse: (suggestion: Suggestion) 
         : { mascot: BERRY, mood: 'rest' as const, action: suggestion.kind === 'prompt' ? 'Put it in the box' : 'Set it up' }),
     words: (
         <p>
-            <span className="opacity-90">{suggestion.why}.</span> <span className="font-semibold">{suggestion.title}</span>
+            <span className="opacity-90">{suggestion.why}.</span> <span className="font-medium">{suggestion.title}</span>
         </p>
     ),
     onUse: () => onUse(suggestion),

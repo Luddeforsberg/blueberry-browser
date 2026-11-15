@@ -10,8 +10,8 @@ export const SettingsRow: React.FC<{ id: string; title: string; description?: st
 }) => (
     <div className="flex items-center gap-6 min-h-16 py-4 border-b last:border-b-0">
         <div className="flex-1 min-w-0">
-            <h3 id={id} className="text-14 font-semibold break-words">{title}</h3>
-            {description && <p className="mt-0.5 text-13 text-muted-foreground break-words">{description}{more && <> <More about={id} text={more} /></>}</p>}
+            <h3 id={id} className="text-13 font-medium break-words">{title}</h3>
+            {description && <p className="mt-0.5 text-13 text-ink-2 break-words">{description}{more && <> <More about={id} text={more} /></>}</p>}
         </div>
         {children}
     </div>
@@ -29,7 +29,7 @@ export const More: React.FC<{ text: string; about?: string }> = ({ text, about }
                 aria-controls={open ? id : undefined}
                 aria-describedby={about}
                 onClick={() => setOpen(!open)}
-                className="rounded-control text-accent-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-row text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
             >
                 {open ? 'Less' : 'More'}
             </button>

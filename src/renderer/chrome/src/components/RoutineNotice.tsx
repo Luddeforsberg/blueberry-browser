@@ -44,7 +44,7 @@ export const RoutineNotice: React.FC = () => {
         <button
             type="button"
             onClick={() => void window.chromeAPI.browser.openPage('routines')}
-            className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-control text-13 outline-none transition-colors app-region-no-drag hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-row text-13 outline-none transition-colors app-region-no-drag hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
             <BerryDot />
             Routine has news

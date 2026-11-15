@@ -25,20 +25,20 @@ const progressText = ({ receivedBytes, totalBytes }: DownloadInfo): string =>
 
 // Status colours always come with words, so colour is never the only signal.
 export const downloadStatus = (download: DownloadInfo): { text: string; className: string } => {
-    if (download.missing) return { text: 'File is missing', className: 'text-warning' }
+    if (download.missing) return { text: 'File is missing', className: 'text-ask' }
     switch (download.state) {
         case 'progressing':
-            return { text: download.path ? progressText(download) : 'Choosing where to save', className: 'text-muted-foreground' }
+            return { text: download.path ? progressText(download) : 'Choosing where to save', className: 'text-ink-2' }
         case 'paused':
-            return { text: `Paused, ${progressText(download)}`, className: 'text-muted-foreground' }
+            return { text: `Paused, ${progressText(download)}`, className: 'text-ink-2' }
         case 'completed':
-            return { text: formatBytes(download.receivedBytes), className: 'text-muted-foreground' }
+            return { text: formatBytes(download.receivedBytes), className: 'text-ink-2' }
         case 'cancelled':
-            return { text: 'Cancelled', className: 'text-muted-foreground' }
+            return { text: 'Cancelled', className: 'text-ink-2' }
         case 'interrupted':
             return {
                 text: download.canResume ? `Stopped, ${progressText(download)}` : 'Didn’t finish',
-                className: 'text-destructive'
+                className: 'text-ask'
             }
     }
 }

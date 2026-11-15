@@ -51,7 +51,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="h-full grid grid-cols-[240px_1fr]">
             <div className="border-r overflow-y-auto px-3 py-6">
-                <h1 className="px-3 pb-4 text-20 font-semibold">Settings</h1>
+                <h1 className="px-3 pb-4 text-18 font-medium">Settings</h1>
                     <nav aria-label="Settings sections">
                         <ul className="flex flex-col gap-0.5">
                             {SECTIONS.map((name) => (
@@ -61,9 +61,9 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         aria-current={section === name ? 'page' : undefined}
                                         onClick={() => setSection(name)}
                                         className={cn(
-                                            "w-full h-9 px-3 rounded-card text-14 text-left outline-none transition-colors",
-                                            "focus-visible:ring-2 focus-visible:ring-ring",
-                                            section === name ? "bg-muted" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            "w-full h-9 px-3 rounded-tile text-13 text-left outline-none transition-colors",
+                                            "focus-visible:ring-2 focus-visible:ring-focus",
+                                            section === name ? "bg-sheet-2" : "text-ink-2 hover:bg-hover hover:text-ink"
                                         )}
                                     >
                                         {name}
@@ -76,11 +76,11 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div className="overflow-y-auto">
                     <section aria-label={section} className="max-w-[680px] px-8 py-8">
                         <div className="mb-5 flex items-end gap-3">
-                            <h2 className="text-20 font-semibold">{section}</h2>
+                            <h2 className="text-18 font-medium">{section}</h2>
                             {section === 'Berry' && <Berry size={40} />}
                         </div>
 
-                        <div className="rounded-panel border bg-surface px-5">
+                        <div className="rounded-sheet border bg-sheet px-5">
                         {section === 'Appearance' && (
                             <>
                             <SettingsRow id="setting-tabs" title="Tabs" description="In the sidebar, or in a row above the address bar.">

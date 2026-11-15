@@ -15,7 +15,7 @@ const PairingCode: React.FC<{ link: string }> = ({ link }) => {
         return { size: modules.size, cells: Array.from(modules.data) }
     }, [link])
     return (
-        <svg role="img" aria-label="Code to scan with your phone" viewBox={`-2 -2 ${size + 4} ${size + 4}`} className="size-40 shrink-0 rounded-control" shapeRendering="crispEdges">
+        <svg role="img" aria-label="Code to scan with your phone" viewBox={`-2 -2 ${size + 4} ${size + 4}`} className="size-40 shrink-0 rounded-row" shapeRendering="crispEdges">
             <rect x={-2} y={-2} width={size + 4} height={size + 4} fill="#fff" />
             {cells.map((on, at) => (on ? <rect key={at} x={at % size} y={Math.floor(at / size)} width={1} height={1} fill="#000" /> : null))}
         </svg>
@@ -51,8 +51,8 @@ export const PhoneSettings: React.FC = () => {
 
             {phone.status === 'off' && (
                 <div className="py-4">
-                    <h3 id="setting-phone-token" className="text-14 font-semibold">Connect a bot</h3>
-                    <p className="mt-0.5 text-13 text-muted-foreground">In Telegram, message @BotFather, send /newbot and paste the token it gives you. It’s kept encrypted on this computer.</p>
+                    <h3 id="setting-phone-token" className="text-13 font-medium">Connect a bot</h3>
+                    <p className="mt-0.5 text-13 text-ink-2">In Telegram, message @BotFather, send /newbot and paste the token it gives you. It’s kept encrypted on this computer.</p>
                     <form className="mt-3 flex items-center gap-2" onSubmit={(event) => void connect(event)}>
                         <input
                             aria-labelledby="setting-phone-token"
@@ -62,11 +62,11 @@ export const PhoneSettings: React.FC = () => {
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
                             placeholder="Bot token"
-                            className="min-w-0 flex-1 h-8 rounded-card border bg-canvas px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         />
                         <Button type="submit" disabled={busy || !token.trim()}>{busy ? 'Checking…' : 'Connect'}</Button>
                     </form>
-                    {phone.problem && <p role="alert" className="mt-2 text-13 text-destructive">{phone.problem}</p>}
+                    {phone.problem && <p role="alert" className="mt-2 text-13 text-ask">{phone.problem}</p>}
                 </div>
             )}
 
@@ -80,7 +80,7 @@ export const PhoneSettings: React.FC = () => {
                             <div className="flex items-center gap-5">
                                 <PairingCode link={phone.pairLink} />
                                 <div className="min-w-0">
-                                    <p className="text-13 text-muted-foreground">Telegram on this computer instead?</p>
+                                    <p className="text-13 text-ink-2">Telegram on this computer instead?</p>
                                     <Button variant="outline" className="mt-2" onClick={() => void api.openLink()}>Open in my browser</Button>
                                 </div>
                             </div>
@@ -105,7 +105,7 @@ export const PhoneSettings: React.FC = () => {
 
             {phone.status !== 'off' && phone.problem && (
                 <div className="py-4">
-                    <p role="alert" className="text-13 text-warning">{phone.problem}</p>
+                    <p role="alert" className="text-13 text-ask">{phone.problem}</p>
                 </div>
             )}
         </>

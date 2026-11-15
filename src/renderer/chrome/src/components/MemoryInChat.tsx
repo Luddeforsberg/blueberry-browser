@@ -16,7 +16,7 @@ const openMemory = (mascotId: string) => {
 }
 
 const ChangeIt: React.FC<{ mascotId: string; children: React.ReactNode }> = ({ mascotId, children }) => (
-    <button type="button" onClick={() => openMemory(mascotId)} className="rounded-control text-accent-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+    <button type="button" onClick={() => openMemory(mascotId)} className="rounded-row text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">
         {children}
     </button>
 )
@@ -29,7 +29,7 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
     const line = (fact: MemoryFact) => <>{fact.text}{fact.site && <span className="whitespace-nowrap"> ({fact.site})</span>}</>
     if (used.length <= MAX_SHOWN) {
         return (
-            <div aria-label="What it’s keeping in mind" className="text-13 text-muted-foreground [overflow-wrap:anywhere]">
+            <div aria-label="What it’s keeping in mind" className="text-13 text-ink-2 [overflow-wrap:anywhere]">
                 {used.map((fact, index) => (
                     <p key={fact.id}>
                         {index === 0 && 'Keeping in mind: '}{line(fact)}{index === used.length - 1 && <> <ChangeIt mascotId={fact.mascotId}>Change</ChangeIt></>}
@@ -39,12 +39,12 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
         )
     }
     return (
-        <div aria-label="What it’s keeping in mind" className="flex flex-col items-start gap-1.5 text-13 text-muted-foreground [overflow-wrap:anywhere]">
+        <div aria-label="What it’s keeping in mind" className="flex flex-col items-start gap-1.5 text-13 text-ink-2 [overflow-wrap:anywhere]">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen(!open)}
-                className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
             >
                 <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
                 Keeping in mind {used.length} things you kept
@@ -72,10 +72,10 @@ const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; erro
     <li aria-label="Offer to remember">
         <p>{offer.text}{offer.site && <span className="text-12"> Only on {offer.site}</span>}</p>
         <div className="-ml-2.5 flex items-center">
-            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => onAnswer(true)}>Remember</Button>
-            <Button size="xs" variant="ghost" className="text-muted-foreground" onClick={() => onAnswer(false)}>No thanks</Button>
+            <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => onAnswer(true)}>Remember</Button>
+            <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => onAnswer(false)}>No thanks</Button>
         </div>
-        {error && <p role="alert" className="text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-ask">{error}</p>}
     </li>
 )
 
@@ -85,13 +85,13 @@ export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text
     const name = useAssistantName(mascot)
     const [open, setOpen] = useState(startOpen)
     return (
-        <div className="flex flex-col items-start gap-1.5 text-13 text-muted-foreground [overflow-wrap:anywhere] animate-fade-in">
+        <div className="flex flex-col items-start gap-1.5 text-13 text-ink-2 [overflow-wrap:anywhere] animate-fade-in">
             {offers.length > 0 && (
                 <button
                     type="button"
                     aria-expanded={open}
                     onClick={() => setOpen(!open)}
-                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-control outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                 >
                     <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
                     {showBerry ? 'Something I could remember for next time' : `Something ${name} could remember for next time`}

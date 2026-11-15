@@ -115,7 +115,7 @@ const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
 const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: boolean }> = ({ tab, frames, name, big = false }) => {
     const picture = useSyncExternalStore(frames.subscribe, () => frames.get(tab.id))
     if (tab.state !== 'picture') {
-        return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-13 text-muted-foreground">{WITHOUT_PICTURE[tab.state](name)}</div>
+        return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-13 text-ink-2">{WITHOUT_PICTURE[tab.state](name)}</div>
     }
     if (tab.cloud) return big ? <CloudPicture tab={tab} /> : <div className="absolute inset-0 bg-tray" />
     return picture ? <img src={picture} alt="" decoding="sync" draggable={false} className="absolute inset-0 size-full object-cover object-top" /> : <div className="absolute inset-0 bg-tray" />
@@ -146,19 +146,19 @@ const WorkWindow: React.FC<{
             onClick={onPress}
             aria-label={`Go to the tab on ${tab.site}`}
             className={cn(
-                "group block w-full overflow-hidden rounded-card bg-surface text-left outline-none transition-shadow duration-layout focus-visible:ring-2 focus-visible:ring-ring",
-                live ? "shadow-reading" : "shadow-page"
+                "group block w-full overflow-hidden rounded-tile bg-sheet text-left outline-none transition-shadow duration-panel focus-visible:ring-2 focus-visible:ring-focus",
+                live ? "shadow-lift" : "shadow-rim"
             )}
         >
             {isUsers(tab) ? (
                 <span className="h-10 px-3 flex items-center gap-2 text-13">
                     <Favicon src={tab.favicon} site={tab.site} />
-                    <span className="truncate text-muted-foreground transition-colors group-hover:text-foreground">{tab.site}</span>
+                    <span className="truncate text-ink-2 transition-colors group-hover:text-ink">{tab.site}</span>
                     <span className="ml-auto shrink-0">You have this tab</span>
                 </span>
             ) : (
                 <>
-                    <span className="h-7 px-2.5 flex items-center gap-1.5 border-b text-12 text-muted-foreground transition-colors group-hover:text-foreground">
+                    <span className="h-7 px-2.5 flex items-center gap-1.5 border-b text-12 text-ink-2 transition-colors group-hover:text-ink">
                         <Favicon src={tab.favicon} site={tab.site} />
                         <span className="truncate">{tab.site}</span>
                     </span>
@@ -172,11 +172,11 @@ const WorkWindow: React.FC<{
 )
 
 const SmallWindow: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; aspect: number; onPress: () => void }> = ({ tab, frames, name, aspect, onPress }) => (
-    <button type="button" onClick={onPress} aria-label={`Go to the tab on ${tab.site}`} className="group w-[104px] flex flex-col gap-1 text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring">
-        <span style={{ aspectRatio: aspect }} className="relative block w-full overflow-hidden rounded-control border bg-tray transition-colors group-hover:border-muted-foreground">
+    <button type="button" onClick={onPress} aria-label={`Go to the tab on ${tab.site}`} className="group w-[104px] flex flex-col gap-1 text-left outline-none rounded-row focus-visible:ring-2 focus-visible:ring-focus">
+        <span style={{ aspectRatio: aspect }} className="relative block w-full overflow-hidden rounded-row border bg-tray transition-colors group-hover:border-ink-2">
             <Picture tab={tab} frames={frames} name={name} />
         </span>
-        <span className="truncate text-11 text-muted-foreground transition-colors group-hover:text-foreground">{tab.site}</span>
+        <span className="truncate text-11 text-ink-2 transition-colors group-hover:text-ink">{tab.site}</span>
     </button>
 )
 
@@ -210,7 +210,7 @@ export const WorkingView: React.FC<{
         <div className="flex flex-col animate-fade-in">
             <WorkWindow tab={current} frames={frames} name={name} live={!ended && current.state === 'picture'} aspect={aspect} perched={perched} onPress={() => void switchTab(current.id)} />
 
-            <div role="status" className="mt-4 text-16 text-foreground">
+            <div role="status" className="mt-4 text-15 text-ink">
                 {ended ? (
                     OUTCOME[view.outcome!]
                 ) : approval ? (
@@ -222,19 +222,19 @@ export const WorkingView: React.FC<{
 
             {/* A handoff is answered in the tab itself, which the window above goes to. */}
             {!ended && approval && !approval.handoff && (
-                <button type="button" onClick={onShowAsking} className="-mx-1.5 mt-1 w-fit h-6 px-1.5 flex items-center gap-1 rounded-control text-13 text-accent-ink outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                <button type="button" onClick={onShowAsking} className="-mx-1.5 mt-1 w-fit h-6 px-1.5 flex items-center gap-1 rounded-row text-13 text-ink outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus">
                     <ArrowLeft aria-hidden className="size-3.5" />
                     Answer in the chat
                 </button>
             )}
 
-            <div className="mt-1 min-h-6 flex items-center gap-2 text-13 text-muted-foreground">
+            <div className="mt-1 min-h-6 flex items-center gap-2 text-13 text-ink-2">
                 {showBerry && <Berry size={20} mascot={mascot} />}
                 <span className="truncate">{name}</span>
                 <span aria-hidden>·</span>
                 <span className="tabular-nums">{elapsed}</span>
                 {!ended && (
-                    <button type="button" onClick={onStop} className="-mr-1.5 ml-auto h-6 px-1.5 shrink-0 flex items-center gap-1 rounded-control outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                    <button type="button" onClick={onStop} className="-mr-1.5 ml-auto h-6 px-1.5 shrink-0 flex items-center gap-1 rounded-row outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus">
                         <CircleStop aria-hidden className="size-3.5" />
                         Stop
                     </button>
@@ -252,7 +252,7 @@ export const WorkingView: React.FC<{
             )}
 
             {view.sites.length > 1 && (
-                <p className="mt-4 pt-4 border-t text-12 text-muted-foreground [overflow-wrap:anywhere]">Been on {sitesInWords(view.sites)}</p>
+                <p className="mt-4 pt-4 border-t text-12 text-ink-2 [overflow-wrap:anywhere]">Been on {sitesInWords(view.sites)}</p>
             )}
         </div>
     )
@@ -270,10 +270,10 @@ export const WorkingStrip: React.FC<{ view: WorkView; mascot: MascotProfile; app
             type="button"
             onClick={() => void switchTab(current.id)}
             aria-label={`Go to the tab on ${current.site}`}
-            className="-mx-2 mb-2 w-[calc(100%+16px)] h-8 px-2 flex items-center gap-2 rounded-control text-13 text-muted-foreground text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="-mx-2 mb-2 w-[calc(100%+16px)] h-8 px-2 flex items-center gap-2 rounded-row text-13 text-ink-2 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
             {showBerry && <Berry mood={approval ? 'asking' : 'fetching'} size={24} mascot={mascot} />}
-            <span role="status" className="min-w-0 truncate text-foreground">
+            <span role="status" className="min-w-0 truncate text-ink">
                 {approval ? askingWords(approval) : <span className={SHIMMER_TEXT}>{view.doing ?? `${name} is thinking`}</span>}
             </span>
             <span aria-hidden>·</span>

@@ -26,7 +26,7 @@ export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: 
             <Download className={active.length > 0 ? 'size-3' : 'size-4'} aria-hidden />
             {active.length > 0 && (
                 <svg viewBox="0 0 24 24" className="absolute inset-1 size-6 -rotate-90" aria-hidden>
-                    <circle cx="12" cy="12" r="10.5" fill="none" strokeWidth="2" className="stroke-border" />
+                    <circle cx="12" cy="12" r="10.5" fill="none" strokeWidth="2" className="stroke-line" />
                     <circle
                         cx="12"
                         cy="12"
@@ -36,7 +36,7 @@ export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: 
                         pathLength={1}
                         strokeDasharray={`${fraction ?? 1} 1`}
                         strokeLinecap="round"
-                        className="stroke-accent-ink transition-[stroke-dasharray] duration-layout"
+                        className="stroke-ink transition-[stroke-dasharray] duration-panel"
                     />
                 </svg>
             )}

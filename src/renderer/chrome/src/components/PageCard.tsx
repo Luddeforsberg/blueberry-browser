@@ -12,21 +12,21 @@ export const PageCard: React.FC<{
     <div
         role="group"
         aria-label={`Berry can see ${host}`}
-        className="group/page relative inline-flex max-w-[240px] items-center gap-2.5 p-1.5 pr-4 rounded-card bg-tray"
+        className="group/page relative inline-flex max-w-[240px] items-center gap-2.5 p-1.5 pr-4 rounded-tile bg-tray"
     >
-        <span className="size-9 shrink-0 flex items-center justify-center rounded-control bg-surface border">
+        <span className="size-9 shrink-0 flex items-center justify-center rounded-row bg-sheet border">
             <Favicon src={favicon} site={host} />
         </span>
         <span className="min-w-0 flex flex-col">
             <span className="text-13 truncate">{title}</span>
-            <span className="text-11 text-muted-foreground truncate">{host}</span>
+            <span className="text-11 text-ink-2 truncate">{host}</span>
         </span>
         <button
             type="button"
             aria-label="Remove this page"
             title="Remove this page"
             onClick={onRemove}
-            className="absolute -top-1.5 -right-1.5 size-5 flex items-center justify-center rounded-full border bg-surface outline-none opacity-0 group-hover/page:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring transition-opacity"
+            className="absolute -top-1.5 -right-1.5 size-5 flex items-center justify-center rounded-full border bg-sheet outline-none opacity-0 group-hover/page:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus transition-opacity"
         >
             <X className="size-3" />
         </button>

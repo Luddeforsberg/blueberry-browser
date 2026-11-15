@@ -43,16 +43,16 @@ export const Favicon: React.FC<FaviconProps> = ({ src, className, fallback, site
                 <span
                     aria-hidden
                     data-letter={letter}
-                    className={cn("size-4 shrink-0 flex items-center justify-center rounded-full bg-muted-foreground/15 text-11 leading-none font-semibold text-muted-foreground before:content-[attr(data-letter)]", className)}
+                    className={cn("size-4 shrink-0 flex items-center justify-center rounded-full bg-ink-2/15 text-11 leading-none font-medium text-ink-2 before:content-[attr(data-letter)]", className)}
                 />
             );
         }
-        return <Globe className={`size-4 shrink-0 text-muted-foreground ${className || ""}`} />;
+        return <Globe className={`size-4 shrink-0 text-ink-2 ${className || ""}`} />;
     }
 
     // Dark icons on a transparent background would vanish in dark mode, so they get a light plate.
     return (
-        <div className="size-4 shrink-0 overflow-hidden rounded-none flex items-center justify-center dark:bg-foreground dark:rounded-control dark:p-px">
+        <div className="size-4 shrink-0 overflow-hidden rounded-none flex items-center justify-center dark:bg-ink dark:rounded-row dark:p-px">
             <img
                 src={src}
                 className="object-contain size-full"

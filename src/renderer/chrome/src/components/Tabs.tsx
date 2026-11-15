@@ -51,7 +51,7 @@ const TabItem: React.FC<{
         onDragStart={(e) => e.preventDefault()}
         style={style}
         className={cn(
-            "group/tab flex items-center h-[34px] pr-1.5 gap-2 rounded-card transition-colors app-region-no-drag",
+            "group/tab flex items-center h-[34px] pr-1.5 gap-2 rounded-tile transition-colors app-region-no-drag",
             iconOnly ? "pl-1.5 gap-1" : "pl-3",
             row && "flex-1 min-w-[60px] max-w-56",
             // Only the active tab always shows its close button, 32px, and the bird perches on it, 44px more, so it starts
@@ -59,9 +59,9 @@ const TabItem: React.FC<{
             row && tab.isActive && (perch
                 ? "basis-[94px] min-w-36 max-w-[calc(theme(maxWidth.56)+76px)]"
                 : "basis-[50px] max-w-[calc(theme(maxWidth.56)+32px)]"),
-            tab.isActive ? "bg-selected shadow-selected" : "hover:bg-foreground/5",
+            tab.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover",
             shifting && "transition-transform",
-            dragged && "relative z-10 shadow-float"
+            dragged && "relative z-10 shadow-lift"
         )}
     >
         <button
@@ -77,12 +77,12 @@ const TabItem: React.FC<{
                 onNudge(e.key === back ? -1 : 1, e.currentTarget)
             }}
             className={cn(
-                "flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-control focus-visible:ring-2 focus-visible:ring-ring",
+                "flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-row focus-visible:ring-2 focus-visible:ring-focus",
                 iconOnly && "justify-center"
             )}
         >
             <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
-            <span className={cn("flex-1 min-w-0 text-14 truncate", iconOnly && "sr-only", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New tab'}</span>
+            <span className={cn("flex-1 min-w-0 text-13 truncate", iconOnly && "sr-only", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New tab'}</span>
             {perch && <span aria-hidden className="w-8 shrink-0" />}
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>
@@ -92,8 +92,8 @@ const TabItem: React.FC<{
             onClick={onClose}
             onPointerDown={(e) => e.stopPropagation()}
             className={cn(
-                "size-6 shrink-0 flex items-center justify-center rounded-control outline-none transition-opacity",
-                "hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100",
+                "size-6 shrink-0 flex items-center justify-center rounded-row outline-none transition-opacity",
+                "hover:bg-press focus-visible:ring-2 focus-visible:ring-focus focus-visible:opacity-100",
                 "opacity-0 group-hover/tab:opacity-100",
                 // In the row, a tab that isn't active only makes room for it on hover or focus, so its title gets the space.
                 row && !tab.isActive && "hidden group-hover/tab:flex group-focus-within/tab:flex",
@@ -172,8 +172,8 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     aria-label="New tab"
                     onClick={() => createTab()}
                     className={cn(
-                        "flex items-center gap-2 h-8 rounded-control text-14 text-muted-foreground app-region-no-drag",
-                        "hover:bg-muted outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                        "flex items-center gap-2 h-8 rounded-row text-13 text-ink-2 app-region-no-drag",
+                        "hover:bg-hover outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
                         vertical ? "w-full px-2 mt-0.5" : "w-8 shrink-0 justify-center"
                     )}
                 >

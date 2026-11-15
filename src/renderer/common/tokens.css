@@ -3,29 +3,27 @@
   :root {
     color-scheme: light;
 
-    --background: 220 223 245;
-    --canvas: 252 252 255;
-    --surface: 255 255 255;
-    --tray: 242 243 251;
-    --card: 243 244 251;
-    --selected: 255 255 255;
-    --muted: 236 238 250;
-    --border: 225 227 242;
-    --foreground: 25 27 51;
-    --muted-foreground: 76 80 112;
-    --primary: 42 51 128;
-    --primary-foreground: 255 255 255;
-    --accent-ink: 47 58 168;
-    --bookmark: 250 204 21;
-    --success: 23 101 60;
-    --warning: 116 75 0;
-    --destructive: 171 36 28;
-    --destructive-foreground: 255 255 255;
-    --shadow-raised: 0 1px 3px rgb(46 52 120 / 0.08), 0 12px 40px rgb(46 52 120 / 0.16);
-    --shadow-selected: 0 2px 10px rgb(58 64 140 / 0.14);
-    --shadow-page: 0 1px 18px rgb(58 64 140 / 0.1);
-    --shadow-card: 0 14px 40px rgb(12 16 70 / 0.3);
-    --frame: linear-gradient(165deg, #c3cbf0 0%, #d6d9f4 30%, #e7e6f7 58%, #d4cfec 100%);
+    --ground: 236 235 231;
+    --tray: 225 224 219;
+    --well: 230 229 224;
+    --sheet: 255 255 255;
+    --sheet-2: 243 242 239;
+    --ink: 21 21 20;
+    --ink-2: 95 94 90;
+    --ink-3: 108 106 101;
+    --faint: 140 138 132;
+    --ask: 198 43 49;
+    --ask-bg: 251 228 227;
+    --focus: 63 81 220;
+    /* Ink at a strength, so these are whole colours rather than channels. */
+    --line: rgb(21 21 20 / 0.09);
+    --dot: rgb(21 21 20 / 0.16);
+    --hover: rgb(21 21 20 / 0.05);
+    --press: rgb(21 21 20 / 0.09);
+
+    --shadow-rim: 0 0 0 1px rgb(21 21 20 / 0.07), 0 1px 2px rgb(21 21 20 / 0.06);
+    --shadow-card-lift: 0 0 0 1px rgb(21 21 20 / 0.07), 0 1px 2px rgb(21 21 20 / 0.06), 0 10px 24px -12px rgb(21 21 20 / 0.2);
+    --shadow-lift: 0 0 0 1px rgb(21 21 20 / 0.06), 0 1px 2px rgb(21 21 20 / 0.05), 0 14px 34px -10px rgb(21 21 20 / 0.16);
 
     /* Berry's own colours, never the UI accent. */
     --berry-ink: 24 28 46;
@@ -42,29 +40,26 @@
   .dark {
     color-scheme: dark;
 
-    --background: 43 43 43;
-    --canvas: 31 31 31;
-    --surface: 36 36 36;
-    --tray: 24 24 24;
-    --card: 42 42 42;
-    --selected: 86 86 86;
-    --muted: 48 48 48;
-    --border: 64 64 64;
-    --foreground: 242 242 242;
-    --muted-foreground: 176 176 176;
-    --primary: 78 95 180;
-    --primary-foreground: 255 255 255;
-    --accent-ink: 163 174 251;
-    --bookmark: 253 224 71;
-    --success: 111 207 151;
-    --warning: 224 176 80;
-    --destructive: 245 158 150;
-    --destructive-foreground: 31 31 31;
-    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.25), 0 10px 32px rgb(0 0 0 / 0.25);
-    --shadow-selected: inset 0 0 0 1px rgb(255 255 255 / 0.08);
-    --shadow-page: 0 1px 18px rgb(0 0 0 / 0.24);
-    --shadow-card: 0 14px 40px rgb(0 0 0 / 0.4);
-    --frame: linear-gradient(165deg, #38383b 0%, #2e2e30 40%, #262628 100%);
+    --ground: 19 19 18;
+    --tray: 31 31 29;
+    --well: 25 25 24;
+    --sheet: 39 39 37;
+    --sheet-2: 49 49 48;
+    --ink: 238 237 232;
+    --ink-2: 166 164 157;
+    --ink-3: 151 149 142;
+    --faint: 119 117 111;
+    --ask: 255 107 107;
+    --ask-bg: 58 31 31;
+    --focus: 143 160 255;
+    --line: rgb(255 255 255 / 0.09);
+    --dot: rgb(255 255 255 / 0.13);
+    --hover: rgb(255 255 255 / 0.06);
+    --press: rgb(255 255 255 / 0.1);
+
+    --shadow-rim: 0 0 0 1px rgb(255 255 255 / 0.08);
+    --shadow-card-lift: 0 0 0 1px rgb(255 255 255 / 0.09), 0 10px 24px -12px rgb(0 0 0 / 0.55);
+    --shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 34px -10px rgb(0 0 0 / 0.6);
 
     /* A dark bird, with a thin light rim so it holds its shape on a dark background. */
     --berry-ink: 42 47 77;
@@ -80,29 +75,14 @@
 
   :root,
   .dark {
-    --glass-tint: rgb(var(--background) / 0.88);
-
     /* The blueberry looks the same in light and dark. */
     --berry-fruit-mid: 78 95 180;
     --berry-fruit-dark: 42 51 128;
     --berry-fruit-bloom: 164 175 224;
     --berry-fruit-crown: 22 28 76;
 
-    /* The ring around a page while Berry is reading it. */
-    --shadow-reading: 0 0 0 2px rgb(127 139 216), 0 0 24px rgb(127 139 216 / 0.5);
-    /* The ring around the page card while the user is showing Berry something. */
-    --shadow-recording: 0 0 0 2px rgb(var(--destructive)), 0 0 18px rgb(var(--destructive) / 0.3);
-
-    /* Names kept from the starter theme, as aliases of the tokens above. */
-    --card-foreground: var(--foreground);
-    --popover: var(--surface);
-    --popover-foreground: var(--foreground);
-    --secondary: var(--muted);
-    --secondary-foreground: var(--foreground);
-    --accent: var(--muted);
-    --accent-foreground: var(--foreground);
-    --input: var(--border);
-    --ring: var(--accent-ink);
+    /* The ring around the page while the user is showing Berry something. */
+    --shadow-recording: 0 0 0 2px rgb(var(--ask)), 0 0 18px rgb(var(--ask) / 0.3);
   }
 
   @media (prefers-reduced-motion: reduce) {

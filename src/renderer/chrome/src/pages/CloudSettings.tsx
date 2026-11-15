@@ -8,7 +8,7 @@ import { useShell } from '../contexts/ShellContext'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 
-const FIELD = 'min-w-0 h-8 rounded-card border bg-canvas px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-ring'
+const FIELD = 'min-w-0 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
 const statusLine = (cloud: CloudState): string => {
     const where = cloud.provider === 'local' ? 'The local test browser' : 'The cloud browser'
@@ -56,22 +56,22 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
 
     return (
         <div className="py-4 border-b last:border-b-0">
-            <h3 id="setting-cloud-logins" className="text-14 font-semibold">Signed in to</h3>
-            <p className="mt-0.5 text-13 text-muted-foreground">
+            <h3 id="setting-cloud-logins" className="text-13 font-medium">Signed in to</h3>
+            <p className="mt-0.5 text-13 text-ink-2">
                 Bring your sign-in to a site along, and a bird in the cloud can use it as you.{' '}
                 <More about="setting-cloud-logins" text="Only that site’s cookies are copied, after Touch ID, and they stay in the cloud browser. Nothing else from this browser goes there." />
             </p>
 
             {cloud.logins.length > 0 && (
-                <ul aria-label="Sites signed in in the cloud" className="mt-3 rounded-card border">
+                <ul aria-label="Sites signed in in the cloud" className="mt-3 rounded-tile border">
                     {cloud.logins.map((login) => (
                         <li key={login.site} className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0">
                             <div className="flex-1 min-w-0">
-                                <p className="text-14 font-semibold truncate">{login.site}</p>
-                                <p className={login.status === 'signed-out' ? 'text-13 text-warning' : 'text-13 text-muted-foreground'}>{loginStatus(login)}</p>
+                                <p className="text-13 font-medium truncate">{login.site}</p>
+                                <p className={login.status === 'signed-out' ? 'text-13 text-ask' : 'text-13 text-ink-2'}>{loginStatus(login)}</p>
                             </div>
-                            <Button size="xs" variant="ghost" className="text-muted-foreground" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
-                            <Button size="xs" variant="ghost" className="text-muted-foreground" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
+                            <Button size="xs" variant="ghost" className="text-ink-2" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
+                            <Button size="xs" variant="ghost" className="text-ink-2" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
                         </li>
                     ))}
                 </ul>
@@ -90,14 +90,14 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
 
             {suggestions.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-13 text-muted-foreground">From your history:</span>
+                    <span className="text-13 text-ink-2">From your history:</span>
                     {suggestions.map((suggestion) => (
                         <Button key={suggestion} size="xs" variant="outline" disabled={working !== null} aria-label={`Bring along ${suggestion}`} onClick={() => void bring(suggestion)}>{suggestion}</Button>
                     ))}
                 </div>
             )}
 
-            {problem && <p role="alert" className="mt-3 text-13 text-warning">{problem}</p>}
+            {problem && <p role="alert" className="mt-3 text-13 text-ask">{problem}</p>}
 
             {cloud.logins.length > 0 && (
                 <div className="mt-3">
@@ -114,7 +114,7 @@ const runnerLine = (runner: RunnerState): string => {
     return 'Jobs can keep going with your Mac off on a server you run, linked here by the email of its own account.'
 }
 
-const LINK = 'rounded-control text-accent-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring'
+const LINK = 'rounded-row text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus'
 
 // The cloud runner, which keeps a job going with this computer off. It's its own account, linked here by email, and it
 // only counts once the runner accepts, naming this account back. Its password never comes here.
@@ -136,13 +136,13 @@ const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
 
     return (
         <div className="py-4 border-b last:border-b-0">
-            <h3 id="setting-cloud-runner" className="text-14 font-semibold">With your Mac off</h3>
+            <h3 id="setting-cloud-runner" className="text-13 font-medium">With your Mac off</h3>
             {runner.status === 'signed-out' ? (
-                <p className="mt-0.5 text-13 text-muted-foreground">
+                <p className="mt-0.5 text-13 text-ink-2">
                     Sign in under <button type="button" onClick={openAccount} className={LINK}>Account</button> to keep jobs going with your Mac off.
                 </p>
             ) : (
-                <p className="mt-0.5 text-13 text-muted-foreground">
+                <p className="mt-0.5 text-13 text-ink-2">
                     {runnerLine(runner)}
                     {runner.status === 'none' && <> <More about="setting-cloud-runner" text="That server signs in as a Blueberry account of its own, not yours, and its password never comes here." /></>}
                 </p>
@@ -156,7 +156,7 @@ const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
             {(runner.status === 'linked' || runner.status === 'waiting') && (
                 <Button className="mt-3" variant="outline" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
             )}
-            {runner.problem && <p role="alert" className="mt-2 text-13 text-warning">{runner.problem}</p>}
+            {runner.problem && <p role="alert" className="mt-2 text-13 text-ask">{runner.problem}</p>}
             {runner.status === 'linked' && runner.relayUrl && <FromOtherApps address={runner.relayUrl} />}
         </div>
     )
@@ -175,25 +175,25 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
     <div className="mt-4">
         <div className="flex items-center gap-6">
             <div className="flex-1 min-w-0">
-                <h4 id="setting-cloud-relay" className="text-13 font-semibold">From ChatGPT or Claude</h4>
-                <p className="mt-0.5 text-13 text-muted-foreground">Give your flock jobs from ChatGPT or Claude on the web or your phone, with your Mac off. <More about="setting-cloud-relay" text="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you." /></p>
+                <h4 id="setting-cloud-relay" className="text-13 font-medium">From ChatGPT or Claude</h4>
+                <p className="mt-0.5 text-13 text-ink-2">Give your flock jobs from ChatGPT or Claude on the web or your phone, with your Mac off. <More about="setting-cloud-relay" text="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you." /></p>
             </div>
             <CopyLink link={address} label="Copy the address for ChatGPT or Claude" />
         </div>
-        <pre aria-labelledby="setting-cloud-relay" className="mt-3 rounded-control bg-tray px-3 py-2.5 text-12 text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
-        <ol className="mt-2 list-decimal pl-5 text-13 text-muted-foreground">
+        <pre aria-labelledby="setting-cloud-relay" className="mt-3 rounded-row bg-tray px-3 py-2.5 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
+        <ol className="mt-2 list-decimal pl-5 text-13 text-ink-2">
             <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
             <li>Sign in with this Blueberry account when it asks.</li>
         </ol>
         <div className="mt-4 flex items-center gap-6">
             <div className="flex-1 min-w-0">
-                <h4 id="setting-cloud-relay-mac" className="text-13 font-semibold">Run their jobs on this Mac when it’s on</h4>
-                <p className="mt-0.5 text-13 text-muted-foreground">While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud. <More about="setting-cloud-relay-mac" text="It asks you here, and they never see the page you’re on." /></p>
+                <h4 id="setting-cloud-relay-mac" className="text-13 font-medium">Run their jobs on this Mac when it’s on</h4>
+                <p className="mt-0.5 text-13 text-ink-2">While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud. <More about="setting-cloud-relay-mac" text="It asks you here, and they never see the page you’re on." /></p>
             </div>
             <Switch labelledBy="setting-cloud-relay-mac" checked={settings.relayOnMac} onChange={(relayOnMac) => updateSettings({ relayOnMac })} />
         </div>
         <Button className="mt-3" variant="outline" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
-        {said && <p role="status" className="mt-2 text-13 text-muted-foreground">{said}</p>}
+        {said && <p role="status" className="mt-2 text-13 text-ink-2">{said}</p>}
     </div>
     )
 }
@@ -233,8 +233,8 @@ export const CloudSettings: React.FC<{ openAccount: () => void }> = ({ openAccou
 
             {cloud.provider !== 'local' && !cloud.configured && (
                 <div className="py-4 border-b last:border-b-0">
-                    <h3 id="setting-cloud-key" className="text-14 font-semibold">Browserbase key</h3>
-                    <p className="mt-0.5 text-13 text-muted-foreground">Both are in Settings in your Browserbase dashboard, and stay encrypted on this computer, sent only to Browserbase.</p>
+                    <h3 id="setting-cloud-key" className="text-13 font-medium">Browserbase key</h3>
+                    <p className="mt-0.5 text-13 text-ink-2">Both are in Settings in your Browserbase dashboard, and stay encrypted on this computer, sent only to Browserbase.</p>
                     <form className="mt-3 flex flex-col gap-2" onSubmit={(event) => void save(event)}>
                         <input aria-label="API key" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" className={`w-full ${FIELD}`} />
                         <div className="flex items-center gap-2">
@@ -261,7 +261,7 @@ export const CloudSettings: React.FC<{ openAccount: () => void }> = ({ openAccou
 
             {cloud.problem && (
                 <div className="py-4 flex items-center gap-6">
-                    <p role="alert" className="flex-1 min-w-0 text-13 text-warning">{cloud.problem}</p>
+                    <p role="alert" className="flex-1 min-w-0 text-13 text-ask">{cloud.problem}</p>
                     {cloud.unreleased && <Button variant="outline" onClick={() => void api.end().then(setCloud)}>Try again</Button>}
                 </div>
             )}

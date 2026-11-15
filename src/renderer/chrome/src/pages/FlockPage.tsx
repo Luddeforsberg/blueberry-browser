@@ -20,14 +20,14 @@ import { blankForm, setRoutinesView } from '../routinesView'
 
 const api = () => window.chromeAPI.mascots
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
-const INPUT = "w-full h-9 px-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+const INPUT = "w-full h-9 px-3 rounded-tile border bg-sheet text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
 // How long a saved mascot gets to fly off before the flock comes back.
 const FLY_OFF_MS = 520
 
 // A bird to press when choosing a look, named for what it's showing.
 const wearing = (name: string, look: MascotLook): MascotProfile => ({ ...BERRY, id: name, name, look })
 
-const QUIET_ACTION = "text-muted-foreground"
+const QUIET_ACTION = "text-ink-2"
 const BIRD = 96
 // How far down the standing drawing its feet reach, and where along it.
 const FEET_Y = 113 / 120
@@ -40,9 +40,9 @@ const HIDDEN_ICON = 32
 // list has `runsOn`, since every row before it is full: its wire carries on to the end of the row, and the list clips it.
 const Wire: React.FC<{ top: number; sags: boolean; runsOn?: boolean }> = ({ top, sags, runsOn = false }) =>
     runsOn ? (
-        <div aria-hidden className="absolute left-0 h-[1.5px] w-screen bg-muted-foreground/45 pointer-events-none" style={{ top: top - 0.75 }} />
+        <div aria-hidden className="absolute left-0 h-[1.5px] w-screen bg-ink-2/45 pointer-events-none" style={{ top: top - 0.75 }} />
     ) : (
-        <svg aria-hidden className="absolute inset-x-0 w-full text-muted-foreground/45 pointer-events-none" style={{ top: top - 1, height: WIRE_SAG + 2 }} viewBox={`0 0 100 ${WIRE_SAG + 2}`} preserveAspectRatio="none">
+        <svg aria-hidden className="absolute inset-x-0 w-full text-ink-2/45 pointer-events-none" style={{ top: top - 1, height: WIRE_SAG + 2 }} viewBox={`0 0 100 ${WIRE_SAG + 2}`} preserveAspectRatio="none">
             <path d={sags ? `M0 1 C 8 1, 9 ${WIRE_SAG + 1}, 16 ${WIRE_SAG + 1} S 34 1, 100 1` : 'M0 1 L100 1'} fill="none" stroke="currentColor" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
         </svg>
     )
@@ -89,14 +89,14 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
             </div>
             {/* A column to the bottom of the row, so every bird's actions sit on one line whatever is above them. */}
             <div className="mt-4 pr-6 flex-1 flex flex-col [overflow-wrap:anywhere]" style={{ paddingLeft: BIRD_LEFT }}>
-                <h2 className="flex items-center gap-2 text-14 font-semibold">
+                <h2 className="flex items-center gap-2 text-13 font-medium">
                     {mascot.name}
                     {working && <BerryDot working />}
                 </h2>
                 <p className="mt-0.5 text-13 line-clamp-2" title={isBerry ? undefined : mascot.instructions}>
                     {isBerry ? 'The original. Always here, and it can do all you let it.' : mascot.instructions}
                 </p>
-                {limits.length > 0 && <p className="mt-1 text-12 text-muted-foreground">{limits.join(' · ')}</p>}
+                {limits.length > 0 && <p className="mt-1 text-12 text-ink-2">{limits.join(' · ')}</p>}
                 <div className="mt-auto pt-1 -ml-2.5 flex flex-wrap">
                     <Button size="xs" variant="ghost" className={QUIET_ACTION} onClick={chat}>Chat</Button>
                     {!isBerry && <Button size="xs" variant="ghost" className={QUIET_ACTION} aria-label={`Edit ${mascot.name}`} onClick={onEdit}>Edit</Button>}
@@ -135,7 +135,7 @@ const RoomForOneMore: React.FC<{ alone: boolean; onNew: () => void }> = ({ alone
                 <Wire top={line} sags={false} runsOn />
                 <div className="relative" style={{ height: line }}>{ghost}</div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1" style={{ paddingLeft: BIRD_LEFT }}>
-                    <p className="text-13 text-muted-foreground">Room for one more</p>
+                    <p className="text-13 text-ink-2">Room for one more</p>
                     <RoomActions onNew={onNew} />
                 </div>
             </li>
@@ -146,7 +146,7 @@ const RoomForOneMore: React.FC<{ alone: boolean; onNew: () => void }> = ({ alone
             <Wire top={line} sags={false} runsOn />
             <div className="relative" style={{ height: line + WIRE_SAG }}>{ghost}</div>
             <div className="mt-4 flex flex-col items-start" style={{ paddingLeft: BIRD_LEFT }}>
-                <p className="text-13 text-muted-foreground">Room for one more</p>
+                <p className="text-13 text-ink-2">Room for one more</p>
                 <div className="mt-1 flex flex-col items-start gap-1"><RoomActions onNew={onNew} /></div>
             </div>
         </li>
@@ -168,8 +168,8 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
     }, [])
     return (
         <>
-            <h1 className="text-20 font-semibold">Flock</h1>
-            <p className="mt-1 text-14 text-muted-foreground">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
+            <h1 className="text-18 font-medium">Flock</h1>
+            <p className="mt-1 text-13 text-ink-2">Each one has its own look, its own job and its own limits. They all ask before anything risky.</p>
             <ul ref={list} aria-label="Your flock" className="mt-6 pt-2 [overflow-x:clip] grid gap-y-10" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${COLUMN}px,1fr))` }}>
                 {flock.map((mascot, index) => (
                     <MascotCard key={mascot.id} mascot={mascot} landed={mascot.id === landed} flipped={index % 3 === 2} onEdit={() => onEdit(mascot)} onPublish={account.status === 'not-set-up' ? undefined : () => onPublish(mascot)} onMemory={() => onMemory(mascot)} />
@@ -182,10 +182,10 @@ const List: React.FC<{ landed?: string; onNew: () => void; onEdit: (mascot: Masc
 
 const Heading: React.FC<{ step: number; title: string; hint?: string }> = ({ step, title, hint }) => (
     <div className="flex items-baseline gap-2">
-        <span aria-hidden className="text-14 font-semibold text-muted-foreground tabular-nums">{step}</span>
+        <span aria-hidden className="text-13 font-medium text-ink-2 tabular-nums">{step}</span>
         <div>
-            <h2 className="text-14 font-semibold">{title}</h2>
-            {hint && <p className="mt-0.5 text-13 text-muted-foreground">{hint}</p>}
+            <h2 className="text-13 font-medium">{title}</h2>
+            {hint && <p className="mt-0.5 text-13 text-ink-2">{hint}</p>}
         </div>
     </div>
 )
@@ -197,14 +197,14 @@ export const Preview: React.FC<{ values: MascotFormValues; mood: Mood; onMood: (
     const mascot = wearing(name || 'New mascot', look)
     const hopKey = `${values.palette}-${values.accessory}`
     return (
-        <aside aria-label="Preview" className="w-full lg:w-[288px] lg:sticky lg:top-0 shrink-0 p-4 rounded-panel bg-surface shadow-raised text-center">
+        <aside aria-label="Preview" className="w-full lg:w-[288px] lg:sticky lg:top-0 shrink-0 p-4 rounded-sheet bg-sheet shadow-lift text-center">
             <div className="h-[184px] flex items-center justify-center">
-                <div key={hopKey} className={cn("motion-safe:animate-berry-hop", flying && "motion-safe:-translate-y-10 motion-safe:transition-transform motion-safe:duration-layout")}>
+                <div key={hopKey} className={cn("motion-safe:animate-berry-hop", flying && "motion-safe:-translate-y-10 motion-safe:transition-transform motion-safe:duration-panel")}>
                     <Berry mood={flying ? 'fetching' : mood} size={160} mascot={mascot} />
                 </div>
             </div>
-            <p className="text-14 font-semibold [overflow-wrap:anywhere]">{name ? `Hi, I’m ${name}.` : 'Who am I?'}</p>
-            <p className="mt-1 text-12 text-muted-foreground">{sitesInWords(sitesFrom(values))} · {toolsInWords(values.tools)}</p>
+            <p className="text-13 font-medium [overflow-wrap:anywhere]">{name ? `Hi, I’m ${name}.` : 'Who am I?'}</p>
+            <p className="mt-1 text-12 text-ink-2">{sitesInWords(sitesFrom(values))} · {toolsInWords(values.tools)}</p>
             <ul aria-label="Its moods" className="mt-4 grid grid-cols-3 gap-0.5">
                 {MOODS.map((option) => (
                     <li key={option}>
@@ -214,7 +214,7 @@ export const Preview: React.FC<{ values: MascotFormValues; mood: Mood; onMood: (
                             aria-pressed={option === mood}
                             title={MOOD_LABELS[option]}
                             onClick={() => onMood(option)}
-                            className={cn("w-full py-1 flex justify-center rounded-control outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", option === mood && "bg-muted")}
+                            className={cn("w-full py-1 flex justify-center rounded-row outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus", option === mood && "bg-sheet-2")}
                         >
                             <Berry mood={option} size={60} mascot={mascot} />
                         </button>
@@ -273,7 +273,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
         <div className="flex flex-col-reverse lg:flex-row items-start gap-8">
             <form onSubmit={(event) => void save(event)} className="flex-1 min-w-0 w-full flex flex-col gap-7">
                 <div className="flex items-center justify-between gap-4">
-                    <h1 className="text-20 font-semibold">{values.id ? `Edit ${values.name || 'mascot'}` : 'New mascot'}</h1>
+                    <h1 className="text-18 font-medium">{values.id ? `Edit ${values.name || 'mascot'}` : 'New mascot'}</h1>
                     <Button type="button" variant="outline" size="sm" onClick={() => { setPicked(null); onChange(surprise(values, others)) }}>
                         <Dices />
                         Surprise me
@@ -289,7 +289,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                                     type="button"
                                     aria-pressed={values.palette === id}
                                     onClick={() => { reactWith(null); set({ palette: id }) }}
-                                    className={cn("w-[84px] py-2 flex flex-col items-center gap-1 rounded-card outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", values.palette === id ? "bg-muted" : "hover:bg-muted")}
+                                    className={cn("w-[84px] py-2 flex flex-col items-center gap-1 rounded-tile outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus", values.palette === id ? "bg-sheet-2" : "hover:bg-hover")}
                                 >
                                     <Berry size={44} mascot={wearing(label, { palette: id, accessory: 'none' })} />
                                     <span className="text-12">{label}</span>
@@ -304,7 +304,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                                     type="button"
                                     aria-pressed={values.accessory === id}
                                     onClick={() => { reactWith(null); set({ accessory: id }) }}
-                                    className={cn("w-[84px] py-2 flex flex-col items-center gap-1 rounded-card outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", values.accessory === id ? "bg-muted" : "hover:bg-muted")}
+                                    className={cn("w-[84px] py-2 flex flex-col items-center gap-1 rounded-tile outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus", values.accessory === id ? "bg-sheet-2" : "hover:bg-hover")}
                                 >
                                     <Berry size={44} mascot={wearing(label, { palette: values.palette, accessory: id })} />
                                     <span className="text-12">{label}</span>
@@ -369,15 +369,15 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                                 onChange={(event) => set({ sitesText: event.target.value })}
                                 className={cn(INPUT, "mt-3")}
                             />
-                            <p className={cn("mt-1 text-12", badSite ? "text-warning" : "text-muted-foreground")}>
+                            <p className={cn("mt-1 text-12", badSite ? "text-ask" : "text-ink-2")}>
                                 {badSite ? `“${badSite}” doesn’t look like a site.` : 'Each one includes its subdomains. It can’t use any other site.'}
                             </p>
                         </>
                     )}
-                    <ul aria-label="What it can do" className="mt-4 rounded-card border bg-surface divide-y">
-                        <li className="flex items-center gap-3 px-3 py-2 text-muted-foreground">
+                    <ul aria-label="What it can do" className="mt-4 rounded-tile border bg-sheet divide-y">
+                        <li className="flex items-center gap-3 px-3 py-2 text-ink-2">
                             <div className="flex-1">
-                                <p className="text-14">Read pages</p>
+                                <p className="text-13">Read pages</p>
                                 <p className="text-12">Every mascot can, on the sites it’s allowed.</p>
                             </div>
                             <span className="text-12">Always on</span>
@@ -385,8 +385,8 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                         {MASCOT_TOOLS.map(({ id, label, hint }) => (
                             <li key={id} className="flex items-center gap-3 px-3 py-2">
                                 <div className="flex-1">
-                                    <p id={`mascot-tool-${id}`} className="text-14">{label}</p>
-                                    <p className="text-12 text-muted-foreground">{hint}</p>
+                                    <p id={`mascot-tool-${id}`} className="text-13">{label}</p>
+                                    <p className="text-12 text-ink-2">{hint}</p>
                                 </div>
                                 <Switch
                                     labelledBy={`mascot-tool-${id}`}
@@ -401,8 +401,8 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                 {canWorkInCloud && (
                     <section className="flex items-center gap-3">
                         <div className="flex-1">
-                            <h2 id="mascot-works-in-cloud" className="text-14 font-semibold">Works in the cloud</h2>
-                            <p className="mt-1 text-12 text-muted-foreground">Choosing it turns on Do this in the cloud. You can still turn that off for one message.</p>
+                            <h2 id="mascot-works-in-cloud" className="text-13 font-medium">Works in the cloud</h2>
+                            <p className="mt-1 text-12 text-ink-2">Choosing it turns on Do this in the cloud. You can still turn that off for one message.</p>
                         </div>
                         <Switch labelledBy="mascot-works-in-cloud" checked={values.worksInCloud} onChange={(on) => set({ worksInCloud: on })} />
                     </section>
@@ -410,7 +410,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
 
                 {values.id && (
                     <section>
-                        <h2 className="text-14 font-semibold">What it remembers</h2>
+                        <h2 className="text-13 font-medium">What it remembers</h2>
                         <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setFlockView({ page: 'memory', mascotId: values.id ?? '', returnTo: values })}>
                             See what {values.name.trim() || 'it'} remembers
                         </Button>
@@ -419,8 +419,8 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
 
                 {values.id && (
                     <section>
-                        <h2 className="text-14 font-semibold">Routines it runs</h2>
-                        {own.length > 0 && <p className="mt-1 text-14 text-muted-foreground">{own.map((routine) => routine.name).join(', ')}</p>}
+                        <h2 className="text-13 font-medium">Routines it runs</h2>
+                        {own.length > 0 && <p className="mt-1 text-13 text-ink-2">{own.map((routine) => routine.name).join(', ')}</p>}
                         <Button
                             type="button"
                             variant="outline"
@@ -441,7 +441,7 @@ const Form: React.FC<{ values: MascotFormValues; onChange: (values: MascotFormVa
                 <div className="flex items-center gap-3">
                     <Button type="submit">{values.id ? 'Save' : 'Add to flock'}</Button>
                     <Button type="button" variant="ghost" onClick={() => onDone()}>Cancel</Button>
-                    {values.id && <Button type="button" variant="ghost" className="ml-auto text-destructive" onClick={() => void remove()}>Delete</Button>}
+                    {values.id && <Button type="button" variant="ghost" className="ml-auto text-ask" onClick={() => void remove()}>Delete</Button>}
                 </div>
             </form>
 

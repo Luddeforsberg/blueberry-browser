@@ -9,15 +9,15 @@ import { MemoryOffers, RememberedLine } from './MemoryInChat'
 
 // Status colours always come with words, so colour is never the only signal.
 const STATUS: Record<RoutineStatus, { label: string; className: string }> = {
-    running: { label: 'Running now', className: 'text-accent-ink' },
-    finished: { label: 'Finished', className: 'text-success' },
-    'needs-approval': { label: 'Needs your OK', className: 'text-warning' },
-    failed: { label: 'Failed', className: 'text-destructive' },
-    stopped: { label: 'Stopped', className: 'text-muted-foreground' },
-    interrupted: { label: 'Interrupted', className: 'text-warning' },
-    queued: { label: 'Waiting to start', className: 'text-muted-foreground' },
-    paused: { label: 'Paused', className: 'text-muted-foreground' },
-    idle: { label: 'Scheduled', className: 'text-muted-foreground' }
+    running: { label: 'Running now', className: 'text-ink' },
+    finished: { label: 'Finished', className: 'text-ink-2' },
+    'needs-approval': { label: 'Needs your OK', className: 'text-ask' },
+    failed: { label: 'Failed', className: 'text-ask' },
+    stopped: { label: 'Stopped', className: 'text-ink-2' },
+    interrupted: { label: 'Interrupted', className: 'text-ask' },
+    queued: { label: 'Waiting to start', className: 'text-ink-2' },
+    paused: { label: 'Paused', className: 'text-ink-2' },
+    idle: { label: 'Scheduled', className: 'text-ink-2' }
 }
 
 export const RoutineStatusLabel: React.FC<{ status: RoutineStatus }> = ({ status }) => (
@@ -43,13 +43,13 @@ export const RoutineRunCard: React.FC<{
     const ended = run.status === 'failed' || run.status === 'stopped' || run.status === 'interrupted'
 
     return (
-        <li aria-label={`Run from ${formatTime(run.startedAt)}`} className="p-4 rounded-panel border bg-surface">
+        <li aria-label={`Run from ${formatTime(run.startedAt)}`} className="p-4 rounded-sheet border bg-sheet">
             <div className="flex items-center justify-between gap-4 text-13">
-                <span className="text-muted-foreground tabular-nums">{formatTime(run.startedAt)}</span>
+                <span className="text-ink-2 tabular-nums">{formatTime(run.startedAt)}</span>
                 <RoutineStatusLabel status={run.status} />
             </div>
             {run.lateFor !== null && (
-                <p className="mt-2 text-13 text-warning">
+                <p className="mt-2 text-13 text-ask">
                     This ran late. It was due {formatTime(run.lateFor)}, when the app was closed or the computer was asleep.
                 </p>
             )}
@@ -84,7 +84,7 @@ export const RoutineRunCard: React.FC<{
                 </div>
             )}
             {run.status === 'finished' && !run.result && (
-                <p className="mt-3 text-14 text-muted-foreground">It finished with nothing to report.</p>
+                <p className="mt-3 text-13 text-ink-2">It finished with nothing to report.</p>
             )}
             {run.error && (
                 <div className="mt-3">
@@ -92,7 +92,7 @@ export const RoutineRunCard: React.FC<{
                 </div>
             )}
             {run.status === 'interrupted' && (
-                <p className="mt-3 text-14">
+                <p className="mt-3 text-13">
                     {run.approval
                         ? `The app closed while this was waiting for your OK, so it wasn’t done: “${run.approval.text}”`
                         : 'The app closed before this finished, so it stopped there.'}
@@ -119,7 +119,7 @@ export const RoutineApprovals: React.FC = () => {
         <ul aria-label="Routines waiting for your OK" className="flex flex-col gap-2">
             {waiting.map(({ id, name, latestRun, mascotId }) => (
                 <li key={id}>
-                    <p className="px-1 pb-1 text-12 text-muted-foreground truncate">{name}</p>
+                    <p className="px-1 pb-1 text-12 text-ink-2 truncate">{name}</p>
                     <ChatApprovalCard chatId={latestRun!.id} approval={latestRun!.approval!} mascot={find(mascotId)} />
                 </li>
             ))}

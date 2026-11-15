@@ -21,12 +21,12 @@ export const PermissionCard: React.FC<{
     const once = prompt.permissions.some((permission) => ASKS_EVERY_TIME.includes(permission))
 
     return (
-        <section aria-label="Site permission" className="rounded-panel border bg-surface p-4 shadow-float text-foreground">
-            <h1 className="text-14">
-                <span className="font-semibold break-all">{siteName(prompt.origin)}</span>{' '}
+        <section aria-label="Site permission" className="rounded-sheet border bg-sheet p-4 shadow-lift text-ink">
+            <h1 className="text-13">
+                <span className="font-medium break-all">{siteName(prompt.origin)}</span>{' '}
                 {permissionQuestion(prompt.permissions)}
             </h1>
-            <p className="mt-1 text-12 text-muted-foreground">
+            <p className="mt-1 text-12 text-ink-2">
                 {once
                     ? 'Allow is for this time only. Block is remembered for this site.'
                     : 'Your answer is remembered for this site. You can change it in Settings.'}

@@ -70,7 +70,7 @@ export const AddressBar: React.FC = () => {
     if (isFocused) {
         return (
             <form onSubmit={handleSubmit} className="relative w-full min-w-0 app-region-no-drag">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-ink-2" />
                 <input
                     type="text"
                     aria-label="Address"
@@ -80,8 +80,8 @@ export const AddressBar: React.FC = () => {
                     onBlur={cancel}
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}
                     className={cn(
-                        "w-full h-8 pl-8 pr-3 rounded-card bg-surface text-14 text-foreground",
-                        "outline-none ring-2 ring-ring placeholder:text-muted-foreground"
+                        "w-full h-8 pl-8 pr-3 rounded-tile bg-sheet text-13 text-ink",
+                        "outline-none ring-2 ring-focus placeholder:text-ink-2"
                     )}
                     placeholder="Search or enter a URL"
                     disabled={!activeTab}
@@ -101,31 +101,31 @@ export const AddressBar: React.FC = () => {
             aria-label="Address"
             onClick={() => setIsFocused(true)}
             className={cn(
-                "w-full min-w-0 h-8 px-2.5 flex items-center gap-2 rounded-card cursor-text group/address-bar",
-                "hover:bg-foreground/5 text-left app-region-no-drag outline-none transition-colors",
-                "focus-visible:ring-2 focus-visible:ring-ring"
+                "w-full min-w-0 h-8 px-2.5 flex items-center gap-2 rounded-tile cursor-text group/address-bar",
+                "hover:bg-hover text-left app-region-no-drag outline-none transition-colors",
+                "focus-visible:ring-2 focus-visible:ring-focus"
             )}
         >
-            <span className="text-14 truncate">
+            <span className="text-13 truncate">
                 {pageLabel ? (
                     <>
-                        <span className="text-foreground">{pageLabel}</span>
+                        <span className="text-ink">{pageLabel}</span>
                         {activeTab?.page === 'chat' && activeTab.pageParam && (
-                            <span className="text-muted-foreground">{` / ${activeTab.title}`}</span>
+                            <span className="text-ink-2">{` / ${activeTab.title}`}</span>
                         )}
                     </>
                 ) : activeTab?.url && !activeTab.page ? (
                     <>
-                        <span className="text-foreground">{domain}</span>
-                        <span className="group-hover/address-bar:hidden text-muted-foreground">
+                        <span className="text-ink">{domain}</span>
+                        <span className="group-hover/address-bar:hidden text-ink-2">
                             {activeTab.title && !activeTab.loadError && ` / ${activeTab.title}`}
                         </span>
-                        <span className="group-hover/address-bar:inline hidden text-muted-foreground">
+                        <span className="group-hover/address-bar:inline hidden text-ink-2">
                             {path}
                         </span>
                     </>
                 ) : (
-                    <span className="text-muted-foreground">Search or enter a URL</span>
+                    <span className="text-ink-2">Search or enter a URL</span>
                 )}
             </span>
         </button>

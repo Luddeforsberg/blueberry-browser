@@ -4,7 +4,7 @@ import { Button } from "./Button";
 
 // Exactly what will happen, set apart from the sentence above it, because this is what's being allowed. Never cut.
 export const ExactWords: React.FC<{ children: string; className?: string }> = ({ children, className }) => (
-  <p className={cn("rounded-control bg-muted dark:bg-tray px-3 py-2 text-12 text-muted-foreground whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>{children}</p>
+  <p className={cn("rounded-row bg-sheet-2 dark:bg-tray px-3 py-2 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>{children}</p>
 );
 
 // A mascot saying something that needs an answer, in line with the conversation. In the main chat its bird hangs beside
@@ -21,8 +21,8 @@ export const MascotSays: React.FC<{
   <section aria-label={label} className={cn("relative [overflow-wrap:anywhere] animate-fade-in", !avatarOutside && "flex items-start gap-3")}>
     <div className={cn("shrink-0", avatarOutside && "absolute -left-11 top-0")}>{avatar}</div>
     <div className="min-w-0 flex-1">
-      <h3 className="text-16">{title}</h3>
-      {note && <p className="mt-1 text-12 text-muted-foreground whitespace-pre-wrap">{note}</p>}
+      <h3 className="text-15">{title}</h3>
+      {note && <p className="mt-1 text-12 text-ink-2 whitespace-pre-wrap">{note}</p>}
       {exactly && <ExactWords className="mt-2">{exactly}</ExactWords>}
       <div className="mt-3">{children}</div>
     </div>

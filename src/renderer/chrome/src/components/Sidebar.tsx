@@ -17,8 +17,8 @@ import { BerryDot } from '@common/components/Mascot'
 import { Berry } from './Berry'
 
 const ROW = cn(
-    "w-full flex items-center gap-3 h-[34px] px-3 rounded-card text-14 text-left outline-none transition-colors",
-    "app-region-no-drag focus-visible:ring-2 focus-visible:ring-ring"
+    "w-full flex items-center gap-3 h-[34px] px-3 rounded-tile text-13 text-left outline-none transition-colors",
+    "app-region-no-drag focus-visible:ring-2 focus-visible:ring-focus"
 )
 
 const SidebarRow: React.FC<{
@@ -34,11 +34,11 @@ const SidebarRow: React.FC<{
         <button
             type="button"
             onClick={onClick}
-            className={cn(ROW, "hover:bg-foreground/5", muted && !open && "text-muted-foreground")}
+            className={cn(ROW, "hover:bg-hover", muted && !open && "text-ink-2")}
         >
             <span className={LEADING_SLOT}>{leading}</span>
             <span className="flex-1 truncate">{label}</span>
-            {trailing && <span className="shrink-0 text-12 text-muted-foreground tabular-nums">{trailing}</span>}
+            {trailing && <span className="shrink-0 text-12 text-ink-2 tabular-nums">{trailing}</span>}
         </button>
     </li>
 )
@@ -55,13 +55,13 @@ const Section: React.FC<{
 
     return (
         <section aria-labelledby={id} className="mt-3">
-            <h2 id={id} className="flex items-center h-8 px-3 text-14 text-muted-foreground">
+            <h2 id={id} className="flex items-center h-8 px-3 text-13 text-ink-2">
                 {collapsible ? (
                     <button
                         type="button"
                         aria-expanded={open}
                         onClick={() => setOpen(!open)}
-                        className="flex items-center gap-1 rounded-control outline-none app-region-no-drag focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex items-center gap-1 rounded-row outline-none app-region-no-drag focus-visible:ring-2 focus-visible:ring-focus"
                     >
                         {title}
                         <ChevronDown className={cn("size-3.5 transition-transform", !open && "-rotate-90")} />
@@ -91,7 +91,7 @@ const Cluster: React.FC = () => {
 
     return (
         <ul aria-label="Bookmarks" className="grid grid-cols-8 gap-y-1.5 px-1 pb-3">
-            {sites.length === 0 && <li className="col-span-8 px-2 py-1 text-13 text-muted-foreground">{NO_SAVED_SITES}</li>}
+            {sites.length === 0 && <li className="col-span-8 px-2 py-1 text-13 text-ink-2">{NO_SAVED_SITES}</li>}
             {sites.map((site, index) => (
                 <li key={site.id} className="col-span-2 flex justify-center" style={{ gridColumnStart: clusterColumn(index) }}>
                     <button
@@ -104,9 +104,9 @@ const Cluster: React.FC = () => {
                             void window.chromeAPI.library.showBookmarkMenu(site.id)
                         }}
                         className={cn(
-                            "size-11 flex items-center justify-center rounded-full text-14 font-semibold text-muted-foreground shadow-selected outline-none transition-colors app-region-no-drag",
-                            "hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring",
-                            theme.glass ? "bg-surface/60" : "bg-surface"
+                            "size-11 flex items-center justify-center rounded-full text-13 font-medium text-ink-2 shadow-rim outline-none transition-colors app-region-no-drag",
+                            "hover:bg-sheet focus-visible:ring-2 focus-visible:ring-focus",
+                            theme.glass ? "bg-sheet/60" : "bg-sheet"
                         )}
                     >
                         <Favicon src={site.favicon ?? siteIcon(site.url)} fallback={site.title.charAt(0)} />
@@ -129,8 +129,8 @@ const ICON = "size-4 shrink-0"
 
 // A chat row's own buttons, over its right end, until the row has the pointer or the keyboard.
 const ROW_ACTION = cn(
-    "absolute top-1 size-[26px] flex items-center justify-center rounded-control text-muted-foreground outline-none transition-colors app-region-no-drag",
-    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    "absolute top-1 size-[26px] flex items-center justify-center rounded-row text-ink-2 outline-none transition-colors app-region-no-drag",
+    "opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
 )
 
 // A page the chat's running job opened, under the chat rather than with the user's tabs. It closes when the job ends,
@@ -143,7 +143,7 @@ const JobTabRow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 type="button"
                 aria-current={tab.isActive ? 'page' : undefined}
                 onClick={() => !tab.isActive && void switchTab(tab.id)}
-                className={cn(ROW, "h-[30px] pl-9 gap-2.5 text-13 text-muted-foreground", tab.isActive ? "bg-selected shadow-selected text-foreground" : "hover:bg-foreground/5 hover:text-foreground")}
+                className={cn(ROW, "h-[30px] pl-9 gap-2.5 text-13 text-ink-2", tab.isActive ? "bg-sheet shadow-rim text-ink" : "hover:bg-hover hover:text-ink")}
             >
                 <Favicon src={tab.favicon} site={tab.url} className="size-3.5" />
                 <span className="flex-1 truncate">{tab.title || 'New tab'}</span>
@@ -198,7 +198,7 @@ export const ChatRow: React.FC<{
                         if (event.key === 'Enter') finish(event.currentTarget.value)
                         if (event.key === 'Escape') finish(null)
                     }}
-                    className={cn(ROW, "bg-surface shadow-selected")}
+                    className={cn(ROW, "bg-sheet shadow-rim")}
                 />
             </li>
         )
@@ -216,15 +216,15 @@ export const ChatRow: React.FC<{
                 type="button"
                 aria-current={selected ? 'page' : undefined}
                 onClick={onOpen}
-                className={cn(ROW, onClose ? "pr-[60px]" : "pr-9", selected ? "bg-selected shadow-selected" : "hover:bg-foreground/5")}
+                className={cn(ROW, onClose ? "pr-[60px]" : "pr-9", selected ? "bg-sheet shadow-rim" : "hover:bg-hover")}
             >
                 {/* Only another bird, or one at work, is worth saying, so a Berry chat's name starts with its title. */}
                 <span className={LEADING_SLOT} aria-hidden={(!chat.mascotId && !chat.running) || undefined}>
-                    {showBerry ? <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} /> : <MessageCircle className={cn(ICON, "text-muted-foreground")} />}
+                    {showBerry ? <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} /> : <MessageCircle className={cn(ICON, "text-ink-2")} />}
                 </span>
                 <span className="flex-1 truncate">{chat.title}</span>
                 {chat.cloud && (
-                    <span className="shrink-0 text-muted-foreground" title="In the cloud">
+                    <span className="shrink-0 text-ink-2" title="In the cloud">
                         <Cloud role="img" aria-label="In the cloud" className="size-3.5" />
                     </span>
                 )}
@@ -235,7 +235,7 @@ export const ChatRow: React.FC<{
                     </span>
                 )}
                 {!selected && !chat.running && (
-                    <span className="shrink-0 -mr-6 text-12 text-muted-foreground tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">
+                    <span className="shrink-0 -mr-6 text-12 text-ink-2 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">
                         {age(chat.updatedAt)}
                     </span>
                 )}

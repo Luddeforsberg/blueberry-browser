@@ -3,7 +3,7 @@ import type { AccountState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
 
-const FIELD = "block w-full h-9 mt-1 px-3 rounded-card border bg-surface text-14 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+const FIELD = "block w-full h-9 mt-1 px-3 rounded-tile border bg-sheet text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
 
 // Typed here, in our own page and never in a tab. The password goes to main once, and this forgets it as soon as it has.
 export const AccountForm: React.FC<{ problem: string | null; onResult: (state: AccountState) => void }> = ({ problem, onResult }) => {
@@ -33,11 +33,11 @@ export const AccountForm: React.FC<{ problem: string | null; onResult: (state: A
                 Password
                 <input type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} value={password} onChange={(event) => setPassword(event.target.value)} className={FIELD} />
             </label>
-            {problem && <p role="alert" className="text-13 text-destructive">{problem}</p>}
+            {problem && <p role="alert" className="text-13 text-ask">{problem}</p>}
             <div>
                 <Button type="submit" disabled={busy || !email.trim() || !password}>{busy ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}</Button>
             </div>
-            <p className="text-12 text-muted-foreground">These go to Blueberry’s sign-in service and nowhere else. Berry, tools and mascots never see them, and your email is never shown to anyone.</p>
+            <p className="text-12 text-ink-2">These go to Blueberry’s sign-in service and nowhere else. Berry, tools and mascots never see them, and your email is never shown to anyone.</p>
         </form>
     )
 }

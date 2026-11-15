@@ -8,12 +8,12 @@ export const DownloadsPage: React.FC = () => {
     return (
         <div className="h-full overflow-y-auto">
             <div className="max-w-3xl mx-auto px-8 py-10">
-                <h1 className="text-20 font-semibold">Downloads</h1>
-                <p className="mt-1 text-14 text-muted-foreground">Files you download from the web.</p>
+                <h1 className="text-18 font-medium">Downloads</h1>
+                <p className="mt-1 text-13 text-ink-2">Files you download from the web.</p>
                 {downloads.length === 0 ? (
-                    <p className="mt-6 rounded-panel border bg-surface px-5 py-4 text-14 text-muted-foreground">Nothing here yet.</p>
+                    <p className="mt-6 rounded-sheet border bg-sheet px-5 py-4 text-13 text-ink-2">Nothing here yet.</p>
                 ) : (
-                    <ul aria-label="Downloads" className="mt-6 rounded-panel border bg-surface divide-y overflow-hidden">
+                    <ul aria-label="Downloads" className="mt-6 rounded-sheet border bg-sheet divide-y overflow-hidden">
                         {downloads.map((download) => (
                             <DownloadRow
                                 key={download.id}

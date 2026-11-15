@@ -50,13 +50,13 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
     const narrow = layout.page.width < NARROW_PAGE
 
     return (
-        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-muted text-13 app-region-no-drag">
-            <span aria-hidden className="size-2 rounded-full bg-destructive motion-safe:animate-pulse" />
+        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-sheet-2 text-13 app-region-no-drag">
+            <span aria-hidden className="size-2 rounded-full bg-ask motion-safe:animate-pulse" />
             {showBerry && !narrow && <Berry mood="curious" size={24} />}
-            <span className="font-semibold">{!showBerry ? 'Recording' : narrow ? 'Watching' : `${name}’s watching`}</span>
+            <span className="font-medium">{!showBerry ? 'Recording' : narrow ? 'Watching' : `${name}’s watching`}</span>
             {!narrow && <Elapsed since={startedAt} />}
             {layout.page.width >= ROOM_FOR_COUNT && (
-                <span aria-hidden className="text-muted-foreground tabular-nums">
+                <span aria-hidden className="text-ink-2 tabular-nums">
                     {steps.length === 1 ? '1 note' : `${steps.length} notes`}
                 </span>
             )}
@@ -81,7 +81,7 @@ export const ShowHowButton: React.FC<{ className?: string; variant?: 'outline' |
             title={status === 'recording' ? 'It’s already watching' : undefined}
             onClick={() => void window.chromeAPI.recording.start()}
         >
-            <span aria-hidden className="size-2 rounded-full bg-destructive" />
+            <span aria-hidden className="size-2 rounded-full bg-ask" />
             {name === 'Assistant' ? 'Record a routine' : `Show ${name} how`}
         </Button>
     )
@@ -94,7 +94,7 @@ const NoteWords: React.FC<{ step: TrailStep }> = ({ step }) => {
     return (
         <>
             {step.text.slice(0, at)}
-            <span className="font-semibold">{step.value}</span>
+            <span className="font-medium">{step.value}</span>
             {step.text.slice(at + step.value.length)}
         </>
     )
@@ -114,19 +114,19 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
         <div className="divide-y">
             {groups.map(({ site, steps: notes }, group) => (
                 <section key={group} aria-label={`On ${site}`} className="py-5">
-                    <h2 className="text-13 font-semibold text-muted-foreground">{site}</h2>
+                    <h2 className="text-13 font-medium text-ink-2">{site}</h2>
                     <ol className="mt-2 flex flex-col">
                         {notes.map(({ step, at }) => (
                             <li key={step.id} className="group flex items-start gap-3 py-1.5">
-                                <span className={cn('mt-1 size-4 shrink-0 flex items-center justify-center', step.kind === 'secret' ? 'text-muted-foreground' : 'text-primary')}>
+                                <span className={cn('mt-1 size-4 shrink-0 flex items-center justify-center', step.kind === 'secret' ? 'text-ink-2' : 'text-ink')}>
                                     {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden /> : <StepFootprint index={at} />}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="block text-16 [overflow-wrap:anywhere]">
+                                    <span className="block text-15 [overflow-wrap:anywhere]">
                                         <NoteWords step={step} />
                                     </span>
                                     {step.path && step.path !== site && (
-                                        <span className="block text-12 text-muted-foreground truncate">{step.path}</span>
+                                        <span className="block text-12 text-ink-2 truncate">{step.path}</span>
                                     )}
                                 </span>
                                 {onRemove && (
@@ -134,7 +134,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
                                         type="button"
                                         aria-label={`Leave out: ${step.text}`}
                                         onClick={() => onRemove(step.id)}
-                                        className="shrink-0 h-6 px-2 rounded-control text-13 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                        className="shrink-0 h-6 px-2 rounded-row text-13 text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                                     >
                                         Leave out
                                     </button>

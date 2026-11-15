@@ -15,13 +15,13 @@ export const Switch: React.FC<{
         aria-label={label}
         onClick={() => onChange(!checked)}
         className={cn(
-            "relative w-9 h-5 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            checked ? "bg-primary" : "bg-border"
+            "relative w-9 h-5 shrink-0 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-focus",
+            checked ? "bg-ink" : "bg-line"
         )}
     >
         <span
             className={cn(
-                "absolute top-0.5 left-0.5 size-4 rounded-full bg-primary-foreground transition-transform",
+                "absolute top-0.5 left-0.5 size-4 rounded-full bg-ground transition-transform",
                 checked && "translate-x-4"
             )}
         />
@@ -48,8 +48,8 @@ export const Choice = <T extends string>({
                 aria-checked={value === option.value}
                 onClick={() => onChange(option.value)}
                 className={cn(
-                    "h-8 px-4 rounded-full text-14 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                    value === option.value ? "bg-selected shadow-selected" : "text-muted-foreground hover:text-foreground"
+                    "h-8 px-4 rounded-full text-13 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                    value === option.value ? "bg-sheet shadow-rim" : "text-ink-2 hover:text-ink"
                 )}
             >
                 {option.label}
@@ -69,8 +69,8 @@ export const QuietChoice = <T extends string>({ label, value, options, onChange 
                 aria-checked={value === option.value}
                 onClick={() => onChange(option.value)}
                 className={cn(
-                    "h-7 text-13 outline-none rounded-control underline-offset-[6px] decoration-[1.5px] transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                    value === option.value ? "underline" : "text-muted-foreground hover:text-foreground"
+                    "h-7 text-13 outline-none rounded-row underline-offset-[6px] decoration-[1.5px] transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                    value === option.value ? "underline" : "text-ink-2 hover:text-ink"
                 )}
             >
                 {option.label}

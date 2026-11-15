@@ -17,7 +17,7 @@ export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; onPres
         </>
     )
     if (!onPress) {
-        return <span aria-label={`This chat is with ${name}`} className="h-9 px-2 flex items-center gap-1.5 text-muted-foreground cursor-default">{inner}</span>
+        return <span aria-label={`This chat is with ${name}`} className="h-9 px-2 flex items-center gap-1.5 text-ink-2 cursor-default">{inner}</span>
     }
     return (
         <button
@@ -25,10 +25,10 @@ export const MascotChip: React.FC<{ mascot: MascotProfile; open: boolean; onPres
             aria-label={`Talking to ${name}. Choose who to ask`}
             aria-expanded={open}
             onClick={onPress}
-            className="h-9 pl-1.5 pr-2 flex items-center gap-1.5 rounded-full outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-9 pl-1.5 pr-2 flex items-center gap-1.5 rounded-full outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
             {inner}
-            <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", open && "rotate-180")} />
+            <ChevronDown className={cn("size-3.5 text-ink-2 transition-transform", open && "rotate-180")} />
         </button>
     )
 }
@@ -56,8 +56,8 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
                         aria-pressed={mascot.id === selectedId}
                         onClick={() => onChoose(mascot.id)}
                         className={cn(
-                            "w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-card outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                            mascot.id === selectedId ? "bg-muted" : "hover:bg-muted"
+                            "w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-tile outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                            mascot.id === selectedId ? "bg-sheet-2" : "hover:bg-hover"
                         )}
                     >
                         <Berry size={40} mascot={mascot} />
@@ -74,7 +74,7 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
                             void window.chromeAPI.browser.openPage('flock')
                             onClose()
                         }}
-                        className="w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-card text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        className="w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-tile text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                     >
                         <span className="size-10 flex items-center justify-center"><Plus className="size-5" /></span>
                         <span className="text-12">New</span>

@@ -64,8 +64,8 @@ export const HistoryImportSettings: React.FC = () => {
         <div className="py-4 border-b">
             <div className="flex items-center gap-6">
                 <div className="flex-1 min-w-0">
-                    <h3 id="setting-import" className="text-14 font-semibold">Bring in history</h3>
-                    <p className="mt-0.5 text-13 text-muted-foreground">{IMPORT_NOTES.join(' ')} <More about="setting-import" text={IMPORT_DETAIL} /></p>
+                    <h3 id="setting-import" className="text-13 font-medium">Bring in history</h3>
+                    <p className="mt-0.5 text-13 text-ink-2">{IMPORT_NOTES.join(' ')} <More about="setting-import" text={IMPORT_DETAIL} /></p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                     <SourceChoice sources={sources} source={source} choose={choose} />
