@@ -349,7 +349,9 @@ Straight on the ground. Under the window controls is a switch between its two fa
 - **Routines:** the next three by time, each with the mascot that runs it and when. The arrow on the label opens them all.
 - **Earlier:** past chats, newest first, each with the mascot that ran it and its age. **Show more** loads the rest.
 
-**The dock** is on `tray`: every mascot at 26px with its mood for a face, then Settings. It's how you see who is doing what at a glance.
+**The dock** is on `tray`: every mascot at 26px with its mood for a face, each in a 28px place, then Settings. It's how you see who is doing what at a glance. Berry and four fill it at the sidebar's usual width, and more scroll along it.
+
+**A new profile starts with a flock,** so the dock and the pill have someone to show: Berry, and four starters from the Gallery, Plain Words, Competitor Watch, Meeting Prep and Newsletter Builder, one of each berry but the gooseberry. They're ordinary copies, to edit or delete, and they come once: deleting them never brings them back, and a profile that already has mascots of its own gets none.
 
 Section labels are 11px mono, lower case, in `ink-3`.
 

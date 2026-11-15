@@ -2,8 +2,11 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 /// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test } from "@playwright/test";
+import { mkdtempSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 
@@ -96,6 +99,31 @@ test("choosing a mascot on the new tab changes the pill, the greeting and the li
     await chrome.getByRole("menuitemradio", { name: /^Berry/ }).click();
     await expect(pill).toHaveAccessibleName("Asking Berry. Choose who to ask");
     await expect(limits).toBeHidden();
+  } finally {
+    await app.close();
+  }
+});
+
+test("a new profile starts with four mascots beside Berry, once, and a deleted one stays gone", async () => {
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-starters-"));
+  let app = await launchApp(profile, { starters: true });
+  try {
+    let chrome = await findView(app, "view=chrome");
+    const starters = ["Berry", "Plain Words", "Competitor Watch", "Meeting Prep", "Newsletter Builder"];
+    const dock = () => chrome.getByRole("list", { name: "Your mascots" }).getByRole("button");
+    await expect(dock()).toHaveCount(starters.length);
+    for (const [index, name] of starters.entries()) await expect(dock().nth(index)).toHaveAccessibleName(new RegExp(`^${name}`));
+    await chrome.getByRole("button", { name: /Choose who to ask/ }).click();
+    await expect(chrome.getByRole("menuitemradio")).toHaveCount(starters.length);
+    await chrome.keyboard.press("Escape");
+
+    const plainWords = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Plain Words")!;
+    await chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id);
+    await app.close();
+    app = await launchApp(profile, { starters: true });
+    chrome = await findView(app, "view=chrome");
+    await expect(dock()).toHaveCount(starters.length - 1);
+    await expect(chrome.getByRole("list", { name: "Your mascots" }).getByRole("button", { name: /^Plain Words/ })).toHaveCount(0);
   } finally {
     await app.close();
   }

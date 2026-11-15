@@ -602,7 +602,7 @@ const DockMascot: React.FC<{ mascot: MascotProfile; mood: 'asking' | 'fetching' 
             aria-expanded={open}
             aria-haspopup="dialog"
             onClick={onPress}
-            className={cn('size-[30px] flex items-center justify-center rounded-row transition-colors hover:bg-hover app-region-no-drag', open && 'bg-press', FOCUS)}
+            className={cn('size-7 flex items-center justify-center rounded-row transition-colors hover:bg-hover app-region-no-drag', open && 'bg-press', FOCUS)}
         >
             {/* The dock's faces stay still: in the sidebar only the working mascot's own row moves. */}
             <Berry mood={mood} size={26} mascot={mascot} still />

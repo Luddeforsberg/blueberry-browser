@@ -47,7 +47,7 @@ test.afterAll(() => {
 const startProfile = () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-downloads-"));
   const folder = join(profile, "saved");
-  writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, downloadFolder: folder }));
+  writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, startersAdded: true, downloadFolder: folder }));
   return { profile, folder };
 };
 

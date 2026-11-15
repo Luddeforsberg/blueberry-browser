@@ -41,6 +41,8 @@ export interface Settings {
   onStartup: StartupChoice;
   // False until the first-launch steps are finished or skipped.
   onboarded: boolean;
+  // Whether this profile has had its starter mascots, or never needed them. Once true, they never come back.
+  startersAdded: boolean;
   // Page zoom in percent, by site. Sites at 100% aren't listed.
   siteZoom: Record<string, number>;
   // Whether the new tab page offers what it noticed you repeat. Off means no model call.

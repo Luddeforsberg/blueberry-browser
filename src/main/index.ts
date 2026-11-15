@@ -8,6 +8,7 @@ import { BookmarkStore } from "./BookmarkStore";
 import { ChatStore } from "./ChatStore";
 import { RoutineStore } from "./RoutineStore";
 import { MascotStore } from "./MascotStore";
+import { addStarterFlock } from "./starterFlock";
 import { Downloads } from "./Downloads";
 import { SitePermissions } from "./SitePermissions";
 import { installSessionHandlers } from "./sessionHandlers";
@@ -85,6 +86,12 @@ const createWindow = (): Window => {
     storeNotice("Your routines", "are")
   );
   mascotStore ??= new MascotStore(join(app.getPath("userData"), "mascots.json"));
+  try {
+    addStarterFlock(mascotStore, settings);
+  } catch (error) {
+    // Tried again on the next launch, since it was never marked done.
+    console.error("Failed to add the starter mascots:", error);
+  }
   const savedSettings = settings;
   if (!downloads || !sitePermissions) {
     downloads = new Downloads(join(app.getPath("userData"), "downloads.json"), {

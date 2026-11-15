@@ -52,15 +52,15 @@ export const killApp = (app: ElectronApplication) => {
 
 // Launches the built app in out/, so run `pnpm exec electron-vite build` first.
 // Pass a profile folder to launch again with the same saved settings.
-// Tests skip onboarding unless they ask for a first launch.
+// Tests skip onboarding unless they ask for a first launch, and start with only Berry unless they ask for the starters.
 // They have no model unless they pass one, and a .env file can't change that: it never overrides these.
 export async function launchApp(
   userDataDir = mkdtempSync(join(tmpdir(), "blueberry-test-")),
-  { firstLaunch = false, modelEnv = {} }: { firstLaunch?: boolean; modelEnv?: Record<string, string> } = {}
+  { firstLaunch = false, starters = false, modelEnv = {} }: { firstLaunch?: boolean; starters?: boolean; modelEnv?: Record<string, string> } = {}
 ): Promise<ElectronApplication> {
   const settingsFile = join(userDataDir, "settings.json");
   if (!firstLaunch && !existsSync(settingsFile)) {
-    writeFileSync(settingsFile, JSON.stringify({ onboarded: true }));
+    writeFileSync(settingsFile, JSON.stringify({ onboarded: true, startersAdded: !starters }));
   }
 
   // Some shells export ELECTRON_RUN_AS_NODE, which would start Node instead of the app.
