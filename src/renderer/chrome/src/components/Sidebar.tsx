@@ -13,6 +13,7 @@ import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
 import { setRoutinesView } from '../routinesView'
+import { dockFaces } from '../flockView'
 import { BERRY_ID } from '@shared/mascots'
 
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
@@ -550,13 +551,33 @@ const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ 
     )
 }
 
-// Every mascot with its mood for a face, then Settings. It's how you see who is doing what at a glance.
+// A face's button and the space between two, for working out how many fit.
+const DOCK_FACE = 28
+const DOCK_GAP = 7
+
+// Every mascot with its mood for a face, then Settings. It's how you see who is doing what at a glance. Those that
+// don't fit become a count that opens the mascots' page, so no face is ever cut in half.
 const Dock: React.FC = () => {
     const { flock } = useFlock()
     const stateOf = useMascotState()
     const [open, setOpen] = useState<string | null>(null)
     const dock = useRef<HTMLDivElement>(null)
     const shown = flock.find((mascot) => mascot.id === open)
+    const list = useRef<HTMLUListElement>(null)
+    const [room, setRoom] = useState(Infinity)
+    useLayoutEffect(() => {
+        const element = list.current
+        if (!element) return
+        const measure = () => {
+            const { paddingLeft, paddingRight } = getComputedStyle(element)
+            setRoom(Math.floor((element.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight) + DOCK_GAP) / (DOCK_FACE + DOCK_GAP)))
+        }
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, [])
+    const faces = dockFaces(flock, room, (mascot) => stateOf(mascot).mood !== 'rest')
 
     useEffect(() => {
         if (!open) return
@@ -577,12 +598,24 @@ const Dock: React.FC = () => {
         <div ref={dock} className="relative shrink-0 mx-0.5">
             {shown && <MascotCard key={shown.id} mascot={shown} onClose={closeCard} />}
             <div className="h-[46px] px-[9px] flex items-center gap-[7px] rounded-tile bg-tray">
-                <ul aria-label="Your mascots" className="flex-1 min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-x-auto [&::-webkit-scrollbar]:hidden">
-                    {flock.map((mascot) => (
+                <ul ref={list} aria-label="Your mascots" className="flex-1 min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-hidden">
+                    {faces.shown.map((mascot) => (
                         <li key={mascot.id} className="shrink-0">
                             <DockMascot mascot={mascot} mood={stateOf(mascot).mood} open={open === mascot.id} onPress={() => setOpen(open === mascot.id ? null : mascot.id)} />
                         </li>
                     ))}
+                    {faces.more > 0 && (
+                        <li className="shrink-0">
+                            <button
+                                type="button"
+                                aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
+                                onClick={() => void window.chromeAPI.browser.openPage('flock')}
+                                className={cn('size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
+                            >
+                                +{faces.more}
+                            </button>
+                        </li>
+                    )}
                 </ul>
                 <ToolBarButton label="Settings" onClick={() => void window.chromeAPI.browser.openPage('settings')} className="size-7 -mr-1">
                     <SlidersHorizontal className={ICON} strokeWidth={1.5} />

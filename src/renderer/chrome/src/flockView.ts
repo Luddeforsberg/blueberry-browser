@@ -102,6 +102,20 @@ export const toMascotDraft = (values: MascotFormValues): MascotDraft => ({
     tools: values.tools
 })
 
+// Who the dock shows when the flock doesn't fit in `room` faces: as many as fit beside a count of the rest. One that's
+// asking or working is never among the hidden, so it takes the place of the last one at rest, after the first.
+export const dockFaces = <T,>(flock: T[], room: number, busy: (mascot: T) => boolean): { shown: T[]; more: number } => {
+    if (flock.length <= room) return { shown: flock, more: 0 }
+    const shown = flock.slice(0, Math.max(1, room - 1))
+    for (const mascot of flock.slice(shown.length)) {
+        if (!busy(mascot)) continue
+        let at = shown.length - 1
+        while (at > 0 && busy(shown[at])) at--
+        if (at > 0) shown[at] = mascot
+    }
+    return { shown, more: flock.length - shown.length }
+}
+
 export const FLOCK_VIEW_EVENT = 'blueberry:flock-view'
 
 // Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.

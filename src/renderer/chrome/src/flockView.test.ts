@@ -51,3 +51,26 @@ describe("which view a Flock tab opens on", () => {
     expect(view.flockViewFor("tab-1")).toEqual({ page: "memory", mascotId: "m1" });
   });
 });
+
+describe("who the dock shows", () => {
+  const busy = (name: string) => name.endsWith("!");
+  const faces = async (flock: string[], room: number) => (await load()).dockFaces(flock, room, busy);
+
+  it("shows everyone while they fit, and at exactly the room there is", async () => {
+    expect(await faces([], 5)).toEqual({ shown: [], more: 0 });
+    expect(await faces(["a", "b", "c"], 3)).toEqual({ shown: ["a", "b", "c"], more: 0 });
+  });
+
+  it("gives one place to the count when there's one too many", async () => {
+    expect(await faces(["a", "b", "c", "d"], 3)).toEqual({ shown: ["a", "b"], more: 2 });
+  });
+
+  it("never hides one that's asking or working, and never moves the first", async () => {
+    expect(await faces(["a", "b", "c", "d!"], 3)).toEqual({ shown: ["a", "d!"], more: 2 });
+    expect(await faces(["a", "b", "c!"], 2)).toEqual({ shown: ["a"], more: 2 });
+  });
+
+  it("always shows the first, however little room there is", async () => {
+    expect(await faces(["a", "b"], 0)).toEqual({ shown: ["a"], more: 1 });
+  });
+});
