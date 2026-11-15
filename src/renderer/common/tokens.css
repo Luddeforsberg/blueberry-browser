@@ -25,6 +25,16 @@
     --shadow-card-lift: 0 0 0 1px rgb(21 21 20 / 0.07), 0 1px 2px rgb(21 21 20 / 0.06), 0 10px 24px -12px rgb(21 21 20 / 0.2);
     --shadow-lift: 0 0 0 1px rgb(21 21 20 / 0.06), 0 1px 2px rgb(21 21 20 / 0.05), 0 14px 34px -10px rgb(21 21 20 / 0.16);
 
+    /* A site with no icon shows its letter on one of these, picked by its name (DESIGN.md section 8). */
+    --site-1: #3a3f47;
+    --site-2: #5e6ad2;
+    --site-3: #f24e1e;
+    --site-4: #d9483b;
+    --site-5: #1a73e8;
+    --site-6: #0b8a5f;
+    --site-7: #7a5af8;
+    --site-8: #ff6600;
+
     /* The mascots' own colours (DESIGN.md section 9), never the chrome's. */
     --berry-blueberry: #3f51dc;
     --berry-blueberry-crown: #2a39b0;

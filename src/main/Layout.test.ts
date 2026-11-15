@@ -29,14 +29,14 @@ describe("computeLayout", () => {
     expect(parkedPage.height).toBe(page.height);
   });
 
-  it("puts the sidebar left, the chat right, and the page card between them under the toolbar", () => {
+  it("puts the sidebar left, and the page and chat sheets under the toolbar with the gutter round them", () => {
     const layout = computeLayout({ width: 1280, height: 800 }, both);
 
     expect(layout.sidebar).toEqual({ x: 0, y: 0, width: 240, height: 800 });
-    expect(layout.chat).toEqual({ x: 920, y: 0, width: 360, height: 800 });
-    expect(layout.toolbar).toEqual({ x: 240, y: 8, width: 680, height: 40 });
+    expect(layout.toolbar).toEqual({ x: 240, y: 0, width: 1040, height: 48 });
     expect(layout.addressRow).toEqual(layout.toolbar);
-    expect(layout.page).toEqual({ x: 240, y: 48, width: 680, height: 744 });
+    expect(layout.page).toEqual({ x: 240, y: 48, width: 664, height: 744 });
+    expect(layout.chat).toEqual({ x: 912, y: 48, width: 360, height: 744 });
   });
 
   it("puts the find bar in the page's top right corner, and never outside the page", () => {
@@ -47,7 +47,7 @@ describe("computeLayout", () => {
     expect(tiny.findBar).toEqual({ x: 8, y: 48, width: 284, height: 34 });
   });
 
-  it("floats the page card with the frame showing around it when both panels are gone", () => {
+  it("keeps the gutter round the page when both panels are gone", () => {
     const layout = computeLayout(
       { width: 1280, height: 800 },
       { sidebarOpen: false, chatOpen: false, ...mac }
@@ -55,7 +55,7 @@ describe("computeLayout", () => {
 
     expect(layout.sidebar.width).toBe(0);
     expect(layout.chat.width).toBe(0);
-    expect(layout.toolbar).toEqual({ x: 8, y: 8, width: 1264, height: 40 });
+    expect(layout.toolbar).toEqual({ x: 8, y: 0, width: 1272, height: 48 });
     expect(layout.page).toEqual({ x: 8, y: 48, width: 1264, height: 744 });
   });
 
@@ -77,13 +77,13 @@ describe("computeLayout", () => {
   it("keeps the window buttons clear on each platform", () => {
     const size = { width: 1280, height: 800 };
 
-    expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 56 });
+    expect(computeLayout(size, both).controls).toEqual({ x: 0, y: 0, width: 80, height: 48 });
     // Off a Mac, the menu button is kept clear too, left of the system's buttons.
     expect(computeLayout(size, { ...both, platform: "win32" }).controls).toEqual({
       x: 1102,
       y: 0,
       width: 178,
-      height: 56,
+      height: 48,
     });
   });
 
@@ -91,7 +91,7 @@ describe("computeLayout", () => {
     const size = { width: 1280, height: 800 };
 
     expect(computeLayout(size, both).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
-    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 12, width: 32, height: 32 });
+    expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 8, width: 32, height: 32 });
     expect(computeLayout(size, { ...both, platform: "win32", mode: "horizontal" }).menuButton).toEqual({ x: 1106, y: 4, width: 32, height: 32 });
     // Linux has no window buttons here, so it's in the corner.
     expect(computeLayout(size, { ...both, platform: "linux" })).toMatchObject({
@@ -138,11 +138,12 @@ describe("computeLayout", () => {
 
     expect(layout.sidebarOpen).toBe(false);
     expect(layout.floatingSidebar.width).toBe(0);
-    expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 920, height: 40 });
-    expect(layout.toolbar).toEqual({ x: 8, y: 40, width: 912, height: 76 });
-    // The bookmarks bar is under the address row, so the panel's buttons line up with the row alone.
-    expect(layout.addressRow).toEqual({ x: 8, y: 40, width: 912, height: 40 });
-    expect(layout.page).toEqual({ x: 8, y: 116, width: 912, height: 676 });
+    expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 1280, height: 40 });
+    expect(layout.toolbar).toEqual({ x: 0, y: 40, width: 1280, height: 84 });
+    // The bookmarks bar is under the address row.
+    expect(layout.addressRow).toEqual({ x: 0, y: 40, width: 1280, height: 48 });
+    expect(layout.page).toEqual({ x: 8, y: 124, width: 896, height: 668 });
+    expect(layout.chat).toEqual({ x: 912, y: 124, width: 360, height: 668 });
     expect(layout.controls.height).toBe(40);
   });
 
@@ -152,8 +153,8 @@ describe("computeLayout", () => {
       { ...both, sidebarWidth: 300, chatWidth: 400 }
     );
     expect(resized.sidebar.width).toBe(300);
-    expect(resized.chat).toEqual({ x: 1000, y: 0, width: 400, height: 800 });
-    expect(resized.page.width).toBe(700);
+    expect(resized.chat).toEqual({ x: 992, y: 48, width: 400, height: 744 });
+    expect(resized.page.width).toBe(684);
 
     const extreme = computeLayout(
       { width: 1400, height: 800 },

@@ -108,6 +108,8 @@ export class EventManager {
 
     this.handle("tab:stop-work", (tabId) => this.mainWindow.chats.stopWorkIn(tabId));
 
+    this.handle("tab:take-over", (tabId) => this.mainWindow.chats.releaseTab(tabId));
+
     this.handle("tab:zoom-reset", (tabId) => this.withTab(tabId, (tab) => this.mainWindow.siteZoom.reset(tab)));
 
     this.handle("find:search", (text) => {

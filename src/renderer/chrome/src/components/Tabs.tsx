@@ -3,10 +3,10 @@ import { Plus, X } from 'lucide-react'
 import type { LayoutMode, TabInfo } from '@shared/ipc'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { useShell } from '../contexts/ShellContext'
 import { LEADING_SLOT, TabIcon } from './TabIcon'
-import { SHIMMER_TEXT } from './ChatMessage'
 import { nudgeTarget, useTabDrag } from './useTabDrag'
+import { Berry } from './Berry'
+import { Pips } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 
 // Below this a tab in the row only has room for its icon, so the title goes rather than showing a letter or two.
@@ -37,9 +37,6 @@ const TabItem: React.FC<{
     style?: React.CSSProperties
 }> = ({ tab, mode, onActivate, onClose, onPress, onNudge, dragged, shifting, style }) => {
     const { find } = useFlock()
-    const { settings } = useShell()
-    // BerryCompanion perches here, except on the new tab page, where it sits on the composer.
-    const perch = tab.isActive && settings.showBerry && tab.page !== 'new-tab'
     const row = mode === 'horizontal'
     const item = useRef<HTMLLIElement>(null)
     const iconOnly = useIconOnly(item, row)
@@ -51,15 +48,13 @@ const TabItem: React.FC<{
         onDragStart={(e) => e.preventDefault()}
         style={style}
         className={cn(
-            "group/tab flex items-center h-[34px] pr-1.5 gap-2 rounded-tile transition-colors app-region-no-drag",
-            iconOnly ? "pl-1.5 gap-1" : "pl-3",
+            "group/tab flex items-center h-[30px] pr-1 rounded-row text-ink-2 transition-colors app-region-no-drag",
+            iconOnly ? "pl-1.5 gap-1" : "pl-2 gap-[9px]",
             row && "flex-1 min-w-[60px] max-w-56",
-            // Only the active tab always shows its close button, 32px, and the bird perches on it, 44px more, so it starts
-            // that much wider than the others, which start from their 18px of padding, and its title gets as much room.
-            row && tab.isActive && (perch
-                ? "basis-[94px] min-w-36 max-w-[calc(theme(maxWidth.56)+76px)]"
-                : "basis-[50px] max-w-[calc(theme(maxWidth.56)+32px)]"),
-            tab.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover",
+            // Only the active tab always shows its close button, so it starts that much wider than the others, and its
+            // title gets as much room.
+            row && tab.isActive && "basis-[44px] max-w-[calc(theme(maxWidth.56)+24px)]",
+            tab.isActive ? "bg-sheet text-ink shadow-rim" : "hover:bg-hover hover:text-ink",
             shifting && "transition-transform",
             dragged && "relative z-10 shadow-lift"
         )}
@@ -77,13 +72,12 @@ const TabItem: React.FC<{
                 onNudge(e.key === back ? -1 : 1, e.currentTarget)
             }}
             className={cn(
-                "flex flex-1 min-w-0 items-center gap-3 h-full text-left outline-none rounded-row focus-visible:ring-2 focus-visible:ring-focus",
+                "flex flex-1 min-w-0 items-center gap-[9px] h-full text-left outline-none rounded-row focus-visible:ring-2 focus-visible:ring-focus",
                 iconOnly && "justify-center"
             )}
         >
             <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
-            <span className={cn("flex-1 min-w-0 text-13 truncate", iconOnly && "sr-only", tab.berryWorking && SHIMMER_TEXT)}>{tab.title || 'New tab'}</span>
-            {perch && <span aria-hidden className="w-8 shrink-0" />}
+            <span className={cn("flex-1 min-w-0 text-13 truncate", iconOnly && "sr-only")}>{tab.title || 'New tab'}</span>
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>
         <button
@@ -92,17 +86,69 @@ const TabItem: React.FC<{
             onClick={onClose}
             onPointerDown={(e) => e.stopPropagation()}
             className={cn(
-                "size-6 shrink-0 flex items-center justify-center rounded-row outline-none transition-opacity",
-                "hover:bg-press focus-visible:ring-2 focus-visible:ring-focus focus-visible:opacity-100",
+                "size-[22px] shrink-0 flex items-center justify-center rounded-[7px] text-ink-3 outline-none transition-opacity",
+                "hover:bg-press hover:text-ink focus-visible:ring-2 focus-visible:ring-focus focus-visible:opacity-100",
                 "opacity-0 group-hover/tab:opacity-100",
                 // In the row, a tab that isn't active only makes room for it on hover or focus, so its title gets the space.
                 row && !tab.isActive && "hidden group-hover/tab:flex group-focus-within/tab:flex",
                 tab.isActive && "opacity-100"
             )}
         >
-            <X className="size-3" />
+            <X className="size-[13px]" strokeWidth={1.5} />
         </button>
     </li>
+    )
+}
+
+// A job's tabs aren't the user's. While one runs, its chat is a row with its mascot's face, on a tray, and the tabs it
+// opened sit under it behind a dotted line. They close when the job ends, except any the user took over.
+const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: TabInfo[]; onClose: (id: string) => void }> = ({ chatId, chatTab, tabs, onClose }) => {
+    const { chats, needsYou } = useLibrary()
+    const { find } = useFlock()
+    const { switchTab } = useBrowser()
+    const chat = chats.find(({ id }) => id === chatId)
+    const mascot = find(chat?.mascotId ?? null)
+    const asking = needsYou.some(({ id }) => id === chatId)
+    const title = chat?.title ?? chatTab?.title ?? 'A job'
+    const open = () => (chatTab ? void switchTab(chatTab.id) : void window.chromeAPI.browser.openPage('chat', { param: chatId, title }))
+    const row = "flex items-center gap-[9px] w-full px-2 rounded-row text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus app-region-no-drag"
+
+    return (
+        <li className="mt-1 p-0.5 pb-1 rounded-tile bg-tray">
+            <div className={cn("flex items-center h-[30px] pr-1 rounded-row", chatTab?.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover")}>
+                <button type="button" aria-current={chatTab?.isActive ? 'page' : undefined} onClick={open} className={cn(row, "flex-1 min-w-0 h-full text-13 text-ink")}>
+                    <span className={LEADING_SLOT}><Berry mood={asking ? 'asking' : 'fetching'} size={20} mascot={mascot} /></span>
+                    <span className="flex-1 truncate">{title}</span>
+                    <span className="sr-only">{asking ? `, ${mascot.name} needs you` : `, ${mascot.name} is working`}</span>
+                    {asking && <Pips pattern="waiting" className="text-ask" />}
+                </button>
+                {chatTab?.isActive && (
+                    <button
+                        type="button"
+                        aria-label={`Close ${title}`}
+                        onClick={() => onClose(chatTab.id)}
+                        className="size-[22px] shrink-0 flex items-center justify-center rounded-[7px] text-ink-3 outline-none hover:bg-press hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                        <X className="size-[13px]" strokeWidth={1.5} />
+                    </button>
+                )}
+            </div>
+            <ul aria-label={`Pages ${mascot.name} opened`} className="ml-[15px] pl-2 border-l border-dotted border-faint">
+                {tabs.map((tab) => (
+                    <li key={tab.id}>
+                        <button
+                            type="button"
+                            aria-current={tab.isActive ? 'page' : undefined}
+                            onClick={() => !tab.isActive && void switchTab(tab.id)}
+                            className={cn(row, "h-[27px] text-12", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink")}
+                        >
+                            <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
+                            <span className="flex-1 truncate">{tab.title || 'New tab'}</span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </li>
     )
 }
 
@@ -115,12 +161,12 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     showNew = true
 }) => {
     const { tabs: allTabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
-    const { chats } = useLibrary()
     const vertical = mode === 'vertical'
-    // In the sidebar, a chat is its row under Chats, and a running job's tabs show under that chat. The tab row has
-    // no chats, so it shows them all.
-    const listedChat = (tab: TabInfo) => tab.page === 'chat' && chats.some(({ id }) => id === tab.pageParam)
-    const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId && !listedChat(tab)) : allTabs
+    // In the sidebar a running job's tabs show in a group under its chat, and that chat's own tab heads the group. The
+    // tab row has no groups, so it shows them all.
+    const jobs = [...new Set(allTabs.flatMap((tab) => (tab.jobChatId ? [tab.jobChatId] : [])))]
+    const heads = (tab: TabInfo) => tab.page === 'chat' && !!tab.pageParam && jobs.includes(tab.pageParam)
+    const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId && !heads(tab)) : allTabs
     // A drag counts places in this list, and the window in all of them.
     const moveShown = (tabId: string, toIndex: number) =>
         moveTab(tabId, toIndex < tabs.length ? allTabs.indexOf(tabs[toIndex]) : allTabs.length - 1)
@@ -163,6 +209,15 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                             if (to !== null) void moveTab(tab.id, to)
                         }}
                         {...itemProps(tab.id, index)}
+                    />
+                ))}
+                {vertical && jobs.map((chatId) => (
+                    <JobGroup
+                        key={chatId}
+                        chatId={chatId}
+                        chatTab={allTabs.find((tab) => tab.page === 'chat' && tab.pageParam === chatId)}
+                        tabs={allTabs.filter((tab) => tab.jobChatId === chatId)}
+                        onClose={(id) => void closeTab(id)}
                     />
                 ))}
             </ul>

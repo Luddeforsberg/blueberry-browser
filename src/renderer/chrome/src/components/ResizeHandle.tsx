@@ -19,9 +19,9 @@ export const ResizeHandle: React.FC<{ panel: ResizablePanel }> = ({ panel }) => 
     const label = LABELS[panel]
     const resize = (next: number) => void window.chromeAPI.layout.resize(panel, next)
 
-    // The sidebar grows to the right and the chat panel grows to the left.
+    // The sidebar grows to the right and the chat panel grows to the left, from its right edge.
     const widthAt = (clientX: number) =>
-        panel === 'sidebar' ? clientX : window.innerWidth - clientX
+        panel === 'sidebar' ? clientX : layout.chat.x + layout.chat.width - clientX
 
     return (
         <div
@@ -33,9 +33,10 @@ export const ResizeHandle: React.FC<{ panel: ResizablePanel }> = ({ panel }) => 
             aria-valuemax={max}
             tabIndex={0}
             className={cn(
-                "absolute inset-y-0 w-1.5 cursor-col-resize app-region-no-drag outline-none",
-                "hover:bg-line focus-visible:bg-ink transition-colors",
-                panel === 'sidebar' ? "right-0" : "left-0"
+                "absolute inset-y-0 w-1.5 cursor-col-resize app-region-no-drag outline-none rounded-full",
+                "hover:bg-line focus-visible:bg-focus transition-colors",
+                // The chat panel's is in the gutter between it and the page.
+                panel === 'sidebar' ? "right-0" : "right-full mr-px"
             )}
             onPointerDown={(e) => {
                 dragging.current = true

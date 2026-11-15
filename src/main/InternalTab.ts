@@ -8,7 +8,7 @@ const TITLES: Record<InternalPage, string> = {
   downloads: "Downloads",
   gallery: "Component gallery",
   history: "History",
-  flock: "Flock",
+  flock: "Your mascots",
   "mascot-gallery": "Gallery",
   "needs-you": "Needs you",
   recording: "What I watched",

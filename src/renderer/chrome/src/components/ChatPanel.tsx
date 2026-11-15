@@ -8,20 +8,13 @@ import { ToolBarButton } from './ToolBarButton'
 
 export const ChatPanel: React.FC = () => {
     const { clearChat, messages } = useChat()
-    const { layout, theme, toggleChat } = useShell()
+    const { toggleChat } = useShell()
     const name = useAssistantName()
 
+    // A second sheet beside the page, under the toolbar (DESIGN.md section 2).
     return (
-        <aside aria-label="Berry" className="h-full flex flex-col">
-            {/* On the toolbar's row, so its buttons line up with the toolbar's. */}
-            <div
-                className="flex items-center gap-1 px-3 pb-2 box-content app-region-drag shrink-0"
-                style={{
-                    paddingTop: layout.addressRow.y - layout.chat.y,
-                    height: layout.addressRow.height,
-                    paddingRight: theme.platform !== 'mac' && layout.addressRow.y < layout.controls.y + layout.controls.height ? layout.controls.width : undefined
-                }}
-            >
+        <aside aria-label="Berry" className="h-full flex flex-col rounded-sheet bg-sheet shadow-lift overflow-hidden">
+            <div className="h-12 shrink-0 flex items-center gap-1 px-2">
                 <ToolBarButton Icon={SquarePen} label="New chat" active={messages.length > 0} onClick={clearChat} />
                 <div className="flex-1" />
                 <ToolBarButton Icon={X} label={`Close ${name}`} onClick={toggleChat} />

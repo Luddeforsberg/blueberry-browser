@@ -7,7 +7,7 @@ export const TabStrip: React.FC = () => {
 
     // The tab row is the window's top edge here, so it keeps the system's window buttons clear, and off a Mac the menu button.
     const leftClear = theme.platform === 'mac' ? layout.controls.width : 8
-    const rightClear = !layout.chatOpen && theme.platform !== 'mac' ? layout.controls.width : 8
+    const rightClear = theme.platform !== 'mac' ? layout.controls.width : 8
 
     return (
         <div

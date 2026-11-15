@@ -352,7 +352,7 @@ Straight on the ground. Under the window controls is a switch between its two fa
 
 Section labels are 11px mono, lower case, in `ink-3`.
 
-**The dock shows, it doesn't choose.** Pressing a mascot opens its card: its name, what it may do, what you've allowed it without asking and a way to take each back, what it's doing now, its recent chats, and **New chat with** its name, which opens a new tab with it chosen. See [switching.html](./docs/design/mocks/switching.html).
+**The dock shows, it doesn't choose.** Pressing a mascot opens its card, above the dock and inside the sidebar: its name, what it may do, what you've allowed it without asking and a way to take each back, what it's doing now, its recent chats, and **New chat with** its name, which opens a new tab with it chosen. Under that, **All your mascots** in quiet text opens the mascots' page, which nothing else in the sidebar leads to. See [switching.html](./docs/design/mocks/switching.html).
 
 ### Toolbar and the address field
 
@@ -364,14 +364,15 @@ Back, forward and reload in `ink-3`, then the address field, then the chat panel
 
 | State | The field |
 |---|---|
-| At rest | On `tray`: a lock, the real address with its site in `ink`, and real navigation state |
-| A mascot is working here | Turns `ink`, with `ground` text. From the left: the mascot, its face the pips; what it's doing in mono, such as "Scanning fares.."; the site, dimmed; then **Take over**, outlined, and **Stop**, filled |
+| At rest | On `tray`: a lock, the real address with its site in `ink`, and real navigation state. A star at its end bookmarks a web page, filled when it's saved, since the toolbar has no other place for it |
+| A mascot is working here | Turns `ink`, with `ground` text. From the left: the mascot, its face the pips; what it's doing in mono, such as "Scanning fares..", or "Thinking.." between its own words; the site, dimmed; then **Take over**, outlined, and **Stop**, filled. Take over is there only on a tab the job opened |
 | It's waiting for you | The same, with its face Asking and "Waiting for you". **Stop** is outlined and **Answer** is filled, and opens the chat at the card |
 | Your turn | `ask-bg` with `ask` text: a lock, "Your turn. Berry can't see this tab", and **I'm done**, filled in `ink`, which is the only thing that gives the tab back |
 | You press the field | The address again, on a sheet with the focus ring. The mascot stays as a small still chip at its left, and "Enter takes this tab over" is in mono at its right |
 
 - **Stop is only ever here,** in the chrome. Anything a page can see it can fake, so no control is drawn on a page. It's the same as Stop in the chat.
-- **Take over** is the same as clicking in the page: the job can't reach the tab any more and is told why. Going somewhere from the field does the same.
+- **Take over** is the same as clicking in the page: the job can't reach the tab any more and is told why. Going somewhere from the field does the same. On one of the user's own tabs, which a job reaches only while it can see the page, there's nothing to take back yet, so only Stop shows.
+- **Beside the field,** on the right, only what has real state: downloads, the zoom when it isn't 100%, and, while the sidebar is closed, what it would say about work elsewhere.
 - **It replaces the ring** that used to go round the page while Berry read or used it. Nothing else marks the tab from the chrome but the mascot's row in the sidebar.
 
 ### New tab
@@ -502,13 +503,12 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 
 **Drawn here and not in the app yet,** to be built:
 
-- The sidebar's two faces, and everything on Chats.
-- Bookmark folders.
+- Bookmark folders. Bookmarks are one list until they exist.
 - Allowing for the rest of a job, or always on a site, and the list of what's allowed on a mascot's card.
 - The reason under an approval, which needs the tool layer to say why it asked.
 - Answers to press on a question.
 - Files in the prompt box.
-- The address field's states: Answer, Your turn with I'm done, and editing while a mascot works.
+- Take over on one of the user's own tabs, which needs a way to put a tab out of a job's reach that the job didn't open.
 - The mascot standing on what it's acting on, in place of the bird that flew.
 - Steps and pills that say what was typed.
 - Waiting for you on the new tab.

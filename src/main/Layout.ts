@@ -3,16 +3,15 @@ import type { DesktopBerrySpot, DesktopEdge, DesktopLineAnchor, Layout, LayoutMo
 export type { Layout, LayoutMode, Rect };
 
 // DESIGN.md section 2, to tune.
-export const SIDEBAR_WIDTH = { default: 280, min: 200, max: 360 };
-export const CHAT_WIDTH = { default: 400, min: 320, max: 480 };
-export const ADDRESS_ROW_HEIGHT = 40;
+export const SIDEBAR_WIDTH = { default: 248, min: 200, max: 360 };
+export const CHAT_WIDTH = { default: 348, min: 320, max: 480 };
+// The toolbar is a row on the ground above the page. In the vertical layout the window buttons share it.
+export const TOOLBAR_HEIGHT = 48;
 // In horizontal mode there is no sidebar to hold the bookmarks, so the toolbar has a bar for them too.
-export const TOOLBAR_HEIGHT_WITH_BOOKMARKS = 76;
+const BOOKMARKS_BAR_HEIGHT = 36;
 export const TAB_ROW_HEIGHT = 40;
-// The page card floats on the frame, with this much of it showing around the card.
+// The gutter: the ground showing between the page's sheet and the window's right and bottom edges, and between sheets.
 export const PAGE_INSET = 8;
-// The window buttons line up with the address row, which sits one inset down.
-export const VERTICAL_TOP_ROW_HEIGHT = ADDRESS_ROW_HEIGHT + 2 * PAGE_INSET;
 export const FLOATING_INSET = 8;
 // The find bar's card with 12px on every side, for its shadow.
 export const FIND_BAR = { width: 384, height: 72 };
@@ -232,8 +231,9 @@ export function computeLayout(
   const chatWidth = clampWidth(options.chatWidth, CHAT_WIDTH);
   const vertical = mode === "vertical";
 
+  // The chat panel is a second sheet, with the gutter between it and the page.
   const pageWidth = (sidebar: boolean, chat: boolean) =>
-    window.width - (sidebar ? sidebarWidth : PAGE_INSET) - (chat ? chatWidth : PAGE_INSET);
+    window.width - (sidebar ? sidebarWidth : PAGE_INSET) - (chat ? chatWidth + PAGE_INSET : 0) - PAGE_INSET;
 
   // When space runs out, the sidebar collapses first and the chat closes next.
   let sidebar = vertical && options.sidebarOpen;
@@ -242,16 +242,15 @@ export function computeLayout(
   if (chat && pageWidth(sidebar, chat) < MIN_PAGE_WIDTH) chat = false;
 
   const left = sidebar ? sidebarWidth : 0;
-  const right = chat ? chatWidth : 0;
   const { height } = window;
-  const middleWidth = Math.max(window.width - left - right, 0);
   const cardX = sidebar ? left : PAGE_INSET;
-  const cardRight = window.width - (chat ? right : PAGE_INSET);
+  const chatX = Math.max(window.width - PAGE_INSET - chatWidth, 0);
+  const cardRight = chat ? chatX - PAGE_INSET : window.width - PAGE_INSET;
   const cardWidth = Math.max(cardRight - cardX, 0);
 
   // The top row holds the window buttons: the toolbar when vertical, the tab row when horizontal.
   // Off a Mac, the menu button is part of what's kept clear, so whatever sits in the top right corner leaves room for it.
-  const topRow = vertical ? VERTICAL_TOP_ROW_HEIGHT : TAB_ROW_HEIGHT;
+  const topRow = vertical ? TOOLBAR_HEIGHT : TAB_ROW_HEIGHT;
   const mac = platform === "darwin";
   // Linux has no window buttons of its own here, only the menu button.
   const systemButtons = platform === "win32" ? WINDOWS_CONTROLS_WIDTH : 0;
@@ -273,9 +272,11 @@ export function computeLayout(
         height: MENU_BUTTON_SIZE,
       };
 
-  const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: middleWidth, height: TAB_ROW_HEIGHT };
-  const toolbarY = vertical ? PAGE_INSET : TAB_ROW_HEIGHT;
-  const toolbarHeight = vertical ? ADDRESS_ROW_HEIGHT : TOOLBAR_HEIGHT_WITH_BOOKMARKS;
+  // The tab row and the toolbar run over the chat panel too, so the panel's button stays at the window's edge.
+  const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: window.width, height: TAB_ROW_HEIGHT };
+  const toolbarY = vertical ? 0 : TAB_ROW_HEIGHT;
+  const toolbarHeight = vertical ? TOOLBAR_HEIGHT : TOOLBAR_HEIGHT + BOOKMARKS_BAR_HEIGHT;
+  const toolbarX = vertical ? cardX : 0;
   const pageY = toolbarY + toolbarHeight;
   const pageHeight = Math.max(height - pageY - PAGE_INSET, 0);
   const findBarWidth = Math.min(FIND_BAR.width, cardWidth);
@@ -305,9 +306,9 @@ export function computeLayout(
       height: Math.min(FIND_BAR.height, pageHeight),
     },
     tabStrip,
-    toolbar: { x: cardX, y: toolbarY, width: cardWidth, height: toolbarHeight },
-    addressRow: { x: cardX, y: toolbarY, width: cardWidth, height: ADDRESS_ROW_HEIGHT },
-    chat: chat ? { x: window.width - right, y: 0, width: right, height } : EMPTY,
+    toolbar: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: toolbarHeight },
+    addressRow: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: TOOLBAR_HEIGHT },
+    chat: chat ? { x: chatX, y: pageY, width: chatWidth, height: pageHeight } : EMPTY,
     page: {
       x: cardX,
       y: pageY,

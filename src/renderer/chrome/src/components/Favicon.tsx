@@ -20,16 +20,20 @@ export const siteIcon = (url: string) => {
     }
 };
 
-// The first letter of the site's name, so sites with no icon still look different from each other.
-export const siteLetter = (site: string) => {
-    let host = site;
+// The first letter of the site's name, so sites with no icon still look different from each other, on a tile in a colour
+// of its own (DESIGN.md section 8). The colour is the site's, from its name, never the chrome's.
+const LETTER_TILES = 8;
+const hostOf = (site: string) => {
     try {
-        host = new URL(site).hostname;
+        return new URL(site).hostname.replace(/^www\./, "");
     } catch {
         // Already a host.
+        return site.replace(/^www\./, "");
     }
-    return host.replace(/^www\./, "").charAt(0).toUpperCase();
 };
+const tileOf = (site: string) => `var(--site-${([...hostOf(site)].reduce((sum, char) => sum + char.charCodeAt(0), 0) % LETTER_TILES) + 1})`;
+
+export const siteLetter = (site: string) => hostOf(site).charAt(0).toUpperCase();
 
 export const Favicon: React.FC<FaviconProps> = ({ src, className, fallback, site }) => {
     const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -43,16 +47,17 @@ export const Favicon: React.FC<FaviconProps> = ({ src, className, fallback, site
                 <span
                     aria-hidden
                     data-letter={letter}
-                    className={cn("size-4 shrink-0 flex items-center justify-center rounded-full bg-ink-2/15 text-11 leading-none font-medium text-ink-2 before:content-[attr(data-letter)]", className)}
+                    style={{ backgroundColor: tileOf(site ?? "") }}
+                    className={cn("size-4 shrink-0 flex items-center justify-center rounded-[5px] text-[9px] leading-none font-medium text-white before:content-[attr(data-letter)]", className)}
                 />
             );
         }
-        return <Globe className={`size-4 shrink-0 text-ink-2 ${className || ""}`} />;
+        return <Globe className={cn("size-4 shrink-0 text-ink-3", className)} />;
     }
 
     // Dark icons on a transparent background would vanish in dark mode, so they get a light plate.
     return (
-        <div className="size-4 shrink-0 overflow-hidden rounded-none flex items-center justify-center dark:bg-ink dark:rounded-row dark:p-px">
+        <div className={cn("size-4 shrink-0 overflow-hidden rounded-none flex items-center justify-center dark:bg-ink dark:rounded-[4px] dark:p-px", className)}>
             <img
                 src={src}
                 className="object-contain size-full"

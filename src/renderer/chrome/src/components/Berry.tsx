@@ -5,7 +5,8 @@ import { Mascot, type Mood } from '@common/components/Mascot'
 import { useShell } from '../contexts/ShellContext'
 
 // Berry, or one of the flock, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
-export const Berry: React.FC<{ mood?: Mood; size: number; className?: string; mascot?: MascotProfile }> = ({ mascot, ...props }) => {
+// `still` holds it still whatever the settings say, where something else in its area already moves.
+export const Berry: React.FC<{ mood?: Mood; size: number; className?: string; mascot?: MascotProfile; still?: boolean; shut?: boolean }> = ({ mascot, ...props }) => {
     const { settings } = useShell()
 
     return (
@@ -30,9 +31,9 @@ export const useAssistantName = (mascot?: MascotProfile) => {
     return showBerry ? 'Berry' : 'Assistant'
 }
 
-// A place on the page for Berry to land. BerryCompanion draws Berry here, so there's only ever one.
+// Berry where a page has room for it, such as an empty chat. With Berry hidden there's nothing in its place.
 export const BerrySpot: React.FC<{ size: number }> = ({ size }) => {
     const { settings } = useShell()
 
-    return settings.showBerry ? <div data-berry-spot style={{ width: size, height: size }} /> : null
+    return settings.showBerry ? <Berry size={size} /> : null
 }

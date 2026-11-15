@@ -47,6 +47,7 @@ const chromeAPI: ChromeAPI = {
     reload: (tabId) => invoke("tab:reload", tabId),
     stop: (tabId) => invoke("tab:stop", tabId),
     stopWork: (tabId) => invoke("tab:stop-work", tabId),
+    takeOver: (tabId) => invoke("tab:take-over", tabId),
     resetZoom: (tabId) => invoke("tab:zoom-reset", tabId),
     openPage: (page, options) => invoke("tabs:open-page", page, options),
     getRecent: () => invoke("history:recent"),

@@ -210,7 +210,7 @@ export class AppMenu {
             click: () => this.mainWindow.openPage("routines"),
           },
           {
-            label: "Flock",
+            label: "Your Mascots",
             click: () => this.mainWindow.openPage("flock"),
           },
           {

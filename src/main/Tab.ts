@@ -4,9 +4,8 @@ import { PageActor, type ActorOptions } from "./PageActor";
 import { savedEntries, type SavedWebTab } from "./Session";
 import type { PageTarget } from "./pageTarget";
 
-// The page card radius from DESIGN.md.
-// Matches the card the page sits in, `rounded-panel` in the chrome.
-const PAGE_RADIUS = 22;
+// The page sheet's radius from DESIGN.md section 2, `rounded-sheet` in the chrome.
+const PAGE_RADIUS = 16;
 
 // An id of our own, away from the page's world (0) and Electron's low numbers.
 const AGENT_WORLD = 1000;

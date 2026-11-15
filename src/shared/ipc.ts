@@ -425,6 +425,8 @@ export interface InvokeChannels {
   "tab:stop": { region: "chrome"; args: [tabId: string]; result: boolean };
   // Ends every job working in this tab. It's here, in the chrome, because no page can reach it.
   "tab:stop-work": { region: "chrome"; args: [tabId: string]; result: boolean };
+  // Takes a tab a job opened away from it, as clicking in the page does: the job can't reach it any more. Only ever narrows.
+  "tab:take-over": { region: "chrome"; args: [tabId: string]; result: void };
   "tab:zoom-reset": { region: "chrome"; args: [tabId: string]; result: boolean };
   "find:search": { region: "find"; args: [text: string]; result: void };
   "find:step": { region: "find"; args: [forward: boolean]; result: void };
@@ -641,6 +643,7 @@ export interface BrowserAPI {
   reload: (tabId: string) => Promise<boolean>;
   stop: (tabId: string) => Promise<boolean>;
   stopWork: (tabId: string) => Promise<boolean>;
+  takeOver: (tabId: string) => Promise<void>;
   resetZoom: (tabId: string) => Promise<boolean>;
   openPage: (page: InternalPage, options?: { param?: string; title?: string }) => Promise<TabInfo>;
   getRecent: () => Promise<Visit[]>;

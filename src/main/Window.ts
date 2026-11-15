@@ -46,7 +46,7 @@ import {
   computeLayout,
   MIN_WINDOW,
   TAB_ROW_HEIGHT,
-  VERTICAL_TOP_ROW_HEIGHT,
+  TOOLBAR_HEIGHT,
   type Layout,
 } from "./Layout";
 import { sendToRenderer } from "./ipc";
@@ -579,7 +579,7 @@ export class Window {
   }
 
   private get topRowHeight(): number {
-    return this.mode === "vertical" ? VERTICAL_TOP_ROW_HEIGHT : TAB_ROW_HEIGHT;
+    return this.mode === "vertical" ? TOOLBAR_HEIGHT : TAB_ROW_HEIGHT;
   }
 
   private windowButtonPosition() {
@@ -1474,7 +1474,7 @@ export class Window {
     const asked = this.chrome.view.webContents
       .executeJavaScript(
         `(() => {
-          const drawn = [...document.querySelectorAll("[data-berry-perched] svg, [data-berry-companion] svg")].map((bird) => bird.getBoundingClientRect()).find(({ width }) => width > 0);
+          const drawn = [...document.querySelectorAll("[data-berry-perched] svg")].map((bird) => bird.getBoundingClientRect()).find(({ width }) => width > 0);
           return drawn ? { x: drawn.x + drawn.width / 2, y: drawn.y + drawn.height / 2 } : null;
         })()`
       )
