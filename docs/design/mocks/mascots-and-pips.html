@@ -256,6 +256,15 @@
   .pc.lt{background:var(--sheet);color:var(--ink);box-shadow:var(--rim)}
   .pc small{font:11px "Geist Mono",monospace;opacity:.6}
   .spec+.spec{margin-top:10px}
+
+  .sseg{display:grid;grid-template-columns:1fr 1fr;background:var(--tray);border-radius:10px;padding:2px;margin:0 0 12px;height:30px;font-size:12px;flex:none}
+  .sseg span{display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;color:var(--ink2)}
+  .sseg .on{background:var(--sheet);color:var(--ink);box-shadow:var(--rim);font-weight:500}
+  .sseg i{width:6px;height:6px;border-radius:50%;background:var(--ask)}
+  .lab.askl{color:var(--ask)}
+  .split{padding-right:0;gap:0}
+  .split i{width:1px;height:14px;background:currentColor;opacity:.25;margin:0 2px 0 11px}
+  .split svg.i{width:26px;height:12px}
 </style>
 </head>
 <body>
@@ -361,6 +370,7 @@
 <div class="fit D"><div class="win">
   <aside class="side">
     <div class="lights"><span></span><span></span><span></span><svg class="i"><use href="#sidebar"/></svg></div>
+    <div class="sseg"><span class="on">Tabs</span><span>Chats</span></div>
     <div class="favs">
       <div class="fav open"><span class="fv" style="background:#3A3F47">G</span></div>
       <div class="fav open"><span class="fv" style="background:#5E6AD2">L</span></div>
@@ -404,15 +414,15 @@
             <div class="field">Depart<b>Sat 12 Dec</b></div><div class="field">Return<b>Wed 16 Dec</b></div>
           </div>
           <div style="margin-top:22px;display:grid;gap:10px">
-            <div class="res" style="outline:1.5px dotted #1846D6;outline-offset:4px"><b style="font-size:15px">07:10</b><div class="sk" style="width:150px;height:9px"></div><span style="margin-left:auto;font-weight:600;font-size:15px">1 840 kr</span></div>
+            <div class="res" style="outline:1.5px dotted #3F51DC;outline-offset:4px;position:relative"><span class="b" data-b="blueberry,working,none" data-still="1" style="position:absolute;right:-13px;top:-17px;--z:24px"></span><b style="font-size:15px">07:10</b><div class="sk" style="width:150px;height:9px"></div><span style="margin-left:auto;font-weight:600;font-size:15px">1 840 kr</span></div>
             <div class="res"><b style="font-size:15px">11:45</b><div class="sk" style="width:120px;height:9px"></div><span style="margin-left:auto;font-weight:600;font-size:15px">2 115 kr</span></div>
             <div class="res"><b style="font-size:15px">16:20</b><div class="sk" style="width:170px;height:9px"></div><span style="margin-left:auto;font-weight:600;font-size:15px">2 390 kr</span></div>
             <div class="res" style="opacity:.5"><b style="font-size:15px">19:05</b><div class="sk" style="width:130px;height:9px"></div></div>
           </div>
         </div>
         <div class="glasses mono">
-          <span class="glass was2"><span class="pips" data-p="type" data-still="1"></span>Typed in From and To</span>
-          <span class="glass was"><span class="pips" data-p="click" data-still="1"></span>Picked the dates</span>
+          <span class="glass was2"><span class="pips" data-p="type" data-still="1"></span>Typed Lisbon in To</span>
+          <span class="glass was"><span class="pips" data-p="click" data-still="1"></span>Picked 12 to 16 Dec</span>
           <span class="glass"><span class="pips" data-p="scan"></span>Scanning fares..</span>
         </div>
       </div>
@@ -422,8 +432,8 @@
         <div class="steps mono">
           <div><span class="pips" data-p="open" data-still="1"></span>Opened klm.com</div>
           <div><span class="pips" data-p="read" data-still="1"></span>Read the page</div>
-          <div><span class="pips" data-p="type" data-still="1"></span>Typed in From and To</div>
-          <div><span class="pips" data-p="click" data-still="1"></span>Picked the dates</div>
+          <div><span class="pips" data-p="type" data-still="1"></span>Typed Lisbon in To</div>
+          <div><span class="pips" data-p="click" data-still="1"></span>Picked 12 to 16 Dec</div>
           <div class="now"><span class="pips" data-p="scan"></span>Scanning fares..</div>
         </div>
         <div class="shell">

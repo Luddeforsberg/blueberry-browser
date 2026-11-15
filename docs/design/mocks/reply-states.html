@@ -250,6 +250,15 @@
   .greys div{border-radius:10px;background:var(--sheet);padding:9px 11px;box-shadow:var(--rim)}
   .greys small{display:block;font:11px "Geist Mono",monospace;color:var(--ink3);margin-top:3px}
   @media (max-width:600px){.ctl{grid-template-columns:1fr}}
+
+  .sseg{display:grid;grid-template-columns:1fr 1fr;background:var(--tray);border-radius:10px;padding:2px;margin:0 0 12px;height:30px;font-size:12px;flex:none}
+  .sseg span{display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;color:var(--ink2)}
+  .sseg .on{background:var(--sheet);color:var(--ink);box-shadow:var(--rim);font-weight:500}
+  .sseg i{width:6px;height:6px;border-radius:50%;background:var(--ask)}
+  .lab.askl{color:var(--ask)}
+  .split{padding-right:0;gap:0}
+  .split i{width:1px;height:14px;background:currentColor;opacity:.25;margin:0 2px 0 11px}
+  .split svg.i{width:26px;height:12px}
 </style>
 </head>
 <body>
@@ -282,15 +291,16 @@
       <div class="card">
         <div class="q">Search flights on klm.com?</div>
         <span class="words">click "Search flights" on klm.com/search</span>
-        <div class="acts"><span class="pill solid">Allow</span><span class="pill line">Don’t allow</span></div>
+        <div class="acts"><span class="pill solid split">Allow<i></i><svg class="i"><use href="#down"/></svg></span><span class="pill line">Don’t allow</span></div>
       </div>
       <div class="note"><span class="pips ask" data-p="wait"></span><span class="tx">Asks because this sends your dates to the site</span></div>
     </div>
   </div>
   <div class="stt">
-    <h5><b>A QUESTION</b> · an answer in words</h5>
+    <h5><b>A QUESTION</b> · answers to press, or your own</h5>
     <div class="q">Arlanda only, or is Bromma fine too?</div>
-        <div class="ans">Type an answer<span class="send off"><svg class="i"><use href="#up"/></svg></span></div>
+        <div class="acts"><span class="pill line">Arlanda only</span><span class="pill line">Either</span></div>
+    <div class="ans">Or type an answer<span class="send off"><svg class="i"><use href="#up"/></svg></span></div>
     <div class="acts" style="margin-top:8px"><span class="pill" style="color:var(--ink2);padding:0 6px">Skip</span></div>
   </div>
   <div class="stt">

@@ -250,6 +250,15 @@
   .greys div{border-radius:10px;background:var(--sheet);padding:9px 11px;box-shadow:var(--rim)}
   .greys small{display:block;font:11px "Geist Mono",monospace;color:var(--ink3);margin-top:3px}
   @media (max-width:600px){.ctl{grid-template-columns:1fr}}
+
+  .sseg{display:grid;grid-template-columns:1fr 1fr;background:var(--tray);border-radius:10px;padding:2px;margin:0 0 12px;height:30px;font-size:12px;flex:none}
+  .sseg span{display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;color:var(--ink2)}
+  .sseg .on{background:var(--sheet);color:var(--ink);box-shadow:var(--rim);font-weight:500}
+  .sseg i{width:6px;height:6px;border-radius:50%;background:var(--ask)}
+  .lab.askl{color:var(--ask)}
+  .split{padding-right:0;gap:0}
+  .split i{width:1px;height:14px;background:currentColor;opacity:.25;margin:0 2px 0 11px}
+  .split svg.i{width:26px;height:12px}
 </style>
 </head>
 <body>
@@ -278,6 +287,7 @@
 <div class="fit L"><div class="win">
   <aside class="side">
     <div class="lights"><span></span><span></span><span></span><svg class="i"><use href="#sidebar"/></svg></div>
+    <div class="sseg"><span class="on">Tabs</span><span>Chats<i></i></span></div>
     <div class="favs">
       <div class="fav open"><span class="fv" style="background:#1F2328">G</span></div>
       <div class="fav open"><span class="fv" style="background:#5E6AD2">L</span></div>
@@ -333,10 +343,11 @@
               <span class="send off"><svg class="i"><use href="#up"/></svg></span></span>
             </div>
           </div>
-          <div class="note"><span class="b" data-b="lingon,asking,cap" style="--z:22px"></span><span class="tx"><b>Scout needs you</b> on Flights to Lisbon</span><span class="pill solid">Review</span></div>
         </div>
       </div>
       <div class="since">
+        <div class="lab askl" style="margin:0 8px 6px">waiting for you</div>
+        <div class="ev" style="background:var(--sheet);border-radius:12px;box-shadow:var(--rim);color:var(--ink);height:44px;margin-bottom:14px"><span class="b" data-b="lingon,asking,cap" style="--z:24px"></span><span><b>Scout</b> wants to search klm.com with your dates, on Flights to Lisbon</span><span class="pill solid" style="height:26px;margin-left:auto">Review</span></div>
         <div class="lab" style="margin:0 8px 6px">since you left</div>
         <div class="ev"><span class="b" data-b="cloudberry,delivered,glasses" style="--z:22px"></span><span><b>Morning Paper</b> read 4 pages, 2 worth your time</span><span class="when mono">07:30</span></div>
         <div class="ev"><span class="b" data-b="blueberry,delivered,none" style="--z:22px"></span><span><b>Berry</b> saved the Fortnox invoice to Downloads</span><span class="when mono">yesterday</span></div>
@@ -351,6 +362,7 @@
 <div class="fit D"><div class="win">
   <aside class="side">
     <div class="lights"><span></span><span></span><span></span><svg class="i"><use href="#sidebar"/></svg></div>
+    <div class="sseg"><span class="on">Tabs</span><span>Chats</span></div>
     <div class="favs">
       <div class="fav open"><span class="fv" style="background:#3A3F47">G</span></div>
       <div class="fav open"><span class="fv" style="background:#5E6AD2">L</span></div>
@@ -402,8 +414,8 @@
             <div class="steps mono">
               <div><span class="pips" data-p="open" data-still="1"></span>Opened klm.com</div>
               <div><span class="pips" data-p="read" data-still="1"></span>Read the page</div>
-              <div><span class="pips" data-p="type" data-still="1"></span>Typed in From and To</div>
-              <div><span class="pips" data-p="click" data-still="1"></span>Picked the dates</div>
+              <div><span class="pips" data-p="type" data-still="1"></span>Typed Lisbon in To</div>
+              <div><span class="pips" data-p="click" data-still="1"></span>Picked 12 to 16 Dec</div>
               <div><span class="pips" data-p="open" data-still="1"></span>Opened Skyscanner in a second tab</div>
               <div class="now"><span class="pips" data-p="scan"></span>Scanning fares..</div>
             </div>
@@ -444,6 +456,7 @@
 <div class="fit L"><div class="win">
   <aside class="side">
     <div class="lights"><span></span><span></span><span></span><svg class="i"><use href="#sidebar"/></svg></div>
+    <div class="sseg"><span class="on">Tabs</span><span>Chats<i></i></span></div>
     <div class="favs">
       <div class="fav open"><span class="fv" style="background:#3A3F47">G</span></div>
       <div class="fav open"><span class="fv" style="background:#5E6AD2">L</span></div>
@@ -475,7 +488,7 @@
     <div class="bar">
       <svg class="i"><use href="#back"/></svg><svg class="i"><use href="#fwd"/></svg><svg class="i"><use href="#reload"/></svg>
       <div class="addr live"><span class="b" data-b="blueberry,asking,none" data-flip="1" style="--z:22px"></span><span class="mono">Waiting for you</span><span class="where mono">klm.com</span>
-        <span class="r"><span class="pill line">Take over</span><span class="pill fill">Stop</span></span></div>
+        <span class="r"><span class="pill line">Stop</span><span class="pill fill">Answer</span></span></div>
       <svg class="i"><use href="#sidebar" transform="scale(-1 1) translate(-16 0)"/></svg>
     </div>
     <div class="cols">
@@ -487,7 +500,7 @@
             <div class="field">From<b>Stockholm ARN</b></div><div class="field">To<b>Lisbon LIS</b></div>
             <div class="field">Depart<b>Sat 12 Dec</b></div><div class="field">Return<b>Wed 16 Dec</b></div>
           </div>
-          <div style="margin-top:16px;height:44px;width:150px;border-radius:10px;background:#1846D6;color:#fff;font-weight:600;font-size:14px;display:grid;place-items:center;outline:1.5px dotted #1846D6;outline-offset:5px">Search flights</div>
+          <div style="margin-top:16px;height:44px;width:150px;border-radius:10px;background:#1846D6;color:#fff;font-weight:600;font-size:14px;display:grid;place-items:center;outline:1.5px dotted #3F51DC;outline-offset:5px;position:relative">Search flights<span class="b" data-b="blueberry,asking,none" style="position:absolute;right:-17px;top:-19px;--z:24px"></span></div>
           <div style="margin-top:36px;display:grid;gap:10px"><div class="sk" style="height:60px;border-radius:12px"></div><div class="sk" style="height:60px;border-radius:12px;opacity:.6"></div></div>
         </div>
         <span class="glass one mono" style="left:196px;top:318px"><span class="pips" data-p="wait" style="color:#FF8A8A"></span>Waiting for you..</span>
@@ -498,14 +511,14 @@
         <div class="steps mono">
           <div><span class="pips" data-p="open" data-still="1"></span>Opened klm.com</div>
           <div><span class="pips" data-p="read" data-still="1"></span>Read the page</div>
-          <div><span class="pips" data-p="type" data-still="1"></span>Typed in From and To</div>
-          <div><span class="pips" data-p="click" data-still="1"></span>Picked the dates</div>
+          <div><span class="pips" data-p="type" data-still="1"></span>Typed Lisbon in To</div>
+          <div><span class="pips" data-p="click" data-still="1"></span>Picked 12 to 16 Dec</div>
         </div>
         <div class="shell" style="margin-top:16px;border-radius:20px">
           <div class="card" style="border-radius:16px;padding:14px">
             <div class="q">Search flights on klm.com?</div>
             <span class="words" style="background:var(--sheet)">click "Search flights" on klm.com/search</span>
-            <div class="acts"><span class="pill solid">Allow</span><span class="pill line">Don’t allow</span></div>
+            <div class="acts"><span class="pill solid split">Allow<i></i><svg class="i"><use href="#down"/></svg></span><span class="pill line">Don’t allow</span></div>
           </div>
           <div class="note" style="height:36px;padding:0 10px 0 12px"><span class="pips ask" data-p="wait"></span><span class="tx">Asks because this sends your dates</span></div>
         </div>

@@ -6,10 +6,11 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 **Where this stands**
 
-- **It replaces Bloom.** The old document is at [docs/design/DESIGN-bloom.md](./docs/design/DESIGN-bloom.md), kept only for how screens that aren't redrawn yet behave.
+- **It replaces Bloom.** The old document is at [docs/design/DESIGN-bloom.md](./docs/design/DESIGN-bloom.md), kept only for how screens that aren't redrawn yet behave. Nothing in it binds this one.
 - **The app still wears Bloom.** Nothing here is built. This document lands with the first build (tokens, type, the mascot and the pips), not before it, so nobody is sent to tokens that don't exist.
 - **The mocks** are in [docs/design/mocks](./docs/design/mocks), and each section below names its own. Where a mock and this document disagree, this document is right.
-- **Not everything is drawn.** Section 11 lists what isn't, and section 12 what's still open.
+- **Some of it is new.** Where the better design needed something the app doesn't do yet, it's drawn anyway and listed in section 12, to be built.
+- **Not everything is drawn.** Section 11 lists what isn't.
 
 ## 1. Principles
 
@@ -41,7 +42,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 | Region | Vertical |
 |---|---|
-| Sidebar | Left, straight on the ground, with no card of its own |
+| Sidebar | Left, straight on the ground, with no card of its own. It has two faces, Tabs and Chats |
 | Toolbar | A row above the page: back, forward, reload, the address field, the chat panel button |
 | Web page | One white sheet, 8px in from the window's right and bottom edges |
 | Chat panel | A second sheet on the right, which pushes the page |
@@ -160,8 +161,8 @@ Two families, both bundled with the app and never fetched: **Geist** for words, 
 |---|---|---|
 | 30px, medium, tight | Geist | The greeting on the new tab |
 | 18px | Geist | What you type in the prompt box |
-| 15px, regular or medium | Geist | The title of a card that needs you, what you type in a chat |
-| 13px | Geist | Everything else: rows, replies, body text |
+| 15px, regular or medium | Geist | The title of a card that needs you, what you type in a chat, and every message in one |
+| 13px | Geist | Everything else: rows, lists, body text outside a chat |
 | 12px | Geist | Buttons, pills, secondary lines |
 | 11.5px | Geist Mono | Status words, steps, exact words, times |
 | 11px | Geist Mono | Section labels, in lower case |
@@ -170,7 +171,7 @@ Two families, both bundled with the app and never fetched: **Geist** for words, 
 - **Tabular figures** wherever numbers line up, such as times and prices.
 - **Mono means "the machine's words":** what a mascot is doing or did, the exact words of what it wants to do, and labels. Never for a mascot's own reply.
 - **Status is present tense and ends in two dots** while it's happening: "Scanning fares..". A finished step is past tense with none: "Opened klm.com".
-- **Replies are 13px in the mocks.** For a long answer that may be small, so 15px is *to tune* on a real window.
+- **Messages in a chat are 15px with a 1.55 line height,** yours and the mascot's, in the page and in the panel, because they're read at length. The mocks still draw them at 13px.
 
 ## 6. The pips
 
@@ -309,7 +310,7 @@ A mascot only speaks about work the user started: a finished task, a routine res
 | Level | Behaviour |
 |---|---|
 | Mood change | Nothing else moves or appears |
-| The `ask` dot | On its face in the dock and on its row, for as long as it waits. Answering clears it, not looking |
+| The `ask` dot | On its face in the dock, on its row, and on the Chats side of the sidebar's switch, for as long as it waits. Answering clears it, not looking |
 | Asking in the chat | Only when it needs a decision to continue |
 | Silent system notification | Something new is waiting, or a routine has news, and the app isn't in front |
 | Message on the user's phone | Something is waiting and they're away, only if they connected a bot |
@@ -329,27 +330,48 @@ Mock for all of this section unless one is named: [shell-and-chat.html](./docs/d
 
 ### Sidebar
 
-Straight on the ground, top to bottom:
+Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 
-- **Window controls** and the button that collapses it.
+Straight on the ground. Under the window controls is a switch between its two faces, **Tabs** and **Chats**. The dock is at the bottom of both.
+
+**Tabs** is a normal browser, with nothing of the assistant in the way of your tabs:
+
 - **Favourites:** pinned sites as tiles, four to a row, 40px tall on `tray` with a 12px radius. The site's icon is 20px. A small dot under a tile means it's open. The last tile is an outlined plus.
-- **Bookmarks:** a labelled section that folds. Rows are 27px with the site's icon. With nothing saved, the section keeps its place and says so in `faint`.
-- **A hairline,** then **Tabs** with a count and a plus. The current tab is a sheet, with its close ×. A loading tab shows the pips where its icon will be.
+- **Bookmarks:** a labelled section that folds, with folders. A folder row shows how many pages it holds and opens to them behind a dotted line. Rows are 27px with the site's icon. With nothing saved, the section keeps its place and says so in `faint`.
+- **A hairline,** then **Tabs** with a count and a plus. The current tab is a sheet, with its close ×. A loading tab shows the pips where its icon will be. An open chat is a tab like any page.
 - **A job's tabs aren't yours.** While a job runs, its chat is a row with its mascot's face, on a `tray` group, and the tabs it opened sit under it, indented behind a dotted line. They close when the job ends, except any you took over.
-- **The dock,** at the bottom, on `tray`: every mascot at 26px with its mood for a face, then Settings. It's how you see who is doing what at a glance.
+
+**Chats** is everything the mascots are doing, did and will do:
+
+- **Needs you** comes first, labelled in `ask` with a count. Each row is the asking mascot, the job's name and **Review**, which opens the chat at its card. Whenever anything is here, a dot in `ask` sits on the switch's Chats side, on either face.
+- **Working:** each running job, with its mascot's face the pips, and how long it's been going.
+- **Routines:** the next three by time, each with the mascot that runs it and when. The arrow on the label opens them all.
+- **Earlier:** past chats, newest first, each with the mascot that ran it and its age. **Show more** loads the rest.
+
+**The dock** is on `tray`: every mascot at 26px with its mood for a face, then Settings. It's how you see who is doing what at a glance.
 
 Section labels are 11px mono, lower case, in `ink-3`.
 
-**The dock shows, it doesn't choose.** Pressing a mascot opens its card: its name, what it may do, what it's doing now, its recent chats, and **New chat with** its name, which opens a new tab with it chosen. See [switching.html](./docs/design/mocks/switching.html).
+**The dock shows, it doesn't choose.** Pressing a mascot opens its card: its name, what it may do, what you've allowed it without asking and a way to take each back, what it's doing now, its recent chats, and **New chat with** its name, which opens a new tab with it chosen. See [switching.html](./docs/design/mocks/switching.html).
 
 ### Toolbar and the address field
 
-Back, forward and reload in `ink-3`, then the address field on `tray`, then the chat panel button. The field shows the real address and real navigation state. On an internal page it shows that page's name.
+Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 
-**While a mascot drives the tab in front, the address field is its status.** It turns `ink`, with `ground` text, and shows from the left: the mascot, its face the pips; what it's doing in mono, such as "Scanning fares.."; the site, dimmed; then **Take over**, outlined, and **Stop**, filled. Waiting on the user, it says "Waiting for you" and the face is Asking.
+Back, forward and reload in `ink-3`, then the address field, then the chat panel button. On an internal page the field shows that page's name.
+
+**The address field is also where a mascot's status is, for the tab in front.** It has five states:
+
+| State | The field |
+|---|---|
+| At rest | On `tray`: a lock, the real address with its site in `ink`, and real navigation state |
+| A mascot is working here | Turns `ink`, with `ground` text. From the left: the mascot, its face the pips; what it's doing in mono, such as "Scanning fares.."; the site, dimmed; then **Take over**, outlined, and **Stop**, filled |
+| It's waiting for you | The same, with its face Asking and "Waiting for you". **Stop** is outlined and **Answer** is filled, and opens the chat at the card |
+| Your turn | `ask-bg` with `ask` text: a lock, "Your turn. Berry can't see this tab", and **I'm done**, filled in `ink`, which is the only thing that gives the tab back |
+| You press the field | The address again, on a sheet with the focus ring. The mascot stays as a small still chip at its left, and "Enter takes this tab over" is in mono at its right |
 
 - **Stop is only ever here,** in the chrome. Anything a page can see it can fake, so no control is drawn on a page. It's the same as Stop in the chat.
-- **Take over** is the same as clicking in the page: the job can't reach the tab any more and is told why.
+- **Take over** is the same as clicking in the page: the job can't reach the tab any more and is told why. Going somewhere from the field does the same.
 - **It replaces the ring** that used to go round the page while Berry read or used it. Nothing else marks the tab from the chrome but the mascot's row in the sidebar.
 
 ### New tab
@@ -358,18 +380,19 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
 - **The greeting,** "Where to?", at 30px, with the chosen mascot at 40px beside it. It's a mark, not a control.
 - **The prompt box,** 640px.
-- **Since you left:** under a mono label, up to three real things, newest first: a chat that finished, a routine's result, what's scheduled next. Each is the mascot's face in its mood, one sentence with the name in medium, and a time in mono. Nothing appears unless it's real.
+- **Under the box,** two short lists with mono labels. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with the asking mascot, one sentence and **Review**, filled. **Since you left** follows: up to three real things, newest first, such as a chat that finished, a routine's result or what's scheduled next. Each is the mascot's face in its mood, one sentence with the name in medium, and a time in mono. Nothing appears unless it's real.
 
 `Enter` opens anything that looks like an address and asks the mascot about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. The chat panel doesn't open here, because this page has its own box.
 
 ### The prompt box
 
-One component everywhere: the new tab, the chat as a page, the chat panel. It is a card set into a shell.
+One component everywhere: the new tab, the chat as a page, the chat panel. It is a card set into a shell. Mock for the chips and the menu: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 
-- **The card:** what you type, at 18px on the new tab and 15px in a chat, over one row of tools. From the left: **+**, a 32px rounded square on `sheet-2`, which adds a page for the mascot to see. Then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
+- **The card** holds, from the top: chips for what it's been given to read, what you type (18px on the new tab, 15px in a chat), and one row of tools. From the left: **+**, a 32px rounded square on `sheet-2`, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
+- **What it's given to read** is chips at the top of the card: a page, by its icon and site, marked "this page" when it's the one in front, or a file. Each has a ×. No chip means the mascot sees no page. **+** adds one from a menu: This page, An open tab, A file, and Show Berry how, which starts showing a job instead of describing it.
 - **The placeholder names who you're asking:** "Ask Berry, or type an address".
-- **The cloud switch** is there only while the cloud can be used: a key is saved or a runner has accepted. It's there for every mascot. Choosing one set to work in the cloud starts it on Cloud, and the user can still switch it back for one message.
-- **The line under the card,** in the shell, is for one of two things. For a mascot with limits, its limits in words with a lock, always, for as long as it's chosen. Otherwise, when something is waiting, who needs you and on what, with **Review**, filled. Limits win when both apply (see section 12).
+- **The cloud switch** is there while the cloud can be used. Choosing a mascot set to work in the cloud starts it on Cloud, and the user can switch it back for one message. It goes away for a mascot that only reads the page in front, since that page isn't in the cloud.
+- **The line under the card,** in the shell, is for the chosen mascot's limits and nothing else: in words, with a lock, for as long as that mascot is chosen. Berry, and any mascot with no limits, has no line. What's waiting for you is in the list under the box and on Chats.
 - **In a chat** the pill says who and doesn't open, because a chat keeps the mascot it started with. While a reply runs, Send is Stop.
 
 ### Choosing a mascot
@@ -383,7 +406,7 @@ Mock: [switching.html](./docs/design/mocks/switching.html), which is live.
 - The mascot, in the pill and beside the greeting.
 - The placeholder.
 - The limits line slides out under the card if the new one has limits, and back in if it has none. Berry, and any mascot with no limits, says nothing.
-- The cloud switch moves to Cloud for one set to work there.
+- The cloud switch moves to Cloud for one set to work there, and goes away for one that only reads the page in front.
 
 **What doesn't:** the window's colours, the sidebar, the dock, Send, and every chat already begun.
 
@@ -406,14 +429,15 @@ A full page for talking to a mascot about anything. A chat starts from the new t
 - **Your messages** are on `sheet-2`, at the right, with a small corner where a tail would be. A mascot's reply is plain text on the sheet.
 - **While it works:** an outlined block headed **Working** with how long in mono, then its steps, each a pip mark and a line of mono. Finished ones are `ink-3`, the live one `ink` with moving pips. While a job runs only its latest steps show, under a quiet line that opens the rest.
 - **The prompt box** is at the bottom, and you can write while it works.
-- **What a step may say:** the field or the control, never what was typed or which key: "Typed in From and To", "Picked the dates". A click the user allowed names what the card named.
+- **What a step says:** what happened, in the user's terms: "Typed Lisbon in To", "Picked 12 to 16 Dec", "Clicked Search flights". Anything typed is cut at 24 characters. In a password, code or payment field it only ever names the field: "Typed in the password field".
 
 ### What a reply can be
 
 Mock: [reply-states.html](./docs/design/mocks/reply-states.html).
 
-- **Asking, for leave to do something.** A card in a shell. The title is what it wants, as one sentence at 15px with addresses cut to their site. Under it, in a mono block on `sheet-2` and never cut, are the exact words from the tool, which are what's being allowed. Then **Allow**, filled, and **Don't allow**, outlined, in that order everywhere: here, on Needs you, on the phone page and in Telegram. Nothing here allows anything for later. The line under the card, with the pips in `ask`, may give a reason when code knows one. It is never text from a page or the model.
-- **A question.** Lighter on purpose, with no shell, because answering it lets nothing happen: the question at 15px, a field to type an answer with Send, and **Skip** as quiet text. Passwords, codes and card details are never asked for here.
+- **Asking, for leave to do something.** A card in a shell. The title is what it wants, as one sentence at 15px with addresses cut to their site. Under it, in a mono block on `sheet-2` and never cut, are the exact words from the tool, which are what's being allowed. Then **Allow**, filled, and **Don't allow**, outlined, in that order everywhere: here, on Needs you, on the phone page and in Telegram. The line under the card, with the pips in `ask`, says why it's asking, in words from code and never from a page or the model. Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
+- **Allow has three sizes.** Pressing Allow means just this once. Its arrow opens the other two: **For the rest of this job**, on this site, until the job ends, and **Always on** this site, for this mascot. Anything that pays, sends or deletes asks every time, and its Allow has no arrow. What's allowed for always is listed on the mascot's card, each with a way to take it back.
+- **A question.** Lighter on purpose, with no shell, because answering it lets nothing happen: the question at 15px, up to three answers to press, a field for your own with Send, and **Skip** as quiet text. Passwords, codes and card details are never asked for here.
 - **Your turn.** A sign-in, a code or a captcha only the user can do. A card in a shell: a lock, "Sign in on" and the site, and that the mascot has stepped back from the tab and can't see it, and what you type goes straight to the site. **Go to the tab**, then **I'm done**, which is the only thing that gives the tab back, and **Not now** as quiet text. The site comes from the tab's address and the words from code, so a page can't write them.
 - **Done.** The answer, then one row of chips: the steps folded into one ("7 steps · 1m 48s", which opens them) and each page it used, by icon and title, which open as your own tabs. Then **Copy** and, only after a job that did some work, **Save as routine**, as outlined chips.
 - **Something to remember.** Rarely, under a finished reply, one strip on `sheet-2`: the mascot looking curious, the fact as a question, **Remember**, outlined, and **No thanks** as quiet text. Ignoring it is as good as No thanks. When and how seldom this appears, and what can never be kept, are unchanged: see What a bird remembers in the old document.
@@ -443,19 +467,18 @@ What's drawn in a page while a mascot works there, and only while the user can s
 
 - **A dotted outline** round the thing it's acting on: 1.5px, a few pixels off the edge, in `focus` (*to tune*).
 - **Up to three pills** in the page's lower left: the step it's on, with moving pips, under the two before it, fading to 50% and 30%. Each is a pip mark and a few words in mono. This is the one place glass is used: near-black at 70% with a blur, white text, 30px tall.
-- **Waiting for you:** one pill beside the thing the approval is about, with the pips in `ask`.
+- **Waiting for you:** the live pill says so, with the pips in `ask`.
+- **The mascot stands on it:** at the outline's top right corner, at 24px, with the pips for a face while it acts and Asking while it waits. It doesn't fly. It's simply at the next thing, with the same pop as a switch.
 
-No mascot is drawn in the page. The bird that flew to each target is gone, and the mascot's face is in the address field instead.
-
-**It only draws.** No clicks, no box, no effect on the page's layout, no text the page or the agent can read, and out of every screenshot. It's in a closed shadow root in the top layer and works on the strictest content security policy. A pill never shows what's being typed, which key, the contents of a text box, or a secret field's label.
+**It only draws.** No clicks, no box, no effect on the page's layout, no text the page or the agent can read, and out of every screenshot. It's in a closed shadow root in the top layer and works on the strictest content security policy. A pill says what a step says, so in a password, code or payment field it only names the field.
 
 **When it isn't there:** in tabs nobody can see; for 5 seconds after the user's last click or key in the page; on a tab handed to the user; while the keyboard is in a password or code field. **Show on pages** in Settings removes all of it for a site that reacts badly.
 
-Whether a click still waits a beat so a watcher can follow it is *to settle when it's built*. It no longer waits for a flight.
+A click doesn't wait for the mascot. Whether it waits a short beat so a watcher can follow is *to settle when it's built*.
 
 ## 11. Not redrawn yet
 
-These keep working as they do. Their behaviour is in [the old document](./docs/design/DESIGN-bloom.md), under the same headings, and only their look changes.
+These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
 
 - Onboarding
 - The horizontal layout
@@ -473,19 +496,29 @@ These keep working as they do. Their behaviour is in [the old document](./docs/d
 - On your desktop
 - The public site and the phone page
 
-**To redraw one:** build it from the parts in sections 3 to 9, look at it in the running app in light and dark, move its section here in the same PR, and delete it from the old document. Don't copy the old look to match its neighbours.
+**To redraw one:** design what would be best, from the parts in sections 3 to 9, look at it in the running app in light and dark, write its section here in the same PR, and delete it from the old document. Don't copy the old look or the old flow to match its neighbours.
 
-## 12. Open
+## 12. New here, and still open
 
-Things drawn one way that aren't settled, or not placed at all.
+**Drawn here and not in the app yet,** to be built:
 
-- **Past chats, and the ways into Needs you, Routines and the mascots' page,** aren't in the new sidebar. The dock's card reaches a mascot's own chats, and its `ask` dot stands in for the Needs you count, but the pages themselves need a way in.
-- **Bookmark folders** are in the sidebar mock, and the app has none. Until it does, bookmarks are one list.
-- **The line under the prompt card** can't hold both a mascot's limits and a "needs you" notice. Limits win for now, and the dock carries the other.
-- **Seeing or editing the address** while the field is showing a mascot's status. Focusing the field should bring the address back, and going somewhere from it takes the tab over, as it always has.
-- **A reason under an approval** needs the tool layer to say why it asked. Without it, there's no line.
-- **The page a mascot can see.** The card on the box that shows it, and what + opens, aren't drawn.
-- **A tab handed to you.** What the address field says then, and where I'm done sits on it.
+- The sidebar's two faces, and everything on Chats.
+- Bookmark folders.
+- Allowing for the rest of a job, or always on a site, and the list of what's allowed on a mascot's card.
+- The reason under an approval, which needs the tool layer to say why it asked.
+- Answers to press on a question.
+- Files in the prompt box.
+- The address field's states: Answer, Your turn with I'm done, and editing while a mascot works.
+- The mascot standing on what it's acting on, in place of the bird that flew.
+- Steps and pills that say what was typed.
+- Waiting for you on the new tab.
+- `@` in the box to choose a mascot.
+- The cloud switch going away for a mascot that only reads the page in front.
+
+**Still open:**
+
+- **The horizontal layout** has no sidebar, so Chats needs a home there.
+- **Needs you, Routines and the mascots' page** as full pages. Chats and the dock lead to them, and they aren't drawn.
 - **The words** "bird" and "flock" are still in the code, in AGENTS.md and in the old document.
 
 ## 13. Accessibility
@@ -524,6 +557,7 @@ The window is a solid colour on both, so nothing depends on a native material. T
 - Add every new component to the gallery, in every state, in light and dark.
 - Test with reduced motion and keyboard only.
 - Run UI changes and look at them, in light and dark.
+- Design what would be best, even where the app can't do it yet, and list it in section 12.
 
 ### Don't
 
@@ -534,7 +568,7 @@ The window is a solid colour on both, so nothing depends on a native material. T
 - Don't add a second place to choose a mascot.
 - Don't add pips anywhere but the five places in section 6.
 - Don't let more than one thing move in an area, or anything loop without real work behind it.
-- Don't draw a control an approval doesn't have: nothing that allows for later, and no suggested answers.
+- Don't let anything that pays, sends or deletes be allowed for later. Those ask every time.
 - Don't let a mascot joke about permissions, payments, messages, data or failures.
 - Don't let a mascot open modals, take focus, make sounds or speak about work the user didn't start.
 - Don't read page content unless the user asked.
