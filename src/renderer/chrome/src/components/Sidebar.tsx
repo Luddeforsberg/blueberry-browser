@@ -13,7 +13,7 @@ import { NeedsYouCount } from './NeedsYou'
 import { RoutineDot } from './RoutineNotice'
 import { ToolBarButton } from './ToolBarButton'
 import { cn } from '@common/lib/utils'
-import { BerryDot } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
 import { Berry } from './Berry'
 
 const ROW = cn(
@@ -230,7 +230,7 @@ export const ChatRow: React.FC<{
                 )}
                 {chat.running && (
                     <span className="shrink-0 -mr-6 group-hover/chat:invisible group-focus-within/chat:invisible">
-                        <BerryDot working />
+                        <Pips pattern="think" />
                         <span className="sr-only">{mascot.name} is working</span>
                     </span>
                 )}

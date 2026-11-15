@@ -31,20 +31,6 @@ module.exports = {
       ask: "rgb(var(--ask) / <alpha-value>)",
       "ask-bg": "rgb(var(--ask-bg) / <alpha-value>)",
       focus: "rgb(var(--focus) / <alpha-value>)",
-      berry: {
-        ink: "rgb(var(--berry-ink) / <alpha-value>)",
-        wing: "rgb(var(--berry-wing) / <alpha-value>)",
-        nape: "rgb(var(--berry-nape) / <alpha-value>)",
-        eye: "rgb(var(--berry-eye) / <alpha-value>)",
-        pupil: "rgb(var(--berry-pupil) / <alpha-value>)",
-        beak: "rgb(var(--berry-beak) / <alpha-value>)",
-        gear: "rgb(var(--berry-gear) / <alpha-value>)",
-        "gear-shade": "rgb(var(--berry-gear-shade) / <alpha-value>)",
-        "fruit-mid": "rgb(var(--berry-fruit-mid) / <alpha-value>)",
-        "fruit-dark": "rgb(var(--berry-fruit-dark) / <alpha-value>)",
-        "fruit-bloom": "rgb(var(--berry-fruit-bloom) / <alpha-value>)",
-        "fruit-crown": "rgb(var(--berry-fruit-crown) / <alpha-value>)",
-      },
     },
     borderColor: ({ theme }) => ({
       ...theme("colors"),
@@ -120,73 +106,18 @@ module.exports = {
         "fade-in": "fade-in 280ms cubic-bezier(.2, .8, .2, 1) forwards",
         "answered": "answered 1600ms cubic-bezier(.2, .8, .2, 1) forwards",
         shimmer: "shimmer 1300ms linear infinite",
-        // Berry's own motion. Bounce belongs to Berry, never the chrome.
-        "berry-bob": "berry-bob 900ms ease-in-out infinite",
-        "berry-feather": "berry-feather 1200ms ease-in forwards",
-        "berry-pose": "berry-pose 160ms ease-out",
-        "berry-settle": "berry-settle 420ms ease-out",
-        "berry-blink": "berry-blink 6s linear infinite",
-        "berry-toss": "berry-toss 1400ms ease-in-out infinite",
-        "berry-flap": "berry-flap 150ms ease-in-out infinite alternate",
-        "berry-swing": "berry-swing 2600ms ease-in-out infinite alternate",
-        "berry-swing-back": "berry-swing 2600ms ease-in-out -900ms infinite alternate",
-        "berry-peck": "berry-peck 700ms ease-in-out infinite",
-        "berry-print": "berry-print 30s ease-in forwards",
-        "berry-hop": "berry-hop 420ms ease-out",
+        // Overshoot is the mascots' alone: one pops when it arrives (DESIGN.md section 7).
+        "mascot-pop": "mascot-pop 340ms cubic-bezier(.3, 1.5, .5, 1)",
       },
       keyframes: {
         shimmer: {
           "0%": { backgroundPosition: "150% 0" },
           "100%": { backgroundPosition: "-50% 0" },
         },
-        "berry-bob": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-3px)" },
-        },
-        "berry-pose": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        "berry-settle": {
-          "0%": { transform: "translate(-6px, -20px)" },
-          "65%": { transform: "translate(0, 0)" },
-          "82%": { transform: "translate(0, -3px)" },
-          "100%": { transform: "translate(0, 0)" },
-        },
-        "berry-blink": {
-          "0%, 95%, 100%": { transform: "scaleY(1)" },
-          "97.5%": { transform: "scaleY(0.08)" },
-        },
-        "berry-toss": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(14px)" },
-        },
-        "berry-swing": {
-          "0%": { transform: "rotate(-12deg)" },
-          "100%": { transform: "rotate(14deg)" },
-        },
-        "berry-peck": {
-          "0%, 55%, 100%": { transform: "rotate(0deg)" },
-          "25%": { transform: "rotate(38deg)" },
-        },
-        "berry-hop": {
-          "0%": { transform: "translateY(0) scale(1, 1)" },
-          "20%": { transform: "translateY(0) scale(1.06, 0.92)" },
-          "55%": { transform: "translateY(-14%) scale(0.97, 1.04)" },
-          "85%": { transform: "translateY(0) scale(1.04, 0.96)" },
-          "100%": { transform: "translateY(0) scale(1, 1)" },
-        },
-        "berry-print": {
-          "0%": { opacity: "0.3" },
-          "100%": { opacity: "0" },
-        },
-        "berry-flap": {
-          "0%": { transform: "rotate(-16deg)" },
-          "100%": { transform: "rotate(24deg)" },
-        },
-        "berry-feather": {
-          "0%": { transform: "translate(0, 0) rotate(0deg)", opacity: "1" },
-          "100%": { transform: "translate(-4px, 14px) rotate(-40deg)", opacity: "0" },
+        "mascot-pop": {
+          "0%": { transform: "scale(.5)", opacity: ".2" },
+          "55%": { transform: "scale(1.14)", opacity: "1" },
+          "100%": { transform: "none" },
         },
         // Stays long enough to read, then goes in the time a panel takes.
         answered: {

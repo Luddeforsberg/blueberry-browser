@@ -3,8 +3,8 @@ import { BIRDS } from "./birds.js";
 
 // A few of the mascots that come with Blueberry, as they look in its Gallery (src/main/mascotCatalog.ts), and Berry.
 const FLOCK = [
-  { name: "Berry", what: "Comes with every Blueberry.", palette: "jackdaw", accessory: "none" },
-  { name: "Prospector", what: "Finds companies that fit your customer.", palette: "kingfisher", accessory: "cap" },
+  { name: "Berry", what: "Comes with every Blueberry.", palette: "kingfisher", accessory: "none" },
+  { name: "Prospector", what: "Finds companies that fit your customer.", palette: "robin", accessory: "cap" },
   { name: "Meeting Prep", what: "Briefs you before a call.", palette: "robin", accessory: "glasses" },
   { name: "Follow-up", what: "Drafts the Gmail replies you owe.", palette: "flamingo", accessory: "headphones" },
   { name: "Talent Scout", what: "Finds people for a role, and contacts nobody.", palette: "parakeet", accessory: "cap" },

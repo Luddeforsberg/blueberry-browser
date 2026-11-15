@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import type { MascotDraft, RoutineSchedule, SuggestionWords } from "../shared/library";
-import { ACCESSORIES, PALETTES, normaliseSite, parseMascotDraft, siteAllowed } from "../shared/mascots";
+import { ACCESSORIES, BERRY, PALETTES, normaliseSite, parseMascotDraft, siteAllowed } from "../shared/mascots";
 import type { Digest, Evidence, Feedback } from "./suggestionDigest";
 import { parseDraft } from "./routineSchedule";
 import { areSimilar, nameOfSite, plainText, wordsOf, type Pattern } from "./suggestionPatterns";
@@ -26,7 +26,7 @@ const SITE_NAME = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
 const WELL_KNOWN_SITES = "reddit youtube twitter facebook instagram tiktok linkedin amazon ebay wikipedia netflix spotify google bing gmail whatsapp telegram discord".split(" ");
 const TAKEN_NAMES = ["berry", "pip", "milo", "max"];
 
-const palettes = PALETTES.filter(({ id }) => id !== "jackdaw").map(({ id }) => id);
+const palettes = PALETTES.filter(({ id }) => id !== BERRY.look.palette).map(({ id }) => id);
 const accessories = ACCESSORIES.filter(({ id }) => id !== "none").map(({ id }) => id);
 
 export const SUGGESTION_PROMPT = `You decide what the small birds on a web browser's new tab page offer to do for one person, from a digest of what they've done lately. The person should read a card and think: how did it know, and yes, I want exactly that.

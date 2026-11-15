@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseGalleryMascot, starterMascots } from "./mascotCatalog";
-import { MAX_MASCOT_NAME, parseMascotDraft } from "../shared/mascots";
+import { BERRY, MAX_MASCOT_NAME, parseMascotDraft } from "../shared/mascots";
 
 const entry = {
   id: "a",
@@ -20,7 +20,7 @@ describe("the mascot catalog", () => {
       expect(parseMascotDraft(draft)).toEqual({ draft });
       expect(draft.name.length).toBeLessThanOrEqual(MAX_MASCOT_NAME);
       expect(draft.name.toLowerCase()).not.toBe("berry");
-      expect(draft.look.palette).not.toBe("jackdaw");
+      expect(draft.look.palette).not.toBe(BERRY.look.palette);
       expect(author).toBe("Blueberry");
       expect(description.length).toBeLessThanOrEqual(70);
     }

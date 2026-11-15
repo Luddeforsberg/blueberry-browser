@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Bird, Hand, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import type { TabInfo, Visit } from '@shared/ipc'
 import type { Suggestion } from '@shared/library'
-import { BerryDot } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Favicon } from '../components/Favicon'
@@ -11,7 +11,6 @@ import { Composer } from '../components/Composer'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 import { ArtBlueberry } from '../components/ArtBlueberry'
-import { Backdrop } from '../components/Backdrop'
 import { BirdSuggestions, BirdsOnFruit, type FruitIdea } from '../components/BirdsOnFruit'
 import { setFlockView, suggestedMascot } from '../flockView'
 import { setRoutinesView, suggestedForm } from '../routinesView'
@@ -135,7 +134,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <>
                     <p className="flex items-center gap-2 font-medium">
                         {routine.name}
-                        {routine.status === 'running' && <BerryDot working />}
+                        {routine.status === 'running' && <Pips pattern="think" />}
                         {routine.status === 'running' && <span className="sr-only">Running now</span>}
                     </p>
                     <p className="opacity-90">{routine.schedule}</p>
@@ -171,7 +170,6 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="relative h-full overflow-y-auto">
             <div className="relative min-h-full overflow-hidden">
-                <Backdrop quiet={suggestions.length > 0} />
                 {/* The space above is 22vh, less on a shorter window, so five recent pages still fit at 900px tall. */}
                 <div className="relative max-w-[800px] mx-auto px-6 pt-[clamp(104px,calc(100vh-796px),22vh)] pb-6">
                     <h1 className="sr-only">Where shall we start today?</h1>

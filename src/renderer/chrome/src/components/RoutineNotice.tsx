@@ -1,5 +1,5 @@
 import React from 'react'
-import { BerryDot } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useLibrary } from '../contexts/LibraryContext'
 
@@ -20,7 +20,7 @@ export const RoutineDot: React.FC = () => {
     if (asking + ready > 0) {
         return (
             <>
-                <BerryDot />
+                <span aria-hidden className={asking > 0 ? "size-1.5 shrink-0 rounded-full bg-ask" : "size-1.5 shrink-0 rounded-full bg-ink-3"} />
                 <span className="sr-only">{asking > 0 ? 'Needs your OK' : 'Has news'}</span>
             </>
         )
@@ -28,7 +28,7 @@ export const RoutineDot: React.FC = () => {
     if (!working) return null
     return (
         <>
-            <BerryDot working />
+            <Pips pattern="think" />
             <span className="sr-only">Running now</span>
         </>
     )
@@ -46,7 +46,7 @@ export const RoutineNotice: React.FC = () => {
             onClick={() => void window.chromeAPI.browser.openPage('routines')}
             className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-row text-13 outline-none transition-colors app-region-no-drag hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
-            <BerryDot />
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ink-3" />
             Routine has news
         </button>
     )

@@ -1,6 +1,6 @@
 import React from 'react'
 import type { RoutineRun, RoutineStatus } from '@shared/library'
-import { BerryDot } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
@@ -22,7 +22,7 @@ const STATUS: Record<RoutineStatus, { label: string; className: string }> = {
 
 export const RoutineStatusLabel: React.FC<{ status: RoutineStatus }> = ({ status }) => (
     <span className={cn("flex items-center gap-2", STATUS[status].className)}>
-        {status === 'running' && <BerryDot working />}
+        {status === 'running' && <Pips pattern="think" />}
         {STATUS[status].label}
     </span>
 )

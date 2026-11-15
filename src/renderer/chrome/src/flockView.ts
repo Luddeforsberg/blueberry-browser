@@ -1,5 +1,5 @@
 import type { ChatThread, MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from '@shared/library'
-import { ACCESSORIES, MASCOT_TOOLS, PALETTES } from '@shared/mascots'
+import { ACCESSORIES, BERRY, MASCOT_TOOLS, PALETTES } from '@shared/mascots'
 
 export interface MascotFormValues {
     // Null for a new mascot.
@@ -51,8 +51,8 @@ const NAMES = ['Pip', 'Scout', 'Juno', 'Wren', 'Otis', 'Margot', 'Figaro', 'Mabe
 const oneOf = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]
 
 const randomLook = () => ({
-    // Not the jackdaw, which is Berry's, so a new one starts out as itself.
-    palette: oneOf(PALETTES.filter(({ id }) => id !== 'jackdaw')).id,
+    // Not Berry's, so a new one starts out as itself.
+    palette: oneOf(PALETTES.filter(({ id }) => id !== BERRY.look.palette)).id,
     accessory: oneOf(ACCESSORIES.filter(({ id }) => id !== 'none')).id
 })
 

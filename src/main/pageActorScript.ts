@@ -39,7 +39,7 @@ const SHEET = `
     position: absolute; left: 0; top: 0; max-width: calc(280px * var(--unit)); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
     padding: calc(3px * var(--unit)) calc(10px * var(--unit)); border-radius: 999px;
     font: 400 calc(12px * var(--unit)) / calc(18px * var(--unit)) -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-    color: rgb(var(--foreground)); background: rgb(var(--surface));
+    color: rgb(var(--ink)); background: rgb(var(--sheet));
     box-shadow: 0 0 0 1px rgb(20 22 36 / 0.08), 0 2px 10px rgb(20 22 36 / 0.22);
     opacity: 0; transition: opacity 140ms ease-out;
   }
@@ -52,7 +52,7 @@ const SHEET = `
   .ripple {
     position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
     /* Two edges, so it shows on a dark button and a light page alike. */
-    border: 3px solid rgb(var(--berry-fruit-bloom)); box-shadow: 0 0 0 1.5px rgb(var(--berry-fruit-dark)), inset 0 0 0 1.5px rgb(var(--berry-fruit-dark));
+    border: 3px solid var(--berry-blueberry); box-shadow: 0 0 0 1.5px var(--berry-blueberry-crown), inset 0 0 0 1.5px var(--berry-blueberry-crown);
   }
 `;
 
@@ -116,7 +116,7 @@ export const installActor = (key: string, look: ActorLook, start: { x: number; y
   const sky = div("sky", root);
   if (LOOK.dark) sky.classList.add("dark");
   if (LOOK.pictured) sky.classList.add("pictured");
-  if (LOOK.palette !== "jackdaw") sky.dataset.mascot = LOOK.palette;
+  sky.dataset.mascot = LOOK.palette;
   sky.style.setProperty("--unit", String(1 / LOOK.zoom));
   const bird = div("bird", sky);
   const flip = div("flip", bird);

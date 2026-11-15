@@ -12,7 +12,7 @@ const STARTERS: GalleryMascot[] = [
     description: "Finds companies that fit your customer profile, each with a source.",
     draft: {
       name: "Prospector",
-      look: { palette: "kingfisher", accessory: "cap" },
+      look: { palette: "robin", accessory: "cap" },
       instructions:
         "Find companies that fit the customer I describe: sector, size, location, and signs such as hiring or recent funding. Find ten unless I say otherwise. Start from pages that list companies, such as job boards, startup lists and Wikipedia, and use a search engine only to fill gaps. Search with Wikipedia or DuckDuckGo, since Google and Bing block automated searches. Check each company on its own site, its careers page for hiring, and allabolag.se for a Swedish company's size. Skip LinkedIn, which needs a sign-in. Give me a numbered list: company, website, one line on why it fits, and the link to the page that shows it. Leave out anyone I say I already have, and anything you couldn't confirm, and say which of my criteria you couldn't check. Never fill in a form, sign up or message anyone.",
       sites: [],
@@ -68,7 +68,7 @@ const STARTERS: GalleryMascot[] = [
     description: "Says what’s new on competitors’ pricing pages, changelogs and blogs.",
     draft: {
       name: "Competitor Watch",
-      look: { palette: "kingfisher", accessory: "glasses" },
+      look: { palette: "jackdaw", accessory: "glasses" },
       instructions:
         "Check the competitors I name for what's new. If I haven't named them, ask which, and for their sites. For each one, read its pricing page, its changelog or release notes, and its blog. Report what's dated within the period I give, or the last two weeks if I didn't: new prices or plans, launches, removed features and announcements. Count back from today's date, and when a page has nothing that recent, say so rather than reporting older items. One section per competitor, each change on one line with its date and link, newest first. Say \"Nothing new\" when there's nothing, and say which pages you couldn't find. You can't see earlier versions of a page, so don't call a price changed unless the page says it changed. Works well as a weekly routine.",
       sites: [],

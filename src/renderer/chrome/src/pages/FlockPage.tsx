@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Dices } from 'lucide-react'
 import type { MascotLook, MascotProfile } from '@shared/library'
-import { BerryDot, Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
+import { Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
@@ -91,7 +92,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; landed: boolean; flip
             <div className="mt-4 pr-6 flex-1 flex flex-col [overflow-wrap:anywhere]" style={{ paddingLeft: BIRD_LEFT }}>
                 <h2 className="flex items-center gap-2 text-13 font-medium">
                     {mascot.name}
-                    {working && <BerryDot working />}
+                    {working && <Pips pattern="think" />}
                 </h2>
                 <p className="mt-0.5 text-13 line-clamp-2" title={isBerry ? undefined : mascot.instructions}>
                     {isBerry ? 'The original. Always here, and it can do all you let it.' : mascot.instructions}

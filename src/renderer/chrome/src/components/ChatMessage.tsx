@@ -11,7 +11,7 @@ import { useShell } from '../contexts/ShellContext'
 import { asContinuation, siteParts, withSiteNames } from '../siteNames'
 import { trailFor } from '../stepTrail'
 import { Button } from '@common/components/Button'
-import { BerryDot } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
@@ -229,7 +229,7 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
                                 {step.done ? (
                                     <StepFootprint index={index} />
                                 ) : (
-                                    <BerryDot working />
+                                    <Pips pattern="think" />
                                 )}
                             </span>
                             <span>

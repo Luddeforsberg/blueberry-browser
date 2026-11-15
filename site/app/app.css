@@ -3,11 +3,11 @@
    bar that sends pinned to the bottom. See On the phone in DESIGN.md. */
 * { box-sizing: border-box; }
 :root { --gutter: 20px; --column: 560px; }
-html { background: rgb(var(--canvas)); color: rgb(var(--foreground)); }
+html { background: rgb(var(--ground)); color: rgb(var(--ink)); }
 body {
   margin: 0;
   min-height: 100dvh;
-  background: rgb(var(--canvas));
+  background: rgb(var(--ground));
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -28,20 +28,20 @@ svg { display: block; overflow: visible; }
   display: flex; align-items: center; gap: 8px;
   min-height: calc(52px + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) max(var(--gutter) - 8px, env(safe-area-inset-right), calc((100% - var(--column)) / 2 + var(--gutter) - 8px)) 0 max(var(--gutter) - 8px, env(safe-area-inset-left), calc((100% - var(--column)) / 2 + var(--gutter) - 8px));
-  background: rgb(var(--canvas) / 0.88);
+  background: rgb(var(--ground) / 0.88);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid rgb(var(--border));
+  border-bottom: 1px solid var(--line);
 }
 .top .title { flex: 1; min-width: 0; padding-left: 8px; font-size: 16px; font-weight: 600; }
 /* After a way back, the title is centred on the bar, as an app's is, so it never reads on from "Jobs". */
 .top .back + .title { position: absolute; left: 88px; right: 88px; padding: 0; text-align: center; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top .title ~ .button { margin-left: auto; }
 /* An action on the bar is a word, like the way back, so its text keeps to the gutter instead of a pill sitting past it. */
-.top .button.outline { border-color: transparent; padding: 0 8px; color: rgb(var(--accent-ink)); font-weight: 600; }
-.top .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--muted-foreground)); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--success)); }
-.status-dot.off { background: rgb(var(--muted-foreground)); }
+.top .button.outline { border-color: transparent; padding: 0 8px; color: rgb(var(--ink)); font-weight: 600; }
+.top .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--ink-2)); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--ink-2)); }
+.status-dot.off { background: rgb(var(--ink-2)); }
 .icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 /* The screen itself, straight on the page, in one column that also works on a desktop. The class keeps its old name
@@ -57,9 +57,9 @@ svg { display: block; overflow: visible; }
 h1 { font-size: 28px; font-weight: 600; line-height: 1.15; letter-spacing: -0.015em; }
 h2 { font-size: 14px; font-weight: 600; padding: 32px 0 8px; }
 h2:first-child { padding-top: 0; }
-.muted { font-size: 14px; color: rgb(var(--muted-foreground)); }
-.small { font-size: 12px; color: rgb(var(--muted-foreground)); }
-.warning { color: rgb(var(--warning)); }
+.muted { font-size: 14px; color: rgb(var(--ink-2)); }
+.small { font-size: 12px; color: rgb(var(--ink-2)); }
+.warning { color: rgb(var(--ask)); }
 .gap { margin-top: 16px; }
 .answer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .answer .actions { margin-top: 4px; }
@@ -68,20 +68,20 @@ h2:first-child { padding-top: 0; }
 .button {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid transparent;
-  background: rgb(var(--primary)); color: rgb(var(--primary-foreground));
+  background: rgb(var(--ink)); color: rgb(var(--ground));
   font-size: 16px; cursor: pointer; text-decoration: none;
   transition: background-color 100ms cubic-bezier(.32, .72, 0, 1), filter 100ms;
 }
 .button:active { filter: brightness(0.9); }
-.button.outline { background: transparent; color: rgb(var(--foreground)); border-color: rgb(var(--border)); }
-.button.outline:hover { background: rgb(var(--muted)); }
-.button.quiet { background: transparent; color: rgb(var(--muted-foreground)); padding: 0 8px; }
+.button.outline { background: transparent; color: rgb(var(--ink)); border-color: var(--line); }
+.button.outline:hover { background: rgb(var(--sheet-2)); }
+.button.quiet { background: transparent; color: rgb(var(--ink-2)); padding: 0 8px; }
 .button.quiet.small { min-height: 28px; font-size: 12px; }
-.button.quiet:hover { background: rgb(var(--muted)); color: rgb(var(--foreground)); }
+.button.quiet:hover { background: rgb(var(--sheet-2)); color: rgb(var(--ink)); }
 .button.wide { width: 100%; min-height: 44px; font-size: 16px; }
 .button.icon-only { width: 44px; padding: 0; }
-.button.back { gap: 2px; padding-left: 4px; color: rgb(var(--accent-ink)); font-size: 16px; }
-.button:focus-visible, a:focus-visible, .row:focus-visible, .perch button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
+.button.back { gap: 2px; padding-left: 4px; color: rgb(var(--ink)); font-size: 16px; }
+.button:focus-visible, a:focus-visible, .row:focus-visible, .perch button:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 
 /* Birds. The drawing comes from poses.js with its palette set on it. */
@@ -93,16 +93,16 @@ h2:first-child { padding-top: 0; }
 /* Signing in: Berry standing on a wire over the heading, in the top third, where the keyboard leaves it in view. */
 .signin { flex: 1; display: flex; flex-direction: column; }
 .signin .card { flex: none; padding-top: calc(max(48px, 10dvh) + env(safe-area-inset-top)); }
-.signin .perched { height: calc(104px * 113 / 120); margin-bottom: 28px; border-bottom: 1.5px solid rgb(var(--muted-foreground) / 0.45); }
+.signin .perched { height: calc(104px * 113 / 120); margin-bottom: 28px; border-bottom: 1.5px solid rgb(var(--ink-2) / 0.45); }
 .signin .perched .bird { display: block; width: 104px; height: 104px; }
 .signin .lead { margin-top: 8px; font-size: 16px; }
 form { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
 .field {
   width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); font-size: 16px; outline: none;
+  border: 1px solid var(--line); background: rgb(var(--sheet)); font-size: 16px; outline: none;
 }
-.field:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 0; }
+.field:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 0; }
 form label { font-weight: 600; }
 form .button.wide { margin-top: 8px; }
 .signin .foot { margin-top: 16px; }
@@ -112,97 +112,97 @@ form .button.wide { margin-top: 8px; }
 .composer-wrap .perched { position: absolute; top: 0; right: 24px; width: 56px; height: 56px; }
 .composer {
   display: flex; align-items: flex-end; gap: 4px; width: 100%; padding: 8px 8px 8px 16px;
-  border-radius: 26px; border: 1px solid rgb(var(--border)); background: rgb(var(--surface)); box-shadow: var(--shadow-selected);
+  border-radius: 26px; border: 1px solid var(--line); background: rgb(var(--sheet)); box-shadow: var(--shadow-rim);
   text-align: left; cursor: text; color: inherit; text-decoration: none;
 }
-.composer .placeholder { flex: 1; padding: 6px 0; color: rgb(var(--muted-foreground)); }
+.composer .placeholder { flex: 1; padding: 6px 0; color: rgb(var(--ink-2)); }
 .composer textarea { flex: 1; min-height: 96px; padding: 6px 0; border: 0; background: transparent; resize: none; outline: none; font-size: 16px; }
-.composer textarea::placeholder { color: rgb(var(--muted-foreground)); }
+.composer textarea::placeholder { color: rgb(var(--ink-2)); }
 .send {
   width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  border-radius: 999px; border: 0; background: rgb(var(--primary)); color: rgb(var(--primary-foreground));
+  border-radius: 999px; border: 0; background: rgb(var(--ink)); color: rgb(var(--ground));
 }
-.send.off { background: rgb(var(--muted)); color: rgb(var(--muted-foreground)); }
+.send.off { background: rgb(var(--sheet-2)); color: rgb(var(--ink-2)); }
 
 /* Lists: plain rows split by lines, like Needs you. */
-.rows > li { border-top: 1px solid rgb(var(--border)); }
-.rows > li:last-child { border-bottom: 1px solid rgb(var(--border)); }
+.rows > li { border-top: 1px solid var(--line); }
+.rows > li:last-child { border-bottom: 1px solid var(--line); }
 .row { display: flex; gap: 12px; min-height: 56px; padding: 14px 0; color: inherit; text-decoration: none; }
 .row .body { flex: 1; min-width: 0; }
 .row .ask { font-size: 16px; }
 .row .prompt { font-size: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.row .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: rgb(var(--muted-foreground)); }
-.row .meta.warning { color: rgb(var(--warning)); }
-.row .chev { align-self: center; color: rgb(var(--muted-foreground)); }
+.row .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: rgb(var(--ink-2)); }
+.row .meta.warning { color: rgb(var(--ask)); }
+.row .chev { align-self: center; color: rgb(var(--ink-2)); }
 
 /* Exactly what will happen, in full, never cut. */
-.exactly { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--tray)); font-size: 13px; color: rgb(var(--muted-foreground)); white-space: pre-wrap; }
+.exactly { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--tray)); font-size: 13px; color: rgb(var(--ink-2)); white-space: pre-wrap; }
 
 /* A job. */
-.bubble { max-width: 85%; margin-left: auto; padding: 10px 16px; border-radius: 22px; background: rgb(var(--muted)); white-space: pre-wrap; }
+.bubble { max-width: 85%; margin-left: auto; padding: 10px 16px; border-radius: 22px; background: rgb(var(--sheet-2)); white-space: pre-wrap; }
 .who { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
 .who b { font-weight: 600; }
-.says { display: flex; gap: 12px; margin-top: 16px; padding: 16px 0; border-top: 1px solid rgb(var(--border)); border-bottom: 1px solid rgb(var(--border)); }
+.says { display: flex; gap: 12px; margin-top: 16px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .says .body { flex: 1; min-width: 0; }
 .says h3 { font-size: 16px; font-weight: 400; }
-.says .note { margin-top: 4px; font-size: 13px; color: rgb(var(--muted-foreground)); }
+.says .note { margin-top: 4px; font-size: 13px; color: rgb(var(--ink-2)); }
 
 .runner-head { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
 .runner-head b { font-weight: 600; }
-.live { position: relative; margin-top: 8px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; border: 1px solid rgb(var(--border)); background: rgb(var(--tray)); }
-.live.yours { aspect-ratio: 3 / 4; box-shadow: var(--shadow-reading); border-color: transparent; }
+.live { position: relative; margin-top: 8px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; border: 1px solid var(--line); background: rgb(var(--tray)); }
+.live.yours { aspect-ratio: 3 / 4; box-shadow: 0 0 0 2px rgb(var(--ask)); border-color: transparent; }
 .live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .live iframe.locked { pointer-events: none; }
-.live-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 13px; color: rgb(var(--muted-foreground)); }
+.live-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 13px; color: rgb(var(--ink-2)); }
 .lockline { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.lockline p { flex: 1; min-width: 0; font-size: 13px; color: rgb(var(--muted-foreground)); }
-.lockline .icon { color: rgb(var(--muted-foreground)); }
+.lockline p { flex: 1; min-width: 0; font-size: 13px; color: rgb(var(--ink-2)); }
+.lockline .icon { color: rgb(var(--ink-2)); }
 
 /* Steps: a footprint for each done, the berry on the one it's on now. */
-.steps { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; font-size: 14px; color: rgb(var(--muted-foreground)); }
+.steps { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; font-size: 14px; color: rgb(var(--ink-2)); }
 .steps li { display: flex; align-items: center; gap: 12px; }
-.steps .foot { width: 16px; height: 16px; color: rgb(var(--primary)); fill: currentColor; }
-.steps .now { color: rgb(var(--foreground)); }
-.dot { width: 10px; height: 10px; margin: 3px; border-radius: 50%; background: radial-gradient(circle at 36% 30%, rgb(var(--berry-fruit-bloom)), rgb(var(--berry-fruit-mid)) 42%, rgb(var(--berry-fruit-dark))); }
+.steps .foot { width: 16px; height: 16px; color: rgb(var(--ink)); fill: currentColor; }
+.steps .now { color: rgb(var(--ink)); }
+.dot { width: 10px; height: 10px; margin: 3px; border-radius: 50%; background: var(--berry-blueberry); }
 .shimmer {
-  background: linear-gradient(90deg, rgb(var(--muted-foreground) / 0.55) 20%, rgb(var(--accent-ink)) 38%, rgb(var(--foreground)) 50%, rgb(var(--accent-ink)) 62%, rgb(var(--muted-foreground) / 0.55) 80%);
+  background: linear-gradient(90deg, rgb(var(--ink-2) / 0.55) 20%, rgb(var(--ink)) 38%, rgb(var(--ink)) 50%, rgb(var(--ink)) 62%, rgb(var(--ink-2) / 0.55) 80%);
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: shimmer 1300ms linear infinite;
 }
 @keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
 .reply { margin-top: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.reply a { color: rgb(var(--accent-ink)); text-decoration: underline; text-underline-offset: 2px; }
+.reply a { color: rgb(var(--ink)); text-decoration: underline; text-underline-offset: 2px; }
 /* A conversation: each job's exchange in turn, and the box to go on under the last once it's over. */
-.exchange + .exchange { margin-top: 32px; padding-top: 32px; border-top: 1px solid rgb(var(--border)); }
+.exchange + .exchange { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--line); }
 /* Going on: the box sits at the bottom of the screen, as a messaging app's does, over a bar the width of the screen. */
 .follow {
   position: sticky; bottom: 0; gap: 8px;
   margin: 32px calc(-1 * max(var(--gutter), env(safe-area-inset-right))) calc(-32px - env(safe-area-inset-bottom)) calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
   padding: 12px max(var(--gutter), env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-  background: rgb(var(--canvas));
-  border-top: 1px solid rgb(var(--border));
+  background: rgb(var(--ground));
+  border-top: 1px solid var(--line);
 }
 .follow .composer { box-shadow: none; }
 .follow textarea { min-height: 44px; }
 
 /* Settings: plain sections split by lines, as in the window. */
 .setting { padding: 20px 0; }
-.setting + .setting { border-top: 1px solid rgb(var(--border)); }
+.setting + .setting { border-top: 1px solid var(--line); }
 .setting:first-child { padding-top: 4px; }
 .setting h2 { padding: 0 0 12px; }
 .setting .lockline { margin-top: 0; }
-.segmented { display: flex; padding: 2px; border-radius: 999px; background: rgb(var(--muted)); }
-.segmented button { flex: 1; min-height: 40px; border: 0; border-radius: 999px; background: none; font-size: 14px; color: rgb(var(--muted-foreground)); cursor: pointer; }
-.segmented [aria-checked="true"] { background: rgb(var(--surface)); color: rgb(var(--foreground)); font-weight: 600; box-shadow: 0 0 0 1px rgb(var(--border)); }
-.segmented button:focus-visible { outline: 2px solid rgb(var(--accent-ink)); outline-offset: 2px; }
+.segmented { display: flex; padding: 2px; border-radius: 999px; background: rgb(var(--sheet-2)); }
+.segmented button { flex: 1; min-height: 40px; border: 0; border-radius: 999px; background: none; font-size: 14px; color: rgb(var(--ink-2)); cursor: pointer; }
+.segmented [aria-checked="true"] { background: rgb(var(--sheet)); color: rgb(var(--ink)); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.segmented button:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
 
 /* Starting a job: the flock stands on a wire, and the one going stands up. */
 .perch { position: relative; display: flex; gap: 4px; overflow-x: auto; padding: 8px 0 0; margin: 0 calc(-1 * var(--gutter)); padding-inline: var(--gutter); scrollbar-width: none; }
-.perch::after { content: ""; position: absolute; left: 0; right: 0; top: 72px; height: 1.5px; background: rgb(var(--muted-foreground) / 0.45); }
+.perch::after { content: ""; position: absolute; left: 0; right: 0; top: 72px; height: 1.5px; background: rgb(var(--ink-2) / 0.45); }
 .perch button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; flex-shrink: 0; padding: 0 0 6px; border: 0; border-radius: 12px; background: none; cursor: pointer; }
 .perch .bird { width: 64px; height: 64px; }
-.perch .name { font-size: 13px; color: rgb(var(--muted-foreground)); padding-bottom: 2px; border-bottom: 2px solid transparent; }
-.perch [aria-pressed="true"] .name { color: rgb(var(--foreground)); font-weight: 600; border-bottom-color: rgb(var(--accent-ink)); }
+.perch .name { font-size: 13px; color: rgb(var(--ink-2)); padding-bottom: 2px; border-bottom: 2px solid transparent; }
+.perch [aria-pressed="true"] .name { color: rgb(var(--ink)); font-weight: 600; border-bottom-color: rgb(var(--ink)); }
 .can { margin-top: 12px; }
 .can li { font-size: 14px; padding: 1px 0; }
 /* Starting a job: the box first, the flock under it, and Send pinned at the bottom within reach of a thumb. */
@@ -213,10 +213,10 @@ form .button.wide { margin-top: 8px; }
   position: sticky; bottom: 0;
   margin: auto calc(-1 * max(var(--gutter), env(safe-area-inset-right))) 0 calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
   padding: 12px max(var(--gutter), env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-  background: rgb(var(--canvas));
-  border-top: 1px solid rgb(var(--border));
+  background: rgb(var(--ground));
+  border-top: 1px solid var(--line);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shimmer { animation: none; color: rgb(var(--foreground)); background: none; }
+  .shimmer { animation: none; color: rgb(var(--ink)); background: none; }
 }

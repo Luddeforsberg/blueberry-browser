@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { DesktopBerryState, DesktopComposerState, DesktopEdge, ThemeState } from '@shared/ipc'
-import { BerryDot, Mascot } from '@common/components/Mascot'
+import { Mascot } from '@common/components/Mascot'
+import { Pips } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 import { Composer } from './components/Composer'
 
@@ -144,7 +145,7 @@ export const DesktopApp: React.FC = () => {
                     onClick={() => void desktop().press()}
                     className={cn(
                         "block px-3 py-1.5 rounded-tile border bg-sheet text-13 leading-[18px] text-left outline-none line-clamp-2",
-                        "shadow-[0_1px_4px_rgb(var(--berry-pupil)/0.18)]",
+                        "shadow-lift",
                         !still && "transition-[opacity,transform] duration-200 ease-out",
                         lineShowing ? "opacity-100 translate-x-0" : cn("opacity-0 pointer-events-none", anchor.side === 'left' ? "-translate-x-1.5" : "translate-x-1.5")
                     )}
@@ -216,12 +217,11 @@ export const DesktopApp: React.FC = () => {
                             hidden={!state.showBerry}
                             still={state.still}
                             lively
-                            noBlink
-                            className={cn(!flight && "drop-shadow-[0_1px_2px_rgb(var(--berry-pupil)/0.45)]")}
+                            className={cn(!flight && "drop-shadow-[0_1px_2px_rgb(var(--ink)/0.45)]")}
                         />
                         {state.sign && (
                             <span data-desktop-sign={state.sign} className="absolute left-1 top-2">
-                                <BerryDot size={14} working={state.sign === 'working' && !state.still} />
+                                {state.sign === 'working' ? <Pips pattern="think" still={state.still} className="text-ink-2" /> : <span aria-hidden className="block size-2 rounded-full bg-ask" />}
                             </span>
                         )}
                     </div>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDigest } from "./suggestionDigest";
 import { fallbackWords, scheduleFits, verifyProposals, type Existing } from "./suggestionProposals";
 import { findPatterns } from "./suggestionPatterns";
+import { BERRY } from "../shared/mascots";
 
 const NOW = new Date(2026, 10, 2, 18, 0).getTime();
 const at = (daysAgo: number, hour: number, minute = 0) => {
@@ -105,7 +106,7 @@ describe("verifying a proposal", () => {
   it("gives a bird only its evidence's sites and going to pages", () => {
     const [kept] = verify({ kind: "mascot", line: "I'm Gull, and I'll hunt Lisbon fares.", why: "You compared fares on three sites", evidence: [flights], name: "Gull", instructions: "Find me the cheapest fares.", palette: "jackdaw", accessory: "cape", tools: ["click", "type"], sites: ["evil.example"] });
     expect(kept.card.kind === "mascot" && kept.card.draft).toMatchObject({ sites: ["kayak.com", "skyscanner.se", "momondo.se"], tools: ["visit"] });
-    expect(kept.card.kind === "mascot" && kept.card.draft.look.palette).not.toBe("jackdaw");
+    expect(kept.card.kind === "mascot" && kept.card.draft.look.palette).not.toBe(BERRY.look.palette);
     expect(verify({ kind: "mascot", line: "I'm Berry.", why: "You compared fares", evidence: [flights], name: "Berry", instructions: "Find fares." })).toEqual([]);
   });
 

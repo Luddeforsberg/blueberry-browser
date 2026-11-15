@@ -4,12 +4,12 @@
 // src/shared/mascots.ts
 var BERRY_ID = "berry";
 var PALETTES = [
-  { id: "jackdaw", label: "Jackdaw" },
-  { id: "robin", label: "Robin" },
-  { id: "canary", label: "Canary" },
-  { id: "parakeet", label: "Parakeet" },
-  { id: "flamingo", label: "Flamingo" },
-  { id: "kingfisher", label: "Kingfisher" }
+  { id: "kingfisher", label: "Blueberry" },
+  { id: "robin", label: "Lingon" },
+  { id: "canary", label: "Cloudberry" },
+  { id: "parakeet", label: "Gooseberry" },
+  { id: "flamingo", label: "Raspberry" },
+  { id: "jackdaw", label: "Currant" }
 ];
 var ACCESSORIES = [
   { id: "none", label: "Nothing" },
@@ -27,7 +27,8 @@ var MASCOT_TOOLS = [
 var BERRY = {
   id: BERRY_ID,
   name: "Berry",
-  look: { palette: "jackdaw", accessory: "none" },
+  // The blueberry, with nothing on.
+  look: { palette: "kingfisher", accessory: "none" },
   instructions: "",
   sites: [],
   tools: MASCOT_TOOLS.map(({ id }) => id),

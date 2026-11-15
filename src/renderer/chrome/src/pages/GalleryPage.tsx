@@ -3,7 +3,9 @@ import { Pin, Star } from 'lucide-react'
 import type { GalleryMascot, MascotProfile, MemoryFact, NeedsYouItem, Suggestion, WorkTab, WorkView } from '@shared/library'
 import type { DownloadInfo } from '@shared/ipc'
 import { ToolBarButton } from '../components/ToolBarButton'
-import { BerryDot, Mascot, MOOD_LABELS, WalkingBird, type Mood } from '@common/components/Mascot'
+import { Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
+import { PIP_MARKS, PIP_PATTERNS, Pips, type PipPattern } from '@common/components/Pips'
+import { cn } from '@common/lib/utils'
 import { ApprovalCard } from '@common/components/ApprovalCard'
 import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
@@ -38,6 +40,16 @@ import { DownloadsProgress } from '../components/DownloadsButton'
 import { useShell } from '../contexts/ShellContext'
 
 const MOODS = Object.keys(MOOD_LABELS) as Mood[]
+
+const PIP_WORDS: Record<PipPattern, string> = {
+    think: 'Thinking..',
+    reading: 'Reading..',
+    scanning: 'Scanning..',
+    clicking: 'Clicking..',
+    typing: 'Typing..',
+    searching: 'Searching..',
+    waiting: 'Waiting for you'
+}
 
 const SAMPLE_FACTS: MemoryFact[] = [
     { id: 'gallery-fact-1', mascotId: 'gallery', text: 'You want prices in kronor.', site: null, savedAt: 1 },
@@ -190,64 +202,74 @@ export const GalleryPage: React.FC = () => {
             <div className="max-w-4xl mx-auto px-8 py-10">
                 <h1 className="text-18 font-medium">Component gallery</h1>
 
-                <Section title="Berry">
+                <Section title="Mascots">
                     <label className="flex items-center gap-2 text-13">
                         <Switch label="Keep Berry still" checked={still} onChange={setStill} />
                         Keep Berry still
                     </label>
-                    <div className="mt-4 grid grid-cols-4 gap-6">
-                        {MOODS.map((mood) => (
-                            <figure key={mood} className="flex flex-col items-center gap-2 p-4 rounded-tile bg-sheet-2">
-                                <Mascot mood={mood} size={96} still={still} />
-                                <div className="flex items-end gap-3">
-                                    <Mascot mood={mood} size={32} still={still} />
-                                    <Mascot mood={mood} size={24} still={still} />
-                                    <Mascot mood={mood} size={16} still={still} />
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                        {[false, true].map((dark) => (
+                            <div key={String(dark)} className={cn("p-5 rounded-tile bg-ground text-ink", dark && "dark")}>
+                                <p className="font-mono text-11 text-ink-3">{dark ? 'dark' : 'light'}</p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {PALETTES.map(({ id, label }) => (
+                                        <figure key={id} className="w-[60px] flex flex-col items-center gap-1.5">
+                                            <Mascot look={{ palette: id, accessory: 'none' }} name={label} size={52} still={still} />
+                                            <figcaption className="text-11 text-ink-2">{label}</figcaption>
+                                        </figure>
+                                    ))}
                                 </div>
-                                <figcaption className="text-12 text-ink-2">{MOOD_LABELS[mood]}</figcaption>
-                            </figure>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {MOODS.map((mood) => (
+                                        <figure key={mood} className="w-[60px] flex flex-col items-center gap-1.5">
+                                            <Mascot mood={mood} size={34} still={still} />
+                                            <figcaption className="font-mono text-11 text-ink-3 text-center">{mood}</figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex flex-wrap items-end gap-2.5">
+                                    {ACCESSORIES.map(({ id }, index) => (
+                                        <Mascot key={id} look={{ palette: PALETTES[(index + 1) % PALETTES.length].id, accessory: id }} size={34} still={still} />
+                                    ))}
+                                    {[14, 18, 20, 22, 26, 40].map((size) => (
+                                        <Mascot key={size} look={{ palette: 'flamingo', accessory: 'none' }} size={size} still={still} />
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex items-center gap-2 h-8 w-fit pl-2 pr-3 rounded-row bg-ink text-ground">
+                                    <Mascot mood="fetching" size={22} inverted still={still} />
+                                    <span className="font-mono text-11.5">On the address field while it works</span>
+                                </div>
+                                <div className="mt-3 flex items-center gap-2 text-12 text-ink-2">
+                                    <Mascot size={26} shut still={still} /> Eyes shut, as one mascot gives way to the next.
+                                </div>
+                            </div>
                         ))}
                     </div>
                     <div className="mt-4 flex items-center gap-3 text-12 text-ink-2">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
                     </div>
-                    <div className="mt-4 flex items-end gap-6 text-12 text-ink-2">
-                        <WalkingBird size={40} foot={1} stepMs={0} />
-                        <WalkingBird size={40} foot={0} stepMs={0} pecking />
-                        <span>The small birds behind the new tab page, walking and pecking.</span>
+                </Section>
+
+                <Section title="Pips">
+                    <div className="flex flex-wrap gap-2">
+                        {PIP_PATTERNS.map((pattern) => (
+                            <span key={pattern} className={cn("h-7 pl-2.5 pr-3 inline-flex items-center gap-2 rounded-full font-mono text-11.5", pattern === 'waiting' ? "bg-sheet text-ink shadow-rim" : "bg-ink text-ground")}>
+                                <Pips pattern={pattern} still={still} className={pattern === 'waiting' ? 'text-ask' : undefined} />
+                                {PIP_WORDS[pattern]}
+                            </span>
+                        ))}
                     </div>
-                    <div className="mt-4 flex items-center gap-3 text-12 text-ink-2">
-                        <BerryDot /> <BerryDot working /> The berry as a status marker, at rest and during real work.
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {PIP_MARKS.map((mark) => (
+                            <span key={mark} className="h-7 pl-2.5 pr-3 inline-flex items-center gap-2 rounded-full bg-sheet text-ink shadow-rim font-mono text-11.5">
+                                <Pips pattern={mark} />
+                                {mark.charAt(0).toUpperCase() + mark.slice(1)}
+                            </span>
+                        ))}
                     </div>
                 </Section>
 
                 <Section title="The flock">
-                    <div className="grid grid-cols-3 gap-4">
-                        {PALETTES.map(({ id, label }, index) => {
-                            const look = { palette: id, accessory: ACCESSORIES[index % ACCESSORIES.length].id }
-                            return (
-                                <figure key={id} className="flex flex-col items-center gap-2 p-4 rounded-tile bg-sheet-2">
-                                    <Mascot look={look} size={96} still={still} />
-                                    <div className="flex flex-wrap justify-center items-end gap-1">
-                                        {MOODS.map((mood) => (
-                                            <Mascot key={mood} look={look} mood={mood} size={36} still={still} />
-                                        ))}
-                                    </div>
-                                    <div className="flex items-end gap-3">
-                                        {ACCESSORIES.map(({ id: accessory }) => (
-                                            <Mascot key={accessory} look={{ palette: id, accessory }} size={24} still={still} />
-                                        ))}
-                                    </div>
-                                    <div className="flex items-end gap-3">
-                                        {ACCESSORIES.map(({ id: accessory }) => (
-                                            <Mascot key={accessory} look={{ palette: id, accessory }} size={16} still={still} />
-                                        ))}
-                                    </div>
-                                    <figcaption className="text-12 text-ink-2">{label}</figcaption>
-                                </figure>
-                            )
-                        })}
-                    </div>
                     <div className="mt-4 max-w-xl p-2 rounded-prompt border bg-sheet">
                         <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} onClose={() => undefined} />
                     </div>

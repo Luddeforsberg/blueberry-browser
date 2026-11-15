@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import type { NeedsYouItem } from '@shared/library'
 import { Button } from '@common/components/Button'
 import { ExactWords } from '@common/components/ApprovalCard'
-import { BerryDot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
@@ -25,8 +24,8 @@ export const NeedsYouCount: React.FC = () => {
     const count = useLibrary().needsYou.length
     if (count === 0) return null
     return (
-        <span className="flex items-center gap-1.5 text-13 text-ink">
-            <BerryDot />
+        <span className="flex items-center gap-1.5 text-13 text-ask">
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ask" />
             {count}
             <span className="sr-only"> waiting for you</span>
         </span>
@@ -44,7 +43,7 @@ export const NeedsYouNotice: React.FC = () => {
             onClick={() => void window.chromeAPI.browser.openPage('needs-you')}
             className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-row text-13 outline-none transition-colors app-region-no-drag hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
-            <BerryDot />
+            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ask" />
             {count === 1 ? '1 thing needs you' : `${count} things need you`}
         </button>
     )

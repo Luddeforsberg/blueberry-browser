@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Layout, Settings, ThemeState } from '@shared/ipc'
+import { StillContext } from '@common/components/motion'
 
 interface ShellContextType {
     layout: Layout
@@ -54,5 +55,9 @@ export const ShellProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateSettings: (patch) => void window.chromeAPI.settings.updateSettings(patch)
     }
 
-    return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>
+    return (
+        <ShellContext.Provider value={value}>
+            <StillContext.Provider value={settings.keepBerryStill}>{children}</StillContext.Provider>
+        </ShellContext.Provider>
+    )
 }

@@ -14,7 +14,6 @@ export const Berry: React.FC<{ mood?: Mood; size: number; className?: string; ma
             look={mascot?.look}
             name={mascot?.name}
             hidden={!settings.showBerry}
-            still={settings.keepBerryStill}
             lively
             onContextMenu={(event) => {
                 event.preventDefault()
