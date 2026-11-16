@@ -1,4 +1,5 @@
 import React from 'react'
+import { StatusPill } from '@common/components/StatusPill'
 import { useShell } from '../contexts/ShellContext'
 import { SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
 import { openMascots } from '../flockView'
@@ -12,9 +13,7 @@ const SUGGESTIONS_DETAIL =
 const MEMORY_DETAIL =
     'To word the offer, what you typed in that chat or routine and the names of the sites it used go to the AI service, never page text or the reply. Nothing is kept unless you press Remember, and each mascot’s page in Your mascots shows all it has. Off means no more offers, and what’s kept stays in use until you forget it there.'
 
-const State: React.FC<{ on: boolean; children: string }> = ({ on, children }) => (
-    <span className={on ? 'font-mono text-11 text-ink whitespace-nowrap' : 'font-mono text-11 text-ink-3 whitespace-nowrap'}>{children}</span>
-)
+const State: React.FC<{ on: boolean; children: string }> = ({ on, children }) => <StatusPill tone={on ? 'on' : 'off'}>{children}</StatusPill>
 
 export const WhatLeaves: React.FC = () => {
     const { settings } = useShell()
@@ -27,7 +26,7 @@ export const WhatLeaves: React.FC = () => {
                     description="With the page you ask about, as text and a picture."
                     more="Messages in the chat panel include the open page’s text and a screenshot, which go to the AI service to answer them."
                 >
-                    <State on>always</State>
+                    <State on>Always</State>
                 </SettingsRow>
                 <SettingsRow
                     id="leaves-attached"
@@ -35,13 +34,13 @@ export const WhatLeaves: React.FC = () => {
                     description="With the message you attach them to. A file goes again with each later message in that chat."
                     more="A tab’s text and a picture of it go with that one message. A file’s contents are kept with its chat on this computer, so you can ask more about it, and are deleted with the chat. Nothing you attach goes to a job that runs with this computer off."
                 >
-                    <State on>when added</State>
+                    <State on>When added</State>
                 </SettingsRow>
                 <SettingsRow id="leaves-suggestions" title="Suggestions" description="Site names, page titles and searches from the last two weeks. Never page text." more={SUGGESTIONS_DETAIL}>
-                    <State on={settings.suggestions}>{settings.suggestions ? 'on' : 'off'}</State>
+                    <State on={settings.suggestions}>{settings.suggestions ? 'On' : 'Off'}</State>
                 </SettingsRow>
                 <SettingsRow id="leaves-memory" title="Offers to remember" description="What you typed in that chat and the names of the sites." more={MEMORY_DETAIL}>
-                    <State on={settings.memoryOffers}>{settings.memoryOffers ? 'on' : 'off'}</State>
+                    <State on={settings.memoryOffers}>{settings.memoryOffers ? 'On' : 'Off'}</State>
                 </SettingsRow>
             </SettingsGroup>
             <SettingsGroup label="Only when you start it">

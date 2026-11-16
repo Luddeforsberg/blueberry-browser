@@ -79,15 +79,15 @@ const Offer: React.FC<{ offer: MemoryOffer }> = ({ offer }) => {
     }
     return (
         <CardInShell label="Offer to remember">
-            <p className="mb-1.5 font-mono text-11 text-ink-3 [overflow-wrap:anywhere]">{source(offer)} · remember this?</p>
+            <p className="mb-1.5 text-12 font-medium text-ink-2 [overflow-wrap:anywhere]">{source(offer).replace(/^f/, 'F')} · remember this?</p>
             <p className="text-15 leading-[1.45] text-ink">
                 {offer.text}
                 {offer.site && <span className="text-14 text-ink-2"> Only on {offer.site}.</span>}
             </p>
             {error && <div className="mt-2"><ChatError message={error} /></div>}
             <div className="mt-3 flex gap-1.5">
-                <Button size="sm" className="h-7" onClick={() => void answer(true)}>Remember</Button>
-                <Button size="sm" variant="raised" className="h-7" onClick={() => void answer(false)}>Don’t</Button>
+                <Button size="sm" onClick={() => void answer(true)}>Remember</Button>
+                <Button size="sm" variant="raised" onClick={() => void answer(false)}>Don’t</Button>
             </div>
         </CardInShell>
     )

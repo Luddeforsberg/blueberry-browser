@@ -2,29 +2,28 @@ import React from 'react'
 import type { RoutineRun, RoutineStatus } from '@shared/library'
 import { Pips } from '@common/components/Pips'
 import { Button } from '@common/components/Button'
-import { cn } from '@common/lib/utils'
+import { StatusPill, type PillTone } from '@common/components/StatusPill'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { ChatApprovalCard, ChatError, Markdown, StatusLine, StepTrail } from './ChatMessage'
 import { MemoryOffers, RememberedLine } from './MemoryInChat'
 
-// Status colours always come with words, so colour is never the only signal.
-const STATUS: Record<RoutineStatus, { label: string; className: string }> = {
-    running: { label: 'Running now', className: 'text-ink' },
-    finished: { label: 'Finished', className: 'text-ink-2' },
-    'needs-approval': { label: 'Needs your OK', className: 'text-ask' },
-    failed: { label: 'Failed', className: 'text-ask' },
-    stopped: { label: 'Stopped', className: 'text-ink-2' },
-    interrupted: { label: 'Interrupted', className: 'text-ask' },
-    queued: { label: 'Waiting to start', className: 'text-ink-2' },
-    paused: { label: 'Paused', className: 'text-ink-2' },
-    idle: { label: 'Scheduled', className: 'text-ink-2' }
+// A state is a pill, and its colour always comes with words, so colour is never the only signal.
+const STATUS: Record<RoutineStatus, { label: string; tone: PillTone }> = {
+    running: { label: 'Running now', tone: 'on' },
+    finished: { label: 'Finished', tone: 'off' },
+    'needs-approval': { label: 'Needs your OK', tone: 'ask' },
+    failed: { label: 'Failed', tone: 'ask' },
+    stopped: { label: 'Stopped', tone: 'off' },
+    interrupted: { label: 'Interrupted', tone: 'ask' },
+    queued: { label: 'Waiting to start', tone: 'off' },
+    paused: { label: 'Paused', tone: 'off' },
+    idle: { label: 'Scheduled', tone: 'off' }
 }
 
 export const RoutineStatusLabel: React.FC<{ status: RoutineStatus }> = ({ status }) => (
-    <span className={cn("flex items-center gap-2", STATUS[status].className)}>
-        {status === 'running' && <Pips pattern="think" />}
+    <StatusPill tone={STATUS[status].tone} lead={status === 'running' ? <Pips pattern="think" /> : undefined}>
         {STATUS[status].label}
-    </span>
+    </StatusPill>
 )
 
 export const formatTime = (at: number) =>
@@ -43,7 +42,7 @@ export const RoutineRunCard: React.FC<{
     const ended = run.status === 'failed' || run.status === 'stopped' || run.status === 'interrupted'
 
     return (
-        <li aria-label={`Run from ${formatTime(run.startedAt)}`} className="p-4 rounded-sheet border bg-sheet">
+        <li aria-label={`Run from ${formatTime(run.startedAt)}`} className="p-4 rounded-sheet bg-sheet shadow-up">
             <div className="flex items-center justify-between gap-4 text-14">
                 <span className="text-ink-2 tabular-nums">{formatTime(run.startedAt)}</span>
                 <RoutineStatusLabel status={run.status} />

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { AppWindow, ChevronLeft, ChevronRight, CircleDot, Paperclip } from 'lucide-react'
 import type { TabChoice } from '@shared/attachments'
 import { cn } from '@common/lib/utils'
+import { LABEL } from '@common/components/StatusPill'
 import { Favicon } from './Favicon'
 import { MenuRule, MenuSheet, menuRowClass } from './MenuSheet'
 
@@ -52,8 +53,8 @@ const Row: React.FC<
             <span className="block truncate">{title}</span>
             {why && <span className="block mt-px text-13 truncate">{why}</span>}
         </span>
-        {!why && note && <span className="shrink-0 max-w-[60%] truncate font-mono text-11 text-ink-3">{note}</span>}
-        {!why && opens && <ChevronRight aria-hidden className="size-[13px] shrink-0 text-ink-3" strokeWidth={1.75} />}
+        {!why && note && <span className="shrink-0 max-w-[60%] truncate text-13 text-ink-3">{note}</span>}
+        {!why && opens && <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />}
     </button>
 )
 
@@ -143,7 +144,7 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refo
                 <Row icon={<AppWindow aria-hidden className={ICON} strokeWidth={1.75} />} title="An open tab" why={tabsOff} onPick={() => undefined} />
             ) : (
                 <div role="group" aria-label="Open tabs">
-                    <p aria-hidden className="px-2.5 pt-1.5 pb-1 font-mono text-11 text-ink-3">open tabs</p>
+                    <p aria-hidden className={cn('px-2.5 pt-1.5 pb-1', LABEL)}>Open tabs</p>
                     {tabs.note && <p className="px-2.5 pb-1.5 text-13 text-ink-2">{tabs.note}</p>}
                     {(many ? choices.slice(0, TABS_SHOWN - 1) : choices).map(tabRow)}
                     {many && (

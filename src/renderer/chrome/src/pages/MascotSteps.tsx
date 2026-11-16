@@ -9,6 +9,7 @@ import { Choice, Switch } from '@common/components/Controls'
 import { BIG_CARD, BIG_SHELL } from '@common/components/cardShell'
 import { useStill } from '@common/components/motion'
 import { cn } from '@common/lib/utils'
+import { LABEL, StatusPill } from '@common/components/StatusPill'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry, BerrySpot } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
@@ -26,10 +27,10 @@ const FIELD = 'w-full rounded-sheet bg-sheet-2 text-ink caret-ink outline-none p
 const STEPS: MascotPart[] = ['look', 'name', 'purpose', 'limits']
 
 const QUESTIONS: Record<MascotPart, { question: string; hint: string; label: string; mood: Mood }> = {
-    look: { question: 'What do I look like?', hint: 'Pick a berry, and something to wear if you like.', label: 'look', mood: 'curious' },
-    name: { question: 'What’s my name?', hint: 'It’s what you’ll see in the prompt box and beside my replies.', label: 'name', mood: 'rest' },
-    purpose: { question: 'What should I do for you?', hint: 'In your own words, as you’d tell a colleague. I read it before every job.', label: 'what it’s for', mood: 'curious' },
-    limits: { question: 'Where can I go, and what can I do there?', hint: 'I can always read the pages I’m allowed on. I still ask before anything risky, and no limit changes that.', label: 'limits', mood: 'rest' }
+    look: { question: 'What do I look like?', hint: 'Pick a berry, and something to wear if you like.', label: 'Look', mood: 'curious' },
+    name: { question: 'What’s my name?', hint: 'It’s what you’ll see in the prompt box and beside my replies.', label: 'Name', mood: 'rest' },
+    purpose: { question: 'What should I do for you?', hint: 'In your own words, as you’d tell a colleague. I read it before every job.', label: 'What it’s for', mood: 'curious' },
+    limits: { question: 'Where can I go, and what can I do there?', hint: 'I can always read the pages I’m allowed on. I still ask before anything risky, and no limit changes that.', label: 'Limits', mood: 'rest' }
 }
 
 // The mascot as it's being made, to draw.
@@ -76,8 +77,9 @@ export const StepCard: React.FC<{
             <div className={cn(BIG_SHELL, 'w-full')}>
                 <div className={cn(BIG_CARD, 'bg-sheet px-5 pt-4 pb-5 overflow-hidden')}>
                     <div key={motionKey} className={still ? 'animate-step-fade' : from === 'next' ? 'animate-step-next' : 'animate-step-back'}>
-                        <div className="h-[26px] flex items-center justify-between font-mono text-11 text-ink-3">
-                            <span>{label}</span>
+                        <div className="h-7 flex items-center justify-between">
+                            {/* The step as a count in mono, or the part being changed in words. */}
+                            <span className={/^\d/.test(label) ? 'font-mono text-11.5 text-ink-3' : LABEL}>{label}</span>
                             {action}
                         </div>
                         <h2 className="mt-0.5 mb-1 text-center text-20 font-semibold">{question}</h2>
@@ -194,10 +196,10 @@ const PurposeAnswer: React.FC<{ values: MascotFormValues; set: Set; offerStarter
                 className={cn(FIELD, 'block min-h-[76px] px-4 py-[13px] resize-none text-15 leading-[1.5]')}
             />
             {offerStarters && starters.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 font-mono text-11 text-ink-3">
-                    <span id="start-from">or start from</span>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-13 text-ink-2">
+                    <span id="start-from" className="mr-0.5">Or start from</span>
                     {starters.map((entry) => (
-                        <Button key={entry.id} type="button" variant="raised" size="sm" className="font-sans" aria-describedby="start-from" onClick={() => set({ instructions: entry.draft.instructions })}>
+                        <Button key={entry.id} type="button" variant="raised" size="sm" aria-describedby="start-from" onClick={() => set({ instructions: entry.draft.instructions })}>
                             {entry.draft.name}
                         </Button>
                     ))}
@@ -337,7 +339,7 @@ const MadeCard: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
             <div className={BIG_SHELL}>
                 <div className={cn(BIG_CARD, 'bg-sheet px-7 pt-[30px] pb-[26px] text-center animate-fade-in')}>
                     <div className="mb-3 flex justify-center"><BerrySpot size={72} mascot={mascot} mood="delivered" /></div>
-                    <p className="font-mono text-11 text-ink-3">added to your mascots</p>
+                    <p className={LABEL}>Added to your mascots</p>
                     <h2 className="mt-1 mb-2 text-30 font-medium [overflow-wrap:anywhere]">{mascot.name}</h2>
                     <p className="mx-auto max-w-[360px] text-14 leading-[1.5] text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{mascot.instructions}</p>
                     <LimitTags mascot={mascot} className="mt-3.5 justify-center" />
@@ -358,11 +360,11 @@ const MadeCard: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
     )
 }
 
-// What it may do, as mono tags, in the words the Gallery uses.
+// What it may do, as pills, in the words the Gallery uses.
 export const LimitTags: React.FC<{ mascot: Pick<MascotProfile, 'sites' | 'tools'>; className?: string }> = ({ mascot, className }) => (
     <ul aria-label="What it may do" className={cn('flex flex-wrap gap-1.5', className)}>
         {permissionsInWords(mascot).map(({ text }) => (
-            <li key={text} className="min-h-[22px] px-2 py-[3px] inline-flex items-center rounded-[7px] bg-sheet-2 font-mono text-11 text-ink-2">{text}</li>
+            <li key={text} className="flex"><StatusPill className="h-auto min-h-6 py-[3px] whitespace-normal">{text}</StatusPill></li>
         ))}
     </ul>
 )

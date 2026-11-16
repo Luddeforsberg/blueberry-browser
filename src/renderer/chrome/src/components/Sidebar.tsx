@@ -9,6 +9,8 @@ import { Tabs } from './Tabs'
 import { useSiteDrag } from './useSiteDrag'
 import { ToolBarButton } from './ToolBarButton'
 import { Pips } from '@common/components/Pips'
+import { LABEL } from '@common/components/StatusPill'
+import { buttonVariants } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
@@ -21,28 +23,33 @@ import { SegmentSwitch } from './SegmentSwitch'
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-const ROW = cn('w-full h-[30px] px-2 flex items-center gap-[9px] rounded-row text-14 text-ink-2 text-left transition-colors app-region-no-drag', FOCUS)
+const ROW = cn('w-full h-8 px-2 flex items-center gap-2.5 rounded-[10px] text-14 text-ink text-left transition-colors app-region-no-drag', FOCUS)
 // A row's own slot for its icon or face, so titles line up whatever starts the row.
-const LEAD = 'size-5 shrink-0 flex items-center justify-center'
+const LEAD = 'size-5 shrink-0 flex items-center justify-center text-ink-2'
 const ICON = 'size-4 shrink-0'
+// A site's icon in a row.
+const SITE_ICON = 'size-[18px] rounded-[5px] text-[10px]'
+// The row in front, and the favourite whose site it is: a sheet lifted with `up`.
+const CURRENT = 'bg-sheet text-ink shadow-up'
 const EARLIER_SHOWN = 8
 
-// Section labels: 11px mono, lower case, in ink-3. `trailing` sits at the right, such as a count or an arrow.
+// Section labels: words with a capital, 12px medium in ink-2. `trailing` sits at the right, such as a count in mono or
+// an arrow.
 const Label: React.FC<{ id?: string; ask?: boolean; trailing?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ id, ask, trailing, className, children }) => (
-    <h2 id={id} className={cn('h-[18px] mt-3 mb-1 mx-2 flex items-center gap-1.5 font-mono text-11 lowercase', ask ? 'text-ask' : 'text-ink-3', className)}>
+    <h2 id={id} className={cn('h-7 mt-1.5 mx-2 flex items-center gap-1.5', LABEL, ask && 'text-ask', className)}>
         {children}
-        {trailing && <span className="ml-auto flex items-center gap-2">{trailing}</span>}
+        {trailing && <span className="ml-auto flex items-center gap-2 font-mono text-11.5 font-regular text-ink-3">{trailing}</span>}
     </h2>
 )
 
 // A small icon button in a label, such as the new tab plus or the arrow that opens a page.
 const LabelButton: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={cn('size-5 -mr-1 flex items-center justify-center rounded-[6px] text-ink-3 hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}>
+    <button type="button" aria-label={label} title={label} onClick={onClick} className={cn('size-6 -mr-1.5 flex items-center justify-center rounded-[7px] text-faint hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}>
         {children}
     </button>
 )
 
-const Rule: React.FC = () => <div aria-hidden className="h-px mx-1.5 mt-2.5 bg-line" />
+const Rule: React.FC = () => <div aria-hidden className="h-px mx-1.5 my-2 bg-line" />
 
 // A minute's tick, for rows that say how long something has been going.
 const useMinute = () => {
@@ -111,12 +118,12 @@ const Favourites: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, st
                             onContextMenu={(event) => savedSiteMenu(event, site)}
                             className={cn(
                                 'w-full h-10 flex items-center justify-center rounded-tile transition-colors app-region-no-drag',
-                                selected ? 'bg-sheet shadow-rim' : 'bg-tray hover:bg-press',
+                                selected ? CURRENT : 'bg-tray hover:bg-press',
                                 drag?.site.id === site.id && 'opacity-40',
                                 FOCUS
                             )}
                         >
-                            <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-5 rounded-[6px]" />
+                            <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-[22px] rounded-[6px] text-[12px]" />
                         </button>
                     </li>
                 )
@@ -138,15 +145,15 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
                 id="sidebar-bookmarks"
                 trailing={
                     <LabelButton label={open ? 'Fold bookmarks' : 'Show bookmarks'} onClick={() => setOpen(!open)}>
-                        {open ? <ChevronDown className="size-[13px]" strokeWidth={1.75} /> : <ChevronRight className="size-[13px]" strokeWidth={1.75} />}
+                        {open ? <ChevronDown className="size-3.5" strokeWidth={1.75} /> : <ChevronRight className="size-3.5" strokeWidth={1.75} />}
                     </LabelButton>
                 }
             >
-                bookmarks
+                Bookmarks
             </Label>
             {open && (shown.length === 0 ? (
                 <ul aria-label="Bookmarks">
-                    <li className="h-[27px] px-2 flex items-center text-13 text-faint">Bookmark a page to keep it here.</li>
+                    <li className="h-8 px-2 flex items-center text-13 text-faint">Bookmark a page to keep it here.</li>
                 </ul>
             ) : (
                 <ul aria-label="Bookmarks">
@@ -157,9 +164,9 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
                                 onPointerDown={(event) => start(event, site, 'bookmarks')}
                                 onClick={() => createTab(site.url)}
                                 onContextMenu={(event) => savedSiteMenu(event, site)}
-                                className={cn(ROW, 'h-[27px] text-13 hover:bg-hover hover:text-ink', drag?.site.id === site.id && 'opacity-40')}
+                                className={cn(ROW, 'hover:bg-hover', drag?.site.id === site.id && 'opacity-40')}
                             >
-                                <span className={LEAD}><Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} /></span>
+                                <span className={LEAD}><Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className={SITE_ICON} /></span>
                                 <span className="flex-1 truncate">{site.title}</span>
                             </button>
                         </li>
@@ -184,10 +191,10 @@ export const SiteDragGhost: React.FC<{ drag: SiteDragging['drag'] }> = ({ drag }
             )}
             <div
                 aria-hidden
-                className="fixed z-50 h-[27px] max-w-[200px] px-2 flex items-center gap-[9px] rounded-row bg-sheet shadow-lift text-13 text-ink pointer-events-none"
+                className="fixed z-50 h-8 max-w-[200px] px-2 flex items-center gap-2.5 rounded-[10px] bg-sheet shadow-lift text-14 text-ink pointer-events-none"
                 style={{ left: drag.x + 10, top: drag.y + 6 }}
             >
-                <Favicon src={drag.site.favicon ?? siteIcon(drag.site.url)} site={drag.site.url} />
+                <Favicon src={drag.site.favicon ?? siteIcon(drag.site.url)} site={drag.site.url} className={SITE_ICON} />
                 <span className="truncate">{drag.site.title}</span>
             </div>
         </>
@@ -210,12 +217,12 @@ const TabsFace: React.FC = () => {
                         <>
                             <span className="tabular-nums" aria-label={`${tabs.length} open`}>{tabs.length}</span>
                             <LabelButton label="New tab" onClick={() => createTab()}>
-                                <Plus className="size-[13px]" strokeWidth={1.75} />
+                                <Plus className="size-4" strokeWidth={1.75} />
                             </LabelButton>
                         </>
                     }
                 >
-                    tabs
+                    Tabs
                 </Label>
                 <Tabs mode="vertical" label="Tabs" showNew={false} />
             </section>
@@ -276,7 +283,7 @@ export const ChatRow: React.FC<{
                         if (event.key === 'Enter') finish(event.currentTarget.value)
                         if (event.key === 'Escape') finish(null)
                     }}
-                    className={cn(ROW, 'bg-sheet text-ink shadow-rim')}
+                    className={cn(ROW, CURRENT)}
                 />
             </li>
         )
@@ -294,7 +301,7 @@ export const ChatRow: React.FC<{
                 type="button"
                 aria-current={selected ? 'page' : undefined}
                 onClick={onOpen}
-                className={cn(ROW, 'pr-8', selected ? 'bg-sheet text-ink shadow-rim' : 'hover:bg-hover hover:text-ink', chat.running && 'text-ink')}
+                className={cn(ROW, 'pr-8', selected ? CURRENT : 'hover:bg-hover')}
             >
                 {/* The row is named by its chat, so the face is left out of it and the mascot comes after. */}
                 <span aria-hidden className={LEAD}>
@@ -304,7 +311,7 @@ export const ChatRow: React.FC<{
                 <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}</span>
                 {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />}
                 {trailing && (
-                    <span className="-mr-6 shrink-0 font-mono text-11 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
+                    <span className="-mr-6 shrink-0 font-mono text-11.5 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
                 )}
             </button>
             <button
@@ -312,7 +319,7 @@ export const ChatRow: React.FC<{
                 aria-label={`More options for ${chat.title}`}
                 onClick={() => void showMenu()}
                 className={cn(
-                    'absolute right-1 top-[3px] size-6 flex items-center justify-center rounded-[7px] text-ink-3 transition-opacity app-region-no-drag',
+                    'absolute right-1 top-1 size-6 flex items-center justify-center rounded-[7px] text-ink-3 transition-opacity app-region-no-drag',
                     'opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-hover hover:text-ink',
                     FOCUS
                 )}
@@ -354,30 +361,29 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                             <>
                                 <span className="tabular-nums">{library.needsYou.length}</span>
                                 <LabelButton label="Open Needs you" onClick={() => void browser.openPage('needs-you')}>
-                                    <ChevronRight className="size-[13px]" strokeWidth={1.75} />
+                                    <ChevronRight className="size-3.5" strokeWidth={1.75} />
                                 </LabelButton>
                             </>
                         }
                     >
-                        needs you
+                        Needs you
                     </Label>
+                    {/* Each row is the button that opens the job at its card, with the asking pips at its end. */}
                     <ul className="flex flex-col gap-0.5">
                         {library.needsYou.map((item) => {
                             const mascot = find(item.mascotId)
                             return (
                                 <li key={item.id}>
-                                    <div className={cn(ROW, 'pr-1 text-ink', onSheet ? 'bg-sheet-2' : 'bg-sheet shadow-rim')}>
+                                    <button
+                                        type="button"
+                                        aria-label={`Review ${item.job}`}
+                                        onClick={() => (item.routineId ? openRoutine({ id: item.routineId }) : openChat({ id: item.id, title: item.job }))}
+                                        className={cn(ROW, onSheet ? 'bg-sheet-2 hover:bg-press' : 'bg-sheet shadow-chip hover:[background-image:linear-gradient(var(--hover),var(--hover))]')}
+                                    >
                                         <span className={LEAD}><Berry mood="asking" size={20} mascot={mascot} /></span>
                                         <span className="flex-1 truncate">{item.job}</span>
-                                        <button
-                                            type="button"
-                                            aria-label={`Review ${item.job}`}
-                                            onClick={() => (item.routineId ? openRoutine({ id: item.routineId }) : openChat({ id: item.id, title: item.job }))}
-                                            className={cn('h-[22px] px-[9px] shrink-0 inline-flex items-center rounded-full bg-ink text-ground text-11.5 font-medium transition-[background-color,transform] duration-fast hover:bg-ink/85 active:scale-[.96]', FOCUS)}
-                                        >
-                                            Review
-                                        </button>
-                                    </div>
+                                        <Pips pattern="waiting" className="text-ask" still />
+                                    </button>
                                 </li>
                             )
                         })}
@@ -387,7 +393,7 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
 
             {working.length > 0 && (
                 <section aria-labelledby="sidebar-working">
-                    <Label id="sidebar-working" className={library.needsYou.length === 0 ? 'mt-0' : undefined}>working</Label>
+                    <Label id="sidebar-working" className={library.needsYou.length === 0 ? 'mt-0' : undefined}>Working</Label>
                     <ul>
                         {working.map((chat) => (
                             <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={shortAge(chat.updatedAt)} />
@@ -403,25 +409,25 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                     className={library.needsYou.length + working.length === 0 ? 'mt-0' : undefined}
                     trailing={
                         <LabelButton label="Open Routines" onClick={() => void browser.openPage('routines')}>
-                            <ChevronRight className="size-[13px]" strokeWidth={1.75} />
+                            <ChevronRight className="size-3.5" strokeWidth={1.75} />
                         </LabelButton>
                     }
                 >
-                    routines
+                    Routines
                 </Label>
                 <ul>
                     {routines.map((routine) => (
                         <li key={routine.id}>
-                            <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover hover:text-ink')}>
+                            <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover')}>
                                 <span className={LEAD}>
                                     <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
                                 </span>
                                 <span className="flex-1 truncate">{routine.name}</span>
                                 {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
                                 {routine.unseen ? (
-                                    <span className="shrink-0 font-mono text-11 text-ink">news<span className="sr-only">. Has news</span></span>
+                                    <span className="shrink-0 font-mono text-11.5 text-ink">news<span className="sr-only">. Has news</span></span>
                                 ) : (
-                                    <span className="shrink-0 font-mono text-11 text-ink-3 tabular-nums">
+                                    <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">
                                         {routine.paused ? 'paused' : routine.nextRunAt ? shortWhen(routine.nextRunAt) : ''}
                                     </span>
                                 )}
@@ -429,20 +435,20 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                         </li>
                     ))}
                 </ul>
-                {routines.length === 0 && <p className="h-[30px] px-2 flex items-center text-13 text-faint">Nothing scheduled yet.</p>}
+                {routines.length === 0 && <p className="h-8 px-2 flex items-center text-13 text-faint">Nothing scheduled yet.</p>}
             </section>
 
             {earlier.length > 0 && (
                 <section aria-labelledby="sidebar-earlier">
                     <Rule />
-                    <Label id="sidebar-earlier">earlier</Label>
+                    <Label id="sidebar-earlier">Earlier</Label>
                     <ul>
                         {(allEarlier ? earlier : earlier.slice(0, EARLIER_SHOWN)).map((chat) => (
                             <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={shortWhen(chat.updatedAt)} />
                         ))}
                     </ul>
                     {!allEarlier && earlier.length > EARLIER_SHOWN && (
-                        <button type="button" onClick={() => setAllEarlier(true)} className={cn(ROW, 'text-ink-3 hover:bg-hover hover:text-ink')}>
+                        <button type="button" onClick={() => setAllEarlier(true)} className={cn(ROW, 'text-ink-2 hover:bg-hover hover:text-ink')}>
                             <span className={LEAD} />
                             Show more
                         </button>
@@ -482,7 +488,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
         card.current?.querySelector<HTMLElement>('button')?.focus()
     }, [])
 
-    const line = 'h-[30px] flex items-center gap-[9px] px-1 text-13 text-ink-2 rounded-row text-left w-full'
+    const line = 'h-8 flex items-center gap-2.5 px-1 text-14 text-ink-2 rounded-row text-left w-full'
     return (
         <div
             ref={card}
@@ -498,7 +504,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                 <Berry mood={mood} size={36} mascot={mascot} still />
                 <span className="min-w-0">
                     <span className="block font-medium truncate">{name}</span>
-                    <span className="block font-mono text-11 leading-[15px] text-ink-3">{limitsInBrief(mascot)}</span>
+                    <span className="block text-13 text-ink-2">{limitsInBrief(mascot)}</span>
                 </span>
             </div>
             <div aria-hidden className="h-px mt-2.5 mb-1 bg-line" />
@@ -516,7 +522,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                         <button type="button" onClick={() => openChat(chat)} className={cn(line, 'text-ink hover:bg-hover', FOCUS)}>
                             <Pips pattern="think" still />
                             <span className="flex-1 truncate">{chat.title}</span>
-                            <span className="font-mono text-11 text-ink-3 tabular-nums">{shortAge(chat.updatedAt)}</span>
+                            <span className="font-mono text-11.5 text-ink-3 tabular-nums">{shortAge(chat.updatedAt)}</span>
                         </button>
                     </li>
                 ))}
@@ -525,7 +531,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                         <button type="button" onClick={() => openChat(chat)} className={cn(line, 'hover:bg-hover hover:text-ink', FOCUS)}>
                             <Pips pattern="read" />
                             <span className="flex-1 truncate">{chat.title}</span>
-                            <span className="font-mono text-11 text-ink-3 tabular-nums">{shortWhen(chat.updatedAt)}</span>
+                            <span className="font-mono text-11.5 text-ink-3 tabular-nums">{shortWhen(chat.updatedAt)}</span>
                         </button>
                     </li>
                 ))}
@@ -538,7 +544,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                     createTab()
                     onClose()
                 }}
-                className={cn('mt-1.5 w-full h-[30px] rounded-full shadow-[inset_0_0_0_1px_var(--line)] text-13 text-ink-2 transition-[background-color,transform] duration-fast hover:bg-hover hover:text-ink active:scale-[.96]', FOCUS)}
+                className={cn(buttonVariants({ variant: 'raised' }), 'mt-1.5 w-full')}
             >
                 New chat with {name}
             </button>
@@ -548,7 +554,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                     openMascots({ page: 'list' })
                     onClose()
                 }}
-                className={cn('mt-1 w-full h-7 rounded-full text-13 text-ink-3 hover:text-ink', FOCUS)}
+                className={cn('mt-1 w-full h-7 rounded-full text-13 text-ink-2 hover:text-ink', FOCUS)}
             >
                 All your mascots
             </button>

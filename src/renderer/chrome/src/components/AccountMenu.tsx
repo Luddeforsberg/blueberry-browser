@@ -77,7 +77,7 @@ const Row: React.FC<{ Icon?: LucideIcon; lead?: React.ReactNode; shortcut?: stri
         type="button"
         data-menu-row
         onClick={onChoose}
-        className={cn('w-full h-[30px] px-2 flex items-center gap-2.5 rounded-row text-14 text-ink text-left transition-colors hover:bg-hover active:bg-press', FOCUS)}
+        className={cn('w-full h-8 px-2 flex items-center gap-2.5 rounded-row text-14 text-ink text-left transition-colors hover:bg-hover active:bg-press', FOCUS)}
     >
         <span aria-hidden className="size-4 shrink-0 flex items-center justify-center text-ink-3">
             {lead ?? (Icon && <Icon className="size-4" strokeWidth={1.75} />)}

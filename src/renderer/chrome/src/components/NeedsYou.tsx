@@ -36,7 +36,8 @@ export const NeedsYouNotice: React.FC = () => {
     )
 }
 
-// Everything but the main action, until the row has the pointer or the keyboard. They can still be tabbed to.
+// Everything but the decision, until the row has the pointer or the keyboard. They can still be tabbed to. Allow and
+// Don't allow are never hidden this way.
 const QUIETLY = "opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
 
 const QuestionBox: React.FC<{ name: string; onAnswer: (words: string) => void }> = ({ name, onAnswer }) => {
@@ -98,8 +99,13 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
         >
             <div className="flex items-start gap-3">
                 <Berry mood="asking" size={32} mascot={mascot} className="shrink-0" />
-                {/* The one action shows on the right, and comes first from the keyboard, as Allow does on the card. */}
-                {!question && !handoff && <Button size="sm" className="shrink-0 order-last" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>}
+                {/* The decision shows on the right, and comes first from the keyboard, Allow then Don't allow, as on the card. */}
+                {!question && !handoff && (
+                    <span className="shrink-0 order-last flex items-center gap-1.5">
+                        <Button size="sm" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>
+                        <Button size="sm" variant="raised" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>
+                    </span>
+                )}
                 {handoff && onThatTab && <Button size="sm" className="shrink-0 order-last" onClick={done}>I’m done</Button>}
                 {handoff && !onThatTab && canGoToTab && <Button size="sm" variant="raised" className="shrink-0 order-last" onClick={goToTab}>Go to the tab</Button>}
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
@@ -110,7 +116,6 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
                     <div className="mt-1 h-7 flex items-center gap-x-1.5 text-13 text-ink-2">
                         <span className="min-w-0 flex-1 truncate">{name} · {item.job}{item.from && ` · from ${item.from}`} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
                         <span className={cn("shrink-0 flex items-center", QUIETLY)}>
-                            {!question && !handoff && <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>}
                             {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-ink-2" onClick={goToTab}>Go to the tab</Button>}
                             <Button size="xs" variant="ghost" className="text-ink-2" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
                             {question && <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => send(false, `Skipped. ${name} carries on without it.`)}>Skip</Button>}

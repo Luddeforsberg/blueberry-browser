@@ -65,7 +65,7 @@ const MenuRow: React.FC<{ mascot: MascotProfile; checked: boolean; onChoose: () 
             <Berry size={28} mascot={mascot} still />
             <span className="flex-1 min-w-0">
                 <span className="block truncate">{name}</span>
-                <span className="block mt-px font-mono text-11 text-ink-3 truncate">{limitsInBrief(mascot)}</span>
+                <span className="block mt-px text-13 text-ink-2 truncate">{limitsInBrief(mascot)}</span>
             </span>
             {checked && <Check className="size-4 shrink-0 text-ink" strokeWidth={1.75} />}
         </button>

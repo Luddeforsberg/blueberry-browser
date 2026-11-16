@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { finishedWhen, limitsInBrief, shortAge, shortWhen } from "./shortWords";
+import { finishedWhen, firstSentence, limitsInBrief, narrowerLimits, shortAge, shortWhen } from "./shortWords";
 
 // A Sunday afternoon.
 const NOW = new Date(2026, 10, 15, 14, 30).getTime();
@@ -46,10 +46,43 @@ describe("shortAge", () => {
 
 describe("limitsInBrief", () => {
   it("says where and what with its hands", () => {
-    expect(limitsInBrief({ sites: [], tools: ["visit", "click", "type"] })).toBe("goes anywhere · clicks and types");
-    expect(limitsInBrief({ sites: ["svt.se"], tools: ["visit"] })).toBe("only svt.se · reads");
+    expect(limitsInBrief({ sites: [], tools: ["visit", "click", "type"] })).toBe("Goes anywhere · clicks and types");
+    expect(limitsInBrief({ sites: ["svt.se"], tools: ["visit"] })).toBe("Only svt.se · reads");
     expect(limitsInBrief({ sites: ["svt.se", "sr.se"], tools: ["visit", "click"] })).toBe("2 sites · clicks");
-    expect(limitsInBrief({ sites: [], tools: ["type"] })).toBe("the page you’re on · types");
-    expect(limitsInBrief({ sites: [], tools: [] })).toBe("the page you’re on · reads");
+    expect(limitsInBrief({ sites: [], tools: ["type"] })).toBe("This page · types");
+    expect(limitsInBrief({ sites: [], tools: [] })).toBe("This page · reads");
+  });
+});
+
+describe("narrowerLimits", () => {
+  it("says nothing for a mascot as free as Berry", () => {
+    expect(narrowerLimits({ sites: [], tools: ["visit", "click", "type"] })).toBeNull();
+  });
+
+  it("names only what is narrower", () => {
+    expect(narrowerLimits({ sites: [], tools: ["visit"] })).toBe("Reads only");
+    expect(narrowerLimits({ sites: [], tools: [] })).toBe("This page · reads only");
+    expect(narrowerLimits({ sites: ["svt.se"], tools: ["visit", "click", "type"] })).toBe("Only svt.se");
+    expect(narrowerLimits({ sites: ["svt.se", "sr.se"], tools: ["visit", "click"] })).toBe("2 sites · no typing");
+    expect(narrowerLimits({ sites: [], tools: ["visit", "type"] })).toBe("No clicking");
+  });
+});
+
+describe("firstSentence", () => {
+  it("keeps a short first sentence whole", () => {
+    expect(firstSentence("Explains pages.  Then more.")).toBe("Explains pages.");
+    expect(firstSentence("No full stop here")).toBe("No full stop here");
+    expect(firstSentence("")).toBe("");
+  });
+
+  it("cuts a long one at a word, never inside one", () => {
+    const long = "Before a call, I’ll name the company and, if I know them, the people I’m meeting, so read up.";
+    expect(firstSentence(long, 40)).toBe("Before a call, I’ll name the company…");
+    expect(firstSentence("a".repeat(50), 10)).toBe("aaaaaaaaaa…");
+  });
+
+  it("cuts at exactly the limit, and not one before it", () => {
+    expect(firstSentence("one two three", 13)).toBe("one two three");
+    expect(firstSentence("one two three", 12)).toBe("one two…");
   });
 });

@@ -30,7 +30,7 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
     await expect(chrome.getByText(DEMO_LINES.routine)).toBeVisible({ timeout: 20_000 });
     // The newest chat to pick up comes first, then the three that checked out.
     await expect(list().getByRole("listitem")).toHaveCount(4);
-    await expect(list().getByRole("listitem").first()).toContainText("pick up");
+    await expect(list().getByRole("listitem").first()).toContainText("Pick up");
     for (const line of Object.values(DEMO_LINES)) await expect(chrome.getByText(line)).toBeVisible();
     for (const line of REFUSED_LINES) await expect(chrome.getByText(line)).toHaveCount(0);
     // Not just left off the page: only these got past the checks.

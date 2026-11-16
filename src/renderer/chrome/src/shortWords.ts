@@ -35,13 +35,36 @@ export const shortAge = (since: number, now = Date.now()): string => {
     return `${Math.floor(minutes / 1440)}d`
 }
 
-// What a mascot may do, in one mono line: where, then what with its hands. "goes anywhere · clicks and types".
+// What a mascot may do, in one line of words: where, then what with its hands. "Goes anywhere · clicks and types".
 export const limitsInBrief = ({ sites, tools }: Pick<MascotDraft, 'sites' | 'tools'>): string => {
     const visits = tools.includes('visit')
     const clicks = tools.includes('click')
     const types = tools.includes('type')
-    const where =
-        sites.length === 1 ? `only ${sites[0]}` : sites.length > 1 ? `${sites.length} sites` : visits ? 'goes anywhere' : 'the page you’re on'
+    const where = sites.length === 1 ? `Only ${sites[0]}` : sites.length > 1 ? `${sites.length} sites` : visits ? 'Goes anywhere' : 'This page'
     const hands = clicks && types ? 'clicks and types' : clicks ? 'clicks' : types ? 'types' : 'reads'
     return `${where} · ${hands}`
+}
+
+// Only what's narrower than Berry, for the pill on a mascot's row: "This page · reads only", "Reads only". Null for a
+// mascot that may do all Berry may, since there's nothing to say.
+export const narrowerLimits = ({ sites, tools }: Pick<MascotDraft, 'sites' | 'tools'>): string | null => {
+    const visits = tools.includes('visit')
+    const clicks = tools.includes('click')
+    const types = tools.includes('type')
+    const where = sites.length === 1 ? `only ${sites[0]}` : sites.length > 1 ? `${sites.length} sites` : visits ? null : 'this page'
+    const hands = clicks && types ? null : clicks ? 'no typing' : types ? 'no clicking' : 'reads only'
+    const words = [where, hands].filter(Boolean).join(' · ')
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : null
+}
+
+// One line on what a mascot is for: the first sentence of its instructions, cut at a word, never mid-word, when it runs
+// past `max`.
+export const firstSentence = (text: string, max = 90): string => {
+    const flat = text.replace(/\s+/g, ' ').trim()
+    const end = flat.search(/[.!?](\s|$)/)
+    const sentence = end === -1 ? flat : flat.slice(0, end + 1)
+    if (sentence.length <= max) return sentence
+    const cut = sentence.slice(0, max + 1)
+    const space = cut.lastIndexOf(' ')
+    return `${(space > 0 ? cut.slice(0, space) : sentence.slice(0, max)).replace(/[\s,;:·–—-]+$/, '')}…`
 }

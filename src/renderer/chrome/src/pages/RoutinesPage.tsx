@@ -82,11 +82,11 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                                 <span className="min-w-0 flex-1 py-3 flex items-center gap-6">
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate font-medium">{routine.name}</span>
-                                        <span className="mt-0.5 block text-14 text-ink-2 line-clamp-2">
+                                        <span className="mt-0.5 block text-13 text-ink-2 line-clamp-2">
                                             {[routine.schedule, routine.cloudNote ?? routine.lastResult].filter(Boolean).join(' · ')}
                                         </span>
                                     </span>
-                                    <span className="shrink-0 text-14">
+                                    <span className="shrink-0">
                                         <RoutineStatusLabel status={routine.status} />
                                     </span>
                                 </span>

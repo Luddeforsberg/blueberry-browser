@@ -13,6 +13,7 @@ import { Choice, Switch } from '@common/components/Controls'
 import { Cloud } from 'lucide-react'
 import { AccountButton, AccountMenu, Avatar } from '../components/AccountMenu'
 import { RowTile, SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
+import { LABEL } from '@common/components/StatusPill'
 import { SegmentSwitch } from '../components/SegmentSwitch'
 import { WindowPicture } from '../components/WindowPicture'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage, WentWrong } from '../components/ChatMessage'
@@ -243,7 +244,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-4 grid grid-cols-2 gap-4">
                         {[false, true].map((dark) => (
                             <div key={String(dark)} className={cn("p-5 rounded-tile bg-ground text-ink", dark && "dark")}>
-                                <p className="font-mono text-11 text-ink-3">{dark ? 'dark' : 'light'}</p>
+                                <p className={LABEL}>{dark ? 'Dark' : 'Light'}</p>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {PALETTES.map(({ id, label }) => (
                                         <figure key={id} className="w-[60px] flex flex-col items-center gap-1.5">
