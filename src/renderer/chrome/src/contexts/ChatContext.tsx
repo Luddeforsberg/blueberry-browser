@@ -17,6 +17,8 @@ interface ChatContextType {
     isLoading: boolean
     error: string | null
     chatId: string | null
+    // The open chat's name, once it has one.
+    title: string | null
     approval: ChatApproval | null
     // Who the open chat runs as. Null is Berry, and it's also what a chat not started yet has.
     mascotId: string | null
@@ -122,6 +124,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: thread?.partial != null,
         error: thread?.error ?? null,
         chatId,
+        title: thread?.title ?? null,
         approval: thread?.approval ?? null,
         mascotId: thread?.mascotId ?? null,
         pageAccess,

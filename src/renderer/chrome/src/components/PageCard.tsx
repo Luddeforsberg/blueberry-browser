@@ -2,7 +2,8 @@ import React from 'react'
 import { X } from 'lucide-react'
 import { Favicon } from './Favicon'
 
-// The page Berry can see, attached to the composer. Removing it takes the page away from Berry.
+// The page the mascot can see, as a chip at the top of the prompt box: its icon and site, marked as the page in front.
+// Removing it takes the page away from the mascot.
 export const PageCard: React.FC<{
     title: string
     host: string
@@ -12,23 +13,20 @@ export const PageCard: React.FC<{
     <div
         role="group"
         aria-label={`Berry can see ${host}`}
-        className="group/page relative inline-flex max-w-[240px] items-center gap-2.5 p-1.5 pr-4 rounded-tile bg-tray"
+        title={title}
+        className="h-[26px] max-w-full pl-1.5 pr-0.5 inline-flex items-center gap-[7px] rounded-row bg-sheet-2 text-12 text-ink"
     >
-        <span className="size-9 shrink-0 flex items-center justify-center rounded-row bg-sheet border">
-            <Favicon src={favicon} site={host} />
-        </span>
-        <span className="min-w-0 flex flex-col">
-            <span className="text-13 truncate">{title}</span>
-            <span className="text-11 text-ink-2 truncate">{host}</span>
-        </span>
+        <Favicon src={favicon} site={host} />
+        <span className="min-w-0 truncate">{host}</span>
+        <span className="shrink-0 text-ink-3">this page</span>
         <button
             type="button"
             aria-label="Remove this page"
             title="Remove this page"
             onClick={onRemove}
-            className="absolute -top-1.5 -right-1.5 size-5 flex items-center justify-center rounded-full border bg-sheet outline-none opacity-0 group-hover/page:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus transition-opacity"
+            className="size-[22px] shrink-0 flex items-center justify-center rounded-full text-ink-3 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
         >
-            <X className="size-3" />
+            <X className="size-3" strokeWidth={1.5} />
         </button>
     </div>
 )

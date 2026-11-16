@@ -104,7 +104,7 @@ test("find, zoom and the page menu on a web page", async () => {
     await page.locator("p").click({ button: "right", position: { x: 5, y: 5 } });
     await expect.poll(openedMenu).toContain("Ask Berry About This");
     await clickOpened("Ask Berry About This");
-    const composer = chrome.getByPlaceholder("Ask Berry", { exact: true });
+    const composer = chrome.getByPlaceholder("Tell Berry something", { exact: true });
     await expect(composer).toHaveValue("jackdaw one, jackdaw two, jackdaw three");
     await expect(composer).toBeFocused();
     expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats).toEqual([]);

@@ -10,7 +10,7 @@ test("the built app renders its sidebar, toolbar and chat", async () => {
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab("about:blank"));
     await chrome.getByRole("button", { name: "Show Berry" }).click();
-    await expect(chrome.getByPlaceholder("Ask Berry", { exact: true })).toBeVisible();
+    await expect(chrome.getByPlaceholder("Tell Berry something", { exact: true })).toBeVisible();
   } finally {
     await app.close();
   }
