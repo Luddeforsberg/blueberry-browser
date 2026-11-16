@@ -43,7 +43,7 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
                 onClick={() => setOpen(!open)}
                 className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
             >
-                <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
+                <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} strokeWidth={1.75} />
                 Keeping in mind {used.length} things you kept
             </button>
             {open && (

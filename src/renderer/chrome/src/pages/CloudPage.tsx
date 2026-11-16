@@ -77,7 +77,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="h-full flex flex-col">
             <div className="flex items-center gap-3 px-4 py-2 border-b">
-                <Cloud className="size-4 shrink-0 text-ink-2" aria-hidden />
+                <Cloud className="size-4 shrink-0 text-ink-2" aria-hidden strokeWidth={1.75} />
                 <p className="flex-1 min-w-0 truncate text-14">
                     <span className="font-medium">In the cloud</span>
                     <span className="text-ink-2">

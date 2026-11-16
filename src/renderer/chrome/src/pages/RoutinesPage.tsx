@@ -118,7 +118,7 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
     return (
         <>
             <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
-                <ChevronLeft />
+                <ChevronLeft strokeWidth={1.75} />
                 Routines
             </Button>
             <div className="mt-2 flex items-start justify-between gap-6">

@@ -52,7 +52,7 @@ export const Favicon: React.FC<FaviconProps> = ({ src, className, fallback, site
                 />
             );
         }
-        return <Globe className={cn("size-4 shrink-0 text-ink-3", className)} />;
+        return <Globe className={cn("size-4 shrink-0 text-ink-3", className)} strokeWidth={1.75} />;
     }
 
     // Dark icons on a transparent background would vanish in dark mode, so they get a light plate.

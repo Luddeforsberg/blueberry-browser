@@ -17,7 +17,7 @@ export const DownloadRow: React.FC<{
 
     return (
         <li aria-label={download.filename} className="min-h-14 px-5 py-3 flex items-center gap-3">
-            <File className="size-4 shrink-0 text-ink-2" aria-hidden />
+            <File className="size-4 shrink-0 text-ink-2" aria-hidden strokeWidth={1.75} />
             <div className="flex-1 min-w-0">
                 <div className={cn("text-14 truncate", !openable && !active && "text-ink-2")} title={download.filename}>
                     {download.filename}

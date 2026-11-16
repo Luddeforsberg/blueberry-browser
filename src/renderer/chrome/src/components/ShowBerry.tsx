@@ -61,7 +61,7 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
                 </span>
             )}
             <Button size="sm" variant="destructive" className="h-6 px-2.5 text-14" onClick={() => void window.chromeAPI.recording.stop()}>
-                <Square className="size-3 fill-current" aria-hidden />
+                <Square className="size-3 fill-current" aria-hidden strokeWidth={1.75} />
                 Stop
             </Button>
         </div>
@@ -135,7 +135,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
                         {notes.map((step) => (
                             <li key={step.id} className="group flex items-start gap-3 py-1.5">
                                 <span className={cn('mt-1 size-4 shrink-0 flex items-center justify-center', step.kind === 'secret' ? 'text-ink-2' : 'text-ink')}>
-                                    {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden /> : <Pips pattern={TRAIL_MARKS[step.kind]} still />}
+                                    {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden strokeWidth={1.75} /> : <Pips pattern={TRAIL_MARKS[step.kind]} still />}
                                 </span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-15 [overflow-wrap:anywhere]">

@@ -47,7 +47,7 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
                         }}
                         className="w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-tile text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                     >
-                        <span className="size-10 flex items-center justify-center"><Plus className="size-5" /></span>
+                        <span className="size-10 flex items-center justify-center"><Plus className="size-5" strokeWidth={1.75} /></span>
                         <span className="text-13">New</span>
                     </button>
                 </li>

@@ -29,8 +29,8 @@ export const LEADING_SLOT = 'size-5 shrink-0 flex items-center justify-center'
 // have it.
 export const TabIcon: React.FC<{ still?: boolean; large?: boolean; tab: Pick<TabInfo, 'page' | 'favicon' | 'isLoading' | 'berryWorking' | 'trouble'> & { url?: string; workingMascotId?: string | null; loadError?: TabInfo['loadError'] } }> = ({ tab, still, large }) => {
     const { find } = useFlock()
-    if (tab.trouble) return <CircleAlert aria-label={tab.trouble === 'crashed' ? 'Page crashed' : 'Page not responding'} className="size-4 shrink-0 text-ask" />
-    if (tab.loadError) return <CircleAlert aria-label="Page couldn’t load" className="size-4 shrink-0 text-ask" />
+    if (tab.trouble) return <CircleAlert aria-label={tab.trouble === 'crashed' ? 'Page crashed' : 'Page not responding'} className="size-4 shrink-0 text-ask" strokeWidth={1.75} />
+    if (tab.loadError) return <CircleAlert aria-label="Page couldn’t load" className="size-4 shrink-0 text-ask" strokeWidth={1.75} />
     if (tab.berryWorking) return <Berry mood="fetching" size={18} mascot={find(tab.workingMascotId ?? null)} className="-m-px" still={still} />
     if (tab.isLoading) return <span className="size-4 shrink-0 flex items-center justify-center text-ink-2"><Pips pattern="think" /></span>
     if (!tab.page) return <Favicon src={tab.favicon} site={tab.url} className={large ? 'size-[18px] rounded-[5px] text-[10px]' : undefined} />

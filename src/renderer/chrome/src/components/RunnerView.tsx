@@ -30,7 +30,7 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
     return (
         <section aria-label="In the cloud" className="flex flex-col gap-2 animate-fade-in">
             <p className="flex items-center gap-2 text-14">
-                <Cloud aria-hidden className="size-4 text-ink-2" />
+                <Cloud aria-hidden className="size-4 text-ink-2" strokeWidth={1.75} />
                 <span className="font-medium">In the cloud</span>
             </p>
             <p className="text-14 text-ink-2">

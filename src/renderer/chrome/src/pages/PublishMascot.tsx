@@ -189,7 +189,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     if (!mascot) {
         return (
             <>
-                <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft />Your mascots</Button>
+                <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft strokeWidth={1.75} />Your mascots</Button>
                 <p className="mt-4 text-14 text-ink-2">This mascot is no longer one of yours.</p>
             </>
         )
@@ -198,7 +198,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     if (account.status === 'signed-in' && mascot.publishedId && !editing) {
         return (
             <div id="publish-top" className="max-w-2xl mx-auto">
-                <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Your mascots</Button>
+                <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft strokeWidth={1.75} />Your mascots</Button>
                 {/* It lands on the line under the heading with the job done, and the link is the next thing to do. */}
                 <header className="mt-3 flex items-end gap-6 border-b">
                     <div className="min-w-0 flex-1 pb-5 [overflow-wrap:anywhere]">
@@ -216,7 +216,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                             <p className="text-15 font-medium [overflow-wrap:anywhere]">{link}</p>
                             <div className="mt-3 flex flex-wrap gap-2">
                                 <CopyLink link={link} main />
-                                <Button variant="raised" size="sm" onClick={() => void window.chromeAPI.browser.createTab(link)}><ExternalLink />Open it</Button>
+                                <Button variant="raised" size="sm" onClick={() => void window.chromeAPI.browser.createTab(link)}><ExternalLink strokeWidth={1.75} />Open it</Button>
                             </div>
                         </>
                     ) : (
@@ -257,7 +257,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
 
     return (
         <div id="publish-top" className="max-w-2xl mx-auto">
-            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Your mascots</Button>
+            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft strokeWidth={1.75} />Your mascots</Button>
             <h1 className="mt-3 text-20 font-semibold [overflow-wrap:anywhere]">{mascot.publishedId ? `Edit ${mascot.name}’s listing` : `Publish ${mascot.name}`}</h1>
 
             {account.status === 'signed-out' && (

@@ -48,7 +48,7 @@ export const HistoryRow: React.FC<{
                 "opacity-0 group-hover/visit:opacity-100 focus-visible:opacity-100 hover:bg-press hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
             )}
         >
-            <X className="size-3" />
+            <X className="size-3" strokeWidth={1.75} />
         </button>
     </li>
 )
@@ -102,7 +102,7 @@ export const HistoryPage: React.FC = () => {
                 </div>
 
                 <div className="relative mt-6">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-2" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-2" strokeWidth={1.75} />
                     <input
                         type="search"
                         aria-label="Search history"

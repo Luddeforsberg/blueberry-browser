@@ -52,7 +52,7 @@ export const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) =
 
 const InFlock: React.FC = () => (
     <span className="flex items-center gap-1 text-13 text-ink-2">
-        <Check aria-hidden className="size-3.5" />
+        <Check aria-hidden className="size-3.5" strokeWidth={1.75} />
         One of yours
     </span>
 )
@@ -141,7 +141,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
     return (
         <article ref={page} className="max-w-2xl mx-auto">
             <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
-                <ArrowLeft />
+                <ArrowLeft strokeWidth={1.75} />
                 Gallery
             </Button>
             {/* The bird stands on the line under the heading, and the page carries on below it. */}
@@ -228,7 +228,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
 const LinkMissing: React.FC<{ status: GalleryListing['status']; onRetry: () => void; onBack: () => void }> = ({ status, onRetry, onBack }) => (
     <article className="max-w-2xl mx-auto">
         <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
-            <ArrowLeft />
+            <ArrowLeft strokeWidth={1.75} />
             Gallery
         </Button>
         <p className="mt-3 text-14 text-ink-2">From a link you opened</p>
@@ -323,7 +323,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         </div>
                         <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-1">
                             <label className="flex-1 min-w-[200px] max-w-xs h-8 flex items-center gap-2 text-ink-2">
-                                <Search aria-hidden className="size-4 shrink-0" />
+                                <Search aria-hidden className="size-4 shrink-0" strokeWidth={1.75} />
                                 <input
                                     type="search"
                                     aria-label="Search the Gallery"
