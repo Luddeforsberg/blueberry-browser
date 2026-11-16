@@ -195,7 +195,7 @@ export const Composer: React.FC<{
     // Moves the keyboard here each time this changes.
     focusKey?: number
     spellCheck?: boolean
-    // The new tab's box is larger, with 18px words. Everywhere else it's the chat's.
+    // The new tab's box is larger, with room for a longer ask. Everywhere else it's the chat's.
     size?: 'hero' | 'chat'
     // Shown above the text, such as the page Berry can see.
     attachment?: React.ReactNode
@@ -296,7 +296,7 @@ export const Composer: React.FC<{
             onKeyDown={onKeyDown}
             className={cn(
                 'block w-full resize-none bg-transparent text-ink caret-ink outline-none placeholder:text-faint placeholder:transition-opacity placeholder:duration-[120ms]',
-                hero ? 'text-18 min-h-[56px]' : 'text-15 min-h-[34px]',
+                hero ? 'text-15 min-h-[50px]' : 'text-15 min-h-[34px]',
                 quietPlaceholder && 'placeholder:opacity-0'
             )}
         />

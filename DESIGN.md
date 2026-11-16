@@ -167,8 +167,8 @@ Two families, both bundled with the app and never fetched: **Geist** for words, 
 | Size | Family | Used for |
 |---|---|---|
 | 30px, medium, tight | Geist | The greeting on the new tab |
-| 18px | Geist | What you type in the prompt box |
-| 15px, regular or medium | Geist | The title of a card that needs you, what you type in a chat, and every message in one |
+| 18px | Geist | A page's title, such as History or Your mascots |
+| 15px, regular or medium | Geist | The title of a card that needs you, what you type in any prompt box, and every message in a chat |
 | 13px | Geist | Everything else: rows, lists, body text outside a chat |
 | 12px | Geist | Buttons, pills, secondary lines |
 | 11.5px | Geist Mono | Status words, steps, exact words, times |
@@ -429,7 +429,7 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
 One component everywhere: the new tab, the chat as a page, the chat panel. It is a card set into a shell. Mock for the chips and the menu: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 
-- **The card** holds, from the top: chips for what it's been given to read, what you type (18px on the new tab, 15px in a chat), and one row of tools. In a chat the card is 16px in a 20px shell, as an approval is, so the chat's cards read as one family, and its tools are the new tab's size. In a chat the card is `card`, which in dark is a step up from the page so it doesn't sink into it, and what's quiet on it is `card-2`: the +, the page chip and the off Send. The mascot pill stays `sheet`, a step down from the card in dark, so it still reads as a pill. The new tab's card stays `sheet` on the well, where it already stands out. From the left: **+**, a 32px rounded square on the card's quiet fill, where there's something to add, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
+- **The card** holds, from the top: chips for what it's been given to read, what you type, at 15px everywhere, over at least 50px on the new tab and 34px in a chat, and one row of tools. In a chat the card is 16px in a 20px shell, as an approval is, so the chat's cards read as one family, and its tools are the new tab's size. In a chat the card is `card`, which in dark is a step up from the page so it doesn't sink into it, and what's quiet on it is `card-2`: the +, the page chip and the off Send. The mascot pill stays `sheet`, a step down from the card in dark, so it still reads as a pill. The new tab's card stays `sheet` on the well, where it already stands out. From the left: **+**, a 32px rounded square on the card's quiet fill, where there's something to add, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
 - **What it's given to read** is chips at the top of the card: a page, by its icon and site, marked "this page" when it's the one in front, or a file. Each has a ×. No chip means the mascot sees no page. **+** adds one from a menu: This page, An open tab and A file. In a chat, + adds the page in front, as it did. **The new tab has no + until attachments come,** since with no page in front there's nothing yet for it to add, and attaching a tab or a file is a change of its own, because it changes what a mascot can read. Show Berry how starts from the Routines page.
 - **The placeholder names who you're asking:** "Ask Berry, or type an address".
 - **The cloud switch** is there while the cloud can be used. Choosing a mascot set to work in the cloud starts it on Cloud, and the user can switch it back for one message. It goes away for a mascot that only reads the page in front, since that page isn't in the cloud.
