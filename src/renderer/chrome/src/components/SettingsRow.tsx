@@ -6,8 +6,9 @@ import { cn } from '@common/lib/utils'
 // line of explanation, and one control on the right. Anything longer waits behind More, or on a page one step in.
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-// The hairline between two rows starts where the text does, after an icon when the rows have one.
-const BETWEEN = "relative before:content-[''] before:absolute before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden"
+// The hairline between two rows starts where the text does, after an icon when the rows have one, so a row that leads
+// with something sets `before:left-*` to where its text starts.
+export const BETWEEN = "relative before:content-[''] before:absolute before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden"
 
 // An 11px mono label over a group. `trailing` sits at its right, such as a button that adds a row.
 export const SettingsLabel: React.FC<{ id?: string; trailing?: React.ReactNode; children: React.ReactNode }> = ({ id, trailing, children }) => (
@@ -69,7 +70,8 @@ export const SettingsLink: React.FC<{
     title: string
     description?: string
     lead?: React.ReactNode
-    value?: string
+    // A quiet value, which may lead with a small face. It's cut short rather than pushing the name aside.
+    value?: React.ReactNode
     state?: string
     stateOn?: boolean
     onOpen: () => void
@@ -89,7 +91,7 @@ export const SettingsLink: React.FC<{
             <span className="block text-13 text-ink break-words">{title}</span>
             {description && <span className="block mt-0.5 text-12 leading-[1.4] text-ink-2 break-words">{description}</span>}
         </span>
-        {value && <span className="text-12 text-ink-2 whitespace-nowrap">{value}</span>}
+        {value && <span className="min-w-0 max-w-[300px] flex items-center gap-[7px] text-12 text-ink-2 whitespace-nowrap [&>:last-child]:truncate">{value}</span>}
         {state && <span className={cn('font-mono text-11 whitespace-nowrap', stateOn ? 'text-ink' : 'text-ink-3')}>{state}</span>}
         <ChevronRight aria-hidden className="size-[13px] shrink-0 -ml-1 text-faint" strokeWidth={1.5} />
     </button>
@@ -102,13 +104,18 @@ export const RowTile: React.FC<{ children: React.ReactNode }> = ({ children }) =
     </span>
 )
 
+// A quiet way back, naming where it goes.
+export const BackButton: React.FC<{ back: string; onBack: () => void }> = ({ back, onBack }) => (
+    <button type="button" onClick={onBack} className={cn('h-[26px] mx-1.5 mb-2.5 pl-1 pr-2.5 inline-flex items-center gap-1 rounded-row text-12 text-ink-2 transition-colors hover:bg-hover hover:text-ink', FOCUS)}>
+        <ChevronLeft aria-hidden className="size-[13px]" strokeWidth={1.5} />
+        <span><span className="sr-only">Back to </span>{back}</span>
+    </button>
+)
+
 // The top of a page one step in: a quiet way back naming its section, its title, and a line or two on what it is.
 export const StepInHeader: React.FC<{ back: string; onBack: () => void; title: string; children?: React.ReactNode }> = ({ back, onBack, title, children }) => (
     <>
-        <button type="button" onClick={onBack} className={cn('h-[26px] mx-1.5 mb-2.5 pl-1 pr-2.5 inline-flex items-center gap-1 rounded-row text-12 text-ink-2 transition-colors hover:bg-hover hover:text-ink', FOCUS)}>
-            <ChevronLeft aria-hidden className="size-[13px]" strokeWidth={1.5} />
-            <span><span className="sr-only">Back to </span>{back}</span>
-        </button>
+        <BackButton back={back} onBack={onBack} />
         <h2 className="mx-3 mb-3.5 text-18 font-medium">{title}</h2>
         {children && <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-13 leading-[1.45] text-ink-2">{children}</p>}
     </>

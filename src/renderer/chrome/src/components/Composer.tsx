@@ -3,11 +3,12 @@ import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus } from 'lucide-r
 import type { MascotProfile } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
+import { SHELL } from '@common/components/cardShell'
 import { useFlock } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief } from '../shortWords'
-import { blankMascot, setFlockView } from '../flockView'
+import { startMascot } from '../flockView'
 import { MenuRule, MenuSheet, menuRowClass } from './MenuSheet'
 import { AddMenu, type AddMenuOptions } from './AddMenu'
 import { BoxChips, useAddMenu } from './BoxAttachments'
@@ -39,8 +40,7 @@ const MascotMenu: React.FC<{ chosenId: string; above: boolean; onChoose: (id: st
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                    setFlockView({ page: 'form', values: blankMascot() })
-                    void window.chromeAPI.browser.openPage('flock')
+                    startMascot()
                     onClose(false)
                 }}
                 className={cn(menuRowClass(false), 'text-ink-2 hover:text-ink')}
@@ -361,7 +361,7 @@ export const Composer: React.FC<{
     return (
         <div ref={box} className="relative w-full" {...dropHandlers}>
             {/* At chat size it's a 16px card in a 20px shell, as an approval is, so the chat's cards read as one family. */}
-            <div className={cn('bg-tray p-1', dropping ? 'shadow-[inset_0_0_0_1.5px_rgb(var(--ink))]' : 'shadow-[inset_0_0_0_1px_var(--line)]', hero ? 'rounded-shell' : 'rounded-card-shell')}>
+            <div className={cn(dropping ? 'bg-tray p-1 shadow-[inset_0_0_0_1.5px_rgb(var(--ink))]' : SHELL, hero ? 'rounded-shell' : 'rounded-card-shell')}>
                 <div
                     onClick={(event) => {
                         if (!(event.target as Element).closest('button,[role=menu],[role=group]')) textareaRef.current?.focus()

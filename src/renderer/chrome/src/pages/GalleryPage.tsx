@@ -25,11 +25,11 @@ import { TabIcon } from '../components/TabIcon'
 import { HistoryRow } from './HistoryPage'
 import { ChatRow } from '../components/Sidebar'
 import { MascotPerch } from '../components/MascotPerch'
-import { MascotCard, Preview } from './FlockPage'
+import { MascotRow } from './FlockPage'
+import { LimitTags, StepCard } from './MascotSteps'
 import { MascotMemoryView } from './MascotMemory'
 import { MemoryOffersLine, RememberedFacts } from '../components/MemoryInChat'
 import { GalleryCard } from './MascotGalleryPage'
-import { mascotForm } from '../flockView'
 import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
@@ -305,9 +305,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-4 max-w-xl p-2 rounded-prompt border bg-sheet">
                         <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} />
                     </div>
-                    <div className="mt-6 max-w-[248px]">
-                        <ul><MascotCard mascot={SAMPLE_MASCOT} landed={false} onEdit={() => undefined} /></ul>
-                    </div>
+                    <ul className="mt-6 max-w-[620px] rounded-sheet bg-sheet shadow-rim"><MascotRow mascot={SAMPLE_MASCOT} /></ul>
                     <ul className="mt-6 border-t">
                         <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={null} onReview={() => undefined} />
                         <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={SAMPLE_MASCOT} onReview={() => undefined} />
@@ -315,8 +313,17 @@ export const GalleryPage: React.FC = () => {
                         <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: ['visit', 'click', 'type'] } }} copy={null} onReview={() => undefined} />
                         <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: [] } }} copy={null} onReview={() => undefined} />
                     </ul>
-                    <div className="mt-4 max-w-[288px]">
-                        <Preview values={mascotForm(SAMPLE_MASCOT)} mood="curious" onMood={() => undefined} flying={false} />
+                    <div className="mt-6 py-6 rounded-tile bg-well">
+                        <StepCard
+                            mascot={SAMPLE_MASCOT}
+                            mood="rest"
+                            label="limits"
+                            question="Where can I go, and what can I do there?"
+                            hint="I can always read the pages I’m allowed on. I still ask before anything risky, and no limit changes that."
+                            nav={<div className="h-[46px] px-1.5 flex items-center justify-between"><Button variant="outline">Cancel</Button><Button>Save</Button></div>}
+                        >
+                            <LimitTags mascot={SAMPLE_MASCOT} className="justify-center" />
+                        </StepCard>
                     </div>
                 </Section>
 
@@ -492,10 +499,11 @@ export const GalleryPage: React.FC = () => {
                         <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
                         <RememberedFacts used={SAMPLE_FACTS} />
                         <RememberedFacts used={[...SAMPLE_FACTS, { ...SAMPLE_FACTS[0], id: 'gallery-fact-3', text: 'You never buy refurbished.' }]} />
-                        <MascotMemoryView mascot={SAMPLE_MASCOT} facts={[]} onBack={() => undefined} />
+                        <MascotMemoryView mascot={SAMPLE_MASCOT} facts={[]} offers={[]} onBack={() => undefined} />
                         <MascotMemoryView
                             mascot={SAMPLE_MASCOT}
                             facts={SAMPLE_FACTS}
+                            offers={[{ id: 'gallery-offer', mascotId: SAMPLE_MASCOT.id, sourceId: 'gallery-chat', text: 'You only buy from shops with free returns.', site: null }]}
                             onBack={() => undefined}
                         />
                     </div>

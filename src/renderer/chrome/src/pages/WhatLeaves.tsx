@@ -1,6 +1,7 @@
 import React from 'react'
 import { useShell } from '../contexts/ShellContext'
 import { SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
+import { openMascots } from '../flockView'
 
 // Settings > Privacy > What leaves this computer: everything Settings says about what goes where, in one place. It only
 // says. The switches are in Mascots. The longer words have to match `buildDigest` in suggestionDigest.ts and
@@ -54,7 +55,7 @@ export const WhatLeaves: React.FC = () => {
                     title="History, chats, bookmarks, open tabs and settings"
                     description="Open tabs only while Blueberry opens your tabs, and your history apart from what Suggestions sends, if it’s on."
                 />
-                <SettingsLink title="What your mascots remember" value="Your mascots" onOpen={() => void window.chromeAPI.browser.openPage('flock')} />
+                <SettingsLink title="What your mascots remember" value="Your mascots" onOpen={() => openMascots({ page: 'list' })} />
             </SettingsGroup>
         </>
     )

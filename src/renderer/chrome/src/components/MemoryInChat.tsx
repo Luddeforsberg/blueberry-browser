@@ -5,15 +5,12 @@ import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { setFlockView } from '../flockView'
+import { openMascots } from '../flockView'
 import { Berry, useAssistantName } from './Berry'
 
 const MAX_SHOWN = 2
 
-const openMemory = (mascotId: string) => {
-    setFlockView({ page: 'memory', mascotId })
-    void window.chromeAPI.browser.openPage('flock')
-}
+const openMemory = (mascotId: string) => openMascots({ page: 'memory', id: mascotId })
 
 const ChangeIt: React.FC<{ mascotId: string; children: React.ReactNode }> = ({ mascotId, children }) => (
     <button type="button" onClick={() => openMemory(mascotId)} className="rounded-row text-ink outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">

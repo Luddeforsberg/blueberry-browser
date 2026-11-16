@@ -32,8 +32,8 @@ export const useAssistantName = (mascot?: MascotProfile) => {
 }
 
 // A mascot where a page has room for it, such as an empty chat. With Berry hidden there's nothing in its place.
-export const BerrySpot: React.FC<{ size: number; mascot?: MascotProfile }> = ({ size, mascot }) => {
+export const BerrySpot: React.FC<{ size: number; mascot?: MascotProfile; mood?: Mood }> = ({ size, mascot, mood }) => {
     const { settings } = useShell()
 
-    return settings.showBerry ? <Berry size={size} mascot={mascot} /> : null
+    return settings.showBerry ? <Berry size={size} mascot={mascot} mood={mood} /> : null
 }

@@ -1401,7 +1401,7 @@ export class Window {
     ]).popup({ window: this._baseWindow });
   }
 
-  // A web tab goes back in its history. Settings goes back from a page one step in to its section.
+  // A web tab goes back in its history. Settings and the mascots' page go back from a page one step in.
   goBack(tabId: string): boolean {
     const tab = this.tabsMap.get(tabId);
     if (tab instanceof Tab) tab.goBack();
