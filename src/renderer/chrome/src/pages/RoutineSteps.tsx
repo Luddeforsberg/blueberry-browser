@@ -54,7 +54,7 @@ const QUESTIONS: Record<RoutinePart, { question: string; hint?: string; mood: Mo
     when: { question: 'When?', mood: 'rest' },
     who: { question: 'Who does it?', hint: 'Whoever does it keeps to its own instructions and limits.', mood: 'rest' },
     where: { question: 'Where may I go?', hint: 'I can only go where I’m let. I still ask before anything risky, and no limit changes that.', mood: 'rest' },
-    name: { question: 'What’s it called?', hint: 'It was named from what it does. Call it anything you like.', mood: 'rest' }
+    name: { question: 'What’s it called?', hint: 'Call it anything you like. A name you choose is never changed for you.', mood: 'rest' }
 }
 
 const isTime = (time: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time)

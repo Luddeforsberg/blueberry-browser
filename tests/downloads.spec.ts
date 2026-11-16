@@ -86,6 +86,8 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await expect(large.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
   await expect(large.getByText("32.0 KB of 64.0 KB")).toBeVisible();
 
+  // What can be done shows on the row you're on.
+  await large.hover();
   await large.getByRole("button", { name: "Pause large.bin" }).click();
   await expect(large.getByText(/^Paused/)).toBeVisible();
   await large.getByRole("button", { name: "Resume large.bin" }).click();
@@ -118,6 +120,7 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));
   const report = chrome.getByRole("listitem", { name: "report (1).txt" });
+  await report.hover();
   await report.getByRole("button", { name: "Open", exact: true }).click();
   await report.getByRole("button", { name: "Show report (1).txt in folder" }).click();
   const saved = join(folder, "report (1).txt");
@@ -131,6 +134,7 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await page.click("#slow");
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));
   const copy = chrome.getByRole("listitem", { name: "large (1).bin" });
+  await copy.hover();
   await copy.getByRole("button", { name: "Cancel large (1).bin" }).click();
   await expect(copy.getByText("Cancelled")).toBeVisible();
   slow!.destroy();
@@ -149,6 +153,7 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await expect(chrome.getByRole("listitem", { name: "large.bin" }).getByRole("button", { name: "Open", exact: true })).toBeVisible();
   await expect(chrome.getByRole("listitem", { name: "large (1).bin" }).getByText("Cancelled")).toBeVisible();
 
+  await gone.hover();
   await gone.getByRole("button", { name: "Remove report.txt from the list" }).click();
   await expect(gone).toHaveCount(0);
   await app.close();

@@ -56,9 +56,11 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
 
     // Filled in and left for the user to save.
     await row(DEMO_LINES.routine).click();
-    await expect(chrome.getByRole("heading", { name: "New routine" })).toBeVisible();
-    await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Morning stories");
-    await expect(chrome.getByRole("textbox", { name: "Time", exact: true })).toHaveValue("08:15");
+    // The same steps as making one, with its answers filled in.
+    await expect(chrome.getByRole("heading", { name: "What should I do?" })).toBeVisible();
+    await expect(chrome.getByRole("textbox", { name: "What should I do?" })).not.toHaveValue("");
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await expect(chrome.getByLabel("Other time")).toHaveValue("08:15");
     const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
     expect(library.routines).toHaveLength(0);
 

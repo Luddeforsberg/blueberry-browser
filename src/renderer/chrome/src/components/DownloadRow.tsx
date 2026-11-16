@@ -56,7 +56,8 @@ export const DownloadRow: React.FC<{
                     </span>
                 )}
             </span>
-            <span className="relative shrink-0 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            {/* Takes no room until it shows, so the name and the bar use the whole row at rest. Still reachable by keyboard. */}
+            <span className="relative shrink-0 max-w-0 -ml-[13px] flex items-center gap-1.5 overflow-hidden opacity-0 transition-opacity group-hover:max-w-none group-hover:ml-0 group-hover:overflow-visible group-hover:opacity-100 group-focus-within:max-w-none group-focus-within:ml-0 group-focus-within:overflow-visible group-focus-within:opacity-100">
                 {download.state === 'progressing' && download.path && (
                     <Button size="sm" variant="raised" aria-label={`Pause ${download.filename}`} onClick={act('pause')}>Pause</Button>
                 )}
