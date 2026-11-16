@@ -55,11 +55,8 @@ test("a bird offers to remember after a job, keeps it only on Remember, uses it 
   await start.fill(`Find a cable on http://127.0.0.1:${port}/, I always go for the cheapest in stock`);
   await start.press("Enter");
 
-  // One quiet line, folded, with nothing of the fact showing until it's opened.
-  const line = chrome.getByRole("button", { name: "Something I could remember for next time" });
-  await expect(line).toHaveAttribute("aria-expanded", "false");
-  await expect(chrome.getByText(KEPT)).toHaveCount(0);
-  await line.click();
+  // One strip under the reply, for the one fact that passed.
+  const line = chrome.getByRole("list", { name: "Something I could remember for next time" });
   const offer = chrome.getByRole("listitem", { name: "Offer to remember" });
   await expect(offer).toHaveCount(1);
   await expect(offer).toContainText(KEPT);

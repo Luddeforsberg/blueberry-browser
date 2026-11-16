@@ -6,7 +6,7 @@ import { cn } from '@common/lib/utils'
 import { useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { setFlockView } from '../flockView'
-import { useAssistantName } from './Berry'
+import { Berry, useAssistantName } from './Berry'
 
 const MAX_SHOWN = 2
 
@@ -67,42 +67,40 @@ export const RememberedLine: React.FC<{ ids?: string[] }> = ({ ids = [] }) => {
     return used.length > 0 ? <RememberedFacts used={used} /> : null
 }
 
-// A fact a bird could keep, word for word, opened from the quiet line. As quiet as the line itself.
-const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; error?: string; onAnswer: (keep: boolean) => void }> = ({ offer, error, onAnswer }) => (
-    <li aria-label="Offer to remember">
-        <p>{offer.text}{offer.site && <span className="text-12"> Only on {offer.site}</span>}</p>
-        <div className="-ml-2.5 flex items-center">
-            <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => onAnswer(true)}>Remember</Button>
-            <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => onAnswer(false)}>No thanks</Button>
-        </div>
-        {error && <p role="alert" className="text-ask">{error}</p>}
-    </li>
-)
+// A fact a mascot could keep, word for word, on one strip under the reply: the mascot looking curious, the fact,
+// Remember, and No thanks. Leaving it alone is as good as No thanks.
+const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; mascot: MascotProfile; error?: string; onAnswer: (keep: boolean) => void }> = ({ offer, mascot, error, onAnswer }) => {
+    const { showBerry } = useShell().settings
+    return (
+        <li aria-label="Offer to remember">
+            <div className="min-h-11 py-[9px] pl-[11px] pr-[9px] flex flex-wrap items-center gap-x-[9px] gap-y-1.5 rounded-tile bg-sheet-2 text-13 text-ink">
+                {showBerry && <Berry mood="curious" size={24} mascot={mascot} className="shrink-0" />}
+                <p className="min-w-0 flex-1 basis-40">
+                    {offer.text}
+                    {offer.site && <span className="text-12 text-ink-2"> Only on {offer.site}</span>}
+                </p>
+                <span className="ml-auto flex items-center gap-1">
+                    <Button size="sm" variant="outline" className="text-ink" onClick={() => onAnswer(true)}>Remember</Button>
+                    <Button size="sm" variant="ghost" className="px-1.5" onClick={() => onAnswer(false)}>No thanks</Button>
+                </span>
+            </div>
+            {error && <p role="alert" className="mt-1.5 text-13 text-ask">{error}</p>}
+        </li>
+    )
+}
 
-// One line, folded however many there are. Nothing about it waits, counts or asks, so leaving it alone is as good as No thanks.
-export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text' | 'site'>[]; mascot: MascotProfile; kept: boolean; keptBy?: string; errors?: Record<string, string>; startOpen?: boolean; onAnswer: (id: string, keep: boolean) => void }> = ({ offers, mascot, kept, keptBy, errors = {}, startOpen = false, onAnswer }) => {
+// Each fact on its own strip. Nothing about it waits, counts or asks again.
+export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text' | 'site'>[]; mascot: MascotProfile; kept: boolean; keptBy?: string; errors?: Record<string, string>; onAnswer: (id: string, keep: boolean) => void }> = ({ offers, mascot, kept, keptBy, errors = {}, onAnswer }) => {
     const { showBerry } = useShell().settings
     const name = useAssistantName(mascot)
-    const [open, setOpen] = useState(startOpen)
     return (
-        <div className="flex flex-col items-start gap-1.5 text-13 text-ink-2 [overflow-wrap:anywhere] animate-fade-in">
+        <div className="flex flex-col gap-1.5 [overflow-wrap:anywhere] animate-fade-in">
             {offers.length > 0 && (
-                <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setOpen(!open)}
-                    className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                    <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
-                    {showBerry ? 'Something I could remember for next time' : `Something ${name} could remember for next time`}
-                </button>
-            )}
-            {open && offers.length > 0 && (
-                <ul className="pl-5 flex flex-col gap-1.5">
-                    {offers.map((offer) => <MemoryOfferRow key={offer.id} offer={offer} error={errors[offer.id]} onAnswer={(keep) => onAnswer(offer.id, keep)} />)}
+                <ul aria-label={showBerry ? 'Something I could remember for next time' : `Something ${name} could remember for next time`} className="flex flex-col gap-1.5">
+                    {offers.map((offer) => <MemoryOfferRow key={offer.id} offer={offer} mascot={mascot} error={errors[offer.id]} onAnswer={(keep) => onAnswer(offer.id, keep)} />)}
                 </ul>
             )}
-            {kept && <p role="status">Noted. <ChangeIt mascotId={keptBy ?? mascot.id}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
+            {kept && <p role="status" className="text-13 text-ink-2">Noted. <ChangeIt mascotId={keptBy ?? mascot.id}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
         </div>
     )
 }

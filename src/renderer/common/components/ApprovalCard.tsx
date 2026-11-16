@@ -4,49 +4,34 @@ import { Button } from "./Button";
 
 // Exactly what will happen, set apart from the sentence above it, because this is what's being allowed. Never cut.
 export const ExactWords: React.FC<{ children: string; className?: string }> = ({ children, className }) => (
-  <p className={cn("rounded-row bg-sheet-2 dark:bg-tray px-3 py-2 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>{children}</p>
+  <p className={cn("rounded-row bg-sheet-2 px-2.5 py-2 font-mono text-11.5 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]", className)}>{children}</p>
 );
 
-// A mascot saying something that needs an answer, in line with the conversation. In the main chat its bird hangs beside
-// the column, as it does on a reply. With no room there, it takes the start of the line.
-export const MascotSays: React.FC<{
-  label: string;
-  avatar: React.ReactNode;
-  avatarOutside?: boolean;
-  title: React.ReactNode;
-  note?: React.ReactNode;
-  exactly?: string;
-  children: React.ReactNode;
-}> = ({ label, avatar, avatarOutside = false, title, note, exactly, children }) => (
-  <section aria-label={label} className={cn("relative [overflow-wrap:anywhere] animate-fade-in", !avatarOutside && "flex items-start gap-3")}>
-    <div className={cn("shrink-0", avatarOutside && "absolute -left-11 top-0")}>{avatar}</div>
-    <div className="min-w-0 flex-1">
-      <h3 className="text-15">{title}</h3>
-      {note && <p className="mt-1 text-12 text-ink-2 whitespace-pre-wrap">{note}</p>}
-      {exactly && <ExactWords className="mt-2">{exactly}</ExactWords>}
-      <div className="mt-3">{children}</div>
-    </div>
+// Anything you have to answer is a white card in a tray-coloured shell, 4px larger all round, with a line of words in the
+// shell under it where there's something to say (DESIGN.md section 3).
+export const CardInShell: React.FC<{ label: string; note?: React.ReactNode; children: React.ReactNode }> = ({ label, note, children }) => (
+  <section aria-label={label} className="rounded-card-shell bg-tray p-1 shadow-[inset_0_0_0_1px_var(--line)] [overflow-wrap:anywhere] animate-fade-in">
+    <div className="rounded-sheet bg-sheet p-3.5 shadow-card-lift">{children}</div>
+    {note && <p className="min-h-9 pl-3 pr-2.5 py-2 flex items-center gap-2.5 text-12 text-ink-2">{note}</p>}
   </section>
 );
 
 // What a mascot asks before anything that matters: what it would like to do, then exactly what will happen. With no
-// `exactly`, the question already says it word for word.
+// `exactly`, the question already says it word for word. Allow, filled, then Don't allow, in that order everywhere.
 export const ApprovalCard: React.FC<{
-  avatar: React.ReactNode;
-  avatarOutside?: boolean;
   question: React.ReactNode;
   exactly?: string;
   onConfirm: () => void;
   onDeny: () => void;
-}> = ({ avatar, avatarOutside, question, exactly, onConfirm, onDeny }) => (
-  <MascotSays label="Approval needed" avatar={avatar} avatarOutside={avatarOutside} title={question} exactly={exactly}>
-    <div className="flex items-center gap-2">
-      <Button size="sm" onClick={onConfirm}>
-        Allow
-      </Button>
-      <Button size="sm" variant="outline" onClick={onDeny}>
+}> = ({ question, exactly, onConfirm, onDeny }) => (
+  <CardInShell label="Approval needed">
+    <h3 className="mb-[9px] text-15 font-medium text-ink">{question}</h3>
+    {exactly && <ExactWords className="mb-3">{exactly}</ExactWords>}
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Button onClick={onConfirm}>Allow</Button>
+      <Button variant="outline" onClick={onDeny}>
         Don’t allow
       </Button>
     </div>
-  </MascotSays>
+  </CardInShell>
 );

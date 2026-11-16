@@ -224,7 +224,8 @@ export const Composer: React.FC<{
     const box = useRef<HTMLDivElement>(null)
     const pill = useRef<HTMLButtonElement>(null)
     const hero = size === 'hero'
-    const small = !hero
+    // The desktop's box is the only one with smaller tools. In a chat they're the new tab's size.
+    const small = !!bare
     // The last words, kept while the line slides away.
     const [lastLimits, setLastLimits] = useState(limits ?? '')
     useEffect(() => {
@@ -289,7 +290,7 @@ export const Composer: React.FC<{
             onKeyDown={onKeyDown}
             className={cn(
                 'block w-full resize-none bg-transparent text-ink caret-ink outline-none placeholder:text-faint placeholder:transition-opacity placeholder:duration-[120ms]',
-                hero ? 'text-18 min-h-[56px]' : 'text-15 min-h-[30px]',
+                hero ? 'text-18 min-h-[56px]' : 'text-15 min-h-[34px]',
                 quietPlaceholder && 'placeholder:opacity-0'
             )}
         />
@@ -323,15 +324,16 @@ export const Composer: React.FC<{
 
     return (
         <div ref={box} className="relative w-full">
-            <div className="rounded-shell bg-tray p-1 shadow-[inset_0_0_0_1px_var(--line)]">
+            {/* At chat size it's a 16px card in a 20px shell, as an approval is, so the chat's cards read as one family. */}
+            <div className={cn('bg-tray p-1 shadow-[inset_0_0_0_1px_var(--line)]', hero ? 'rounded-shell' : 'rounded-card-shell')}>
                 <div
                     onClick={(event) => {
                         if (!(event.target as Element).closest('button,[role=menu]')) textareaRef.current?.focus()
                     }}
-                    className={cn('relative rounded-prompt bg-sheet shadow-card-lift cursor-text', hero ? 'pt-[18px] pr-3 pb-3 pl-5' : 'pt-3 pr-2 pb-2 pl-4')}
+                    className={cn('relative bg-sheet shadow-card-lift cursor-text', hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4')}
                 >
                     {attachment && <div className="mb-2 -ml-1.5 cursor-default">{attachment}</div>}
-                    <div className={hero ? 'mb-1' : 'mb-1.5'}>{textarea}</div>
+                    <div className={hero ? 'mb-1' : undefined}>{textarea}</div>
                     <div className="-ml-2 flex items-center gap-[7px]">
                         {plusButton}
                         {cloud && <WhereSwitch on={cloud.on} onToggle={cloud.onToggle} small={small} />}

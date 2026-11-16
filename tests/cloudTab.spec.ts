@@ -117,7 +117,7 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
     await expect(goThere).toBeVisible({ timeout: 20_000 });
     // The local test browser's own pictures, and the bird on the window's edge, as there's none in a cloud page.
     await expect(view.locator("img[src^='data:image/jpeg']")).toBeVisible({ timeout: 10_000 });
-    await expect(view.getByRole("status")).toHaveText("Thinking");
+    await expect(view.getByRole("status")).toHaveText("Berry is on 127.0.0.1");
     await expect(chrome.getByText(/Opened/).first()).toBeVisible();
     await shoot(chrome, "cloud-working-view");
 

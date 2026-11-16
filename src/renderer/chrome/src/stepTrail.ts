@@ -3,6 +3,9 @@ import type { ChatStep } from '@shared/library'
 // How many of the latest steps show while a job runs, or where one was cut short.
 const LATEST = 3
 
+// The step a stopped reply ends with, in the words of `STOPPED_STEP` in `Chats.ts`.
+export const STOPPED_STEP = 'Stopped here'
+
 // The user was asked something, the job stayed out of somewhere or it was stopped, which is worth seeing on any trail.
 // The words come from the tools' labels in `browserTools.ts` and from `STOPPED_STEP` in `Chats.ts`.
 const WORTH_KEEPING = /^(Asked you|Stayed off|Left the tab you took over|Stopped here)/

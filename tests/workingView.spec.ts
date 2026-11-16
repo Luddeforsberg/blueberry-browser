@@ -105,7 +105,7 @@ test.describe("the working view", () => {
     await expect(chrome.getByText("All done")).toBeVisible();
     // Its tab closes once it's done, so the view goes with it, and nothing about the picture was kept.
     await expect(view()).toHaveCount(0);
-    await expect(chrome.getByRole("button", { name: "Pages it used (1)" })).toBeVisible();
+    await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(1);
     const saved = await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), chatId);
     const said = JSON.stringify(saved);
     expect(said).not.toContain("data:image");

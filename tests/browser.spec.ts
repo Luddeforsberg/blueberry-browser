@@ -463,7 +463,7 @@ test("a chat with no page opens tabs behind itself, and reaches only those", asy
   expect((await activeTab()).page).toBe("chat");
   // It closed once the job was done, and the reply keeps it.
   expect((await getTabs()).map((tab) => tab.url)).not.toContain(`${origin}/form`);
-  await expect(chrome.getByRole("button", { name: "Pages it used (1)" })).toBeVisible();
+  await expect(chrome.getByRole("list", { name: "Pages it used" }).getByRole("button")).toHaveCount(1);
 });
 
 test("real input in a tab behind the chat, a card naming another site's frame, and a question", async () => {
@@ -1106,9 +1106,10 @@ test("deleting the panel's chat starts it fresh", async () => {
   expect(model.requests.at(-1)?.messages.map((message) => message.role)).toEqual(["system", "user"]);
 });
 
-test("the thinking state shimmers", async () => {
+test("the thinking state says so beside the pips", async () => {
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("gallery"));
-  await expect(chrome.getByRole("status").getByText("Thinking")).toHaveCSS("animation-name", "shimmer");
+  const thinking = chrome.getByRole("status").filter({ hasText: "Thinking.." }).first();
+  await expect(thinking.locator("[data-pips=think]")).toBeVisible();
 });
 
 test("a reply takes over from Thinking in place, and isn't redrawn when it ends", async () => {
@@ -1129,17 +1130,18 @@ test("a reply takes over from Thinking in place, and isn't redrawn when it ends"
   await message.fill("hello");
   await message.press("Enter");
 
-  const berry = chrome.getByRole("img", { name: "Berry, thinking" });
-  await expect(chrome.getByRole("status").getByText("Thinking")).toBeVisible();
+  const status = chrome.getByRole("status").filter({ hasText: "Thinking.." });
+  await expect(status).toBeVisible();
   await fadesDone();
-  const thinking = await berry.boundingBox();
+  const thinking = await status.boundingBox();
 
   releaseStart();
   const words = chrome.getByText("first words");
   await expect(words).toBeVisible();
   await expect(chrome.getByRole("status")).toHaveCount(0);
   await fadesDone();
-  expect(await berry.boundingBox()).toEqual(thinking);
+  // The words start where Thinking was.
+  expect(Math.abs((await words.boundingBox())!.y - thinking!.y)).toBeLessThan(2);
   const reply = await words.elementHandle();
 
   releaseRest();

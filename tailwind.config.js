@@ -47,12 +47,14 @@ module.exports = {
       ...theme("colors"),
       DEFAULT: "rgb(var(--ground))",
     }),
-    // Rows and small chips, tiles and groups, sheets and cards in the chat, menus, the prompt card and its shell.
+    // Rows and small chips, tiles and groups, sheets and cards in the chat and their shell, menus, the prompt card and
+    // its shell.
     borderRadius: {
       none: "0",
       row: "9px",
       tile: "12px",
       sheet: "16px",
+      "card-shell": "20px",
       menu: "22px",
       prompt: "24px",
       shell: "28px",

@@ -10,7 +10,7 @@ import { ApprovalCard } from '@common/components/ApprovalCard'
 import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
-import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
+import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage, WentWrong } from '../components/ChatMessage'
 import { ChatComposer, Composer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
 import { PageTrouble } from '../components/PageTrouble'
@@ -333,14 +333,45 @@ export const GalleryPage: React.FC = () => {
                             content=""
                             isStreaming
                             statusLine="I'll check their careers page and LinkedIn first."
-                            steps={[{ text: 'Opened strawberrybrowser.com/careers', done: false }]}
+                            startedAt={Date.now() - 72_000}
+                            steps={[
+                                { text: 'Opened strawberrybrowser.com/careers', done: true, kind: 'open' },
+                                { text: 'Read strawberrybrowser.com', done: true, kind: 'read' },
+                                { text: 'Clicked something on strawberrybrowser.com', done: true, kind: 'click' },
+                                { text: 'Typed into a field on strawberrybrowser.com', done: false, kind: 'type' },
+                            ]}
                         />
+                        <AssistantMessage content="" isStreaming waiting />
                         <ThinkingMessage />
+                        <AssistantMessage
+                            content="The cheapest direct flight is **KLM at 07:10**, 1 840 kr return."
+                            steps={[
+                                { text: 'Opened klm.com', done: true, kind: 'open' },
+                                { text: 'Read klm.com', done: true, kind: 'read' },
+                                { text: 'Asked you something', done: true, kind: 'ask' },
+                            ]}
+                            pages={[{ url: 'https://www.klm.com/search', title: 'Stockholm to Lisbon' }]}
+                            actions={{ onSay: () => undefined, onSaveAsRoutine: () => undefined }}
+                        />
+                        <AssistantMessage
+                            content=""
+                            steps={[
+                                { text: 'Opened klm.com', done: true, kind: 'open' },
+                                { text: 'Read klm.com', done: true, kind: 'read' },
+                                { text: 'Stopped here', done: true },
+                            ]}
+                            actions={{ onSay: () => undefined }}
+                        />
+                        <WentWrong
+                            message="Couldn't reach the model. Check your connection and try again."
+                            steps={[{ text: 'Opened klm.com', done: true, kind: 'open' }]}
+                            actions={{ onSay: () => undefined }}
+                        />
                         <ChatError message="The model is rate limited right now. Try again in a moment." />
                         <StepTrail
                             steps={[
                                 { text: 'Looked through your history for Lisbon', done: true },
-                                { text: 'Opened norrskenair.com', done: true },
+                                { text: 'Opened norrskenair.com', done: true, kind: 'open' },
                                 { text: 'Comparing three weekends in November', done: false }
                             ]}
                         />
@@ -371,10 +402,10 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Working view">
-                    <div className="mt-16 flex flex-wrap items-start gap-x-8 gap-y-20">
+                    <div className="flex flex-wrap items-start gap-8">
                         {WORK_SAMPLES.map(({ label, view, asking }) => (
-                            <div key={label} className="w-[320px]">
-                                <WorkingView view={view} frames={SAMPLE_FRAMES} mascot={BERRY} approval={asking ? SAMPLE_ASKING : null} aspect={10 / 7} onStop={() => {}} onShowAsking={() => {}} />
+                            <div key={label} className="w-[420px]">
+                                <div className="h-[420px] flex flex-col rounded-sheet bg-well"><WorkingView view={view} frames={SAMPLE_FRAMES} mascot={BERRY} approval={asking ? SAMPLE_ASKING : null} aspect={10 / 7} onHide={() => {}} onShowAsking={() => {}} /></div>
                                 <p className="mt-2 text-11 text-ink-2">{label}</p>
                             </div>
                         ))}
@@ -394,7 +425,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Memory">
                     <div className="max-w-xl flex flex-col gap-6">
                         <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} onAnswer={() => undefined} />
-                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} startOpen errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
                         <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
                         <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
                         <RememberedFacts used={SAMPLE_FACTS} />
@@ -446,8 +477,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Approval card">
                     <div className="max-w-sm">
                         <ApprovalCard
-                            avatar={<Mascot mood="asking" size={32} />}
-                            question={<>I’d like to open <strong className="font-medium">github.com</strong> in a new tab</>}
+                            question="I’d like to open github.com in a new tab"
                             exactly="Open https://github.com/acme/checkout/pull/412?diff=split in a new tab"
                             onConfirm={() => undefined}
                             onDeny={() => undefined}
