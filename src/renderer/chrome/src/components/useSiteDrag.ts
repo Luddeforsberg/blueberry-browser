@@ -43,9 +43,14 @@ export interface SiteDrag {
     over: { list: SavedSiteList; index: number; mark: Box } | null
 }
 
+// How each list lays its sites out: in the sidebar the tiles read in rows and the bookmarks go one under another; in the
+// horizontal bookmarks bar both run along one row.
+export type SiteLayouts = Record<SavedSiteList, 'tiles' | 'rows'>
+const SIDEBAR_LAYOUTS: SiteLayouts = { favourites: 'tiles', bookmarks: 'rows' }
+
 // Dragging saved sites between the tiles on top and the bookmarks, and along either. Each list marks itself with
 // `zone`, and each site in it with `data-saved-site`. On release the site goes to main at its new place.
-export const useSiteDrag = (onPlace: (id: string, list: SavedSiteList, index: number) => void) => {
+export const useSiteDrag = (onPlace: (id: string, list: SavedSiteList, index: number) => void, layouts: SiteLayouts = SIDEBAR_LAYOUTS) => {
     const zones = useRef<Partial<Record<SavedSiteList, HTMLElement | null>>>({})
     const [drag, setDrag] = useState<SiteDrag | null>(null)
     const stopListening = useRef<() => void>(undefined)
@@ -58,7 +63,7 @@ export const useSiteDrag = (onPlace: (id: string, list: SavedSiteList, index: nu
             if (!zone) continue
             const area = zone.getBoundingClientRect()
             if (x < area.left - ZONE_MARGIN || x > area.right + ZONE_MARGIN || y < area.top - ZONE_MARGIN || y > area.bottom + ZONE_MARGIN) continue
-            const layout = list === 'favourites' ? 'tiles' : 'rows'
+            const layout = layouts[list]
             const boxes = [...zone.querySelectorAll<HTMLElement>('[data-saved-site]')]
                 .filter((element) => element.dataset.savedSite !== id)
                 .map((element) => element.getBoundingClientRect())

@@ -92,7 +92,13 @@ describe("computeLayout", () => {
 
     expect(computeLayout(size, both).menuButton).toEqual({ x: 0, y: 0, width: 0, height: 0 });
     expect(computeLayout(size, { ...both, platform: "win32" }).menuButton).toEqual({ x: 1106, y: 8, width: 32, height: 32 });
-    expect(computeLayout(size, { ...both, platform: "win32", mode: "horizontal" }).menuButton).toEqual({ x: 1106, y: 4, width: 32, height: 32 });
+    // In the horizontal layout it's at the toolbar's end instead, so the tab row keeps only the system's buttons clear.
+    const horizontal = { ...both, platform: "win32" as const, mode: "horizontal" as const };
+    expect(computeLayout(size, horizontal).menuButton).toEqual({ x: 1240, y: 48, width: 32, height: 32 });
+    expect(computeLayout(size, { ...horizontal, platform: "darwin" }).menuButton.width).toBe(0);
+    expect(computeLayout(size, horizontal).controls).toEqual({ x: 1142, y: 0, width: 138, height: 42 });
+    expect(computeLayout(size, { ...horizontal, platform: "linux" }).controls.width).toBe(0);
+    expect(computeLayout(size, { ...horizontal, platform: "darwin" }).controls).toEqual({ x: 0, y: 0, width: 80, height: 42 });
     // Linux has no window buttons here, so it's in the corner.
     expect(computeLayout(size, { ...both, platform: "linux" })).toMatchObject({
       controls: { x: 1240, width: 40 },
@@ -130,7 +136,7 @@ describe("computeLayout", () => {
     }
   });
 
-  it("puts a tab row above the toolbar in horizontal mode, with no sidebar", () => {
+  it("puts a tab row and a toolbar above the page in horizontal mode, with no sidebar, and a bookmarks bar only with something saved", () => {
     const layout = computeLayout(
       { width: 1280, height: 800 },
       { ...both, mode: "horizontal" }
@@ -138,13 +144,28 @@ describe("computeLayout", () => {
 
     expect(layout.sidebarOpen).toBe(false);
     expect(layout.floatingSidebar.width).toBe(0);
-    expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 1280, height: 40 });
-    expect(layout.toolbar).toEqual({ x: 0, y: 40, width: 1280, height: 84 });
-    // The bookmarks bar is under the address row.
-    expect(layout.addressRow).toEqual({ x: 0, y: 40, width: 1280, height: 48 });
-    expect(layout.page).toEqual({ x: 8, y: 124, width: 896, height: 668 });
-    expect(layout.chat).toEqual({ x: 912, y: 124, width: 360, height: 668 });
-    expect(layout.controls.height).toBe(40);
+    expect(layout.tabStrip).toEqual({ x: 0, y: 0, width: 1280, height: 42 });
+    expect(layout.toolbar).toEqual({ x: 0, y: 42, width: 1280, height: 44 });
+    expect(layout.addressRow).toEqual({ x: 0, y: 42, width: 1280, height: 44 });
+    expect(layout.page).toEqual({ x: 8, y: 86, width: 896, height: 706 });
+    expect(layout.chat).toEqual({ x: 912, y: 86, width: 360, height: 706 });
+    expect(layout.controls.height).toBe(42);
+    // Chats and a mascot's card open over everything under the toolbar's own row.
+    expect(layout.popover).toEqual({ x: 0, y: 86, width: 1280, height: 714 });
+
+    const saved = computeLayout({ width: 1280, height: 800 }, { ...both, mode: "horizontal", savedSites: true });
+    // The bookmarks bar is under the address row, and the popover area starts above it, so it covers the bar too.
+    expect(saved.toolbar).toEqual({ x: 0, y: 42, width: 1280, height: 74 });
+    expect(saved.addressRow).toEqual({ x: 0, y: 42, width: 1280, height: 44 });
+    expect(saved.page).toEqual({ x: 8, y: 116, width: 896, height: 676 });
+    expect(saved.popover).toEqual({ x: 0, y: 86, width: 1280, height: 714 });
+  });
+
+  it("leaves the vertical layout as it was, with nothing to open over the page, whatever's saved", () => {
+    const layout = computeLayout({ width: 1280, height: 800 }, { ...both, savedSites: true });
+    expect(layout.toolbar).toEqual({ x: 240, y: 0, width: 1040, height: 48 });
+    expect(layout.page.y).toBe(48);
+    expect(layout.popover).toEqual({ x: 0, y: 0, width: 0, height: 0 });
   });
 
   it("uses resized panel widths, kept within their limits", () => {

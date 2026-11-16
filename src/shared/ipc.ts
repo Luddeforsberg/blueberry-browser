@@ -271,6 +271,16 @@ export interface Rect {
 }
 
 // Where each region of the window goes, in window coordinates. Closed regions have no size.
+// In the horizontal layout, what opens over the page from the toolbar: Chats, or a mascot's card. `anchor` is what was
+// pressed, in the window, for the panel to open under.
+export type Popover = { kind: "chats"; anchor: Rect } | { kind: "mascot"; mascotId: string; anchor: Rect };
+
+// What's open over the page, and when it closed, whether the keyboard goes back to what opened it.
+export interface PopoverState {
+  shown: Popover | null;
+  refocus: boolean;
+}
+
 export interface Layout {
   mode: LayoutMode;
   sidebarOpen: boolean;
@@ -288,6 +298,8 @@ export interface Layout {
   toolbar: Rect;
   // The toolbar's row of buttons and address, which the sidebar's and chat panel's own buttons line up with.
   addressRow: Rect;
+  // Horizontal only: where Chats and a mascot's card open, over the page. Empty in the vertical layout.
+  popover: Rect;
   chat: Rect;
   page: Rect;
   // The page's size, all but one pixel outside the window, for a tab Berry works in behind the user's.
@@ -441,6 +453,8 @@ export interface InvokeChannels {
   "layout:app-menu": { region: "chrome"; args: []; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
+  "overlay:open-popover": { region: "chrome"; args: [popover: Popover]; result: void };
+  "overlay:close-popover": { region: "chrome" | "overlay"; args: [refocus: boolean]; result: void };
   "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
@@ -619,6 +633,7 @@ export interface EventChannels {
   "gallery:linked": string;
   "toolbar:focus-address": null;
   "overlay:visibility": boolean;
+  "overlay:popover": PopoverState;
   "recording:updated": RecordingState;
   "work:updated": WorkView | null;
   "work:frame": WorkFrame;
@@ -672,6 +687,9 @@ export interface LayoutAPI {
   showFloatingSidebar: () => Promise<void>;
   hideFloatingSidebar: () => Promise<void>;
   onFloatingSidebarVisibility: (callback: (visible: boolean) => void) => Unsubscribe;
+  openPopover: (popover: Popover) => Promise<void>;
+  closePopover: (refocus: boolean) => Promise<void>;
+  onPopover: (callback: (state: PopoverState) => void) => Unsubscribe;
   onLayoutUpdated: (callback: (layout: Layout) => void) => Unsubscribe;
 }
 

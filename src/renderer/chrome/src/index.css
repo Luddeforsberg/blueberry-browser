@@ -49,6 +49,24 @@
   height: 100vh;
 }
 
+/* The tab row's hairline between two neighbours, unless either is in front or hovered (DESIGN.md section 10). */
+.tab-row > li + li::before {
+  content: "";
+  position: absolute;
+  left: -1.5px;
+  top: 9px;
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+}
+
+.tab-row > li[data-active]::before,
+.tab-row > li[data-active] + li::before,
+.tab-row > li:hover::before,
+.tab-row > li:hover + li::before {
+  display: none;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

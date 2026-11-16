@@ -68,6 +68,9 @@ const chromeAPI: ChromeAPI = {
     showFloatingSidebar: () => invoke("overlay:show-sidebar"),
     hideFloatingSidebar: () => invoke("overlay:hide"),
     onFloatingSidebarVisibility: (callback) => subscribe("overlay:visibility", callback),
+    openPopover: (popover) => invoke("overlay:open-popover", popover),
+    closePopover: (refocus) => invoke("overlay:close-popover", refocus),
+    onPopover: (callback) => subscribe("overlay:popover", callback),
     onLayoutUpdated: (callback) => subscribe("layout:updated", callback),
   },
   theme: {

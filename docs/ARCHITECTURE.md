@@ -38,9 +38,9 @@ flowchart LR
 
 ## Windows, views and the layout
 
-A window is a `BaseWindow` holding a stack of `WebContentsView`s ([src/main/Window.ts](../src/main/Window.ts)). At the bottom is one window-sized chrome view, which draws the sidebar or tab row, the toolbar, the chat panel and the glass. Above it is one view per tab, with no preload and no Node access. On top sit small views for anything that floats over a page: the collapsed sidebar when it slides out ([src/main/Window.ts](../src/main/Window.ts)), the find bar ([src/main/FindBar.ts](../src/main/FindBar.ts)) and the site permission prompt ([src/main/PermissionPromptView.ts](../src/main/PermissionPromptView.ts)).
+A window is a `BaseWindow` holding a stack of `WebContentsView`s ([src/main/Window.ts](../src/main/Window.ts)). At the bottom is one window-sized chrome view, which draws the sidebar or tab row, the toolbar, the chat panel and the glass. Above it is one view per tab, with no preload and no Node access. On top sit small views for anything that floats over a page: the collapsed sidebar when it slides out, and in the horizontal layout Chats and a mascot's card opened from the toolbar, both in the overlay view ([src/main/Window.ts](../src/main/Window.ts)), the find bar ([src/main/FindBar.ts](../src/main/FindBar.ts)) and the site permission prompt ([src/main/PermissionPromptView.ts](../src/main/PermissionPromptView.ts)).
 
-Views stack by order, so CSS in the chrome can never draw over a page. That's why floating things get views of their own, each only as large as what it shows.
+Views stack by order, so CSS in the chrome can never draw over a page. That's why floating things get views of their own, each only as large as what it shows, except what opens from the horizontal toolbar: its view covers everything under the toolbar, so a press outside the panel closes it.
 
 Every chrome view loads the same React renderer in [src/renderer/chrome](../src/renderer/chrome), with a `view` parameter saying which part to draw ([src/main/chromeView.ts](../src/main/chromeView.ts)). Internal pages, such as the new tab page, Flock, Routines, Needs you and Settings, open as tabs with no web view, drawn by the chrome on the same card a web page sits on.
 

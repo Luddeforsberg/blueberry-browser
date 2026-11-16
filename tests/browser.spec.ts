@@ -1264,7 +1264,8 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect
     .poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
-    .toEqual([width - 16, height - 40 - 84 - 8]);
+    // The tab row and the toolbar, and no bookmarks bar with nothing saved.
+    .toEqual([width - 16, height - 42 - 44 - 8]);
   expect(
     await app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("horizontal-tabs")?.checked)
   ).toBe(true);
@@ -1319,10 +1320,15 @@ test("off a Mac, the menu button opens the app's own menu just under itself", as
 
   for (const layoutMode of ["vertical", "horizontal"] as const) {
     await chrome.evaluate((layoutMode) => window.chromeAPI.settings.updateSettings({ layoutMode }), layoutMode);
-    const { menuButton, controls } = await chrome.evaluate(() => window.chromeAPI.layout.getLayout());
-    // Where the layout puts it, inside the room kept clear left of the window buttons.
+    const { menuButton, controls, toolbar, addressRow } = await chrome.evaluate(() => window.chromeAPI.layout.getLayout());
+    // Where the layout puts it: inside the room kept clear left of the window buttons, or ending the horizontal toolbar.
     await expect.poll(() => button.boundingBox()).toEqual(menuButton);
-    expect(menuButton.x).toBeGreaterThanOrEqual(controls.x);
+    if (layoutMode === "vertical") expect(menuButton.x).toBeGreaterThanOrEqual(controls.x);
+    else {
+      expect(menuButton.x + menuButton.width).toBe(toolbar.width - 8);
+      expect(menuButton.y).toBeGreaterThanOrEqual(addressRow.y);
+      expect(menuButton.y + menuButton.height).toBeLessThanOrEqual(addressRow.y + addressRow.height);
+    }
     await app.evaluate(() => void ((globalThis as { popped?: unknown }).popped = null));
     await button.click();
     await expect
@@ -1645,7 +1651,7 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   await chrome.mouse.up();
   await expect.poll(tabOrder).toEqual(["/b", "new-tab", "/a"]);
 
-  // The active tab is wider than the others in the row, so a drop goes by each tab's own size.
+  // Back to the start, and then just past half of the third tab. With room, the tabs are all as wide as they get.
   const back = (await strip.nth(2).boundingBox())!;
   await chrome.mouse.move(back.x + 20, back.y + back.height / 2);
   await chrome.mouse.down();
@@ -1654,8 +1660,6 @@ test("dragging a tab reorders it in both layouts, and a short press only selects
   await expect.poll(tabOrder).toEqual(["/a", "/b", "new-tab"]);
   const wide = (await strip.nth(0).boundingBox())!;
   const third = (await strip.nth(2).boundingBox())!;
-  expect(wide.width).toBeGreaterThan(third.width);
-  // Just past half of the third tab, which is less than one and a half of the wide tab's widths.
   const along = third.x + third.width / 2 - (wide.x + wide.width) + 10;
   await chrome.mouse.move(wide.x + 20, wide.y + wide.height / 2);
   await chrome.mouse.down();
@@ -1746,14 +1750,20 @@ test("Hide Berry swaps the character for a plain icon and neutral words", async 
   await expect(chrome.getByRole("textbox", { name: "Search, enter a URL, or ask a question" })).toBeVisible();
 });
 
-test("bookmarks are in the sidebar when vertical and under the address bar when horizontal", async () => {
+test("bookmarks are in the sidebar when vertical, and in a bar under the toolbar when horizontal, only with something saved", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
   await expect(sidebar.getByRole("list", { name: "Bookmarks" })).toBeVisible();
   await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveCount(1);
 
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
   await expect(sidebar).toHaveCount(0);
-  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toBeVisible();
+  // Nothing saved, so no bar, and the page starts under the toolbar.
+  await expect(chrome.getByRole("list", { name: "Bookmarks" })).toHaveCount(0);
+  const before = (await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).page.y;
+  await openFixture();
+  await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
+  await expect(chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "Fixture" })).toBeVisible();
+  await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).page.y).toBe(before + 30);
 });
 
 test("right-clicking Berry beside the greeting opens its menu", async () => {

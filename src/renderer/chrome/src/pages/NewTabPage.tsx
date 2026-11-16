@@ -275,8 +275,9 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 </ul>
                             </section>
                         )}
-                        {/* With no sidebar, the pages it leads to are here. */}
-                        {!layout.sidebarOpen && (
+                        {/* With the sidebar collapsed, the pages it leads to are here. The horizontal layout has Chats and the
+                            dock in its toolbar instead. */}
+                        {layout.mode === 'vertical' && !layout.sidebarOpen && (
                             <nav aria-label="Places" className="flex flex-wrap justify-center gap-1">
                                 {([['needs-you', 'Needs you'], ['routines', 'Routines'], ['flock', 'Your mascots'], ['settings', 'Settings']] as const).map(([page, words]) => (
                                     <Button key={page} variant="ghost" size="sm" onClick={() => void browser.openPage(page)}>{words}</Button>

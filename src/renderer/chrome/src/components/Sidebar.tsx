@@ -53,7 +53,7 @@ const useMinute = () => {
 
 // --- Tabs -----------------------------------------------------------------------------------------------------------
 
-const sameSite = (a: string, b: string) => {
+export const sameSite = (a: string, b: string) => {
     try {
         return new URL(a).hostname === new URL(b).hostname
     } catch {
@@ -61,12 +61,12 @@ const sameSite = (a: string, b: string) => {
     }
 }
 
-const savedSiteMenu = (event: React.MouseEvent, site: Bookmark) => {
+export const savedSiteMenu = (event: React.MouseEvent, site: Bookmark) => {
     event.preventDefault()
     void window.chromeAPI.library.showBookmarkMenu(site.id)
 }
 
-type SiteDragging = ReturnType<typeof useSiteDrag>
+export type SiteDragging = ReturnType<typeof useSiteDrag>
 
 // Bookmarks kept on top, as tiles four to a row. The one whose site is in front looks selected, like the tab, and
 // pressing one goes to its tab if it's open. With none, there's nothing here, until a bookmark is dragged up.
@@ -170,7 +170,7 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
 
 // What follows the pointer while a saved site is dragged, and the line where it would land. Fixed, so neither moves
 // anything else.
-const SiteDragGhost: React.FC<{ drag: SiteDragging['drag'] }> = ({ drag }) => {
+export const SiteDragGhost: React.FC<{ drag: SiteDragging['drag'] }> = ({ drag }) => {
     const { pinned } = useLibrary()
     if (!drag) return null
     // The empty place on top lights up instead.
@@ -321,7 +321,9 @@ export const ChatRow: React.FC<{
     )
 }
 
-const ChatsFace: React.FC = () => {
+// Also what Chats opens over the page in the horizontal layout, so the two are one list. There it's on a sheet already,
+// so what needs you sits on `sheet-2` rather than a sheet of its own.
+export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) => {
     const library = useLibrary()
     const { find } = useFlock()
     const { activeTab } = useBrowser()
@@ -362,7 +364,7 @@ const ChatsFace: React.FC = () => {
                             const mascot = find(item.mascotId)
                             return (
                                 <li key={item.id}>
-                                    <div className={cn(ROW, 'pr-1 bg-sheet text-ink shadow-rim')}>
+                                    <div className={cn(ROW, 'pr-1 text-ink', onSheet ? 'bg-sheet-2' : 'bg-sheet shadow-rim')}>
                                         <span className={LEAD}><Berry mood="asking" size={20} mascot={mascot} /></span>
                                         <span className="flex-1 truncate">{item.job}</span>
                                         <button
@@ -453,7 +455,7 @@ const ChatsFace: React.FC = () => {
 // --- The dock -------------------------------------------------------------------------------------------------------
 
 // What a mascot's face says in the dock: asking, working, or at rest.
-const useMascotState = () => {
+export const useMascotState = () => {
     const library = useLibrary()
     return (mascot: MascotProfile) => {
         const ownChats = library.chats.filter((chat) => (chat.mascotId ?? BERRY_ID) === mascot.id)
@@ -465,8 +467,8 @@ const useMascotState = () => {
 }
 
 // Pressing a mascot in the dock opens this: who it is, what it may do, what it's doing, and a way to start a chat with
-// it. It shows, it doesn't choose.
-const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ mascot, onClose }) => {
+// it. It shows, it doesn't choose. In the sidebar it sits above the dock; over the page, where `className` places it.
+export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; className?: string }> = ({ mascot, onClose, className = 'absolute inset-x-0 bottom-[54px] z-20' }) => {
     const stateOf = useMascotState()
     const { mood, asking, running, recent } = stateOf(mascot)
     const name = useAssistantName(mascot)
@@ -487,7 +489,7 @@ const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void }> = ({ 
             onKeyDown={(event) => {
                 if (event.key === 'Escape') onClose()
             }}
-            className="absolute inset-x-0 bottom-[54px] z-20 p-3 rounded-sheet bg-sheet text-ink shadow-lift animate-[fade-in_150ms_cubic-bezier(.2,.8,.2,1)] app-region-no-drag"
+            className={cn(className, 'p-3 rounded-sheet bg-sheet text-ink shadow-lift animate-[fade-in_150ms_cubic-bezier(.2,.8,.2,1)] app-region-no-drag')}
         >
             <div className="flex items-center gap-2.5">
                 {/* Still, as only the working mascot's own row moves in the sidebar. */}
@@ -626,7 +628,8 @@ const Dock: React.FC = () => {
     )
 }
 
-const DockMascot: React.FC<{ mascot: MascotProfile; mood: 'asking' | 'fetching' | 'rest'; open: boolean; onPress: () => void }> = ({ mascot, mood, open, onPress }) => {
+// In the sidebar's dock a face is 26px in a 28px place; in the horizontal toolbar's, 22px in 24px.
+export const DockMascot: React.FC<{ mascot: MascotProfile; mood: 'asking' | 'fetching' | 'rest'; open: boolean; onPress: (button: HTMLButtonElement) => void; small?: boolean }> = ({ mascot, mood, open, onPress, small = false }) => {
     const name = useAssistantName(mascot)
     return (
         <button
@@ -635,11 +638,11 @@ const DockMascot: React.FC<{ mascot: MascotProfile; mood: 'asking' | 'fetching' 
             aria-label={`${name}${mood === 'asking' ? ', needs you' : mood === 'fetching' ? ', working' : ''}`}
             aria-expanded={open}
             aria-haspopup="dialog"
-            onClick={onPress}
-            className={cn('size-7 flex items-center justify-center rounded-row transition-colors hover:bg-hover app-region-no-drag', open && 'bg-press', FOCUS)}
+            onClick={(event) => onPress(event.currentTarget)}
+            className={cn(small ? 'size-6 rounded-[7px]' : 'size-7 rounded-row', 'flex items-center justify-center transition-colors hover:bg-hover app-region-no-drag', open && 'bg-press', FOCUS)}
         >
             {/* The dock's faces stay still: in the sidebar only the working mascot's own row moves. */}
-            <Berry mood={mood} size={26} mascot={mascot} still />
+            <Berry mood={mood} size={small ? 22 : 26} mascot={mascot} still />
         </button>
     )
 }

@@ -9,6 +9,10 @@ import { Berry } from './Berry'
 import { Pips } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 
+// A tab in the row at its widest, and the space between two.
+const ROW_TAB_MAX = 196
+const ROW_TAB_GAP = 2
+
 // Below this a tab in the row only has room for its icon, so the title goes rather than showing a letter or two.
 const ICON_ONLY_WIDTH = 72
 
@@ -44,17 +48,19 @@ const TabItem: React.FC<{
     <li
         ref={item}
         data-berry-tab={tab.id}
+        data-active={tab.isActive || undefined}
         onPointerDown={onPress}
         onDragStart={(e) => e.preventDefault()}
         style={style}
         className={cn(
-            "group/tab flex items-center h-[30px] pr-1 rounded-row text-ink-2 transition-colors app-region-no-drag",
-            iconOnly ? "pl-1.5 gap-1" : "pl-2 gap-[9px]",
-            row && "flex-1 min-w-[60px] max-w-56",
-            // Only the active tab always shows its close button, so it starts that much wider than the others, and its
-            // title gets as much room.
-            row && tab.isActive && "basis-[44px] max-w-[calc(theme(maxWidth.56)+24px)]",
-            tab.isActive ? "bg-sheet text-ink shadow-rim" : "hover:bg-hover hover:text-ink",
+            "group/tab flex items-center pr-1 rounded-row text-ink-2 transition-colors app-region-no-drag",
+            row ? "relative h-8" : "h-[30px]",
+            iconOnly ? "pl-1.5 gap-1" : row ? "pl-2.5 gap-2" : "pl-2 gap-[9px]",
+            // In the row they take equal shares up to 196px, down to an icon's 36. The one in front keeps room for its name.
+            row && "flex-[1_1_196px] min-w-9 max-w-[196px]",
+            // Its close button always shows, so it gives way at half the others' rate, and its title keeps up with theirs.
+            row && tab.isActive && "min-w-[120px] shrink-[0.5]",
+            tab.isActive ? "bg-sheet text-ink shadow-rim" : row ? "hover:bg-tray hover:text-ink" : "hover:bg-hover hover:text-ink",
             shifting && "transition-transform",
             dragged && "relative z-10 shadow-lift"
         )}
@@ -153,6 +159,52 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
     )
 }
 
+// The tab row's version of the job block: a tray-toned group with the mascot's face and the job's name, then its tabs,
+// and the waiting pips in `ask` at its end while it needs you. Pressing the face or the name opens the chat.
+const JobGroupRow: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: TabInfo[] }> = ({ chatId, chatTab, tabs }) => {
+    const { chats, needsYou } = useLibrary()
+    const { find } = useFlock()
+    const { switchTab } = useBrowser()
+    const chat = chats.find(({ id }) => id === chatId)
+    const mascot = find(chat?.mascotId ?? null)
+    const asking = needsYou.some(({ id }) => id === chatId)
+    const title = chat?.title ?? chatTab?.title ?? 'A job'
+    const open = () => (chatTab ? void switchTab(chatTab.id) : void window.chromeAPI.browser.openPage('chat', { param: chatId, title }))
+    const focus = "outline-none focus-visible:ring-2 focus-visible:ring-focus app-region-no-drag"
+
+    return (
+        <li aria-label={`${title}, ${asking ? `${mascot.name} needs you` : `${mascot.name} is working`}`} className="h-9 mx-[3px] pl-1 pr-0.5 min-w-0 shrink flex items-center gap-0.5 rounded-tile bg-tray">
+            <button
+                type="button"
+                aria-current={chatTab?.isActive ? 'page' : undefined}
+                onClick={open}
+                className={cn("h-[30px] pl-1 pr-2 min-w-0 shrink-0 flex items-center gap-[7px] rounded-row text-13 text-ink", chatTab?.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover", focus)}
+            >
+                <Berry mood={asking ? 'asking' : 'fetching'} size={20} mascot={mascot} />
+                <span className="max-w-[124px] truncate">{title}</span>
+            </button>
+            <ul aria-label={`Pages ${mascot.name} opened`} className="min-w-0 flex items-center gap-0.5">
+                {tabs.map((tab) => (
+                    <li key={tab.id} className="min-w-9 flex-[0_1_136px]">
+                        <button
+                            type="button"
+                            aria-current={tab.isActive ? 'page' : undefined}
+                            title={tab.title || 'New tab'}
+                            onClick={() => !tab.isActive && void switchTab(tab.id)}
+                            className={cn("w-full h-[30px] px-2.5 flex items-center gap-2 rounded-row text-13", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink", focus)}
+                        >
+                            {/* The group's face is what moves while the job works. */}
+                            <span className={LEADING_SLOT}><TabIcon tab={tab} still /></span>
+                            <span className="flex-1 min-w-0 truncate">{tab.title || 'New tab'}</span>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            {asking && <Pips pattern="waiting" className="mx-1.5 shrink-0 text-ask" />}
+        </li>
+    )
+}
+
 // One tab list for both layouts: a column in the sidebar, a row in the horizontal tab strip.
 // The sidebar puts its new tab button in the section heading, so it passes showNew={false}.
 export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: string; showNew?: boolean }> = ({
@@ -163,11 +215,11 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
 }) => {
     const { tabs: allTabs, createTab, closeTab, switchTab, moveTab, moveTabBy } = useBrowser()
     const vertical = mode === 'vertical'
-    // In the sidebar a running job's tabs show in a group under its chat, and that chat's own tab heads the group. The
-    // tab row has no groups, so it shows them all.
+    // A running job's tabs show in a group of their own, and that chat's own tab heads the group: under its chat in the
+    // sidebar, and after the user's tabs in the row.
     const jobs = [...new Set(allTabs.flatMap((tab) => (tab.jobChatId ? [tab.jobChatId] : [])))]
     const heads = (tab: TabInfo) => tab.page === 'chat' && !!tab.pageParam && jobs.includes(tab.pageParam)
-    const tabs = vertical ? allTabs.filter((tab) => !tab.jobChatId && !heads(tab)) : allTabs
+    const tabs = allTabs.filter((tab) => !tab.jobChatId && !heads(tab))
     // A drag counts places in this list, and the window in all of them.
     const moveShown = (tabId: string, toIndex: number) =>
         moveTab(tabId, toIndex < tabs.length ? allTabs.indexOf(tabs[toIndex]) : allTabs.length - 1)
@@ -187,7 +239,9 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
             <ul
                 aria-labelledby={labelledBy}
                 aria-label={label}
-                className={cn("flex gap-0.5", vertical ? "flex-col" : "flex-1 min-w-0 items-center")}
+                // In the row, as wide as its tabs at their widest, and narrower with less room, so + follows the last tab.
+                style={vertical ? undefined : { flexBasis: tabs.length * (ROW_TAB_MAX + ROW_TAB_GAP) }}
+                className={cn("flex gap-0.5", vertical ? "flex-col" : "tab-row min-w-0 shrink grow-0 items-center")}
             >
                 {tabs.map((tab, index) => (
                     <TabItem
@@ -214,6 +268,18 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                 ))}
             </ul>
             {/* A list of their own, because a job's tabs aren't the user's. */}
+            {!vertical && jobs.length > 0 && (
+                <ul aria-label="Running jobs" className="min-w-0 shrink flex items-center">
+                    {jobs.map((chatId) => (
+                        <JobGroupRow
+                            key={chatId}
+                            chatId={chatId}
+                            chatTab={allTabs.find((tab) => tab.page === 'chat' && tab.pageParam === chatId)}
+                            tabs={allTabs.filter((tab) => tab.jobChatId === chatId)}
+                        />
+                    ))}
+                </ul>
+            )}
             {vertical && jobs.length > 0 && (
                 <ul aria-label="Running jobs" className="flex flex-col">
                     {jobs.map((chatId) => (
@@ -235,7 +301,7 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     className={cn(
                         "flex items-center gap-2 h-8 rounded-row text-13 text-ink-2 app-region-no-drag",
                         "hover:bg-hover outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
-                        vertical ? "w-full px-2 mt-0.5" : "w-8 shrink-0 justify-center"
+                        vertical ? "w-full px-2 mt-0.5" : "size-7 ml-1 shrink-0 justify-center text-ink-3 hover:text-ink"
                     )}
                 >
                     <Plus className="size-4" />

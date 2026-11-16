@@ -7,7 +7,7 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 **Where this stands**
 
 - **It replaces Bloom.** The old document is at [docs/design/DESIGN-bloom.md](./docs/design/DESIGN-bloom.md), kept only for how screens that aren't redrawn yet behave. Nothing in it binds this one.
-- **The first build is in.** Tokens, type, the mascots, the pips, the window (sidebar, dock, toolbar and address field) and the new tab wear Pips. The main chat, the chat panel, replies and approvals, the working view and the mascot on web pages still wear Bloom's layout in Pips colours, until they're built.
+- **The first build is in.** Tokens, type, the mascots, the pips, the window in both layouts (sidebar or tab row, dock, toolbar and address field) and the new tab wear Pips. The main chat, the chat panel, replies and approvals, the working view and the mascot on web pages still wear Bloom's layout in Pips colours, until they're built.
 - **The mocks** are in [docs/design/mocks](./docs/design/mocks), and each section below names its own. Where a mock and this document disagree, this document is right.
 - **Some of it is new.** Where the better design needed something the app doesn't do yet, it's drawn anyway and listed in section 12, to be built.
 - **Not everything is drawn.** Section 11 lists what isn't.
@@ -38,15 +38,17 @@ This document is the source of truth for the UI. Values marked *to tune* are sta
 
 ## 2. Layout
 
-**Vertical is the default.** Horizontal is a setting that applies without a restart, and it isn't redrawn yet. Both arrange the same components.
+**Vertical is the default.** Horizontal is a setting that applies without a restart. Both arrange the same components. Mock for horizontal: [horizontal-layout.html](./docs/design/mocks/horizontal-layout.html).
 
-| Region | Vertical |
-|---|---|
-| Sidebar | Left, straight on the ground, with no card of its own. It has two faces, Tabs and Chats |
-| Toolbar | A row above the page: back, forward, reload, the address field, the chat panel button |
-| Web page | One white sheet, 8px in from the window's right and bottom edges |
-| Chat panel | A second sheet on the right, which pushes the page |
-| Internal pages | Drawn by the chrome where a page would be: on a sheet when they have content, in the well when they're waiting for one |
+| Region | Vertical | Horizontal |
+|---|---|---|
+| Sidebar | Left, straight on the ground, with no card of its own. It has two faces, Tabs and Chats | None. Tabs are a row, Chats and the dock are in the toolbar, bookmarks are a bar |
+| Tab row | None | The top row: tabs, a mascot's job as a group, then + |
+| Toolbar | A row above the page: back, forward, reload, the address field, the chat panel button | Edge to edge: back, forward, reload, the address field, downloads, the chat panel button, Chats, the dock, and the menu |
+| Bookmarks bar | None | Favourites, then bookmarks, under the toolbar. Not there with nothing saved |
+| Web page | One white sheet, 8px in from the window's right and bottom edges | The same, 8px in at the sides and bottom |
+| Chat panel | A second sheet on the right, which pushes the page | The same |
+| Internal pages | Drawn by the chrome where a page would be: on a sheet when they have content, in the well when they're waiting for one | The same |
 
 Sizes (*to tune*):
 
@@ -55,6 +57,9 @@ Sizes (*to tune*):
 | Sidebar | 248px default, resizable 200 to 360px, collapses fully |
 | Chat panel | 348px default, resizable 320 to 480px |
 | Toolbar | 48px, the address field 32px tall and at most 560px wide |
+| Horizontal rows | Tab row 42px, toolbar 44px, bookmarks bar 30px |
+| Horizontal tab | Equal shares up to 196px, down to 36px with only its icon. The one in front keeps room for its name |
+| Chats over the page | 296px wide |
 | Gutter round the page | 8px |
 | Page sheet radius | 16px |
 | Sidebar row | 30px for a tab, 27px for a bookmark or a job's tab |
@@ -72,13 +77,13 @@ From bottom to top:
 
 1. **Chrome view:** one window-sized renderer that draws all our UI.
 2. **Tab views:** one solid view per tab. Only the active tab is visible.
-3. **Overlay views:** small views for anything that floats over a page, such as menus and the revealed sidebar.
+3. **Overlay views:** small views for anything that floats over a page, such as menus, the revealed sidebar, and in the horizontal layout Chats and a mascot's card.
 
 Rules:
 
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view,** because the chrome view is underneath tab views. The one exception is what's drawn in the page while a mascot works there (see Over a web page).
-- **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks.
+- **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks. The one exception is what opens from the horizontal toolbar: its view covers everything under the toolbar's own row, so a press anywhere outside the panel closes it, as with a menu.
 
 ## 3. Surfaces
 
@@ -401,7 +406,7 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
 - **Its states:** at rest it's plain; hovered it takes `hover` on the row's radius; focused it has the standard ring; and **used**, while the box holds what it put there, it's a sheet with its rim, until the box is emptied or changed.
 - **A suggestion can be dismissed:** a × at the row's end, its own button beside the row's, shows on hover and while the row has the keyboard. Chats to pick up and mascots to try have none.
-- **With no sidebar,** in the horizontal layout or with it collapsed, a row of quiet buttons under the suggestions leads to Needs you, Routines, your mascots and Settings, since nothing else on screen does.
+- **With the sidebar collapsed,** a row of quiet buttons under the suggestions leads to Needs you, Routines, your mascots and Settings. The horizontal layout has none, since Chats, the dock and the menu are in its toolbar.
 
 `Enter` opens anything that looks like an address and asks the mascot about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. The chat panel doesn't open here, because this page has its own box.
 
@@ -497,12 +502,24 @@ What's drawn in a page while a mascot works there, and only while the user can s
 
 A click doesn't wait for the mascot. Whether it waits a short beat so a watcher can follow is *to settle when it's built*.
 
+### Horizontal layout
+
+Mock: [horizontal-layout.html](./docs/design/mocks/horizontal-layout.html). Three rows above the page, all placed by the layout owner: the tab row, the toolbar, and the bookmarks bar. The page keeps its gutter and radius. Everything in it is the vertical layout's own parts, arranged in a row.
+
+- **The tab row.** Tabs take equal shares up to 196px, down to 36px, where only the icon shows. The tab in front is the sheet with its rim, and keeps its name when the others have lost theirs. Hover is `tray`. A hairline sits between two neighbours that are neither in front nor hovered. A loading tab shows the think pips where its icon would be. **+** comes right after the last tab. The window's buttons keep their corner: on the left on a Mac, on the right on Windows.
+- **A mascot's job keeps its tabs together,** after the user's tabs: a `tray` group with the mascot's face, the job's name, then its tabs, and the waiting pips in `ask` at its end while it needs you. It's the row's version of the sidebar's job block. Pressing the face or the name opens the chat.
+- **The toolbar runs edge to edge,** 44px tall with 28px buttons. Back, forward and reload, then the address field filling everything up to the tools, with no maximum width here, in the same five states. Then downloads, the chat panel button, **Chats**, the dock, and off a Mac the menu at the very end.
+- **Chats** is a `tray` pill with the word, and the `ask` dot while anything needs you. It opens a panel under itself, 296px wide, with the sidebar's Chats face: needs you, working, routines, earlier. Its arrows lead to Needs you and Routines.
+- **The dock** is a `tray` pill with every mascot's face at 22px. Pressing one opens its card, the same as in the sidebar, under it. Its **All your mascots** leads to the mascots' page. When the faces don't all fit beside an address field of at least 320px, it folds to the chosen mascot, any that are asking or working, and a count of the rest, which opens the mascots' page.
+- **Chats and a card open over the page,** in an overlay view, since a tab's view covers the chrome. Escape or a press anywhere outside closes them, and the keyboard goes back to what opened them. Opening a chat or a page from them closes them too.
+- **The bookmarks bar:** favourites first, as icon tiles, the one in front selected as in the sidebar, then a hairline, then bookmarks with icon and name. Dragging between the two and the right-click menus work as in the sidebar. With nothing saved there's no bar at all.
+- **The new tab** is the vertical layout's. Settings is in the menu (or the app's menu on a Mac), so nothing else needs a link under the box.
+
 ## 11. Not redrawn yet
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
 
 - Onboarding
-- The horizontal layout
 - Find in page, zoom and printing, the page menu
 - Show Berry how
 - Routines
@@ -535,7 +552,6 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 
 **Still open:**
 
-- **The horizontal layout** has no sidebar, so Chats needs a home there.
 - **Needs you, Routines and the mascots' page** as full pages. Chats and the dock lead to them, and they aren't drawn.
 - **The words** "bird" and "flock" are still in the code, in AGENTS.md and in the old document.
 

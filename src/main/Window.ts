@@ -58,6 +58,7 @@ import type {
   ImportSource,
   InternalPage,
   LayoutMode,
+  Popover,
   ResizablePanel,
   MascotSaveResult,
   Settings,
@@ -114,6 +115,8 @@ export class Window {
   readonly findBar: FindBar;
   readonly siteZoom: SiteZoom;
   private floatingSidebarVisible = false;
+  // What's open over the page from the horizontal toolbar, in the overlay view. Null when nothing is.
+  private popover: Popover | null = null;
   private sidebarOpen = true;
   private chatOpen = false;
   private windowClosed = false;
@@ -1085,6 +1088,8 @@ export class Window {
     }
 
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
+    // Opening anything from Chats or a card is done with it, even the tab already in front.
+    this.closePopover(false);
     this.activeTabId = tabId;
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
     const unvisited = this.unvisitedTabs.delete(tabId);
@@ -1336,6 +1341,8 @@ export class Window {
     try {
       save();
       this.broadcast("library:updated", this.librarySnapshot);
+      // The horizontal layout's bookmarks bar comes and goes with what's saved.
+      this.updateAllBounds();
     } catch (error) {
       console.error("Failed to save pinned sites and bookmarks:", error);
       void dialog.showMessageBox(this._baseWindow, {
@@ -1427,6 +1434,31 @@ export class Window {
   resizePanel(panel: ResizablePanel, width: number): void {
     if (panel === "sidebar") this.updateSettings({ sidebarWidth: width });
     else if (panel === "chat") this.updateSettings({ chatWidth: width });
+  }
+
+  // Chats or a mascot's card, opened from the horizontal toolbar. A tab's view covers the chrome, so they're drawn in the
+  // overlay view, which takes everything under the toolbar's own row: a press anywhere in it outside the panel closes it.
+  openPopover(request: unknown): void {
+    const area = this.layout.popover;
+    const popover = validPopover(request);
+    if (area.width === 0 || !popover) return;
+    this.hideFloatingSidebar();
+    this.popover = popover;
+    // Adding a view again moves it to the top, above tabs opened since.
+    this._baseWindow.contentView.addChildView(this.overlay.view);
+    this.overlay.view.setBounds(area);
+    this.overlay.view.setVisible(true);
+    this.overlay.view.webContents.focus();
+    this.broadcast("overlay:popover", { shown: popover, refocus: false });
+  }
+
+  // With `refocus`, the keyboard goes back to what opened it, as after Escape.
+  closePopover(refocus: boolean): void {
+    if (!this.popover) return;
+    this.popover = null;
+    this.overlay.view.setVisible(false);
+    if (refocus) this.chrome.view.webContents.focus();
+    this.broadcast("overlay:popover", { shown: null, refocus });
   }
 
   showFloatingSidebar(): void {
@@ -1531,6 +1563,7 @@ export class Window {
         sidebarWidth: this.settings.sidebarWidth,
         chatWidth: this.settings.chatWidth,
         platform: process.platform,
+        savedSites: this.pinnedStore.get().length + this.bookmarkStore.get().length > 0,
       }
     );
   }
@@ -1559,6 +1592,8 @@ export class Window {
     this.allTabs.forEach((tab) => this.placeTab(tab, layout));
     if (layout.floatingSidebar.width === 0) this.hideFloatingSidebar();
     else if (this.floatingSidebarVisible) this.overlay.view.setBounds(layout.floatingSidebar);
+    if (layout.popover.width === 0) this.closePopover(false);
+    else if (this.popover) this.overlay.view.setBounds(layout.popover);
     this.findBar.setBounds(layout.findBar);
     this.broadcast("layout:updated", layout);
     this.permissionPrompt.sync();
@@ -1588,3 +1623,15 @@ export class Window {
     sendToRenderer(this.overlay.view.webContents, channel, payload);
   }
 }
+
+// What a renderer asked to open, checked: a known kind, a mascot named by a string, and a rect of finite numbers.
+const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const validPopover = (input: unknown): Popover | null => {
+  const { kind, mascotId, anchor } = (input ?? {}) as { kind?: unknown; mascotId?: unknown; anchor?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown } };
+  const { x, y, width, height } = anchor ?? {};
+  if (!finite(x) || !finite(y) || !finite(width) || !finite(height)) return null;
+  const rect = { x, y, width, height };
+  if (kind === "chats") return { kind: "chats", anchor: rect };
+  if (kind === "mascot" && typeof mascotId === "string") return { kind: "mascot", mascotId, anchor: rect };
+  return null;
+};

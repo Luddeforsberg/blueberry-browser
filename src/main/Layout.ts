@@ -7,9 +7,11 @@ export const SIDEBAR_WIDTH = { default: 248, min: 200, max: 360 };
 export const CHAT_WIDTH = { default: 348, min: 320, max: 480 };
 // The toolbar is a row on the ground above the page. In the vertical layout the window buttons share it.
 export const TOOLBAR_HEIGHT = 48;
-// In horizontal mode there is no sidebar to hold the bookmarks, so the toolbar has a bar for them too.
-const BOOKMARKS_BAR_HEIGHT = 36;
-export const TAB_ROW_HEIGHT = 40;
+// The horizontal layout's three rows above the page: tabs, the toolbar, and the bookmarks bar, which is only there with
+// something saved, since there's no sidebar to hold the bookmarks.
+export const TAB_ROW_HEIGHT = 42;
+const HORIZONTAL_TOOLBAR_HEIGHT = 44;
+const BOOKMARKS_BAR_HEIGHT = 30;
 // The gutter: the ground showing between the page's sheet and the window's right and bottom edges, and between sheets.
 export const PAGE_INSET = 8;
 export const FLOATING_INSET = 8;
@@ -35,6 +37,8 @@ export interface LayoutOptions {
   sidebarWidth: number;
   chatWidth: number;
   platform: NodeJS.Platform;
+  // Whether anything is saved, for the horizontal layout's bookmarks bar.
+  savedSites?: boolean;
 }
 
 const EMPTY: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -254,7 +258,9 @@ export function computeLayout(
   const mac = platform === "darwin";
   // Linux has no window buttons of its own here, only the menu button.
   const systemButtons = platform === "win32" ? WINDOWS_CONTROLS_WIDTH : 0;
-  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP;
+  // In the horizontal layout the menu button is at the toolbar's end, so the tab row keeps only the system's buttons clear.
+  const menuInTopRow = !mac && vertical;
+  const controlsWidth = mac ? MAC_CONTROLS_WIDTH : systemButtons + (menuInTopRow ? MENU_BUTTON_SIZE + 2 * MENU_BUTTON_GAP : 0);
   const controls: Rect = mac
     ? { x: 0, y: 0, width: controlsWidth, height: topRow }
     : {
@@ -263,19 +269,28 @@ export function computeLayout(
         width: Math.min(controlsWidth, window.width),
         height: topRow,
       };
+  // In the horizontal layout it ends the toolbar instead, at the gutter's width from the window's edge.
   const menuButton: Rect = mac
     ? EMPTY
-    : {
-        x: Math.max(window.width - systemButtons - MENU_BUTTON_GAP - MENU_BUTTON_SIZE, 0),
-        y: Math.round((topRow - MENU_BUTTON_SIZE) / 2),
-        width: MENU_BUTTON_SIZE,
-        height: MENU_BUTTON_SIZE,
-      };
+    : menuInTopRow
+      ? {
+          x: Math.max(window.width - systemButtons - MENU_BUTTON_GAP - MENU_BUTTON_SIZE, 0),
+          y: Math.round((topRow - MENU_BUTTON_SIZE) / 2),
+          width: MENU_BUTTON_SIZE,
+          height: MENU_BUTTON_SIZE,
+        }
+      : {
+          x: Math.max(window.width - PAGE_INSET - MENU_BUTTON_SIZE, 0),
+          y: TAB_ROW_HEIGHT + Math.round((HORIZONTAL_TOOLBAR_HEIGHT - MENU_BUTTON_SIZE) / 2),
+          width: MENU_BUTTON_SIZE,
+          height: MENU_BUTTON_SIZE,
+        };
 
   // The tab row and the toolbar run over the chat panel too, so the panel's button stays at the window's edge.
   const tabStrip = vertical ? EMPTY : { x: 0, y: 0, width: window.width, height: TAB_ROW_HEIGHT };
   const toolbarY = vertical ? 0 : TAB_ROW_HEIGHT;
-  const toolbarHeight = vertical ? TOOLBAR_HEIGHT : TOOLBAR_HEIGHT + BOOKMARKS_BAR_HEIGHT;
+  const addressHeight = vertical ? TOOLBAR_HEIGHT : HORIZONTAL_TOOLBAR_HEIGHT;
+  const toolbarHeight = vertical ? TOOLBAR_HEIGHT : HORIZONTAL_TOOLBAR_HEIGHT + (options.savedSites ? BOOKMARKS_BAR_HEIGHT : 0);
   const toolbarX = vertical ? cardX : 0;
   const pageY = toolbarY + toolbarHeight;
   const pageHeight = Math.max(height - pageY - PAGE_INSET, 0);
@@ -307,7 +322,12 @@ export function computeLayout(
     },
     tabStrip,
     toolbar: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: toolbarHeight },
-    addressRow: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: TOOLBAR_HEIGHT },
+    addressRow: { x: toolbarX, y: toolbarY, width: Math.max(window.width - toolbarX, 0), height: addressHeight },
+    // In the horizontal layout, what Chats and a mascot's card open over: everything under the toolbar's own row. It
+    // covers the page too, since a tab's view would cover the chrome, and a press anywhere in it closes them.
+    popover: vertical
+      ? EMPTY
+      : { x: 0, y: toolbarY + addressHeight, width: window.width, height: Math.max(height - toolbarY - addressHeight, 0) },
     chat: chat ? { x: chatX, y: pageY, width: chatWidth, height: pageHeight } : EMPTY,
     page: {
       x: cardX,

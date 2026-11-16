@@ -146,3 +146,76 @@ test("a new profile starts with four mascots beside Berry, once, and a deleted o
     await app.close();
   }
 });
+
+test("in the horizontal layout, Chats and a mascot's card open over a web page, give the keyboard back, and open a chat or a new one", async () => {
+  test.setTimeout(60_000);
+  const site = await startSite();
+  const model = await startFakeModel();
+  const app = await launchApp(undefined, { modelEnv: model.env });
+  try {
+    const chrome = await findView(app, "view=chrome");
+    await chrome.evaluate(() =>
+      window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "News.", sites: ["svt.se"], tools: ["visit"] })
+    );
+    model.titleWith("Flights to Lisbon");
+    model.replyWith("Three flights.");
+    const chat = await chrome.evaluate(() => window.chromeAPI.chat.send(null, "Find flights to Lisbon", { seePage: false }));
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).chats.some((each) => each.running)).toBe(false);
+    await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
+    await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${site.origin}/`);
+    await (await findView(app, `${site.origin}/`)).waitForLoadState();
+
+    const pill = chrome.getByRole("button", { name: /^Chats/ });
+    await pill.click();
+    const overlay = await findView(app, "view=overlay");
+    const panel = overlay.getByRole("dialog", { name: "Chats" });
+    await expect(panel).toBeVisible();
+    await expect(pill).toHaveAttribute("aria-expanded", "true");
+    // Over the page: the overlay's view is showing, above the tab's view, and covers where the page is.
+    const stack = await app.evaluate(({ BaseWindow, WebContentsView }) =>
+      BaseWindow.getAllWindows()[0].contentView.children.map((view) => ({
+        url: view instanceof WebContentsView ? view.webContents.getURL() : "",
+        visible: view.getVisible(),
+        bounds: view.getBounds(),
+      }))
+    );
+    const overlayAt = stack.findIndex(({ url }) => url.includes("view=overlay"));
+    const pageAt = stack.findIndex(({ url }) => url.startsWith(site.origin));
+    expect(stack[overlayAt].visible).toBe(true);
+    expect(overlayAt).toBeGreaterThan(pageAt);
+    expect(stack[overlayAt].bounds.y).toBeLessThanOrEqual(stack[pageAt].bounds.y);
+
+    await overlay.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(pill).toBeFocused();
+
+    await pill.click();
+    await panel.getByRole("button", { name: /^Flights to Lisbon/ }).click();
+    await expect
+      .poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.pageParam)
+      .toBe(chat!.id);
+    await expect(panel).toBeHidden();
+
+    // Back on the web page, a mascot's card opens over it from the dock. Escape gives its face the keyboard back.
+    const web = (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.url.startsWith("http"))!;
+    await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), web.id);
+    const face = chrome.getByRole("list", { name: "Your mascots" }).getByRole("button", { name: "Scout" });
+    await face.click();
+    const card = overlay.getByRole("dialog", { name: "Scout" });
+    await expect(card).toBeVisible();
+    await expect(face).toHaveAttribute("aria-expanded", "true");
+    await overlay.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+    await expect(face).toBeFocused();
+    // New chat with it: a new tab, with Scout chosen there, though the card was in another view.
+    await face.click();
+    await card.getByRole("button", { name: "New chat with Scout" }).click();
+    await expect(card).toBeHidden();
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page).toBe("new-tab");
+    await expect(chrome.getByRole("button", { name: /Choose who to ask/ })).toHaveAccessibleName("Asking Scout. Choose who to ask");
+  } finally {
+    await app.close();
+    model.close();
+    site.close();
+  }
+});

@@ -136,6 +136,10 @@ export class EventManager {
     this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
 
     this.handle("overlay:hide", () => this.mainWindow.hideFloatingSidebar());
+
+    this.handle("overlay:open-popover", (popover) => this.mainWindow.openPopover(popover));
+
+    this.handle("overlay:close-popover", (refocus) => this.mainWindow.closePopover(refocus === true));
   }
 
   private handleThemeEvents(): void {

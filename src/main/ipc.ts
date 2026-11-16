@@ -37,6 +37,8 @@ export const CHANNEL_REGIONS: {
   "layout:app-menu": ["chrome"],
   "overlay:show-sidebar": ["chrome"],
   "overlay:hide": ["overlay"],
+  "overlay:open-popover": ["chrome"],
+  "overlay:close-popover": BOTH,
   "theme:get": ["chrome", "overlay", "find", "prompt", "desktop", "composer"],
   "library:get": BOTH,
   "bookmarks:toggle": ["chrome"],

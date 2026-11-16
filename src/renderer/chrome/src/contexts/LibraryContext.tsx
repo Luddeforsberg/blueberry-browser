@@ -8,15 +8,6 @@ const LibraryContext = createContext<LibrarySnapshot>(EMPTY)
 
 export const useLibrary = () => useContext(LibraryContext)
 
-// What the bookmark cluster and bar show when there's nothing saved yet.
-export const NO_SAVED_SITES = 'Pin or bookmark a page to keep it here.'
-
-// Pinned sites first, then bookmarks. A site saved both ways shows once, as a pin.
-export const useSavedSites = () => {
-    const { pinned, bookmarks } = useLibrary()
-    return [...pinned, ...bookmarks.filter((bookmark) => !pinned.some((pin) => pin.url === bookmark.url))]
-}
-
 const ChosenContext = createContext<{ chosenId: string; choose: (id: string) => void }>({ chosenId: BERRY_ID, choose: () => undefined })
 
 // The flock, and who the next new chat runs as. Chosen on any composer, and shown on all of them.
