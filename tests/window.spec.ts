@@ -136,7 +136,11 @@ test("a new profile starts with four mascots beside Berry, once, and a deleted o
     await box.fill("");
 
     const plainWords = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Plain Words")!;
-    await chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id);
+    // Deleting asks first, in a dialog nothing here can press.
+    await app.evaluate(({ dialog }) => {
+      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
+    });
+    expect(await chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id)).toBe(true);
     await app.close();
     app = await launchApp(profile, { starters: true });
     chrome = await findView(app, "view=chrome");
