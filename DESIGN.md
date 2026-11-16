@@ -592,6 +592,41 @@ A page in a tab, on the well with no dot grid, in one column 620px wide. Under t
 
 The pages behind Phone, Claude and other apps, Site permissions and bringing in history aren't drawn. Until they are, each keeps what it has today, laid out in these groups and rows.
 
+### Your mascots
+
+Mocks: [your-mascots.html](./docs/design/mocks/your-mascots.html) and [making-a-mascot.html](./docs/design/mocks/making-a-mascot.html).
+
+A page in a tab, built like Settings: the well with no dot grid, one column 620px wide, groups as sheets. The dock, the account menu and New mascot in the chooser lead here. Where the page is lives in its tab, as in Settings, so Back, the toolbar's Back and a restored session all find the list, a mascot, one of its parts or its memory.
+
+**The list.** The title, with **Gallery** outlined and **New mascot** filled on its right, and one line under it. Then one sheet with a row per mascot, Berry first. A row is 66px and is a button from edge to edge that opens the mascot's page:
+
+- Its face at 36px, in the mood it's in: the pips while it works, round eyes with the `ask` dot while it waits for you.
+- Its name, one line on what it's for, and a mono line on what it may do, from `permissionsInWords`. The mono line ends with how many routines it runs and how many things it remembers, when there are any.
+- On the right, what it's doing in mono: the pips and the site it's on while it works, **needs you** in `ask` while it waits. Then **Chat**, outlined, which starts a new chat with it, and the arrow.
+
+There are no cards and nothing to stand on. With mascots hidden a row starts with the plain icon.
+
+**A mascot's own page** is short. On top is a sheet that says who it is: its face at 64px, its name at 18px, what it's for in full, its limits as mono tags, and **Chat**. Under *change* is one row for each part, showing what it is now and an arrow: Look, Name, What it's for and Limits. Under *its things*: What it remembers with a count, Routines with their names and **New routine**, In the Gallery with its state, and Works in the cloud as a switch, only where the cloud is set up. Last, alone, **Delete** and its name in `ask`, which asks first. Nothing on this page needs Save, because each part saves where it's changed. Berry's page has no *change* group and no Delete.
+
+**Making one is four questions,** one at a time, asked in the mascot's own voice. Each is a card set into a shell, 520px wide, like the prompt box. The mascot being made stands on the card's top edge at 72px, and changes as the answers do. In the card: the step in mono (`2 / 4`), the question at 18px, one line under it, and the answer. In the shell under the card: a round Back on the left, four dots in the middle with the current one long, and the filled button on the right.
+
+| Step | It asks | The answer | The button |
+|---|---|---|---|
+| 1 | What do I look like? | The six berries, then the six things to wear, drawn on the chosen berry. The berries not chosen are asleep, and the chosen one wakes. It starts on one picked at random, and **Surprise me** picks again, with a name | Continue |
+| 2 | What's my name? | One field, 30px, centred | Continue, once there's a name |
+| 3 | What should I do for you? | A text box at 15px. Under it, *or start from* and up to three of the bundled starters the user hasn't added, by name. Pressing one fills in its words and nothing else | Continue, or Skip while the box is empty |
+| 4 | Where can I go, and what can I do there? | Any site or Only these sites, with each site a mono chip with its ×, and Add a site. Then Go to pages, Click and choose, and Type, each a switch | Add and its name |
+
+- **The limits step uses plain words.** Its line says it can always read the pages it's allowed on, that it still asks before anything risky, and that no limit changes that. A site that isn't one is said under the chips in `ask`, and so is Only these sites with none.
+- **It ends on a card that reads it back:** the mascot looking pleased, *added to your mascots* in mono, its name at 30px, what it's for, its limits as tags, and **Give it a job**, which opens a new tab with it chosen, beside **Done**, which opens its page.
+- **Leaving** part way keeps nothing.
+- **Moving between steps** is a 200ms slide of the card's contents, and the mascot stays where it stands. Reduced motion and Still get a fade.
+- A suggestion that offers a mascot opens the same steps with its answers filled in.
+
+**Changing a part** is the same card, alone, one step in from the mascot's page: the mascot on top, the part's name in mono where the step number was, and **Cancel** and **Save** in the shell. Works in the cloud isn't a step, because all it does is preset a switch.
+
+**What it remembers** is one step in from its page: the title with its name, one line saying that only what the user said yes to is kept, on this computer. An offer waiting for an answer is a card in a shell on top, with where it came from in mono, the words at 15px, and **Remember** and **Don't**. Then a group for each place, *anywhere* first, with a row per thing and **Change** and **Forget** on each. Change makes the row a field. **Forget everything** is last, in `ask`. With nothing kept, one sheet has the mascot and the sentence saying when it may ask.
+
 ## 11. Not redrawn yet
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
@@ -600,7 +635,6 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Find in page, zoom and printing, the page menu
 - Show Berry how
 - Routines
-- The mascots' page and making one (Flock in the old document), and its memory page
 - Gallery and Publishing
 - Needs you, and answering from the phone
 - History, Downloads, Restoring tabs, A page in trouble, Damaged saved data
@@ -628,10 +662,11 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - How long a finished job took, on its steps chip, and how long a reply with no tabs has been working. Only the working view knows when a job began, so Working shows a time only while a job uses tabs.
 - `@` in the box to choose a mascot.
 - An open tab in the prompt box, from **+**, which comes to the new tab with attachments.
+- The site a working mascot is on, beside it in Your mascots. Until the list can know it, the row shows only the pips.
 
 **Still open:**
 
-- **Needs you, Routines and the mascots' page** as full pages. Chats and the dock lead to them, and they aren't drawn.
+- **Needs you and Routines** as full pages. Chats leads to them, and they aren't drawn.
 - **The words** "bird" and "flock" are still in the code, in AGENTS.md and in the old document.
 
 ## 13. Accessibility
