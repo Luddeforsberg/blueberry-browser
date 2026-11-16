@@ -105,8 +105,10 @@ const MascotPill: React.FC<{
     mascot: MascotProfile
     face?: PillFace
     small: boolean
+    // On the chat's card, where a quiet fill is `card-2`.
+    onCard: boolean
     chooser?: { open: boolean; onToggle: () => void; onOpen: () => void; button: React.Ref<HTMLButtonElement> }
-}> = ({ mascot, face, small, chooser }) => {
+}> = ({ mascot, face, small, onCard, chooser }) => {
     const name = useAssistantName(mascot)
     const { keepBerryStill } = useShell().settings
     const look = cn('shrink-0 flex items-center gap-[7px] rounded-full bg-sheet shadow-[inset_0_0_0_1px_var(--line)] text-12 text-ink', small ? 'h-7 pl-1 pr-2' : 'h-[30px] pl-[5px] pr-[9px]')
@@ -137,7 +139,7 @@ const MascotPill: React.FC<{
                     chooser.onOpen()
                 }
             }}
-            className={cn(look, 'transition-[background-color,transform] duration-fast hover:bg-sheet-2 active:scale-[.96]', chooser.open && 'bg-sheet-2', FOCUS)}
+            className={cn(look, 'transition-[background-color,transform] duration-fast active:scale-[.96]', onCard ? 'hover:bg-card-2' : 'hover:bg-sheet-2', chooser.open && (onCard ? 'bg-card-2' : 'bg-sheet-2'), FOCUS)}
         >
             {drawn}
             <span className="max-w-28 truncate">{name}</span>
@@ -226,6 +228,9 @@ export const Composer: React.FC<{
     const hero = size === 'hero'
     // The desktop's box is the only one with smaller tools. In a chat they're the new tab's size.
     const small = !!bare
+    // The chat's card is `card`, a step up from the page it's on in dark, and anything quiet on it is `card-2`. The new
+    // tab's sits on the well and the desktop's is a window of its own, so they keep `sheet` and `sheet-2`.
+    const onCard = !hero && !bare
     // The last words, kept while the line slides away.
     const [lastLimits, setLastLimits] = useState(limits ?? '')
     useEffect(() => {
@@ -269,7 +274,8 @@ export const Composer: React.FC<{
             className={cn(
                 'shrink-0 rounded-full flex items-center justify-center transition-[background-color,color,transform] duration-fast active:scale-[.96]',
                 small ? 'size-7' : 'size-8',
-                'bg-ink text-sheet hover:bg-ink/85 disabled:bg-sheet-2 disabled:text-faint disabled:active:scale-100',
+                'bg-ink text-sheet hover:bg-ink/85 disabled:text-faint disabled:active:scale-100',
+                onCard ? 'disabled:bg-card-2' : 'disabled:bg-sheet-2',
                 FOCUS
             )}
         >
@@ -313,7 +319,8 @@ export const Composer: React.FC<{
             title={addLabel}
             onClick={onAdd}
             className={cn(
-                'shrink-0 flex items-center justify-center bg-sheet-2 text-ink transition-[background-color,transform] duration-fast hover:bg-press active:scale-[.96]',
+                'shrink-0 flex items-center justify-center text-ink transition-[background-color,transform] duration-fast hover:bg-press active:scale-[.96]',
+                onCard ? 'bg-card-2' : 'bg-sheet-2',
                 small ? 'size-7 rounded-row' : 'size-8 rounded-tile',
                 FOCUS
             )}
@@ -330,7 +337,7 @@ export const Composer: React.FC<{
                     onClick={(event) => {
                         if (!(event.target as Element).closest('button,[role=menu]')) textareaRef.current?.focus()
                     }}
-                    className={cn('relative bg-sheet shadow-card-lift cursor-text', hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4')}
+                    className={cn('relative shadow-card-lift cursor-text', onCard ? 'bg-card' : 'bg-sheet', hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4')}
                 >
                     {attachment && <div className="mb-2 -ml-1.5 cursor-default">{attachment}</div>}
                     <div className={hero ? 'mb-1' : undefined}>{textarea}</div>
@@ -343,6 +350,7 @@ export const Composer: React.FC<{
                                 mascot={mascot}
                                 face={face}
                                 small={small}
+                                onCard={onCard}
                                 chooser={
                                     onChooseMascot && {
                                         open: choosing,

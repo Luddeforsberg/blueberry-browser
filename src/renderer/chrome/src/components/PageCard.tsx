@@ -14,7 +14,7 @@ export const PageCard: React.FC<{
         role="group"
         aria-label={`Berry can see ${host}`}
         title={title}
-        className="h-[26px] max-w-full pl-1.5 pr-0.5 inline-flex items-center gap-[7px] rounded-row bg-sheet-2 text-12 text-ink"
+        className="h-[26px] max-w-full pl-1.5 pr-0.5 inline-flex items-center gap-[7px] rounded-row bg-card-2 text-12 text-ink"
     >
         <Favicon src={favicon} site={host} />
         <span className="min-w-0 truncate">{host}</span>

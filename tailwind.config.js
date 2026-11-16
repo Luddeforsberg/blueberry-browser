@@ -20,6 +20,8 @@ module.exports = {
       well: "rgb(var(--well) / <alpha-value>)",
       sheet: "rgb(var(--sheet) / <alpha-value>)",
       "sheet-2": "rgb(var(--sheet-2) / <alpha-value>)",
+      card: "rgb(var(--card) / <alpha-value>)",
+      "card-2": "rgb(var(--card-2) / <alpha-value>)",
       ink: "rgb(var(--ink) / <alpha-value>)",
       "ink-2": "rgb(var(--ink-2) / <alpha-value>)",
       "ink-3": "rgb(var(--ink-3) / <alpha-value>)",
