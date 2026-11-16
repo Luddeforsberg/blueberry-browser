@@ -59,6 +59,8 @@ export interface Settings {
   desktopBerrySpot: DesktopBerrySpot | null;
   // Jobs from ChatGPT or Claude, through the relay, run in this Blueberry while it's open, instead of in the cloud.
   relayOnMac: boolean;
+  // What the account menu and Account call you. Only ever on this computer: never sent, prompted or published.
+  accountName: string | null;
 }
 
 export type DesktopEdge = "bottom" | "top" | "left" | "right";

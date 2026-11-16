@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, sanitizeSettings, SettingsStore } from "./SettingsStore";
+import { ACCOUNT_NAME_MAX } from "../shared/accountName";
 
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-settings-")), "settings.json");
 
@@ -30,6 +31,34 @@ describe("sanitizeSettings", () => {
     expect(
       sanitizeSettings({ layoutMode: "horizontal", appearance: "dark", sidebarWidth: 9999, chatWidth: 1 })
     ).toMatchObject({ layoutMode: "horizontal", appearance: "dark", sidebarWidth: 360, chatWidth: 320 });
+  });
+});
+
+describe("accountName", () => {
+  const named = { ...DEFAULT_SETTINGS, accountName: "Alex" };
+
+  it("starts with none, and keeps a name trimmed", () => {
+    expect(DEFAULT_SETTINGS.accountName).toBeNull();
+    expect(sanitizeSettings({ accountName: "  Alex Lind " }).accountName).toBe("Alex Lind");
+  });
+
+  it("clears it for nothing, or only spaces", () => {
+    expect(sanitizeSettings({ accountName: null }, named).accountName).toBeNull();
+    expect(sanitizeSettings({ accountName: "" }, named).accountName).toBeNull();
+    expect(sanitizeSettings({ accountName: "   " }, named).accountName).toBeNull();
+  });
+
+  it("takes one character up to the limit, counting what's drawn rather than code units, and keeps the old name past it", () => {
+    expect(sanitizeSettings({ accountName: "A" }).accountName).toBe("A");
+    expect(sanitizeSettings({ accountName: "a".repeat(ACCOUNT_NAME_MAX) }).accountName).toBe("a".repeat(ACCOUNT_NAME_MAX));
+    expect(sanitizeSettings({ accountName: "🫐".repeat(ACCOUNT_NAME_MAX) }).accountName).toBe("🫐".repeat(ACCOUNT_NAME_MAX));
+    expect(sanitizeSettings({ accountName: "a".repeat(ACCOUNT_NAME_MAX + 1) }, named).accountName).toBe("Alex");
+  });
+
+  it("refuses control characters and line breaks, and anything not a string", () => {
+    for (const accountName of ["Al\nex", "Al\u0000ex", "Al\u001bex", "Al\u2028ex", "Al\u0085ex", 42, {}]) {
+      expect(sanitizeSettings({ accountName }, named).accountName).toBe("Alex");
+    }
   });
 });
 
