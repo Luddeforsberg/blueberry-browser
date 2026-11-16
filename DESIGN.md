@@ -503,9 +503,10 @@ A full page for talking to a mascot about anything. A chat starts from the new t
 - **On a sheet.** The address field shows the chat's name.
 - **No line on top.** The conversation starts at the top of the sheet. The mascot is beside each reply, and the address field has the chat's name. Where a chat runs is only said when it isn't here: a cloud chat's first reply, and a runner chat's, starts with a quiet line in mono, the cloud icon and "in the cloud", over its words. One started from another app says so the same way, with no icon: "from Claude Code".
 - **One column.** The conversation and the prompt box share one column, at most 720px wide with 28px either side, so they line up however wide the page is.
-- **Your messages** are on `sheet-2`, at the right, with a small corner where a tail would be. A mascot's reply is plain text on the sheet, with its face, 24px, to the left of its first line. It hangs 36px out in the gutter, so the words keep the column. Where the page is too narrow for that, the column's sides grow from 28px to 36px. Beside a Working block the face lines up with its heading. With Berry hidden there's no face.
+- **Your messages** are on `sheet-2`, at the right, with a small corner where a tail would be. A mascot's reply is plain text on the sheet, with its face, 24px, to the left of its first line. It hangs 36px out in the gutter, so the words keep the column. Where the page is too narrow for that, the column's sides grow from 28px to 36px. Beside the Working line the face lines up with it. With Berry hidden there's no face.
 - **One face per reply,** in the mood of what it's doing: the pips while it runs, asking while a card or a question waits, Oops when it went wrong, and at rest otherwise, stopped included. Stopped and went wrong say so in the reply, under its words, so their face is the reply's.
-- **While it works:** an outlined block headed **Working** with how long in mono, then its steps, each a pip mark and a line of mono. Finished ones are `ink-3`, the live one has moving pips and its words shimmer (section 7). While a job runs only its latest steps show, under a quiet line that opens the rest. Between steps the last line says "Thinking..", and while a card waits for you it says "Waiting for you.." with the pips in `ask`. A reply with no steps yet has that line alone, where its words will start.
+- **While it works, one line leads the reply,** and stays for the job's whole life. Mock: [chat-and-asking.html](./docs/design/mocks/chat-and-asking.html). It's mono, with no outline round it: the moving pips, **Working**, and how long. Under it are the steps, each a pip mark and a line of mono. Finished ones are `ink-3`, the live one has moving pips and its words shimmer (section 7). Steps of one kind in a row on one site are one line, "Read 3 pages on klm.com", which opens to show them. What the mascot says between steps is in its own voice, at 15px in `ink-2`, where it said it. While a job runs only its latest steps show, and the line opens the rest. Between steps the last line says "Thinking..", and while a card waits for you it says "Waiting for you.." with the pips in `ask`. A reply with no steps yet has that line alone, where its words will start.
+- **When it ends, the line folds where it is:** "Worked 0:48", then "7 steps on klm.com" and a faint arrow, in `ink-3`, above the answer. Pressing it opens the steps in place. The steps never move under the answer, so how it got there and what it found never look alike. A reply that used no tools has no line.
 - **The prompt box** is at the bottom, and you can write while it works.
 - **What a step says:** what happened, in the user's terms: "Typed Lisbon in To", "Picked 12 to 16 Dec", "Clicked Search flights". Anything typed is cut at 24 characters. In a password, code or payment field it only ever names the field: "Typed in the password field".
 
@@ -513,15 +514,17 @@ A full page for talking to a mascot about anything. A chat starts from the new t
 
 Mock: [reply-states.html](./docs/design/mocks/reply-states.html).
 
-- **Asking, for leave to do something.** A card in a shell. The title is what it wants, as one sentence at 15px with addresses cut to their site. Under it, at 12px mono in an inset well on `card-2` with a hairline and a 10px radius, and never cut, are the exact words from the tool, which are what's being allowed. Then **Allow**, filled, and **Don't allow**, raised, both 32px, in that order everywhere: here, on Needs you, on the phone page and in Telegram. The line under the card, with the pips in `ask`, says why it's asking, in words from code and never from a page or the model. Until the tool layer can say why, there's no line, and the Working block's last line says it's waiting. Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
+- **Asking, for leave to do something.** A card in a shell. The title is what it wants, as one sentence at 15px with addresses cut to their site. Under it, at 12px mono in an inset well on `card-2` with a hairline and a 10px radius, and never cut, are the exact words from the tool, which are what's being allowed. Then **Allow**, filled, and **Don't allow**, raised, both 32px, in that order everywhere: here, on Needs you, on the phone page and in Telegram. Mocks: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html) and [chat-and-asking.html](./docs/design/mocks/chat-and-asking.html).
+- **It says why it's asking,** in the shell under the card, starting "Asking because": "Asking because this address carries data, marked above." The tool layer gives the reason as a code (`ASK_REASONS` in `src/shared/asking.ts`), and the sentence for each code is written in the app, so nothing a page or the model wrote is ever in that line. Where the reason is about a piece of the exact words, that piece is marked in them, on `ask-bg`. A card with no reason has no line.
+- **Keys.** While the keyboard is on the card, Enter allows and Escape doesn't, and each button shows its key as a keycap. The keyboard is never put on a card in a chat, so Enter in the prompt box always sends what's typed. On Needs you the open card has it. A key held down doesn't count, and neither does one pressed in the first half second a card is there, so answering one card can't answer the next.
 - **Allow has three sizes.** Pressing Allow means just this once. Its arrow opens the other two: **For the rest of this job**, on this site, until the job ends, and **Always on** this site, for this mascot. Anything that pays, sends or deletes asks every time, and its Allow has no arrow. What's allowed for always is listed on the mascot's card, each with a way to take it back.
-- **A question.** Lighter on purpose, with no shell, because answering it lets nothing happen: the question at 15px, up to three answers to press, a field for your own on `sheet-2` with Send, and **Skip** as quiet text, with "Passwords and codes go in the page, never here." across from it. The field is a prompt box of its own, so the caret marks its focus. Passwords, codes and card details are never asked for here.
+- **A question.** A card in a shell, with the question at 15px and, where the mascot offered them, up to three answers as rows to press, 40px each on `card-2`. There's no field in the card. The prompt box under it is where you answer, and says so, "Answer Berry, or pick one above", so a chat has one place to type, and what's sent while a question waits is its answer. In the shell under the card: "Passwords and codes go in the page, never here." and **Skip** as quiet text. While the keyboard is on the card, A, B and C pick an answer, and the rows show those keys. Passwords, codes and card details are never asked for here.
 - **Your turn.** A sign-in, a code or a captcha only the user can do. A card in a shell: a lock, "Sign in on", "Enter the code on" or "Solve the captcha on" and the site, and that the mascot has stepped back from the tab and can't see it, and what you type goes straight to the site. **Go to the tab**, then **I'm done**, which is the only thing that gives the tab back, and **Not now** as quiet text. The site comes from the tab's address and the words from code, so a page can't write them. The line under the card says the mascot waits here until you say so, with the pips in `ask` held still, because the live step above is already moving.
 - **When the user is on the tab already,** Go to the tab goes, and **I'm done** is the filled one.
-- **Done.** The answer, then one row of chips: the steps folded into one ("7 steps on klm.com", which opens them) and each page it used, by icon and title, which open as your own tabs. Then **Copy** and, only after a job that did some work, **Save as routine**, on the last reply only: 28px icons in `ink-3` with no words and no outline, each with its name as a tooltip and to assistive technology. They show only while the pointer is on that reply or the keyboard is in it, and their row keeps its height the rest of the time, so nothing moves. Copy turns to a tick for a moment once it's copied. The chips are what the reply found, so they always show. There's no thumbs up or down until pressing one would do something. A step worth seeing on any trail, something asked, refused or handed back, still shows under the chips while they're folded.
+- **Done.** The folded line, the answer, then what it found: each page it used as a chip on `sheet` with `chip`, with its icon, title and site, which open as your own tabs. Then **Copy** and, only after a job that did some work, **Save as routine**, on the last reply only: 28px icons in `ink-3` with no words and no outline, each with its name as a tooltip and to assistive technology. They show only while the pointer is on that reply or the keyboard is in it, and their row keeps its height the rest of the time, so nothing moves. Copy turns to a tick for a moment once it's copied. The chips are what the reply found, so they always show. There's no thumbs up or down until pressing one would do something. A step worth seeing on any trail, something asked, refused or handed back, still shows under the line while it's folded.
 - **Something to remember.** Rarely, under a finished reply, one strip on `sheet-2`: the mascot looking curious, the fact in the words it would be kept in, **Remember**, raised, and **No thanks** as quiet text. Ignoring it is as good as No thanks. When and how seldom this appears, and what can never be kept, are unchanged: see What a bird remembers in the old document.
-- **Stopped.** The chips as for done, then "You stopped this after 3 steps.", with the reply's face at rest, and **Carry on**, raised, which says "Carry on" as you.
-- **Went wrong.** The reply's face in Oops, what happened in plain words under anything it did write, **Try again**, filled, which says "Try again" as you, and **See the 5 steps**, raised, which opens them.
+- **Stopped.** The folded line and what it found, as for done, then "You stopped this after 3 steps.", with the reply's face at rest, and **Carry on**, raised, which says "Carry on" as you.
+- **Went wrong.** The reply's face in Oops, what happened in plain words under anything it did write, and **Try again**, filled, which says "Try again" as you. The folded line above opens its steps.
 
 ### The working view
 
@@ -724,6 +727,31 @@ The title, with **Open folder** raised on its right, which shows the folder file
 
 Files save straight to the folder with no dialog unless Settings says to ask, and never overwrite: a second `report.pdf` becomes `report (1).pdf`. The toolbar has one Downloads button, which opens this page. While anything is running, a ring around the icon shows the combined progress, and the button's label names each file with its percentage. There's no popover, so nothing floats over the page.
 
+### Needs you
+
+Mock: [chat-and-asking.html](./docs/design/mocks/chat-and-asking.html).
+
+Everything waiting for you, from every chat and routine, on one page, on the frame (A page in a tab). Opens as a tab from the sidebar, the menu or the toolbar, with only one open at a time.
+
+- **On top,** the title and one line that counts: "3 things are waiting, from 3 chats. The oldest has waited 4 minutes."
+- **One is open at a time,** the oldest first, as the real card, the same one its chat shows. Over its words: the asking mascot at 20px, its name and the job (the chat's title or the routine's name), and how long it's waited in mono. Then the sentence, the exact words with what the reason is about marked, and **Allow** and **Don't allow**, both always showing. In the shell under the card, why it's asking, and **Open the chat** or **Open the routine**.
+- **The rest are one line each,** in a sheet under it: the mascot with the `ask` dot, what it wants at 14px medium, its name and the job at 13px in `ink-2`, how long it's waited, and a faint arrow. Pressing one opens it as the card, and the one that was open becomes a row.
+- **A question** opens as its card with its answers and, since this page has no prompt box, one field under them with **Answer**. **Your turn** opens as its card, with Go to the tab, I'm done and Not now.
+- **After an answer,** from here or from the phone, the card says what happened for about a second and a half, "Allowed. Scout carries on.", and the next oldest opens. The open card has the keyboard, so Enter and Escape answer it (see Keys, under What a reply can be).
+- **Under the list,** how many have been answered this visit, in mono, "1 of 3 answered", and across from it one line about the phone: "Replies from your phone are on", "Replies from your phone are paused" with a problem, or **Answer these from your phone**, which opens Settings at Phone.
+- **Nothing waiting** is one sheet: the mascots at rest and "Nothing needs you right now." Anyone working is named instead, because resting has to be true.
+- Last, one quiet line: passwords and codes go in the page, not through the model.
+
+It answers through `chat:decide`, like the card in a chat, and the job goes on behind it.
+
+**A blocked job asks.** A sign-in, a code or a captcha is something only the user does, so the job calls `hand_to_user` and the row says "Scout needs you to sign in on github.com" or "Scout needs a code for linkedin.com". The site comes from the tab's address and the words from code, so a page can't write them.
+
+- **Go to the tab** goes there. The toolbar on that tab says "Scout can't see this tab" with **I'm done**, in both layouts, since that's where the user will be when they finish. The row has **I'm done** too, and **Not now**. No control on the row or the tab takes a secret. The only text box answers a question, and the question can't ask for one.
+- **While the user has it,** no job can reach the tab: not the one that asked, not another with the page open, and no message sends it along. Tools get an error saying the user is busy there. The chat composer says the mascot can't see it, and the working icon and reading ring go away.
+- **I'm done** gives the tab back and Berry reads it again. A sign-in can land on an address with a code or token in it, so from then on, while that tab is open, the query and fragment of its address are kept out of everything the model is told. This is the one way a taken tab returns to a job, apart from sending it with a message or a code going in from the phone. The next click there takes it over again, as it would any other time.
+- **Not now** tells Berry no. If the user touched the tab it stays theirs and out of every job's reach, so Berry can't read something left half typed, until they close it or send it with a message. If they didn't, it stays the job's. Closing the tab counts as Not now. Stop or closing the app ends the job the same way.
+- Any Ask before acting setting hands over, because this isn't permission: Berry simply can't do it.
+
 ## 11. Not redrawn yet
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
@@ -732,7 +760,7 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Find in page, zoom and printing, the page menu
 - Show Berry how
 - Gallery and Publishing
-- Needs you, and answering from the phone
+- Answering from the phone
 - Restoring tabs, A page in trouble, Damaged saved data
 - The cloud tab
 - A chat on the runner
@@ -748,20 +776,16 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 
 - Bookmark folders. Bookmarks are one list until they exist.
 - Allowing for the rest of a job, or always on a site, and the list of what's allowed on a mascot's card.
-- The reason under an approval, which needs the tool layer to say why it asked.
-- Answers to press on a question.
 - Take over on one of the user's own tabs, which needs a way to put a tab out of a job's reach that the job didn't open.
 - The mascot standing on what it's acting on, in place of the bird that flew.
 - Steps and pills that say what was typed.
 - Steps in the present tense while they happen. Main writes each step once, in the past tense, so the live one says "Read klm.com" until then.
-- How long a finished job took, on its steps chip, and how long a reply with no tabs has been working. Only the working view knows when a job began, so Working shows a time only while a job uses tabs.
 - `@` in the box to choose a mascot.
 
 **Still open:**
 
 - **Choosing a look with mascots hidden:** every berry is the plain icon, so the first step only has their names. Whether that step should draw them anyway is open.
 
-- **Needs you** as a full page. Chats leads to it, and it isn't drawn.
 - **The words** "bird" and "flock" are still in the code, in AGENTS.md and in the old document.
 
 ## 13. Accessibility
