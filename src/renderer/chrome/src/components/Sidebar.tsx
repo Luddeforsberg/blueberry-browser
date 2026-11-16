@@ -14,7 +14,7 @@ import { buttonVariants } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
-import { setRoutinesView } from '../routinesView'
+import { openRoutines } from '../routinesView'
 import { dockFaces, openMascots } from '../flockView'
 import { BERRY_ID } from '@shared/mascots'
 import { AccountButton, AccountMenu } from './AccountMenu'
@@ -233,11 +233,8 @@ const TabsFace: React.FC = () => {
 // --- Chats ----------------------------------------------------------------------------------------------------------
 
 const openChat = (chat: Pick<ChatThreadSummary, 'id' | 'title'>) => void window.chromeAPI.browser.openPage('chat', { param: chat.id, title: chat.title })
-// Named in the page's param too, since from Chats over a page this runs in the overlay's view, not the page's.
-const openRoutine = (routine: Pick<Routine, 'id'>) => {
-    setRoutinesView({ page: 'detail', id: routine.id })
-    void window.chromeAPI.browser.openPage('routines', { param: routine.id })
-}
+// Named in the page's param, which also works from Chats over a page, where this runs in the overlay's view.
+const openRoutine = (routine: Pick<Routine, 'id'>) => openRoutines({ page: 'routine', id: routine.id })
 
 // A chat in the sidebar. Its menu, from a right click or the button that shows on hover, renames or deletes it.
 export const ChatRow: React.FC<{

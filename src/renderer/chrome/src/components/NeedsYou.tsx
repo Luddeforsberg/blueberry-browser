@@ -5,7 +5,7 @@ import { ExactWords } from '@common/components/ApprovalCard'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { setRoutinesView } from '../routinesView'
+import { openRoutines } from '../routinesView'
 import { withSiteNames } from '../siteNames'
 import { Berry, useAssistantName } from './Berry'
 
@@ -80,8 +80,7 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
     }
     const openJob = () => {
         if (item.routineId) {
-            setRoutinesView({ page: 'detail', id: item.routineId })
-            void browser.openPage('routines')
+            openRoutines({ page: 'routine', id: item.routineId })
         } else {
             void browser.openPage('chat', { param: id, title: item.job })
         }

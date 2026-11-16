@@ -39,18 +39,37 @@ test.afterEach(async () => {
 
 const createRoutine = async (chrome: Page) => {
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
+  await expect(chrome.getByText(/A routine is a job I do again by myself/)).toBeVisible();
   await chrome.getByRole("button", { name: "New routine" }).click();
-  await chrome.getByRole("button", { name: "Save" }).click();
-  await expect(chrome.getByRole("alert")).toHaveText("Give the routine a name.");
 
-  await chrome.getByLabel("Name").fill("Flight watch");
-  await chrome.getByLabel("What should it do?").fill("Check the prices");
+  // Four questions, one at a time, and the name is never one of them.
+  await expect(chrome.getByRole("button", { name: "Continue" })).toBeDisabled();
+  await chrome.getByRole("textbox", { name: "What should I do?" }).fill("Check the prices");
+  await chrome.getByRole("button", { name: "Continue" }).click();
+
   await chrome.getByRole("radio", { name: "Weekly" }).click();
-  await chrome.getByRole("button", { name: "Saturday" }).click();
-  await chrome.getByLabel("Time").fill("07:30");
-  await chrome.getByRole("button", { name: "Save" }).click();
+  const days = chrome.getByRole("group", { name: "Days" });
+  await days.getByRole("button", { name: "Saturday", pressed: false }).click().catch(() => undefined);
+  for (const label of await days.getByRole("button", { pressed: true }).evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")))) {
+    if (label !== "Saturday") await days.getByRole("button", { name: label! }).click();
+  }
+  await chrome.getByRole("radio", { name: "Other…" }).click();
+  await chrome.getByLabel("Other time").fill("07:30");
+  await expect(chrome.getByText("Every Saturday at 07:30", { exact: true })).toBeVisible();
+  await chrome.getByRole("button", { name: "Continue" }).click();
+  await chrome.getByRole("button", { name: "Continue" }).click();
+  await expect(chrome.getByRole("radiogroup", { name: "Where it may go" })).toBeVisible();
+
+  // Named the way a chat is, from what it does and nothing else.
+  model.titleWith("Flight watch");
+  await chrome.getByRole("button", { name: "Save routine" }).click();
+  const saved = chrome.getByRole("region", { name: "Saved as a routine" });
+  await expect(saved).toContainText("Every Saturday at 07:30, Berry will check the prices");
+  await expect.poll(() => model.titleRequests.length).toBe(1);
+  expect(JSON.stringify(model.titleRequests[0].messages)).toContain("Check the prices");
+  await saved.getByRole("button", { name: "Done" }).click();
   await expect(chrome.getByRole("heading", { name: "Flight watch" })).toBeVisible();
-  await expect(chrome.getByText(/at 07:30/)).toBeVisible();
+  await expect(chrome.getByText("Every Saturday at 07:30").first()).toBeVisible();
 };
 
 test("a routine is created, runs behind the user, asks first, and doesn't act after the app closes", async () => {
@@ -71,12 +90,12 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   model.callTools({ name: "read_page", args: {} });
   model.replyWith("Three flights ", "under €200.");
   const finishReply = model.holdBeforeFirstToken();
-  await chrome.getByRole("button", { name: "Run now" }).click();
+  await chrome.getByRole("button", { name: "Run now", exact: true }).click();
 
   const question = `Open ${address} in a new tab`;
   const cards = chrome.getByRole("region", { name: "Approval needed" });
   await expect(cards.getByText(question)).toBeVisible();
-  await expect(chrome.getByText("Needs your OK").first()).toBeVisible();
+  await expect(chrome.getByText("Needs you", { exact: true }).first()).toBeVisible();
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id), (await tabs()).find((tab) => !tab.page || tab.page === "new-tab")!.id);
   await expect(chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible();
   await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).needsYou.map(({ approval }) => approval.text)).toEqual([question]);
@@ -107,7 +126,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   // Run again, and close the app while it's waiting.
   requested = [];
   model.callTools({ name: "open_tab", args: { url: address } });
-  await chrome.getByRole("button", { name: "Run now" }).click();
+  await chrome.getByRole("button", { name: "Run now", exact: true }).click();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(1);
   // Tabs come back on the next launch, and with Routines in front there would be no news left to show.
   await chrome.evaluate(() => window.chromeAPI.browser.createTab());
@@ -132,7 +151,7 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   model.callTools({ name: "open_tab", args: { url: address } });
   await chrome.getByRole("button", { name: "Run again" }).click();
   await expect(chrome.getByRole("region", { name: "Approval needed" })).toHaveCount(1);
-  await chrome.getByRole("button", { name: "Stop" }).click();
+  await chrome.getByRole("list", { name: "Runs" }).getByRole("button", { name: "Stop" }).click();
   await expect(chrome.getByText("Stopped", { exact: true })).toBeVisible();
   // Where it was stopped stays on the run's trail.
   await expect(chrome.getByText("Stopped here")).toBeVisible();

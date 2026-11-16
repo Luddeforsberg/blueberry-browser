@@ -1,110 +1,135 @@
 import React, { useEffect, useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import type { TabInfo } from '@shared/ipc'
 import type { Routine, RoutineRun } from '@shared/library'
+import { routinesParam, routinesPlace, type RoutinePart } from '@shared/routinePlaces'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
+import { StatusPill, type PillTone } from '@common/components/StatusPill'
 import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
-import { RoutineForm } from '../components/RoutineForm'
+import { EmptySheet, PageFrame, PageHeader } from '../components/PageFrame'
+import { BackButton, BETWEEN, SettingsGroup, SettingsLink } from '../components/SettingsRow'
 import { ShowHowButton } from '../components/ShowBerry'
-import { formatTime, RoutineApprovals, RoutineRunCard, RoutineStatusLabel } from '../components/RoutineRunCard'
-import { blankForm, formFor, routinesView, setRoutinesView, type RoutinesView } from '../routinesView'
+import { RoutineRunRow } from '../components/RoutineRunRow'
+import { forgetTabDraftElsewhere } from '../flockView'
+import { formFor, nextInWords, openRoutines, scheduleSentence, sentenceText, startRoutine } from '../routinesView'
+import { ChangeRoutinePart, NewRoutine, PART_NAMES } from './RoutineSteps'
+
+// DESIGN.md section 10, Routines: a page in a tab, with the list, each routine's own page, making one in four steps,
+// and changing one part. Where it is lives in the tab's param (routinePlaces.ts).
 
 const api = () => window.chromeAPI.routines
-const ROW_BIRD = 48
-const HIDDEN_ICON = 24
-// How far down the standing drawing its feet reach.
-const FEET_Y = 113 / 120
+const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
-const moodFor = (status: Routine['status']): Mood => {
-    switch (status) {
+const moodFor = (status: Routine['status']): Mood => (status === 'running' ? 'fetching' : status === 'needs-approval' ? 'asking' : 'rest')
+
+const going = (routine: Routine) => routine.status === 'running' || routine.status === 'needs-approval'
+
+// Its state as a pill: going, waiting for you, paused, gone wrong, or when it's next.
+const stateOf = (routine: Routine): { words: string; tone?: PillTone } => {
+    switch (routine.status) {
         case 'running':
-            return 'fetching'
+            return { words: 'Running', tone: 'on' }
         case 'needs-approval':
-            return 'asking'
-        case 'finished':
-            return 'delivered'
+            return { words: 'Needs you', tone: 'ask' }
+        case 'queued':
+            return { words: 'Waiting to start' }
+        case 'paused':
+            return { words: 'Paused' }
         case 'failed':
+            return { words: 'Failed', tone: 'ask' }
         case 'interrupted':
-            return 'oops'
+            return { words: 'Interrupted', tone: 'ask' }
         default:
-            return 'rest'
+            if (routine.scheduleSpec.kind === 'manual') return { words: 'Only when you ask' }
+            return routine.nextRunAt !== null ? { words: `Scheduled · ${nextInWords(routine.nextRunAt)}` } : { words: 'Not scheduled' }
     }
 }
 
-const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ onNew, onOpen }) => {
-    const { routines } = useLibrary()
-    const isBerry = useAssistantName() === 'Berry'
-    const { find } = useFlock()
-    const { showBerry } = useShell().settings
-    const standing = showBerry ? ROW_BIRD : HIDDEN_ICON
+const scheduleWords = (routine: Routine) => sentenceText(scheduleSentence(formFor(routine)))
 
+// Run now, or Stop while a run is going. Run now waits its turn when two are already working.
+const runOrStop = (routine: Routine) => {
+    if (going(routine) && routine.latestRun) void api().stop(routine.latestRun.id)
+    else void api().runNow(routine.id)
+}
+
+// One row per routine. The whole row opens its page, and Run now or Stop shows on the row you're on, by pointer or
+// keyboard, in place of its state.
+const RoutineRow: React.FC<{ routine: Routine }> = ({ routine }) => {
+    const mascot = useFlock().find(routine.mascotId)
+    const state = stateOf(routine)
+    const queued = routine.status === 'queued'
+    return (
+        <li className={cn(BETWEEN, 'group before:left-[66px] relative min-h-16 py-[13px] pl-4 pr-3.5 flex items-center gap-3.5 transition-colors hover:bg-sheet-2/50 focus-within:bg-sheet-2/50 first:rounded-t-sheet last:rounded-b-sheet')}>
+            <Berry mood={moodFor(routine.status)} size={36} mascot={mascot} />
+            <div className="flex-1 min-w-0">
+                <button
+                    type="button"
+                    onClick={() => openRoutines({ page: 'routine', id: routine.id })}
+                    className={cn("block max-w-full truncate text-left text-14 font-medium text-ink before:content-[''] before:absolute before:inset-0 before:rounded-[inherit]", FOCUS, 'focus-visible:ring-0 focus-visible:before:ring-2 focus-visible:before:ring-focus')}
+                >
+                    {routine.name}
+                </button>
+                <p className="mt-0.5 truncate text-13 text-ink-2">{[scheduleWords(routine), routine.cloudNote ?? routine.lastResult].join(' · ')}</p>
+            </div>
+            <span className="shrink-0 grid justify-items-end items-center [&>*]:[grid-area:1/1]">
+                <StatusPill tone={state.tone} className={cn('transition-opacity', !queued && 'group-hover:opacity-0 group-focus-within:opacity-0')}>{state.words}</StatusPill>
+                {!queued && (
+                    <Button size="sm" variant="raised" className="relative opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" aria-label={`${going(routine) ? 'Stop' : 'Run now'}: ${routine.name}`} onClick={() => runOrStop(routine)}>
+                        {going(routine) ? 'Stop' : 'Run now'}
+                    </Button>
+                )}
+            </span>
+            <ChevronRight aria-hidden className="size-3.5 shrink-0 -ml-1 text-faint" strokeWidth={1.75} />
+        </li>
+    )
+}
+
+const List: React.FC<{ routines: Routine[] }> = ({ routines }) => {
+    const isBerry = useAssistantName() === 'Berry'
     return (
         <>
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-20 font-semibold">Routines</h1>
-                    <p className="mt-1 text-14 text-ink-2">Work done for you on a schedule, in tabs of its own.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <ShowHowButton variant="raised" />
-                    <Button onClick={onNew}>New routine</Button>
-                </div>
-            </div>
-
-            <div className="mt-6 empty:hidden">
-                <RoutineApprovals />
-            </div>
-
+            <PageHeader
+                title="Routines"
+                actions={
+                    <>
+                        <ShowHowButton variant="raised" />
+                        <Button onClick={() => startRoutine()}>
+                            <Plus strokeWidth={1.75} />
+                            New routine
+                        </Button>
+                    </>
+                }
+            >
+                Work done for you on a schedule, in tabs of its own.
+            </PageHeader>
             {routines.length === 0 ? (
-                <div className="mt-16 flex flex-col items-center gap-3 text-center">
-                    <Berry mood="rest" size={88} />
-                    <p className="text-14 text-ink-2">
-                        {isBerry ? 'Nothing here yet. I looked under everything.' : 'No routines yet.'}
-                    </p>
-                </div>
+                <EmptySheet face={<Berry mood="rest" size={56} />}>
+                    {isBerry
+                        ? 'A routine is a job I do again by myself, when you say. Tell me what to do, or show me once.'
+                        : 'A routine is a job done again by itself, when you say. Say what to do, or show it once.'}
+                </EmptySheet>
             ) : (
-                // Rows with no box, each with the bird that runs it standing on the line under it, as in the Gallery.
-                <ul aria-label="Routines" className="mt-6 border-t">
-                    {routines.map((routine) => (
-                        <li key={routine.id} className="border-b">
-                            <button
-                                type="button"
-                                onClick={() => onOpen(routine.id)}
-                                className="w-full flex items-stretch gap-4 pr-3 text-14 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-                            >
-                                <span className={cn("shrink-0", showBerry ? "self-end" : "self-center ml-3")} style={{ width: standing, height: showBerry ? standing * FEET_Y : standing }}>
-                                    <Berry mood={moodFor(routine.status)} size={standing} mascot={find(routine.mascotId)} />
-                                </span>
-                                <span className="min-w-0 flex-1 py-3 flex items-center gap-6">
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block truncate font-medium">{routine.name}</span>
-                                        <span className="mt-0.5 block text-13 text-ink-2 line-clamp-2">
-                                            {[routine.schedule, routine.cloudNote ?? routine.lastResult].filter(Boolean).join(' · ')}
-                                        </span>
-                                    </span>
-                                    <span className="shrink-0">
-                                        <RoutineStatusLabel status={routine.status} />
-                                    </span>
-                                </span>
-                            </button>
-                        </li>
-                    ))}
+                <ul aria-label="Routines" className="rounded-sheet bg-sheet shadow-up">
+                    {routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)}
                 </ul>
             )}
         </>
     )
 }
 
-const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => void }> = ({ routine, onBack, onEdit }) => {
+// A routine's own page: what it is, a row for each part you can change, its runs, and Delete.
+const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
     const library = useLibrary()
     const mascot = useFlock().find(routine.mascotId)
+    const who = useAssistantName(mascot)
     const [runs, setRuns] = useState<RoutineRun[]>([])
-    const open = routine.status === 'running' || routine.status === 'needs-approval'
-    const waiting = routine.status === 'queued'
+    const state = stateOf(routine)
+    const queued = routine.status === 'queued'
+    const part = (which: RoutinePart) => () => openRoutines({ page: 'part', id: routine.id, part: which })
 
     // The library changes whenever a run takes a step.
     useEffect(() => {
@@ -112,82 +137,80 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
     }, [routine.id, library])
 
     const remove = async () => {
-        if (await api().delete(routine.id)) onBack()
+        if (await api().delete(routine.id)) openRoutines({ page: 'list' })
     }
 
     return (
         <>
-            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
-                <ChevronLeft strokeWidth={1.75} />
-                Routines
-            </Button>
-            <div className="mt-2 flex items-start justify-between gap-6">
-                <div className="min-w-0">
-                    <h1 className="text-20 font-semibold [overflow-wrap:anywhere]">{routine.name}</h1>
-                    <p className="mt-1 text-14 text-ink-2">
-                        {routine.schedule}
-                        {routine.nextRunAt !== null && !routine.paused && ` · next ${formatTime(routine.nextRunAt)}`}
-                        {routine.mascotId && ` · runs as ${mascot.name}`}
-                        {routine.sites.length > 0 && ` · ${routine.sites.length === 1 ? `stays on ${routine.sites[0]}` : `stays on ${routine.sites.length} sites`}`}
-                    </p>
+            <BackButton back="Routines" onBack={() => openRoutines({ page: 'list' })} />
+            <section aria-label={routine.name} className="rounded-sheet bg-sheet shadow-up pt-5 pr-[18px] pb-5 pl-[22px] flex items-start gap-5">
+                <Berry mood={moodFor(routine.status)} size={64} mascot={mascot} className="mt-0.5" />
+                <div className="flex-1 min-w-0">
+                    <h1 className="mb-1 text-20 font-semibold [overflow-wrap:anywhere]">{routine.name}</h1>
+                    <p className="text-14 text-ink-2">{scheduleWords(routine)}</p>
+                    {routine.cloudNote && <p className="mt-0.5 text-13 text-ink-2">{routine.cloudNote}</p>}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <StatusPill tone={state.tone}>{state.words}</StatusPill>
+                    </div>
                 </div>
-                <Berry mood={moodFor(routine.status)} size={64} mascot={mascot} className="shrink-0" />
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Button
-                    disabled={open || waiting}
-                    title={open ? 'It’s running now' : waiting ? 'It’s waiting to start' : undefined}
-                    onClick={() => void api().runNow(routine.id)}
-                >
-                    Run now
-                </Button>
-                <Button variant="raised" onClick={() => void api().setPaused(routine.id, !routine.paused)}>
-                    {routine.paused ? 'Resume' : 'Pause'}
-                </Button>
-                <Button variant="raised" onClick={onEdit}>Edit</Button>
-                <Button variant="ghost" className="text-ask" onClick={() => void remove()}>Delete</Button>
-            </div>
-
-            <section aria-labelledby="routine-instructions" className="mt-8">
-                <h2 id="routine-instructions" className="text-14 font-medium">What it does</h2>
-                <p className="mt-2 text-14 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{routine.instructions}</p>
+                <div className="shrink-0 flex items-center gap-2">
+                    {routine.scheduleSpec.kind !== 'manual' && (
+                        <Button variant="raised" onClick={() => void api().setPaused(routine.id, !routine.paused)}>{routine.paused ? 'Resume' : 'Pause'}</Button>
+                    )}
+                    <Button disabled={queued} title={queued ? 'It’s waiting to start' : undefined} onClick={() => runOrStop(routine)}>
+                        {going(routine) ? 'Stop' : 'Run now'}
+                    </Button>
+                </div>
             </section>
 
-            <section aria-labelledby="routine-history" className="mt-8">
-                <h2 id="routine-history" className="text-14 font-medium">Run history</h2>
+            <SettingsGroup label="Change">
+                <SettingsLink title={PART_NAMES.name} value={<span>{routine.name}</span>} onOpen={part('name')} />
+                <SettingsLink title={PART_NAMES.does} value={<span>{routine.instructions}</span>} onOpen={part('does')} />
+                <SettingsLink title={PART_NAMES.when} value={<span>{scheduleWords(routine)}</span>} onOpen={part('when')} />
+                <SettingsLink title={PART_NAMES.who} value={<><Berry size={20} mascot={mascot} still /><span>{who}</span></>} onOpen={part('who')} />
+                <SettingsLink title={PART_NAMES.where} value={<span>{routine.sites.length > 0 ? routine.sites.join(', ') : 'Anywhere'}</span>} onOpen={part('where')} />
+            </SettingsGroup>
+
+            <SettingsGroup label="Runs">
                 {runs.length === 0 ? (
-                    <p className="mt-2 text-14 text-ink-2">It hasn’t run yet.</p>
+                    <p className="min-h-[52px] px-4 flex items-center text-14 text-ink-2">It hasn’t run yet.</p>
                 ) : (
-                    <ol className="mt-3 flex flex-col gap-3">
-                        {runs.map((run) => (
-                            <RoutineRunCard
+                    <ol aria-label="Runs">
+                        {runs.map((run, at) => (
+                            <RoutineRunRow
                                 key={run.id}
                                 run={run}
+                                open={at === 0}
                                 onStop={() => void api().stop(run.id)}
-                                onRunAgain={open || waiting ? undefined : () => void api().runNow(routine.id)}
+                                onRunAgain={going(routine) || queued ? undefined : () => void api().runNow(routine.id)}
                             />
                         ))}
                     </ol>
                 )}
-            </section>
+            </SettingsGroup>
+
+            <Button size="sm" variant="ghost" className="mt-5 text-ask hover:text-ask" onClick={() => void remove()}>
+                Delete {routine.name}
+            </Button>
         </>
     )
 }
 
+// A routine the page was left on that has since been deleted, or a place a restored session names that isn't there.
+const Gone: React.FC = () => (
+    <>
+        <BackButton back="Routines" onBack={() => openRoutines({ page: 'list' })} />
+        <EmptySheet>This routine isn’t here any more.</EmptySheet>
+    </>
+)
+
 export const RoutinesPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { routines } = useLibrary()
-    const [view, setViewState] = useState<RoutinesView>(routinesView)
+    const place = routinesPlace(tab.pageParam)
+    const param = routinesParam(place)
 
-    const setView = (next: RoutinesView) => {
-        setRoutinesView(next)
-        setViewState(next)
-    }
-
-    // A routine named in the param, as from Chats over a page, opens at its detail.
-    useEffect(() => {
-        if (tab.pageParam) setView({ page: 'detail', id: tab.pageParam })
-    }, [tab.pageParam])
+    // Leaving part way keeps nothing: what was typed belongs to the place it was typed in.
+    useEffect(() => forgetTabDraftElsewhere(tab.id, param), [tab.id, param])
 
     // Being here is seeing them, so the dots elsewhere clear.
     const unseen = routines.some((routine) => routine.unseen)
@@ -195,28 +218,31 @@ export const RoutinesPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         if (unseen) void api().markSeen()
     }, [unseen])
 
-    const opened = view.page === 'detail' ? routines.find((routine) => routine.id === view.id) : undefined
+    const routine = place.page === 'routine' || place.page === 'part' ? routines.find((each) => each.id === place.id) ?? null : null
 
     return (
-        <div className="h-full overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-10">
-                {view.page === 'form' ? (
-                    <RoutineForm
-                        values={view.values}
-                        onChange={(values) => setView({ page: 'form', values })}
-                        onCancel={() => setView(view.values.id ? { page: 'detail', id: view.values.id } : { page: 'list' })}
-                        onSaved={(id) => setView({ page: 'detail', id })}
-                    />
-                ) : opened ? (
-                    <Detail
-                        routine={opened}
-                        onBack={() => setView({ page: 'list' })}
-                        onEdit={() => setView({ page: 'form', values: formFor(opened) })}
-                    />
-                ) : (
-                    <List onNew={() => setView({ page: 'form', values: blankForm() })} onOpen={(id) => setView({ page: 'detail', id })} />
-                )}
-            </div>
-        </div>
+        <PageFrame>
+            {place.page === 'new' ? (
+                <>
+                    <BackButton back="Routines" onBack={() => openRoutines({ page: 'list' })} />
+                    <div className="mt-14">
+                        <NewRoutine tabId={tab.id} routines={routines} />
+                    </div>
+                </>
+            ) : place.page !== 'list' && !routine ? (
+                <Gone />
+            ) : place.page === 'part' && routine ? (
+                <>
+                    <BackButton back={routine.name} onBack={() => openRoutines({ page: 'routine', id: routine.id })} />
+                    <div className="mt-14">
+                        <ChangeRoutinePart key={param} tabId={tab.id} routine={routine} part={place.part} />
+                    </div>
+                </>
+            ) : routine ? (
+                <RoutineView key={routine.id} routine={routine} />
+            ) : (
+                <List routines={routines} />
+            )}
+        </PageFrame>
     )
 }

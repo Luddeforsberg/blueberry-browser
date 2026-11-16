@@ -13,7 +13,7 @@ import { Composer, type PillFace } from '../components/Composer'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 import { startMascot, suggestedMascot } from '../flockView'
-import { setRoutinesView, suggestedForm } from '../routinesView'
+import { openRoutines, startRoutine, suggestedForm } from '../routinesView'
 import { asContinuation, withSiteNames } from '../siteNames'
 import { SuggestionItem } from '../components/SuggestionItem'
 import { suggestionRows, type SuggestionRow } from '../newTabSuggestions'
@@ -77,8 +77,7 @@ const limitsOf = (mascot: MascotProfile): string | null => {
 
 const openJob = (item: Pick<NeedsYouItem, 'id' | 'job' | 'routineId'>) => {
     if (item.routineId) {
-        setRoutinesView({ page: 'detail', id: item.routineId })
-        void window.chromeAPI.browser.openPage('routines')
+        openRoutines({ page: 'routine', id: item.routineId })
     } else {
         void window.chromeAPI.browser.openPage('chat', { param: item.id, title: item.job })
     }
@@ -165,8 +164,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         if (suggestion.kind === 'prompt') {
             fill(`suggestion-${suggestion.id}`, suggestion.id, suggestion.prompt)
         } else if (suggestion.kind === 'routine') {
-            setRoutinesView({ page: 'form', values: suggestedForm(suggestion.draft, suggestion.id) })
-            void browser.openPage('routines')
+            startRoutine(suggestedForm(suggestion.draft, suggestion.id))
         } else {
             startMascot(suggestedMascot(suggestion.draft, suggestion.id))
         }

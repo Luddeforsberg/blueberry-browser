@@ -165,7 +165,7 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
       changes: [{ label: "Search term", value: "usb-c cable" }],
     }));
     await chrome.getByRole("button", { name: "Turn this into a routine" }).click();
-    await expect(chrome.getByRole("heading", { name: "New routine" })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "What should I do?" })).toBeVisible();
     const sent = JSON.stringify(model.titleRequests[0].messages);
     expect(sent).toContain("Add to cart");
     expect(sent).not.toContain(PASSWORD);
@@ -173,8 +173,6 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     // A page's name for something goes as data, marked as such.
     expect(sent).toContain("page_label");
 
-    await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Buy a cable");
-    await expect(chrome.getByRole("textbox", { name: "Sites it may use" })).toHaveValue("127.0.0.1");
     const library = await chrome.evaluate(() => window.chromeAPI.library.getLibrary());
     expect(library.routines).toHaveLength(0);
     expect((await chrome.evaluate(() => window.chromeAPI.recording.state())).steps).toHaveLength(0);
@@ -182,15 +180,24 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     // Changing what might change changes the instructions.
     await chrome.getByRole("textbox", { name: "Search term" }).fill("hdmi cable");
     await chrome.getByRole("textbox", { name: "Search term" }).blur();
-    await expect(chrome.getByRole("textbox", { name: "What should it do?" })).toHaveValue(/hdmi cable/);
+    await expect(chrome.getByRole("textbox", { name: "What should I do?" })).toHaveValue(/hdmi cable/);
+
+    // Only when asked, by Berry, and only on the sites it was shown.
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await expect(chrome.getByRole("radio", { name: "Only when you ask" })).toHaveAttribute("aria-checked", "true");
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await expect(chrome.getByRole("radio", { name: "Only these sites" })).toHaveAttribute("aria-checked", "true");
+    await expect(chrome.getByRole("list", { name: "Sites it may use" }).getByRole("listitem")).toHaveText(["127.0.0.1", "Add a site"]);
 
     // The run goes the normal way, and the tools stop it going off the sites it was shown.
     model.reset();
     model.callTools({ name: "open_tab", args: { url: "https://evil.example/" } });
     model.replyWith("Done, and I stayed where you showed me.");
-    await chrome.getByRole("button", { name: "Save and run it now" }).click();
+    await chrome.getByRole("button", { name: "Save routine" }).click();
+    await chrome.getByRole("button", { name: "Run it now" }).click();
     await expect(chrome.getByRole("heading", { name: "Buy a cable" })).toBeVisible();
-    await expect(chrome.getByText("When you ask")).toBeVisible();
+    await expect(chrome.getByText("Only when you ask").first()).toBeVisible();
     await expect(chrome.getByText("Done, and I stayed where you showed me.").first()).toBeVisible({ timeout: 20_000 });
     await expect(chrome.getByText(/Stayed off evil\.example/).first()).toBeVisible();
     expect(JSON.stringify(model.requests[0].messages)).toContain("hdmi cable");

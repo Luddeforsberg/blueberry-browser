@@ -24,7 +24,7 @@ import { PublishMascot } from './PublishMascot'
 import { MascotMemory } from './MascotMemory'
 import { ChangePart, LimitTags, NewMascot } from './MascotSteps'
 import { blankPublish, forgetTabDraftElsewhere, keepTabDraft, mascotForm, openMascots, startMascot, tabDraft, toMascotDraft, type PublishValues } from '../flockView'
-import { blankForm, setRoutinesView } from '../routinesView'
+import { blankForm, startRoutine } from '../routinesView'
 
 // DESIGN.md section 10, Your mascots: a page in a tab, built like Settings, with the list, each mascot's own page, making
 // one in steps, changing one part, and what each remembers. Where it is lives in the tab's param (flockPlaces.ts).
@@ -190,10 +190,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                     <Button
                         size="sm"
                         variant="raised"
-                        onClick={() => {
-                            setRoutinesView({ page: 'form', values: blankForm('', '', isBerry ? null : mascot.id) })
-                            void window.chromeAPI.browser.openPage('routines')
-                        }}
+                        onClick={() => startRoutine(blankForm('', '', isBerry ? null : mascot.id))}
                     >
                         New routine
                     </Button>

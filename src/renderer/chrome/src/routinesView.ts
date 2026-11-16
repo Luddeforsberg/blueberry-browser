@@ -1,8 +1,10 @@
 import type { RecordedChange, RecordedDraft, Routine, RoutineDraft, RoutineSchedule } from '@shared/library'
+import { routinesParam, type RoutinePart, type RoutinePlace } from '@shared/routinePlaces'
 
 export interface RoutineFormValues {
     // Null for a new routine.
     id: string | null
+    // Never asked for while making one. Empty means main names it from what it does, or keeps the name it has.
     name: string
     instructions: string
     kind: RoutineSchedule['kind']
@@ -12,8 +14,10 @@ export interface RoutineFormValues {
     day: number
     // Who runs it. Null is Berry.
     mascotId: string | null
-    // The sites a run may use, as typed, split by commas. Empty adds no limit.
-    sites: string
+    // Only these sites, or anywhere. The sites are kept while it's anywhere, so turning it back on finds them.
+    onlySomeSites: boolean
+    // Each as the user added it. Main checks them again when it's saved.
+    sites: string[]
     // Runs on its schedule in the cloud, even with the Mac off. Only offered with a runner linked.
     inCloud?: boolean
     // The suggestion that filled this in, which goes away once it's saved.
@@ -27,11 +31,6 @@ export interface RecordedChangeValue extends RecordedChange {
     // What the instructions say at the moment, which `value` differs from while it's being typed.
     applied: string
 }
-
-export type RoutinesView =
-    | { page: 'list' }
-    | { page: 'detail'; id: string }
-    | { page: 'form'; values: RoutineFormValues }
 
 const pad = (value: number) => String(value).padStart(2, '0')
 
@@ -50,7 +49,8 @@ export const blankForm = (name = '', instructions = '', mascotId: string | null 
         days: [tomorrow.getDay()],
         day: tomorrow.getDate(),
         mascotId,
-        sites: ''
+        onlySomeSites: false,
+        sites: []
     }
 }
 
@@ -67,13 +67,14 @@ const withSchedule = (blank: RoutineFormValues, schedule: RoutineSchedule): Rout
 }
 
 export const formFor = ({ id, name, instructions, mascotId, sites, inCloud, scheduleSpec }: Routine): RoutineFormValues =>
-    withSchedule({ ...blankForm(name, instructions, mascotId), id, sites: sites.join(', '), inCloud }, scheduleSpec)
+    withSchedule({ ...blankForm(name, instructions, mascotId), id, onlySomeSites: sites.length > 0, sites, inCloud }, scheduleSpec)
 
 // It does nothing by itself until the user gives it a time, and the sites are the ones they used.
 export const recordedForm = ({ name, instructions, sites, changes }: RecordedDraft): RoutineFormValues => ({
     ...blankForm(name, instructions),
     kind: 'manual',
-    sites: sites.join(', '),
+    onlySomeSites: sites.length > 0,
+    sites,
     recorded: changes.map((change) => ({ ...change, ask: false, applied: change.value }))
 })
 
@@ -129,7 +130,7 @@ export const suggestedForm = ({ name, instructions, mascotId, schedule }: Routin
 
 export const toDraft = (form: RoutineFormValues): RoutineDraft => {
     // Saving with Enter leaves a field that hasn't been finished with.
-    const { name, instructions, kind, time, date, days, day, mascotId, sites, inCloud } = (form.recorded ?? []).reduce((values, _, at) => applyRecordedValue(values, at), form)
+    const { name, instructions, kind, time, date, days, day, mascotId, onlySomeSites, sites, inCloud } = (form.recorded ?? []).reduce((values, _, at) => applyRecordedValue(values, at), form)
     const schedule = (): RoutineSchedule => {
         switch (kind) {
             case 'manual':
@@ -144,14 +145,130 @@ export const toDraft = (form: RoutineFormValues): RoutineDraft => {
                 return { kind, day, time }
         }
     }
-    return { name, instructions, schedule: schedule(), mascotId, sites: sites.split(/[\s,]+/).filter(Boolean), ...(inCloud && kind !== 'manual' ? { inCloud } : {}) }
+    return { name, instructions, schedule: schedule(), mascotId, sites: onlySomeSites ? sites : [], ...(inCloud && kind !== 'manual' ? { inCloud } : {}) }
 }
 
-// Lasts while the page isn't showing, so going to another tab doesn't lose what's been typed.
-let current: RoutinesView = { page: 'list' }
+// What each part of a routine is, among the form's values. The name is its own part, so changing any other sends no
+// name, and main keeps the one it has.
+const PART_FIELDS = {
+    does: ['instructions', 'recorded'],
+    when: ['kind', 'time', 'date', 'days', 'day', 'inCloud'],
+    who: ['mascotId'],
+    where: ['onlySomeSites', 'sites'],
+    name: ['name']
+} as const satisfies Record<RoutinePart, readonly (keyof RoutineFormValues)[]>
 
-export const routinesView = () => current
+// The routine as it is now with one part as it was changed, so a part changed on its own never puts back anything
+// else from when it was opened.
+export const withRoutinePart = (current: RoutineFormValues, changed: RoutineFormValues, part: RoutinePart): RoutineFormValues => ({
+    ...current,
+    name: '',
+    ...Object.fromEntries(PART_FIELDS[part].map((field) => [field, changed[field]]))
+})
 
-export const setRoutinesView = (view: RoutinesView) => {
-    current = view
+// Save as routine from a chat: what to do is only what the user asked for, and who does it is the chat's mascot.
+export const chatRoutine = (title: string, messages: Array<{ role: string; content: string }>, mascotId: string | null): RoutineFormValues =>
+    blankForm(title, messages.filter((message) => message.role === 'user').map((message) => message.content).join('\n\n'), mascotId)
+
+// --- When ------------------------------------------------------------------------------------------------------------
+
+// How often, as the pills show it. Weekdays is Weekly with Monday to Friday chosen.
+export type HowOften = RoutineSchedule['kind'] | 'weekdays'
+
+export const WEEKDAYS = [1, 2, 3, 4, 5]
+export const TIME_CHIPS = ['07:00', '08:00', '09:00', '12:00', '17:00', '21:00']
+
+const isWeekdays = (days: number[]) => days.length === WEEKDAYS.length && WEEKDAYS.every((day) => days.includes(day))
+
+export const howOften = ({ kind, days }: Pick<RoutineFormValues, 'kind' | 'days'>): HowOften =>
+    kind === 'weekly' && isWeekdays(days) ? 'weekdays' : kind
+
+// Weekly from Weekdays starts again on one day, today's, so the two pills never look the same.
+export const withHowOften = (values: RoutineFormValues, often: HowOften): Partial<RoutineFormValues> => {
+    if (often === 'weekdays') return { kind: 'weekly', days: WEEKDAYS }
+    if (often === 'weekly' && (values.kind !== 'weekly' || isWeekdays(values.days))) return { kind: 'weekly', days: [new Date().getDay()] }
+    return { kind: often }
+}
+
+// Sunday first, as the schedule counts them.
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+const ordinal = (day: number) => {
+    const tens = day % 100
+    const suffixes: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' }
+    return `${day}${tens >= 11 && tens <= 13 ? 'th' : suffixes[day % 10] ?? 'th'}`
+}
+
+const listed = (words: string[]) => (words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`)
+
+// The schedule read back as a sentence, each part that was chosen marked, as in "Every **weekday** at **09:00**".
+export type SentencePart = { text: string; chosen?: boolean }
+
+export const scheduleSentence = ({ kind, time, date, days, day }: Pick<RoutineFormValues, 'kind' | 'time' | 'date' | 'days' | 'day'>): SentencePart[] => {
+    const at: SentencePart[] = [{ text: ' at ' }, { text: time, chosen: true }]
+    switch (kind) {
+        case 'manual':
+            return [{ text: 'Only when you ' }, { text: 'ask', chosen: true }]
+        case 'once': {
+            const on = new Date(`${date}T00:00`)
+            const words = Number.isNaN(on.getTime()) ? date : on.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+            return [{ text: 'Once, on ' }, { text: words, chosen: true }, ...at]
+        }
+        case 'daily':
+            return [{ text: 'Every ' }, { text: 'day', chosen: true }, ...at]
+        case 'weekly': {
+            if (isWeekdays(days)) return [{ text: 'Every ' }, { text: 'weekday', chosen: true }, ...at]
+            if (days.length === 7) return [{ text: 'Every ' }, { text: 'day', chosen: true }, ...at]
+            // Monday first, as the week reads.
+            const sorted = [...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+            return [{ text: 'Every ' }, { text: listed(sorted.map((each) => DAY_NAMES[each])) || 'week', chosen: true }, ...at]
+        }
+        case 'monthly':
+            return [{ text: 'On the ' }, { text: ordinal(day), chosen: true }, { text: ' of every month' }, ...at]
+    }
+}
+
+export const sentenceText = (parts: SentencePart[]) => parts.map(({ text }) => text).join('')
+
+// The whole routine as one sentence: "Every weekday at 09:00, Berry will read SVT…". The user's words stay as they
+// are, except a capital at the start of an ordinary first word.
+export const readBack = (values: Pick<RoutineFormValues, 'kind' | 'time' | 'date' | 'days' | 'day' | 'instructions'>, name: string): string => {
+    const when = values.kind === 'manual' ? 'When you ask' : sentenceText(scheduleSentence(values))
+    const words = values.instructions.trim().replace(/\s+/g, ' ')
+    const first = /^[A-Z][a-z]+\b/.exec(words)?.[0]
+    const said = first ? words.charAt(0).toLowerCase() + words.slice(1) : words
+    return `${when}, ${name} will ${said}`
+}
+
+// When it's next, in a few words: "today 17:00", "tomorrow 09:00", "Tue 09:00", or the date further off.
+export const nextInWords = (at: number, now = Date.now()): string => {
+    const time = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    const days = Math.round((new Date(at).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86_400_000)
+    if (days <= 0) return `today ${time}`
+    if (days === 1) return `tomorrow ${time}`
+    if (days < 7) return `${new Date(at).toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`
+    return new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+// --- Where it is -----------------------------------------------------------------------------------------------------
+
+// The Routines page at a place. It moves around itself this way too, so where it is lives in its tab's param, which is
+// how Back and a restored session find it.
+export const openRoutines = (place: RoutinePlace) => void window.chromeAPI.browser.openPage('routines', { param: routinesParam(place) })
+
+// A new routine started from elsewhere, such as Show Berry how, a suggestion or a mascot's page, with its answers filled
+// in. The steps take it when they show, whichever tab they're in.
+export const NEW_ROUTINE_EVENT = 'blueberry:new-routine'
+let started: RoutineFormValues | null = null
+
+export const startRoutine = (values: RoutineFormValues = blankForm()) => {
+    started = values
+    window.dispatchEvent(new Event(NEW_ROUTINE_EVENT))
+    openRoutines({ page: 'new' })
+}
+
+export const takeStartedRoutine = (): RoutineFormValues | null => {
+    const values = started
+    started = null
+    return values
 }

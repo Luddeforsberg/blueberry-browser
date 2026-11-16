@@ -9,7 +9,7 @@ import { cn } from '@common/lib/utils'
 import { toUrl } from '@common/lib/url'
 import { useAssistantName } from './Berry'
 import { TabIcon } from './TabIcon'
-import { setRoutinesView } from '../routinesView'
+import { openRoutines } from '../routinesView'
 import { BERRY_ID } from '@shared/mascots'
 
 // DESIGN.md section 10, Toolbar and the address field. The field is also where a mascot's status is, for the tab in
@@ -85,8 +85,7 @@ const useJobHere = (tab: TabInfo | null) => {
 
 const openJob = (item: NeedsYouItem) => {
     if (item.routineId) {
-        setRoutinesView({ page: 'detail', id: item.routineId })
-        void window.chromeAPI.browser.openPage('routines')
+        openRoutines({ page: 'routine', id: item.routineId })
     } else {
         void window.chromeAPI.browser.openPage('chat', { param: item.id, title: item.job })
     }
