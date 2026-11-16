@@ -28,6 +28,14 @@ export const WhatLeaves: React.FC = () => {
                 >
                     <State on>always</State>
                 </SettingsRow>
+                <SettingsRow
+                    id="leaves-attached"
+                    title="Tabs and files you attach"
+                    description="With the message you attach them to. A file goes again with each later message in that chat."
+                    more="A tab’s text and a picture of it go with that one message. A file’s contents are kept with its chat on this computer, so you can ask more about it, and are deleted with the chat. Nothing you attach goes to a job that runs with this computer off."
+                >
+                    <State on>when added</State>
+                </SettingsRow>
                 <SettingsRow id="leaves-suggestions" title="Suggestions" description="Site names, page titles and searches from the last two weeks. Never page text." more={SUGGESTIONS_DETAIL}>
                     <State on={settings.suggestions}>{settings.suggestions ? 'on' : 'off'}</State>
                 </SettingsRow>
