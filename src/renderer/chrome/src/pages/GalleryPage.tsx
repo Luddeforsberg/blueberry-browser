@@ -63,6 +63,7 @@ const SAMPLE_TABS: TabChoice[] = [
     { id: 'g-2', title: 'Inbox · Linear', site: 'linear.app', favicon: null, problem: null },
     { id: 'g-3', title: 'Mail', site: 'mail.example', favicon: null, problem: 'You’re signing in there, so it stays yours' },
 ]
+const MANY_TABS: TabChoice[] = [...SAMPLE_TABS, ...['Hotels in Alfama', 'Lisbon, next ten days', 'Trains to Sintra'].map((title, n) => ({ id: `g-more-${n}`, title, site: 'example.com', favicon: null, problem: null }))]
 const sampleAdd = (overrides: Partial<AddMenuOptions> = {}): AddMenuOptions => ({
     tabs: { problem: null, note: null, load: async () => SAMPLE_TABS, added: [], onChoose: () => undefined },
     files: { problem: null, onChoose: () => undefined },
@@ -372,7 +373,8 @@ export const GalleryPage: React.FC = () => {
 
                 <Section title="The + menu">
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-x-6 gap-y-[300px] p-6 pb-[300px] rounded-tile bg-well">
-                        <div className="relative h-0"><AddMenu {...sampleAdd({ showHow: { label: 'Show Berry how', problem: null, onStart: () => undefined } })} above={false} onClose={() => undefined} /></div>
+                        <div className="relative h-0"><AddMenu {...sampleAdd({ showHow: { label: 'Show Berry how', note: 'makes a routine', problem: null, onStart: () => undefined } })} above={false} onClose={() => undefined} /></div>
+                        <div className="relative h-0"><AddMenu {...sampleAdd({ tabs: { problem: null, note: null, load: async () => MANY_TABS, added: ['g-2'], onChoose: () => undefined } })} above={false} onClose={() => undefined} /></div>
                         <div className="relative h-0"><AddMenu {...sampleAdd({ thisPage: { site: 'klm.com', favicon: null, problem: null, onAdd: () => undefined } })} above={false} onClose={() => undefined} /></div>
                         <div className="relative h-0"><AddMenu {...sampleAdd({ tabs: { problem: null, note: 'Deal Watcher only visits prisjakt.nu', load: async () => [], added: [], onChoose: () => undefined } })} above={false} onClose={() => undefined} /></div>
                         <div className="relative h-0"><AddMenu {...sampleAdd({ tabs: { problem: ATTACHMENT_WORDS.tabToCloud, note: null, load: async () => SAMPLE_TABS, added: [], onChoose: () => undefined }, files: { problem: ATTACHMENT_WORDS.fileToCloud, onChoose: () => undefined } })} above={false} onClose={() => undefined} /></div>

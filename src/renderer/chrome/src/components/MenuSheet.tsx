@@ -10,7 +10,8 @@ export const MenuSheet: React.FC<{
     label: string
     // In a chat the box is at the bottom, so its menus open above it.
     above: boolean
-    align: 'left' | 'right'
+    // `box` is as wide as the card of the box it opens from.
+    align: 'left' | 'right' | 'box'
     className?: string
     onClose: (refocus: boolean) => void
     // Keys a menu has of its own, such as going back from a list it opened. Return true if it took the key.
@@ -53,7 +54,7 @@ export const MenuSheet: React.FC<{
             className={cn(
                 'absolute z-30 max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-13 text-ink shadow-lift cursor-default',
                 'animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)]',
-                align === 'right' ? 'right-0' : 'left-0',
+                align === 'box' ? 'inset-x-1' : align === 'right' ? 'right-0' : 'left-0',
                 above ? 'bottom-full mb-2' : 'top-full mt-2',
                 above ? (align === 'right' ? 'origin-bottom-right' : 'origin-bottom-left') : align === 'right' ? 'origin-top-right' : 'origin-top-left',
                 className

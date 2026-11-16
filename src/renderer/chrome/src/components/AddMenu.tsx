@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { AppWindow, ChevronLeft, ChevronRight, CircleDot, File } from 'lucide-react'
+import { AppWindow, ChevronLeft, ChevronRight, CircleDot, Paperclip } from 'lucide-react'
 import type { TabChoice } from '@shared/attachments'
 import { cn } from '@common/lib/utils'
 import { Favicon } from './Favicon'
 import { MenuRule, MenuSheet, menuRowClass } from './MenuSheet'
 
-// DESIGN.md section 10, The prompt box: what the + adds. On the new tab, An open tab, A file, a hairline and Show Berry
-// how. In a chat, This page while the page in front isn't a chip, then An open tab and A file. A row that's ruled out
-// stays and says why. Mock: docs/design/mocks/the-plus.html.
+// DESIGN.md section 10, The prompt box: what the + adds. As wide as the card, with the open tabs in it, so adding one is
+// a single press: This page in the chat panel while the page in front isn't a chip, the tabs, a hairline, A file, and
+// Show Berry how on the new tab. A row that's ruled out stays and says why.
 
 export interface AddMenuOptions {
     // The page in front, in the chat panel, while it isn't on the card already.
@@ -23,16 +23,42 @@ export interface AddMenuOptions {
         onChoose: (tab: TabChoice) => void
     }
     files: { problem: string | null; onChoose: () => void }
-    showHow?: { label: string; problem: string | null; onStart: () => void }
+    // `note` is what it leads to, where the label doesn't say.
+    showHow?: { label: string; note: string | null; problem: string | null; onStart: () => void }
 }
+
+// The menu lists this many tabs itself. With more, it lists one fewer and a row that opens them all.
+const TABS_SHOWN = 4
 
 const ICON = 'size-4 shrink-0'
 
-const RowWords: React.FC<{ title: string; sub?: string | null; off?: boolean }> = ({ title, sub, off }) => (
-    <span className="flex-1 min-w-0">
-        <span className="block truncate">{title}</span>
-        {sub && <span className={cn('block mt-px text-12 truncate', off ? 'text-faint' : 'text-ink-2')}>{sub}</span>}
-    </span>
+// One line: what it adds, and a quiet note at the right, such as a tab's site. Ruled out, it stays, off, and the reason
+// takes a second line in place of the note.
+const Row: React.FC<
+    {
+        icon: React.ReactNode
+        title: string
+        note?: string | null
+        why?: string | null
+        // It opens a list rather than adding something.
+        opens?: boolean
+        onPick: () => void
+        className?: string
+    } & React.ButtonHTMLAttributes<HTMLButtonElement>
+> = ({ icon, title, note, why = null, opens, onPick, className, ...rest }) => (
+    <button type="button" role="menuitem" aria-disabled={why !== null} onClick={() => why === null && onPick()} className={cn(menuRowClass(why !== null, why !== null), className)} {...rest}>
+        {icon}
+        <span className="flex-1 min-w-0">
+            <span className="block truncate">{title}</span>
+            {why && <span className="block mt-px text-12 truncate">{why}</span>}
+        </span>
+        {!why && note && <span className="shrink-0 max-w-[60%] truncate font-mono text-11 text-ink-3">{note}</span>}
+        {!why && opens && <ChevronRight aria-hidden className="size-[13px] shrink-0 text-ink-3" strokeWidth={1.5} />}
+    </button>
+)
+
+const SiteIcon: React.FC<{ favicon: string | null; site: string; off: boolean }> = ({ favicon, site, off }) => (
+    <span className={cn('flex shrink-0', off && 'opacity-50')}><Favicon src={favicon} site={site} /></span>
 )
 
 export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refocus: boolean) => void }> = ({ thisPage, tabs, files, showHow, above, onClose }) => {
@@ -43,30 +69,44 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refo
         setCameBack(true)
         setView('main')
     }
-    // Asked for as the menu opens, so the row can say if there's nothing to choose.
+    // Asked for as the + is pressed. The menu opens once they're here, so it opens whole, with the keyboard on its first row.
     const [choices, setChoices] = useState<TabChoice[] | null>(null)
     useEffect(() => {
         let live = true
-        void tabs.load().then((list) => live && setChoices(list))
+        const show = (list: TabChoice[]) => live && setChoices(list)
+        void tabs.load().then(show, () => show([]))
         return () => {
             live = false
         }
     }, [])
+    if (choices === null) return null
 
     const pick = (act: () => void) => {
         act()
         onClose(true)
     }
-    const noTabs = choices !== null && choices.length === 0
-    const tabsOff = tabs.problem ?? (noTabs ? (tabs.note ? `${tabs.note}, and none is open` : 'No other tabs are open') : null)
+    const tabsOff = tabs.problem ?? (choices.length === 0 ? (tabs.note ? `${tabs.note}, and none is open` : 'No other tabs are open') : null)
+    const tabRow = (tab: TabChoice) => {
+        const why = tab.problem ?? (tabs.added.includes(tab.id) ? 'Already added' : null)
+        return (
+            <Row
+                key={tab.id}
+                data-tab-row
+                icon={<SiteIcon favicon={tab.favicon} site={tab.site} off={why !== null} />}
+                title={tab.title}
+                note={tab.site}
+                why={why}
+                onPick={() => pick(() => tabs.onChoose(tab))}
+            />
+        )
+    }
 
     if (view === 'tabs') {
         return (
             <MenuSheet
-                label="An open tab"
+                label="Open tabs"
                 above={above}
-                align="left"
-                className="w-[320px]"
+                align="box"
                 view="tabs"
                 // The keyboard goes to the first tab, as the pointer would, with the way back above it.
                 focusFirst="[data-tab-row]"
@@ -80,89 +120,53 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refo
             >
                 <button type="button" role="menuitem" onClick={back} className="w-full h-[34px] px-2 flex items-center gap-2 rounded-[14px] text-12 text-ink-2 outline-none hover:bg-sheet-2 focus-visible:bg-sheet-2">
                     <ChevronLeft aria-hidden className="size-[13px]" strokeWidth={1.5} />
-                    An open tab
+                    Open tabs
                 </button>
-                <div className="max-h-[min(322px,50vh)] overflow-y-auto">
-                    {(choices ?? []).map((tab) => {
-                        const added = tabs.added.includes(tab.id)
-                        const why = tab.problem ?? (added ? 'Already added' : null)
-                        return (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                role="menuitem"
-                                data-tab-row
-                                aria-disabled={why !== null}
-                                onClick={() => why === null && pick(() => tabs.onChoose(tab))}
-                                className={menuRowClass(true, why !== null)}
-                            >
-                                <span className={cn('flex', why !== null && 'opacity-50')}><Favicon src={tab.favicon} site={tab.site} /></span>
-                                <RowWords title={tab.title} sub={why ?? tab.site} off={why !== null} />
-                            </button>
-                        )
-                    })}
-                </div>
+                <div className="max-h-[min(322px,50vh)] overflow-y-auto">{choices.map(tabRow)}</div>
             </MenuSheet>
         )
     }
 
+    const many = choices.length > TABS_SHOWN
     return (
-        <MenuSheet label="Add to the message" above={above} align="left" className="w-[300px]" view="main" focusFirst={cameBack ? '[data-tabs-row]' : undefined} onClose={onClose}>
+        <MenuSheet label="Add to the message" above={above} align="box" view="main" focusFirst={cameBack ? '[data-all-row]' : undefined} onClose={onClose}>
             {thisPage && (
-                <button
-                    type="button"
-                    role="menuitem"
-                    aria-disabled={thisPage.problem !== null}
-                    onClick={() => thisPage.problem === null && pick(thisPage.onAdd)}
-                    className={menuRowClass(true, thisPage.problem !== null)}
-                >
-                    <span className={cn('flex', thisPage.problem !== null && 'opacity-50')}><Favicon src={thisPage.favicon} site={thisPage.site} /></span>
-                    <RowWords title="This page" sub={thisPage.problem ?? thisPage.site} off={thisPage.problem !== null} />
-                </button>
+                <Row
+                    icon={<SiteIcon favicon={thisPage.favicon} site={thisPage.site} off={thisPage.problem !== null} />}
+                    title="This page"
+                    note={thisPage.site}
+                    why={thisPage.problem}
+                    onPick={() => pick(thisPage.onAdd)}
+                />
             )}
-            <button
-                type="button"
-                role="menuitem"
-                data-tabs-row
-                aria-haspopup="menu"
-                aria-disabled={tabsOff !== null}
-                onClick={() => tabsOff === null && setView('tabs')}
-                onKeyDown={(event) => {
-                    if (event.key !== 'ArrowRight' || tabsOff !== null) return
-                    event.preventDefault()
-                    setView('tabs')
-                }}
-                className={menuRowClass(!!(tabsOff ?? tabs.note), tabsOff !== null)}
-            >
-                <AppWindow aria-hidden className={cn(ICON, tabsOff ? 'text-faint' : 'text-ink-3')} strokeWidth={1.5} />
-                <RowWords title="An open tab" sub={tabsOff ?? tabs.note} off={tabsOff !== null} />
-                {tabsOff === null && <ChevronRight aria-hidden className="size-[13px] shrink-0 text-ink-3" strokeWidth={1.5} />}
-            </button>
-            <button
-                type="button"
-                role="menuitem"
-                aria-disabled={files.problem !== null}
-                onClick={() => files.problem === null && pick(files.onChoose)}
-                className={menuRowClass(files.problem !== null, files.problem !== null)}
-            >
-                <File aria-hidden className={cn(ICON, files.problem ? 'text-faint' : 'text-ink-3')} strokeWidth={1.5} />
-                <RowWords title="A file" sub={files.problem} off={files.problem !== null} />
-            </button>
-            {showHow && (
-                <>
-                    <MenuRule />
-                    <button
-                        type="button"
-                        role="menuitem"
-                        aria-disabled={showHow.problem !== null}
-                        onClick={() => showHow.problem === null && pick(showHow.onStart)}
-                        className={menuRowClass(showHow.problem !== null, showHow.problem !== null)}
-                    >
-                        <CircleDot aria-hidden className={cn(ICON, showHow.problem ? 'text-faint' : 'text-ink-3')} strokeWidth={1.5} />
-                        <RowWords title={showHow.label} sub={showHow.problem} off={showHow.problem !== null} />
-                    </button>
-                </>
+            {tabsOff !== null ? (
+                <Row icon={<AppWindow aria-hidden className={ICON} strokeWidth={1.5} />} title="An open tab" why={tabsOff} onPick={() => undefined} />
+            ) : (
+                <div role="group" aria-label="Open tabs">
+                    <p aria-hidden className="px-2.5 pt-1.5 pb-1 font-mono text-11 text-ink-3">open tabs</p>
+                    {tabs.note && <p className="px-2.5 pb-1.5 text-12 text-ink-2">{tabs.note}</p>}
+                    {(many ? choices.slice(0, TABS_SHOWN - 1) : choices).map(tabRow)}
+                    {many && (
+                        <Row
+                            data-all-row
+                            aria-haspopup="menu"
+                            icon={<AppWindow aria-hidden className={cn(ICON, 'text-ink-3')} strokeWidth={1.5} />}
+                            title={`All ${choices.length} tabs`}
+                            opens
+                            onPick={() => setView('tabs')}
+                            onKeyDown={(event) => {
+                                if (event.key !== 'ArrowRight') return
+                                event.preventDefault()
+                                setView('tabs')
+                            }}
+                            className="text-ink-2"
+                        />
+                    )}
+                </div>
             )}
+            <MenuRule />
+            <Row icon={<Paperclip aria-hidden className={ICON} strokeWidth={1.5} />} title="A file" note="or drop it on the box" why={files.problem} onPick={() => pick(files.onChoose)} />
+            {showHow && <Row icon={<CircleDot aria-hidden className={ICON} strokeWidth={1.5} />} title={showHow.label} note={showHow.note} why={showHow.problem} onPick={() => pick(showHow.onStart)} />}
         </MenuSheet>
     )
 }
