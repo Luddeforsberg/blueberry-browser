@@ -52,6 +52,28 @@ export const promptRect = (page: Rect, cardHeight: number): Rect => {
   return { x: page.x, y: page.y, width: Math.min(PROMPT_WIDTH, page.width), height };
 };
 
+// The list under the address field while it's being edited: a menu sheet as wide as the field, 8px under it, with 40px
+// rows, 6px inside its edges, and a hairline with 6px either side before asking a mascot. The view has room round the
+// sheet for its shadow, but none above it, so it never covers the field.
+const SUGGESTIONS = { gap: 8, row: 40, padding: 6, rule: 13, side: 12, below: 24 };
+
+export const suggestionsRect = (
+  field: Rect,
+  rows: number,
+  ruled: boolean,
+  window: { width: number; height: number }
+): { view: Rect; sheet: Rect } => {
+  const { gap, row, padding, rule, side, below } = SUGGESTIONS;
+  const sheetHeight = 2 * padding + rows * row + (ruled ? rule : 0);
+  const x = Math.max(Math.round(field.x) - side, 0);
+  const y = Math.round(field.y + field.height + gap);
+  const width = Math.max(Math.min(Math.round(field.width) + 2 * side, window.width - x), 0);
+  const height = Math.max(Math.min(sheetHeight + below, window.height - y), 0);
+  const sheetX = Math.round(field.x) - x;
+  const sheet = { x: sheetX, y: 0, width: Math.max(Math.min(Math.round(field.width), width - sheetX), 0), height: Math.min(sheetHeight, height) };
+  return { view: { x, y, width, height }, sheet };
+};
+
 // The bird on the edge of the screen. Its window keeps one size wherever it stands, so nothing resizes while it moves or
 // speaks, and the bird tucks by being moved past the side of the window that lies along the edge.
 export const DESKTOP_BIRD_SIZE = 72;

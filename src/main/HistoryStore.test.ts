@@ -144,4 +144,21 @@ describe("HistoryStore", () => {
     expect(history.importVisits(visits)).toBe(0);
     expect(history.recent().map((visit) => visit.title)).toEqual(["https://b.example/", "A"]);
   });
+
+  it("suggests each page once, with its visits, hosts that start with the word first", () => {
+    const history = new HistoryStore(":memory:");
+    history.record("https://news.example/klm", "KLM strike", null, 1);
+    history.record("https://www.klm.com/", "KLM", null, 2);
+    history.record("https://news.example/", "News", null, 3);
+    history.record("https://www.klm.com/", "KLM home", null, 4 + 60 * 60 * 1000);
+    history.record("https://example.com/100%", "Percent", null, 5);
+
+    expect(history.suggest("KLM flights")).toEqual([
+      { url: "https://www.klm.com/", title: "KLM home", favicon: null, lastVisit: 4 + 60 * 60 * 1000, visits: 2 },
+      { url: "https://news.example/klm", title: "KLM strike", favicon: null, lastVisit: 1, visits: 1 },
+    ]);
+    expect(history.suggest("%").map(({ url }) => url)).toEqual(["https://example.com/100%"]);
+    expect(history.suggest("  ")).toEqual([]);
+    expect(history.suggest("klm", 1)).toHaveLength(1);
+  });
 });

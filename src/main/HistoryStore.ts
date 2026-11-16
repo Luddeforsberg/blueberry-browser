@@ -1,7 +1,7 @@
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { DatabaseSync } from "node:sqlite";
-import type { HistoryCursor, HistoryEntry, HistoryPage, Visit } from "../shared/ipc";
+import type { HistoryCursor, HistoryEntry, HistoryPage, Visit, VisitedPage } from "../shared/ipc";
 import { migrate } from "./database";
 
 const MIGRATIONS = [
@@ -20,6 +20,8 @@ const RELOAD_WINDOW_MS = 30 * 60 * 1000;
 const RECENT_LIMIT = 20;
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
+// Enough for the address field to narrow down to its few rows.
+const SUGGEST_LIMIT = 60;
 
 const isWeb = (url: string): boolean => /^https?:/i.test(url);
 
@@ -119,6 +121,26 @@ export class HistoryStore {
       entries,
       next: rows.length > size && last ? { visitedAt: last.visitedAt, id: last.id } : null,
     };
+  }
+
+  // Pages whose title or address holds the text's first word, one row per page with its newest visit and how many there
+  // were, for the address field. Addresses whose host starts with it come first, then the newest. The field narrows
+  // these further by every word, so this only has to keep the list short.
+  suggest(text: string, limit = SUGGEST_LIMIT): VisitedPage[] {
+    const [word] = text.trim().toLowerCase().split(/\s+/);
+    if (!word) return [];
+    const escaped = word.replace(/[\\%_]/g, "\\$&");
+    const anywhere = `%${escaped}%`;
+    const hosts = ["https://", "https://www.", "http://", "http://www."].map((scheme) => `${scheme}${escaped}%`);
+    return this.db
+      .prepare(
+        `SELECT url, title, favicon, MAX(visited_at) AS lastVisit, COUNT(*) AS visits FROM visits
+         WHERE title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\'
+         GROUP BY url
+         ORDER BY (url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\') DESC, lastVisit DESC
+         LIMIT ?`
+      )
+      .all(anywhere, anywhere, ...hosts, Math.max(1, Math.min(limit, SUGGEST_LIMIT))) as unknown as VisitedPage[];
   }
 
   // The address that was removed, so anything else holding it can forget it too.

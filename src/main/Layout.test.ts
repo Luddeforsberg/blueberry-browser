@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH,
+import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH, suggestionsRect,
   DESKTOP_BIRD_SIZE,
   DESKTOP_PEEK,
   desktopComposerBounds,
@@ -335,5 +335,20 @@ describe("the bird on the desktop", () => {
     expect(desktopFlightPoint(from, to, 0)).toEqual(from);
     expect(desktopFlightPoint(from, to, 1)).toEqual(to);
     expect(desktopFlightPoint(from, to, 0.5).y).toBeLessThan(from.y + (to.y - from.y) * 0.5);
+  });
+});
+
+describe("suggestionsRect", () => {
+  it("puts the list under the field, as wide as it, with room for its shadow but none over the field", () => {
+    const field = { x: 400, y: 8, width: 560, height: 32 };
+    const { view, sheet } = suggestionsRect(field, 4, true, { width: 1280, height: 800 });
+    expect(view).toEqual({ x: 388, y: 48, width: 584, height: 12 + 160 + 13 + 24 });
+    expect(sheet).toEqual({ x: 12, y: 0, width: 560, height: 12 + 160 + 13 });
+  });
+
+  it("stays inside the window at its edges", () => {
+    const { view, sheet } = suggestionsRect({ x: 4, y: 8, width: 900, height: 32 }, 6, false, { width: 910, height: 200 });
+    expect(view).toEqual({ x: 0, y: 48, width: 910, height: 152 });
+    expect(sheet).toEqual({ x: 4, y: 0, width: 900, height: 152 });
   });
 });
