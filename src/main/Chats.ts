@@ -209,7 +209,8 @@ interface Job {
   // Tabs the user attached to a message in this chat, which its tools reach from then on, unless the user has been
   // handed one or another job has it. The job never closes them.
   attached: Set<string>;
-  // Their sites as they were attached, which count as named by the user, and nothing more.
+  // Their sites as they were attached, which count as ones the job has been on, as a page sent with a message does, and
+  // nothing more: not as named, so a new subdomain there still asks.
   attachedSites: Set<string>;
 }
 
@@ -428,8 +429,7 @@ export class Chats {
       handOver: (tab, need) => this.handOver(chatId, run, job, tab, need),
       limits: unlimited(run.mascot) ? undefined : run.mascot,
       asked,
-      beenTo: run.earlierSites,
-      named: job.attachedSites,
+      beenTo: [...run.earlierSites, ...job.attachedSites],
       attached: (id) => job.attached.has(id),
       search: firecrawlSearch(),
       fetchPage: firecrawlFetch(),
@@ -560,7 +560,7 @@ export class Chats {
   // Nothing's left to wait for once a handed-over tab has gone.
   tabClosed(tabId: string): void {
     this.handedOver.delete(tabId);
-    // An attached tab that's gone is simply no longer there to reach. Its site stays named, as words typed would.
+    // An attached tab that's gone is simply no longer there to reach. Its site stays one the job has been on.
     this.jobs.forEach((job) => job.attached.delete(tabId));
     this.handedBack.forEach((tab) => {
       if (tab.id === tabId) this.handedBack.delete(tab);
@@ -731,16 +731,19 @@ export class Chats {
   }
 
   // The user clicked or typed in this tab, or sent it somewhere. Looking at it isn't enough. From here on it may hold
-  // anything, so the job that opened it can't reach it, and the model is told why.
+  // anything, so the job that opened it can't reach it, and the model is told why. A tab the user attached to a chat is
+  // the same: it was shared as it stood, and once they use it again the chat has it only if they attach it again.
   releaseTab(tabId: string): void {
     this.taskPopups.forEach((popups) => popups.delete(tabId));
     const held = this.handedOver.get(tabId);
     if (held) held.touched = true;
     // This runs on every click and key press in every tab, so most of the time it has nothing to do.
-    if (!this.isOwnTab(tabId)) return;
+    if (!this.isOwnTab(tabId) && ![...this.jobs.values()].some(({ attached }) => attached.has(tabId))) return;
     const tab = this.browser.allTabs().find((candidate) => candidate.id === tabId);
     this.jobs.forEach((job, id) => {
-      if (!job.own.delete(tabId)) return;
+      const opened = job.own.delete(tabId);
+      const lent = job.attached.delete(tabId);
+      if (!opened && !lent) return;
       // Said to the model later, when the tab may be somewhere else, so it's cleaned now.
       const url = tab?.url ?? this.cloud?.page(tabId)?.url;
       job.takenOver.set(tabId, url ? this.withoutCodes(url) : "an earlier page");

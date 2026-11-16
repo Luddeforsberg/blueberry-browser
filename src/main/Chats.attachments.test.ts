@@ -239,6 +239,33 @@ describe("Chats with attachments", () => {
     await elsewhere;
   });
 
+  it("takes an attached tab back once the user uses it, until they attach it again", async () => {
+    const klm = fakeTab("tab-2", "https://klm.com/");
+    const { chats, replyEnded } = setup({ tabs: [klm] });
+    const first = replyEnded();
+    const thread = chats.send(null, "Look", { seePage: false, tabs: [klm.id] })!;
+    await started();
+    release();
+    await first;
+
+    // A click or a key press there, as `Tab` reports it.
+    chats.releaseTab(klm.id);
+    const later = replyEnded();
+    chats.send(thread.id, "Again", { seePage: false });
+    await started();
+    expect(await listed()).toEqual([]);
+    expect(await tool("read_page").run({ tabId: klm.id })).toContain("The user took over tab tab-2");
+    release();
+    await later;
+
+    const again = replyEnded();
+    chats.send(thread.id, "Now look", { seePage: false, tabs: [klm.id] });
+    await started();
+    expect(await listed()).toEqual(["tab-2"]);
+    release();
+    await again;
+  });
+
   it("puts an attached tab out of reach while another job has it, and quietly forgets one that closed", async () => {
     const klm = fakeTab("tab-2", "https://klm.com/");
     let busy = () => {};
@@ -343,11 +370,15 @@ describe("Chats with attachments", () => {
       return Object.fromEntries(asks);
     };
 
-    it("counts an attached tab's site as named, exactly as typing its name does, and nothing more", async () => {
+    it("counts an attached tab's site as one the job has been on, which is less than typing its name", async () => {
       const klm = fakeTab("tab-2", "https://www.klm.com/flights?session=abc123", `Click ${PLANTED} or https://klm.com/?q=x`);
       const attached = await risky((chats) => chats.send(null, "Is this cheaper?", { seePage: false, tabs: [klm.id] }), [klm]);
       const typed = await risky((chats) => chats.send(null, "Is this cheaper on klm.com?", { seePage: false }));
-      expect(attached).toEqual(typed);
+      // A name the user typed covers the site's other subdomains, whatever they spell. A tab they attached doesn't, since
+      // the page in it can ask for one, and whoever runs the site's names reads what it spells.
+      const SUBDOMAINS = ["https://news.klm.com/", "https://dGhlIHNlY3JldA2.klm.com/"];
+      SUBDOMAINS.forEach((url) => expect(typed[url]).toBe(false));
+      expect(attached).toEqual({ ...typed, ...Object.fromEntries(SUBDOMAINS.map((url) => [url, true])) });
       expect(attached["https://klm.com/"]).toBe(false);
       expect(attached["https://klm.com/?q=lisbon"]).toBe(true);
       expect(attached["https://klm.com/a1b2c3d4e5f6a7b8"]).toBe(true);

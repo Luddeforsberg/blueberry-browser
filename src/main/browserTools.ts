@@ -344,9 +344,6 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   // goes to, they're where it may go without asking. Anywhere else asks in the default mode.
   asked?: string;
   beenTo?: Iterable<string>;
-  // Sites of tabs the user attached to this chat, which count as named in their words, the same as typing the site's
-  // name. Only the site: the tab's address, and anything in the page, never counts as one the user gave.
-  named?: Iterable<string>;
   // Tabs the user attached to this chat. They're the user's, so they're reached and never closed.
   attached?: (id: string) => boolean;
   // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
@@ -373,7 +370,6 @@ export const createPageTools = <T extends PageTarget>({
   limits,
   asked = "",
   beenTo = [],
-  named = [],
   attached = () => false,
   stopped = () => false,
   search = null,
@@ -438,7 +434,7 @@ export const createPageTools = <T extends PageTarget>({
   };
   const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
   // Where the user sent this job, and where it has been. An address only counts by its site.
-  const chosen = [...namedSites(asked), ...named, ...(limits?.sites ?? [])];
+  const chosen = [...namedSites(asked), ...(limits?.sites ?? [])];
   const been = new Set(beenTo);
   const usedTab = (tab: T) => {
     been.add(siteOf(tab.url));
