@@ -393,7 +393,7 @@ export class Chats {
       // Sending the page with a message is the user handing it over.
       job.takenOver.delete(page.id);
     } else if (attachedNow.length > 0) {
-      job.current = attachedNow.at(-1)!.id;
+      job.current = attachedNow[attachedNow.length - 1].id;
     } else if (job.current && !job.own.has(job.current) && !job.takenOver.has(job.current) && !job.attached.has(job.current)) {
       // That was the page from an earlier message. This one came without it, so it's out of reach.
       job.current = [...job.own].at(-1) ?? null;
@@ -902,9 +902,8 @@ export class Chats {
     const narrowed = sites.length > 0 ? { ...profile, sites: narrowSites(profile.sites, sites) } : profile;
     const mascot = tools ? { ...narrowed, tools: narrowed.tools.filter((tool) => tools.includes(tool)) } : narrowed;
     // Judged again here, as the message goes, since anything may have changed since the menu showed them.
-    const attachedTabs = tabIds.map((tabId) => this.browser.allTabs().find((tab) => tab.id === tabId) ?? null);
-    if (attachedTabs.some((tab) => !tab || this.tabProblem(tab, chatId, mascot) !== null)) return null;
-    const tabsNow = attachedTabs as Tab[];
+    const tabsNow = tabIds.flatMap((tabId) => this.browser.allTabs().filter((tab) => tab.id === tabId));
+    if (tabsNow.length !== tabIds.length || tabsNow.some((tab) => this.tabProblem(tab, chatId, mascot) !== null)) return null;
     const id = chatId ?? this.store.createChat(titleFrom(message), chosen, from);
     const attached: SentAttachment[] = [
       ...tabsNow.map((tab) => ({ kind: "tab" as const, title: this.withoutCodes(tab.title || siteOf(tab.url)), site: siteOf(tab.url) })),

@@ -192,11 +192,9 @@ const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseC
   return new ChatOpenAI({ apiKey, model, maxRetries: MAX_RETRIES, useResponsesApi: !process.env.OPENAI_BASE_URL });
 };
 
-type Provider = ReturnType<typeof modelConfig>["provider"];
-
 // The installed LangChain has no one shape for a PDF that both providers read: the older file block goes to Anthropic
 // twice, and the newer one is dropped by OpenAI's Responses API. So each gets the block its own converter passes on.
-export const forProvider = (content: ReplyContent, provider: Provider): unknown => {
+export const forProvider = (content: ReplyContent, provider: string): unknown => {
   if (typeof content === "string" || !content.some((block) => block.type === "pdf")) return content;
   return content.map((block) => {
     if (block.type !== "pdf") return block;
@@ -204,14 +202,6 @@ export const forProvider = (content: ReplyContent, provider: Provider): unknown 
       ? { type: "document", title: block.name, source: { type: "base64", media_type: "application/pdf", data: block.data } }
       : { type: "file", source_type: "base64", mime_type: "application/pdf", data: block.data, metadata: { filename: block.name } };
   });
-};
-
-const providerOrOpenAi = (): Provider => {
-  try {
-    return modelConfig().provider;
-  } catch {
-    return "openai";
-  }
 };
 
 export const systemPrompt = (withTools: boolean, userPresent: boolean): string =>
@@ -305,8 +295,9 @@ export async function* streamReply(
         : []
     )
   );
+  const chatModel = model ?? (await createModel());
   const agent = createAgent({
-    model: model ?? (await createModel()),
+    model: chatModel,
     // A reply's state lasts as long as the reply, so a paused action doesn't survive a restart.
     checkpointer: new MemorySaver(),
     middleware: [
@@ -348,7 +339,8 @@ export async function* streamReply(
   });
   const sorter = new ReplySorter();
   const configurable = { thread_id: "reply" };
-  const provider = providerOrOpenAi();
+  // Asked of the model itself, which says "anthropic" or "openai".
+  const provider = chatModel._llmType();
   let input: Parameters<typeof agent.stream>[0] = {
     messages: messages.map(({ role, content }) => [role, forProvider(content, provider)] as [string, ReplyContent]),
   };
