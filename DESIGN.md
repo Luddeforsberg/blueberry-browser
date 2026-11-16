@@ -513,6 +513,7 @@ While a job uses tabs, it can be watched. On the right of the main chat, 420px w
 
 A second sheet on the right, opened with `⌘E` (`Ctrl+E` on Windows), which pushes the page. Its header is the mascot, the chat's name, **New chat** and a close ×. Messages, steps, cards and the prompt box are the same components as the main chat, so the two sizes look like one chat: the steps sit in the same Working block, and the prompt box keeps its mascot pill. A reply's face is 20px here, in line with an 8px gap, since the panel has no gutter to hang it in.
 
+- **Empty,** it shows the face of whoever the pill says, 40px, over "Ask about this page, or anything else." Choosing another mascot in the pill changes it.
 - **One box everywhere.** The panel's prompt box and cards are the main chat's, `card` cards in `tray` shells. Mock 03 drew them as `sheet-2` cards in a `well` shell, to sit back from the panel's white sheet. Tried in the app, a grey card made an approval look switched off and took away the lift that marks it as needing you, and the page chip, `sheet-2` on `sheet-2`, all but vanished. In dark the two were nearly the same. So the panel keeps the one box.
 
 ### Over a web page

@@ -51,7 +51,7 @@ export const Chat: React.FC = () => {
             <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
-                        <BerrySpot size={40} />
+                        <BerrySpot size={40} mascot={mascot} />
                         <p className="text-13 text-ink-2">
                             Ask about this page, or anything else.
                         </p>
