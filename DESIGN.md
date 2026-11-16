@@ -124,7 +124,7 @@ Components use tokens only, never raw colours.
 | `press` | ink at 9% | white at 10% | Pressed |
 | `ask` | `#C62B31` | `#FF6B6B` | Something needs you |
 | `ask-bg` | `#FBE4E3` | `#3A1F1F` | Behind `ask` text, where it needs a fill |
-| `focus` | `#3F51DC` | `#8FA0FF` | The focus ring, blueberry blue. Its only use in the chrome |
+| `focus` | `#3F51DC` | `#8FA0FF` | Blueberry blue: the focus ring, and a switch that's on. Nothing else in the chrome |
 
 The grey is warm on purpose. A cooler grey and a warmer oat were tried beside it and this one was chosen.
 
@@ -327,7 +327,7 @@ A mascot never opens a modal, takes keyboard focus or makes a sound. A notificat
 - **Still:** keeps the mascots and stops all movement. Pips hold one frame.
 - **Hide Berry:** removes the character everywhere, replacing it with a plain icon and neutral copy.
 
-Every feature keeps working either way, and turning it off never prompts the user to reconsider.
+Every feature keeps working either way, and turning it off never prompts the user to reconsider. Settings has the two as one choice, under Mascots: Moving, Still or Hidden.
 
 ## 10. Screens
 
@@ -354,13 +354,31 @@ Straight on the ground. Under the window controls is a switch between its two fa
 - **Routines:** the next three by time, each with the mascot that runs it and when. The arrow on the label opens them all.
 - **Earlier:** past chats, newest first, each with the mascot that ran it and its age. **Show more** loads the rest.
 
-**The dock** is on `tray`: every mascot at 26px with its mood for a face, each in a 28px place, then Settings. It's how you see who is doing what at a glance. Berry and four fill it at the sidebar's usual width, and more scroll along it.
+**The dock** is on `tray`: every mascot at 26px with its mood for a face, each in a 28px place. It's how you see who is doing what at a glance. Beside it, outside the tray, is the account button. Berry and four fill it at the sidebar's usual width, and more scroll along it.
 
 **A new profile starts with a flock,** so the dock and the pill have someone to show: Berry, and four starters from the Gallery, Plain Words, Competitor Watch, Meeting Prep and Newsletter Builder, one of each berry but the gooseberry. They're ordinary copies, to edit or delete, and they come once: deleting them never brings them back, and a profile that already has mascots of its own gets none.
 
 Section labels are 11px mono, lower case, in `ink-3`.
 
 **The dock shows, it doesn't choose.** Pressing a mascot opens its card, above the dock and inside the sidebar: its name, what it may do, what you've allowed it without asking and a way to take each back, what it's doing now, its recent chats, and **New chat with** its name, which opens a new tab with it chosen. Under that, **All your mascots** in quiet text opens the mascots' page, which nothing else in the sidebar leads to. See [switching.html](./docs/design/mocks/switching.html).
+
+### The account menu
+
+Mock: [account-menu.html](./docs/design/mocks/account-menu.html).
+
+**You're beside the dock:** a 30px round button to its right, straight on the ground, with the first letter of your name on a sheet with its rim. Signed out, it's a person glyph on `tray`. The dock keeps its room for Berry and four. While the menu is open the button has an `ink` ring.
+
+**The menu opens above the button, inside the sidebar,** as wide as the sidebar's rows, so it needs no overlay there. It's a sheet with a 16px radius and `lift`, and its rows are 30px like the sidebar's own, because it sits among them:
+
+- **Who you are:** your name over your email. Signed out, it says "Not signed in" beside a filled **Sign in**, which opens Settings at Account.
+- **Theme:** Light, Dark and System as one segmented control, each with its icon and its name. It changes at once, and it's the same setting as in Settings.
+- **Settings, History** and **Downloads,** each with its shortcut in mono.
+- A hairline, then **Your mascots, Routines** and **Gallery.** Your mascots has Berry's face for its icon.
+- A hairline, then **Sign out,** only while signed in.
+
+It's the one way in to those pages that's always on screen. Choosing a row closes the menu. So do Escape and a press outside, and the keyboard goes back to the button. Arrow keys move through the rows and through the theme's three.
+
+**With tabs on top** the button comes after the dock in the toolbar, at 28px, and the menu opens under it, against the window's right edge, in the overlay view like Chats and a mascot's card.
 
 ### Toolbar and the address field
 
@@ -498,7 +516,7 @@ What's drawn in a page while a mascot works there, and only while the user can s
 
 **It only draws.** No clicks, no box, no effect on the page's layout, no text the page or the agent can read, and out of every screenshot. It's in a closed shadow root in the top layer and works on the strictest content security policy. A pill says what a step says, so in a password, code or payment field it only names the field.
 
-**When it isn't there:** in tabs nobody can see; for 5 seconds after the user's last click or key in the page; on a tab handed to the user; while the keyboard is in a password or code field. **Show on pages** in Settings removes all of it for a site that reacts badly.
+**When it isn't there:** in tabs nobody can see; for 5 seconds after the user's last click or key in the page; on a tab handed to the user; while the keyboard is in a password or code field. **On the page they work in**, in Settings under Mascots, removes all of it for a site that reacts badly.
 
 A click doesn't wait for the mascot. Whether it waits a short beat so a watcher can follow is *to settle when it's built*.
 
@@ -508,12 +526,38 @@ Mock: [horizontal-layout.html](./docs/design/mocks/horizontal-layout.html). Thre
 
 - **The tab row.** Tabs take equal shares up to 196px, down to 36px, where only the icon shows. The tab in front is the sheet with its rim, and keeps its name when the others have lost theirs. Hover is `tray`. A hairline sits between two neighbours that are neither in front nor hovered. A loading tab shows the think pips where its icon would be. **+** comes right after the last tab. The window's buttons keep their corner: on the left on a Mac, on the right on Windows.
 - **A mascot's job keeps its tabs together,** after the user's tabs: a `tray` group with the mascot's face, the job's name, then its tabs, and the waiting pips in `ask` at its end while it needs you. It's the row's version of the sidebar's job block. Pressing the face or the name opens the chat.
-- **The toolbar runs edge to edge,** 44px tall with 28px buttons. Back, forward and reload, then the address field filling everything up to the tools, with no maximum width here, in the same five states. Then downloads, the chat panel button, **Chats**, the dock, and off a Mac the menu at the very end.
+- **The toolbar runs edge to edge,** 44px tall with 28px buttons. Back, forward and reload, then the address field filling everything up to the tools, with no maximum width here, in the same five states. Then downloads, the chat panel button, **Chats**, the dock, the account button, and off a Mac the menu at the very end.
 - **Chats** is a `tray` pill with the word, and the `ask` dot while anything needs you. It opens a panel under itself, 296px wide, with the sidebar's Chats face: needs you, working, routines, earlier. Its arrows lead to Needs you and Routines.
 - **The dock** is a `tray` pill with every mascot's face at 22px. Pressing one opens its card, the same as in the sidebar, under it. Its **All your mascots** leads to the mascots' page. When the faces don't all fit beside an address field of at least 320px, it folds to the chosen mascot, any that are asking or working, and a count of the rest, which opens the mascots' page.
 - **Chats and a card open over the page,** in an overlay view, since a tab's view covers the chrome. Escape or a press anywhere outside closes them, and the keyboard goes back to what opened them. Opening a chat or a page from them closes them too.
 - **The bookmarks bar:** favourites first, as icon tiles, the one in front selected as in the sidebar, then a hairline, then bookmarks with icon and name. Dragging between the two and the right-click menus work as in the sidebar. With nothing saved there's no bar at all.
 - **The new tab** is the vertical layout's. Settings is in the menu (or the app's menu on a Mac), so nothing else needs a link under the box.
+
+### Settings
+
+Mock: [settings.html](./docs/design/mocks/settings.html).
+
+A page in a tab, on the well with no dot grid, in one column 620px wide. Under the title is a switch with five sections, as wide as the column and built like the sidebar's Tabs and Chats switch: a `tray` strip 32px tall, with the current section a sheet. There's no list down the side, because beside the sidebar it would be a second one. Each section is short enough to need no scrolling at the usual window size. The account menu opens General, and another page can open Settings at any section.
+
+**A group is a sheet** with a 16px radius and its rim, under an 11px mono label. **A row** is 48px, or taller with a second line, with a hairline between rows that starts where the text does. Its name is on the left in `ink`, and on the right is one control: a switch, a segmented control, a quiet value with an outlined button, or an arrow to a page one step in. A row gets one line of explanation at most, in `ink-2` at 12px. Anything longer goes on a page one step in.
+
+- **A switch** is 34 by 20px. On is `focus` with a white knob, and off is `sheet-2` with a hairline.
+- **A choice with a picture:** Theme and Tabs are small drawings of the window, 86 by 56px, with the name under each. The chosen one has a 1.5px `ink` ring with a 2px gap. System is half light and half dark.
+
+**The sections:**
+
+- **General.** Under *look*: Theme (Light, Dark, System) and Tabs (On the side, On top). Under *browsing*: When Blueberry opens (Your tabs, A new tab), Save files to with **Change**, and Ask where to save each file.
+- **Mascots.** Under *at work*: Ask before acting (When risky, Always, Never), with a line under it saying what the chosen one means, and for Never what that risks. Then On the page they work in, and On your desktop, whose line names the shortcut or says another app has it. Under *how they look*: one choice, Moving, Still or Hidden, in place of two switches. Under *what they offer*: Suggestions and Offers to remember, each saying in one line what it sends.
+- **Privacy.** What leaves this computer, and Site permissions with how many sites have an answer saved. Under *history*: History, and bringing it in from another browser.
+- **Connections.** Phone, Claude and other apps, and Cloud. Each is a row with an icon on a `sheet-2` tile, one line on what it's for, its state in mono (`off`, `on`, `ready`) and an arrow to its page.
+- **Account.** Your name and email with **Sign out**. Under *you*: Name with **Change**, and Email. Under *published in the gallery*: each mascot you've published, with **Unpublish**. Signed out, it's the sign-in form and one line on what an account is for.
+
+**One step in.** A row's arrow opens its page in the same tab and the same column: a quiet back button naming the section it came from, the page's title at 18px, a line or two on what it is, then groups as above. The back button and the toolbar's Back both return to the section. Two are drawn:
+
+- **What leaves this computer** gathers what used to be rows of text, in three groups: *goes to the AI service* (your messages with the page you ask about, always, then Suggestions and Offers to remember with their state), *only when you start it* (publishing a mascot, a cloud job, answering from your phone) and *stays here*. It only says. The switches are in Mascots.
+- **Cloud:** the Browserbase key and session, the sites it's signed in to with **Add a site**, and what runs with this computer off.
+
+The pages behind Phone, Claude and other apps, Site permissions and bringing in history aren't drawn. Until they are, each keeps what it has today, laid out in these groups and rows.
 
 ## 11. Not redrawn yet
 
@@ -527,7 +571,7 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Gallery and Publishing
 - Needs you, and answering from the phone
 - History, Downloads, Restoring tabs, A page in trouble, Damaged saved data
-- Settings, with Claude and Cloud, and the cloud tab
+- The cloud tab
 - A chat on the runner
 - Site permissions
 - On your desktop
@@ -549,6 +593,9 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Steps and pills that say what was typed.
 - `@` in the box to choose a mascot.
 - An open tab in the prompt box, from **+**, which comes to the new tab with attachments.
+- Settings in its five sections, with the pages one step in. Until it's built, Settings is as the old document has it.
+- The account menu, and its button beside the dock in place of Settings.
+- A name on the account, which is only an email address today.
 
 **Still open:**
 
