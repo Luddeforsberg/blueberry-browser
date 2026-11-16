@@ -188,5 +188,5 @@ export const useAddressSuggestions = ({ editing, value, setValue, field, input, 
         return true
     }
 
-    return { open, onChange, onKeyDown, submit }
+    return { onChange, onKeyDown, submit }
 }

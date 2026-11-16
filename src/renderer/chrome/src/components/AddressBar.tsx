@@ -135,7 +135,6 @@ export const AddressBar: React.FC = () => {
                     type="text"
                     aria-label="Address"
                     aria-autocomplete="both"
-                    aria-expanded={suggestions.open}
                     value={url}
                     onChange={suggestions.onChange}
                     onFocus={(e) => e.target.select()}

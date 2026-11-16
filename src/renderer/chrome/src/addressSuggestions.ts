@@ -5,7 +5,7 @@ import { looksLikeUrl, toUrl } from '@common/lib/url'
 // What the address field offers while it's being edited: open tabs, saved sites, history, a search, and asking a
 // mascot, in that order. Everything comes from this computer, and nothing here leaves it.
 
-export const MAX_ROWS = 6
+const MAX_ROWS = 6
 // One letter would complete to nearly anything, so it takes two.
 const MIN_COMPLETION = 2
 

@@ -22,6 +22,8 @@ const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
 // Enough for the address field to narrow down to its few rows.
 const SUGGEST_LIMIT = 60;
+// How many of the newest visits the address field looks through.
+const SUGGEST_VISITS = 10_000;
 
 const isWeb = (url: string): boolean => /^https?:/i.test(url);
 
@@ -125,7 +127,9 @@ export class HistoryStore {
 
   // Pages whose title or address holds the text's first word, one row per page with its newest visit and how many there
   // were, for the address field. Addresses whose host starts with it come first, then the newest. The field narrows
-  // these further by every word, so this only has to keep the list short.
+  // these further by every word, so this only has to keep the list short. It looks only through the newest visits, taken
+  // by their index, so it takes the same few milliseconds however long the history is: it runs on main's thread, which
+  // also carries the keys being typed.
   suggest(text: string, limit = SUGGEST_LIMIT): VisitedPage[] {
     const [word] = text.trim().toLowerCase().split(/\s+/);
     if (!word) return [];
@@ -134,13 +138,14 @@ export class HistoryStore {
     const hosts = ["https://", "https://www.", "http://", "http://www."].map((scheme) => `${scheme}${escaped}%`);
     return this.db
       .prepare(
-        `SELECT url, title, favicon, MAX(visited_at) AS lastVisit, COUNT(*) AS visits FROM visits
+        `SELECT url, title, favicon, MAX(visited_at) AS lastVisit, COUNT(*) AS visits
+         FROM (SELECT url, title, favicon, visited_at FROM visits ORDER BY visited_at DESC LIMIT ?)
          WHERE title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\'
          GROUP BY url
          ORDER BY (url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\') DESC, lastVisit DESC
          LIMIT ?`
       )
-      .all(anywhere, anywhere, ...hosts, Math.max(1, Math.min(limit, SUGGEST_LIMIT))) as unknown as VisitedPage[];
+      .all(SUGGEST_VISITS, anywhere, anywhere, ...hosts, Math.max(1, Math.min(limit, SUGGEST_LIMIT))) as unknown as VisitedPage[];
   }
 
   // The address that was removed, so anything else holding it can forget it too.
