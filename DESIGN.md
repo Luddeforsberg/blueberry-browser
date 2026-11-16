@@ -372,12 +372,17 @@ Straight on the ground. Under the window controls is a switch between its two fa
 - **A hairline,** then **Tabs** with a count and a plus. A row is 32px with its name at 14px in `ink` and its icon in `ink-2`. The current tab is a sheet lifted with `up`, with its close ×. A loading tab shows the pips where its icon will be. An open chat is a tab like any page.
 - **A job's tabs aren't yours.** While a job runs, its chat is a row with its mascot's face, on a `tray` group, and the tabs it opened sit under it, indented behind a dotted line. They close when the job ends, except any you took over.
 
-**Chats** is everything the mascots are doing, did and will do:
+**Chats** is everything the mascots are doing, did and will do. Mock: [sidebar-chats.html](./docs/design/mocks/sidebar-chats.html).
 
-- **Needs you** comes first, labelled in `ask` with a count. Each row is a sheet with `chip` and is the button itself: the asking mascot, the job's name, and the waiting pips in `ask` at its end. Pressing it opens the chat at its card. Whenever anything is here, a dot in `ask` sits on the switch's Chats side, on either face.
+- **New chat** is the first row, with a plus, in `ink-2`. It opens a new tab with the keyboard in the box, as the plus on Tabs does.
+- **Needs you** comes next, labelled in `ask` with a count. Each row is a sheet with `chip`: the asking mascot, the job's name, and the waiting pips in `ask` at its end. Pressing it opens the chat at its card. Whenever anything is here, a dot in `ask` sits on the switch's Chats side, on either face.
 - **Working:** each running job, with its mascot's face the pips, and how long it's been going.
+- **Done:** chats that finished while you were somewhere else, and that you haven't opened since. The label counts them, "1 new", and each row has its name in medium and a dot in `focus` at its end. Opening one moves it to Earlier. A chat that finished in front of you never comes here, and neither does one you stopped.
 - **Routines:** the next three by time, each with the mascot that runs it and when. The arrow on the label opens them all.
-- **Earlier:** past chats, newest first, each with the mascot that ran it and its age. **Show more** loads the rest.
+- **Earlier:** past chats, newest first, each with the mascot that ran it and how long ago. **Show more** loads the rest.
+- **A row is the button,** from edge to edge, and carries no button of its own. What can be done to a chat, renaming and deleting it, is in its menu: the context menu, and a quiet ⋯ that takes the place of the time on the row you're on, by pointer or keyboard.
+- **A group with nothing in it isn't shown,** label and all. With no chats at all, New chat is followed by one line in `faint` saying that chats and what the mascots are doing show up here.
+- **Times are written one way,** in mono at the row's end. Something going on is how long so far, `0:48`. The past is how long ago: `12m`, `2h`, then the weekday for a week, `Sat`, then the date, `3 Nov`. The future is when: the time today, `14:00`, then `tomorrow`, the weekday for a week, then the date.
 
 **The dock** is on `tray`: every mascot at 26px with its mood for a face, each in a 28px place. It's how you see who is doing what at a glance. Beside it, outside the tray, is the account button. Berry and four fill it at the sidebar's usual width, and more scroll along it.
 
