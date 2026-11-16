@@ -1337,7 +1337,10 @@ export class Chats {
       return { role: history.role, content: withAttached(history.content, (files[index] ?? []).flatMap(fileBlocks)) };
     });
     const front = seePage ? await this.readPage(mascot) : null;
-    const tabs = await Promise.all(attachedTabs.map((tab) => this.readTab(tab, mascot)));
+    // The user may take a tab back, or another job take it up, while it's being read. Nothing read goes out then.
+    const job = this.jobs.get(chatId);
+    const shared = (tab: Tab) => () => !!job?.attached.has(tab.id) && !this.inOtherHands(tab.id, chatId);
+    const tabs = await Promise.all(attachedTabs.map((tab) => (shared(tab)() ? this.readTab(tab, mascot, shared(tab)) : null)));
     const pages = [front, ...tabs].filter((page): page is PageSnapshot => page !== null);
     const newest = messages.at(-1);
     if (pages.length === 0 || !newest) return messages;

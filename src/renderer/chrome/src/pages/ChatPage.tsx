@@ -122,7 +122,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <div className={`${COLUMN} shrink-0 pb-4`}>
                     {work && !roomBeside && work.outcome === null && <WorkingStrip view={work} mascot={mascot} approval={thread.approval} />}
                     <ChatComposer
-                        onSend={(message, attached) => void window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id, ...attached })}
+                        onSend={(message, attached) => window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id, ...attached }).then((sent) => sent !== null, () => false)}
                         // A runner chat goes on with this computer off, and a cloud chat works in its own browser there.
                         attach={{ chatId, mascot, place: thread.runner ? 'runner' : inCloud ? 'cloud' : 'here' }}
                         disabled={running}

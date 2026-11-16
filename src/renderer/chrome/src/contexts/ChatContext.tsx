@@ -31,7 +31,8 @@ interface ChatContextType {
 
     // Chat actions
     // A new chat runs as `mascotId`. An open one keeps its own.
-    sendMessage: (content: string, mascotId: string, attached?: Attached) => Promise<void>
+    // Whether main took the message.
+    sendMessage: (content: string, mascotId: string, attached?: Attached) => Promise<boolean>
     stop: () => void
     clearChat: () => void
 
@@ -104,8 +105,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true, mascotId, ...attached })
             if (sent) setChatId(sent.id)
+            return sent !== null
         } catch (error) {
             console.error('Failed to send message:', error)
+            return false
         }
     }, [chatId])
 

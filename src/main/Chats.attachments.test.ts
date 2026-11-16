@@ -239,6 +239,24 @@ describe("Chats with attachments", () => {
     await elsewhere;
   });
 
+  it("sends nothing of an attached tab the user took back while it was being read", async () => {
+    const klm = fakeTab("tab-2", "https://klm.com/");
+    const { chats, replyEnded } = setup({ tabs: [klm] });
+    // The user clicks in it just as its text is read.
+    const read = klm.getTabText.bind(klm);
+    klm.getTabText = klm.getTextWithFrames = async () => {
+      chats.releaseTab(klm.id);
+      return read();
+    };
+    const done = replyEnded();
+    chats.send(null, "Look", { seePage: false, tabs: [klm.id] });
+    await started();
+    release();
+    await done;
+    expect(contentOf(sent[0])).not.toContain("<page");
+    expect(contentOf(sent[0])).not.toContain("The text of");
+  });
+
   it("takes an attached tab back once the user uses it, until they attach it again", async () => {
     const klm = fakeTab("tab-2", "https://klm.com/");
     const { chats, replyEnded } = setup({ tabs: [klm] });

@@ -438,7 +438,8 @@ export const Composer: React.FC<{
 
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
-    onSend: (message: string, attached: Attached) => void
+    // Whether main took the message. It may refuse one, as when an attached tab has been handed to the user since.
+    onSend: (message: string, attached: Attached) => Promise<boolean>
     onStop?: () => void
     disabled?: boolean
     placeholder: string
@@ -472,10 +473,14 @@ export const ChatComposer: React.FC<{
         onDraftTaken?.()
     }, [draft, onDraftTaken])
 
-    const send = () => {
+    // What was typed and attached stays in the box until main has taken it, so a refused message can be sent again.
+    const sending = useRef(false)
+    const send = async () => {
         const message = value.trim()
-        if (!message || disabled) return
-        onSend(message, box.sendable())
+        if (!message || disabled || sending.current) return
+        sending.current = true
+        const sent = await onSend(message, box.sendable()).finally(() => (sending.current = false))
+        if (!sent) return
         setValue('')
         box.clear()
     }
@@ -491,14 +496,14 @@ export const ChatComposer: React.FC<{
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
-                    send()
+                    void send()
                 }
             }}
             attachment={box.empty && !attachment ? undefined : <BoxChips box={box} before={attachment} />}
             add={attach ? add : undefined}
             onFiles={attach && attach.place !== 'runner' ? (files) => void box.addFiles(files) : undefined}
             canSend={!disabled && value.trim().length > 0}
-            onSend={send}
+            onSend={() => void send()}
             onStop={onStop}
             mascot={mascot}
             onChooseMascot={onChooseMascot}

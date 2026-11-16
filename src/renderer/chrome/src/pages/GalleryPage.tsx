@@ -438,15 +438,15 @@ export const GalleryPage: React.FC = () => {
                             ]}
                         />
                         <div>
-                            <ChatComposer onSend={() => undefined} placeholder="Ask Berry" />
+                            <ChatComposer onSend={async () => true} placeholder="Ask Berry" />
                         </div>
                         <ChatComposer
-                            onSend={() => undefined}
+                            onSend={async () => true}
                             placeholder="With a page attached"
                             attachment={<PageChip title="Jackdaw" host="en.wikipedia.org" onRemove={() => undefined} />}
                         />
-                        <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
-                        <ChatComposer onSend={() => undefined} onStop={() => undefined} placeholder="While replying" disabled />
+                        <ChatComposer onSend={async () => true} placeholder="Disabled" disabled />
+                        <ChatComposer onSend={async () => true} onStop={() => undefined} placeholder="While replying" disabled />
                     </div>
                 </Section>
 

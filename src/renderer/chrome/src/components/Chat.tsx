@@ -87,7 +87,7 @@ export const Chat: React.FC = () => {
 
             <div className="px-3.5 pb-3.5 pt-1">
                 <ChatComposer
-                    onSend={(message, attached) => void sendMessage(message, mascot.id, attached)}
+                    onSend={(message, attached) => sendMessage(message, mascot.id, attached)}
                     mascot={mascot}
                     onChooseMascot={chatId ? undefined : choose}
                     draft={draft}
