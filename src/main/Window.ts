@@ -366,6 +366,8 @@ export class Window {
       },
       stillInCloud: (id) => this.runnerJobs.stillInCloud(id),
       cloudFailed: (id) => this.runnerJobs.cloudFailed(id),
+      // Named the way a chat is titled, from the user's own words for what it does and nothing else.
+      writeName: async (instructions) => (hasModel() ? generateTitle([{ role: "user", content: instructions }]) : null),
       onAttention: (routine, kind) => {
         // The Routines row and the toolbar say so anyway, and that holds until the user is free. Anything asking
         // is notified from Needs you, along with every chat's.

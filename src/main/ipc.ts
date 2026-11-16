@@ -111,6 +111,7 @@ export const CHANNEL_REGIONS: {
   "downloads:list": ["chrome"],
   "downloads:act": ["chrome"],
   "downloads:choose-folder": ["chrome"],
+  "downloads:open-folder": ["chrome"],
   "permissions:saved": ["chrome"],
   "permissions:set": ["chrome"],
   "phone:state": ["chrome"],
