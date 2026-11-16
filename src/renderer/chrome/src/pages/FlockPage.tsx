@@ -158,7 +158,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                 <Berry mood={stateOf(mascot).mood} size={64} mascot={mascot} className="mt-0.5" still />
                 <div className="flex-1 min-w-0">
                     <h1 className="mb-1 text-18 font-medium [overflow-wrap:anywhere]">{name}</h1>
-                    <p className="text-13 leading-[1.45] text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{isBerry ? BERRY_LINE : mascot.instructions}</p>
+                    <p className="text-13 leading-[1.45] text-ink-2 line-clamp-3 [overflow-wrap:anywhere]">{isBerry ? BERRY_LINE : mascot.instructions}</p>
                     <LimitTags mascot={mascot} className="mt-3" />
                 </div>
                 <Button className="h-7" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
