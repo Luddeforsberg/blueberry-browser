@@ -1741,7 +1741,9 @@ test("a card on the composer shows the page Berry can see, and removing it takes
   await expect(card).toHaveCount(0);
   expect(await chrome.evaluate(() => window.chromeAPI.chat.getPageAccess())).toBe(false);
 
-  await panel.getByRole("button", { name: "Add this page" }).click();
+  // + offers the page in front first.
+  await panel.getByRole("button", { name: "Add a tab or a file" }).click();
+  await panel.getByRole("menuitem", { name: /^This page/ }).click();
   await expect(card).toBeVisible();
   expect(await chrome.evaluate(() => window.chromeAPI.chat.getPageAccess())).toBe(true);
 });

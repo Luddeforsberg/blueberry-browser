@@ -18,16 +18,18 @@ const Chip: React.FC<{
     factInFull?: string | null
     problem?: string | null
     label: string
+    // Shown on hover when there's nothing more to say, such as a page's title.
+    hint?: string
     onRemove?: () => void
     removeLabel?: string
     sheet?: boolean
-}> = ({ icon, name, fact, factInFull, problem, label, onRemove, removeLabel, sheet }) => {
+}> = ({ icon, name, fact, factInFull, problem, label, hint, onRemove, removeLabel, sheet }) => {
     const said = problem ?? fact
     return (
         <span
             role="group"
             aria-label={problem ? `${label}, not added: ${problem}` : factInFull || fact ? `${label}, ${factInFull ?? fact}` : label}
-            title={problem ?? factInFull ?? undefined}
+            title={problem ?? factInFull ?? hint}
             className={cn(
                 'h-7 max-w-[240px] pl-1.5 inline-flex items-center gap-[7px] rounded-row text-12 whitespace-nowrap',
                 onRemove ? 'pr-0.5' : 'pr-2',
@@ -59,7 +61,7 @@ const iconClass = (problem: string | null | undefined) => cn('size-[13px] shrink
 
 // The page in front, marked as that.
 export const PageChip: React.FC<{ title: string; host: string; favicon?: string | null; onRemove: () => void }> = ({ title, host, favicon, onRemove }) => (
-    <Chip icon={<Favicon src={favicon} site={host} />} name={host} fact="this page" label={`The page in front, ${title}`} onRemove={onRemove} removeLabel="Remove this page" />
+    <Chip icon={<Favicon src={favicon} site={host} />} name={host} fact="this page" label={`Berry can see ${host}`} hint={title} onRemove={onRemove} removeLabel="Remove this page" />
 )
 
 export const TabChip: React.FC<{ tab: Pick<TabChoice, 'title' | 'site' | 'favicon'>; problem?: string | null; onRemove?: () => void; sheet?: boolean }> = ({ tab, problem, onRemove, sheet }) => (
