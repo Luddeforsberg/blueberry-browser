@@ -224,9 +224,10 @@ const TabsFace: React.FC = () => {
 // --- Chats ----------------------------------------------------------------------------------------------------------
 
 const openChat = (chat: Pick<ChatThreadSummary, 'id' | 'title'>) => void window.chromeAPI.browser.openPage('chat', { param: chat.id, title: chat.title })
+// Named in the page's param too, since from Chats over a page this runs in the overlay's view, not the page's.
 const openRoutine = (routine: Pick<Routine, 'id'>) => {
     setRoutinesView({ page: 'detail', id: routine.id })
-    void window.chromeAPI.browser.openPage('routines')
+    void window.chromeAPI.browser.openPage('routines', { param: routine.id })
 }
 
 // A chat in the sidebar. Its menu, from a right click or the button that shows on hover, renames or deletes it.

@@ -20,7 +20,7 @@ export const InternalPageView: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         case 'chat':
             return <ChatPage key={tab.id} tab={tab} />
         case 'routines':
-            return <RoutinesPage />
+            return <RoutinesPage tab={tab} />
         case 'settings':
             return <SettingsPage tab={tab} />
         case 'downloads':

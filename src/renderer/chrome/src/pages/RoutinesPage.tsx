@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
+import type { TabInfo } from '@shared/ipc'
 import type { Routine, RoutineRun } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
@@ -174,7 +175,7 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
     )
 }
 
-export const RoutinesPage: React.FC = () => {
+export const RoutinesPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { routines } = useLibrary()
     const [view, setViewState] = useState<RoutinesView>(routinesView)
 
@@ -182,6 +183,11 @@ export const RoutinesPage: React.FC = () => {
         setRoutinesView(next)
         setViewState(next)
     }
+
+    // A routine named in the param, as from Chats over a page, opens at its detail.
+    useEffect(() => {
+        if (tab.pageParam) setView({ page: 'detail', id: tab.pageParam })
+    }, [tab.pageParam])
 
     // Being here is seeing them, so the dots elsewhere clear.
     const unseen = routines.some((routine) => routine.unseen)

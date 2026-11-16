@@ -509,6 +509,8 @@ export interface InvokeChannels {
   "mascots:gallery": { region: "chrome"; args: []; result: GalleryListing };
   // The bundled starters' example prompts, by Gallery id, from real runs. For the new tab's try rows. Nothing from the server.
   "mascots:examples": { region: "chrome"; args: []; result: Record<string, string> };
+  // Who the next new chat runs as, from the chrome or a mascot's card over the page. Null is Berry.
+  "mascots:choose": { region: "chrome" | "overlay"; args: [mascotId: string | null]; result: void };
   "mascots:gallery-linked": { region: "chrome"; args: [galleryId: string]; result: GalleryLinked };
   // By the entry's id, so main copies what it has rather than what a renderer sends. A name is only for one that clashes.
   // `version` is the one the review showed, so what's added is what was read.
@@ -750,6 +752,7 @@ export interface MascotsAPI {
   delete: (id: string) => Promise<boolean>;
   gallery: () => Promise<GalleryListing>;
   examples: () => Promise<Record<string, string>>;
+  choose: (mascotId: string | null) => Promise<void>;
   galleryLinked: (galleryId: string) => Promise<GalleryLinked>;
   addFromGallery: (galleryId: string, version: string, name: string | null) => Promise<MascotSaveResult>;
   publish: (mascotId: string, choices: PublishChoices) => Promise<PublishResult>;

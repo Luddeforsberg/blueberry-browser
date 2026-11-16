@@ -247,6 +247,9 @@ export class EventManager {
     this.handle("mascots:delete", (id) => this.mainWindow.confirmDeleteMascot(id));
     this.handle("mascots:gallery", () => this.mainWindow.gallery.list());
     this.handle("mascots:examples", () => starterExamplePrompts());
+    this.handle("mascots:choose", (mascotId) => {
+      if (mascotId === null || typeof mascotId === "string") this.mainWindow.updateSettings({ chosenMascotId: mascotId });
+    });
     this.handle("mascots:gallery-linked", (id) => this.mainWindow.gallery.linked(id));
     this.handle("mascots:add-from-gallery", (galleryId, version, name) => this.mainWindow.addFromGallery(galleryId, version, name));
     this.handle("mascots:publish", (mascotId, choices) => this.mainWindow.gallery.publish(mascotId, choices));

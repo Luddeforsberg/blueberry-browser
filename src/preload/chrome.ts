@@ -143,6 +143,7 @@ const chromeAPI: ChromeAPI = {
     delete: (id) => invoke("mascots:delete", id),
     gallery: () => invoke("mascots:gallery"),
     examples: () => invoke("mascots:examples"),
+    choose: (mascotId) => invoke("mascots:choose", mascotId),
     galleryLinked: (galleryId) => invoke("mascots:gallery-linked", galleryId),
     addFromGallery: (galleryId, version, name) => invoke("mascots:add-from-gallery", galleryId, version, name),
     publish: (mascotId, choices) => invoke("mascots:publish", mascotId, choices),
