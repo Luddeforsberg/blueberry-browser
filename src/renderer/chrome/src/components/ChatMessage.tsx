@@ -262,7 +262,20 @@ const PageChips: React.FC<{ pages: UsedPage[] }> = ({ pages }) => (
     </ul>
 )
 
-const CopyChip: React.FC<{ content: string }> = ({ content }) => {
+// A reply's action: an icon with its name as a tooltip, and no outline, so the reply stays the thing to read.
+const ReplyAction: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
+    <button
+        type="button"
+        aria-label={label}
+        title={label}
+        onClick={onClick}
+        className={cn('size-7 shrink-0 grid place-items-center rounded-row text-ink-3 transition-[background-color,color,transform] duration-fast hover:bg-hover hover:text-ink active:bg-press active:scale-[.96]', FOCUS)}
+    >
+        {children}
+    </button>
+)
+
+const CopyAction: React.FC<{ content: string }> = ({ content }) => {
     const [copied, setCopied] = useState(false)
     useEffect(() => {
         if (!copied) return undefined
@@ -270,14 +283,9 @@ const CopyChip: React.FC<{ content: string }> = ({ content }) => {
         return () => clearTimeout(timer)
     }, [copied])
     return (
-        <button
-            type="button"
-            onClick={() => void navigator.clipboard.writeText(content).then(() => setCopied(true))}
-            className={chipClass(true)}
-        >
-            {copied ? <Check aria-hidden className="size-[13px]" strokeWidth={1.5} /> : <Copy aria-hidden className="size-[13px]" strokeWidth={1.5} />}
-            {copied ? 'Copied' : 'Copy'}
-        </button>
+        <ReplyAction label={copied ? 'Copied' : 'Copy'} onClick={() => void navigator.clipboard.writeText(content).then(() => setCopied(true))}>
+            {copied ? <Check aria-hidden className="size-[15px]" strokeWidth={1.5} /> : <Copy aria-hidden className="size-[15px]" strokeWidth={1.5} />}
+        </ReplyAction>
     )
 }
 
@@ -447,14 +455,14 @@ export const AssistantMessage: React.FC<{
                 </TroubleLine>
             )}
             {failed && <WhatWentWrong message={error} steps={steps} actions={actions} />}
+            {/* Only while the pointer or the keyboard is in this reply. The row keeps its height, so nothing moves. */}
             {actions && !isStreaming && !stopped && !failed && content && (
-                <div className="-mt-2 flex flex-wrap gap-1.5">
-                    <CopyChip content={content} />
+                <div className="-mt-3.5 -ml-1.5 h-7 flex gap-0.5 opacity-0 transition-opacity duration-fast group-hover/reply:opacity-100 group-focus-within/reply:opacity-100">
+                    <CopyAction content={content} />
                     {actions.onSaveAsRoutine && (
-                        <button type="button" onClick={actions.onSaveAsRoutine} className={chipClass(true)}>
-                            <Repeat aria-hidden className="size-[13px]" strokeWidth={1.5} />
-                            Save as routine
-                        </button>
+                        <ReplyAction label="Save as routine" onClick={actions.onSaveAsRoutine}>
+                            <Repeat aria-hidden className="size-[15px]" strokeWidth={1.5} />
+                        </ReplyAction>
                     )}
                 </div>
             )}
