@@ -231,12 +231,12 @@ Crisp: quick to start, gently settling.
 | Switching mascots, the longest in the chrome | 420ms in all |
 
 - **Easing:** `cubic-bezier(.2, .8, .2, 1)` (*to tune*).
-- **One thing moves per area.** The areas are the sidebar, the toolbar, the conversation, the working view and the page. In the sidebar that's the working mascot's own row, and the dock's faces stay still. In a conversation it's the live step. A loading tab and something waiting for you may move as well, since each is a different thing to know.
+- **One thing moves per area.** The areas are the sidebar, the toolbar, the conversation, the working view and the page. In the sidebar that's the working mascot's own row, and the dock's faces stay still. In a conversation it's the live step. The one stated exception is in there: the live line's words shimmer with its pips, a band of `ink` passing through `ink-3` every 2.4s, linear, and the dots and their words count as one thing. Only the live line does it, the Thinking line or the live step, in the chat and the chat panel, and it stops with the pips under Keep Berry still and reduced motion, where the words are plain `ink`. A loading tab and something waiting for you may move as well, since each is a different thing to know.
 - **Overshoot is the mascots' alone:** a mascot pops when it arrives. Nothing else in the chrome bounces.
 - **Loops** only while real work is happening, stopping as soon as it ends.
 - **Interruptible:** every transition can reverse from wherever it is.
 - **Web pages:** never animate page content.
-- **Reduced motion:** follow the system setting and the CSS media query. Pips show one still frame, a mascot changes with a short fade, and nothing slides.
+- **Reduced motion:** follow the system setting and the CSS media query. Pips show one still frame, the live line's words stop shimmering, a mascot changes with a short fade, and nothing slides.
 
 ## 8. Component states
 
@@ -467,7 +467,7 @@ A full page for talking to a mascot about anything. A chat starts from the new t
 - **The header** is one line: the mascot at rest, its name, and where it runs in mono, such as "on this Mac" or "in the cloud". One started from another app says so the same way, "from Claude Code". While the working view is hidden, **Show work** is at its right.
 - **One column.** The header, the conversation and the prompt box share one column, at most 720px wide with 28px either side, so they line up however wide the page is.
 - **Your messages** are on `sheet-2`, at the right, with a small corner where a tail would be. A mascot's reply is plain text on the sheet.
-- **While it works:** an outlined block headed **Working** with how long in mono, then its steps, each a pip mark and a line of mono. Finished ones are `ink-3`, the live one `ink` with moving pips. While a job runs only its latest steps show, under a quiet line that opens the rest. Between steps the last line says "Thinking..", and while a card waits for you it says "Waiting for you.." with the pips in `ask`. A reply with no steps yet has that line alone, where its words will start.
+- **While it works:** an outlined block headed **Working** with how long in mono, then its steps, each a pip mark and a line of mono. Finished ones are `ink-3`, the live one has moving pips and its words shimmer (section 7). While a job runs only its latest steps show, under a quiet line that opens the rest. Between steps the last line says "Thinking..", and while a card waits for you it says "Waiting for you.." with the pips in `ask`. A reply with no steps yet has that line alone, where its words will start.
 - **The prompt box** is at the bottom, and you can write while it works.
 - **What a step says:** what happened, in the user's terms: "Typed Lisbon in To", "Picked 12 to 16 Dec", "Clicked Search flights". Anything typed is cut at 24 characters. In a password, code or payment field it only ever names the field: "Typed in the password field".
 

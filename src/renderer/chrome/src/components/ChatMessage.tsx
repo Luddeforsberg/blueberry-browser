@@ -11,6 +11,7 @@ import { asContinuation, withSiteNames } from '../siteNames'
 import { STOPPED_STEP, trailFor } from '../stepTrail'
 import { Button } from '@common/components/Button'
 import { Pips, type PipMark, type PipPattern } from '@common/components/Pips'
+import { useStill } from '@common/components/motion'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
@@ -93,8 +94,12 @@ export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     </div>
 )
 
-// Words for work happening right now, where there are no pips to say it.
-export const SHIMMER_TEXT = 'bg-shimmer bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer'
+// Words for work happening right now: a band of `ink` passes through them. With the pips beside them they're one thing
+// moving (DESIGN.md section 7), and they hold still as the pips do, in plain `ink`.
+export const LiveWords: React.FC<{ className?: string; children: React.ReactNode }> = ({ className, children }) => {
+    const still = useStill()
+    return <span className={cn(still ? 'text-ink' : 'bg-shimmer bg-[length:260%_100%] bg-clip-text text-transparent animate-shimmer', className)}>{children}</span>
+}
 
 // What a job said it's doing, in its mascot's own words, while it works. Its answer replaces it.
 export const StatusLine: React.FC<{ text: string }> = ({ text }) => (
@@ -125,14 +130,14 @@ const STEP_PIPS: Record<StepKind | 'plain', { live: PipPattern; done: PipMark }>
     plain: { live: 'think', done: 'done' },
 }
 
-// One line of what a mascot did or is doing, in its words, after a pip mark. The live one is `ink` with moving pips,
-// and finished ones are `ink-3`.
+// One line of what a mascot did or is doing, in its words, after a pip mark. The live one has moving pips and its
+// words shimmer, and finished ones are `ink-3`.
 const StepLine: React.FC<{ pips: PipPattern | PipMark; live?: boolean; ask?: boolean; children: React.ReactNode }> = ({ pips, live = false, ask = false, children }) => (
     <span className={cn('flex items-start gap-3 font-mono text-11.5', live ? 'text-ink' : 'text-ink-3')}>
         <span className={cn('h-4 shrink-0 flex items-center', ask && 'text-ask')}>
             <Pips pattern={pips} />
         </span>
-        <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
+        {live ? <LiveWords className="min-w-0 [overflow-wrap:anywhere]">{children}</LiveWords> : <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>}
     </span>
 )
 

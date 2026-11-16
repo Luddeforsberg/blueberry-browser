@@ -100,21 +100,22 @@ module.exports = {
       spacing: {
         4.5: "1.125rem",
       },
+      // The live line's words: `ink-3` with a band of `ink` passing through (DESIGN.md section 7).
       backgroundImage: {
         shimmer:
-          "linear-gradient(90deg, rgb(var(--ink-3)) 20%, rgb(var(--ink)) 50%, rgb(var(--ink-3)) 80%)",
+          "linear-gradient(90deg, rgb(var(--ink-3)) 38%, rgb(var(--ink)) 50%, rgb(var(--ink-3)) 62%)",
       },
       animation: {
         "fade-in": "fade-in 280ms cubic-bezier(.2, .8, .2, 1) forwards",
         "answered": "answered 1600ms cubic-bezier(.2, .8, .2, 1) forwards",
-        shimmer: "shimmer 1300ms linear infinite",
+        shimmer: "shimmer 2400ms linear infinite",
         // Overshoot is the mascots' alone: one pops when it arrives (DESIGN.md section 7).
         "mascot-pop": "mascot-pop 340ms cubic-bezier(.3, 1.5, .5, 1)",
       },
       keyframes: {
         shimmer: {
-          "0%": { backgroundPosition: "150% 0" },
-          "100%": { backgroundPosition: "-50% 0" },
+          "0%": { backgroundPosition: "130% 0" },
+          "100%": { backgroundPosition: "-130% 0" },
         },
         // A menu opening, and a mascot changing with the motion held still.
         "menu-in": {

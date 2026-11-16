@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Berry, useAssistantName } from '../components/Berry'
-import { ChatError, SHIMMER_TEXT } from '../components/ChatMessage'
+import { ChatError, LiveWords } from '../components/ChatMessage'
 import { TrailNotes, useRecording } from '../components/ShowBerry'
 import { recordedForm, setRoutinesView } from '../routinesView'
 
@@ -68,7 +68,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <div className="max-w-[608px] mx-auto border-t pt-4">
                     {drafting ? (
                         <p role="status" className="h-9 flex items-center gap-2 text-13">
-                            <span className={SHIMMER_TEXT}>Writing it up as a routine</span>
+                            <LiveWords>Writing it up as a routine</LiveWords>
                         </p>
                     ) : (
                         <>
