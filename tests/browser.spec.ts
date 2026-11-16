@@ -480,7 +480,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   model.callTools({ name: "click", args: { ref: "e1" } });
   model.callTools({ name: "click", args: { ref: "f1.e1" } });
   model.callTools({ name: "ask_user", args: { question: "What is your password?" } });
-  model.callTools({ name: "ask_user", args: { question: "Which colour?" } });
+  model.callTools({ name: "ask_user", args: { question: "Which colour?", answers: ["Blue", "Green", "123456"] } });
   // Held, since its tab closes once it's done.
   const finish = model.holdBeforeFirstToken();
   await message.fill("Press them");
@@ -491,10 +491,15 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   await card.getByRole("button", { name: "Allow", exact: true }).click();
   // Even a harmless-looking button in another site's frame asks, and says whose it is.
   await expect(card.locator("p").getByText(`Click the button “Inside” in a frame from ${framed}, inside ${url}`)).toBeVisible();
+  const why = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval.why));
+  expect(why).toEqual({ reason: "other-origin-frame", mark: framed });
   await card.getByRole("button", { name: "Allow", exact: true }).click();
 
   const question = chrome.getByRole("region", { name: "Berry is asking" });
   await expect(question.getByText("Which colour?")).toBeVisible();
+  // The answers to press arrive with it, without the one shaped like a code.
+  const asked = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval));
+  expect(asked).toMatchObject({ text: "Which colour?", question: true, answers: ["Blue", "Green"] });
   await question.getByRole("textbox", { name: "Your answer" }).fill("Blue");
   await question.getByRole("button", { name: "Answer" }).click();
 

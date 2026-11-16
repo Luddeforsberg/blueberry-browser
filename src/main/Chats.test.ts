@@ -475,7 +475,7 @@ describe("Chats", () => {
     const risky: boolean[] = [];
     const stream: StreamReply = async function* (_, __, { tools }) {
       const open = tools.find(({ name }) => name === "open_tab")!;
-      risky.push(await open.isRisky!({ url: "https://en.wikipedia.org/wiki/Jet_engine" }), await open.isRisky!({ url: "https://elsewhere.example/" }));
+      risky.push((await open.whyRisky!({ url: "https://en.wikipedia.org/wiki/Jet_engine" })) !== null, (await open.whyRisky!({ url: "https://elsewhere.example/" })) !== null);
       yield "ok";
     };
     const { chats, replyEnded } = setup(stream, null);

@@ -70,19 +70,30 @@ const RISKY_WORDS = [
 const ASSESS = `
   const riskyWord = new RegExp("(^|[^\\p{L}])(" + ${JSON.stringify(RISKY_WORDS.join("|"))} + ")([^\\p{L}]|$)", "iu");
   const sendsForm = (form) => !!form && (form.method === "post" || !!form.querySelector("input[type=password]"));
-  // A plain link only goes somewhere. A button with no label could do anything, so it counts as risky.
-  const riskyClick = (el) => {
+  // Why a click asks, as a reason from src/shared/asking.ts, or null if it needn't. A plain link only goes somewhere.
+  // A button with no label could do anything, so it counts as risky.
+  const clickRisk = (el) => {
     const name = nameOf(el);
-    if (!name || riskyWord.test(name) || isSecret(el) || isTransparent(el)) return true;
+    if (!name) return { reason: "unnamed" };
+    const word = name.match(riskyWord);
+    if (word) return { reason: "risky-word", mark: word[2] };
+    if (isSecret(el)) return { reason: "secret-field" };
+    if (isTransparent(el)) return { reason: "hidden" };
     const role = roleOf(el);
-    if (role === "checkbox" || role === "switch") return true;
+    if (role === "checkbox" || role === "switch") return { reason: "toggle" };
     const submits = el.form && (el.type === "submit" || el.type === "image");
-    return !!submits && (el.formMethod === "post" || sendsForm(el.form));
+    return submits && (el.formMethod === "post" || sendsForm(el.form)) ? { reason: "sends-form" } : null;
   };
   const isSearch = (el) =>
     el.type === "search" || el.getAttribute("role") === "searchbox" || !!el.closest?.("[role=search]") ||
     /search|sök/i.test(nameOf(el));
-  const safeToType = (el) => !isSecret(el) && !isTransparent(el) && !el.isContentEditable && isSearch(el) && !sendsForm(el.form);
+  // The same for typing in it. Only a search box is safe.
+  const typeRisk = (el) => {
+    if (isSecret(el)) return { reason: "secret-field" };
+    if (isTransparent(el)) return { reason: "hidden" };
+    if (sendsForm(el.form)) return { reason: "sends-form" };
+    return el.isContentEditable || !isSearch(el) ? { reason: "not-search" } : null;
+  };
 `;
 
 const LIST = `
@@ -175,7 +186,7 @@ const withElement = (ref: string, body: string): string => `(() => {
   ${body}
 })()`;
 
-const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, riskyClick: riskyClick(el), safeToType: safeToType(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
+const DESCRIBE_FIELDS = `role: roleOf(el), name: nameOf(el), target: el.href || (el.hasAttribute("formaction") ? el.formAction : el.form?.action) || null, clickRisk: clickRisk(el), typeRisk: typeRisk(el), frameUrl: el.ownerDocument !== document ? el.ownerDocument.URL : null`;
 
 export const describeElement = (ref: string): string => withElement(ref, `return { ${DESCRIBE_FIELDS} };`);
 

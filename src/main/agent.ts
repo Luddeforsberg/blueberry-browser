@@ -5,6 +5,7 @@ import * as dotenv from "dotenv";
 import { join } from "path";
 import type { PageTool } from "./browserTools";
 import type { ActionApproval } from "../shared/ipc";
+import type { AskWhy } from "../shared/asking";
 import type { ChatThreadMessage, StepKind } from "../shared/library";
 
 // Load environment variables from .env file
@@ -23,8 +24,8 @@ export interface ReplyOptions {
   tools: PageTool[];
   // Read on every action, so a change in Settings applies straight away.
   actionApproval: () => ActionApproval;
-  // Resolves with the user's answer, and rejects if the reply is stopped first.
-  approve: (description: string) => Promise<boolean>;
+  // Resolves with the user's answer, and rejects if the reply is stopped first. `why` is the rule that made it ask.
+  approve: (description: string, why?: AskWhy) => Promise<boolean>;
   // Called as each tool starts, with what the chat should show. The result is called when it ends. `shown` is set for a
   // call the user allowed, naming what they allowed, and is only for the screen, as `kind` is.
   onStep: (text: string, shown?: string, kind?: StepKind) => () => void;
@@ -269,11 +270,15 @@ export async function* streamReply(
   const presented = new Set<string>();
   // A mascot's limit comes first: what it won't be allowed to do at all has nothing to ask about.
   const refusedOutright = async ({ refuses }: PageTool, args: unknown) => (await refuses?.(args)) ?? null;
-  const needsAsking = async ({ isRisky }: PageTool, args: unknown): Promise<boolean> => {
+  // Whether this call asks, and why. Null when it doesn't.
+  const whyAsk = async ({ whyRisky }: PageTool, args: unknown): Promise<AskWhy | null> => {
     const mode = actionApproval();
-    if (mode === "always") return true;
-    return mode === "risky" && (!isRisky || (await isRisky(args)));
+    if (mode === "always") return { reason: "always-ask" };
+    if (mode !== "risky") return null;
+    return whyRisky ? whyRisky(args) : { reason: "tool-always-asks" };
   };
+  // Why each call put to the user asked, by tool call, worked out with the decision itself.
+  const reasons = new Map<string, AskWhy>();
   const interruptOn = Object.fromEntries(
     tools.flatMap((pageTool) =>
       pageTool.describe
@@ -287,8 +292,12 @@ export async function* streamReply(
                   if (id !== undefined) presented.add(id);
                   return pageTool.describe!(args);
                 },
-                when: async ({ toolCall }: { toolCall: { args: unknown } }) =>
-                  !(await refusedOutright(pageTool, toolCall.args)) && needsAsking(pageTool, toolCall.args),
+                when: async ({ toolCall }: { toolCall: { args: unknown; id?: string } }) => {
+                  if (await refusedOutright(pageTool, toolCall.args)) return false;
+                  const why = await whyAsk(pageTool, toolCall.args);
+                  if (why && toolCall.id !== undefined) reasons.set(toolCall.id, why);
+                  return why !== null;
+                },
               },
             ],
           ]
@@ -316,7 +325,7 @@ export async function* streamReply(
           // Allowed, it must still be the same action. Not asked about, it must still not need asking.
           const allowedAs = allowed.get(config.toolCall?.id ?? "");
           if (describe && allowedAs !== undefined && (await describe(args)) !== allowedAs) return CHANGED;
-          if (describe && allowedAs === undefined && (await needsAsking(pageTool, args))) return CHANGED;
+          if (describe && allowedAs === undefined && (await whyAsk(pageTool, args)) !== null) return CHANGED;
           const shown = (allowedAs !== undefined && pageTool.allowedLabel?.(args)) || pageTool.shownLabel?.(args) || undefined;
           const finish = onStep(label(args), shown, kind);
           try {
@@ -376,7 +385,7 @@ export async function* streamReply(
     for (const { id, value } of paused) {
       if (!id || !value) throw new Error("A paused action has nothing to identify it by.");
       const { tool_call_id: callId, description } = value as { tool_call_id: string; description: string };
-      const yes = await approve(description);
+      const yes = await approve(description, reasons.get(callId));
       if (yes) allowed.set(callId, description);
       decisions[id] = yes ? { type: "approve" } : { type: "reject", message: DECLINED };
     }

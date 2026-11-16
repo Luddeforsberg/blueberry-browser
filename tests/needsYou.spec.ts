@@ -40,6 +40,9 @@ test("an approval answered from Needs you lets the job carry on", async () => {
     await expect(row.getByRole("heading")).toHaveText("Open 127.0.0.1 in a new tab");
     await expect(row.getByText(`Open ${address} in a new tab`)).toBeAttached();
     await expect(chrome.getByRole("tab", { name: /^Chats.*1 needs you/ })).toBeVisible();
+    // It says why it asked, marking the query, for the card to show.
+    const waiting = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval.why));
+    expect(waiting).toEqual({ reason: "carries-data", mark: "?from=inbox" });
     await row.getByRole("button", { name: "Allow", exact: true }).click();
 
     await expect.poll(async () => (await chrome.evaluate((id) => window.chromeAPI.library.getChat(id), sent!.id))?.messages.at(-1)?.content).toBe("All done");

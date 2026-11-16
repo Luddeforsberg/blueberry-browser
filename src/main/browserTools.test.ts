@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createPageTools } from "./browserTools";
 import type { Tab } from "./Tab";
 import type { MascotTool } from "../shared/library";
+import type { AskWhy } from "../shared/asking";
 
 const IMAGE = Buffer.from("picture");
 
@@ -18,7 +19,8 @@ const screenshotTool = (tab: Tab, canSee: () => boolean) =>
 
 type Asking = { open?: string; linked?: boolean; asked?: string; beenTo?: string[]; sites?: string[]; tool?: "open_tab" | "go_to" };
 
-// Whether going to `url` from a job on `open` asks in the default mode. `linked` is whether that page links to it.
+// Why going to `url` from a job on `open` asks in the default mode, or null if it doesn't. `linked` is whether that page
+// links to it.
 const asks = (url: string, { open = "https://page.example/", linked = false, asked, beenTo, sites, tool = "open_tab" }: Asking = {}) => {
   const tab = { id: "tab-1", url: open, foreignFrames: [], runInPage: async () => linked } as unknown as Tab;
   return createPageTools({
@@ -34,32 +36,35 @@ const asks = (url: string, { open = "https://page.example/", linked = false, ask
     limits: sites && { name: "Scout", sites, tools: ["visit"] },
   })
     .find(({ name }) => name === tool)!
-    .isRisky!({ url });
+    .whyRisky!({ url });
 };
 
 describe("whether an address with a query asks in the default mode", () => {
   // Counts the "?" too, so this query and hash come to exactly `length`.
   const ofLength = (length: number) => `?q=${"a".repeat(length - 3)}`;
 
-  it.each([
-    ["a short search on a listed site", "https://www.youtube.com/results?search_query=jet+engine", false],
-    ["a subdomain of one", "https://sv.wikipedia.org/w/index.php?search=jet", false],
-    ["exactly 100 characters", `https://www.youtube.com/results${ofLength(100)}`, false],
-    ["101 characters", `https://www.youtube.com/results${ofLength(101)}`, true],
-    ["a hash counting towards the limit", `https://www.youtube.com/results${ofLength(95)}#${"b".repeat(5)}`, true],
-    ["a lookalike hostname", "https://youtube.com.evil.example/results?q=jet", true],
-    ["a name that only ends like one", "https://evilyoutube.com/results?q=jet", true],
-    ["a listed site as the username", "https://youtube.com@evil.example/?q=jet", true],
-    ["an unknown site", "https://unknown.example/?q=jet", true],
-    ["the site this job has open", "https://www.page.example/search?q=jet", true],
-    ["a script anyone can publish on Google", "https://script.google.com/macros/s/abc/exec?d=jet", true],
-    ["a form anyone can publish on Google", "https://docs.google.com/forms/d/abc/formResponse?entry.1=jet", true],
-    ["a redirect on a listed site", "https://www.google.com/url?q=https://evil.example/", true],
-    ["another page on a listed site", "https://www.youtube.com/redirect?q=https://evil.example/", true],
-    ["a host named like an object's built-in property", "http://constructor/?q=jet", true],
-    ["a listed site without www", "https://youtube.com/results?search_query=jet", false],
-  ])("%s", async (_, url, expected) => {
-    expect(await asks(url)).toBe(expected);
+  const data = (mark: string): AskWhy => ({ reason: "carries-data", mark });
+
+  it.each<[string, string, boolean, AskWhy | null]>([
+    ["a short search on a listed site", "https://www.youtube.com/results?search_query=jet+engine", false, null],
+    ["a subdomain of one", "https://sv.wikipedia.org/w/index.php?search=jet", false, null],
+    ["exactly 100 characters", `https://www.youtube.com/results${ofLength(100)}`, false, null],
+    ["101 characters", `https://www.youtube.com/results${ofLength(101)}`, true, { reason: "carries-data", mark: ofLength(101) }],
+    ["a hash counting towards the limit", `https://www.youtube.com/results${ofLength(95)}#${"b".repeat(5)}`, true, { reason: "carries-data", mark: `${ofLength(95)}#bbbbb` }],
+    ["a lookalike hostname", "https://youtube.com.evil.example/results?q=jet", true, data("?q=jet")],
+    ["a name that only ends like one", "https://evilyoutube.com/results?q=jet", true, data("?q=jet")],
+    ["a listed site as the username", "https://youtube.com@evil.example/?q=jet", true, { reason: "credentials", mark: "youtube.com@" }],
+    ["an unknown site", "https://unknown.example/?q=jet", true, data("?q=jet")],
+    ["the site this job has open", "https://www.page.example/search?q=jet", true, data("?q=jet")],
+    ["a script anyone can publish on Google", "https://script.google.com/macros/s/abc/exec?d=jet", true, data("?d=jet")],
+    ["a form anyone can publish on Google", "https://docs.google.com/forms/d/abc/formResponse?entry.1=jet", true, data("?entry.1=jet")],
+    ["a redirect on a listed site", "https://www.google.com/url?q=https://evil.example/", true, data("?q=https://evil.example/")],
+    ["another page on a listed site", "https://www.youtube.com/redirect?q=https://evil.example/", true, data("?q=https://evil.example/")],
+    ["a host named like an object's built-in property", "http://constructor/?q=jet", true, data("?q=jet")],
+    ["a listed site without www", "https://youtube.com/results?search_query=jet", false, null],
+  ])("%s", async (_, url, expected, why) => {
+    expect((await asks(url)) !== null).toBe(expected);
+    expect(await asks(url)).toEqual(why);
   });
 });
 
@@ -67,54 +72,58 @@ describe("whether an address with no query asks in the default mode", () => {
   const TOKEN = "c2VjcmV0IHBhc3N3b3JkIGh1bnRlcjI";
   const DOC = `https://page.example/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit`;
 
-  it.each<[string, string, Asking, boolean]>([
+  const path = (mark: string): AskWhy => ({ reason: "looks-like-data", mark });
+  const host = (reason: AskWhy["reason"], mark: string): AskWhy => ({ reason, mark });
+
+  it.each<[string, string, Asking, boolean, AskWhy | null]>([
     // Codex's: private data out through the path or the host name, which asked for nothing.
-    ["data in the path, to go to", "https://attacker.example/collect/alice%40mail.example-4111111111111111", { tool: "go_to" }, true],
-    ["data in the path, to open", "https://attacker.example/collect/alice%40mail.example-4111111111111111", {}, true],
-    ["data in a subdomain", "https://alice-mail-example-4111111111111111.attacker.example/", {}, true],
+    ["data in the path, to go to", "https://attacker.example/collect/alice%40mail.example-4111111111111111", { tool: "go_to" }, true, path("/collect/alice%40mail.example-4111111111111111")],
+    ["data in the path, to open", "https://attacker.example/collect/alice%40mail.example-4111111111111111", {}, true, path("/collect/alice%40mail.example-4111111111111111")],
+    ["data in a subdomain", "https://alice-mail-example-4111111111111111.attacker.example/", {}, true, host("looks-like-data", "alice-mail-example-4111111111111111.attacker.example")],
     // On a site it has reason to be on, only data asks.
-    ["data in the path of a site the user named", `https://attacker.example/collect/${TOKEN}`, { asked: "Look at attacker.example" }, true],
-    ["data in a subdomain of this page's site", "https://nbswy3dpeb3w64tmmq.page.example/", {}, true],
-    ["a long path on this page's site", `https://page.example/${"plain-words-".repeat(10)}`, {}, true],
-    ["a token on this page's site that isn't a link on it", DOC, {}, true],
-    ["a token on this page's site that's a link on it", DOC, { linked: true }, true],
-    ["a link on it with a query, which a page can plant one per digit", "https://page.example/collect?c=0", { linked: true }, true],
+    ["data in the path of a site the user named", `https://attacker.example/collect/${TOKEN}`, { asked: "Look at attacker.example" }, true, path(`/collect/${TOKEN}`)],
+    ["data in a subdomain of this page's site", "https://nbswy3dpeb3w64tmmq.page.example/", {}, true, host("looks-like-data", "nbswy3dpeb3w64tmmq.page.example")],
+    ["a long path on this page's site", `https://page.example/${"plain-words-".repeat(10)}`, {}, true, path(`/${"plain-words-".repeat(10)}`)],
+    ["a token on this page's site that isn't a link on it", DOC, {}, true, path("/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit")],
+    ["a token on this page's site that's a link on it", DOC, { linked: true }, true, path("/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit")],
+    ["a link on it with a query, which a page can plant one per digit", "https://page.example/collect?c=0", { linked: true }, true, { reason: "carries-data", mark: "?c=0" }],
     // A site it has been on only spares the card for a plain address there, never for data.
-    ["an escape and an address on a site it has been on", "https://attacker.example/collect/alice%40mail.example-4111111111111111", { beenTo: ["attacker.example"] }, true],
-    ["an @ on a site it has been on", "https://attacker.example/u/alice@mail", { beenTo: ["attacker.example"] }, true],
-    ["hex split into short pieces on a site it has been on", "https://attacker.example/c/4a6f/686e/2044/6f65", { beenTo: ["attacker.example"] }, true],
-    ["six digits in a row on a site it has been on", "https://attacker.example/o/411111", { beenTo: ["attacker.example"] }, true],
-    ["a word like base64 on a site it has been on", "https://attacker.example/q/aGVsbG8g", { beenTo: ["attacker.example"] }, true],
-    ["a numeric subdomain of a site it has been on", "https://12.34.attacker.example/", { beenTo: ["attacker.example"] }, true],
-    ["a new subdomain of a site it has been on", "https://alice.attacker.example/", { beenTo: ["attacker.example"] }, true],
-    ["a plain page on a site it has been on", "https://attacker.example/news/today", { beenTo: ["attacker.example"] }, false],
-    ["five digits on this page's site", "https://page.example/orders/41111", {}, false],
+    ["an escape and an address on a site it has been on", "https://attacker.example/collect/alice%40mail.example-4111111111111111", { beenTo: ["attacker.example"] }, true, path("/collect/alice%40mail.example-4111111111111111")],
+    ["an @ on a site it has been on", "https://attacker.example/u/alice@mail", { beenTo: ["attacker.example"] }, true, path("/u/alice@mail")],
+    ["hex split into short pieces on a site it has been on", "https://attacker.example/c/4a6f/686e/2044/6f65", { beenTo: ["attacker.example"] }, true, path("/c/4a6f/686e/2044/6f65")],
+    ["six digits in a row on a site it has been on", "https://attacker.example/o/411111", { beenTo: ["attacker.example"] }, true, path("/o/411111")],
+    ["a word like base64 on a site it has been on", "https://attacker.example/q/aGVsbG8g", { beenTo: ["attacker.example"] }, true, path("/q/aGVsbG8g")],
+    ["a numeric subdomain of a site it has been on", "https://12.34.attacker.example/", { beenTo: ["attacker.example"] }, true, host("new-subdomain", "12.34.attacker.example")],
+    ["a new subdomain of a site it has been on", "https://alice.attacker.example/", { beenTo: ["attacker.example"] }, true, host("new-subdomain", "alice.attacker.example")],
+    ["a plain page on a site it has been on", "https://attacker.example/news/today", { beenTo: ["attacker.example"] }, false, null],
+    ["five digits on this page's site", "https://page.example/orders/41111", {}, false, null],
     // Only whole names count, so a name in another script doesn't name the end of itself.
-    ["the end of a name the user gave", "https://cher.de/", { asked: "Read https://bücher.de" }, true],
-    ["the end of a name the user wrote", "https://cher.de/", { asked: "Find it on bücher.de" }, true],
-    ["a name the user wrote in another script", "https://bücher.de/", { asked: "Find it on bücher.de" }, false],
-    ["the end of a name written with a combining mark", "https://cher.de/", { asked: "Find it on bu\u0308cher.de" }, true],
-    ["a name written with a combining mark", "https://bücher.de/", { asked: "Find it on bu\u0308cher.de" }, false],
+    ["the end of a name the user gave", "https://cher.de/", { asked: "Read https://bücher.de" }, true, host("new-site", "cher.de")],
+    ["the end of a name the user wrote", "https://cher.de/", { asked: "Find it on bücher.de" }, true, host("new-site", "cher.de")],
+    ["a name the user wrote in another script", "https://bücher.de/", { asked: "Find it on bücher.de" }, false, null],
+    ["the end of a name written with a combining mark", "https://cher.de/", { asked: "Find it on bu\u0308cher.de" }, true, host("new-site", "cher.de")],
+    ["a name written with a combining mark", "https://bücher.de/", { asked: "Find it on bu\u0308cher.de" }, false, null],
     // Credentials in an address go out to the site when it asks for them.
-    ["a name and password on a site it has been on", "https://4111111111111111:x@attacker.example/", { beenTo: ["attacker.example"] }, true],
-    ["only a name on this page's site", "https://alice@page.example/", {}, true],
-    ["credentials in an address the user gave", "https://alice:pw@page.example/", { asked: "Open https://alice:pw@page.example/" }, true],
-    ["a link on it to another site", `https://attacker.example/collect/${TOKEN}`, { linked: true }, true],
-    ["another page on this page's site", "https://page.example/about/team", {}, false],
-    ["another page in this page's own subdomain", "https://www.page.example/news/2026/jet-engines-of-the-future", {}, false],
+    ["a name and password on a site it has been on", "https://4111111111111111:x@attacker.example/", { beenTo: ["attacker.example"] }, true, { reason: "credentials", mark: "4111111111111111:x@" }],
+    ["only a name on this page's site", "https://alice@page.example/", {}, true, { reason: "credentials", mark: "alice@" }],
+    ["credentials in an address the user gave", "https://alice:pw@page.example/", { asked: "Open https://alice:pw@page.example/" }, true, { reason: "credentials", mark: "alice:pw@" }],
+    ["a link on it to another site", `https://attacker.example/collect/${TOKEN}`, { linked: true }, true, path(`/collect/${TOKEN}`)],
+    ["another page on this page's site", "https://page.example/about/team", {}, false, null],
+    ["another page in this page's own subdomain", "https://www.page.example/news/2026/jet-engines-of-the-future", {}, false, null],
     // A site it has no reason to be on asks however plain.
-    ["a plain new site", "https://www.wikipedia.org/", {}, true],
-    ["a plain new site the user named", "https://www.wikipedia.org/", { asked: "Find jet engines on wikipedia.org" }, false],
-    ["a page in a subdomain of one", "https://en.wikipedia.org/wiki/Jet_engine", { asked: "Find jet engines on wikipedia.org" }, false],
-    ["only a site whose name ends like one", "https://notwikipedia.org/", { asked: "Find jet engines on wikipedia.org" }, true],
-    ["an address the user gave, token and all", "https://docs.example.com/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit", { asked: "Read https://docs.example.com/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit" }, false],
-    ["a local site the user gave an address on", "http://127.0.0.1:5173/settings", { asked: "Check http://127.0.0.1:5173/ for me" }, false],
-    ["a site an earlier reply was on", "https://example.org/news", { beenTo: ["example.org"] }, false],
-    ["a site the bird is limited to", "https://docs.github.com/en", { open: "https://github.com/", sites: ["github.com"] }, false],
-    ["a search", "https://www.google.com/search?q=jet+engine", {}, false],
-    ["a page no tab is on", "https://elsewhere.example/", { open: "about:blank" }, true],
-  ])("%s", async (_, url, options, expected) => {
-    expect(await asks(url, options)).toBe(expected);
+    ["a plain new site", "https://www.wikipedia.org/", {}, true, host("new-site", "www.wikipedia.org")],
+    ["a plain new site the user named", "https://www.wikipedia.org/", { asked: "Find jet engines on wikipedia.org" }, false, null],
+    ["a page in a subdomain of one", "https://en.wikipedia.org/wiki/Jet_engine", { asked: "Find jet engines on wikipedia.org" }, false, null],
+    ["only a site whose name ends like one", "https://notwikipedia.org/", { asked: "Find jet engines on wikipedia.org" }, true, host("new-site", "notwikipedia.org")],
+    ["an address the user gave, token and all", "https://docs.example.com/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit", { asked: "Read https://docs.example.com/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit" }, false, null],
+    ["a local site the user gave an address on", "http://127.0.0.1:5173/settings", { asked: "Check http://127.0.0.1:5173/ for me" }, false, null],
+    ["a site an earlier reply was on", "https://example.org/news", { beenTo: ["example.org"] }, false, null],
+    ["a site the bird is limited to", "https://docs.github.com/en", { open: "https://github.com/", sites: ["github.com"] }, false, null],
+    ["a search", "https://www.google.com/search?q=jet+engine", {}, false, null],
+    ["a page no tab is on", "https://elsewhere.example/", { open: "about:blank" }, true, host("new-site", "elsewhere.example")],
+  ])("%s", async (_, url, options, expected, why) => {
+    expect((await asks(url, options)) !== null).toBe(expected);
+    expect(await asks(url, options)).toEqual(why);
   });
 
   it("never asks the page, so a link on it changes nothing", async () => {
@@ -122,8 +131,8 @@ describe("whether an address with no query asks in the default mode", () => {
     const tab = { id: "tab-1", url: "https://page.example/", foreignFrames: [], runInPage } as unknown as Tab;
     const goTo = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} })
       .find(({ name }) => name === "go_to")!;
-    expect(await goTo.isRisky!({ url: "https://page.example/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789" })).toBe(true);
-    expect(await goTo.isRisky!({ url: "https://page.example/about" })).toBe(false);
+    expect(await goTo.whyRisky!({ url: "https://page.example/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789" })).not.toBeNull();
+    expect(await goTo.whyRisky!({ url: "https://page.example/about" })).toBeNull();
     expect(runInPage).not.toHaveBeenCalled();
   });
 
@@ -140,9 +149,9 @@ describe("whether an address with no query asks in the default mode", () => {
       onUse: () => {},
     });
     const goTo = tools.find(({ name }) => name === "go_to")!;
-    expect(await goTo.isRisky!({ url: "https://other.example/plain" })).toBe(true);
+    expect(await goTo.whyRisky!({ url: "https://other.example/plain" })).toEqual({ reason: "new-site", mark: "other.example" });
     await tools.find(({ name }) => name === "read_page")!.run({ tabId: "tab-2" });
-    expect(await goTo.isRisky!({ url: "https://other.example/plain" })).toBe(false);
+    expect(await goTo.whyRisky!({ url: "https://other.example/plain" })).toBeNull();
   });
 });
 
@@ -191,7 +200,7 @@ describe("the screenshot tool", () => {
 });
 
 describe("the ask_user tool", () => {
-  const askTool = (ask: (question: string) => Promise<string | null>) =>
+  const askTool = (ask: (question: string, answers: string[]) => Promise<string | null>) =>
     createPageTools({
       activeTab: () => null,
       allTabs: () => [],
@@ -219,6 +228,37 @@ describe("the ask_user tool", () => {
 
   it("says when the user skipped", async () => {
     expect(await askTool(async () => null).run({ question: "Which colour?" })).toMatch(/chose not to answer/);
+  });
+
+  it.each([
+    ["none", undefined, []],
+    ["one", ["Friday evening"], ["Friday evening"]],
+    ["three", ["Friday evening", "Saturday evening", "Either"], ["Friday evening", "Saturday evening", "Either"]],
+    ["one of 60 characters", ["a".repeat(60)], ["a".repeat(60)]],
+  ])("offers %s to press", async (_, answers, offered) => {
+    const ask = vi.fn(async () => "Friday evening");
+    expect(await askTool(ask).run({ question: "Which evening?", answers })).toBe("The user answered: Friday evening");
+    expect(ask).toHaveBeenCalledWith("Which evening?", offered);
+  });
+
+  it.each([
+    ["a fourth", ["One", "Two", "Three", "Four"]],
+    ["an empty one", [""]],
+    ["one of 61 characters", ["a".repeat(61)]],
+  ])("refuses %s answer", async (_, answers) => {
+    expect(() => askTool(async () => null).label({ question: "Which?", answers })).toThrow();
+  });
+
+  it.each(["My password", "The code from the text", "Card number ending 4242"])("never asks with %s as an answer", async (answer) => {
+    const ask = vi.fn(async () => "secret");
+    expect(await askTool(ask).run({ question: "Which one?", answers: ["Neither", answer] })).toMatch(/never go through this chat/);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("drops an answer shaped like a code, and keeps the rest", async () => {
+    const ask = vi.fn(async () => "Neither");
+    await askTool(ask).run({ question: "Which one?", answers: ["482913", "Neither", "AB12 CD34"] });
+    expect(ask).toHaveBeenCalledWith("Which one?", ["Neither"]);
   });
 
   it("shows one question at a time", async () => {
@@ -268,8 +308,9 @@ describe("a frame from another site", () => {
     runInFrame.mockResolvedValueOnce(listing);
     const tool = setUp(runInFrame);
     const { elements } = JSON.parse(await tool("list_elements").run({}));
-    expect(await tool("click").isRisky!({ ref: elements[0].ref })).toBe(true);
-    expect(await tool("type_text").isRisky!({ ref: elements[0].ref, text: "hi" })).toBe(true);
+    const frame = { reason: "other-origin-frame", mark: "https://other.example" };
+    expect(await tool("click").whyRisky!({ ref: elements[0].ref })).toEqual(frame);
+    expect(await tool("type_text").whyRisky!({ ref: elements[0].ref, text: "hi" })).toEqual(frame);
     expect(await tool("click").describe!({ ref: elements[0].ref })).toContain("https://other.example");
   });
 
@@ -406,7 +447,7 @@ describe("the step for an allowed click", () => {
       id: "t1",
       url: "https://shop.example/basket",
       foreignFrames: [],
-      runInPage: async () => ({ role: "button", name, target: null, riskyClick: true, safeToType: false, frameUrl: null }),
+      runInPage: async () => ({ role: "button", name, target: null, clickRisk: { reason: "risky-word", mark: "order" }, typeRisk: { reason: "not-search" }, frameUrl: null }),
     } as unknown as Tab;
     const tools = createPageTools({ activeTab: () => tab, allTabs: () => [tab], openTab: () => tab, closeTab: () => true, ask: async () => null, canSee: () => true, onUse: () => {} });
     return (tool: string) => tools.find(({ name: candidate }) => candidate === tool)!;
@@ -462,7 +503,7 @@ describe("the web_search tool", () => {
     expect(offered({ sites: ["github.com"], tools: ["visit", "click", "type"] })).toBe(false);
   });
 
-  const asksFor = (query: string) => toolsWith(nothing).find(({ name }) => name === "web_search")!.isRisky!({ query });
+  const asksFor = (query: string) => toolsWith(nothing).find(({ name }) => name === "web_search")!.whyRisky!({ query });
   const words = (length: number) => "plain words ".repeat(20).slice(0, length);
 
   it.each([
@@ -477,7 +518,9 @@ describe("the web_search tool", () => {
     ["a word like base64", "c2VjcmV0IHBhc3N3b3Jk", true],
     ["only spaces", "   ", true],
   ])("%s", async (_, query, expected) => {
-    expect(await asksFor(query)).toBe(expected);
+    expect((await asksFor(query)) !== null).toBe(expected);
+    // The whole query is what goes out, so it's what the card marks.
+    expect(await asksFor(query)).toEqual(expected ? { reason: "carries-data", mark: query } : null);
   });
 
   it("refuses an empty query and one past the service's limit", () => {
@@ -540,12 +583,12 @@ describe("the fetch_page tool", () => {
     const asked = "Find jet engines on wikipedia.org";
     const tools = toolsWith(echo, { asked });
     const openTab = tools.find(({ name }) => name === "open_tab")!;
-    expect(await fetchOf(tools)!.isRisky!({ url })).toBe(await openTab.isRisky!({ url }));
+    expect(await fetchOf(tools)!.whyRisky!({ url })).toEqual(await openTab.whyRisky!({ url }));
   });
 
   it("always asks for a name or password in the address, even one the user gave", async () => {
     const url = "https://alice:pw@page.example/";
-    expect(await fetchOf(toolsWith(echo, { asked: `Read ${url}` }))!.isRisky!({ url })).toBe(true);
+    expect(await fetchOf(toolsWith(echo, { asked: `Read ${url}` }))!.whyRisky!({ url })).toEqual({ reason: "credentials", mark: "alice:pw@" });
   });
 
   it("says on the card that the address goes to Firecrawl, and keeps the path off the step the model sees", async () => {
@@ -587,10 +630,10 @@ describe("the fetch_page tool", () => {
 
   it("counts a site it read as one the job has been on", async () => {
     const tools = toolsWith(echo);
-    expect(await fetchOf(tools)!.isRisky!({ url: "https://acme.example/news" })).toBe(true);
-    expect(await fetchOf(tools)!.isRisky!({ url: "https://acme.example/" })).toBe(true);
+    expect(await fetchOf(tools)!.whyRisky!({ url: "https://acme.example/news" })).not.toBeNull();
+    expect(await fetchOf(tools)!.whyRisky!({ url: "https://acme.example/" })).not.toBeNull();
     await fetchOf(tools)!.run({ url: "https://acme.example/" });
-    expect(await fetchOf(tools)!.isRisky!({ url: "https://acme.example/news" })).toBe(false);
+    expect(await fetchOf(tools)!.whyRisky!({ url: "https://acme.example/news" })).toBeNull();
   });
 
   it("keeps a bird to its sites, wherever the page ends up", async () => {

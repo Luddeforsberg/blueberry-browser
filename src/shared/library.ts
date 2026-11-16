@@ -2,6 +2,7 @@
 // All of it is saved locally.
 
 import type { SentAttachment } from "./attachments";
+import type { AskWhy } from "./asking";
 
 export interface Bookmark {
   id: string;
@@ -35,6 +36,10 @@ export interface ChatApproval {
   text: string;
   // Berry is asking for an answer in words, not for leave to do something.
   question?: boolean;
+  // For a question: answers the user can press, each sent back as if typed. They can still type their own.
+  answers?: string[];
+  // For an action: the rule that made it ask, and the piece of `text` it's about. None from the cloud runner.
+  why?: AskWhy;
   // Berry has handed a tab to the user, and is waiting for them to say they're done with it.
   handoff?: ChatHandoff;
 }

@@ -381,7 +381,7 @@ describe("Chats with attachments", () => {
       const done = replyEnded();
       send(chats);
       await started();
-      const asks = await Promise.all(ADDRESSES.map(async (url) => [url, await tool("open_tab").isRisky!({ url })] as const));
+      const asks = await Promise.all(ADDRESSES.map(async (url) => [url, (await tool("open_tab").whyRisky!({ url })) !== null] as const));
       await started();
       release();
       await done;
@@ -408,7 +408,7 @@ describe("Chats with attachments", () => {
         const done = replyEnded();
         chats.send(null, "Is this cheaper?", { seePage: false, tabs: [klm.id] });
         await started();
-        const asks = await tool("open_tab").isRisky!({ url: klm.url });
+        const asks = (await tool("open_tab").whyRisky!({ url: klm.url })) !== null;
         await started();
         release();
         await done;

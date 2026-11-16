@@ -173,7 +173,7 @@ describe("a mascot's limits and approvals", () => {
     schema: z.object({}),
     label: () => "Clicked",
     describe: async () => "Click Delete",
-    isRisky: async () => true,
+    whyRisky: async () => ({ reason: "risky-word", mark: "Delete" }),
     run,
     ...extra,
   });
@@ -188,7 +188,7 @@ describe("a mascot's limits and approvals", () => {
     const run = vi.fn(async () => "clicked");
     const approve = vi.fn(async () => false);
     await reply(click({ refuses: async () => null }, run), approve);
-    expect(approve).toHaveBeenCalledWith("Click Delete");
+    expect(approve).toHaveBeenCalledWith("Click Delete", { reason: "risky-word", mark: "Delete" });
     expect(run).not.toHaveBeenCalled();
   });
 
@@ -211,7 +211,7 @@ describe("a mascot's limits and approvals", () => {
           new AbortController().signal,
           {
             ...NO_TOOLS,
-            tools: [click({ isRisky: async () => isRisky, allowedLabel: () => "Clicked “Delete” on example.com" })],
+            tools: [click({ whyRisky: async () => (isRisky ? { reason: "risky-word" } : null), allowedLabel: () => "Clicked “Delete” on example.com" })],
             approve: async () => true,
             actionApproval: () => mode,
             onStep: (text, shown) => {
@@ -450,20 +450,20 @@ describe("streamReply with an action that needs approval", () => {
       );
 
     it("runs a safe action without asking, and asks about a risky one", async () => {
-      const safe = click({ isRisky: async () => false });
+      const safe = click({ whyRisky: async () => null });
       const asked: string[] = [];
       await ask(safe, callsTool("1"), () => "risky", asked);
       expect(asked).toEqual([]);
       expect(safe.run).toHaveBeenCalledTimes(1);
 
-      const risky = click({ isRisky: async () => true });
+      const risky = click({ whyRisky: async () => ({ reason: "risky-word" }) });
       await ask(risky, callsTool("1"), () => "risky", asked);
       expect(asked).toEqual(["Click e-1"]);
       expect(risky.run).toHaveBeenCalledTimes(1);
     });
 
     it("asks about nothing in never mode", async () => {
-      const risky = click({ isRisky: async () => true });
+      const risky = click({ whyRisky: async () => ({ reason: "risky-word" }) });
       const asked: string[] = [];
       await ask(risky, callsTool("1"), () => "never", asked);
       expect(asked).toEqual([]);
@@ -472,11 +472,22 @@ describe("streamReply with an action that needs approval", () => {
 
     it("does nothing if a safe action turned risky before it ran", async () => {
       let checks = 0;
-      const tool = click({ isRisky: async () => ++checks > 1 });
+      const tool = click({ whyRisky: async () => (++checks > 1 ? { reason: "risky-word" } : null) });
       const model = callsTool("1");
       await ask(tool, model, () => "risky", []);
       expect(tool.run).not.toHaveBeenCalled();
       expect(model.calls.at(-1)?.messages.at(-1)?.text).toContain("page changed");
+    });
+
+    it("says which rule made each call ask", async () => {
+      const because = async (tool: PageTool, mode: "risky" | "always") => {
+        const approve = vi.fn(async () => true);
+        await collect(streamReply([{ role: "user", content: "hi" }], new AbortController().signal, { ...NO_TOOLS, tools: [tool], approve, actionApproval: () => mode }, callsTool("1")));
+        return approve.mock.calls.map((call) => (call as unknown[])[1]);
+      };
+      expect(await because(click({ whyRisky: async () => ({ reason: "new-site", mark: "e-1" }) }), "risky")).toEqual([{ reason: "new-site", mark: "e-1" }]);
+      expect(await because(click(), "risky")).toEqual([{ reason: "tool-always-asks" }]);
+      expect(await because(click({ whyRisky: async () => null }), "always")).toEqual([{ reason: "always-ask" }]);
     });
   });
 

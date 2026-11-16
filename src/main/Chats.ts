@@ -26,6 +26,7 @@ import type { MemoryToOffer } from "./MemoryStore";
 import { sentAttachment, type PreparedFile } from "./Attachments";
 import { fileBlocks, pageBlocks, withAttached, type PageSnapshot } from "./attachmentPrompt";
 import { MAX_FILES, MAX_TABS, type SentAttachment, type TabChoice } from "../shared/attachments";
+import { whyOnCard, type AskWhy } from "../shared/asking";
 
 const MAX_TITLE_LENGTH = 40;
 const MAX_RENAME_LENGTH = 100;
@@ -45,7 +46,14 @@ const hostOf = (url: string): string | null => {
   }
 };
 
-const publicApproval = ({ id, text, question, handoff }: ChatApproval): ChatApproval => ({ id, text, ...(question ? { question } : {}), ...(handoff ? { handoff } : {}) });
+const publicApproval = ({ id, text, question, answers, why, handoff }: ChatApproval): ChatApproval => ({
+  id,
+  text,
+  ...(question ? { question } : {}),
+  ...(answers?.length ? { answers } : {}),
+  ...(why ? { why } : {}),
+  ...(handoff ? { handoff } : {}),
+});
 
 const titleFrom = (text: string): string =>
   text.length > MAX_TITLE_LENGTH ? `${text.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…` : text;
@@ -348,7 +356,7 @@ export class Chats {
       closeTab: (tab) => cloud.close(tab.id),
       heldByUser: (id) => this.handedOver.has(id),
       handOver: (tab, need) => this.handOverInCloud(chatId, run, job, tab, need),
-      ask: (question) => this.askQuestion(chatId, run, question),
+      ask: (question, answers) => this.askQuestion(chatId, run, question, answers),
     });
   }
 
@@ -434,7 +442,7 @@ export class Chats {
       search: firecrawlSearch(),
       fetchPage: firecrawlFetch(),
       closeTab: (tab) => this.closeRunTab(run, tab),
-      ask: (question) => this.askQuestion(chatId, run, question),
+      ask: (question, answers) => this.askQuestion(chatId, run, question, answers),
     });
     // A picture can't be gone through, so `Tab` refuses to take one instead. A refusal goes straight to the model too.
     return tools.map((tool) => ({
@@ -1135,7 +1143,7 @@ export class Chats {
     for await (const part of this.streamReply(messages, run.controller.signal, {
       tools,
       actionApproval: () => stricter(this.browser.actionApproval(), run.askAtLeast),
-      approve: (text) => this.askToAllow(id, run, text),
+      approve: (text, why) => this.askToAllow(id, run, text, why),
       onStep: (text, shown, kind) => this.startStep(id, run, text, shown, kind),
       onUsage,
       mascotNote: (run.mascot.id === BERRY.id ? "" : mascotNote(run.mascot)) + run.memoryNote || undefined,
@@ -1262,7 +1270,7 @@ export class Chats {
     };
   }
 
-  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
+  private wait<T>(chatId: string, run: Run, text: string, kind: Pick<ChatApproval, "question" | "answers" | "why" | "handoff">, onAnswer: (allow: boolean, answer?: string) => T): Promise<T> {
     const { signal } = run.controller;
     return new Promise((resolve, reject) => {
       const stopped = () => reject(new Error("Stopped while waiting for approval"));
@@ -1286,13 +1294,15 @@ export class Chats {
     });
   }
 
-  private askToAllow(chatId: string, run: Run, text: string): Promise<boolean> {
-    return this.wait(chatId, run, text, {}, (allow) => allow);
+  // The card names why it asked only by a known reason, and marks only what's in its words.
+  private askToAllow(chatId: string, run: Run, text: string, because?: AskWhy): Promise<boolean> {
+    const why = whyOnCard(text, because);
+    return this.wait(chatId, run, text, why ? { why } : {}, (allow) => allow);
   }
 
-  // Null if the user would rather not answer.
-  private askQuestion(chatId: string, run: Run, question: string): Promise<string | null> {
-    return this.wait(chatId, run, question, { question: true }, (allow, answer) => {
+  // Null if the user would rather not answer. A pressed answer comes back through `decide` like a typed one.
+  private askQuestion(chatId: string, run: Run, question: string, answers: string[] = []): Promise<string | null> {
+    return this.wait(chatId, run, question, { question: true, ...(answers.length > 0 ? { answers } : {}) }, (allow, answer) => {
       if (!allow || !answer) return null;
       if (!run.answeredElsewhere) run.answers.push({ question, answer });
       return answer;

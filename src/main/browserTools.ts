@@ -31,6 +31,8 @@ import type { PageFrame, PageTarget } from "./pageTarget";
 import type { HandoffNeed, MascotProfile, MascotTool, StepKind } from "../shared/library";
 import { NOWHERE, siteAllowed } from "../shared/mascots";
 import { cleanLine } from "../shared/publishing";
+import type { AskReason, AskWhy } from "../shared/asking";
+import { plausibleCode } from "./phoneReplies";
 import type { WebSearch } from "./webSearch";
 import type { FetchedPage, WebFetch } from "./webFetch";
 
@@ -64,8 +66,8 @@ export interface PageTool {
   describe?: (args: unknown) => Promise<string>;
   // Called once as a card about this call is put to the user, not when `describe` is checked again.
   whileAsking?: (args: unknown) => void;
-  // Whether to ask in the default mode: anything that could delete, send, buy or change text.
-  isRisky?: (args: unknown) => Promise<boolean>;
+  // Whether to ask in the default mode, and why: anything that could delete, send, buy or change text. Null when it needn't.
+  whyRisky?: (args: unknown) => Promise<AskWhy | null>;
   // `run` answers with an image's data address when it worked, which the model gets as a picture.
   returnsImage?: boolean;
   // Says why this call can't happen at all, before anything asks or runs: a mascot's limits, or a tab the user took over.
@@ -123,20 +125,20 @@ const pageTool = <S extends z.ZodObject>(tool: {
   run: (args: z.infer<S>) => Promise<string>;
   describe?: (args: z.infer<S>) => Promise<string>;
   whileAsking?: (args: z.infer<S>) => void;
-  isRisky?: (args: z.infer<S>) => Promise<boolean>;
+  whyRisky?: (args: z.infer<S>) => Promise<AskWhy | null>;
   returnsImage?: boolean;
   allowedLabel?: (args: z.infer<S>) => string | null;
   shownLabel?: (args: z.infer<S>) => string;
   kind: StepKind;
 }): PageTool => {
-  const { describe, whileAsking, isRisky, allowedLabel, shownLabel } = tool;
+  const { describe, whileAsking, whyRisky, allowedLabel, shownLabel } = tool;
   return {
     ...tool,
     label: (args) => tool.label(tool.schema.parse(args)),
     run: (args) => tool.run(tool.schema.parse(args)),
     describe: describe && ((args) => describe(tool.schema.parse(args))),
     whileAsking: whileAsking && ((args) => whileAsking(tool.schema.parse(args))),
-    isRisky: isRisky && ((args) => isRisky(tool.schema.parse(args))),
+    whyRisky: whyRisky && ((args) => whyRisky(tool.schema.parse(args))),
     allowedLabel: allowedLabel && ((args) => allowedLabel(tool.schema.parse(args))),
     shownLabel: shownLabel && ((args) => shownLabel(tool.schema.parse(args))),
   };
@@ -183,8 +185,9 @@ interface ElementInfo {
   name: string;
   // Where a link or form goes, which a page can change while the user decides.
   target: string | null;
-  riskyClick: boolean;
-  safeToType: boolean;
+  // Why clicking it or typing in it asks, or null if it needn't.
+  clickRisk: AskWhy | null;
+  typeRisk: AskWhy | null;
   // Set for a same-origin frame: where in the site this is.
   frameUrl: string | null;
   // Set for a frame from another origin, by the main process rather than the frame: the site it's really from.
@@ -217,6 +220,14 @@ const looksLikeData = (piece: string): boolean =>
   piece.length > MAX_SAFE_TYPED_LENGTH ||
   /[%@=]|\d{6}/.test(piece) ||
   (piece.match(/[\p{L}\p{N}]+/gu) ?? []).some((word) => word.length > MAX_PLAIN_WORD || MIXED_WORD.test(word) || HEX_WORD.test(word) || BASE64_WORD.test(word));
+
+const because = (reason: AskReason, mark?: string): AskWhy => (mark ? { reason, mark } : { reason });
+
+// An address as it was written: its name and password with the "@", its host, its path, and its query and fragment. Only
+// so a card can mark the piece a reason is about. A backslash ends the host, as the browser reads one.
+const WRITTEN_ADDRESS = /^[a-z][a-z\d+.-]*:\/\/([^/\\?#]*@)?([^/\\?#]*)([^?#]*)(.*)$/i;
+const writtenHost = (host: string, address: URL): string | undefined =>
+  URL.canParse(`https://${host}`) && new URL(`https://${host}`).hostname === address.hostname ? host : undefined;
 
 // Whether a search that goes out to a search service is an ordinary one, by the same measures as an address: short, and
 // with nothing in it that looks like data.
@@ -266,6 +277,10 @@ const SCRIPTED = "It got a scripted click rather than a real one, which some sit
 // Ones the model might reach for when a page asks. These go in the page, typed by the user, and never through a model.
 const SECRET_REQUEST =
   /pass ?(word|code|phrase)|lösenord|\b2fa\b|two.factor|one.time|\botp\b|(?<!(postal|zip|post|promo|discount|coupon|area|country|source) )\bcode\b|\bkod(en)?\b|engångskod|verifieringskod|\bcvc\b|\bcvv\b|card (number|details)|kortnummer|personnummer|\bpin\b/i;
+
+// Answers ask_user offers to press, so a choice is one press.
+const MAX_ANSWERS = 3;
+const MAX_ANSWER_LENGTH = 60;
 
 // What the user is handed a tab to do, after "needs you to" and "Asked you to".
 export const HANDOFF_WORDS: Record<HandoffNeed, string> = {
@@ -332,8 +347,9 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   // Waits until the user says they're done with this tab, which gives it back: true. "code" if that's because a code
   // they sent from their phone went in, which never comes here itself. False if they won't, or closed it.
   handOver?: (tab: T, need: HandoffNeed) => Promise<boolean | "code">;
-  // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped.
-  ask: (question: string) => Promise<string | null>;
+  // Waits for the user's answer, or null if they'd rather not. Rejects if the reply is stopped. `answers` are ones the
+  // user can press instead of typing, and may be empty.
+  ask: (question: string, answers: string[]) => Promise<string | null>;
   // Checked on every call, because "Can see" can be switched off while a reply runs.
   canSee: () => boolean;
   // Told about each tab a tool is about to use, so the user can see where Berry is working.
@@ -443,22 +459,27 @@ export const createPageTools = <T extends PageTarget>({
   // In the default mode, going somewhere asks unless it's plainly safe: an address the user gave, a short search on a
   // well-known search page, or a plain address on a site this job is on or has reason to be on. A reason to be on a
   // site never covers data: a query, a path or host name that looks like it carries some, or a new subdomain of a site
-  // it has only been to, which whoever runs that site's names can read.
-  const needsCard = async (url: string, from: T | null) => {
-    if (!isWebAddress(url)) return false;
+  // it has only been to, which whoever runs that site's names can read. Says which, with the piece of the address it's about.
+  const whyCard = async (url: string, from: T | null): Promise<AskWhy | null> => {
+    if (!isWebAddress(url)) return null;
     const address = new URL(url);
+    const [, credentials, writtenAs = "", path, details] = WRITTEN_ADDRESS.exec(url) ?? [];
     // A name and password in an address go to the site when it asks for them, whoever's site it is.
-    if (address.username !== "" || address.password !== "") return true;
-    if (asked.includes(url)) return false;
+    if (address.username !== "" || address.password !== "") return because("credentials", credentials);
+    if (asked.includes(url)) return null;
     if (address.search !== "" || address.hash !== "") {
-      return address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
+      const carries = address.search.length + address.hash.length > MAX_SAFE_TYPED_LENGTH || !isSearchPage(address);
+      return carries ? because("carries-data", details) : null;
     }
     const visited = [...been, ...(from ? [siteOf(from.url)] : [])];
     const host = siteOf(url);
+    const shownHost = writtenHost(writtenAs, address);
     const newSubdomain = !siteAllowed(url, chosen.length > 0 ? chosen : [NOWHERE]) && !visited.includes(host) && siteAllowed(url, visited.length > 0 ? visited : [NOWHERE]);
-    if (looksLikeData(address.hostname) || looksLikeData(address.pathname) || newSubdomain) return true;
+    if (looksLikeData(address.hostname)) return because("looks-like-data", shownHost);
+    if (looksLikeData(address.pathname)) return because("looks-like-data", path);
+    if (newSubdomain) return because("new-subdomain", shownHost);
     const sites = [...chosen, ...visited];
-    return !siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]);
+    return siteAllowed(url, sites.length > 0 ? sites : [NOWHERE]) ? null : because("new-site", shownHost);
   };
   const site = (id?: string) => {
     const tab = canSee() ? find(id) : null;
@@ -603,7 +624,8 @@ export const createPageTools = <T extends PageTarget>({
     if (!entry || entry === "gone") return onRef<ElementInfo>(tab, ref, describeElement);
     // Saying nothing or failing can't make it safe either, because the action would still reach that frame.
     const info = await onRef<ElementInfo>(tab, ref, describeElement).catch(() => null);
-    return { role: "element", name: "unnamed", ...info, target: null, frameUrl: null, riskyClick: true, safeToType: false, frameOrigin: entry.origin };
+    const risk = because("other-origin-frame", entry.origin);
+    return { role: "element", name: "unnamed", ...info, target: null, frameUrl: null, clickRisk: risk, typeRisk: risk, frameOrigin: entry.origin };
   };
 
   const placeOf = (info: ElementInfo) => {
@@ -693,7 +715,7 @@ export const createPageTools = <T extends PageTarget>({
       label: () => "Searched the web",
       shownLabel: ({ query }) => `Searched the web for “${clipWords(cleanLine(query))}”`,
       describe: async ({ query }) => `Search the web for “${query}”`,
-      isRisky: async ({ query }) => !plainSearch(query),
+      whyRisky: async ({ query }) => (plainSearch(query) ? null : because("carries-data", query)),
       run: async ({ query }) => {
         if (!canSee()) return NO_ACCESS;
         let results;
@@ -734,7 +756,7 @@ export const createPageTools = <T extends PageTarget>({
       label: ({ url }) => `Read ${siteOf(url)}`,
       shownLabel: ({ url }) => `Read ${shownAddress(url)}`,
       describe: async ({ url }) => `Read ${url} through Firecrawl, which visits it from its own servers, without opening a tab`,
-      isRisky: async ({ url }) => needsCard(url, find()),
+      whyRisky: async ({ url }) => whyCard(url, find()),
       run: async ({ url, offset = 0 }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
@@ -877,7 +899,7 @@ export const createPageTools = <T extends PageTarget>({
       allowedLabel: ({ tabId: id, ref }) => clickedLabel("Clicked", id, ref),
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Click the ${role} “${name}”`),
       whileAsking: standOnRef,
-      isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
+      whyRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.clickRisk ?? null,
       run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 1)),
     }),
     pageTool({
@@ -889,7 +911,7 @@ export const createPageTools = <T extends PageTarget>({
       allowedLabel: ({ tabId: id, ref }) => clickedLabel("Double-clicked", id, ref),
       describe: ({ tabId: id, ref }) => describeOn(id, ref, ({ role, name }) => `Double-click the ${role} “${name}”`),
       whileAsking: standOnRef,
-      isRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.riskyClick ?? false,
+      whyRisky: async ({ tabId: id, ref }) => (await element(id, ref))?.clickRisk ?? null,
       run: ({ tabId: id, ref }) => withTab(id, (tab) => clickRef(tab, ref, 2)),
     }),
     pageTool({
@@ -930,7 +952,7 @@ export const createPageTools = <T extends PageTarget>({
       description: "Drag an element from list_elements onto another. The user is asked first. Nothing confirms that the page accepted it, so look at the page afterwards before saying it worked.",
       schema: z.object({ tabId, ref: z.string().max(20), toRef: z.string().max(20) }),
       label: ({ tabId: id }) => `Dragged something on ${site(id)}`,
-      // No `isRisky`, so it always asks in the default mode: dropping something can mean anything on a page.
+      // No `whyRisky`, so it always asks in the default mode: dropping something can mean anything on a page.
       whileAsking: standOnRef,
       describe: async ({ tabId: id, ref, toRef }) => {
         const [from, to] = await Promise.all([element(id, ref), element(id, toRef)]);
@@ -984,7 +1006,7 @@ export const createPageTools = <T extends PageTarget>({
         const where = focus?.foreignFrame ? "in a frame from another site" : focus?.role ? `with the focus on the ${focus.role} “${focus.name}”` : "with the focus on the page";
         return `Press ${shift ? "Shift+" : ""}${key} ${where}, on ${tab?.url ?? "no page"}`;
       },
-      isRisky: async ({ key }) => !isHarmlessKey(key),
+      whyRisky: async ({ key }) => (isHarmlessKey(key) ? null : because("risky-key")),
       run: ({ tabId: id, key, shift = false }) =>
         withTab(id, async (tab) => {
           if (!isKnownKey(key)) return `That isn't a key this can press. It can press ${KEY_NAMES.join(", ")}, or a single character.`;
@@ -1012,14 +1034,23 @@ export const createPageTools = <T extends PageTarget>({
     pageTool({
       name: "ask_user",
       kind: "ask",
-      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. Never ask for a password, a code or card details: use hand_to_user, so they type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
-      schema: z.object({ question: z.string().min(1).max(500) }),
+      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. When it's a choice between a few things, give them as answers to press, and leave answers out otherwise. They can always type their own. Never ask for a password, a code or card details: use hand_to_user, so they type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
+      schema: z.object({
+        question: z.string().min(1).max(500),
+        answers: z
+          .array(z.string().min(1).max(MAX_ANSWER_LENGTH))
+          .max(MAX_ANSWERS)
+          .optional()
+          .describe(`Up to ${MAX_ANSWERS} answers the user can press, each a few plain words, such as “Friday evening”.`),
+      }),
       label: () => "Asked you something",
-      run: async ({ question }) => {
-        if (SECRET_REQUEST.test(question)) {
+      run: async ({ question, answers = [] }) => {
+        if ([question, ...answers].some((words) => SECRET_REQUEST.test(words))) {
           return "That wasn't asked, because passwords, codes and card details never go through this chat. If a page needs one, use hand_to_user so the user types it in the page themselves.";
         }
-        const answer = await oneAtATime(() => ask(question));
+        // A code only ever goes into the page, so nothing shaped like one is offered to press.
+        const offered = answers.map((words) => words.trim()).filter((words) => words !== "" && plausibleCode(words) === null);
+        const answer = await oneAtATime(() => ask(question, offered));
         return answer === null ? "The user chose not to answer. Carry on without it if you can, or say what you couldn't do." : `The user answered: ${answer}`;
       },
     }),
@@ -1061,9 +1092,10 @@ export const createPageTools = <T extends PageTarget>({
           ref,
           ({ role, name }) => `Type “${text}” into the ${role} “${name}”${submit ? " and submit it" : ""}`
         ),
-      isRisky: async ({ tabId: id, ref, text }) => {
+      whyRisky: async ({ tabId: id, ref, text }) => {
         const info = await element(id, ref);
-        return !!info && (!info.safeToType || text.length > MAX_SAFE_TYPED_LENGTH);
+        if (!info) return null;
+        return info.typeRisk ?? (text.length > MAX_SAFE_TYPED_LENGTH ? because("long-text") : null);
       },
       run: ({ tabId: id, ref, text, submit = false }) =>
         withTab(id, async (tab) => {
@@ -1097,7 +1129,7 @@ export const createPageTools = <T extends PageTarget>({
       description: "Choose an option in a dropdown (role dropdown) from list_elements, by the text it shows. Says what the dropdown shows afterwards. The user is asked first.",
       schema: z.object({ tabId, ref: z.string().max(20), option: z.string().max(500) }),
       label: ({ tabId: id }) => `Chose an option on ${site(id)}`,
-      // No `isRisky`, so it always asks in the default mode: changing a dropdown can run anything the page likes.
+      // No `whyRisky`, so it always asks in the default mode: changing a dropdown can run anything the page likes.
       whileAsking: standOnRef,
       describe: async ({ tabId: id, ref, option }) => {
         const tab = canSee() ? find(id) : null;
@@ -1164,7 +1196,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId }),
       label: ({ tabId: id }) => `Went back on ${site(id)}`,
       describe: async ({ tabId: id }) => `Go back from ${find(id)?.url ?? "no page"}`,
-      isRisky: async () => false,
+      whyRisky: async () => null,
       run: ({ tabId: id }) =>
         withTab(id, async (tab) => {
           if (!tab.canGoBack) return "There's no earlier page in that tab, so nothing happened.";
@@ -1184,7 +1216,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId: z.string().describe("The tab, from list_tabs.") }),
       label: () => "Closed a tab it opened",
       describe: async ({ tabId: id }) => `Close the tab showing ${find(id)?.url ?? "no page"}, which Berry opened`,
-      isRisky: async () => false,
+      whyRisky: async () => null,
       run: async ({ tabId: id }) => {
         if (!canSee()) return NO_ACCESS;
         const tab = find(id);
@@ -1202,7 +1234,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ tabId, url: z.string().max(2000) }),
       label: ({ url }) => `Went to ${siteOf(url)}`,
       describe: async ({ tabId: id, url }) => `Go to ${url} in the tab showing ${find(id)?.url ?? "no page"}`,
-      isRisky: async ({ tabId: id, url }) => needsCard(url, find(id)),
+      whyRisky: async ({ tabId: id, url }) => whyCard(url, find(id)),
       run: ({ tabId: id, url }) =>
         withTab(id, async (tab) => {
           if (!isWebAddress(url)) return NOT_WEB;
@@ -1225,7 +1257,7 @@ export const createPageTools = <T extends PageTarget>({
       schema: z.object({ url: z.string().max(2000) }),
       label: ({ url }) => `Opened ${siteOf(url)}`,
       describe: async ({ url }) => `Open ${url} in a new tab`,
-      isRisky: async ({ url }) => needsCard(url, find()),
+      whyRisky: async ({ url }) => whyCard(url, find()),
       run: async ({ url }) => {
         if (!canSee()) return NO_ACCESS;
         if (!isWebAddress(url)) return NOT_WEB;
