@@ -82,7 +82,7 @@ export const SuggestionsApp: React.FC = () => {
             role="listbox"
             aria-label="Suggestions"
             style={{ left: sheet.x, top: sheet.y, width: sheet.width, height: sheet.height }}
-            className="absolute p-1.5 overflow-hidden rounded-menu bg-sheet text-13 text-ink shadow-lift cursor-default select-none"
+            className="absolute p-1.5 overflow-hidden rounded-menu bg-sheet text-14 text-ink shadow-lift cursor-default select-none"
         >
             {rows.map((row, index) => {
                 const address = row.kind === 'tab' || row.kind === 'bookmark' || row.kind === 'history' ? shownAddress(row.url) : ''
@@ -105,9 +105,9 @@ export const SuggestionsApp: React.FC = () => {
                             {lead(row)}
                             <span className="flex-1 min-w-0 truncate">
                                 <span className="font-medium">{title(row)}</span>
-                                {address && <span className="ml-[9px] text-ink-2">{address}</span>}
+                                {address && <span className="ml-[9px] text-13 text-ink-2">{address}</span>}
                             </span>
-                            {words && <span className="shrink-0 text-12 text-ink-2">{words}</span>}
+                            {words && <span className="shrink-0 text-13 text-ink-2">{words}</span>}
                             {row.kind === 'ask' ? <Keys keys={[enter, '↵']} /> : index === selected && <Keys keys={['↵']} />}
                         </button>
                     </React.Fragment>
