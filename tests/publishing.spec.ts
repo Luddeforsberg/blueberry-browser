@@ -120,7 +120,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
 
     // Settings shows who's signed in and what's published, and sign out works.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));
-    await expect(chrome.getByRole("heading", { name: `Signed in as ${EMAIL}` })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: EMAIL, exact: true })).toBeVisible();
     await expect(chrome.getByRole("list", { name: "What you’ve published" })).toContainText("Scout");
     await chrome.getByRole("button", { name: "Sign out" }).click();
     await expect(chrome.getByRole("heading", { name: "Not signed in" })).toBeVisible();

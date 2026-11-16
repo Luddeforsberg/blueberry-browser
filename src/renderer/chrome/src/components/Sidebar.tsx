@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Cloud, Ellipsis, PanelLeft, Plus, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronRight, Cloud, Ellipsis, PanelLeft, Plus } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { Bookmark, ChatThreadSummary, MascotProfile, Routine } from '@shared/library'
 import { useBrowser } from '../contexts/BrowserContext'
@@ -15,6 +15,8 @@ import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
 import { setRoutinesView } from '../routinesView'
 import { dockFaces } from '../flockView'
 import { BERRY_ID } from '@shared/mascots'
+import { AccountButton, AccountMenu } from './AccountMenu'
+import { SegmentSwitch } from './SegmentSwitch'
 
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
 
@@ -558,14 +560,11 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
 const DOCK_FACE = 28
 const DOCK_GAP = 7
 
-// Every mascot with its mood for a face, then Settings. It's how you see who is doing what at a glance. Those that
-// don't fit become a count that opens the mascots' page, so no face is ever cut in half.
-const Dock: React.FC = () => {
+// Every mascot with its mood for a face. It's how you see who is doing what at a glance. Those that don't fit become a
+// count that opens the mascots' page, so no face is ever cut in half.
+const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = ({ open, onPress }) => {
     const { flock } = useFlock()
     const stateOf = useMascotState()
-    const [open, setOpen] = useState<string | null>(null)
-    const dock = useRef<HTMLDivElement>(null)
-    const shown = flock.find((mascot) => mascot.id === open)
     const list = useRef<HTMLUListElement>(null)
     const [room, setRoom] = useState(Infinity)
     useLayoutEffect(() => {
@@ -582,48 +581,66 @@ const Dock: React.FC = () => {
     }, [])
     const faces = dockFaces(flock, room, (mascot) => stateOf(mascot).mood !== 'rest')
 
+    return (
+        <div className="flex-1 min-w-0 h-[46px] px-2 flex items-center rounded-tile bg-tray">
+            <ul ref={list} aria-label="Your mascots" className="flex-1 min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-hidden">
+                {faces.shown.map((mascot) => (
+                    <li key={mascot.id} className="shrink-0">
+                        <DockMascot mascot={mascot} mood={stateOf(mascot).mood} open={open === mascot.id} onPress={() => onPress(mascot.id)} />
+                    </li>
+                ))}
+                {faces.more > 0 && (
+                    <li className="shrink-0">
+                        <button
+                            type="button"
+                            aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
+                            onClick={() => void window.chromeAPI.browser.openPage('flock')}
+                            className={cn('size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
+                        >
+                            +{faces.more}
+                        </button>
+                    </li>
+                )}
+            </ul>
+        </div>
+    )
+}
+
+// The dock and, beside it, the account button. A mascot's card or the account menu opens above both, inside the
+// sidebar, one at a time. A press anywhere else closes it.
+type FootOpen = { kind: 'mascot'; id: string } | { kind: 'account' } | null
+
+const SidebarFoot: React.FC = () => {
+    const { flock } = useFlock()
+    const [open, setOpen] = useState<FootOpen>(null)
+    const foot = useRef<HTMLDivElement>(null)
+    const mascotId = open?.kind === 'mascot' ? open.id : null
+    const shown = flock.find((mascot) => mascot.id === mascotId)
+
     useEffect(() => {
         if (!open) return
         const close = (event: PointerEvent) => {
-            if (!dock.current?.contains(event.target as Node)) setOpen(null)
+            if (!foot.current?.contains(event.target as Node)) setOpen(null)
         }
         window.addEventListener('pointerdown', close)
         return () => window.removeEventListener('pointerdown', close)
     }, [open])
 
-    const closeCard = () => {
-        const id = open
+    // The keyboard goes back to what opened it.
+    const close = (refocus: boolean) => {
+        const was = open
         setOpen(null)
-        dock.current?.querySelector<HTMLElement>(`[data-dock-mascot="${id}"]`)?.focus()
+        if (!refocus || !was) return
+        const opener = was.kind === 'account' ? '[data-account-button]' : `[data-dock-mascot="${was.id}"]`
+        foot.current?.querySelector<HTMLElement>(opener)?.focus()
     }
 
     return (
-        <div ref={dock} className="relative shrink-0 mx-0.5">
-            {shown && <MascotCard key={shown.id} mascot={shown} onClose={closeCard} />}
-            <div className="h-[46px] px-[9px] flex items-center gap-[7px] rounded-tile bg-tray">
-                <ul ref={list} aria-label="Your mascots" className="flex-1 min-w-0 -m-1.5 p-1.5 flex items-center gap-[7px] overflow-hidden">
-                    {faces.shown.map((mascot) => (
-                        <li key={mascot.id} className="shrink-0">
-                            <DockMascot mascot={mascot} mood={stateOf(mascot).mood} open={open === mascot.id} onPress={() => setOpen(open === mascot.id ? null : mascot.id)} />
-                        </li>
-                    ))}
-                    {faces.more > 0 && (
-                        <li className="shrink-0">
-                            <button
-                                type="button"
-                                aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
-                                onClick={() => void window.chromeAPI.browser.openPage('flock')}
-                                className={cn('size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
-                            >
-                                +{faces.more}
-                            </button>
-                        </li>
-                    )}
-                </ul>
-                <ToolBarButton label="Settings" onClick={() => void window.chromeAPI.browser.openPage('settings')} className="size-7 -mr-1">
-                    <SlidersHorizontal className={ICON} strokeWidth={1.5} />
-                </ToolBarButton>
-            </div>
+        <div ref={foot} className="relative shrink-0 mx-0.5 flex items-center gap-2">
+            {shown && <MascotCard key={shown.id} mascot={shown} onClose={() => close(true)} />}
+            {open?.kind === 'account' && <AccountMenu onClose={close} className="absolute inset-x-0 bottom-[54px] z-20" />}
+            <Dock open={mascotId} onPress={(id) => setOpen(mascotId === id ? null : { kind: 'mascot', id })} />
+            <AccountButton open={open?.kind === 'account'} onPress={() => setOpen(open?.kind === 'account' ? null : { kind: 'account' })} />
         </div>
     )
 }
@@ -655,30 +672,25 @@ type Face = 'tabs' | 'chats'
 const FaceSwitch: React.FC<{ face: Face; onChange: (face: Face) => void }> = ({ face, onChange }) => {
     const waiting = useLibrary().needsYou.length
     return (
-        <div role="tablist" aria-label="Sidebar" className="shrink-0 mx-0.5 mb-3 h-[30px] p-0.5 grid grid-cols-2 rounded-[10px] bg-tray text-12 app-region-no-drag">
-            {(['tabs', 'chats'] as const).map((each) => (
-                <button
-                    key={each}
-                    type="button"
-                    role="tab"
-                    aria-selected={face === each}
-                    onClick={() => onChange(each)}
-                    className={cn(
-                        'flex items-center justify-center gap-1.5 rounded-[8px] transition-colors',
-                        face === each ? 'bg-sheet text-ink font-medium shadow-rim' : 'text-ink-2 hover:text-ink',
-                        FOCUS
-                    )}
-                >
-                    {each === 'tabs' ? 'Tabs' : 'Chats'}
-                    {each === 'chats' && waiting > 0 && (
+        <SegmentSwitch
+            label="Sidebar"
+            current={face}
+            onChange={onChange}
+            className="mx-0.5 mb-3 h-[30px] rounded-[10px] [&>button]:rounded-[8px] text-12"
+            items={[
+                { value: 'tabs', label: 'Tabs' },
+                {
+                    value: 'chats',
+                    label: 'Chats',
+                    after: waiting > 0 && (
                         <>
-                            <span aria-hidden className="size-1.5 rounded-full bg-ask" />
+                            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ask" />
                             <span className="sr-only">, {waiting} {waiting === 1 ? 'needs' : 'need'} you</span>
                         </>
-                    )}
-                </button>
-            ))}
-        </div>
+                    )
+                }
+            ]}
+        />
     )
 }
 
@@ -742,7 +754,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                 <div>{face === 'tabs' ? <TabsFace /> : <ChatsFace />}</div>
             </div>
 
-            <Dock />
+            <SidebarFoot />
         </nav>
     )
 }

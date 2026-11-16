@@ -59,6 +59,8 @@ export interface Settings {
   desktopBerrySpot: DesktopBerrySpot | null;
   // Jobs from ChatGPT or Claude, through the relay, run in this Blueberry while it's open, instead of in the cloud.
   relayOnMac: boolean;
+  // What the account menu and Account call you. Only ever on this computer: never sent, prompted or published.
+  accountName: string | null;
 }
 
 export type DesktopEdge = "bottom" | "top" | "left" | "right";
@@ -273,7 +275,7 @@ export interface Rect {
 // Where each region of the window goes, in window coordinates. Closed regions have no size.
 // In the horizontal layout, what opens over the page from the toolbar: Chats, or a mascot's card. `anchor` is what was
 // pressed, in the window, for the panel to open under.
-export type Popover = { kind: "chats"; anchor: Rect } | { kind: "mascot"; mascotId: string; anchor: Rect };
+export type Popover = { kind: "chats"; anchor: Rect } | { kind: "mascot"; mascotId: string; anchor: Rect } | { kind: "account"; anchor: Rect };
 
 // What's open over the page, and when it closed, whether the keyboard goes back to what opened it.
 export interface PopoverState {
@@ -464,6 +466,8 @@ export interface InvokeChannels {
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
+  // Light, dark or system, from the account menu, which can open in the overlay. It is all the overlay may change.
+  "settings:set-appearance": { region: "chrome" | "overlay"; args: [appearance: Appearance]; result: void };
   // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
   "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
   "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
@@ -543,10 +547,10 @@ export interface InvokeChannels {
   "memory:forget": { region: "chrome"; args: [factId: string]; result: boolean };
   // Asks first, in main.
   "memory:clear": { region: "chrome"; args: [mascotId: string]; result: boolean };
-  "account:state": { region: "chrome"; args: []; result: AccountState };
+  "account:state": { region: "chrome" | "overlay"; args: []; result: AccountState };
   "account:sign-in": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
   "account:sign-up": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
-  "account:sign-out": { region: "chrome"; args: []; result: AccountState };
+  "account:sign-out": { region: "chrome" | "overlay"; args: []; result: AccountState };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };
@@ -701,6 +705,7 @@ export interface ThemeAPI {
 export interface SettingsAPI {
   getSettings: () => Promise<Settings>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  setAppearance: (appearance: Appearance) => Promise<void>;
   // The native menu for right-clicking Berry, with Keep Berry still and Hide Berry.
   showBerryMenu: () => Promise<void>;
   onSettingsUpdated: (callback: (settings: Settings) => void) => Unsubscribe;

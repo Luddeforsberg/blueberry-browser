@@ -667,10 +667,6 @@ When a page crashes, stops responding or can't load, its view hides and the chro
 
 A chats or history database that can't be read doesn't stop the app. The file is moved aside beside its old name, never deleted, and the app starts empty and says so once in a native dialog, with where the old file is.
 
-### Settings
-
-Plain sections, each row one sentence with anything more, such as exactly what's sent, behind a quiet **More** link. The column starts at the left, beside the list of sections. Berry at rest stands beside the Berry heading. The sections include Account (for publishing and keeping cloud jobs going with your Mac off: the sign-in form, or who's signed in with **Sign out** and a plain list of what they've published, each with **Copy link** and **Unpublish**. With no server, it says plainly that this copy isn't set up for it), Appearance (tabs, and light or dark), Berry (Still, Hide, On your desktop, Show the bird on pages and when to ask before acting), Phone (connecting a Telegram bot, what Telegram can read, and Send even when I'm here), Claude (see below), Cloud (see below), Downloads (the folder, and whether to ask where to save), Site permissions (every saved answer, to change or forget), and data and privacy, which must be easy to find. Data and privacy holds what stays on this computer, a way to history, bringing in history from another browser (only when one is found, with the same words as onboarding), whether Blueberry restores tabs or starts fresh, and the Suggestions and Offers to remember switches with what each sends. Appearance follows the system by default, with a manual light or dark override.
-
 ### Claude
 
 Settings > Claude lets Claude Code and Claude Desktop on this computer hand jobs to the flock over MCP. It's off by default, and the same plain rows as Phone.
@@ -682,16 +678,10 @@ Settings > Claude lets Claude Code and Claude Desktop on this computer hand jobs
 
 ### Cloud
 
-Settings > Cloud lets a bird work in a browser on Browserbase. It's off until a key is saved, and the same plain rows as Phone.
+Settings > Cloud is redrawn in DESIGN.md. What's left here is how a chat chooses the cloud. Bringing a site along asks for Touch ID, or a plain confirm without it, and then opens the site in a cloud tab in front.
 
-- **What it does** in one sentence, including that the cloud browser is only signed in to the sites brought along.
-- **Status:** one line in words (off, starting, running with or without a job, ended), and **End cloud session** only while there's one to end.
-- **The key:** API key and project id, both as password fields, and **Save**. Once saved they never come back to the page: the row says the key is saved and offers **Forget key**.
-- **Signed in to:** what's copied and that it asks for Touch ID, then the sites brought along in a plain list split by `border`, each with its name, its status in words ("Brought over", "Checked by you" or, in `warning`, "Signed out when you checked") and the date, with **Check** and **Remove**. Under it a field for a site and **Bring along**, and up to eight sites from history and bookmarks as small outline buttons after "From your history:". **Forget all cloud logins** once there's anything to forget. Bringing a site along asks for Touch ID, or a plain confirm without it, and then opens the site in a cloud tab in front.
-- **A local test browser:** an unpackaged app started with `BLUEBERRY_CLOUD_LOCAL` says so here instead of asking for a key.
 - **Choosing it:** on the new tab page, while the cloud is on or a runner has accepted, the composer's `+` opens a small menu with one item, **Do this in the cloud**, ticked in `accent-ink` while on. Nothing else sits in the composer, so the text box keeps its width. While it's on, Send wears a small cloud mark on its corner, with no label, and is named "Send to the cloud". With a linked runner that has accepted, the job goes there and keeps going with the Mac off. Without one, it goes to a cloud tab. The user never chooses between the two. With neither, there's no `+`, unless the composer has a page to add. That chat works in the cloud from then on, and has a small cloud mark in the chat list.
-- **With your Mac off:** in Settings > Cloud, while signed in to the Blueberry account, one plain row: what it does in one sentence, a field for the runner's email and **Link**. Signed out, the line says to sign in under **Account**, a link that opens that section. Linked, the line says it's waiting for the runner to accept, then that it's your runner, with **Unlink**. A problem shows in `warning` under it. The runner's password never comes here.
-- **From ChatGPT or Claude:** under With your Mac off, once linked and only if the server gives an address: a 13px semibold heading, one muted line on what it does and that they can't answer for you, **Copy link**, the address in a `tray` block, and two short numbered steps for ChatGPT and Claude, then a 13px semibold **Run their jobs on this Mac when it's on** with one muted line and a switch, off by default, then **Disconnect ChatGPT and Claude**, which says in one muted line that they have to sign in again. A job that runs on the Mac is an ordinary chat with "From ChatGPT or Claude" over its first message, as one from Claude Code. Signing in there is a plain page on the server with email, password and **Sign in and connect**.
+- **From ChatGPT or Claude:** a job that runs on the Mac is an ordinary chat with "From ChatGPT or Claude" over its first message, as one from Claude Code. Signing in there is a plain page on the server with email, password and **Sign in and connect**.
 - **Words:** nothing the user sees says "runner". It's "in the cloud", and keeping going "with your Mac off".
 
 ### On the runner

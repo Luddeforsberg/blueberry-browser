@@ -226,7 +226,7 @@ export class Window {
     const config = serverConfig(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, app.isPackaged);
     const server = config && new GalleryServer(config);
     this.account = new Account(server, join(app.getPath("userData"), "account.json"), () => {
-      sendToRenderer(this.chrome.view.webContents, "account:updated", this.account.state);
+      this.broadcast("account:updated", this.account.state);
       this.runnerJobs?.accountChanged();
       this.macJobs?.sync();
     });
@@ -1391,6 +1391,17 @@ export class Window {
     ]).popup({ window: this._baseWindow });
   }
 
+  // A web tab goes back in its history. Settings goes back from a page one step in to its section.
+  goBack(tabId: string): boolean {
+    const tab = this.tabsMap.get(tabId);
+    if (tab instanceof Tab) tab.goBack();
+    else if (tab instanceof InternalTab && tab.canGoBack) {
+      tab.goBack();
+      this.notifyTabs();
+    }
+    return tab !== undefined;
+  }
+
   getTab(tabId: string): Tab | null {
     const tab = this.tabsMap.get(tabId);
     return tab instanceof Tab ? tab : null;
@@ -1633,5 +1644,6 @@ const validPopover = (input: unknown): Popover | null => {
   const rect = { x, y, width, height };
   if (kind === "chats") return { kind: "chats", anchor: rect };
   if (kind === "mascot" && typeof mascotId === "string") return { kind: "mascot", mascotId, anchor: rect };
+  if (kind === "account") return { kind: "account", anchor: rect };
   return null;
 };

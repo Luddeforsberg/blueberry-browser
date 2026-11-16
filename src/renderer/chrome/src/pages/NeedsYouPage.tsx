@@ -5,6 +5,7 @@ import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { AnsweredRow, NeedsYouRow } from '../components/NeedsYou'
 import { usePhone } from '../usePhone'
+import { openSettings } from '../openSettings'
 
 const ANSWERED_MS = 1600
 
@@ -44,11 +45,11 @@ const AllClear: React.FC = () => {
 // One true line about the phone, or a quiet way to set it up.
 const PhoneLine: React.FC = () => {
     const [phone] = usePhone()
-    const openSettings = () => void window.chromeAPI.browser.openPage('settings', { param: 'Phone' })
+    const openPhoneSettings = () => openSettings('phone')
     const link = "text-13 text-ink rounded-row outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
     if (phone.status === 'connected' && !phone.problem) return <p className="text-13 text-ink-2">Replies from your phone are on</p>
-    if (phone.status === 'connected') return <button type="button" onClick={openSettings} className={link}>Replies from your phone are paused</button>
-    return <button type="button" onClick={openSettings} className={link}>Answer these from your phone</button>
+    if (phone.status === 'connected') return <button type="button" onClick={openPhoneSettings} className={link}>Replies from your phone are paused</button>
+    return <button type="button" onClick={openPhoneSettings} className={link}>Answer these from your phone</button>
 }
 
 // Everything the flock is waiting on, from every chat and routine, answered right here.

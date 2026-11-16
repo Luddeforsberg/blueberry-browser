@@ -41,8 +41,9 @@ const Shell: React.FC = () => {
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     const trouble = activeTab?.trouble ?? activeTab?.loadError
-    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3).
-    const well = activeTab?.page === 'new-tab' && !trouble
+    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Settings is a
+    // column of sheets on the well too.
+    const well = (activeTab?.page === 'new-tab' || activeTab?.page === 'settings') && !trouble
 
     return (
         <div className="relative h-full bg-ground">

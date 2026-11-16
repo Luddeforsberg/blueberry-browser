@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from "path";
 import type { DesktopBerrySpot, Settings } from "../shared/ipc";
 import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "./Layout";
 import { sanitizeSiteZoom } from "./siteZoom";
+import { cleanAccountName } from "../shared/accountName";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   desktopBerry: false,
   desktopBerrySpot: null,
   relayOnMac: false,
+  accountName: null,
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -80,6 +82,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     desktopBerry: bool(input.desktopBerry, base.desktopBerry),
     desktopBerrySpot: spot(input.desktopBerrySpot, base.desktopBerrySpot),
     relayOnMac: bool(input.relayOnMac, base.relayOnMac),
+    accountName: cleanAccountName(input.accountName, base.accountName),
   };
 }
 

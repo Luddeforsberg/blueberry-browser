@@ -208,8 +208,8 @@ test("a site can't use anything until the user answers, and the answer can be ch
   page = await openFiles(app, chrome);
   expect(await notifications()).toBe("granted");
 
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-  await chrome.getByRole("button", { name: "Site permissions" }).click();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "privacy" }));
+  await chrome.getByRole("button", { name: /^Site permissions/ }).click();
   await chrome.getByRole("radiogroup", { name: `Notifications for ${origin}` }).getByRole("radio", { name: "Block" }).click();
   await expect.poll(notifications).toBe("denied");
   await chrome.getByRole("button", { name: `Forget Location for ${origin}` }).click();

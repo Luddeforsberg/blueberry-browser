@@ -1,5 +1,7 @@
 /* DESIGN.md section 4. Components use these through Tailwind, never raw colours. */
 @layer base {
+  /* `.light` draws something in light mode inside a dark window, such as Settings' picture of a light one. */
+  .light,
   :root {
     color-scheme: light;
 
