@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, StepKind, UsedPage } from '@shared/library'
 import { linkSite } from '@shared/publishing'
-import { ArrowUp, Check, ChevronDown, Copy, Lock, Repeat } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Cloud, Copy, Lock, Repeat } from 'lucide-react'
 import { ApprovalCard, CardInShell } from '@common/components/ApprovalCard'
 import { useShell } from '../contexts/ShellContext'
 import { asContinuation, withSiteNames } from '../siteNames'
@@ -199,20 +199,34 @@ const Elapsed: React.FC<{ since: number }> = ({ since }) => {
     return <span className="ml-auto font-mono text-11.5 font-regular text-ink-3 tabular-nums">{elapsedWords(now - since)}</span>
 }
 
-// What a reply is doing between its steps: thinking, or waiting for an answer to a card. Present tense, two dots.
-const statusRow = (waiting: boolean) =>
-    waiting ? <StepLine pips="waiting" live ask>Waiting for you..</StepLine> : <StepLine pips="think" live>Thinking..</StepLine>
+// What a reply is doing between its steps: thinking, or waiting for an answer to a card. Present tense, two dots. With
+// no steps yet the mascot's face beside it is the pips, so the words stand alone (`bare`).
+const statusRow = (waiting: boolean, bare = false) => {
+    const words = waiting ? 'Waiting for you..' : 'Thinking..'
+    if (bare) return <LiveWords className="font-mono text-11.5">{words}</LiveWords>
+    return waiting ? <StepLine pips="waiting" live ask>{words}</StepLine> : <StepLine pips="think" live>{words}</StepLine>
+}
 
 // While a reply works: an outlined block headed Working, with its latest steps and the one it's on now. The one thing
 // that moves in a conversation is in here (DESIGN.md section 7).
-const WorkingBlock: React.FC<{ steps: ChatStep[]; status: React.ReactNode; startedAt?: number }> = ({ steps, status, startedAt }) => {
+const WorkingBlock: React.FC<{ steps: ChatStep[]; status: React.ReactNode; startedAt?: number; onShowWork?: () => void }> = ({ steps, status, startedAt, onShowWork }) => {
     const [open, setOpen] = useState(false)
     const { shown, line } = trailFor(steps, { running: true, open })
     return (
         <section aria-label="Working" className="rounded-sheet px-3.5 pt-3 pb-[13px] shadow-[inset_0_0_0_1px_var(--line)]">
-            <h3 className="mb-[11px] flex items-center gap-2 text-13 font-medium text-ink">
+            <h3 className="mb-[11px] h-[18px] flex items-center gap-2 text-13 font-medium text-ink">
                 Working
                 {startedAt !== undefined && <Elapsed since={startedAt} />}
+                {/* Brings back the working view after Hide work. */}
+                {onShowWork && (
+                    <button
+                        type="button"
+                        onClick={onShowWork}
+                        className={cn('-my-[3px] -mr-1.5 h-6 px-1.5 shrink-0 rounded-row text-12 font-regular text-ink-3 transition-colors hover:bg-hover hover:text-ink', startedAt === undefined && 'ml-auto', FOCUS)}
+                    >
+                        Show work
+                    </button>
+                )}
             </h3>
             <div role="status" className="pl-[5px] flex flex-col items-start gap-[9px]">
                 {line && <FoldLine open={open} onToggle={() => setOpen(!open)}>{line}</FoldLine>}
@@ -287,6 +301,19 @@ export interface ReplyActions {
 
 const stepsWord = (count: number) => `${count} ${count === 1 ? 'step' : 'steps'}`
 
+// Where a chat runs, said only when it isn't here, or who started it when it wasn't the user. Quiet, over its first reply.
+export interface ReplyOrigin {
+    words: string
+    cloud: boolean
+}
+
+const OriginLine: React.FC<{ origin: ReplyOrigin }> = ({ origin }) => (
+    <p className="-mb-3 h-[22px] flex items-center gap-1.5 font-mono text-11.5 text-ink-3">
+        {origin.cloud && <Cloud aria-hidden className="size-[13px] shrink-0" strokeWidth={1.5} />}
+        <span className="min-w-0 truncate">{origin.words}</span>
+    </p>
+)
+
 // A mascot's reply: plain text on the sheet. While it works, the Working block comes first. Once it's done, the steps
 // fold into a chip beside the pages it used, then come Copy and Save as routine on the last reply.
 export const AssistantMessage: React.FC<{
@@ -308,7 +335,11 @@ export const AssistantMessage: React.FC<{
     startedAt?: number
     // Set on the last reply only.
     actions?: ReplyActions
-}> = ({ content, steps = [], statusLine, isStreaming = false, waiting = false, mascot, failed = false, memoryIds, pages = [], startedAt, actions }) => {
+    // Set on the first reply only, where there's something to say.
+    origin?: ReplyOrigin
+    // While the working view is hidden.
+    onShowWork?: () => void
+}> = ({ content, steps = [], statusLine, isStreaming = false, waiting = false, mascot, failed = false, memoryIds, pages = [], startedAt, actions, origin, onShowWork }) => {
     const [open, setOpen] = useState(false)
     // While it runs: between steps, with no words yet, it says what it's doing. A step waiting on the user is already
     // the live one.
@@ -324,12 +355,13 @@ export const AssistantMessage: React.FC<{
     // One tree whether it's running or done, with the words in the same place, so they aren't drawn again when it ends.
     return (
         <div className="flex flex-col gap-4 animate-fade-in">
+            {origin && <OriginLine origin={origin} />}
             {mascot && <RememberedLine ids={memoryIds} />}
             {isStreaming ? (
                 <>
                     {statusLine && !content && <p role="status" className="text-15 text-ink-2 line-clamp-3">{statusLine}</p>}
                     {steps.length > 0 ? (
-                        <WorkingBlock steps={steps} status={status} startedAt={startedAt} />
+                        <WorkingBlock steps={steps} status={status} startedAt={startedAt} onShowWork={onShowWork} />
                     ) : (
                         status && <div role="status" className="h-6 flex items-center">{status}</div>
                     )}

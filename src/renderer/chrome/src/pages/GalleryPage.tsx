@@ -328,7 +328,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Chat">
                     <div className="max-w-xl flex flex-col gap-5">
                         <UserMessage content="What did the Monday digest find?" />
-                        <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." />
+                        <AssistantMessage content="Two things changed: **flight prices** and the studio invoice." origin={{ words: 'in the cloud', cloud: true }} />
                         <AssistantMessage
                             content=""
                             isStreaming
