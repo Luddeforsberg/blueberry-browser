@@ -221,7 +221,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 to clear the box and the lists, so it shows in the corners and softly along the edges. */}
             <div
                 aria-hidden
-                className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_75%_85%_at_50%_52%,transparent_0,transparent_64%,#000_100%)]"
+                className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_66%_84%_at_50%_54%,transparent_0,transparent_48%,#000_86%)]"
             />
             {/* Placed by the page area's own height, not the window's: the box's middle at 43% of it, and the greeting
                 never nearer the top than 48px. 127px is from the greeting's top to the middle of the empty box. The lists
