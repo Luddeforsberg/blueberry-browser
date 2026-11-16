@@ -67,7 +67,7 @@ const ChatsPill: React.FC<{ shown: Popover | null }> = ({ shown }) => {
             aria-expanded={open}
             onClick={(event) => toggle(open, event.currentTarget, () => ({ kind: 'chats', anchor: anchorOf(event.currentTarget) }))}
             className={cn(
-                'h-[30px] ml-1 px-[11px] shrink-0 flex items-center gap-[7px] rounded-row text-12 text-ink transition-colors app-region-no-drag',
+                'h-[30px] ml-1 px-[11px] shrink-0 flex items-center gap-[7px] rounded-row text-13 text-ink transition-colors app-region-no-drag',
                 open ? 'bg-sheet shadow-rim font-medium' : 'bg-tray hover:bg-press',
                 FOCUS
             )}
@@ -175,7 +175,7 @@ const BookmarksBar: React.FC = () => {
                     <div
                         ref={zone('favourites')}
                         className={cn(
-                            'h-6 px-2 shrink-0 flex items-center rounded-row border border-dashed text-12 transition-colors',
+                            'h-6 px-2 shrink-0 flex items-center rounded-row border border-dashed text-13 transition-colors',
                             drag.over?.list === 'favourites' ? 'border-ink-3 bg-hover text-ink' : 'border-line text-ink-3'
                         )}
                     >
@@ -193,7 +193,7 @@ const BookmarksBar: React.FC = () => {
                             onClick={() => createTab(site.url)}
                             onContextMenu={(event) => savedSiteMenu(event, site)}
                             className={cn(
-                                'h-6 px-2 flex items-center gap-[7px] rounded-row text-12 text-ink-2 whitespace-nowrap transition-colors app-region-no-drag hover:bg-hover hover:text-ink',
+                                'h-6 px-2 flex items-center gap-[7px] rounded-row text-13 text-ink-2 whitespace-nowrap transition-colors app-region-no-drag hover:bg-hover hover:text-ink',
                                 drag?.site.id === site.id && 'opacity-40',
                                 FOCUS
                             )}

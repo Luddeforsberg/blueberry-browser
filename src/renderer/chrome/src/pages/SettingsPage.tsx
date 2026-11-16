@@ -71,7 +71,7 @@ const General: React.FC = () => {
     const { settings, updateSettings } = useShell()
     return (
         <>
-            <SettingsGroup label="look">
+            <SettingsGroup label="Look">
                 <SettingsRow id="setting-appearance" title="Theme" top>
                     <Choice<Appearance>
                         label="Theme"
@@ -96,7 +96,7 @@ const General: React.FC = () => {
                     />
                 </SettingsRow>
             </SettingsGroup>
-            <SettingsGroup label="browsing">
+            <SettingsGroup label="Browsing">
                 <SettingsRow id="setting-startup" title="When Blueberry opens" {...STARTUP_DESCRIPTIONS[settings.onStartup]}>
                     <Choice<StartupChoice>
                         label="When Blueberry opens"
@@ -126,7 +126,7 @@ const Mascots: React.FC = () => {
 
     return (
         <>
-            <SettingsGroup label="at work">
+            <SettingsGroup label="At work">
                 <SettingsRow id="setting-action-approval" title="Ask before acting" {...APPROVAL_DESCRIPTIONS[settings.actionApproval]}>
                     <Choice<ActionApproval>
                         label="Ask before acting"
@@ -160,7 +160,7 @@ const Mascots: React.FC = () => {
                     <Switch labelledBy="setting-desktop-berry" checked={settings.desktopBerry} onChange={(desktopBerry) => updateSettings({ desktopBerry })} />
                 </SettingsRow>
             </SettingsGroup>
-            <SettingsGroup label="how they look">
+            <SettingsGroup label="How they look">
                 <SettingsRow id="setting-mascots-look" title="Mascots" description={LOOK_DESCRIPTIONS[look]}>
                     <Choice<Look>
                         label="Mascots"
@@ -174,7 +174,7 @@ const Mascots: React.FC = () => {
                     />
                 </SettingsRow>
             </SettingsGroup>
-            <SettingsGroup label="what they offer">
+            <SettingsGroup label="What they offer">
                 <SettingsRow id="setting-suggestions" title="Suggestions" description="The new tab offers to take over what you keep doing, from a summary of your last two weeks sent to the AI service.">
                     <Switch labelledBy="setting-suggestions" checked={settings.suggestions} onChange={(suggestions) => updateSettings({ suggestions })} />
                 </SettingsRow>
@@ -203,7 +203,7 @@ const Privacy: React.FC = () => {
                     onOpen={() => openSettings('site-permissions')}
                 />
             </SettingsGroup>
-            <SettingsGroup label="history">
+            <SettingsGroup label="History">
                 <SettingsLink
                     title="History"
                     description="Every web page you visit is saved until you delete it or clear your history."
@@ -217,35 +217,52 @@ const Privacy: React.FC = () => {
     )
 }
 
+// Each row's state is a pill, and only what's true: a next step is a raised button beside it, and Set up opens the same
+// page as the row.
 const Connections: React.FC = () => {
     const [phone] = usePhone()
     const [mcp] = useMcp()
-    const [cloud] = useCloud()
-    const cloudState = cloud.provider !== 'local' && !cloud.configured ? 'off' : cloud.status === 'running' || cloud.status === 'starting' ? 'on' : 'ready'
+    const [cloud, setCloud] = useCloud()
+    const setUp = (page: StepInPage) => ({ label: 'Set up', onAct: () => openSettings(page) })
+    const cloudSetUp = cloud.provider === 'local' || cloud.configured
     return (
         <SettingsGroup>
             <SettingsLink
-                lead={<RowTile><Smartphone strokeWidth={1.5} /></RowTile>}
+                lead={<RowTile><Smartphone strokeWidth={1.75} /></RowTile>}
                 title="Phone"
                 description="Answer a waiting job from Telegram."
-                state={phone.status === 'connected' ? 'on' : phone.status === 'pairing' ? 'pairing' : 'off'}
-                stateOn={phone.status === 'connected'}
+                state={phone.status === 'connected' ? { words: 'Connected', tone: 'on' } : phone.status === 'pairing' ? { words: 'Pairing' } : { words: 'Not set up' }}
+                action={phone.status === 'off' ? setUp('phone') : undefined}
                 onOpen={() => openSettings('phone')}
             />
             <SettingsLink
-                lead={<RowTile><Plug strokeWidth={1.5} /></RowTile>}
+                lead={<RowTile><Plug strokeWidth={1.75} /></RowTile>}
                 title="Claude and other apps"
                 description="Apps on this computer can give your mascots jobs."
-                state={mcp.on ? 'on' : 'off'}
-                stateOn={mcp.on}
+                state={!mcp.on ? { words: 'Not set up' } : mcp.url ? { words: 'On', tone: 'on' } : { words: 'Couldn’t start', tone: 'ask' }}
+                action={mcp.on ? undefined : setUp('claude')}
                 onOpen={() => openSettings('claude')}
             />
             <SettingsLink
-                lead={<RowTile><Cloud strokeWidth={1.5} /></RowTile>}
+                lead={<RowTile><Cloud strokeWidth={1.75} /></RowTile>}
                 title="Cloud"
                 description="Jobs in a cloud browser, and with this computer off."
-                state={cloudState}
-                stateOn={cloudState !== 'off'}
+                state={
+                    cloud.unreleased
+                        ? { words: 'Session still open', tone: 'ask' }
+                        : !cloudSetUp
+                          ? { words: 'Not set up' }
+                          : cloud.status === 'running' || cloud.status === 'starting'
+                            ? { words: 'Session open', tone: 'on' }
+                            : { words: 'Ready', tone: 'on' }
+                }
+                action={
+                    cloud.unreleased
+                        ? { label: 'Try again', onAct: () => void window.chromeAPI.cloud.end().then(setCloud) }
+                        : !cloudSetUp
+                          ? setUp('cloud')
+                          : undefined
+                }
                 onOpen={() => openSettings('cloud')}
             />
         </SettingsGroup>
@@ -287,13 +304,13 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     </section>
                 ) : (
                     <>
-                        <h1 className="mx-3 mb-3.5 text-18 font-medium">Settings</h1>
+                        <h1 className="mx-3 mb-4 text-20 font-semibold">Settings</h1>
                         <SegmentSwitch
                             label="Settings sections"
                             items={SETTINGS_SECTIONS.map((value) => ({ value, label: SECTION_NAMES[value] }))}
                             current={section}
                             onChange={openSettings}
-                            className="h-8 rounded-[11px] [&>button]:rounded-[9px] text-12"
+                            className="h-8 rounded-[11px] [&>button]:rounded-[9px] text-13"
                         />
                         <section role="tabpanel" aria-label={SECTION_NAMES[section]}>
                             <Section />

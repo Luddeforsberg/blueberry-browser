@@ -45,7 +45,7 @@ const editableUrl = (tab: TabInfo | null) => (tab && !tab.page ? tab.url : '')
 const FIELD = 'w-full min-w-0 h-8 flex items-center rounded-row app-region-no-drag'
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
 // The two buttons inside the field while a mascot works there. Filled is `ground` on the field's `ink`.
-const IN_FIELD = cn('h-6 px-[9px] shrink-0 rounded-[7px] text-12 transition-[background-color,transform] duration-fast active:scale-[.96]', FOCUS)
+const IN_FIELD = cn('h-6 px-[9px] shrink-0 rounded-[7px] text-13 transition-[background-color,transform] duration-fast active:scale-[.96]', FOCUS)
 const FILLED_IN_FIELD = cn(IN_FIELD, 'bg-ground text-ink font-medium hover:bg-ground/90')
 const OUTLINED_IN_FIELD = cn(IN_FIELD, 'shadow-[inset_0_0_0_1px_rgb(var(--ground)/0.28)] text-ground hover:bg-ground/10')
 
@@ -133,7 +133,7 @@ export const AddressBar: React.FC = () => {
                     onFocus={(e) => e.target.select()}
                     onBlur={cancel}
                     onKeyDown={(e) => e.key === 'Escape' && cancel()}
-                    className="flex-1 min-w-0 h-full bg-transparent text-13 text-ink caret-ink outline-none placeholder:text-faint"
+                    className="flex-1 min-w-0 h-full bg-transparent text-14 text-ink caret-ink outline-none placeholder:text-faint"
                     placeholder="Search or enter address"
                     disabled={!activeTab}
                     spellCheck={false}
@@ -148,8 +148,8 @@ export const AddressBar: React.FC = () => {
     if (job.turn) {
         const { turn } = job
         return (
-            <div role="status" className={cn(FIELD, 'gap-2 pl-3 pr-1 bg-ask-bg text-ask text-13')}>
-                <Lock aria-hidden className="size-3.5 shrink-0" strokeWidth={1.5} />
+            <div role="status" className={cn(FIELD, 'gap-2 pl-3 pr-1 bg-ask-bg text-ask text-14')}>
+                <Lock aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
                 <span className="flex-1 min-w-0 truncate">Your turn. {name} can’t see this tab</span>
                 <button type="button" onClick={() => void window.chromeAPI.chat.decide(turn.id, turn.approval.id, true)} className={cn(IN_FIELD, 'bg-ink text-ground font-medium hover:bg-ink/85')}>
                     I’m done
@@ -193,7 +193,7 @@ export const AddressBar: React.FC = () => {
     // A favourite is a bookmark kept on top.
     const bookmarked = web && [...bookmarks, ...pinned].some((bookmark) => bookmark.url === activeTab.url)
     return (
-        <div className={cn(FIELD, 'bg-tray text-13 text-ink-3')}>
+        <div className={cn(FIELD, 'bg-tray text-14 text-ink-3')}>
             <button type="button" aria-label="Address" onClick={() => setIsFocused(true)} className={cn('flex-1 min-w-0 h-full flex items-center gap-2 pl-3 pr-2 text-left cursor-text rounded-row', FOCUS)}>
                 {pageLabel ? (
                     <>
@@ -202,7 +202,7 @@ export const AddressBar: React.FC = () => {
                     </>
                 ) : activeTab?.url && !activeTab.page ? (
                     <>
-                        {secure && <Lock aria-label="Secure" className="size-[13px] shrink-0" strokeWidth={1.5} />}
+                        {secure && <Lock aria-label="Secure" className="size-[13px] shrink-0" strokeWidth={1.75} />}
                         <span className="truncate"><span className="text-ink">{site}</span>{path}</span>
                     </>
                 ) : (
@@ -218,7 +218,7 @@ export const AddressBar: React.FC = () => {
                     onClick={() => void window.chromeAPI.library.toggleBookmark()}
                     className={cn('mr-1 size-6 shrink-0 flex items-center justify-center rounded-[7px] hover:bg-hover hover:text-ink', bookmarked && 'text-ink', FOCUS)}
                 >
-                    <Star className={cn('size-[13px]', bookmarked && 'fill-current')} strokeWidth={1.5} />
+                    <Star className={cn('size-[13px]', bookmarked && 'fill-current')} strokeWidth={1.75} />
                 </button>
             )}
         </div>

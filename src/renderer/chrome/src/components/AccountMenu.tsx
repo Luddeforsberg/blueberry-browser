@@ -25,7 +25,7 @@ export const Avatar: React.FC<{ name: string | null; email: string | null; large
         aria-hidden
         className={cn(
             'shrink-0 rounded-full flex items-center justify-center bg-sheet-2 font-medium text-ink',
-            large ? 'size-9 text-13' : 'size-[30px] text-12'
+            large ? 'size-9 text-14' : 'size-[30px] text-13'
         )}
     >
         {initialOf(name, email)}
@@ -34,7 +34,7 @@ export const Avatar: React.FC<{ name: string | null; email: string | null; large
 
 const PersonGlyph: React.FC<{ className?: string }> = ({ className }) => (
     <span aria-hidden className={cn('shrink-0 rounded-full flex items-center justify-center bg-tray text-ink-3', className)}>
-        <User className="size-4" strokeWidth={1.5} />
+        <User className="size-4" strokeWidth={1.75} />
     </span>
 )
 
@@ -62,7 +62,7 @@ export const AccountButton: React.FC<{ open: boolean; onPress: (button: HTMLButt
             )}
         >
             {signedIn ? (
-                <span className="size-full rounded-full flex items-center justify-center bg-sheet shadow-rim text-12 font-medium text-ink">
+                <span className="size-full rounded-full flex items-center justify-center bg-sheet shadow-rim text-13 font-medium text-ink">
                     {initialOf(settings.accountName, account.email)}
                 </span>
             ) : (
@@ -77,10 +77,10 @@ const Row: React.FC<{ Icon?: LucideIcon; lead?: React.ReactNode; shortcut?: stri
         type="button"
         data-menu-row
         onClick={onChoose}
-        className={cn('w-full h-[30px] px-2 flex items-center gap-2.5 rounded-row text-13 text-ink text-left transition-colors hover:bg-hover active:bg-press', FOCUS)}
+        className={cn('w-full h-[30px] px-2 flex items-center gap-2.5 rounded-row text-14 text-ink text-left transition-colors hover:bg-hover active:bg-press', FOCUS)}
     >
         <span aria-hidden className="size-4 shrink-0 flex items-center justify-center text-ink-3">
-            {lead ?? (Icon && <Icon className="size-4" strokeWidth={1.5} />)}
+            {lead ?? (Icon && <Icon className="size-4" strokeWidth={1.75} />)}
         </span>
         <span className="flex-1 truncate">{children}</span>
         {shortcut && (
@@ -101,7 +101,7 @@ const Who: React.FC<{ account: AccountState; name: string | null; onClose: (refo
                 <Avatar name={name} email={account.email} />
                 <span className="min-w-0">
                     <span className="block truncate font-medium">{name ?? account.email}</span>
-                    {name && <span className="block truncate mt-px text-12 text-ink-2">{account.email}</span>}
+                    {name && <span className="block truncate mt-px text-13 text-ink-2">{account.email}</span>}
                 </span>
             </div>
         )
@@ -166,7 +166,7 @@ export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; classN
             role="dialog"
             aria-label="Account"
             onKeyDown={onKeyDown}
-            className={cn('p-1.5 rounded-sheet bg-sheet text-13 text-ink shadow-lift animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)] app-region-no-drag', className)}
+            className={cn('p-1.5 rounded-sheet bg-sheet text-14 text-ink shadow-lift animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)] app-region-no-drag', className)}
         >
             {account.status !== 'not-set-up' && <Who account={account} name={settings.accountName} onClose={onClose} />}
             <Choice<Appearance>

@@ -89,7 +89,7 @@ export const Onboarding: React.FC = () => {
                                         aria-checked={settings.layoutMode === value}
                                         onClick={() => updateSettings({ layoutMode: value })}
                                         className={cn(
-                                            "p-3 pb-2 flex flex-col items-center gap-2 rounded-tile text-13 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                                            "p-3 pb-2 flex flex-col items-center gap-2 rounded-tile text-14 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
                                             settings.layoutMode === value ? "bg-sheet shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink"
                                         )}
                                     >
@@ -125,7 +125,7 @@ export const Onboarding: React.FC = () => {
                                 <SourceChoice sources={sources} source={source} choose={choose} />
                             </div>
                         )}
-                        <ul className="mt-4 flex flex-col gap-2 text-13 text-ink-2 text-left">
+                        <ul className="mt-4 flex flex-col gap-2 text-14 text-ink-2 text-left">
                             {IMPORT_NOTES.map((note, index) => <li key={note}>{note}{index === IMPORT_NOTES.length - 1 && <> <More text={IMPORT_DETAIL} /></>}</li>)}
                         </ul>
                         {message && <p role="status" className="mt-4 text-15">{message}</p>}

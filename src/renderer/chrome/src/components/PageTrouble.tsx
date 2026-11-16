@@ -33,9 +33,9 @@ export const PageTrouble: React.FC<{ trouble: TabTrouble | TabLoadError; onReloa
         <div role="alert" className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
             <Berry mood="oops" size={88} />
             <div>
-                <h1 className="text-18 font-medium">{title}</h1>
-                {failedLoad && <p className="mt-1 max-w-md text-13 [overflow-wrap:anywhere]">{failedLoad.url}</p>}
-                <p className="mt-1 max-w-md text-13 text-ink-2">{text}</p>
+                <h1 className="text-20 font-semibold">{title}</h1>
+                {failedLoad && <p className="mt-1 max-w-md text-14 [overflow-wrap:anywhere]">{failedLoad.url}</p>}
+                <p className="mt-1 max-w-md text-14 text-ink-2">{text}</p>
             </div>
             <Button onClick={onReload}>Reload</Button>
         </div>

@@ -50,7 +50,7 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
     const narrow = layout.page.width < NARROW_PAGE
 
     return (
-        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-sheet-2 text-13 app-region-no-drag">
+        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-sheet-2 text-14 app-region-no-drag">
             <span aria-hidden className="size-2 rounded-full bg-ask motion-safe:animate-pulse" />
             {showBerry && !narrow && <Berry mood="curious" size={24} />}
             <span className="font-medium">{!showBerry ? 'Recording' : narrow ? 'Watching' : `${name}’s watching`}</span>
@@ -60,7 +60,7 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
                     {steps.length === 1 ? '1 note' : `${steps.length} notes`}
                 </span>
             )}
-            <Button size="sm" variant="destructive" className="h-6 px-2.5 text-13" onClick={() => void window.chromeAPI.recording.stop()}>
+            <Button size="sm" variant="destructive" className="h-6 px-2.5 text-14" onClick={() => void window.chromeAPI.recording.stop()}>
                 <Square className="size-3 fill-current" aria-hidden />
                 Stop
             </Button>
@@ -69,7 +69,7 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
 }
 
 // Starts it from wherever this is. What it says stays the same everywhere, so it's one thing to learn.
-export const ShowHowButton: React.FC<{ className?: string; variant?: 'outline' | 'ghost'; size?: 'default' | 'sm' }> = ({ className, variant = 'ghost', size }) => {
+export const ShowHowButton: React.FC<{ className?: string; variant?: 'raised' | 'ghost'; size?: 'default' | 'sm' }> = ({ className, variant = 'ghost', size }) => {
     const { status } = useRecording()
     const name = useAssistantName()
     return (
@@ -114,7 +114,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
         <div className="divide-y">
             {groups.map(({ site, steps: notes }, group) => (
                 <section key={group} aria-label={`On ${site}`} className="py-5">
-                    <h2 className="text-13 font-medium text-ink-2">{site}</h2>
+                    <h2 className="text-14 font-medium text-ink-2">{site}</h2>
                     <ol className="mt-2 flex flex-col">
                         {notes.map(({ step, at }) => (
                             <li key={step.id} className="group flex items-start gap-3 py-1.5">
@@ -126,7 +126,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
                                         <NoteWords step={step} />
                                     </span>
                                     {step.path && step.path !== site && (
-                                        <span className="block text-12 text-ink-2 truncate">{step.path}</span>
+                                        <span className="block text-13 text-ink-2 truncate">{step.path}</span>
                                     )}
                                 </span>
                                 {onRemove && (
@@ -134,7 +134,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
                                         type="button"
                                         aria-label={`Leave out: ${step.text}`}
                                         onClick={() => onRemove(step.id)}
-                                        className="shrink-0 h-6 px-2 rounded-row text-13 text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
+                                        className="shrink-0 h-6 px-2 rounded-row text-14 text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                                     >
                                         Leave out
                                     </button>

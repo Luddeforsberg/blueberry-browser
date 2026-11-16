@@ -21,12 +21,12 @@ export const ChatPanel: React.FC = () => {
         <aside aria-label={name} className="h-full flex flex-col rounded-sheet bg-sheet shadow-lift overflow-hidden">
             <div className="h-[50px] shrink-0 flex items-center gap-2 pl-3.5 pr-2.5">
                 <Berry mood={approval ? 'asking' : 'rest'} size={20} mascot={mascot} still />
-                <h2 className="min-w-0 flex-1 truncate text-13 font-medium text-ink">{title || name}</h2>
+                <h2 className="min-w-0 flex-1 truncate text-14 font-medium text-ink">{title || name}</h2>
                 <button type="button" aria-label="New chat" title="New chat" disabled={messages.length === 0} onClick={clearChat} className={ICON_BUTTON}>
-                    <SquarePen className="size-4" strokeWidth={1.5} />
+                    <SquarePen className="size-4" strokeWidth={1.75} />
                 </button>
                 <button type="button" aria-label={`Close ${name}`} title="Close" onClick={toggleChat} className={ICON_BUTTON}>
-                    <X className="size-4" strokeWidth={1.5} />
+                    <X className="size-4" strokeWidth={1.75} />
                 </button>
             </div>
             <div className="flex-1 min-h-0">

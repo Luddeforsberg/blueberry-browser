@@ -44,12 +44,12 @@ export const RoutineRunCard: React.FC<{
 
     return (
         <li aria-label={`Run from ${formatTime(run.startedAt)}`} className="p-4 rounded-sheet border bg-sheet">
-            <div className="flex items-center justify-between gap-4 text-13">
+            <div className="flex items-center justify-between gap-4 text-14">
                 <span className="text-ink-2 tabular-nums">{formatTime(run.startedAt)}</span>
                 <RoutineStatusLabel status={run.status} />
             </div>
             {run.lateFor !== null && (
-                <p className="mt-2 text-13 text-ask">
+                <p className="mt-2 text-14 text-ask">
                     This ran late. It was due {formatTime(run.lateFor)}, when the app was closed or the computer was asleep.
                 </p>
             )}
@@ -84,7 +84,7 @@ export const RoutineRunCard: React.FC<{
                 </div>
             )}
             {run.status === 'finished' && !run.result && (
-                <p className="mt-3 text-13 text-ink-2">It finished with nothing to report.</p>
+                <p className="mt-3 text-14 text-ink-2">It finished with nothing to report.</p>
             )}
             {run.error && (
                 <div className="mt-3">
@@ -92,7 +92,7 @@ export const RoutineRunCard: React.FC<{
                 </div>
             )}
             {run.status === 'interrupted' && (
-                <p className="mt-3 text-13">
+                <p className="mt-3 text-14">
                     {run.approval
                         ? `The app closed while this was waiting for your OK, so it wasn’t done: “${run.approval.text}”`
                         : 'The app closed before this finished, so it stopped there.'}
@@ -100,8 +100,8 @@ export const RoutineRunCard: React.FC<{
             )}
             {(open || (ended && onRunAgain)) && (
                 <div className="mt-3 flex items-center gap-3">
-                    {open && <Button size="sm" variant="outline" onClick={onStop}>Stop</Button>}
-                    {ended && onRunAgain && <Button size="sm" variant="outline" onClick={onRunAgain}>Run again</Button>}
+                    {open && <Button size="sm" variant="raised" onClick={onStop}>Stop</Button>}
+                    {ended && onRunAgain && <Button size="sm" variant="raised" onClick={onRunAgain}>Run again</Button>}
                 </div>
             )}
         </li>
@@ -119,7 +119,7 @@ export const RoutineApprovals: React.FC = () => {
         <ul aria-label="Routines waiting for your OK" className="flex flex-col gap-2">
             {waiting.map(({ id, name, latestRun, mascotId }) => (
                 <li key={id}>
-                    <p className="px-1 pb-1 text-12 text-ink-2 truncate">{name}</p>
+                    <p className="px-1 pb-1 text-13 text-ink-2 truncate">{name}</p>
                     <ChatApprovalCard chatId={latestRun!.id} approval={latestRun!.approval!} mascot={find(mascotId)} />
                 </li>
             ))}

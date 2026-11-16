@@ -52,7 +52,7 @@ export const MenuSheet: React.FC<{
                 }
             }}
             className={cn(
-                'absolute z-30 max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-13 text-ink shadow-lift cursor-default',
+                'absolute z-30 max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-14 text-ink shadow-lift cursor-default',
                 'animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)]',
                 align === 'box' ? 'inset-x-1' : align === 'right' ? 'right-0' : 'left-0',
                 above ? 'bottom-full mb-2' : 'top-full mt-2',

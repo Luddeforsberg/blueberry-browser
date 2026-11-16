@@ -37,7 +37,7 @@ export const SuggestionItem: React.FC<{ row: SuggestionRow; used?: boolean; onPr
             <button
                 type="button"
                 onClick={onPress}
-                className="flex-1 min-w-0 h-[34px] px-2 flex items-center gap-[11px] rounded-row text-13 text-ink-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="flex-1 min-w-0 h-[34px] px-2 flex items-center gap-[11px] rounded-row text-14 text-ink-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
                 <span aria-hidden className="flex shrink-0">
                     <Berry mood={mood} size={22} mascot={mascot} still />
@@ -55,7 +55,7 @@ export const SuggestionItem: React.FC<{ row: SuggestionRow; used?: boolean; onPr
                     onClick={onDismiss}
                     className="hidden group-hover:flex group-focus-within:flex size-6 mr-1 shrink-0 items-center justify-center rounded-[7px] text-ink-3 hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
-                    <X className="size-[13px]" strokeWidth={1.5} />
+                    <X className="size-[13px]" strokeWidth={1.75} />
                 </button>
             )}
         </li>

@@ -81,11 +81,11 @@ export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                 <button
                     type="button"
                     onClick={() => openMascots({ page: 'mascot', id: mascot.id })}
-                    className={cn("block max-w-full truncate text-left text-13 font-medium text-ink before:content-[''] before:absolute before:inset-0 before:rounded-[inherit]", FOCUS, 'focus-visible:ring-0 focus-visible:before:ring-2 focus-visible:before:ring-focus')}
+                    className={cn("block max-w-full truncate text-left text-14 font-medium text-ink before:content-[''] before:absolute before:inset-0 before:rounded-[inherit]", FOCUS, 'focus-visible:ring-0 focus-visible:before:ring-2 focus-visible:before:ring-focus')}
                 >
                     {name}
                 </button>
-                <p className="mt-0.5 truncate text-12 text-ink-2">{mascot.id === BERRY_ID ? BERRY_LINE : mascot.instructions}</p>
+                <p className="mt-0.5 truncate text-13 text-ink-2">{mascot.id === BERRY_ID ? BERRY_LINE : mascot.instructions}</p>
                 <p className="mt-1 truncate font-mono text-11 text-ink-3">{brief}</p>
             </div>
             {mood === 'asking' ? (
@@ -96,8 +96,8 @@ export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                     {site ? `on ${site}` : 'working'}
                 </span>
             ) : null}
-            <Button size="sm" variant="outline" className="relative" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
-            <ChevronRight aria-hidden className="size-[13px] shrink-0 -ml-1 text-faint" strokeWidth={1.5} />
+            <Button size="sm" variant="raised" className="relative" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
+            <ChevronRight aria-hidden className="size-[13px] shrink-0 -ml-1 text-faint" strokeWidth={1.75} />
         </li>
     )
 }
@@ -107,14 +107,14 @@ const List: React.FC = () => {
     return (
         <>
             <div className="mx-3 mb-3.5 flex items-center gap-2.5">
-                <h1 className="flex-1 text-18 font-medium">Your mascots</h1>
-                <Button variant="outline" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Gallery</Button>
+                <h1 className="flex-1 text-20 font-semibold">Your mascots</h1>
+                <Button variant="raised" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Gallery</Button>
                 <Button onClick={() => startMascot()}>
-                    <Plus strokeWidth={1.5} />
+                    <Plus strokeWidth={1.75} />
                     New mascot
                 </Button>
             </div>
-            <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-13 leading-[1.45] text-ink-2">Each has its own job and its own limits. They all ask before anything risky.</p>
+            <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-14 leading-[1.45] text-ink-2">Each has its own job and its own limits. They all ask before anything risky.</p>
             <ul aria-label="Your mascots" className="rounded-sheet bg-sheet shadow-rim">
                 {flock.map((mascot) => <MascotRow key={mascot.id} mascot={mascot} />)}
             </ul>
@@ -157,15 +157,15 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
             <section aria-label={name} className="rounded-sheet bg-sheet shadow-rim pt-5 pr-[18px] pb-5 pl-[22px] flex items-start gap-5">
                 <Berry mood={stateOf(mascot).mood} size={64} mascot={mascot} className="mt-0.5" still />
                 <div className="flex-1 min-w-0">
-                    <h1 className="mb-1 text-18 font-medium [overflow-wrap:anywhere]">{name}</h1>
-                    <p className="text-13 leading-[1.45] text-ink-2 line-clamp-3 [overflow-wrap:anywhere]">{isBerry ? BERRY_LINE : mascot.instructions}</p>
+                    <h1 className="mb-1 text-20 font-semibold [overflow-wrap:anywhere]">{name}</h1>
+                    <p className="text-14 leading-[1.45] text-ink-2 line-clamp-3 [overflow-wrap:anywhere]">{isBerry ? BERRY_LINE : mascot.instructions}</p>
                     <LimitTags mascot={mascot} className="mt-3" />
                 </div>
                 <Button className="h-7" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
             </section>
 
             {!isBerry && (
-                <SettingsGroup label="change">
+                <SettingsGroup label="Change">
                     <SettingsLink title={PART_NAMES.look} value={<><Berry size={20} mascot={mascot} still /><span>{lookInWords(mascot)}</span></>} onOpen={part('look')} />
                     <SettingsLink title={PART_NAMES.name} value={<span>{mascot.name}</span>} onOpen={part('name')} />
                     <SettingsLink title={PART_NAMES.purpose} value={<span>{mascot.instructions}</span>} onOpen={part('purpose')} />
@@ -173,12 +173,12 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                 </SettingsGroup>
             )}
 
-            <SettingsGroup label="its things">
+            <SettingsGroup label="Its things">
                 <SettingsLink title="What it remembers" value={<span>{remembers > 0 ? count(remembers, 'thing') : 'Nothing yet'}</span>} onOpen={() => openMascots({ page: 'memory', id: mascot.id })} />
                 <SettingsRow id="mascot-routines" title="Routines" description={routines.length > 0 ? routines.map((routine) => routine.name).join(', ') : undefined}>
                     <Button
                         size="sm"
-                        variant="outline"
+                        variant="raised"
                         onClick={() => {
                             setRoutinesView({ page: 'form', values: blankForm('', '', isBerry ? null : mascot.id) })
                             void window.chromeAPI.browser.openPage('routines')
@@ -196,8 +196,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                         <SettingsLink
                             title="In the Gallery"
                             description="Others can add a copy of it. They never get what it remembers."
-                            state={mascot.publishedId ? 'published' : 'not published'}
-                            stateOn={!!mascot.publishedId}
+                            state={mascot.publishedId ? { words: 'Published', tone: 'on' } : { words: 'Not published' }}
                             onOpen={() => openMascots({ page: 'publish', id: mascot.id })}
                         />
                     )
@@ -240,7 +239,7 @@ const Publish: React.FC<{ tabId: string; mascotId: string }> = ({ tabId, mascotI
 const Gone: React.FC = () => (
     <>
         <BackButton back="Your mascots" onBack={() => openMascots({ page: 'list' })} />
-        <p className="mx-3 text-13 text-ink-2">This mascot isn’t here any more.</p>
+        <p className="mx-3 text-14 text-ink-2">This mascot isn’t here any more.</p>
     </>
 )
 

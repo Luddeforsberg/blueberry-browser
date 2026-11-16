@@ -20,7 +20,7 @@ export const WhatLeaves: React.FC = () => {
     const { settings } = useShell()
     return (
         <>
-            <SettingsGroup label="goes to the ai service">
+            <SettingsGroup label="Goes to the AI service">
                 <SettingsRow
                     id="leaves-messages"
                     title="Your messages"
@@ -44,12 +44,12 @@ export const WhatLeaves: React.FC = () => {
                     <State on={settings.memoryOffers}>{settings.memoryOffers ? 'on' : 'off'}</State>
                 </SettingsRow>
             </SettingsGroup>
-            <SettingsGroup label="only when you start it">
+            <SettingsGroup label="Only when you start it">
                 <SettingsRow id="leaves-publishing" title="Publishing a mascot" description="Only a mascot you choose to publish goes public, and you see exactly what goes first." />
                 <SettingsRow id="leaves-cloud" title="A cloud job" description="Its pages load in Browserbase’s browser, not yours, signed in only to the sites you bring along." />
                 <SettingsRow id="leaves-phone" title="Answering from your phone" description="Telegram sees what the job asks you, the site and any code you send. Passwords are never sent this way." />
             </SettingsGroup>
-            <SettingsGroup label="stays here">
+            <SettingsGroup label="Stays here">
                 <SettingsRow
                     id="leaves-local"
                     title="History, chats, bookmarks, open tabs and settings"

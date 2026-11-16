@@ -22,17 +22,17 @@ export const PermissionCard: React.FC<{
 
     return (
         <section aria-label="Site permission" className="rounded-sheet border bg-sheet p-4 shadow-lift text-ink">
-            <h1 className="text-13">
+            <h1 className="text-14">
                 <span className="font-medium break-all">{siteName(prompt.origin)}</span>{' '}
                 {permissionQuestion(prompt.permissions)}
             </h1>
-            <p className="mt-1 text-12 text-ink-2">
+            <p className="mt-1 text-13 text-ink-2">
                 {once
                     ? 'Allow is for this time only. Block is remembered for this site.'
                     : 'Your answer is remembered for this site. You can change it in Settings.'}
             </p>
             <div className="mt-3 flex justify-end gap-2">
-                <Button size="sm" variant="outline" disabled={!armed} onClick={() => onDecide(false)}>
+                <Button size="sm" variant="raised" disabled={!armed} onClick={() => onDecide(false)}>
                     Block
                 </Button>
                 <Button size="sm" disabled={!armed} onClick={() => onDecide(true)}>

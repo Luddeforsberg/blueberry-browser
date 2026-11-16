@@ -35,15 +35,15 @@ const Snippet: React.FC<{ snippet: McpSnippet }> = ({ snippet }) => {
             id={id}
             title={snippet.app}
             description={snippet.where}
-            below={<pre aria-labelledby={id} className="max-h-32 overflow-auto rounded-row bg-sheet-2 px-3 py-2.5 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{snippet.text}</pre>}
+            below={<pre aria-labelledby={id} className="max-h-32 overflow-auto rounded-row bg-sheet-2 px-3 py-2.5 text-13 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{snippet.text}</pre>}
         >
-            <Button variant="outline" size="sm" aria-describedby={id} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
+            <Button variant="raised" size="sm" aria-describedby={id} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
         </SettingsRow>
     )
 }
 
 const ActivityRow: React.FC<{ entry: McpActivity }> = ({ entry }) => (
-    <li className="flex items-baseline gap-3 py-2 border-t first:border-t-0 text-13">
+    <li className="flex items-baseline gap-3 py-2 border-t first:border-t-0 text-14">
         <span className="shrink-0 w-12 tabular-nums text-ink-2">{timeOf(entry.at)}</span>
         <span className="shrink-0 w-28 truncate text-ink-2">{entry.client}</span>
         <span className="min-w-0 flex-1 truncate">
@@ -80,13 +80,13 @@ export const McpSettings: React.FC = () => {
 
             {mcp.on && mcp.url && (
                 <>
-                    <SettingsGroup label="set up an app">
+                    <SettingsGroup label="Set up an app">
                         {mcp.snippets.map((snippet) => <Snippet key={snippet.app} snippet={snippet} />)}
                         <SettingsRow id="setting-mcp-revoke" title="Revoke access" description="Makes a new key, so every app you set up has to be set up again with a fresh copy.">
-                            <Button variant="outline" size="sm" onClick={() => void api.revoke().then(setMcp)}>Revoke</Button>
+                            <Button variant="raised" size="sm" onClick={() => void api.revoke().then(setMcp)}>Revoke</Button>
                         </SettingsRow>
                     </SettingsGroup>
-                    <SettingsGroup label="recent calls">
+                    <SettingsGroup label="Recent calls">
                         <SettingsRow
                             id="setting-mcp-activity"
                             title="Since Blueberry opened, newest first"
@@ -97,7 +97,7 @@ export const McpSettings: React.FC = () => {
                                         {mcp.activity.map((entry) => <ActivityRow key={entry.id} entry={entry} />)}
                                     </ul>
                                 ) : (
-                                    <p className="text-13 text-ink-2">No calls yet.</p>
+                                    <p className="text-14 text-ink-2">No calls yet.</p>
                                 )
                             }
                         />

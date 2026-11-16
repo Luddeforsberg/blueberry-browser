@@ -94,7 +94,7 @@ const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
     // An approval says what it would do, so it reads on from the mascot's name. A question or a handoff is already a sentence.
     const words = withSiteNames(approval.text)
     return (
-        <li className="h-11 pl-2 pr-[9px] flex items-center gap-[11px] rounded-tile bg-sheet text-13 text-ink shadow-rim">
+        <li className="h-11 pl-2 pr-[9px] flex items-center gap-[11px] rounded-tile bg-sheet text-14 text-ink shadow-rim">
             <Berry mood="asking" size={24} mascot={mascot} />
             <span className="flex-1 min-w-0 truncate">
                 {approval.question || approval.handoff ? words : <><span className="font-medium">{name}</span> wants to {asContinuation(words)}</>}

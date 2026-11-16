@@ -32,7 +32,7 @@ const AllClear: React.FC = () => {
             </ul>
             <div>
                 <p className="text-15">Nothing needs you right now.</p>
-                <p className="mt-1 text-13 text-ink-2">
+                <p className="mt-1 text-14 text-ink-2">
                     {working.size === 0
                         ? 'Your mascots are resting. If a job gets stuck, it waits here.'
                         : `${working.size === 1 ? `${anyone} is` : `${working.size} of them are`} working. If a job gets stuck, it waits here.`}
@@ -46,8 +46,8 @@ const AllClear: React.FC = () => {
 const PhoneLine: React.FC = () => {
     const [phone] = usePhone()
     const openPhoneSettings = () => openSettings('phone')
-    const link = "text-13 text-ink rounded-row outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
-    if (phone.status === 'connected' && !phone.problem) return <p className="text-13 text-ink-2">Replies from your phone are on</p>
+    const link = "text-14 text-ink rounded-row outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
+    if (phone.status === 'connected' && !phone.problem) return <p className="text-14 text-ink-2">Replies from your phone are on</p>
     if (phone.status === 'connected') return <button type="button" onClick={openPhoneSettings} className={link}>Replies from your phone are paused</button>
     return <button type="button" onClick={openPhoneSettings} className={link}>Answer these from your phone</button>
 }
@@ -86,7 +86,7 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         <div className="h-full overflow-y-auto">
             <div className="mx-auto max-w-3xl px-8 py-10">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                    <h1 className="text-18 font-medium">Needs you</h1>
+                    <h1 className="text-20 font-semibold">Needs you</h1>
                     <PhoneLine />
                 </div>
 
@@ -103,7 +103,7 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 )
                             )}
                         </ul>
-                        <p className="mt-3 text-12 text-ink-2">Passwords and codes go in the page, not through the model.</p>
+                        <p className="mt-3 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
                     </>
                 )}
             </div>

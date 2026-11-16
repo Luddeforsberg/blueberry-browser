@@ -83,7 +83,7 @@ const TabItem: React.FC<{
             )}
         >
             <span className={LEADING_SLOT}><TabIcon tab={tab} /></span>
-            <span className={cn("flex-1 min-w-0 text-13 truncate", iconOnly && "sr-only")}>{tab.title || 'New tab'}</span>
+            <span className={cn("flex-1 min-w-0 text-14 truncate", iconOnly && "sr-only")}>{tab.title || 'New tab'}</span>
             {tab.berryWorking && <span className="sr-only"> ({find(tab.workingMascotId).name} is working here)</span>}
         </button>
         <button
@@ -100,7 +100,7 @@ const TabItem: React.FC<{
                 tab.isActive && "opacity-100"
             )}
         >
-            <X className="size-[13px]" strokeWidth={1.5} />
+            <X className="size-[13px]" strokeWidth={1.75} />
         </button>
     </li>
     )
@@ -122,7 +122,7 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
     return (
         <li className="mt-1 p-0.5 pb-1 rounded-tile bg-tray">
             <div className={cn("flex items-center h-[30px] pr-1 rounded-row", chatTab?.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover")}>
-                <button type="button" aria-current={chatTab?.isActive ? 'page' : undefined} onClick={open} className={cn(row, "flex-1 min-w-0 h-full text-13 text-ink")}>
+                <button type="button" aria-current={chatTab?.isActive ? 'page' : undefined} onClick={open} className={cn(row, "flex-1 min-w-0 h-full text-14 text-ink")}>
                     <span className={LEADING_SLOT}><Berry mood={asking ? 'asking' : 'fetching'} size={20} mascot={mascot} /></span>
                     <span className="flex-1 truncate">{title}</span>
                     <span className="sr-only">{asking ? `, ${mascot.name} needs you` : `, ${mascot.name} is working`}</span>
@@ -135,7 +135,7 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
                         onClick={() => onClose(chatTab.id)}
                         className="size-[22px] shrink-0 flex items-center justify-center rounded-[7px] text-ink-3 outline-none hover:bg-press hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                     >
-                        <X className="size-[13px]" strokeWidth={1.5} />
+                        <X className="size-[13px]" strokeWidth={1.75} />
                     </button>
                 )}
             </div>
@@ -146,7 +146,7 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
                             type="button"
                             aria-current={tab.isActive ? 'page' : undefined}
                             onClick={() => !tab.isActive && void switchTab(tab.id)}
-                            className={cn(row, "h-[27px] text-12", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink")}
+                            className={cn(row, "h-[27px] text-13", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink")}
                         >
                             {/* The group's own row is what moves while the job works. */}
                             <span className={LEADING_SLOT}><TabIcon tab={tab} still /></span>
@@ -178,7 +178,7 @@ const JobGroupRow: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs
                 type="button"
                 aria-current={chatTab?.isActive ? 'page' : undefined}
                 onClick={open}
-                className={cn("h-[30px] pl-1 pr-2 min-w-0 shrink-0 flex items-center gap-[7px] rounded-row text-13 text-ink", chatTab?.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover", focus)}
+                className={cn("h-[30px] pl-1 pr-2 min-w-0 shrink-0 flex items-center gap-[7px] rounded-row text-14 text-ink", chatTab?.isActive ? "bg-sheet shadow-rim" : "hover:bg-hover", focus)}
             >
                 <Berry mood={asking ? 'asking' : 'fetching'} size={20} mascot={mascot} />
                 <span className="max-w-[124px] truncate">{title}</span>
@@ -191,7 +191,7 @@ const JobGroupRow: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs
                             aria-current={tab.isActive ? 'page' : undefined}
                             title={tab.title || 'New tab'}
                             onClick={() => !tab.isActive && void switchTab(tab.id)}
-                            className={cn("w-full h-[30px] px-2.5 flex items-center gap-2 rounded-row text-13", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink", focus)}
+                            className={cn("w-full h-[30px] px-2.5 flex items-center gap-2 rounded-row text-14", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink", focus)}
                         >
                             {/* The group's face is what moves while the job works. */}
                             <span className={LEADING_SLOT}><TabIcon tab={tab} still /></span>
@@ -299,7 +299,7 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     aria-label="New tab"
                     onClick={() => createTab()}
                     className={cn(
-                        "flex items-center gap-2 h-8 rounded-row text-13 text-ink-2 app-region-no-drag",
+                        "flex items-center gap-2 h-8 rounded-row text-14 text-ink-2 app-region-no-drag",
                         "hover:bg-hover outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
                         vertical ? "w-full px-2 mt-0.5" : "size-7 ml-1 shrink-0 justify-center text-ink-3 hover:text-ink"
                     )}

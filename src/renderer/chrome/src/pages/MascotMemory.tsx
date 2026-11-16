@@ -41,11 +41,11 @@ export const FactRow: React.FC<{ fact: Pick<MemoryFact, 'text'>; onEdit: (text: 
                         onKeyDown={(event) => {
                             if (event.key === 'Escape') setEditing(null)
                         }}
-                        className="block w-full px-3 py-2 rounded-row bg-sheet-2 text-13 leading-[1.45] text-ink outline-none resize-none focus-visible:ring-2 focus-visible:ring-focus"
+                        className="block w-full px-3 py-2 rounded-row bg-sheet-2 text-14 leading-[1.45] text-ink outline-none resize-none focus-visible:ring-2 focus-visible:ring-focus"
                     />
                     {error && <div className="mt-1.5"><ChatError message={error} /></div>}
                     <div className="mt-2 flex items-center justify-end gap-1.5">
-                        <Button size="sm" type="button" variant="outline" onClick={() => { setEditing(null); setError(null) }}>Cancel</Button>
+                        <Button size="sm" type="button" variant="raised" onClick={() => { setEditing(null); setError(null) }}>Cancel</Button>
                         <Button size="sm" type="submit">Save</Button>
                     </div>
                 </form>
@@ -54,9 +54,9 @@ export const FactRow: React.FC<{ fact: Pick<MemoryFact, 'text'>; onEdit: (text: 
     }
     return (
         <li className={cn(BETWEEN, 'before:left-4 min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3')}>
-            <p className="flex-1 min-w-0 text-13 leading-[1.45] text-ink [overflow-wrap:anywhere]">{fact.text}</p>
-            <Button size="sm" variant="outline" aria-label={`Change: ${fact.text}`} onClick={() => setEditing(fact.text)}>Change</Button>
-            <Button size="sm" variant="outline" aria-label={`Forget: ${fact.text}`} onClick={onForget}>Forget</Button>
+            <p className="flex-1 min-w-0 text-14 leading-[1.45] text-ink [overflow-wrap:anywhere]">{fact.text}</p>
+            <Button size="sm" variant="raised" aria-label={`Change: ${fact.text}`} onClick={() => setEditing(fact.text)}>Change</Button>
+            <Button size="sm" variant="raised" aria-label={`Forget: ${fact.text}`} onClick={onForget}>Forget</Button>
         </li>
     )
 }
@@ -82,12 +82,12 @@ const Offer: React.FC<{ offer: MemoryOffer }> = ({ offer }) => {
             <p className="mb-1.5 font-mono text-11 text-ink-3 [overflow-wrap:anywhere]">{source(offer)} · remember this?</p>
             <p className="text-15 leading-[1.45] text-ink">
                 {offer.text}
-                {offer.site && <span className="text-13 text-ink-2"> Only on {offer.site}.</span>}
+                {offer.site && <span className="text-14 text-ink-2"> Only on {offer.site}.</span>}
             </p>
             {error && <div className="mt-2"><ChatError message={error} /></div>}
             <div className="mt-3 flex gap-1.5">
                 <Button size="sm" className="h-7" onClick={() => void answer(true)}>Remember</Button>
-                <Button size="sm" variant="outline" className="h-7" onClick={() => void answer(false)}>Don’t</Button>
+                <Button size="sm" variant="raised" className="h-7" onClick={() => void answer(false)}>Don’t</Button>
             </div>
         </CardInShell>
     )
@@ -112,14 +112,14 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
                 </div>
             )}
             {facts.length === 0 ? (
-                <div className="mt-4 rounded-sheet bg-sheet shadow-rim px-4 py-[26px] text-center text-13 leading-[1.5] text-ink-2">
+                <div className="mt-4 rounded-sheet bg-sheet shadow-rim px-4 py-[26px] text-center text-14 leading-[1.5] text-ink-2">
                     <div className="mb-2.5 flex justify-center"><BerrySpot size={40} mascot={mascot} /></div>
                     <p className="mx-auto max-w-[440px]">Nothing yet. After a job it may ask to remember how you like something done, and it’s kept only if you say yes.</p>
                 </div>
             ) : (
                 <>
                     {places.map((place) => (
-                        <SettingsGroup key={place} label={place === ANYWHERE ? ANYWHERE : `on ${place}`}>
+                        <SettingsGroup key={place} label={place === ANYWHERE ? 'Anywhere' : `On ${place}`}>
                             <ul>
                                 {(groups.get(place) ?? []).map((fact) => (
                                     <FactRow

@@ -21,7 +21,7 @@ import { SegmentSwitch } from './SegmentSwitch'
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-const ROW = cn('w-full h-[30px] px-2 flex items-center gap-[9px] rounded-row text-13 text-ink-2 text-left transition-colors app-region-no-drag', FOCUS)
+const ROW = cn('w-full h-[30px] px-2 flex items-center gap-[9px] rounded-row text-14 text-ink-2 text-left transition-colors app-region-no-drag', FOCUS)
 // A row's own slot for its icon or face, so titles line up whatever starts the row.
 const LEAD = 'size-5 shrink-0 flex items-center justify-center'
 const ICON = 'size-4 shrink-0'
@@ -82,7 +82,7 @@ const Favourites: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, st
             <div
                 ref={zone('favourites')}
                 className={cn(
-                    'h-10 mb-1.5 flex items-center justify-center rounded-tile border border-dashed text-12 transition-colors',
+                    'h-10 mb-1.5 flex items-center justify-center rounded-tile border border-dashed text-13 transition-colors',
                     drag.over?.list === 'favourites' ? 'border-ink-3 bg-hover text-ink' : 'border-line text-ink-3'
                 )}
             >
@@ -138,7 +138,7 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
                 id="sidebar-bookmarks"
                 trailing={
                     <LabelButton label={open ? 'Fold bookmarks' : 'Show bookmarks'} onClick={() => setOpen(!open)}>
-                        {open ? <ChevronDown className="size-[13px]" strokeWidth={1.5} /> : <ChevronRight className="size-[13px]" strokeWidth={1.5} />}
+                        {open ? <ChevronDown className="size-[13px]" strokeWidth={1.75} /> : <ChevronRight className="size-[13px]" strokeWidth={1.75} />}
                     </LabelButton>
                 }
             >
@@ -146,7 +146,7 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
             </Label>
             {open && (shown.length === 0 ? (
                 <ul aria-label="Bookmarks">
-                    <li className="h-[27px] px-2 flex items-center text-12 text-faint">Bookmark a page to keep it here.</li>
+                    <li className="h-[27px] px-2 flex items-center text-13 text-faint">Bookmark a page to keep it here.</li>
                 </ul>
             ) : (
                 <ul aria-label="Bookmarks">
@@ -157,7 +157,7 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
                                 onPointerDown={(event) => start(event, site, 'bookmarks')}
                                 onClick={() => createTab(site.url)}
                                 onContextMenu={(event) => savedSiteMenu(event, site)}
-                                className={cn(ROW, 'h-[27px] text-12 hover:bg-hover hover:text-ink', drag?.site.id === site.id && 'opacity-40')}
+                                className={cn(ROW, 'h-[27px] text-13 hover:bg-hover hover:text-ink', drag?.site.id === site.id && 'opacity-40')}
                             >
                                 <span className={LEAD}><Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} /></span>
                                 <span className="flex-1 truncate">{site.title}</span>
@@ -184,7 +184,7 @@ export const SiteDragGhost: React.FC<{ drag: SiteDragging['drag'] }> = ({ drag }
             )}
             <div
                 aria-hidden
-                className="fixed z-50 h-[27px] max-w-[200px] px-2 flex items-center gap-[9px] rounded-row bg-sheet shadow-lift text-12 text-ink pointer-events-none"
+                className="fixed z-50 h-[27px] max-w-[200px] px-2 flex items-center gap-[9px] rounded-row bg-sheet shadow-lift text-13 text-ink pointer-events-none"
                 style={{ left: drag.x + 10, top: drag.y + 6 }}
             >
                 <Favicon src={drag.site.favicon ?? siteIcon(drag.site.url)} site={drag.site.url} />
@@ -210,7 +210,7 @@ const TabsFace: React.FC = () => {
                         <>
                             <span className="tabular-nums" aria-label={`${tabs.length} open`}>{tabs.length}</span>
                             <LabelButton label="New tab" onClick={() => createTab()}>
-                                <Plus className="size-[13px]" strokeWidth={1.5} />
+                                <Plus className="size-[13px]" strokeWidth={1.75} />
                             </LabelButton>
                         </>
                     }
@@ -302,7 +302,7 @@ export const ChatRow: React.FC<{
                 </span>
                 <span className="flex-1 truncate">{chat.title}</span>
                 <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}</span>
-                {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.5} />}
+                {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />}
                 {trailing && (
                     <span className="-mr-6 shrink-0 font-mono text-11 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
                 )}
@@ -317,7 +317,7 @@ export const ChatRow: React.FC<{
                     FOCUS
                 )}
             >
-                <Ellipsis className={ICON} strokeWidth={1.5} />
+                <Ellipsis className={ICON} strokeWidth={1.75} />
             </button>
         </li>
     )
@@ -354,7 +354,7 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                             <>
                                 <span className="tabular-nums">{library.needsYou.length}</span>
                                 <LabelButton label="Open Needs you" onClick={() => void browser.openPage('needs-you')}>
-                                    <ChevronRight className="size-[13px]" strokeWidth={1.5} />
+                                    <ChevronRight className="size-[13px]" strokeWidth={1.75} />
                                 </LabelButton>
                             </>
                         }
@@ -403,7 +403,7 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                     className={library.needsYou.length + working.length === 0 ? 'mt-0' : undefined}
                     trailing={
                         <LabelButton label="Open Routines" onClick={() => void browser.openPage('routines')}>
-                            <ChevronRight className="size-[13px]" strokeWidth={1.5} />
+                            <ChevronRight className="size-[13px]" strokeWidth={1.75} />
                         </LabelButton>
                     }
                 >
@@ -429,7 +429,7 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                         </li>
                     ))}
                 </ul>
-                {routines.length === 0 && <p className="h-[30px] px-2 flex items-center text-12 text-faint">Nothing scheduled yet.</p>}
+                {routines.length === 0 && <p className="h-[30px] px-2 flex items-center text-13 text-faint">Nothing scheduled yet.</p>}
             </section>
 
             {earlier.length > 0 && (
@@ -482,7 +482,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
         card.current?.querySelector<HTMLElement>('button')?.focus()
     }, [])
 
-    const line = 'h-[30px] flex items-center gap-[9px] px-1 text-12 text-ink-2 rounded-row text-left w-full'
+    const line = 'h-[30px] flex items-center gap-[9px] px-1 text-13 text-ink-2 rounded-row text-left w-full'
     return (
         <div
             ref={card}
@@ -538,7 +538,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                     createTab()
                     onClose()
                 }}
-                className={cn('mt-1.5 w-full h-[30px] rounded-full shadow-[inset_0_0_0_1px_var(--line)] text-12 text-ink-2 transition-[background-color,transform] duration-fast hover:bg-hover hover:text-ink active:scale-[.96]', FOCUS)}
+                className={cn('mt-1.5 w-full h-[30px] rounded-full shadow-[inset_0_0_0_1px_var(--line)] text-13 text-ink-2 transition-[background-color,transform] duration-fast hover:bg-hover hover:text-ink active:scale-[.96]', FOCUS)}
             >
                 New chat with {name}
             </button>
@@ -548,7 +548,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                     openMascots({ page: 'list' })
                     onClose()
                 }}
-                className={cn('mt-1 w-full h-7 rounded-full text-12 text-ink-3 hover:text-ink', FOCUS)}
+                className={cn('mt-1 w-full h-7 rounded-full text-13 text-ink-3 hover:text-ink', FOCUS)}
             >
                 All your mascots
             </button>
@@ -676,7 +676,7 @@ const FaceSwitch: React.FC<{ face: Face; onChange: (face: Face) => void }> = ({ 
             label="Sidebar"
             current={face}
             onChange={onChange}
-            className="mx-0.5 mb-3 h-[30px] rounded-[10px] [&>button]:rounded-[8px] text-12"
+            className="mx-0.5 mb-3 h-[30px] rounded-[10px] [&>button]:rounded-[8px] text-13"
             items={[
                 { value: 'tabs', label: 'Tabs' },
                 {

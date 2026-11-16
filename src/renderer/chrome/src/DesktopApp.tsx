@@ -144,7 +144,7 @@ export const DesktopApp: React.FC = () => {
                     aria-hidden={!lineShowing}
                     onClick={() => void desktop().press()}
                     className={cn(
-                        "block px-3 py-1.5 rounded-tile border bg-sheet text-13 leading-[18px] text-left outline-none line-clamp-2",
+                        "block px-3 py-1.5 rounded-tile border bg-sheet text-14 leading-[18px] text-left outline-none line-clamp-2",
                         "shadow-lift",
                         !still && "transition-[opacity,transform] duration-200 ease-out",
                         lineShowing ? "opacity-100 translate-x-0" : cn("opacity-0 pointer-events-none", anchor.side === 'left' ? "-translate-x-1.5" : "translate-x-1.5")

@@ -31,7 +31,7 @@ const Chip: React.FC<{
             aria-label={problem ? `${label}, not added: ${problem}` : factInFull || fact ? `${label}, ${factInFull ?? fact}` : label}
             title={problem ?? factInFull ?? hint}
             className={cn(
-                'h-7 max-w-[240px] pl-1.5 inline-flex items-center gap-[7px] rounded-row text-12 whitespace-nowrap',
+                'h-7 max-w-[240px] pl-1.5 inline-flex items-center gap-[7px] rounded-row text-13 whitespace-nowrap',
                 onRemove ? 'pr-0.5' : 'pr-2',
                 problem ? 'bg-ask-bg text-ask' : cn('text-ink', sheet ? 'bg-sheet-2' : QUIET)
             )}
@@ -50,7 +50,7 @@ const Chip: React.FC<{
                         problem ? 'text-ask hover:bg-hover' : 'text-ink-3 hover:bg-hover hover:text-ink'
                     )}
                 >
-                    <X className="size-[11px]" strokeWidth={1.5} />
+                    <X className="size-[11px]" strokeWidth={1.75} />
                 </button>
             )}
         </span>
@@ -78,9 +78,9 @@ export const TabChip: React.FC<{ tab: Pick<TabChoice, 'title' | 'site' | 'favico
 
 const FileIcon: React.FC<{ kind: FileChipInfo['kind']; thumbnail: string | null; problem?: string | null }> = ({ kind, thumbnail, problem }) => {
     if (thumbnail && !problem) return <img src={thumbnail} alt="" className="size-[18px] shrink-0 rounded-[5px] object-cover" />
-    if (kind === 'picture') return <Image aria-hidden className={iconClass(problem)} strokeWidth={1.5} />
-    if (kind === 'text') return <FileText aria-hidden className={iconClass(problem)} strokeWidth={1.5} />
-    return <File aria-hidden className={iconClass(problem)} strokeWidth={1.5} />
+    if (kind === 'picture') return <Image aria-hidden className={iconClass(problem)} strokeWidth={1.75} />
+    if (kind === 'text') return <FileText aria-hidden className={iconClass(problem)} strokeWidth={1.75} />
+    return <File aria-hidden className={iconClass(problem)} strokeWidth={1.75} />
 }
 
 const KIND_WORDS: Record<NonNullable<FileChipInfo['kind']>, string> = { picture: 'The picture', pdf: 'The PDF', text: 'The file' }

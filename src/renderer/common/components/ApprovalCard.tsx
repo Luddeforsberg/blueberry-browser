@@ -14,7 +14,7 @@ export const ExactWords: React.FC<{ children: string; className?: string }> = ({
 export const CardInShell: React.FC<{ label: string; note?: React.ReactNode; children: React.ReactNode }> = ({ label, note, children }) => (
   <section aria-label={label} className={cn(SHELL, "rounded-card-shell [overflow-wrap:anywhere] animate-fade-in")}>
     <div className="rounded-sheet bg-card p-3.5 shadow-card-lift">{children}</div>
-    {note && <p className="min-h-9 pl-3 pr-2.5 py-2 flex items-center gap-2.5 text-12 text-ink-2">{note}</p>}
+    {note && <p className="min-h-9 pl-3 pr-2.5 py-2 flex items-center gap-2.5 text-13 text-ink-2">{note}</p>}
   </section>
 );
 
@@ -31,7 +31,7 @@ export const ApprovalCard: React.FC<{
     {exactly && <ExactWords className="mb-3 bg-card-2">{exactly}</ExactWords>}
     <div className="flex flex-wrap items-center gap-1.5">
       <Button onClick={onConfirm}>Allow</Button>
-      <Button variant="outline" onClick={onDeny}>
+      <Button variant="raised" onClick={onDeny}>
         Don’t allow
       </Button>
     </div>

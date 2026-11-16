@@ -89,7 +89,7 @@ export const Choice = <T extends string>({
                             aria-checked={chosen}
                             tabIndex={tabIndex}
                             onClick={() => onChange(option.value)}
-                            className={cn('group w-[86px] flex flex-col items-center gap-[7px] text-12 outline-none', chosen ? 'text-ink font-medium' : 'text-ink-2 hover:text-ink')}
+                            className={cn('group w-[86px] flex flex-col items-center gap-[7px] text-13 outline-none', chosen ? 'text-ink font-medium' : 'text-ink-2 hover:text-ink')}
                         >
                             <span
                                 aria-hidden
@@ -113,12 +113,12 @@ export const Choice = <T extends string>({
                         tabIndex={tabIndex}
                         onClick={() => onChange(option.value)}
                         className={cn(
-                            "h-7 flex items-center justify-center rounded-full text-12 whitespace-nowrap outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                            "h-7 flex items-center justify-center rounded-full text-13 whitespace-nowrap outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
                             fill ? "px-1 gap-[5px]" : "px-2.5 gap-1.5",
-                            chosen ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:text-ink"
+                            chosen ? "bg-sheet text-ink shadow-chip" : "text-ink-2 hover:text-ink"
                         )}
                     >
-                        {option.Icon && <option.Icon aria-hidden className="size-[13px] shrink-0" strokeWidth={1.5} />}
+                        {option.Icon && <option.Icon aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />}
                         {option.label}
                     </button>
                 )
@@ -138,7 +138,7 @@ export const QuietChoice = <T extends string>({ label, value, options, onChange 
                 aria-checked={value === option.value}
                 onClick={() => onChange(option.value)}
                 className={cn(
-                    "h-7 text-13 outline-none rounded-row underline-offset-[6px] decoration-[1.5px] transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                    "h-7 text-14 outline-none rounded-row underline-offset-[6px] decoration-[1.5px] transition-colors focus-visible:ring-2 focus-visible:ring-focus",
                     value === option.value ? "underline" : "text-ink-2 hover:text-ink"
                 )}
             >
