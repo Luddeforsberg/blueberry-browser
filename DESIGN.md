@@ -152,11 +152,13 @@ Contrast, measured:
 
 - **Radius:** 9px for rows and small chips, 12px for tiles and groups, 16px for sheets and cards in the chat with 20px for the shell round one, 24px for the prompt card with 28px for its shell, and full for buttons, pills and Send.
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px. The mocks still carry a few values off this grid, and those go when it's built.
-- **Elevation** has three steps, and the last two are the only shadows:
+- **Elevation** has five steps. Everything that is a surface of its own has an edge you can see: a hairline and a soft shadow under it, never a flat fill on a flat ground.
 
 | Step | Light | Dark | Used for |
 |---|---|---|---|
-| `rim` | A 1px line at ink 7%, and `0 1px 2px` at ink 6% | A 1px line at white 8% | The page sheet, the active row |
+| `rim` | A 1px line at ink 7%, and `0 1px 2px` at ink 6% | A 1px line at white 8% | The page sheet |
+| `chip` | A 1px line at ink 9%, and `0 1px 2px` at ink 7% | A 1px line at white 10%, and `0 1px 2px` at black 40% | A raised button, the chosen side of a switch, a hovered row on the well |
+| `up` | A 1px line at ink 7%, `0 1px 1px` at ink 4%, `0 3px 6px -1px` at ink 5%, and `0 10px 20px -8px` at ink 10% | A 1px line at white 8%, and `0 10px 20px -8px` at black 50% | A group of rows on the well, the active row in the sidebar |
 | `card-lift` | `rim`, and `0 10px 24px -12px` at ink 20% | A 1px line at white 9%, and the same shadow at black 55% | A card in its shell |
 | `lift` | A 1px line at ink 6%, `0 1px 2px` at ink 5%, and `0 14px 34px -10px` at ink 16% | A 1px line at white 7%, and the same shadow at black 60% | Menus, the chat panel, the picture in the working view |
 
@@ -167,16 +169,18 @@ Two families, both bundled with the app and never fetched: **Geist** for words, 
 | Size | Family | Used for |
 |---|---|---|
 | 30px, medium, tight | Geist | The greeting on the new tab |
-| 18px | Geist | A page's title, such as History or Your mascots |
+| 20px, semibold, tight | Geist | A page's title, such as History or Your mascots |
 | 15px, regular or medium | Geist | The title of a card that needs you, what you type in any prompt box, and every message in a chat |
-| 13px | Geist | Everything else: rows, lists, body text outside a chat |
-| 12px | Geist | Buttons, pills, secondary lines |
-| 11.5px | Geist Mono | Status words, steps, exact words, times |
-| 11px | Geist Mono | Section labels, in lower case |
+| 14px | Geist | Everything else: rows, lists, body text outside a chat. A row's name is medium |
+| 13px | Geist | Buttons, and the second line of a row |
+| 12px, medium | Geist | Section labels, in words with a capital, in `ink-2`. Status pills |
+| 12px | Geist Mono | The exact words of what a mascot wants to do |
+| 11.5px | Geist Mono | Status words, steps, times, counts |
+| 11px | Geist Mono | A key on a keycap |
 
-- **Regular and medium only.**
+- **Regular and medium,** and semibold for a page's title alone.
 - **Tabular figures** wherever numbers line up, such as times and prices.
-- **Mono means "the machine's words":** what a mascot is doing or did, the exact words of what it wants to do, and labels. Never for a mascot's own reply.
+- **Mono means "the machine's words":** what a mascot is doing or did, the exact words of what it wants to do, a time, a count, a key. Never a label, never a value such as On or Not set up, never a mascot's limits, and never a mascot's own reply. A page of lower-case mono reads as a terminal, which this isn't.
 - **Status is present tense and ends in two dots** while it's happening: "Scanning fares..". A finished step is past tense with none: "Opened klm.com".
 - **Messages in a chat are 15px with a 1.55 line height,** yours and the mascot's, in the page and in the panel, because they're read at length. The mocks still draw them at 13px.
 
@@ -242,7 +246,7 @@ Crisp: quick to start, gently settling.
 
 ## 8. Component states
 
-Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell-and-chat.html).
+Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell-and-chat.html). The sizes, edges, pills and buttons as they are now: [polish.html](./docs/design/mocks/polish.html), which wins where the two differ.
 
 | State | Treatment |
 |---|---|
@@ -250,12 +254,18 @@ Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell
 | Hover | `hover` behind it. The filled button lightens a step |
 | Pressed | `press`, and it shrinks to 96%, in about 100ms |
 | Focused | A 2px `focus` ring with a 2px gap in the ground's colour, never removed. The prompt box is the exception, and so are the fields in the cards that make a mascot, which are built like it: the caret marks focus |
-| Current | A sheet: white, hairline, small shadow. The text stays regular, so rows don't shift |
+| Current | A sheet with `up`. The text stays regular, so rows don't shift |
 | Off | `tray` behind `faint` text, with a reason where possible, and based on real state |
 | Loading | The pips, only while work is really happening |
 | Error | `ask` with words and a way forward |
 
-- **Buttons have three roles:** filled in `ink` for the one decision, outlined beside it, and quiet text for everything else. A view has at most one filled button.
+- **Buttons have three roles:** filled in `ink` for the one decision, raised beside it, and quiet text for everything else. A view has at most one filled button, and a row in a list never carries one. A button is 32px tall with 13px medium text, or 28px where it belongs to a row. Filled has a 1px highlight along its top edge, white at 14%, and `0 1px 2px` at ink 25% under it. Raised is a sheet with `chip`, in `ink`: it replaces the outlined button everywhere, because a faint outline on a sheet reads as off.
+- **A row's own action shows on the row you're on:** Chat on a mascot, Pick up on a suggestion, as a 28px raised button on the hovered or focused row, with a faint arrow at rest. A decision is never hidden this way: Allow and Don't allow are always both on screen.
+- **State is a pill, never a mono word.** 24px tall, 12px medium, on `sheet-2`: "Not set up" in `ink-2`; "Connected" or "On" in `ink` after a 6px dot in `focus`; and in `ask` on `ask-bg` after an `ask` dot when it needs you, with what's wrong in two or three words. When there's a next step it's a raised button beside the pill, named for what it does: **Set up**, **Try again**.
+- **Icons** are 16px at a 1.75 stroke, in `ink-2` at rest and `ink` on anything current. An icon that stands for a thing, such as a connection, sits on a 32px tile with a 10px radius, `sheet-2` and a hairline, in `ink`.
+- **A row in a group** has its name at 14px medium and one line under it at 13px in `ink-2`. Text that doesn't fit is rewritten shorter before it's cut with an ellipsis.
+- **A section label** is words with a capital, 12px medium in `ink-2`, with its count and its + on the same line.
+- **The dot grid never sits behind text.** It fades out behind anything that's read.
 - **Send has three states:** off until there's something to send, filled when ready, and a filled stop square while a reply runs. It is always `ink`, never a mascot's colour.
 - **A switch between two things** is a segmented control, and the chosen side carries its name: "This Mac", "Cloud". The other side is its icon alone.
 - **Menus** are sheets with a 22px radius and `lift`. Rows are 40px, or 46px with a second line, and the hovered row gets a 14px-radius `sheet-2` fill.

@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Blueberry design: polish</title><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
+.pg{font-family:Geist,var(--font-sans),system-ui,sans-serif;font-size:14px;line-height:20px;-webkit-font-smoothing:antialiased;
+ --ground:#ECEBE7;--tray:#E1E0DB;--well:#E6E5E0;--sheet:#FFFFFF;--sheet2:#F3F2EF;--ink:#151514;--ink2:#5F5E5A;--ink3:#7A7872;--faint:#9A9892;--line:rgba(21,21,20,.09);--ask:#C62B31;--berry:#3F51DC;
+ --up:0 0 0 1px rgba(21,21,20,.07),0 1px 1px rgba(21,21,20,.04),0 3px 6px -1px rgba(21,21,20,.05),0 10px 20px -8px rgba(21,21,20,.10);
+ --chip:0 0 0 1px rgba(21,21,20,.09),0 1px 2px rgba(21,21,20,.07)}
+.cap{margin:26px 2px 10px}
+.cap:first-child{margin-top:0}
+.cap b{display:block;font:500 12px/1.5 "Geist Mono",var(--font-mono),monospace;color:var(--foreground,#111)}
+.cap span{display:block;font-size:13px;line-height:19px;color:var(--muted-foreground,#777);margin-top:2px}
+.tag{font:500 11px/1 "Geist Mono",var(--font-mono),monospace;color:var(--muted-foreground,#777);margin:12px 2px 6px;letter-spacing:.04em}
+img{display:block;border-radius:12px;box-shadow:0 0 0 1px rgba(128,128,128,.25);max-width:100%}
+.stage{border-radius:12px;box-shadow:0 0 0 1px rgba(128,128,128,.25);padding:22px 10px;color:var(--ink);display:flex;flex-direction:column;align-items:center;overflow:hidden}
+.stage.well{background:var(--well);--bg:var(--well)}
+.stage.white{background:#fff;align-items:flex-start;padding:22px 24px;--bg:#fff}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.go{width:14px;height:14px;color:var(--faint)}
+.b{flex:none;display:block}
+.fv{width:18px;height:18px;border-radius:5px;flex:none;display:grid;place-items:center;color:#fff;font:600 10px/1 Geist,sans-serif}
+.mono{font-family:"Geist Mono",var(--font-mono),monospace;font-size:11.5px}
+.mono.ask{color:var(--ask)}
+.link{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+kbd{font:500 10.5px/16px "Geist Mono",var(--font-mono),monospace;min-width:18px;height:18px;padding:0 4px;border-radius:5px;display:inline-grid;place-items:center;background:var(--sheet2);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line)}
+
+.sheet{background:var(--sheet);border-radius:18px;box-shadow:var(--up);overflow:hidden}
+.btn{height:32px;padding:0 13px;border-radius:16px;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;white-space:nowrap;flex:none}
+.btn.sm{height:28px;padding:0 11px;border-radius:14px;font-size:12.5px}
+.btn.fill{background:var(--ink);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(21,21,20,.25)}
+.btn.fill kbd{background:rgba(255,255,255,.16);color:rgba(255,255,255,.8);box-shadow:none}
+.btn.raised{background:var(--sheet);color:var(--ink);box-shadow:var(--chip)}
+.st{height:24px;padding:0 9px;border-radius:12px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2);background:var(--sheet2);white-space:nowrap;flex:none}
+.st u{width:6px;height:6px;border-radius:50%;background:var(--ink3)}
+.st.on{color:var(--ink)}.st.on u{background:var(--berry)}
+.st.ask{color:var(--ask);background:#FBE9E8}.st.ask u{background:var(--ask)}
+
+.crow{display:flex;align-items:center;gap:13px;padding:13px 14px 13px 14px;position:relative}
+.crow+.crow:before{content:"";position:absolute;left:59px;right:0;top:0;height:1px;background:var(--line)}
+.tile{width:32px;height:32px;border-radius:10px;background:var(--sheet2);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;color:var(--ink);flex:none}
+.w{flex:1;min-width:0}
+.w b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w small{display:block;font-size:13px;line-height:19px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r{display:flex;align-items:center;gap:8px;flex:none}
+
+.live{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.shell{background:var(--tray);border-radius:22px;padding:4px;box-shadow:inset 0 0 0 1px var(--line)}
+.card{background:var(--sheet);border-radius:18px;box-shadow:var(--up);padding:16px 16px 14px}
+.say{margin:0 0 10px;font-size:15px;line-height:22px;font-weight:500;letter-spacing:-.005em}
+.exact{margin:0 0 14px;font:12.5px/19px "Geist Mono",var(--font-mono),monospace;color:var(--ink3);background:var(--sheet2);border-radius:10px;padding:8px 11px;box-shadow:inset 0 0 0 1px var(--line);word-break:break-all}
+.exact mark{background:rgba(21,21,20,.09);color:var(--ink);border-radius:4px;padding:1px 3px;margin:0 1px}
+.acts{display:flex;gap:8px}
+.note{margin:0;padding:9px 12px 8px;font-size:12.5px;line-height:18px;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.note svg.i{width:14px;height:14px;color:var(--ink3)}
+.note.between{justify-content:space-between}
+.answers{display:flex;flex-direction:column;gap:2px;margin:2px -6px -4px}
+.ans{height:40px;border-radius:12px;display:flex;align-items:center;gap:11px;padding:0 10px}
+.ans.on{background:var(--sheet2)}
+.ans.on kbd{background:var(--ink);color:#fff;box-shadow:none}
+.ans.quiet span{color:var(--faint)}
+
+.stage.plain{align-items:center}
+.seclabel{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:500;color:var(--ink2);padding:0 12px 6px}
+.seclabel .link{font-weight:400}
+.srow{display:flex;align-items:center;gap:13px;padding:9px 12px;border-radius:14px}
+.srow.hov{background:var(--sheet);box-shadow:var(--chip)}
+.phead{display:flex;align-items:center;gap:8px;padding:0 4px 2px}
+.psub{margin:0;padding:0 4px 14px;font-size:13.5px;color:var(--ink2)}
+.phead>div{flex:1}
+.phead h3{margin:0;font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.015em}
+.phead p{margin:2px 0 0;font-size:13.5px;color:var(--ink2)}
+.mrow{display:flex;align-items:center;gap:14px;padding:13px 14px 13px 16px;position:relative}
+.mrow+.mrow:before{content:"";position:absolute;left:66px;right:0;top:0;height:1px;background:var(--line)}
+.mrow.hov{background:#FAFAF8}
+
+.pair{display:flex;gap:28px;justify-content:center;align-items:flex-start}
+.side{width:248px;background:var(--ground);border-radius:12px;box-shadow:0 0 0 1px rgba(128,128,128,.25);padding:10px 10px 12px 12px;color:var(--ink)}
+.seg{display:flex;background:var(--tray);border-radius:12px;padding:3px;margin-bottom:12px}
+.seg span{flex:1;height:26px;border-radius:9px;display:grid;place-items:center;font-size:13px;color:var(--ink2)}
+.seg .on{background:var(--sheet);color:var(--ink);font-weight:500;box-shadow:var(--chip)}
+.favs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.fav{height:40px;border-radius:12px;background:var(--tray);display:grid;place-items:center}
+.fav .fv{width:22px;height:22px;border-radius:6px;font-size:12px}
+.slab{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;font-size:12.5px;font-weight:500;color:var(--ink2)}
+.slab span{flex:1}
+.slab em{font:normal 11.5px "Geist Mono",var(--font-mono),monospace;color:var(--ink3)}
+.trow{height:32px;border-radius:10px;display:flex;align-items:center;gap:10px;padding:0 8px;font-size:13.5px;color:var(--ink);white-space:nowrap}
+.trow>span:not(.fv){flex:1;overflow:hidden;text-overflow:ellipsis}
+.trow svg.i{color:var(--ink2)}
+.trow.on{background:var(--sheet);box-shadow:var(--up);font-weight:500}
+.rule{height:1px;background:var(--line);margin:8px 6px}
+</style></head><body><div class="pg"><div class="cap"><b>A ROW WITH A STATE</b><span>A status pill, a raised button for the next step, the icon on a tile, a sheet with a real edge. The states are drawn to show the pill, not what a new install shows.</span></div><div class="tag">AS IT SHOULD BE DRAWN</div><div class="stage well"><div class="sheet" style="width:620px"><div class="crow"><span class="tile"><svg class="i " viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></span><span class="w"><b>Phone</b><small>Answer a waiting job from Telegram.</small></span><span class="r"><span class="st on"><u></u>Connected</span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span></div><div class="crow"><span class="tile"><svg class="i " viewBox="0 0 24 24"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg></span><span class="w"><b>Claude and other apps</b><small>Apps on this computer can give your mascots jobs.</small></span><span class="r"><span class="st">Not set up</span><span class="btn raised">Set up</span></span></div><div class="crow"><span class="tile"><svg class="i " viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></span><span class="w"><b>Cloud</b><small>Jobs in a cloud browser, and with this computer off.</small></span><span class="r"><span class="st ask"><u></u>Session still open</span><span class="btn raised">Try again</span></span></div></div></div><div class="cap"><b>AN APPROVAL</b><span>Buttons a size up. The line under the card and the keys on the buttons wait for the build that makes them true.</span></div><div class="tag">AS IT SHOULD BE DRAWN</div><div class="stage white"><div class="live"><svg class="b" style="width:22px;height:22px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2B3AA8"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><circle cx="20" cy="4.5" r="3" fill="#C62B31" stroke="var(--bg,#fff)" stroke-width="1.5"/></svg><span class="mono ask">Waiting for you..</span></div><div class="shell" style="width:570px;margin-left:34px"><div class="card"><p class="say">I’d like to open klm.localhost in a new tab</p><p class="exact">Open http://klm.localhost:53326/orders<mark>?from=inbox0</mark> in a new tab</p><div class="acts"><span class="btn fill">Allow<kbd>↵</kbd></span><span class="btn raised">Don’t allow<kbd>esc</kbd></span></div></div><p class="note"><svg class="i " viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Asking because this address carries data, marked above.</p></div></div><div class="cap"><b>A QUESTION</b><span>Answers as rows to press. Not built yet.</span></div><div class="tag">AS IT SHOULD BE DRAWN</div><div class="stage white"><div class="live"><svg class="b" style="width:22px;height:22px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2B3AA8"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><circle cx="20" cy="4.5" r="3" fill="#C62B31" stroke="var(--bg,#fff)" stroke-width="1.5"/></svg><span class="mono ask">Waiting for you..</span></div><div class="shell" style="width:610px;margin-left:34px"><div class="card"><p class="say">Do you prefer a morning flight or an afternoon departure?</p><div class="answers"><div class="ans on "><kbd>A</kbd><span>Morning</span></div><div class="ans  "><kbd>B</kbd><span>Afternoon</span></div><div class="ans  quiet"><kbd>C</kbd><span>Something else…</span></div></div></div><p class="note between"><span class="link">Skip</span><span>or answer in the box below</span></p></div></div><div class="cap"><b>SUGGESTIONS ON THE NEW TAB</b><span>Two lines, a label in words, the action on the row you're on.</span></div><div class="tag">AS IT SHOULD BE DRAWN</div><div class="stage well plain"><div style="width:636px"><div class="seclabel"><span>Suggestions</span><span class="link">More ideas</span></div><div class="srow hov"><svg class="b" style="width:26px;height:26px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2B3AA8"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Weekend in Porto</b><small>Berry finished it at 21:30. Pick up where it stopped.</small></span><span class="btn raised sm">Pick up</span></div><div class="srow "><svg class="b" style="width:26px;height:26px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#8A5A2B"/><circle cx="12" cy="13.6" r="9.2" fill="#2A2930"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>What changed on Notion’s and Linear’s pricing pages?</b><small>Competitor Watch checks the pages you name for what’s new.</small></span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div><div class="srow "><svg class="b" style="width:26px;height:26px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3E8E41"/><circle cx="12" cy="13.6" r="9.2" fill="#E0453A"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Prep me for a call with Spotify’s ads team</b><small>Meeting Prep reads up on a company and writes a brief.</small></span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div></div></div><div class="cap"><b>A LIST PAGE</b><span>A heading with weight, one line on what each is for, limits as one pill where they're narrower than Berry's.</span></div><div class="tag">AS IT SHOULD BE DRAWN</div><div class="stage well plain"><div style="width:620px"><div class="phead"><div><h3>Your mascots</h3></div><span class="btn raised">Gallery</span><span class="btn fill"><svg class="i " viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New mascot</span></div><p class="psub">Each has its own job and its own limits. They all ask before anything risky.</p><div class="sheet"><div class="mrow hov"><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#2B3AA8"/><circle cx="12" cy="13.6" r="9.2" fill="#3F51DC"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Berry</b><small>Does whatever you ask, wherever you let it.</small></span><span class="btn raised sm">Chat</span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div><div class="mrow "><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#3F51DC"/><circle cx="12" cy="13.6" r="9.2" fill="#F2A93B"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#3A2A10"/></svg><span class="w"><b>Plain Words</b><small>Explains the page you’re on in plain English.</small></span><span class="st">This page · reads only</span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div><div class="mrow "><svg class="b" style="width:36px;height:36px" viewBox="0 0 24 24"><path d="M8.6 5.4 9.9 2.6l2.1 1.7 2.1-1.7 1.3 2.8z" fill="#8A5A2B"/><circle cx="12" cy="13.6" r="9.2" fill="#2A2930"/><rect x="8.5" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/><rect x="13.4" y="10.8" width="2.1" height="5.2" rx="1.05" fill="#fff"/></svg><span class="w"><b>Competitor Watch</b><small>Checks the competitors you name for what’s new.</small></span><span class="st">Reads only</span><svg class="i go" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></div></div></div></div><div class="cap"><b>THE SIDEBAR</b><span>Labels in words, site icons at 18px, rows at 14px, a lifted active row.</span></div><div class="pair"><div class="side"><div class="seg"><span class="on">Tabs</span><span>Chats</span></div><div class="favs"><span class="fav"><span class="fv" style="background:#1F1F1F">G</span></span><span class="fav"><span class="fv" style="background:#DB3A2B">M</span></span><span class="fav"><span class="fv" style="background:#3B82F6">D</span></span><span class="fav"><span class="fv" style="background:#0B7A53">H</span></span></div><div class="slab"><span>Bookmarks</span><svg class="i go" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div><div class="trow"><span class="fv" style="background:#D8463B">W</span><span>Blueberry – Wikipedia</span></div><div class="trow"><span class="fv" style="background:#E8501E">R</span><span>Blåbärspaj – Recept</span></div><div class="trow"><span class="fv" style="background:#1B6B3A">S</span><span>SVT Nyheter</span></div><div class="rule"></div><div class="slab"><span>Tabs</span><em>6</em><svg class="i go" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><div class="trow"><svg class="i " viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg><span>New tab</span></div><div class="trow"><span class="fv" style="background:#D8463B">W</span><span>Blueberry – Wikipedia</span></div><div class="trow"><span class="fv" style="background:#1B6B3A">S</span><span>SVT Nyheter</span></div><div class="trow"><span class="fv" style="background:#00A1DE">K</span><span>Stockholm to Lisbon, 12…</span></div><div class="trow"><span class="fv" style="background:#F26A21">P</span><span>Anker USB-C cable 2 m …</span></div><div class="trow on"><svg class="i " viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg><span>New tab</span><svg class="i go" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div></div></div></div></body></html>
