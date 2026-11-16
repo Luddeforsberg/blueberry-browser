@@ -80,6 +80,7 @@ const chromeAPI: ChromeAPI = {
   settings: {
     getSettings: () => invoke("settings:get"),
     updateSettings: (patch) => invoke("settings:update", patch),
+    setAppearance: (appearance) => invoke("settings:set-appearance", appearance),
     showBerryMenu: () => invoke("berry:context-menu"),
     onSettingsUpdated: (callback) => subscribe("settings:updated", callback),
   },

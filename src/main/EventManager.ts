@@ -161,6 +161,9 @@ export class EventManager {
     this.handle("settings:get", () => this.mainWindow.settings);
 
     this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));
+    this.handle("settings:set-appearance", (appearance) => {
+      if (appearance === "system" || appearance === "light" || appearance === "dark") this.mainWindow.updateSettings({ appearance });
+    });
 
     this.handle("phone:state", () => this.mainWindow.telegram.state);
     this.handle("phone:connect", (token) => this.mainWindow.telegram.connect(token));

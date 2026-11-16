@@ -104,6 +104,8 @@ test("the account menu changes the theme and opens Settings, whose sections and 
     await expect(over).toContainText(EMAIL);
     await over.getByRole("radio", { name: "System" }).click();
     await expect.poll(async () => (await settings()).appearance).toBe("system");
+    // The theme is all the view over the page may change.
+    await expect(overlay.evaluate(() => window.chromeAPI.settings.updateSettings({ actionApproval: "never" }))).rejects.toThrow(/Rejected/);
     await over.getByRole("button", { name: /^History/ }).click();
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).find((tab) => tab.isActive)?.page).toBe("history");
     await expect(over).toHaveCount(0);

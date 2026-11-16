@@ -465,7 +465,9 @@ export interface InvokeChannels {
   "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
-  "settings:update": { region: "chrome" | "overlay"; args: [patch: Partial<Settings>]; result: Settings };
+  "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
+  // Light, dark or system, from the account menu, which can open in the overlay. It is all the overlay may change.
+  "settings:set-appearance": { region: "chrome" | "overlay"; args: [appearance: Appearance]; result: void };
   // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
   "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
   "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
@@ -703,6 +705,7 @@ export interface ThemeAPI {
 export interface SettingsAPI {
   getSettings: () => Promise<Settings>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
+  setAppearance: (appearance: Appearance) => Promise<void>;
   // The native menu for right-clicking Berry, with Keep Berry still and Hide Berry.
   showBerryMenu: () => Promise<void>;
   onSettingsUpdated: (callback: (settings: Settings) => void) => Unsubscribe;

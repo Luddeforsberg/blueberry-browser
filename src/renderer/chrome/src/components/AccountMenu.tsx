@@ -127,7 +127,7 @@ const Who: React.FC<{ account: AccountState; name: string | null; onClose: (refo
 // or a press outside. Choosing a row closes it and leaves the keyboard with what the row opened.
 export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; className?: string }> = ({ onClose, className }) => {
     const [account] = useAccount()
-    const { settings, updateSettings, theme } = useShell()
+    const { settings, theme } = useShell()
     const menu = useRef<HTMLDivElement>(null)
     const mac = theme.platform === 'mac'
     const choose = (act: () => void) => () => {
@@ -171,7 +171,7 @@ export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; classN
             <Choice<Appearance>
                 label="Theme"
                 value={settings.appearance}
-                onChange={(appearance) => updateSettings({ appearance })}
+                onChange={(appearance) => void window.chromeAPI.settings.setAppearance(appearance)}
                 fill
                 // In dark, a strip a step below the sheet, as sheet-2 on it would read as raised.
                 className="mx-0.5 mb-1.5 rounded-[11px] [&>button]:rounded-[9px] dark:bg-ground dark:[&>button[aria-checked=true]]:bg-sheet-2"
