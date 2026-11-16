@@ -4,7 +4,7 @@ import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { generateTitle, ModelConfigError, modelConfig, NO_KEY, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
+import { forProvider, generateTitle, ModelConfigError, modelConfig, NO_KEY, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
 
 const NO_TOOLS = {
   tools: [],
@@ -549,5 +549,51 @@ describe("generateTitle", () => {
   it("keeps a title to 60 characters", async () => {
     expect(await titled("x".repeat(60))).toBe("x".repeat(60));
     expect(await titled("x".repeat(61))).toBe(`${"x".repeat(59)}…`);
+  });
+});
+
+describe("forProvider", () => {
+  // The request each provider's own client would send, caught before it leaves.
+  const requestBody = async (model: BaseChatModel, content: unknown, seen: { body: string }) => {
+    const { HumanMessage } = await import("@langchain/core/messages");
+    await model.invoke([new HumanMessage({ content: content as never })]).catch(() => {});
+    return JSON.parse(seen.body);
+  };
+  const catching = (seen: { body: string }) => async (_url: unknown, init?: { body?: unknown }) => {
+    seen.body = String(init?.body ?? "");
+    return new Response("{}", { status: 400 });
+  };
+  const content = [
+    { type: "text" as const, text: '<file name="itinerary.pdf" kind="pdf">' },
+    { type: "pdf" as const, name: "itinerary.pdf", data: "JVBERi0=" },
+    { type: "text" as const, text: "</file>" },
+  ];
+
+  it("leaves content without a PDF as it was", () => {
+    expect(forProvider("Hi", "anthropic")).toBe("Hi");
+    const picture = [{ type: "image_url" as const, image_url: { url: "data:image/png;base64,AA" } }];
+    expect(forProvider(picture, "openai")).toBe(picture);
+  });
+
+  it("sends a PDF to Anthropic once, as a document", async () => {
+    const { ChatAnthropic } = await import("@langchain/anthropic");
+    const seen = { body: "" };
+    const model = new ChatAnthropic({ apiKey: "key", model: "claude-sonnet-5-5", maxRetries: 0, clientOptions: { fetch: catching(seen) as never } });
+    const { messages } = await requestBody(model, forProvider(content, "anthropic"), seen);
+    const documents = messages[0].content.filter((block: { type: string }) => block.type === "document");
+    expect(documents).toEqual([{ type: "document", title: "itinerary.pdf", source: { type: "base64", media_type: "application/pdf", data: "JVBERi0=" } }]);
+  });
+
+  it("sends a PDF to OpenAI as a named file, through either API", async () => {
+    const { ChatOpenAI } = await import("@langchain/openai");
+    for (const useResponsesApi of [true, false]) {
+      const seen = { body: "" };
+      const model = new ChatOpenAI({ apiKey: "key", model: "gpt-6.1-terra", maxRetries: 0, useResponsesApi, configuration: { fetch: catching(seen) as never } });
+      const body = await requestBody(model, forProvider(content, "openai"), seen);
+      const sent = JSON.stringify(useResponsesApi ? body.input : body.messages);
+      expect(sent).toContain(useResponsesApi ? '"type":"input_file"' : '"type":"file"');
+      expect(sent).toContain('"file_data":"data:application/pdf;base64,JVBERi0="');
+      expect(sent).toContain('"filename":"itinerary.pdf"');
+    }
   });
 });

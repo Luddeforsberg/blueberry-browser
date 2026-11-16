@@ -86,6 +86,7 @@ const NO_CHATS: ChatStoreLike = {
     throw new Error("The runner has no chats.");
   },
   addMessage: () => {},
+  filesOf: () => [],
   renameChat: () => false,
   deleteChat: () => false,
   needsTitle: () => false,

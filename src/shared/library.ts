@@ -1,6 +1,8 @@
 // What the sidebar and internal pages show. Types only, like the IPC contract.
 // All of it is saved locally.
 
+import type { SentAttachment } from "./attachments";
+
 export interface Bookmark {
   id: string;
   title: string;
@@ -73,6 +75,8 @@ export interface ChatThreadMessage {
   memoryIds?: string[];
   // The pages its job opened, which close when it ends, so the user can open any of them again.
   pages?: UsedPage[];
+  // What the user sent with it from the prompt box's +, by name only.
+  attached?: SentAttachment[];
 }
 
 export interface UsedPage {

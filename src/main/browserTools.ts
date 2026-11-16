@@ -344,6 +344,11 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   // goes to, they're where it may go without asking. Anywhere else asks in the default mode.
   asked?: string;
   beenTo?: Iterable<string>;
+  // Sites of tabs the user attached to this chat, which count as named in their words, the same as typing the site's
+  // name. Only the site: the tab's address, and anything in the page, never counts as one the user gave.
+  named?: Iterable<string>;
+  // Tabs the user attached to this chat. They're the user's, so they're reached and never closed.
+  attached?: (id: string) => boolean;
   // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
   stopped?: () => boolean;
   // A web search service. Without one there's no web_search tool.
@@ -368,6 +373,8 @@ export const createPageTools = <T extends PageTarget>({
   limits,
   asked = "",
   beenTo = [],
+  named = [],
+  attached = () => false,
   stopped = () => false,
   search = null,
   fetchPage = null,
@@ -431,7 +438,7 @@ export const createPageTools = <T extends PageTarget>({
   };
   const noTab = (id?: string) => tookOver(id ?? activeTab()?.id) ?? (id ? `There is no web page in tab ${id}.` : NO_CURRENT_TAB);
   // Where the user sent this job, and where it has been. An address only counts by its site.
-  const chosen = [...namedSites(asked), ...(limits?.sites ?? [])];
+  const chosen = [...namedSites(asked), ...named, ...(limits?.sites ?? [])];
   const been = new Set(beenTo);
   const usedTab = (tab: T) => {
     been.add(siteOf(tab.url));
@@ -773,10 +780,10 @@ export const createPageTools = <T extends PageTarget>({
         const tabs = allTabs()
           .filter((tab) => allowed(tab.url))
           .filter((tab) => !takenOver?.has(tab.id) && !heldByUser(tab.id))
-          .map(({ id, title, url }) => ({ id, title, url, active: id === active?.id, ...(ownsTab(id) ? { yours: true } : {}) }));
+          .map(({ id, title, url }) => ({ id, title, url, active: id === active?.id, ...(ownsTab(id) ? { yours: true } : {}), ...(attached(id) ? { attached: true } : {}) }));
         const notes = [
           // A chat with no page sees only its own tabs, so an empty list says nothing about what's open.
-          ...(ownsEveryTab ? ["This is only the tabs you opened in this chat. The user may have others, which you can't reach."] : []),
+          ...(ownsEveryTab ? ["This is only the tabs you opened in this chat and any the user attached to it. The user may have others, which you can't reach."] : []),
           ...[...(takenOver ?? [])].map(([id, url]) => (heldByUser(id) ? heldMessage(id) : takenOverMessage(id, url))),
         ];
         return [JSON.stringify(tabs), ...notes].join("\n\n");
@@ -1186,7 +1193,7 @@ export const createPageTools = <T extends PageTarget>({
         if (!canSee()) return NO_ACCESS;
         const tab = find(id);
         if (!tab) return noTab(id);
-        if (!ownsEveryTab && !opened.has(id)) return "You didn't open that tab, so it stays open.";
+        if (attached(id) || (!ownsEveryTab && !opened.has(id))) return "You didn't open that tab, so it stays open.";
         if (!closeTab(tab)) return "That tab stays open, because it's the last in the window or the user is looking at it.";
         opened.delete(id);
         return `Closed tab ${id}.`;

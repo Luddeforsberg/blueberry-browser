@@ -106,6 +106,12 @@ const chromeAPI: ChromeAPI = {
     onChatDeleted: (callback) => subscribe("chat:deleted", callback),
     onDraft: (callback) => subscribe("chat:draft", callback),
   },
+  attachments: {
+    chooseFiles: (kept) => invoke("attachments:choose-files", kept),
+    addFiles: (files, kept) => invoke("attachments:add-files", files, kept),
+    discard: (id) => invoke("attachments:discard", id),
+    tabs: (chatId, mascotId) => invoke("attachments:tabs", chatId, mascotId),
+  },
   work: {
     watch: (chatId, pictureWidth) => invoke("work:watch", chatId, pictureWidth),
     onUpdated: (callback) => subscribe("work:updated", callback),

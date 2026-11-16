@@ -61,6 +61,10 @@ export const CHANNEL_REGIONS: {
   "desktop:close-composer": ["composer"],
   "chat:send": ["chrome"],
   "work:watch": ["chrome"],
+  "attachments:choose-files": ["chrome"],
+  "attachments:add-files": ["chrome"],
+  "attachments:discard": ["chrome"],
+  "attachments:tabs": ["chrome"],
   "chat:stop": ["chrome"],
   "chat:decide": BOTH,
   "chat:rename": BOTH,
@@ -178,8 +182,22 @@ export const isTrustedSender = (
 // What a renderer may ask of `chat:send`, and nothing else, each checked for its type. What only main sets on a reply,
 // such as `from`, `sites`, `tools`, `askAtLeast` and `onEnd`, can't come in this way.
 export const chatSendOptions = (options: unknown): ChatSendOptions => {
-  const { seePage, mascotId, cloud, runner } = (options ?? {}) as Record<string, unknown>;
-  return { seePage: seePage === true, mascotId: typeof mascotId === "string" ? mascotId : null, cloud: cloud === true, runner: runner === true };
+  const { seePage, mascotId, cloud, runner, files, tabs } = (options ?? {}) as Record<string, unknown>;
+  return {
+    seePage: seePage === true,
+    mascotId: typeof mascotId === "string" ? mascotId : null,
+    cloud: cloud === true,
+    runner: runner === true,
+    files: ids(files, "files"),
+    tabs: ids(tabs, "tabs"),
+  };
+};
+
+// A list of ids, or none. Anything else isn't quietly dropped, so a message never goes without what the user saw on it.
+const ids = (value: unknown, what: string): string[] => {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every((id) => typeof id === "string")) throw new Error(`chat:send got ${what} that aren't ids`);
+  return [...value];
 };
 
 export const sendToRenderer = <C extends keyof EventChannels>(

@@ -9,6 +9,8 @@ import type { HistoryStore } from "./HistoryStore";
 import { browserDataFor, findBrowsers, readBrowserHistory } from "./browserHistory";
 import type { SavedTab, SavedWebTab, Session, SessionStore } from "./Session";
 import { Chats } from "./Chats";
+import { Attachments } from "./Attachments";
+import { preparePicture } from "./pictures";
 import { WorkViews } from "./WorkViews";
 import { Recordings } from "./Recordings";
 import { Phone } from "./Phone";
@@ -140,6 +142,8 @@ export class Window {
   readonly chats: Chats;
   readonly workViews: WorkViews;
   readonly recordings: Recordings;
+  // Files added to a prompt box, kept in main until they're sent or let go.
+  readonly attachments = new Attachments(() => this.pickFiles(), preparePicture);
   readonly routines: Routines;
   readonly suggestions: Suggestions;
   readonly permissionPrompt: PermissionPromptView;
@@ -1357,6 +1361,12 @@ export class Window {
   private closeTabLeftEmpty(contents: WebContents): void {
     const tab = this.allTabs.find((candidate) => candidate.existingView?.webContents === contents);
     if (tab && !tab.hasLoaded && this.tabCount > 1) this.closeTab(tab.id, false);
+  }
+
+  // The system's own dialog, for the prompt box's A file. The paths stay here.
+  private async pickFiles(): Promise<string[]> {
+    const { canceled, filePaths } = await dialog.showOpenDialog(this._baseWindow, { properties: ["openFile", "multiSelections"] });
+    return canceled ? [] : filePaths;
   }
 
   async chooseDownloadFolder(): Promise<void> {

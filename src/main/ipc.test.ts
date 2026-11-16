@@ -52,10 +52,17 @@ describe("isTrustedSender", () => {
 
 describe("chatSendOptions", () => {
   it("passes on only what a renderer may set, of the right type", () => {
-    expect(chatSendOptions({ seePage: true, mascotId: "m-1", cloud: true, runner: true })).toEqual({ seePage: true, mascotId: "m-1", cloud: true, runner: true });
+    expect(chatSendOptions({ seePage: true, mascotId: "m-1", cloud: true, runner: true, files: ["f-1"], tabs: ["tab-2"] })).toEqual({ seePage: true, mascotId: "m-1", cloud: true, runner: true, files: ["f-1"], tabs: ["tab-2"] });
     const sneaky = { seePage: "yes", mascotId: 7, cloud: 1, from: "ChatGPT or Claude", sites: ["bank.example"], tools: [], askAtLeast: "never", onEnd: () => {} };
-    expect(chatSendOptions(sneaky)).toEqual({ seePage: false, mascotId: null, cloud: false, runner: false });
-    expect(chatSendOptions(null)).toEqual({ seePage: false, mascotId: null, cloud: false, runner: false });
-    expect(chatSendOptions("seePage")).toEqual({ seePage: false, mascotId: null, cloud: false, runner: false });
+    const none = { seePage: false, mascotId: null, cloud: false, runner: false, files: [], tabs: [] };
+    expect(chatSendOptions(sneaky)).toEqual(none);
+    expect(chatSendOptions(null)).toEqual(none);
+    expect(chatSendOptions("seePage")).toEqual(none);
+  });
+
+  it("refuses attachments that aren't a list of ids, rather than sending without them", () => {
+    expect(() => chatSendOptions({ seePage: false, files: "f-1" })).toThrow();
+    expect(() => chatSendOptions({ seePage: false, files: [{ path: "C:/secret.txt" }] })).toThrow();
+    expect(() => chatSendOptions({ seePage: false, tabs: [7] })).toThrow();
   });
 });

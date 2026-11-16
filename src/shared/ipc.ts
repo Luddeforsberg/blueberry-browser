@@ -1,6 +1,7 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
+import type { FileChip, TabChoice } from "./attachments";
 import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
@@ -361,6 +362,9 @@ export interface ChatSendOptions {
   cloud?: boolean;
   // Send it to the cloud runner, which keeps going with this computer off. Needs the user signed in.
   runner?: boolean;
+  // What the + added: files by the ids main gave them, and the user's tabs by id. Main judges each again.
+  files?: string[];
+  tabs?: string[];
 }
 
 // Settings > Cloud > Runner: the account the cloud runner signs in as, linked to this user's, and whether the runner has
@@ -491,6 +495,13 @@ export interface InvokeChannels {
   // Says which chat's working view is on screen and how wide its picture is, or null for none. The answer and everything
   // after it come as `work:updated` and `work:frame`, to the chrome and nowhere else. A width of 0 means words only.
   "work:watch": { region: "chrome"; args: [chatId: string | null, pictureWidth: number]; result: void };
+  // The prompt box's +. Main opens the dialog, reads the files and keeps them, and only chips come back. `kept` is what
+  // the box holds already, so main can keep the count. A drop or a paste sends the bytes, never a path.
+  "attachments:choose-files": { region: "chrome"; args: [kept: string[]]; result: FileChip[] };
+  "attachments:add-files": { region: "chrome"; args: [files: { name: string; bytes: Uint8Array }[], kept: string[]]; result: FileChip[] };
+  "attachments:discard": { region: "chrome"; args: [id: string]; result: void };
+  // The user's tabs that could go with a message in this chat, or a new one as this mascot, each with why not if it can't.
+  "attachments:tabs": { region: "chrome"; args: [chatId: string | null, mascotId: string | null]; result: TabChoice[] };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
   // A routine's run answers its approvals here too, under the run's id.
   "chat:decide": {
@@ -727,6 +738,13 @@ export interface ChatAPI {
   onDraft: (callback: (text: string) => void) => Unsubscribe;
 }
 
+export interface AttachmentsAPI {
+  chooseFiles: (kept: string[]) => Promise<FileChip[]>;
+  addFiles: (files: { name: string; bytes: Uint8Array }[], kept: string[]) => Promise<FileChip[]>;
+  discard: (id: string) => Promise<void>;
+  tabs: (chatId: string | null, mascotId: string | null) => Promise<TabChoice[]>;
+}
+
 export interface LibraryAPI {
   toggleBookmark: () => Promise<void>;
   placeSavedSite: (bookmarkId: string, list: SavedSiteList, index: number) => Promise<void>;
@@ -895,6 +913,7 @@ export interface ChromeAPI {
   settings: SettingsAPI;
   library: LibraryAPI;
   chat: ChatAPI;
+  attachments: AttachmentsAPI;
   work: WorkAPI;
   recording: RecordingAPI;
   find: FindAPI;

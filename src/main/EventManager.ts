@@ -197,8 +197,22 @@ export class EventManager {
 
   private handleChatEvents(): void {
     // Only Blueberry's own composers send this, so the user is there to answer if Berry asks before it starts.
-    this.handle("chat:send", (chatId, text, options) =>
-      typeof text === "string" ? this.mainWindow.chats.send(chatId, text, { ...chatSendOptions(options), userPresent: true }) : null
+    this.handle("chat:send", (chatId, text, raw) => {
+      if (typeof text !== "string") return null;
+      const { files: fileIds = [], tabs = [], ...options } = chatSendOptions(raw);
+      const { attachments, chats } = this.mainWindow;
+      // Only files main read and kept go, and only once the message has gone are they let go of.
+      const files = attachments.peek(fileIds);
+      if (!files) return null;
+      const thread = chats.send(chatId, text, { ...options, files, tabs, userPresent: true });
+      if (thread) attachments.drop(fileIds);
+      return thread;
+    });
+    this.handle("attachments:choose-files", (kept) => this.mainWindow.attachments.chooseFiles(kept));
+    this.handle("attachments:add-files", (files, kept) => this.mainWindow.attachments.addFiles(files, kept));
+    this.handle("attachments:discard", (id) => this.mainWindow.attachments.discard(id));
+    this.handle("attachments:tabs", (chatId, mascotId) =>
+      this.mainWindow.chats.attachableTabs(typeof chatId === "string" ? chatId : null, typeof mascotId === "string" ? mascotId : null)
     );
 
     this.handle("work:watch", (chatId, pictureWidth) => this.mainWindow.workViews.watch(chatId, pictureWidth));
