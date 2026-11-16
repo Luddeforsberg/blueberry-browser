@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Lock, Square } from 'lucide-react'
-import type { RecordingState, TrailStep } from '@shared/library'
+import type { RecordingState, TrailKind, TrailStep } from '@shared/library'
 import { Button } from '@common/components/Button'
+import { Pips, type PipMark } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
-import { StepFootprint } from './ChatMessage'
 
 const IDLE: RecordingState = { status: 'idle', startedAt: null, steps: [], cut: null, error: null }
 
@@ -100,14 +100,30 @@ const NoteWords: React.FC<{ step: TrailStep }> = ({ step }) => {
     )
 }
 
-// Notes rather than a list of cards: a footprint for each thing it saw, under the site it saw it on, with a thin line
+// Each kind of note keeps the still pip mark of the step it's like (DESIGN.md section 6). A secret field has a lock.
+const TRAIL_MARKS: Record<Exclude<TrailKind, 'secret'>, PipMark> = {
+    went: 'opened',
+    switched: 'opened',
+    searched: 'read',
+    frame: 'read',
+    copied: 'read',
+    clicked: 'clicked',
+    chose: 'clicked',
+    ticked: 'clicked',
+    file: 'clicked',
+    typed: 'typed',
+    pressed: 'typed',
+    pasted: 'typed'
+}
+
+// Notes rather than a list of cards: a mark for each thing it saw, under the site it saw it on, with a thin line
 // between sites. Everything's plain text, so a label from a page is only ever words.
 export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) => void }> = ({ steps, onRemove }) => {
-    const groups: Array<{ site: string; steps: Array<{ step: TrailStep; at: number }> }> = []
-    steps.forEach((step, at) => {
+    const groups: Array<{ site: string; steps: TrailStep[] }> = []
+    steps.forEach((step) => {
         const last = groups.at(-1)
-        if (last && (last.site === step.site || !step.site)) last.steps.push({ step, at })
-        else groups.push({ site: step.site, steps: [{ step, at }] })
+        if (last && (last.site === step.site || !step.site)) last.steps.push(step)
+        else groups.push({ site: step.site, steps: [step] })
     })
 
     return (
@@ -116,10 +132,10 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
                 <section key={group} aria-label={`On ${site}`} className="py-5">
                     <h2 className="text-14 font-medium text-ink-2">{site}</h2>
                     <ol className="mt-2 flex flex-col">
-                        {notes.map(({ step, at }) => (
+                        {notes.map((step) => (
                             <li key={step.id} className="group flex items-start gap-3 py-1.5">
                                 <span className={cn('mt-1 size-4 shrink-0 flex items-center justify-center', step.kind === 'secret' ? 'text-ink-2' : 'text-ink')}>
-                                    {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden /> : <StepFootprint index={at} />}
+                                    {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden /> : <Pips pattern={TRAIL_MARKS[step.kind]} still />}
                                 </span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-15 [overflow-wrap:anywhere]">

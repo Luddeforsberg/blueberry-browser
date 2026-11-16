@@ -111,8 +111,9 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
                     {offers.map((offer) => <Offer key={offer.id} offer={offer} />)}
                 </div>
             )}
+            {/* Nothing kept says so, but not under an offer, which is already the news. */}
             {facts.length === 0 ? (
-                <div className="mt-4 rounded-sheet bg-sheet shadow-rim px-4 py-[26px] text-center text-14 leading-[1.5] text-ink-2">
+                offers.length === 0 && <div className="mt-4 rounded-sheet bg-sheet shadow-up px-4 py-[26px] text-center text-14 leading-[1.5] text-ink-2">
                     <div className="mb-2.5 flex justify-center"><BerrySpot size={40} mascot={mascot} /></div>
                     <p className="mx-auto max-w-[440px]">Nothing yet. After a job it may ask to remember how you like something done, and it’s kept only if you say yes.</p>
                 </div>

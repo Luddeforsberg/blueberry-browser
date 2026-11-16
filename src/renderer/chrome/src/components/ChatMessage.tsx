@@ -113,16 +113,6 @@ export const StatusLine: React.FC<{ text: string }> = ({ text }) => (
     <p role="status" className="text-14 text-ink-2 line-clamp-2">{text}</p>
 )
 
-// Left foot, right foot.
-export const StepFootprint: React.FC<{ index: number }> = ({ index }) => (
-    <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
-        <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
-        <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
-        <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
-        <ellipse cx={0} cy={3} rx={1} ry={2.1} />
-    </svg>
-)
-
 // Which pips a step has: the pattern while it's the live one, and its kind's still mark once it's done (DESIGN.md
 // section 6). A step from before steps had kinds, or one no tool made, such as Stopped here, is plain.
 const STEP_PIPS: Record<StepKind | 'plain', { live: PipPattern; done: PipMark }> = {

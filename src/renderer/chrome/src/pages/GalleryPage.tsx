@@ -576,6 +576,7 @@ export const GalleryPage: React.FC = () => {
                         <DownloadsProgress downloads={[]} />
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(0, 1)} />
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(1, 2)} />
+                        <DownloadsProgress downloads={[{ ...SAMPLE_DOWNLOAD, id: 'starting', receivedBytes: 0 }]} />
                     </div>
                     <ul className="mt-4 rounded-sheet border bg-sheet divide-y overflow-hidden">
                         {SAMPLE_DOWNLOADS.map((download) => (

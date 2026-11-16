@@ -100,6 +100,8 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await expect.poll(param).toBe(`${scout.id}/memory`);
     const offer = chrome.getByRole("region", { name: "Offer to remember" });
     await expect(offer).toContainText(KEPT);
+    // Nothing is kept yet, but the offer is the news, so the page doesn't also say Nothing yet under it.
+    await expect(chrome.getByText(/^Nothing yet\./)).toHaveCount(0);
     await offer.getByRole("button", { name: "Remember" }).click();
     await expect(offer).toHaveCount(0);
     await expect(chrome.getByRole("region", { name: "anywhere" })).toContainText(KEPT);

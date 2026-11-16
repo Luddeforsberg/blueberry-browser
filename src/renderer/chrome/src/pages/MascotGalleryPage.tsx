@@ -157,7 +157,7 @@ const Review: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null; linke
                 </div>
                 <div aria-label="Preview" role="group" className="relative shrink-0" style={{ width: reviewBird, height: reviewBird * (showBerry ? FEET_Y : 1) }}>
                     <div key={copy ? 'added' : 'reviewing'} className={cn(copy && !settings.keepBerryStill && "motion-safe:animate-berry-hop")} style={{ transformOrigin: `${FEET_X * 100}% ${FEET_Y * 100}%` }}>
-                        <Berry mood={copy ? 'delivered' : 'asking'} size={reviewBird} mascot={copy ?? asMascot(entry)} />
+                        <Berry mood={copy ? 'delivered' : 'rest'} size={reviewBird} mascot={copy ?? asMascot(entry)} />
                     </div>
                 </div>
             </header>

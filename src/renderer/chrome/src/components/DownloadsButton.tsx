@@ -29,7 +29,8 @@ export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: 
             {active.length > 0 && (
                 <svg viewBox="0 0 24 24" className={cn('absolute size-6 -rotate-90', small ? 'inset-0.5' : 'inset-1')} aria-hidden>
                     <circle cx="12" cy="12" r="10.5" fill="none" strokeWidth="2" className="stroke-line" />
-                    <circle
+                    {/* Nothing yet draws no arc at all: a round cap on nothing would still be a dot. */}
+                    {fraction !== 0 && <circle
                         cx="12"
                         cy="12"
                         r="10.5"
@@ -39,7 +40,7 @@ export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: 
                         strokeDasharray={`${fraction ?? 1} 1`}
                         strokeLinecap="round"
                         className="stroke-ink transition-[stroke-dasharray] duration-panel"
-                    />
+                    />}
                 </svg>
             )}
         </ToolBarButton>
