@@ -107,7 +107,7 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   expect((await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).bookmarks).toEqual([]);
 });
 
-test("a bookmark kept on top is a tile, by its menu or by dragging, and the sidebar has Settings and no account", async () => {
+test("a bookmark kept on top is a tile, by its menu or by dragging, and the sidebar has its menu but no account", async () => {
   const profile = mkdtempSync(join(tmpdir(), "blueberry-pins-"));
   await app.close();
   app = await launchApp(profile);
@@ -119,7 +119,8 @@ test("a bookmark kept on top is a tile, by its menu or by dragging, and the side
   // With nothing on top there's no place for it at all.
   await expect(favourites()).toHaveCount(0);
   await expect(sidebar().getByText("Bookmark a page to keep it here.")).toBeVisible();
-  await expect(sidebar().getByRole("button", { name: "Settings", exact: true })).toBeVisible();
+  // With no server there's no account, so the button beside the dock is only the menu.
+  await expect(sidebar().getByRole("button", { name: "Settings and more", exact: true })).toBeVisible();
   await expect(sidebar().getByText("Sam Rivera")).toHaveCount(0);
   await expect(sidebar().getByText("sam@example.com")).toHaveCount(0);
 

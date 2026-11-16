@@ -1,5 +1,6 @@
 import { Menu, app } from "electron";
 import { HORIZONTAL_TABS_MENU_ID, type Window } from "./Window";
+import { SHORTCUTS } from "../shared/shortcuts";
 
 export class AppMenu {
   private mainWindow: Window;
@@ -16,7 +17,7 @@ export class AppMenu {
         submenu: [
           {
             label: "Settings…",
-            accelerator: "CmdOrCtrl+,",
+            accelerator: SHORTCUTS.settings,
             click: () => this.mainWindow.openPage("settings"),
           },
           ...(process.platform === "darwin"
@@ -24,7 +25,7 @@ export class AppMenu {
             : []),
           {
             label: "Downloads",
-            accelerator: "CmdOrCtrl+Shift+J",
+            accelerator: SHORTCUTS.downloads,
             click: () => this.mainWindow.openPage("downloads"),
           },
           {
@@ -202,7 +203,7 @@ export class AppMenu {
           { type: "separator" },
           {
             label: "History",
-            accelerator: "CmdOrCtrl+Y",
+            accelerator: SHORTCUTS.history,
             click: () => this.mainWindow.openPage("history"),
           },
           {
@@ -271,9 +272,8 @@ export class AppMenu {
   }
 
   private handleGoBack(): void {
-    if (this.mainWindow.activeTab) {
-      this.mainWindow.activeTab.goBack();
-    }
+    const tab = this.mainWindow.activeEntry;
+    if (tab) this.mainWindow.goBack(tab.id);
   }
 
   private handleGoForward(): void {

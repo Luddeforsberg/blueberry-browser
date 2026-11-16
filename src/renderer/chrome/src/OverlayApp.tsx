@@ -4,6 +4,7 @@ import { BrowserProvider } from './contexts/BrowserContext'
 import { LibraryProvider, useFlock } from './contexts/LibraryContext'
 import { ShellProvider, useShell } from './contexts/ShellContext'
 import { ChatsFace, MascotCard, Sidebar } from './components/Sidebar'
+import { AccountMenu } from './components/AccountMenu'
 import { cn } from '@common/lib/utils'
 
 // Matches `duration-panel`, so the view only hides once the card has slid away.
@@ -63,12 +64,11 @@ const FloatingSidebar: React.FC = () => {
     )
 }
 
-// DESIGN.md section 10, Horizontal layout: Chats, or a mascot's card, opened from the toolbar. This view covers
+// DESIGN.md section 10, Horizontal layout: Chats, a mascot's card or the account menu, opened from the toolbar. This view covers
 // everything under the toolbar's own row, since a tab's view would cover the chrome, so a press anywhere outside the
 // panel closes it, as Escape does, and the keyboard goes back to what opened it. Opening a chat or a page from it
 // closes it too, in main, since that's a tab coming to the front.
-const CHATS_WIDTH = 296
-const CARD_WIDTH = 248
+const WIDTHS: Record<Popover['kind'], number> = { chats: 296, mascot: 248, account: 232 }
 const EDGE = 8
 
 const OverPage: React.FC<{ popover: Popover }> = ({ popover }) => {
@@ -92,11 +92,13 @@ const OverPage: React.FC<{ popover: Popover }> = ({ popover }) => {
     }, [popover])
 
     const { anchor } = popover
-    const width = popover.kind === 'chats' ? CHATS_WIDTH : CARD_WIDTH
+    const width = WIDTHS[popover.kind]
     const clampLeft = (left: number) => Math.min(Math.max(left, EDGE), area.width - width - EDGE)
-    // Chats lines up with the end of what opened it, a card with the middle of its face, and both start just above the
-    // page, over the bookmarks bar when there is one.
-    const left = clampLeft(popover.kind === 'chats' ? anchor.x + anchor.width - width : anchor.x + anchor.width / 2 - width / 2)
+    // Chats lines up with the end of what opened it, a card with the middle of its face, and the account menu with the
+    // window's right edge. All start just above the page, over the bookmarks bar when there is one.
+    const left = clampLeft(
+        popover.kind === 'chats' ? anchor.x + anchor.width - width : popover.kind === 'account' ? area.width - width - EDGE : anchor.x + anchor.width / 2 - width / 2
+    )
     const top = Math.max(layout.page.y - area.y - 4, 4)
     const place: React.CSSProperties = { left, top, width, maxHeight: area.height - top - EDGE }
 
@@ -117,6 +119,10 @@ const OverPage: React.FC<{ popover: Popover }> = ({ popover }) => {
                     className="absolute overflow-y-auto px-2 pt-2 pb-2.5 outline-none rounded-sheet bg-sheet text-ink shadow-lift animate-[fade-in_150ms_cubic-bezier(.2,.8,.2,1)]"
                 >
                     <ChatsFace onSheet />
+                </div>
+            ) : popover.kind === 'account' ? (
+                <div ref={panel} style={place} className="absolute">
+                    <AccountMenu onClose={close} />
                 </div>
             ) : (
                 <div ref={panel} style={place} className="absolute">

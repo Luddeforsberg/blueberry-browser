@@ -1441,12 +1441,13 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
 });
 
 test("the sidebar opens Routines and Settings as tabs, once each", async () => {
-  // Routines from the arrow on Chats, which is there with nothing scheduled too, and Settings from the dock.
+  // Routines from the arrow on Chats, which is there with nothing scheduled too, and Settings from the menu beside the dock.
   await showChats();
   await chrome.getByRole("button", { name: "Open Routines" }).click();
   await expect(chrome.getByRole("heading", { name: "Routines", level: 1 })).toBeVisible();
 
-  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Settings", exact: true }).last().click();
+  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Settings and more" }).click();
+  await chrome.getByRole("dialog", { name: "Account" }).getByRole("button", { name: /^Settings/ }).click();
   await chrome.getByRole("button", { name: "Open Routines" }).click();
 
   const pages = (await getTabs()).map((tab) => tab.page).filter(Boolean);
@@ -1462,8 +1463,7 @@ test("settings are saved and come back after a restart", async () => {
   chrome = await findView(app, "view=chrome");
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings"));
-  await chrome.getByRole("button", { name: "Appearance" }).click();
-  await chrome.getByRole("radio", { name: "Horizontal" }).click();
+  await chrome.getByRole("radio", { name: "On top" }).click();
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toHaveCount(0);
 
   await app.close();
@@ -1558,21 +1558,21 @@ test("the new tab page has no chat panel, and it comes back on the next page", a
   await expect(panel).toBeVisible();
 });
 
-test("settings sits at the bottom of the sidebar", async () => {
+test("the menu beside the dock sits at the bottom of the sidebar and opens Settings", async () => {
   const sidebar = chrome.getByRole("navigation", { name: "Sidebar" });
-  // In the dock, last, because the Settings tab has the same name once it's open.
-  const row = sidebar.getByRole("button", { name: "Settings", exact: true }).last();
+  const button = sidebar.getByRole("button", { name: "Settings and more" });
 
-  const [rowBox, sidebarBox] = await Promise.all([row.boundingBox(), sidebar.boundingBox()]);
-  expect(rowBox!.y + rowBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 24);
+  const [buttonBox, sidebarBox] = await Promise.all([button.boundingBox(), sidebar.boundingBox()]);
+  expect(buttonBox!.y + buttonBox!.height).toBeGreaterThan(sidebarBox!.y + sidebarBox!.height - 24);
 
-  await row.click();
-  expect((await activeTab()).page).toBe("settings");
-  // One highlight: the Settings tab has it, and the row it was opened from doesn't.
+  await button.click();
+  await sidebar.getByRole("dialog", { name: "Account" }).getByRole("button", { name: /^Settings/ }).click();
+  await expect.poll(async () => (await activeTab()).page).toBe("settings");
+  // One highlight: the Settings tab has it, and the menu it was opened from has closed.
   const tab = sidebar.getByRole("list", { name: "Tabs", exact: true }).getByRole("button", { name: "Settings", exact: true });
   await expect(tab).toHaveAttribute("aria-current", "page");
   await expect(sidebar.locator("[aria-current=page]")).toHaveCount(1);
-  await expect(row).not.toHaveClass(/bg-selected/);
+  await expect(sidebar.getByRole("dialog", { name: "Account" })).toHaveCount(0);
 });
 
 test("dragging a tab reorders it in both layouts, and a short press only selects it", async () => {

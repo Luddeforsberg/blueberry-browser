@@ -20,8 +20,9 @@ import { desktopFace, firstLine, readingTime, type DesktopResult, type DesktopTa
 import type { DesktopBerrySpot, DesktopBerryState, DesktopComposerState, Point, Settings, ThemeState } from "../shared/ipc";
 import type { LibrarySnapshot, MascotProfile } from "../shared/library";
 import { BERRY } from "../shared/mascots";
+import { SHORTCUTS } from "../shared/shortcuts";
 
-export const DESKTOP_SHORTCUT = "Alt+Space";
+const DESKTOP_SHORTCUT = SHORTCUTS.desktop;
 
 // How often the pointer is checked against what can be clicked. Nothing else tells a window that lets clicks through.
 const POINTER_POLL_MS = 50;

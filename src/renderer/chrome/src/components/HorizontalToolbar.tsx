@@ -7,6 +7,7 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { dockFaces } from '../flockView'
+import { AccountButton } from './AccountMenu'
 import { AddressBar } from './AddressBar'
 import { DownloadsButton } from './DownloadsButton'
 import { Favicon, siteIcon } from './Favicon'
@@ -270,6 +271,13 @@ export const HorizontalToolbar: React.FC = () => {
                 <div data-flex="dock" className="shrink-0 flex">
                     <Dock shown={shown} room={room} />
                 </div>
+                <span data-popover-opener className="shrink-0 ml-1 flex">
+                    <AccountButton
+                        small
+                        open={shown?.kind === 'account'}
+                        onPress={(button) => toggle(shown?.kind === 'account', button, () => ({ kind: 'account', anchor: anchorOf(button) }))}
+                    />
+                </span>
             </div>
             {layout.toolbar.height > layout.addressRow.height && <BookmarksBar />}
         </div>

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
-import { SettingsRow } from '../components/SettingsRow'
+import { SettingsGroup, SettingsRow } from '../components/SettingsRow'
 import { useShell } from '../contexts/ShellContext'
 import { usePhone } from '../usePhone'
 
@@ -22,7 +22,8 @@ const PairingCode: React.FC<{ link: string }> = ({ link }) => {
     )
 }
 
-// Your own Telegram bot, off until you connect one. The token leaves this page once, and never comes back to it.
+// Settings > Connections > Phone: your own Telegram bot, off until you connect one. The token leaves this page once, and
+// never comes back to it.
 export const PhoneSettings: React.FC = () => {
     const { settings, updateSettings } = useShell()
     const [phone, setPhone] = usePhone()
@@ -41,73 +42,79 @@ export const PhoneSettings: React.FC = () => {
 
     return (
         <>
-            <SettingsRow
-                id="setting-phone"
-                title="Replies from your phone"
-                description="When a job needs you and you’re away, your own Telegram bot asks you, and your reply goes straight to the job."
-                more="It runs from this computer, so it only works while Blueberry is open."
-            />
-            <SettingsRow id="setting-phone-reads" title="What Telegram sees" description={WHO_READS} />
+            <SettingsGroup>
+                <SettingsRow id="setting-phone-reads" title="What Telegram sees" description={WHO_READS} />
+            </SettingsGroup>
 
-            {phone.status === 'off' && (
-                <div className="py-4">
-                    <h3 id="setting-phone-token" className="text-13 font-medium">Connect a bot</h3>
-                    <p className="mt-0.5 text-13 text-ink-2">In Telegram, message @BotFather, send /newbot and paste the token it gives you. It’s kept encrypted on this computer.</p>
-                    <form className="mt-3 flex items-center gap-2" onSubmit={(event) => void connect(event)}>
-                        <input
-                            aria-labelledby="setting-phone-token"
-                            type="password"
-                            autoComplete="off"
-                            spellCheck={false}
-                            value={token}
-                            onChange={(event) => setToken(event.target.value)}
-                            placeholder="Bot token"
-                            className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                        />
-                        <Button type="submit" disabled={busy || !token.trim()}>{busy ? 'Checking…' : 'Connect'}</Button>
-                    </form>
-                    {phone.problem && <p role="alert" className="mt-2 text-13 text-ask">{phone.problem}</p>}
-                </div>
-            )}
+            <SettingsGroup label="your bot">
+                {phone.status === 'off' && (
+                    <SettingsRow
+                        id="setting-phone-token"
+                        title="Connect a bot"
+                        description="In Telegram, message @BotFather, send /newbot and paste the token it gives you. It’s kept encrypted on this computer."
+                        below={
+                            <>
+                                <form className="flex items-center gap-2" onSubmit={(event) => void connect(event)}>
+                                    <input
+                                        aria-labelledby="setting-phone-token"
+                                        type="password"
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                        value={token}
+                                        onChange={(event) => setToken(event.target.value)}
+                                        placeholder="Bot token"
+                                        className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                                    />
+                                    <Button type="submit" disabled={busy || !token.trim()}>{busy ? 'Checking…' : 'Connect'}</Button>
+                                </form>
+                                {phone.problem && <p role="alert" className="mt-2 text-13 text-ask">{phone.problem}</p>}
+                            </>
+                        }
+                    />
+                )}
 
-            {phone.status === 'pairing' && (
-                <>
-                    <SettingsRow id="setting-phone-link" title={`Now connect @${phone.botName}`} description="Scan this with your phone’s camera, open it in Telegram and press Start." more="That chat is the only one Blueberry will listen to. It works once, for ten minutes.">
-                        <Button variant="outline" onClick={() => void api.newLink().then(setPhone)}>New link</Button>
-                    </SettingsRow>
-                    <div className="py-4 border-b last:border-b-0">
-                        {phone.pairLink && (
-                            <div className="flex items-center gap-5">
-                                <PairingCode link={phone.pairLink} />
-                                <div className="min-w-0">
-                                    <p className="text-13 text-ink-2">Telegram on this computer instead?</p>
-                                    <Button variant="outline" className="mt-2" onClick={() => void api.openLink()}>Open in my browser</Button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <SettingsRow id="setting-phone-cancel" title="Changed your mind?" description="This forgets the token.">
-                        <Button variant="outline" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
-                    </SettingsRow>
-                </>
-            )}
+                {phone.status === 'pairing' && (
+                    <>
+                        <SettingsRow
+                            id="setting-phone-link"
+                            title={`Now connect @${phone.botName}`}
+                            description="Scan this with your phone’s camera, open it in Telegram and press Start."
+                            more="That chat is the only one Blueberry will listen to. It works once, for ten minutes."
+                            below={
+                                phone.pairLink && (
+                                    <div className="flex items-center gap-5">
+                                        <PairingCode link={phone.pairLink} />
+                                        <div className="min-w-0">
+                                            <p className="text-13 text-ink-2">Telegram on this computer instead?</p>
+                                            <Button variant="outline" className="mt-2" onClick={() => void api.openLink()}>Open in my browser</Button>
+                                        </div>
+                                    </div>
+                                )
+                            }
+                        >
+                            <Button variant="outline" size="sm" onClick={() => void api.newLink().then(setPhone)}>New link</Button>
+                        </SettingsRow>
+                        <SettingsRow id="setting-phone-cancel" title="Changed your mind?" description="This forgets the token.">
+                            <Button variant="outline" size="sm" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
+                        </SettingsRow>
+                    </>
+                )}
 
-            {phone.status === 'connected' && (
-                <>
-                    <SettingsRow id="setting-phone-bot" title={`Connected to @${phone.botName}`} description="Disconnecting forgets the token and the chat." more="To stop the bot for good, revoke it with @BotFather too.">
-                        <Button variant="outline" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
-                    </SettingsRow>
-                    <SettingsRow id="setting-phone-always" title="Send even when I’m here" description="Normally it only sends when the Blueberry window isn’t in front, or after a minute with no input." more="This is for trying it out or filming.">
-                        <Switch labelledBy="setting-phone-always" checked={settings.phoneAlways} onChange={(phoneAlways) => updateSettings({ phoneAlways })} />
-                    </SettingsRow>
-                </>
-            )}
+                {phone.status === 'connected' && (
+                    <>
+                        <SettingsRow id="setting-phone-bot" title={`Connected to @${phone.botName}`} description="Disconnecting forgets the token and the chat." more="To stop the bot for good, revoke it with @BotFather too.">
+                            <Button variant="outline" size="sm" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
+                        </SettingsRow>
+                        <SettingsRow id="setting-phone-always" title="Send even when I’m here" description="Normally it only sends when the Blueberry window isn’t in front, or after a minute with no input." more="This is for trying it out or filming.">
+                            <Switch labelledBy="setting-phone-always" checked={settings.phoneAlways} onChange={(phoneAlways) => updateSettings({ phoneAlways })} />
+                        </SettingsRow>
+                    </>
+                )}
 
-            {phone.status !== 'off' && phone.problem && (
-                <div className="py-4">
-                    <p role="alert" className="text-13 text-ask">{phone.problem}</p>
-                </div>
-            )}
+                {phone.status !== 'off' && phone.problem && (
+                    <SettingsRow id="setting-phone-problem" title={<span role="alert" className="text-ask">{phone.problem}</span>} />
+                )}
+            </SettingsGroup>
         </>
     )
 }

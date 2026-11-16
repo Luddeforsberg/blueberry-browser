@@ -1,4 +1,5 @@
 import type { InternalPage } from "../shared/ipc";
+import { settingsBack } from "../shared/settingsPlaces";
 
 const TITLES: Record<InternalPage, string> = {
   "new-tab": "New tab",
@@ -15,14 +16,14 @@ const TITLES: Record<InternalPage, string> = {
   cloud: "Cloud tab",
 };
 
-// A tab whose page the chrome renderer draws, so it has no web view and no navigation history.
+// A tab whose page the chrome renderer draws, so it has no web view and no navigation history. The one step back it
+// has is Settings', from a page one step in to its section, which its param names.
 export class InternalTab {
   readonly kind = "internal";
   readonly favicon = null;
   readonly isLoading = false;
   readonly berryWorking = false;
   readonly workingMascotId = null;
-  readonly canGoBack = false;
   readonly canGoForward = false;
   readonly trouble = null;
   readonly loadError = null;
@@ -35,6 +36,14 @@ export class InternalTab {
     title?: string
   ) {
     this.title = title || TITLES[page];
+  }
+
+  get canGoBack(): boolean {
+    return this.page === "settings" && settingsBack(this.param) !== null;
+  }
+
+  goBack(): void {
+    if (this.page === "settings") this.param = settingsBack(this.param) ?? this.param;
   }
 
   get url(): string {

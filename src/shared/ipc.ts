@@ -275,7 +275,7 @@ export interface Rect {
 // Where each region of the window goes, in window coordinates. Closed regions have no size.
 // In the horizontal layout, what opens over the page from the toolbar: Chats, or a mascot's card. `anchor` is what was
 // pressed, in the window, for the panel to open under.
-export type Popover = { kind: "chats"; anchor: Rect } | { kind: "mascot"; mascotId: string; anchor: Rect };
+export type Popover = { kind: "chats"; anchor: Rect } | { kind: "mascot"; mascotId: string; anchor: Rect } | { kind: "account"; anchor: Rect };
 
 // What's open over the page, and when it closed, whether the keyboard goes back to what opened it.
 export interface PopoverState {
@@ -465,7 +465,7 @@ export interface InvokeChannels {
   "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
-  "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
+  "settings:update": { region: "chrome" | "overlay"; args: [patch: Partial<Settings>]; result: Settings };
   // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
   "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
   "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
@@ -545,10 +545,10 @@ export interface InvokeChannels {
   "memory:forget": { region: "chrome"; args: [factId: string]; result: boolean };
   // Asks first, in main.
   "memory:clear": { region: "chrome"; args: [mascotId: string]; result: boolean };
-  "account:state": { region: "chrome"; args: []; result: AccountState };
+  "account:state": { region: "chrome" | "overlay"; args: []; result: AccountState };
   "account:sign-in": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
   "account:sign-up": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
-  "account:sign-out": { region: "chrome"; args: []; result: AccountState };
+  "account:sign-out": { region: "chrome" | "overlay"; args: []; result: AccountState };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };

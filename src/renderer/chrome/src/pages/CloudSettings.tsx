@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
 import type { CloudLogin, CloudState, RunnerState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
 import { CopyLink } from '../components/CopyLink'
-import { More, SettingsRow } from '../components/SettingsRow'
+import { SettingsGroup, SettingsRow } from '../components/SettingsRow'
+import { openSettings } from '../openSettings'
 import { useShell } from '../contexts/ShellContext'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
@@ -35,6 +37,7 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
     const [suggestions, setSuggestions] = useState<string[]>([])
     const [working, setWorking] = useState<string | null>(null)
     const [problem, setProblem] = useState<string | null>(null)
+    const field = useRef<HTMLInputElement>(null)
     const sites = cloud.logins.map((login) => login.site).join(' ')
 
     useEffect(() => {
@@ -55,56 +58,68 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
     }
 
     return (
-        <div className="py-4 border-b last:border-b-0">
-            <h3 id="setting-cloud-logins" className="text-13 font-medium">Signed in to</h3>
-            <p className="mt-0.5 text-13 text-ink-2">
-                Bring your sign-in to a site along, and a mascot in the cloud can use it as you.{' '}
-                <More about="setting-cloud-logins" text="Only that site’s cookies are copied, after Touch ID, and they stay in the cloud browser. Nothing else from this browser goes there." />
-            </p>
-
+        <SettingsGroup
+            label="signed in to"
+            trailing={
+                <button type="button" onClick={() => field.current?.focus()} className="h-[22px] -mr-1 px-1.5 flex items-center gap-1 rounded-[7px] font-sans text-12 normal-case text-ink-2 hover:bg-hover hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                    <Plus aria-hidden className="size-[13px]" strokeWidth={1.5} />
+                    Add a site
+                </button>
+            }
+        >
             {cloud.logins.length > 0 && (
-                <ul aria-label="Sites signed in in the cloud" className="mt-3 rounded-tile border">
+                <ul aria-label="Sites signed in in the cloud">
                     {cloud.logins.map((login) => (
-                        <li key={login.site} className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0">
+                        <li key={login.site} className="relative min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3 before:content-[''] before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden">
                             <div className="flex-1 min-w-0">
-                                <p className="text-13 font-medium truncate">{login.site}</p>
-                                <p className={login.status === 'signed-out' ? 'text-13 text-ask' : 'text-13 text-ink-2'}>{loginStatus(login)}</p>
+                                <p className="text-13 truncate">{login.site}</p>
+                                <p className={login.status === 'signed-out' ? 'mt-0.5 text-12 text-ask' : 'mt-0.5 text-12 text-ink-2'}>{loginStatus(login)}</p>
                             </div>
-                            <Button size="xs" variant="ghost" className="text-ink-2" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
-                            <Button size="xs" variant="ghost" className="text-ink-2" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
+                            <Button size="sm" variant="outline" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
+                            <Button size="sm" variant="outline" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
                         </li>
                     ))}
                 </ul>
             )}
 
-            <form
-                className="mt-3 flex items-center gap-2"
-                onSubmit={(event) => {
-                    event.preventDefault()
-                    if (site.trim()) void bring(site.trim())
-                }}
-            >
-                <input aria-label="Site to bring along" spellCheck={false} autoComplete="off" value={site} onChange={(event) => setSite(event.target.value)} placeholder="A site, such as github.com" className={`flex-1 ${FIELD}`} />
-                <Button type="submit" disabled={working !== null || !site.trim()}>{working === site.trim() && site.trim() ? 'Bringing…' : 'Bring along'}</Button>
-            </form>
+            <SettingsRow
+                id="setting-cloud-logins"
+                title={cloud.logins.length > 0 ? 'Another site' : 'Bring a site along'}
+                description="Bring your sign-in to a site along, and a mascot in the cloud can use it as you."
+                more="Only that site’s cookies are copied, after Touch ID, and they stay in the cloud browser. Nothing else from this browser goes there."
+                below={
+                    <>
+                        <form
+                            className="flex items-center gap-2"
+                            onSubmit={(event) => {
+                                event.preventDefault()
+                                if (site.trim()) void bring(site.trim())
+                            }}
+                        >
+                            <input ref={field} aria-label="Site to bring along" spellCheck={false} autoComplete="off" value={site} onChange={(event) => setSite(event.target.value)} placeholder="A site, such as github.com" className={`flex-1 ${FIELD}`} />
+                            <Button type="submit" disabled={working !== null || !site.trim()}>{working === site.trim() && site.trim() ? 'Bringing…' : 'Bring along'}</Button>
+                        </form>
 
-            {suggestions.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-13 text-ink-2">From your history:</span>
-                    {suggestions.map((suggestion) => (
-                        <Button key={suggestion} size="xs" variant="outline" disabled={working !== null} aria-label={`Bring along ${suggestion}`} onClick={() => void bring(suggestion)}>{suggestion}</Button>
-                    ))}
-                </div>
-            )}
+                        {suggestions.length > 0 && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="text-13 text-ink-2">From your history:</span>
+                                {suggestions.map((suggestion) => (
+                                    <Button key={suggestion} size="xs" variant="outline" disabled={working !== null} aria-label={`Bring along ${suggestion}`} onClick={() => void bring(suggestion)}>{suggestion}</Button>
+                                ))}
+                            </div>
+                        )}
 
-            {problem && <p role="alert" className="mt-3 text-13 text-ask">{problem}</p>}
+                        {problem && <p role="alert" className="mt-3 text-13 text-ask">{problem}</p>}
+                    </>
+                }
+            />
 
             {cloud.logins.length > 0 && (
-                <div className="mt-3">
-                    <Button variant="outline" disabled={working !== null} onClick={() => void run('all', () => api.forgetLogins())}>Forget all cloud logins</Button>
-                </div>
+                <SettingsRow id="setting-cloud-forget-logins" title="Every site above" description="Takes their sign-ins out of the cloud browser.">
+                    <Button variant="outline" size="sm" disabled={working !== null} onClick={() => void run('all', () => api.forgetLogins())}>Forget all cloud logins</Button>
+                </SettingsRow>
             )}
-        </div>
+        </SettingsGroup>
     )
 }
 
@@ -135,30 +150,38 @@ const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
     }
 
     return (
-        <div className="py-4 border-b last:border-b-0">
-            <h3 id="setting-cloud-runner" className="text-13 font-medium">With your Mac off</h3>
-            {runner.status === 'signed-out' ? (
-                <p className="mt-0.5 text-13 text-ink-2">
-                    Sign in under <button type="button" onClick={openAccount} className={LINK}>Account</button> to keep jobs going with your Mac off.
-                </p>
-            ) : (
-                <p className="mt-0.5 text-13 text-ink-2">
-                    {runnerLine(runner)}
-                    {runner.status === 'none' && <> <More about="setting-cloud-runner" text="That server signs in as a Blueberry account of its own, not yours, and its password never comes here." /></>}
-                </p>
-            )}
-            {(runner.status === 'none' || runner.status === 'waiting') && (
-                <form className="mt-3 flex items-center gap-2" onSubmit={(event) => void link(event)}>
-                    <input aria-label="Its account’s email" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cloud@example.com" className={`flex-1 ${FIELD}`} />
-                    <Button type="submit" disabled={busy || !email.trim()}>{busy ? 'Linking…' : 'Link'}</Button>
-                </form>
-            )}
-            {(runner.status === 'linked' || runner.status === 'waiting') && (
-                <Button className="mt-3" variant="outline" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
-            )}
-            {runner.problem && <p role="alert" className="mt-2 text-13 text-ask">{runner.problem}</p>}
+        <SettingsGroup label="with this computer off">
+            <SettingsRow
+                id="setting-cloud-runner"
+                title="Runner"
+                description={
+                    runner.status === 'signed-out' ? (
+                        <>Sign in under <button type="button" onClick={openAccount} className={LINK}>Account</button> to keep jobs going with your Mac off.</>
+                    ) : (
+                        runnerLine(runner)
+                    )
+                }
+                more={runner.status === 'none' ? 'That server signs in as a Blueberry account of its own, not yours, and its password never comes here.' : undefined}
+                below={
+                    (runner.status === 'none' || runner.status === 'waiting' || runner.problem) && (
+                        <>
+                            {(runner.status === 'none' || runner.status === 'waiting') && (
+                                <form className="flex items-center gap-2" onSubmit={(event) => void link(event)}>
+                                    <input aria-label="Its account’s email" type="email" autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="cloud@example.com" className={`flex-1 ${FIELD}`} />
+                                    <Button type="submit" disabled={busy || !email.trim()}>{busy ? 'Linking…' : 'Link'}</Button>
+                                </form>
+                            )}
+                            {runner.problem && <p role="alert" className="mt-2 text-13 text-ask">{runner.problem}</p>}
+                        </>
+                    )
+                }
+            >
+                {(runner.status === 'linked' || runner.status === 'waiting') && (
+                    <Button variant="outline" size="sm" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
+                )}
+            </SettingsRow>
             {runner.status === 'linked' && runner.relayUrl && <FromOtherApps address={runner.relayUrl} />}
-        </div>
+        </SettingsGroup>
     )
 }
 
@@ -172,35 +195,41 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
         setSaid((await window.chromeAPI.cloud.disconnectRelay()) ? 'Disconnected. ChatGPT and Claude have to sign in again.' : 'Couldn’t disconnect. Try again.')
     }
     return (
-    <div className="mt-4">
-        <div className="flex items-center gap-6">
-            <div className="flex-1 min-w-0">
-                <h4 id="setting-cloud-relay" className="text-13 font-medium">From ChatGPT or Claude</h4>
-                <p className="mt-0.5 text-13 text-ink-2">Give your mascots jobs from ChatGPT or Claude on the web or your phone, with your Mac off. <More about="setting-cloud-relay" text="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you." /></p>
-            </div>
-            <CopyLink link={address} label="Copy the address for ChatGPT or Claude" />
-        </div>
-        <pre aria-labelledby="setting-cloud-relay" className="mt-3 rounded-row bg-tray px-3 py-2.5 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
-        <ol className="mt-2 list-decimal pl-5 text-13 text-ink-2">
-            <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
-            <li>Sign in with this Blueberry account when it asks.</li>
-        </ol>
-        <div className="mt-4 flex items-center gap-6">
-            <div className="flex-1 min-w-0">
-                <h4 id="setting-cloud-relay-mac" className="text-13 font-medium">Run their jobs on this Mac when it’s on</h4>
-                <p className="mt-0.5 text-13 text-ink-2">While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud. <More about="setting-cloud-relay-mac" text="It asks you here, and they never see the page you’re on." /></p>
-            </div>
-            <Switch labelledBy="setting-cloud-relay-mac" checked={settings.relayOnMac} onChange={(relayOnMac) => updateSettings({ relayOnMac })} />
-        </div>
-        <Button className="mt-3" variant="outline" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
-        {said && <p role="status" className="mt-2 text-13 text-ink-2">{said}</p>}
-    </div>
+        <>
+            <SettingsRow
+                id="setting-cloud-relay"
+                title="From ChatGPT or Claude"
+                description="Give your mascots jobs from ChatGPT or Claude on the web or your phone, with your Mac off."
+                more="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you."
+                below={
+                    <>
+                        <pre aria-labelledby="setting-cloud-relay" className="rounded-row bg-sheet-2 px-3 py-2.5 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
+                        <ol className="mt-2 list-decimal pl-5 text-13 text-ink-2">
+                            <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
+                            <li>Sign in with this Blueberry account when it asks.</li>
+                        </ol>
+                        <Button className="mt-3" variant="outline" size="sm" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
+                        {said && <p role="status" className="mt-2 text-13 text-ink-2">{said}</p>}
+                    </>
+                }
+            >
+                <CopyLink link={address} label="Copy the address for ChatGPT or Claude" />
+            </SettingsRow>
+            <SettingsRow
+                id="setting-cloud-relay-mac"
+                title="Run their jobs on this Mac when it’s on"
+                description="While Blueberry is open here, a job from ChatGPT or Claude works in your own tabs and sign-ins instead of the cloud."
+                more="It asks you here, and they never see the page you’re on."
+            >
+                <Switch labelledBy="setting-cloud-relay-mac" checked={settings.relayOnMac} onChange={(relayOnMac) => updateSettings({ relayOnMac })} />
+            </SettingsRow>
+        </>
     )
 }
 
-// Browserbase, for birds that work in a browser in the cloud. Off until a key is saved. The key and project id leave
-// this page once and never come back to it.
-export const CloudSettings: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
+// Settings > Connections > Cloud: Browserbase, for mascots that work in a browser in the cloud. Off until a key is
+// saved. The key and project id leave this page once and never come back to it.
+export const CloudSettings: React.FC = () => {
     const [cloud, setCloud] = useCloud()
     const [apiKey, setApiKey] = useState('')
     const [projectId, setProjectId] = useState('')
@@ -221,50 +250,48 @@ export const CloudSettings: React.FC<{ openAccount: () => void }> = ({ openAccou
 
     return (
         <>
-            <SettingsRow
-                id="setting-cloud"
-                title="Work in the cloud"
-                description="A bird can do a job in a browser on Browserbase instead of in your tabs here, signed in only to the sites you bring along."
-                more="You watch it live in a cloud tab and can take over there, and it asks you before anything risky, the same as here."
-            />
-            <SettingsRow id="setting-cloud-status" title="Status" description={statusLine(cloud)}>
-                {cloud.canEnd && <Button variant="outline" onClick={() => void api.end().then(setCloud)}>End cloud session</Button>}
-            </SettingsRow>
+            <SettingsGroup label="browserbase">
+                {cloud.provider === 'local' && (
+                    <SettingsRow id="setting-cloud-local" title="Local test browser" description="This copy of Blueberry was started with a Chrome on this computer standing in for the cloud, so Browserbase isn’t used." />
+                )}
 
-            {cloud.provider !== 'local' && !cloud.configured && (
-                <div className="py-4 border-b last:border-b-0">
-                    <h3 id="setting-cloud-key" className="text-13 font-medium">Browserbase key</h3>
-                    <p className="mt-0.5 text-13 text-ink-2">Both are in Settings in your Browserbase dashboard, and stay encrypted on this computer, sent only to Browserbase.</p>
-                    <form className="mt-3 flex flex-col gap-2" onSubmit={(event) => void save(event)}>
-                        <input aria-label="API key" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" className={`w-full ${FIELD}`} />
-                        <div className="flex items-center gap-2">
-                            <input aria-label="Project id" type="password" autoComplete="off" spellCheck={false} value={projectId} onChange={(event) => setProjectId(event.target.value)} placeholder="Project id" className={`flex-1 ${FIELD}`} />
-                            <Button type="submit" disabled={busy || !apiKey.trim() || !projectId.trim()}>{busy ? 'Saving…' : 'Save'}</Button>
-                        </div>
-                    </form>
-                </div>
-            )}
+                {cloud.provider !== 'local' && !cloud.configured && (
+                    <SettingsRow
+                        id="setting-cloud-key"
+                        title="Key"
+                        description="Both are in Settings in your Browserbase dashboard, and stay encrypted on this computer, sent only to Browserbase."
+                        below={
+                            <form className="flex flex-col gap-2" onSubmit={(event) => void save(event)}>
+                                <input aria-label="API key" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API key" className={`w-full ${FIELD}`} />
+                                <div className="flex items-center gap-2">
+                                    <input aria-label="Project id" type="password" autoComplete="off" spellCheck={false} value={projectId} onChange={(event) => setProjectId(event.target.value)} placeholder="Project id" className={`flex-1 ${FIELD}`} />
+                                    <Button type="submit" disabled={busy || !apiKey.trim() || !projectId.trim()}>{busy ? 'Saving…' : 'Save'}</Button>
+                                </div>
+                            </form>
+                        }
+                    />
+                )}
+
+                {cloud.configured && (
+                    <SettingsRow id="setting-cloud-forget" title="Key" description="Saved, encrypted on this computer. Forgetting it ends the cloud session too.">
+                        <Button variant="outline" size="sm" onClick={() => void api.forget().then(setCloud)}>Forget key</Button>
+                    </SettingsRow>
+                )}
+
+                <SettingsRow id="setting-cloud-status" title="Session" description={statusLine(cloud)}>
+                    {cloud.canEnd && <Button variant="outline" size="sm" onClick={() => void api.end().then(setCloud)}>End cloud session</Button>}
+                </SettingsRow>
+
+                {cloud.problem && (
+                    <SettingsRow id="setting-cloud-problem" title={<span role="alert" className="text-ask">{cloud.problem}</span>}>
+                        {cloud.unreleased && <Button variant="outline" size="sm" onClick={() => void api.end().then(setCloud)}>Try again</Button>}
+                    </SettingsRow>
+                )}
+            </SettingsGroup>
 
             {cloud.provider !== null && <SignedInTo cloud={cloud} />}
 
-            <Runner openAccount={openAccount} />
-
-            {cloud.configured && (
-                <SettingsRow id="setting-cloud-forget" title="Browserbase key saved" description="It stays encrypted on this computer, and forgetting it ends the cloud session too.">
-                    <Button variant="outline" onClick={() => void api.forget().then(setCloud)}>Forget key</Button>
-                </SettingsRow>
-            )}
-
-            {cloud.provider === 'local' && (
-                <SettingsRow id="setting-cloud-local" title="Local test browser" description="This copy of Blueberry was started with a Chrome on this computer standing in for the cloud, so Browserbase isn’t used." />
-            )}
-
-            {cloud.problem && (
-                <div className="py-4 flex items-center gap-6">
-                    <p role="alert" className="flex-1 min-w-0 text-13 text-ask">{cloud.problem}</p>
-                    {cloud.unreleased && <Button variant="outline" onClick={() => void api.end().then(setCloud)}>Try again</Button>}
-                </div>
-            )}
+            <Runner openAccount={() => openSettings('account')} />
         </>
     )
 }

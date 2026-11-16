@@ -153,7 +153,7 @@ test("with no key the cloud is off, and a saved key never comes back to the page
     await chrome.getByRole("textbox", { name: "API key" }).fill("bb_live_not_a_real_key");
     await chrome.getByRole("textbox", { name: "Project id" }).fill("project-not-real");
     await chrome.getByRole("button", { name: "Save" }).click();
-    await expect(chrome.getByText("Browserbase key saved")).toBeVisible();
+    await expect(chrome.getByText("Saved, encrypted on this computer.", { exact: false })).toBeVisible();
     const state = JSON.stringify(await chrome.evaluate(() => window.chromeAPI.cloud.state()));
     expect(state).not.toContain("bb_live_not_a_real_key");
     expect(state).not.toContain("project-not-real");

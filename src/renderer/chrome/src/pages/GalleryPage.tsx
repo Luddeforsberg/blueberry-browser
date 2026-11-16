@@ -10,6 +10,11 @@ import { ApprovalCard } from '@common/components/ApprovalCard'
 import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
+import { Cloud } from 'lucide-react'
+import { AccountButton, AccountMenu, Avatar } from '../components/AccountMenu'
+import { RowTile, SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
+import { SegmentSwitch } from '../components/SegmentSwitch'
+import { WindowPicture } from '../components/WindowPicture'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage } from '../components/ChatMessage'
 import { ChatComposer, Composer } from '../components/Composer'
 import { PageCard } from '../components/PageCard'
@@ -204,6 +209,9 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
 export const GalleryPage: React.FC = () => {
     const [on, setOn] = useState(true)
     const [choice, setChoice] = useState<'one' | 'two'>('one')
+    const [section, setSection] = useState<'one' | 'two' | 'three'>('one')
+    const [picture, setPicture] = useState<'light' | 'dark' | 'system'>('system')
+    const [menuOpen, setMenuOpen] = useState(false)
     const [still, setStill] = useState(false)
     const [routineForm, setRoutineForm] = useState(() => blankForm('Flight price watch'))
 
@@ -535,6 +543,50 @@ export const GalleryPage: React.FC = () => {
                                 { value: 'two', label: 'Two' }
                             ]}
                         />
+                    </div>
+                </Section>
+
+                <Section title="Settings">
+                    <div className="max-w-[620px]">
+                        <SegmentSwitch
+                            label="Example sections"
+                            items={[{ value: 'one', label: 'One' }, { value: 'two', label: 'Two' }, { value: 'three', label: 'Three' }]}
+                            current={section}
+                            onChange={setSection}
+                            className="h-8 rounded-[11px] [&>button]:rounded-[9px] text-12"
+                        />
+                        <SettingsGroup label="a group">
+                            <SettingsRow id="gallery-row-switch" title="A switch" description="One line on what it does." more="The rest, behind More.">
+                                <Switch labelledBy="gallery-row-switch" checked={on} onChange={setOn} />
+                            </SettingsRow>
+                            <SettingsRow id="gallery-row-pictures" title="Pictures" top>
+                                <Choice
+                                    label="Pictures"
+                                    value={picture}
+                                    onChange={setPicture}
+                                    options={[
+                                        { value: 'light', label: 'Light', picture: <WindowPicture mode="light" /> },
+                                        { value: 'dark', label: 'Dark', picture: <WindowPicture mode="dark" /> },
+                                        { value: 'system', label: 'System', picture: <WindowPicture mode="system" /> }
+                                    ]}
+                                />
+                            </SettingsRow>
+                            <SettingsRow id="gallery-row-avatar" lead={<Avatar name="Alex Lind" email={null} large />} title="A value and a button">
+                                <span className="text-12 text-ink-2">Alex Lind</span>
+                                <Button variant="outline" size="sm">Change</Button>
+                            </SettingsRow>
+                        </SettingsGroup>
+                        <SettingsGroup label="rows that open something">
+                            <SettingsLink lead={<RowTile><Cloud strokeWidth={1.5} /></RowTile>} title="With a state" description="And a line." state="ready" stateOn onOpen={() => undefined} />
+                            <SettingsLink title="With a value" value="3 sites" onOpen={() => undefined} />
+                        </SettingsGroup>
+                    </div>
+                    <div className="mt-6 flex items-end gap-6">
+                        <div className="relative w-[226px]">
+                            {menuOpen && <AccountMenu onClose={() => setMenuOpen(false)} />}
+                        </div>
+                        <AccountButton open={menuOpen} onPress={() => setMenuOpen(!menuOpen)} />
+                        <AccountButton small open={false} onPress={() => setMenuOpen(!menuOpen)} />
                     </div>
                 </Section>
 

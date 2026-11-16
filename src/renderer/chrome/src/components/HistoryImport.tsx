@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { HistoryImportResult, ImportSource } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
-import { More } from './SettingsRow'
+import { More, SettingsGroup, SettingsRow } from './SettingsRow'
 
 // What happens, in the one place both screens say it. The detail has to match `buildDigest` in suggestionDigest.ts.
 export const IMPORT_NOTES = [
@@ -56,25 +56,34 @@ export const SourceChoice: React.FC<{ sources: ImportSource[]; source: ImportSou
         />
     ) : null
 
-// Hidden with no browser to bring from, so it never offers something it can't do.
-export const HistoryImportSettings: React.FC = () => {
+// Settings > Privacy > Bring in history. Privacy only leads here when there's a browser to bring from.
+export const BringInHistory: React.FC = () => {
     const { sources, source, choose, busy, bringIn, message } = useHistoryImport()
-    if (!sources || !source) return null
     return (
-        <div className="py-4 border-b">
-            <div className="flex items-center gap-6">
-                <div className="flex-1 min-w-0">
-                    <h3 id="setting-import" className="text-13 font-medium">Bring in history</h3>
-                    <p className="mt-0.5 text-13 text-ink-2">{IMPORT_NOTES.join(' ')} <More about="setting-import" text={IMPORT_DETAIL} /></p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                    <SourceChoice sources={sources} source={source} choose={choose} />
-                    <Button variant="outline" disabled={busy} onClick={() => void bringIn()}>
-                        {busy ? 'Bringing it in…' : `From ${source.name}`}
-                    </Button>
-                </div>
-            </div>
-            {message && <p role="status" className="mt-2 text-13">{message}</p>}
-        </div>
+        <>
+            <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-13 leading-[1.45] text-ink-2">
+                {IMPORT_NOTES.join(' ')} <More text={IMPORT_DETAIL} />
+            </p>
+            {sources && source ? (
+                <SettingsGroup>
+                    {sources.length > 1 && (
+                        <SettingsRow id="setting-import-from" title="Browser">
+                            <SourceChoice sources={sources} source={source} choose={choose} />
+                        </SettingsRow>
+                    )}
+                    <SettingsRow id="setting-import" title="Your history there" description={message ? <span role="status">{message}</span> : undefined}>
+                        <Button variant="outline" size="sm" disabled={busy} onClick={() => void bringIn()}>
+                            {busy ? 'Bringing it in…' : `From ${source.name}`}
+                        </Button>
+                    </SettingsRow>
+                </SettingsGroup>
+            ) : (
+                sources && (
+                    <SettingsGroup>
+                        <SettingsRow id="setting-import" title="No other browser found" description="Blueberry can bring history in from Chromium browsers on this computer." />
+                    </SettingsGroup>
+                )
+            )}
+        </>
     )
 }
