@@ -42,10 +42,11 @@ const Shell: React.FC = () => {
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     const trouble = activeTab?.trouble ?? activeTab?.loadError
-    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Settings and
-    // Your mascots are columns of sheets on the well too, apart from publishing one, which isn't redrawn yet.
+    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Every page
+    // built on `PageFrame` is a column of sheets on the well too, apart from publishing a mascot, which isn't redrawn yet.
     const mascots = activeTab?.page === 'flock' && flockPlace(activeTab.pageParam).page !== 'publish'
-    const well = (activeTab?.page === 'new-tab' || activeTab?.page === 'settings' || mascots) && !trouble
+    const framed = activeTab?.page === 'settings' || activeTab?.page === 'routines' || activeTab?.page === 'history' || activeTab?.page === 'downloads' || mascots
+    const well = (activeTab?.page === 'new-tab' || framed) && !trouble
 
     return (
         <div className="relative h-full bg-ground">

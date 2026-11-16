@@ -645,6 +645,87 @@ There are no cards and nothing to stand on. With mascots hidden a row starts wit
 
 **What it remembers** is one step in from its page: the title with its name, one line saying that only what the user said yes to is kept, on this computer. An offer waiting for an answer is a card in a shell on top, with where it came from as a label in words, the words at 15px, and **Remember** and **Don't**. Then a group for each place, *Anywhere* first, with a row per thing and **Change** and **Forget** on each. Change makes the row a field. **Forget everything** is last, in `ask`. With nothing kept, one sheet has the mascot and the sentence saying when it may ask.
 
+### A page in a tab
+
+Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
+
+Settings and Your mascots set the frame, and every page of Blueberry's own that opens in a tab uses it, from one component, so they can't drift apart: the well with no dot grid and one column 620px wide, which scrolls as a whole.
+
+- **On top,** the title at 20px semibold, with the page's own actions on its right: raised, and at most one filled. Under it, one line in `ink-2` on what the page is.
+- **Then groups:** a label in words, and under it a sheet with a 16px radius and `up`, with a row per thing and a hairline between rows that starts where the text does. A row that opens something is a button from edge to edge. What can be done to a row shows on the row you're on, by pointer or keyboard, as 28px buttons at its end (section 8).
+- **Nothing to show** is one sheet with one sentence, and the mascot where the page is about it. It's never an empty page with a heading.
+- **One step in** works as in Settings: a quiet back button naming where it came from, in the same tab and the same column, and where the page is lives in its tab, so Back, the toolbar's Back and a restored session find it.
+- **A search field,** where a page has one, is 36px on `tray` with a hairline, as wide as the column, between the line and the first group.
+
+Routines, History and Downloads are on it. Needs you and the Gallery move to it when they're redrawn.
+
+### Routines
+
+Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
+
+**The list.** The title, with **Show Berry how** raised and **New routine** filled on its right, and one line under it. Then one sheet with a row per routine, 64px, which opens the routine's page:
+
+- The face of the mascot that runs it at 36px, in the mood it's in: the pips while a run is going, the `ask` dot while one waits for you.
+- Its name at 14px medium. Under it, at 13px in `ink-2`, its schedule in words and how the last run went: "Every weekday at 09:00 · Finished yesterday".
+- On the right, its state as a pill: Scheduled with when it's next in a few words ("Scheduled · tomorrow 09:00"), Running, Needs you in `ask`, Paused, Failed or Interrupted in `ask`, Waiting to start while a Run now waits for a place, Not scheduled for a one-off that has run, or Only when you ask. Then a faint arrow.
+- **Run now,** a 28px raised button, shows on the row you're on in place of the pill. While a run is going it's **Stop**. While one waits to start there's nothing to press, so the pill stays.
+
+With no routines, one sheet has Berry and one sentence on what a routine is, and the two buttons above are the way in.
+
+**Making one is four questions,** one at a time, in the voice of the mascot that will do it, built from the same card as making a mascot: 520px wide, set into a shell, the mascot standing on its top edge at 72px, the step in mono (`2 / 4`), the question at 20px semibold, a round Back, four dots and the filled button in the shell. The mascot on the card is the one chosen in step 3, and Berry until then.
+
+| Step | It asks | The answer | The button |
+|---|---|---|---|
+| 1 | What should I do? | A text box at 15px, with one line under it saying it works in tabs of its own and asks before acting, as a chat does | Continue, once there are words |
+| 2 | When? | A sentence that reads the answer back, with the parts that were chosen on `sheet-2`: "Every **weekday** at **09:00**". Under it, how often as pills: Once, Every day, Weekdays, Weekly, Monthly, Only when you ask. Then the time as mono chips, 07:00, 08:00, 09:00, 12:00, 17:00, 21:00 and **Other…**, which becomes a time field. Weekly adds the seven days as pills, Monthly a day of the month, and Once a date. Only when you ask has no time | Continue |
+| 3 | Who does it? | The flock as rows in a sheet, Berry first: face, name, and its limits as a pill where they're narrower than Berry's. The chosen row has a check, and the mascot on the card changes to it | Continue |
+| 4 | Where may I go? | Anywhere, or Only these sites, with each site a mono chip with its × and Add a site, as in a mascot's limits. A mascot with sites of its own says so in one line, and that this can only narrow them | Save routine |
+
+- **The name is never asked for.** A saved routine is named from what it does, the way a chat is, and the name can be changed on its page. One the user chose is never replaced.
+- **Weekdays** is Weekly with Monday to Friday chosen, and reads back as "Every weekday".
+- **Under the time,** one line says what happens when Blueberry is closed at that time. With a cloud runner that has accepted, a switch there says **Runs even when your computer is off.**
+- **It ends on a card that reads it back:** the mascot looking pleased, *Saved as a routine* as a label in words, then one sentence at 20px medium made from the answers: the schedule, the mascot's name and "will", and what it does in the user's own words, cut at three lines: "Every weekday at 09:00, Berry will read SVT…". The words stay as typed, except that a capital at the start of an ordinary first word goes small. Under it, when it's next in mono, and **Run it now** beside **Done**, which opens the routine's page.
+- **Leaving** part way keeps what was typed while the tab stays open, as before, and saves nothing.
+- **From Show Berry how,** the steps open with their answers filled in from what was shown. Step 1 then has *What might change* under the box: a row for each value, with its field and **Ask me each run** as a switch. Step 4 starts on Only these sites, with the sites that were used.
+- **From a suggestion,** the steps open with its answers filled in.
+
+**A routine's own page** is built like a mascot's. On top is a sheet that says what it is: the mascot's face at 64px, the name at 20px semibold, the schedule sentence, its state as a pill, and **Run now** beside **Pause** or **Resume**. While a run is going Run now is **Stop**, and a routine that only runs when you ask has no Pause. Under *Change* is one row for each part, showing what it is now and an arrow: Name, What it does, When, Who does it, Where it may go. Each opens the same card as its step, alone, with **Cancel** and **Save** in the shell. Under *Runs* is its history, newest first, each run a row with when it started, its state as a pill and how long it took, which opens in place to show its steps and report, as a finished reply's steps do. A run that's going has **Stop**, and one that failed, was stopped or was interrupted has **Run again**. Last, alone, **Delete** and its name in `ask`, which asks first.
+
+**Save as routine never leaves the chat.** The icon on a finished reply opens a card under it, set into a shell like an approval: *When should I do this again?*, how often as pills (Every day, Weekdays, Weekly, Monthly) with the time chips, then **Save routine** filled and **Not now** raised. The shell's line says that what to do and who does it come from this chat, and can be changed on the routine's page. Saved, the card becomes one line with the schedule sentence and **Open routine**. Weekly adds the days and Monthly the day of the month, as in the steps. It's offered where it was before: on the last reply of a finished chat where the mascot did some work, in the main chat and in the chat panel.
+
+**How a run behaves** hasn't changed:
+
+- **A run** works like a chat with no page: the same tools, the same Ask before acting setting and the same step limit. It opens its own tabs behind the current view and closes them when it ends, except any the user has been to, which are theirs. It can't reach any other tab, including popups its pages open, which also stay behind and close with it. Its tabs are muted.
+- **Each routine keeps its last 50 runs.**
+- **Approvals** use the same card and exact words as a chat. The card waits on the routine's page and on Needs you, and so do questions and tabs handed to the user. Nothing is ever allowed for later: closing the app stops the run with nothing done, and the next launch shows it as Interrupted, saying what it was waiting to do.
+- **Timing:** a routine runs only while a window is open. A time missed with the app closed or the computer asleep runs once on the next chance, however many were missed, and says it was late. Times missed while paused are not made up. A time that comes while the same routine is still going is skipped. A run starts only while fewer than two are working, and the rest wait to start. A run waiting on the user doesn't count, so other routines carry on, and once allowed it goes straight on, even if two others have started meanwhile. A day the month doesn't have means its last day.
+- **In the cloud:** with the switch on, the line under the schedule says it runs in the cloud at that time, even with the computer off, and its run shows as a chat, In the cloud, with its approvals in Needs you. It then never runs here on its schedule, though Run now still runs it here. Paused, it waits in the cloud too. Its time is this computer's own time zone, and a time missed while the runner was down runs once when it's back. Turned off, it says "Moving back to this computer…" in place of its last result, and doesn't run here until the cloud has let it go, so the two never both run it. One that couldn't be sent says "Couldn’t reach the cloud, will retry" the same way.
+- **Speaking up:** a result or a needed approval puts a dot on the Routines row until Routines is opened. If the app isn't in front, and the window isn't fullscreen and no tab is playing sound, a silent notification says so, with no page text or approval wording in it. Anything waiting goes through Needs you, and clicking its notification opens the item there. A run the user stopped says nothing.
+
+### History
+
+Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
+
+Opens as a tab with `⌘Y` (`Ctrl+Y` on Windows) and from the menu, with only one open at a time. The title, with **Clear…** raised on its right, one line saying it's the pages you've visited, kept on this computer, and the search field, which takes the keyboard. Then a group for each day, labelled Today, Yesterday or the date.
+
+- **A row** is 40px: the time in mono, the site's icon, the title at 14px medium, and the site at 13px in `ink-2`. Pressing it opens the page in a new tab. **Remove** shows on the row you're on.
+- **Visits in a row to the same site fold into one row,** with the time of the newest, the site and how many in mono, which opens in place to show them. A search shows every match unfolded, since folding would hide what was found.
+- **Show more** loads the next hundred, and search covers titles and addresses. A search with nothing found says so in one sheet.
+
+Clear… asks first, in a native dialog, because it can't be undone. Deleting history also takes those pages out of tabs' back and forward lists, Reopen Closed Tab and the saved session, and an open tab keeps the page it's showing. Reloading a page isn't a new visit, and neither is coming back to one after a restart. Pages a mascot opens behind the chat stay out of history, and out of the address field's suggestions, until you go to that tab.
+
+### Downloads
+
+Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
+
+The title, with **Open folder** raised on its right, which shows the folder files are saved to, and one line under it. Then a group for each day, newest first.
+
+- **A row** has the kind of file on the 32px tile, as its ending in mono (`pdf`, `dmg`), or a file icon for a name with none, its name at 14px medium, and one line at 13px in `ink-2`: its size, the site it came from, and while it's running how much has arrived and how long is left. A running one has a thin `ink` bar under the line.
+- **What can be done shows on the row you're on:** Pause or Resume and Cancel while it runs, Open and Show in folder when it's finished, and Remove, which takes it off the list and leaves the file alone. Pressing a finished row opens the file.
+- A file that's gone says "File is missing" in `ask` and offers only Remove.
+
+Files save straight to the folder with no dialog unless Settings says to ask, and never overwrite: a second `report.pdf` becomes `report (1).pdf`. The toolbar has one Downloads button, which opens this page. While anything is running, a ring around the icon shows the combined progress, and the button's label names each file with its percentage. There's no popover, so nothing floats over the page.
+
 ## 11. Not redrawn yet
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
@@ -652,10 +733,9 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - Onboarding
 - Find in page, zoom and printing, the page menu
 - Show Berry how
-- Routines
 - Gallery and Publishing
 - Needs you, and answering from the phone
-- History, Downloads, Restoring tabs, A page in trouble, Damaged saved data
+- Restoring tabs, A page in trouble, Damaged saved data
 - The cloud tab
 - A chat on the runner
 - Site permissions
@@ -683,7 +763,7 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 
 - **Choosing a look with mascots hidden:** every berry is the plain icon, so the first step only has their names. Whether that step should draw them anyway is open.
 
-- **Needs you and Routines** as full pages. Chats leads to them, and they aren't drawn.
+- **Needs you** as a full page. Chats leads to it, and it isn't drawn.
 - **The words** "bird" and "flock" are still in the code, in AGENTS.md and in the old document.
 
 ## 13. Accessibility

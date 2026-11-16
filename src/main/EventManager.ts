@@ -299,6 +299,7 @@ export class EventManager {
     this.handle("downloads:list", () => this.mainWindow.downloads.refresh());
     this.handle("downloads:act", (id, action) => this.mainWindow.downloads.act(id, action));
     this.handle("downloads:choose-folder", () => this.mainWindow.chooseDownloadFolder());
+    this.handle("downloads:open-folder", () => this.mainWindow.downloads.openFolder());
   }
 
   private handlePermissionEvents(): void {

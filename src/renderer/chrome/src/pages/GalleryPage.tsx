@@ -27,17 +27,18 @@ import { HistoryRow } from './HistoryPage'
 import { ChatRow } from '../components/Sidebar'
 import { MascotPerch } from '../components/MascotPerch'
 import { MascotRow } from './FlockPage'
-import { LimitTags, StepCard } from './MascotSteps'
+import { LimitTags } from './MascotSteps'
+import { StepCard } from '../components/StepCard'
 import { MascotMemoryView } from './MascotMemory'
 import { MemoryOffersLine, RememberedFacts } from '../components/MemoryInChat'
 import { GalleryCard } from './MascotGalleryPage'
 import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
-import { RoutineForm } from '../components/RoutineForm'
 import { SuggestionItem } from '../components/SuggestionItem'
 import type { SuggestionRow } from '../newTabSuggestions'
-import { RoutineRunCard } from '../components/RoutineRunCard'
+import { RoutineRunRow } from '../components/RoutineRunRow'
+import { ScheduleSentence, WhenAnswer } from './RoutineSteps'
 import { NeedsYouRow } from '../components/NeedsYou'
 import { blankForm } from '../routinesView'
 import { WorkingStrip, WorkingView, type WorkFrames } from '../components/WorkingView'
@@ -421,7 +422,7 @@ export const GalleryPage: React.FC = () => {
                                 { text: 'Asked you something', done: true, kind: 'ask' },
                             ]}
                             pages={[{ url: 'https://www.klm.com/search', title: 'Stockholm to Lisbon' }]}
-                            actions={{ onSay: () => undefined, onSaveAsRoutine: () => undefined }}
+                            actions={{ onSay: () => undefined, routineFromChat: () => blankForm('Flight price watch', 'Find the cheapest flight to Lisbon') }}
                         />
                         <AssistantMessage
                             content=""
@@ -513,21 +514,22 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Routine runs">
-                    <ol className="max-w-xl flex flex-col gap-3">
-                        {SAMPLE_RUNS.map((run) => (
-                            <RoutineRunCard key={run.id} run={run} onStop={() => undefined} onRunAgain={() => undefined} />
+                    <ol className="max-w-xl rounded-sheet bg-sheet shadow-up">
+                        {SAMPLE_RUNS.map((run, at) => (
+                            <RoutineRunRow key={run.id} run={run} open={at === 0} onStop={() => undefined} onRunAgain={() => undefined} />
                         ))}
                     </ol>
                 </Section>
 
-                <Section title="Routine form">
-                    <div className="max-w-xl">
-                        <RoutineForm preview values={routineForm} onChange={setRoutineForm} onCancel={() => undefined} onSaved={() => undefined} />
-                    </div>
+                <Section title="A routine's When step">
+                    <StepCard mascot={null} mood="rest" label="2 / 4" question="When?" nav={<div className="h-[46px]" />}>
+                        <ScheduleSentence values={routineForm} className="mb-4 text-center" />
+                        <WhenAnswer values={routineForm} set={(patch) => setRoutineForm({ ...routineForm, ...patch })} />
+                    </StepCard>
                 </Section>
 
                 <Section title="History">
-                    <ul className="max-w-xl rounded-sheet border bg-sheet p-2">
+                    <ul className="max-w-xl rounded-sheet bg-sheet shadow-up overflow-hidden">
                         <HistoryRow
                             entry={{ id: 1, url: 'https://en.wikipedia.org/wiki/Jackdaw', title: 'Jackdaw', favicon: null, visitedAt: Date.now() }}
                             onOpen={() => undefined}
@@ -578,7 +580,7 @@ export const GalleryPage: React.FC = () => {
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(1, 2)} />
                         <DownloadsProgress downloads={[{ ...SAMPLE_DOWNLOAD, id: 'starting', receivedBytes: 0 }]} />
                     </div>
-                    <ul className="mt-4 rounded-sheet border bg-sheet divide-y overflow-hidden">
+                    <ul className="mt-4 rounded-sheet bg-sheet shadow-up">
                         {SAMPLE_DOWNLOADS.map((download) => (
                             <DownloadRow key={download.id} download={download} onAction={() => undefined} />
                         ))}

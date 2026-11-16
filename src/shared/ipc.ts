@@ -610,6 +610,8 @@ export interface InvokeChannels {
   "downloads:list": { region: "chrome"; args: []; result: DownloadInfo[] };
   "downloads:act": { region: "chrome"; args: [id: string, action: DownloadAction]; result: boolean };
   "downloads:choose-folder": { region: "chrome"; args: []; result: void };
+  // Shows the folder files are saved to. Main knows which, so nothing names a path.
+  "downloads:open-folder": { region: "chrome"; args: []; result: boolean };
   "permissions:saved": { region: "chrome"; args: []; result: SavedSitePermission[] };
   "permissions:set": {
     region: "chrome";
@@ -885,6 +887,7 @@ export interface DownloadsAPI {
   list: () => Promise<DownloadInfo[]>;
   act: (id: string, action: DownloadAction) => Promise<boolean>;
   chooseFolder: () => Promise<void>;
+  openFolder: () => Promise<boolean>;
   onUpdated: (callback: (downloads: DownloadInfo[]) => void) => Unsubscribe;
 }
 

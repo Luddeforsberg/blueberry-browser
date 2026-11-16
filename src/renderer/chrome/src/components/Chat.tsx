@@ -3,7 +3,8 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useChat, type Message } from '../contexts/ChatContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useAssistantName, BerrySpot } from './Berry'
-import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, didWork, saveChatAsRoutine, useFollowReply, type ReplyActions } from './ChatMessage'
+import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, didWork, useFollowReply, type ReplyActions } from './ChatMessage'
+import { chatRoutine } from '../routinesView'
 import { MemoryOffers } from './MemoryInChat'
 import { PageChip } from './AttachmentChips'
 import { ChatComposer } from './Composer'
@@ -43,7 +44,7 @@ export const Chat: React.FC = () => {
     const failedReply = error && last?.role === 'assistant' ? last : null
     const actions: ReplyActions = {
         onSay: (words) => void sendMessage(words, mascot.id),
-        onSaveAsRoutine: chatId && didWork(messages) ? () => saveChatAsRoutine(title ?? '', messages, mascotId) : undefined,
+        routineFromChat: chatId && didWork(messages) ? () => chatRoutine(title ?? '', messages, mascotId) : undefined,
     }
 
     return (

@@ -4,7 +4,7 @@ import { Button } from '@common/components/Button'
 import { Berry, useAssistantName } from '../components/Berry'
 import { ChatError, LiveWords } from '../components/ChatMessage'
 import { TrailNotes, useRecording } from '../components/ShowBerry'
-import { recordedForm, setRoutinesView } from '../routinesView'
+import { recordedForm, startRoutine } from '../routinesView'
 
 const api = () => window.chromeAPI.recording
 
@@ -25,8 +25,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             setFailed(result.error)
             return
         }
-        setRoutinesView({ page: 'form', values: recordedForm(result.draft) })
-        await browser.openPage('routines')
+        startRoutine(recordedForm(result.draft))
         await browser.closeTab(tab.id)
     }
 

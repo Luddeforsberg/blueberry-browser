@@ -7,6 +7,7 @@ import { Choice, Switch } from '@common/components/Controls'
 import { useShell } from '../contexts/ShellContext'
 import { More, RowTile, SettingsGroup, SettingsLink, SettingsRow, StepInHeader } from '../components/SettingsRow'
 import { SegmentSwitch } from '../components/SegmentSwitch'
+import { PageFrame, PageHeader } from '../components/PageFrame'
 import { WindowPicture } from '../components/WindowPicture'
 import { BringInHistory } from '../components/HistoryImport'
 import { openSettings } from '../openSettings'
@@ -292,9 +293,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const stepIn = page && STEP_IN[page]
 
     return (
-        // The gutter stays when nothing scrolls, so the column doesn't move between a short section and a long page.
-        <div className="h-full overflow-y-auto [scrollbar-gutter:stable_both-edges]">
-            <div className="w-[620px] max-w-[calc(100%-32px)] mx-auto pt-[26px] pb-12">
+        <PageFrame>
                 {page && stepIn ? (
                     <section aria-label={PAGE_TITLES[page]}>
                         <StepInHeader back={SECTION_NAMES[section]} onBack={() => openSettings(section)} title={PAGE_TITLES[page]}>
@@ -304,7 +303,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     </section>
                 ) : (
                     <>
-                        <h1 className="mx-3 mb-4 text-20 font-semibold">Settings</h1>
+                        <PageHeader title="Settings" />
                         <SegmentSwitch
                             label="Settings sections"
                             items={SETTINGS_SECTIONS.map((value) => ({ value, label: SECTION_NAMES[value] }))}
@@ -317,7 +316,6 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         </section>
                     </>
                 )}
-            </div>
-        </div>
+        </PageFrame>
     )
 }

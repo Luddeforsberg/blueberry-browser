@@ -15,7 +15,7 @@ interface FakeRun {
   end: (result?: Partial<TaskResult>) => void;
 }
 
-const setup = (store = new RoutineStore(":memory:"), cloud: Pick<RoutineEvents, "stillInCloud" | "cloudFailed"> = {}) => {
+const setup = (store = new RoutineStore(":memory:"), cloud: Pick<RoutineEvents, "stillInCloud" | "cloudFailed" | "writeName"> = {}) => {
   const started: FakeRun[] = [];
   const stoppedIds: string[] = [];
   const runner = {
@@ -330,6 +330,43 @@ describe("the scheduler", () => {
     const past = { name: "Once", instructions: "Look", schedule: { kind: "once", at: NOW - 1 } };
     expect(routines.save(null, past)).toEqual({ ok: false, error: expect.any(String) });
     expect(routines.save("missing", daily())).toEqual({ ok: false, error: expect.any(String) });
+  });
+
+  it("names one saved with no name from what it does, and never replaces a name the user chose", async () => {
+    const written: string[] = [];
+    let answer: (name: string | null) => void = () => undefined;
+    let hasModel = true;
+    const { store, routines } = setup(undefined, {
+      writeName: (instructions) => {
+        written.push(instructions);
+        return hasModel ? new Promise<string | null>((resolve) => (answer = resolve)) : Promise.resolve(null);
+      },
+    });
+
+    // Its first words until the name is written.
+    const id = save(routines, { ...daily(), name: "", instructions: "Read SVT.\nSum up the news" });
+    expect(store.routine(id)).toMatchObject({ name: "Read SVT", nameSettled: false });
+    answer("SVT news summary");
+    await flush();
+    expect(store.routine(id)).toMatchObject({ name: "SVT news summary", nameSettled: true });
+
+    // Changing another part keeps it.
+    save(routines, { ...daily("14:00"), name: "", instructions: "Read DN" }, id);
+    expect(store.routine(id)?.name).toBe("SVT news summary");
+    expect(written).toHaveLength(1);
+
+    // The user's own name, typed while one is being written, wins.
+    const other = save(routines, { ...daily(), name: "", instructions: "Check fares" });
+    save(routines, { ...daily(), name: "Fares", instructions: "Check fares" }, other);
+    answer("Flight fare check");
+    await flush();
+    expect(store.routine(other)).toMatchObject({ name: "Fares", nameSettled: true });
+
+    // A name it's given, as from a suggestion, is kept, and with no model the first words stay.
+    expect(store.routine(save(routines, { ...daily(), name: "Given" }))).toMatchObject({ name: "Given", nameSettled: true });
+    hasModel = false;
+    expect(store.routine(save(routines, { ...daily(), name: "", instructions: "Look around" }))?.name).toBe("Look around");
+    await flush();
   });
 });
 

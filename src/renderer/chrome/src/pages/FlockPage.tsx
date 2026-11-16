@@ -13,6 +13,7 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
+import { PageFrame, PageHeader } from '../components/PageFrame'
 import { BackButton, BETWEEN, SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
 import { useMascotState } from '../components/Sidebar'
 import { firstSentence, limitsInBrief, narrowerLimits } from '../shortWords'
@@ -23,7 +24,7 @@ import { PublishMascot } from './PublishMascot'
 import { MascotMemory } from './MascotMemory'
 import { ChangePart, LimitTags, NewMascot } from './MascotSteps'
 import { blankPublish, forgetTabDraftElsewhere, keepTabDraft, mascotForm, openMascots, startMascot, tabDraft, toMascotDraft, type PublishValues } from '../flockView'
-import { blankForm, setRoutinesView } from '../routinesView'
+import { blankForm, startRoutine } from '../routinesView'
 
 // DESIGN.md section 10, Your mascots: a page in a tab, built like Settings, with the list, each mascot's own page, making
 // one in steps, changing one part, and what each remembers. Where it is lives in the tab's param (flockPlaces.ts).
@@ -111,15 +112,20 @@ const List: React.FC = () => {
     const { flock } = useFlock()
     return (
         <>
-            <div className="mx-3 mb-3 flex items-center gap-2">
-                <h1 className="flex-1 text-20 font-semibold">Your mascots</h1>
-                <Button variant="raised" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Gallery</Button>
-                <Button onClick={() => startMascot()}>
-                    <Plus strokeWidth={1.75} />
-                    New mascot
-                </Button>
-            </div>
-            <p className="-mt-1 mx-3 mb-4 max-w-[520px] text-14 text-ink-2">Each has its own job and its own limits. They all ask before anything risky.</p>
+            <PageHeader
+                title="Your mascots"
+                actions={
+                    <>
+                        <Button variant="raised" onClick={() => void window.chromeAPI.browser.openPage('mascot-gallery')}>Gallery</Button>
+                        <Button onClick={() => startMascot()}>
+                            <Plus strokeWidth={1.75} />
+                            New mascot
+                        </Button>
+                    </>
+                }
+            >
+                Each has its own job and its own limits. They all ask before anything risky.
+            </PageHeader>
             <ul aria-label="Your mascots" className="rounded-sheet bg-sheet shadow-up">
                 {flock.map((mascot) => <MascotRow key={mascot.id} mascot={mascot} />)}
             </ul>
@@ -184,10 +190,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                     <Button
                         size="sm"
                         variant="raised"
-                        onClick={() => {
-                            setRoutinesView({ page: 'form', values: blankForm('', '', isBerry ? null : mascot.id) })
-                            void window.chromeAPI.browser.openPage('routines')
-                        }}
+                        onClick={() => startRoutine(blankForm('', '', isBerry ? null : mascot.id))}
                     >
                         New routine
                     </Button>
@@ -273,9 +276,7 @@ export const FlockPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
 
     return (
-        // The gutter stays when nothing scrolls, so the column doesn't move between a short page and a long one.
-        <div className="h-full overflow-y-auto [scrollbar-gutter:stable_both-edges]">
-            <div className="w-[620px] max-w-[calc(100%-32px)] mx-auto pt-[26px] pb-12">
+        <PageFrame>
                 {missing ? (
                     <Gone />
                 ) : place.page === 'new' ? (
@@ -299,7 +300,6 @@ export const FlockPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 ) : (
                     <List />
                 )}
-            </div>
-        </div>
+        </PageFrame>
     )
 }

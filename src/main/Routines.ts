@@ -1,4 +1,4 @@
-import { nextRun, parseDraft, scheduleLabel } from "./routineSchedule";
+import { nameFromWords, nextRun, parseDraft, scheduleLabel } from "./routineSchedule";
 import type { TaskProgress, TaskResult } from "./Chats";
 import type { RoutineStore, StoredRoutine } from "./RoutineStore";
 import type { ChatApproval, ChatStep, MascotProfile, Routine, RoutineRun, RoutineStatus } from "../shared/library";
@@ -32,6 +32,9 @@ export interface RoutineEvents {
   // Only for what the user started and hasn't seen: a result, or a decision only they can make.
   onAttention: (routine: StoredRoutine, kind: "finished" | "failed" | "needs-approval") => void;
   closeTab: (tabId: string) => void;
+  // A name for one saved with none, written from what it does by the cheap model, as a chat's title is. Null or a
+  // failure keeps the name from its first words. Without it, that name stays.
+  writeName?: (instructions: string) => Promise<string | null>;
 }
 
 interface ActiveRun {
@@ -301,17 +304,37 @@ export class Routines {
       return { ok: false, error: "Choose a time that hasn’t passed." };
     }
 
+    // No name is asked for. With none, it's named from what it does, as a chat is, unless it already has a settled one.
+    // A name that isn't the one it has is the user's, and nothing written replaces it.
+    const fromWords = draft.name === "" && !existing?.nameSettled;
+    const name = (!fromWords && (draft.name || existing?.name)) || nameFromWords(draft.instructions);
+    const nameSettled = !fromWords && (draft.name !== existing?.name || existing?.nameSettled === true);
+    // Written once for what it does, and again only if what it does changes before it's settled.
+    const toWrite = fromWords && existing?.instructions !== draft.instructions;
+
     let savedId: string;
     if (existing) {
       const nextRunAt = existing.paused ? null : sameSchedule ? existing.nextRunAt : next;
-      this.store.update(existing.id, draft, nextRunAt);
+      this.store.update(existing.id, { ...draft, name }, nextRunAt, nameSettled);
       savedId = existing.id;
     } else {
-      savedId = this.store.create(draft, next);
+      savedId = this.store.create({ ...draft, name }, next, nameSettled);
     }
     this.events.onChanged();
     this.tick();
+    if (toWrite) void this.writeName(savedId, draft.instructions);
     return { ok: true, id: savedId };
+  }
+
+  // Never rejects: it keeps the name from its first words until this works.
+  private async writeName(id: string, instructions: string): Promise<void> {
+    if (!this.events.writeName) return;
+    try {
+      const name = await this.events.writeName(instructions);
+      if (name && this.store.setWrittenName(id, name)) this.events.onChanged();
+    } catch (error) {
+      console.error("Failed to name a routine:", error);
+    }
   }
 
   // Times missed while paused stay missed: resuming counts from now.

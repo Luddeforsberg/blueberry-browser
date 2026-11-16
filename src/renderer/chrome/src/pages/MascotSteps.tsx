@@ -1,19 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Plus, X } from 'lucide-react'
 import type { GalleryMascot, MascotProfile } from '@shared/library'
 import { flockParam, type MascotPart } from '@shared/flockPlaces'
-import { ACCESSORIES, BERRY, MASCOT_TOOLS, MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME, PALETTES, normaliseSite, permissionsInWords } from '@shared/mascots'
+import { ACCESSORIES, BERRY, MASCOT_TOOLS, MAX_MASCOT_INSTRUCTIONS, MAX_MASCOT_NAME, PALETTES, permissionsInWords } from '@shared/mascots'
 import type { Mood } from '@common/components/Mascot'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
 import { BIG_CARD, BIG_SHELL } from '@common/components/cardShell'
-import { useStill } from '@common/components/motion'
 import { cn } from '@common/lib/utils'
 import { LABEL, StatusPill } from '@common/components/StatusPill'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry, BerrySpot } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
 import { BETWEEN } from '../components/SettingsRow'
+import { FIELD, PartNav, SiteChips, StepCard, StepNav } from '../components/StepCard'
 import { blankMascot, keepTabDraft, mascotForm, NEW_MASCOT_EVENT, openMascots, sitesFrom, surprise, tabDraft, takeStartedMascot, toMascotDraft, withPart, type MascotFormValues } from '../flockView'
 
 // DESIGN.md section 10, Your mascots: making one is four questions, one at a time, each a card set into a shell like the
@@ -21,8 +20,6 @@ import { blankMascot, keepTabDraft, mascotForm, NEW_MASCOT_EVENT, openMascots, s
 
 const api = () => window.chromeAPI.mascots
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-// The card is like the prompt box, so as there, the caret marks focus in a field (DESIGN.md section 8).
-const FIELD = 'w-full rounded-sheet bg-sheet-2 text-ink caret-ink outline-none placeholder:text-faint'
 
 const STEPS: MascotPart[] = ['look', 'name', 'purpose', 'limits']
 
@@ -51,67 +48,6 @@ const blocked = (part: MascotPart, values: MascotFormValues): string | null => {
     if (part === 'limits' && values.onlySomeSites && values.sites.length === 0) return 'Name at least one site, or choose Any site.'
     return null
 }
-
-// The card in its shell, with the mascot standing on its top edge. `motionKey` changes when the contents do, so they
-// slide in from the side they came from, or fade with the motion held still.
-export const StepCard: React.FC<{
-    mascot: MascotProfile | null
-    mood: Mood
-    label: string
-    action?: React.ReactNode
-    question: string
-    hint?: string
-    motionKey?: string
-    from?: 'next' | 'back'
-    nav: React.ReactNode
-    children: React.ReactNode
-}> = ({ mascot, mood, label, action, question, hint, motionKey, from = 'next', nav, children }) => {
-    const still = useStill()
-    return (
-        <section aria-label={question} className="w-[520px] max-w-full mx-auto flex flex-col items-center">
-            {mascot && (
-                <div className="relative z-[1] -mb-1">
-                    <BerrySpot size={72} mascot={mascot} mood={mood} />
-                </div>
-            )}
-            <div className={cn(BIG_SHELL, 'w-full')}>
-                <div className={cn(BIG_CARD, 'bg-sheet px-5 pt-4 pb-5 overflow-hidden')}>
-                    <div key={motionKey} className={still ? 'animate-step-fade' : from === 'next' ? 'animate-step-next' : 'animate-step-back'}>
-                        <div className="h-7 flex items-center justify-between">
-                            {/* The step as a count in mono, or the part being changed in words. */}
-                            <span className={/^\d/.test(label) ? 'font-mono text-11.5 text-ink-3' : LABEL}>{label}</span>
-                            {action}
-                        </div>
-                        <h2 className="mt-0.5 mb-1 text-center text-20 font-semibold">{question}</h2>
-                        {hint && <p className="mx-auto mb-4 max-w-[380px] text-center text-13 leading-[1.45] text-ink-2">{hint}</p>}
-                        {children}
-                    </div>
-                </div>
-                {nav}
-            </div>
-        </section>
-    )
-}
-
-// Under the card, in the shell: a round Back on the left, where the steps are in the middle, and the button on the right.
-const StepNav: React.FC<{ step: number; onBack?: () => void; children: React.ReactNode }> = ({ step, onBack, children }) => (
-    <div className="relative h-[46px] px-1.5 flex items-center justify-between">
-        <button
-            type="button"
-            aria-label="Back a step"
-            onClick={onBack}
-            className={cn('size-[30px] grid place-items-center rounded-full bg-sheet text-ink-2 shadow-rim transition-[background-color,transform] duration-fast hover:text-ink active:scale-[.96]', FOCUS, !onBack && 'invisible')}
-        >
-            <ChevronLeft aria-hidden className="size-[13px]" strokeWidth={1.75} />
-        </button>
-        <span aria-hidden className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-[5px]">
-            {STEPS.map((part, index) => (
-                <i key={part} className={cn('h-1.5 rounded-[3px] transition-[width] duration-fast', index === step ? 'w-[18px] bg-ink' : index < step ? 'w-1.5 bg-ink-3' : 'w-1.5 bg-dot')} />
-            ))}
-        </span>
-        {children}
-    </div>
-)
 
 // A berry or a thing to wear, with its name under it.
 const LookChoice: React.FC<{ label: string; chosen: boolean; onChoose: () => void; children: React.ReactNode }> = ({ label, chosen, onChoose, children }) => (
@@ -209,77 +145,6 @@ const PurposeAnswer: React.FC<{ values: MascotFormValues; set: Set; offerStarter
     )
 }
 
-// A site as a chip with its ×, and Add a site, which becomes a field. One that isn't a site stays in the field and is
-// said under the chips.
-const SitesAnswer: React.FC<{ values: MascotFormValues; set: Set }> = ({ values, set }) => {
-    const [adding, setAdding] = useState<string | null>(null)
-    const [bad, setBad] = useState<string | null>(null)
-    const add = (text: string): boolean => {
-        if (!text.trim()) {
-            setAdding(null)
-            setBad(null)
-            return true
-        }
-        const site = normaliseSite(text)
-        if (!site) {
-            setBad(text.trim())
-            return false
-        }
-        if (!values.sites.includes(site)) set({ sites: [...values.sites, site] })
-        setAdding(null)
-        setBad(null)
-        return true
-    }
-    const problem = bad ? `“${bad}” doesn’t look like a site. Try something like example.com.` : blocked('limits', values)
-    return (
-        <>
-            <ul aria-label="Sites it may use" className="flex flex-wrap justify-center items-center gap-1.5">
-                {values.sites.map((site) => (
-                    <li key={site} className="h-[26px] pl-[9px] pr-[3px] inline-flex items-center gap-1 rounded-row bg-sheet-2 font-mono text-11.5 text-ink">
-                        {site}
-                        <button type="button" aria-label={`Remove ${site}`} onClick={() => set({ sites: values.sites.filter((each) => each !== site) })} className={cn('size-5 grid place-items-center rounded-[6px] text-ink-3 hover:bg-hover hover:text-ink', FOCUS)}>
-                            <X aria-hidden className="size-[11px]" strokeWidth={1.75} />
-                        </button>
-                    </li>
-                ))}
-                <li>
-                    {adding === null ? (
-                        <button type="button" onClick={() => setAdding('')} className={cn('h-[26px] pl-[9px] pr-3 inline-flex items-center gap-1.5 rounded-row shadow-[inset_0_0_0_1px_var(--line)] text-13 text-ink-2 hover:bg-hover hover:text-ink', FOCUS)}>
-                            <Plus aria-hidden className="size-[11px]" strokeWidth={1.75} />
-                            Add a site
-                        </button>
-                    ) : (
-                        <input
-                            autoFocus
-                            aria-label="Add a site"
-                            aria-invalid={!!bad}
-                            value={adding}
-                            spellCheck={false}
-                            placeholder="example.com"
-                            onChange={(event) => {
-                                setAdding(event.target.value)
-                                setBad(null)
-                            }}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ',') {
-                                    event.preventDefault()
-                                    if (add(adding) && event.key === ',') setAdding('')
-                                } else if (event.key === 'Escape') {
-                                    setAdding(null)
-                                    setBad(null)
-                                }
-                            }}
-                            onBlur={() => add(adding)}
-                            className="h-[26px] w-40 px-[9px] rounded-row bg-sheet-2 font-mono text-11.5 text-ink caret-ink outline-none placeholder:text-faint"
-                        />
-                    )}
-                </li>
-            </ul>
-            {problem && <p role="alert" className="mt-2 text-center text-13 text-ask">{problem}</p>}
-        </>
-    )
-}
-
 const LimitsAnswer: React.FC<{ values: MascotFormValues; set: Set }> = ({ values, set }) => (
     <>
         <div className="mb-2.5 flex justify-center">
@@ -293,7 +158,7 @@ const LimitsAnswer: React.FC<{ values: MascotFormValues; set: Set }> = ({ values
                 ]}
             />
         </div>
-        {values.onlySomeSites && <div className="mb-3.5"><SitesAnswer values={values} set={set} /></div>}
+        {values.onlySomeSites && <div className="mb-3.5"><SiteChips sites={values.sites} onChange={(sites) => set({ sites })} problem={blocked('limits', values)} /></div>}
         <ul aria-label="What it can do" className="rounded-sheet shadow-[inset_0_0_0_1px_var(--line)]">
             {MASCOT_TOOLS.map(({ id, label, hint }) => (
                 <li key={id} className={cn(BETWEEN, 'before:left-3.5 min-h-11 py-2 pl-3.5 pr-3 flex items-center gap-3')}>
@@ -439,7 +304,7 @@ export const NewMascot: React.FC<{ tabId: string }> = ({ tabId }) => {
             motionKey={part}
             from={making.from}
             nav={
-                <StepNav step={step} onBack={step > 0 ? () => { setError(null); setMaking({ ...making, step: step - 1, from: 'back' }) } : undefined}>
+                <StepNav step={step} steps={STEPS.length} onBack={step > 0 ? () => { setError(null); setMaking({ ...making, step: step - 1, from: 'back' }) } : undefined}>
                     <Button disabled={!!off || saving} title={off ?? undefined} onClick={() => void next()}>
                         {last ? `Add ${values.name.trim() || 'mascot'}` : 'Continue'}
                     </Button>
@@ -482,12 +347,7 @@ export const ChangePart: React.FC<{ tabId: string; mascot: MascotProfile; part: 
             label={QUESTIONS[part].label}
             question={QUESTIONS[part].question}
             hint={QUESTIONS[part].hint}
-            nav={
-                <div className="h-[46px] px-1.5 flex items-center justify-between">
-                    <Button variant="raised" onClick={back}>Cancel</Button>
-                    <Button disabled={!!off || saving} title={off ?? undefined} onClick={() => void commit()}>Save</Button>
-                </div>
-            }
+            nav={<PartNav off={off} saving={saving} onCancel={back} onSave={() => void commit()} />}
         >
             <Answer part={part} values={values} set={set} onEnter={() => void commit()} making={false} />
             {error && <div className="mt-3 text-center"><ChatError message={error} /></div>}

@@ -42,3 +42,20 @@ export const downloadStatus = (download: DownloadInfo): { text: string; classNam
             }
     }
 }
+
+// How long is left, from how fast it's come so far, only while it's arriving with a known size.
+export const timeLeft = (download: DownloadInfo, now = Date.now()): string | null => {
+    const { state, receivedBytes, totalBytes, startedAt } = download
+    const elapsed = now - startedAt
+    if (state !== 'progressing' || !download.path || totalBytes <= 0 || receivedBytes <= 0 || receivedBytes >= totalBytes || elapsed <= 0) return null
+    const seconds = Math.ceil(((totalBytes - receivedBytes) * elapsed) / receivedBytes / 1000)
+    if (seconds < 60) return `${seconds} s left`
+    const minutes = Math.round(seconds / 60)
+    return minutes < 60 ? `${minutes} min left` : `${Math.round(minutes / 60)} h left`
+}
+
+// The kind of file, as its ending: "pdf", "dmg". Null for a name with none, or one too long to be a kind.
+export const fileEnding = (filename: string): string | null => {
+    const ending = /\.([a-z0-9]{1,4})$/i.exec(filename)?.[1]
+    return ending ? ending.toLowerCase() : null
+}

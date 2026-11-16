@@ -227,6 +227,7 @@ const chromeAPI: ChromeAPI = {
     list: () => invoke("downloads:list"),
     act: (id, action) => invoke("downloads:act", id, action),
     chooseFolder: () => invoke("downloads:choose-folder"),
+    openFolder: () => invoke("downloads:open-folder"),
     onUpdated: (callback) => subscribe("downloads:updated", callback),
   },
   permissions: {

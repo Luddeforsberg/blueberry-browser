@@ -20,7 +20,8 @@ import { Favicon, siteIcon } from './Favicon'
 import { SentAttachments } from './AttachmentChips'
 import type { SentAttachment } from '@shared/attachments'
 import { RememberedLine } from './MemoryInChat'
-import { blankForm, setRoutinesView } from '../routinesView'
+import type { RoutineFormValues } from '../routinesView'
+import { SaveAsRoutineCard } from './SaveAsRoutine'
 
 const FOLLOW_DISTANCE = 120
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
@@ -285,13 +286,6 @@ const CopyAction: React.FC<{ content: string }> = ({ content }) => {
     )
 }
 
-// Save as routine: only what the user asked for, in a form they can change before saving it.
-export const saveChatAsRoutine = (title: string, messages: Array<{ role: string; content: string }>, mascotId: string | null) => {
-    const asked = messages.filter((message) => message.role === 'user').map((message) => message.content)
-    setRoutinesView({ page: 'form', values: blankForm(title, asked.join('\n\n'), mascotId) })
-    void window.chromeAPI.browser.openPage('routines')
-}
-
 // Whether a mascot has done something in this chat, so it has something to repeat.
 export const didWork = (messages: Array<{ role: string; steps?: ChatStep[] }>) =>
     messages.some((message) => message.role === 'assistant' && (message.steps?.length ?? 0) > 0)
@@ -300,8 +294,9 @@ export const didWork = (messages: Array<{ role: string; steps?: ChatStep[] }>) =
 export interface ReplyActions {
     // Carries on after Stop, or tries again after it went wrong, by saying so as the user.
     onSay: (words: string) => void
-    // Only after a job that did some work: a reply that's just an answer has nothing to repeat.
-    onSaveAsRoutine?: () => void
+    // Only after a job that did some work: a reply that's just an answer has nothing to repeat. What to do and who does
+    // it, from the chat, for the card under the reply that asks only when.
+    routineFromChat?: () => RoutineFormValues
 }
 
 const stepsWord = (count: number) => `${count} ${count === 1 ? 'step' : 'steps'}`
@@ -397,6 +392,7 @@ export const AssistantMessage: React.FC<{
     gutter?: boolean
 }> = ({ content, steps = [], statusLine, isStreaming = false, waiting = false, mascot, error, memoryIds, pages = [], startedAt, actions, origin, onShowWork, gutter = false }) => {
     const [open, setOpen] = useState(false)
+    const [routine, setRoutine] = useState<RoutineFormValues | null>(null)
     const { showBerry } = useShell().settings
     const failed = error !== undefined
     const working = isStreaming && steps.length > 0
@@ -455,13 +451,14 @@ export const AssistantMessage: React.FC<{
             {actions && !isStreaming && !stopped && !failed && content && (
                 <div className="-mt-3.5 -ml-1.5 h-7 flex gap-0.5 opacity-0 transition-opacity duration-fast group-hover/reply:opacity-100 group-focus-within/reply:opacity-100">
                     <CopyAction content={content} />
-                    {actions.onSaveAsRoutine && (
-                        <ReplyAction label="Save as routine" onClick={actions.onSaveAsRoutine}>
+                    {actions.routineFromChat && (
+                        <ReplyAction label="Save as routine" onClick={() => setRoutine(routine ?? actions.routineFromChat?.() ?? null)}>
                             <Repeat aria-hidden className="size-[15px]" strokeWidth={1.75} />
                         </ReplyAction>
                     )}
                 </div>
             )}
+            {routine && actions?.routineFromChat && <SaveAsRoutineCard from={routine} onClose={() => setRoutine(null)} />}
         </WithFace>
     )
 }

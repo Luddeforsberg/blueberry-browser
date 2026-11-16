@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { useChatThread } from '../contexts/ChatContext'
-import { AssistantMessage, ChatApprovalCard, UserMessage, WentWrong, didWork, saveChatAsRoutine, useFollowReply, type ReplyActions, type ReplyOrigin } from '../components/ChatMessage'
+import { AssistantMessage, ChatApprovalCard, UserMessage, WentWrong, didWork, useFollowReply, type ReplyActions, type ReplyOrigin } from '../components/ChatMessage'
+import { chatRoutine } from '../routinesView'
 import { useAssistantName } from '../components/Berry'
 import { MemoryOffers } from '../components/MemoryInChat'
 import { ChatComposer } from '../components/Composer'
@@ -62,7 +63,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     const actions: ReplyActions = {
         onSay: (words) => void window.chromeAPI.chat.send(chatId, words, { seePage: false, mascotId: mascot.id }),
-        onSaveAsRoutine: didWork(thread.messages) ? () => saveChatAsRoutine(thread.title, thread.messages, thread.mascotId) : undefined,
+        routineFromChat: didWork(thread.messages) ? () => chatRoutine(thread.title, thread.messages, thread.mascotId) : undefined,
     }
 
     const onRunner = !!thread.runner && running && roomBeside

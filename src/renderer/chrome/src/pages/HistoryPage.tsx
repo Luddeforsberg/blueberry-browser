@@ -1,57 +1,80 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import type { HistoryCursor, HistoryEntry } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
-import { useAssistantName } from '../components/Berry'
+import { Berry, useAssistantName } from '../components/Berry'
 import { Favicon } from '../components/Favicon'
-import { groupByDay } from './historyDays'
+import { EmptySheet, PageFrame, PageHeader, SearchField } from '../components/PageFrame'
+import { BETWEEN, SettingsGroup } from '../components/SettingsRow'
+import { foldVisits, groupByDay, siteOf, type VisitRun } from './historyDays'
+
+// DESIGN.md section 10, History: a page in a tab, with a group for each day, newest first.
 
 const SEARCH_DELAY_MS = 150
+const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus'
+// A row is 40px. The hairline between rows starts where the words do, after the time and the icon.
+const ROW = cn(BETWEEN, 'group/visit relative before:left-[90px]')
 
 const timeOf = (visitedAt: number) =>
     new Date(visitedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-const hostOf = (url: string) => {
-    try {
-        return new URL(url).hostname.replace(/^www\./, '')
-    } catch {
-        return url
-    }
-}
-
+// One visit: the time in mono, the site's icon, the title and the site. Pressing it opens the page in a new tab, and
+// Remove shows on the row you're on.
 export const HistoryRow: React.FC<{
     entry: HistoryEntry
     onOpen: () => void
     onDelete: () => void
-}> = ({ entry, onOpen, onDelete }) => (
-    <li className="group/visit relative">
+    // Inside a folded group, the site is said once already.
+    inGroup?: boolean
+}> = ({ entry, onOpen, onDelete, inGroup = false }) => (
+    <li className={ROW}>
         <button
             type="button"
             onClick={onOpen}
-            className={cn(
-                "w-full h-9 pl-2 pr-9 flex items-center gap-3 rounded-row text-14 text-left outline-none transition-colors",
-                "hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
-            )}
+            className={cn('w-full h-10 pl-4 pr-3.5 flex items-center gap-3 text-left transition-colors hover:bg-hover active:bg-press', FOCUS)}
         >
-            <span className="w-12 shrink-0 text-13 text-ink-2 tabular-nums">{timeOf(entry.visitedAt)}</span>
+            <span className="w-[38px] shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">{timeOf(entry.visitedAt)}</span>
             <Favicon src={entry.favicon} site={entry.url} />
-            <span className="min-w-0 truncate">{entry.title}</span>
-            <span className="min-w-0 shrink-[2] truncate text-13 text-ink-2">{hostOf(entry.url)}</span>
+            <span className="min-w-0 truncate text-14 font-medium text-ink">{entry.title || siteOf(entry.url)}</span>
+            {!inGroup && <span className="min-w-0 shrink-[2] truncate text-13 text-ink-2">{siteOf(entry.url)}</span>}
+            <span className="flex-1" />
         </button>
-        <button
-            type="button"
-            aria-label={`Delete ${entry.title} from history`}
-            onClick={onDelete}
-            className={cn(
-                "absolute right-1.5 top-1.5 size-6 flex items-center justify-center rounded-row text-ink-2 outline-none transition-colors",
-                "opacity-0 group-hover/visit:opacity-100 focus-visible:opacity-100 hover:bg-press hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
-            )}
-        >
-            <X className="size-3" strokeWidth={1.75} />
-        </button>
+        <span className="absolute right-3 top-1.5 opacity-0 transition-opacity group-hover/visit:opacity-100 group-focus-within/visit:opacity-100">
+            <Button size="sm" variant="raised" aria-label={`Remove ${entry.title || siteOf(entry.url)} from history`} onClick={onDelete}>Remove</Button>
+        </span>
     </li>
 )
+
+// Visits in a row to the same site, as one row with the site and how many, which opens in place to show them.
+const VisitGroup: React.FC<{ run: VisitRun; onOpen: (entry: HistoryEntry) => void; onDelete: (entry: HistoryEntry) => void }> = ({ run, onOpen, onDelete }) => {
+    const [open, setOpen] = useState(false)
+    const newest = run.entries[0]
+    return (
+        <li className={cn(BETWEEN, 'before:left-[90px]')}>
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+                className={cn('w-full h-10 pl-4 pr-3.5 flex items-center gap-3 text-left transition-colors hover:bg-hover active:bg-press', FOCUS)}
+            >
+                <span className="w-[38px] shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">{timeOf(newest.visitedAt)}</span>
+                <Favicon src={newest.favicon} site={newest.url} />
+                <span className="min-w-0 truncate text-14 font-medium text-ink">{run.site}</span>
+                <span className="shrink-0 font-mono text-11.5 text-ink-2 tabular-nums">{run.entries.length} visits</span>
+                <span className="flex-1" />
+                <ChevronDown aria-hidden className={cn('size-3.5 shrink-0 text-faint transition-transform duration-fast', open && 'rotate-180')} strokeWidth={1.75} />
+            </button>
+            {open && (
+                <ul aria-label={`Visits to ${run.site}`} className="pl-6">
+                    {run.entries.map((entry) => (
+                        <HistoryRow key={entry.id} entry={entry} inGroup onOpen={() => onOpen(entry)} onDelete={() => onDelete(entry)} />
+                    ))}
+                </ul>
+            )}
+        </li>
+    )
+}
 
 // Every page visited, by day, newest first. It's only here, on this computer.
 export const HistoryPage: React.FC = () => {
@@ -88,69 +111,50 @@ export const HistoryPage: React.FC = () => {
         if (await browser.clearHistory()) await load(query, null)
     }
 
+    const open = (entry: HistoryEntry) => void browser.createTab(entry.url)
+    const searching = query.trim() !== ''
+
     return (
-        <div className="h-full overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-10">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-20 font-semibold">History</h1>
-                        <p className="mt-1 text-14 text-ink-2">Pages you’ve visited, kept on this computer.</p>
-                    </div>
-                    <Button variant="raised" disabled={!entries?.length && !query} onClick={() => void clear()}>
-                        Clear history
-                    </Button>
+        <PageFrame>
+            <PageHeader title="History" actions={<Button variant="raised" disabled={!entries?.length && !query} onClick={() => void clear()}>Clear…</Button>}>
+                Pages you’ve visited, kept on this computer.
+            </PageHeader>
+            <SearchField label="Search history" value={query} onChange={setQuery} autoFocus />
+
+            {failed && (
+                <p role="alert" className="mt-5 mx-3 text-14 text-ask">
+                    Your history couldn’t be read. Close this tab and try again.
+                </p>
+            )}
+
+            {entries?.length === 0 && !failed && (
+                <EmptySheet className="mt-5" face={searching ? undefined : <Berry mood="rest" size={56} />}>
+                    {searching
+                        ? `No pages match “${query.trim()}”.`
+                        : isBerry ? 'Nothing here yet. Pages you visit are kept here, on this computer, until you clear them.' : 'Nothing here yet.'}
+                </EmptySheet>
+            )}
+
+            {groupByDay(entries ?? []).map((day) => (
+                <SettingsGroup key={day.key} label={day.label}>
+                    <ul aria-label={day.label} className="rounded-sheet overflow-hidden">
+                        {/* A search shows every match, so nothing it found is folded away. */}
+                        {(searching ? day.entries.map((entry): VisitRun => ({ key: String(entry.id), site: '', entries: [entry] })) : foldVisits(day.entries)).map((run) =>
+                            run.entries.length === 1 ? (
+                                <HistoryRow key={run.key} entry={run.entries[0]} onOpen={() => open(run.entries[0])} onDelete={() => void remove(run.entries[0].id)} />
+                            ) : (
+                                <VisitGroup key={run.key} run={run} onOpen={open} onDelete={(entry) => void remove(entry.id)} />
+                            )
+                        )}
+                    </ul>
+                </SettingsGroup>
+            ))}
+
+            {next && (
+                <div className="mt-5 flex justify-center">
+                    <Button variant="raised" onClick={() => void load(query, next)}>Show more</Button>
                 </div>
-
-                <div className="relative mt-6">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-2" strokeWidth={1.75} />
-                    <input
-                        type="search"
-                        aria-label="Search history"
-                        placeholder="Search history"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        spellCheck={false}
-                        autoFocus
-                        className="w-full h-9 pl-9 pr-3 rounded-tile border bg-sheet text-14 outline-none placeholder:text-ink-2 focus-visible:ring-2 focus-visible:ring-focus"
-                    />
-                </div>
-
-                {failed && (
-                    <p role="alert" className="mt-6 text-14 text-ask">
-                        Your history couldn’t be read. Close this tab and try again.
-                    </p>
-                )}
-
-                {entries?.length === 0 && !failed && (
-                    <p className="mt-10 text-center text-14 text-ink-2">
-                        {query.trim()
-                            ? `No pages match “${query.trim()}”.`
-                            : isBerry ? 'Nothing here yet. I looked under everything.' : 'Nothing here yet.'}
-                    </p>
-                )}
-
-                {groupByDay(entries ?? []).map((day) => (
-                    <section key={day.key} aria-label={day.label} className="mt-6">
-                        <h2 className="px-4 pb-1 text-14 font-medium">{day.label}</h2>
-                        <ul className="rounded-sheet border bg-sheet p-2">
-                            {day.entries.map((entry) => (
-                                <HistoryRow
-                                    key={entry.id}
-                                    entry={entry}
-                                    onOpen={() => void browser.createTab(entry.url)}
-                                    onDelete={() => void remove(entry.id)}
-                                />
-                            ))}
-                        </ul>
-                    </section>
-                ))}
-
-                {next && (
-                    <div className="mt-6 flex justify-center">
-                        <Button variant="raised" onClick={() => void load(query, next)}>Show more</Button>
-                    </div>
-                )}
-            </div>
-        </div>
+            )}
+        </PageFrame>
     )
 }
