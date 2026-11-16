@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
 import type { ChatThread, NeedsYouItem } from '@shared/library'
 import { Lock, Star } from 'lucide-react'
@@ -9,6 +9,7 @@ import { cn } from '@common/lib/utils'
 import { toUrl } from '@common/lib/url'
 import { useAssistantName } from './Berry'
 import { TabIcon } from './TabIcon'
+import { useAddressSuggestions } from './useAddressSuggestions'
 import { setRoutinesView } from '../routinesView'
 import { BERRY_ID } from '@shared/mascots'
 
@@ -100,6 +101,9 @@ export const AddressBar: React.FC = () => {
     const job = useJobHere(activeTab)
     const words = useWorkWords(job.working ? job.chatId : null)
     const name = useAssistantName(job.mascot)
+    const form = useRef<HTMLFormElement>(null)
+    const input = useRef<HTMLInputElement>(null)
+    const suggestions = useAddressSuggestions({ editing: isFocused, value: url, setValue: setUrl, field: form, input, onDone: () => setIsFocused(false) })
 
     useEffect(() => {
         if (!isFocused) setUrl(editableUrl(activeTab))
@@ -114,6 +118,7 @@ export const AddressBar: React.FC = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
+        if (suggestions.submit()) return
         if (!url.trim()) return
         navigateToUrl(toUrl(url))
         setIsFocused(false)
@@ -123,16 +128,18 @@ export const AddressBar: React.FC = () => {
     // still chip at its left, and going somewhere takes the tab over, as clicking in the page does.
     if (isFocused) {
         return (
-            <form onSubmit={handleSubmit} className={cn(FIELD, 'gap-2 pl-[7px] pr-3 bg-sheet ring-2 ring-focus')}>
+            <form ref={form} onSubmit={handleSubmit} className={cn(FIELD, 'gap-2 pl-[7px] pr-3 bg-sheet ring-2 ring-focus')}>
                 {job.working ? <Mascot mood="fetching" size={22} look={job.mascot.look} name={name} still /> : <span className="w-1" />}
                 <input
+                    ref={input}
                     type="text"
                     aria-label="Address"
+                    aria-autocomplete="both"
                     value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    onChange={suggestions.onChange}
                     onFocus={(e) => e.target.select()}
                     onBlur={cancel}
-                    onKeyDown={(e) => e.key === 'Escape' && cancel()}
+                    onKeyDown={(e) => !suggestions.onKeyDown(e) && e.key === 'Escape' && cancel()}
                     className="flex-1 min-w-0 h-full bg-transparent text-14 text-ink caret-ink outline-none placeholder:text-faint"
                     placeholder="Search or enter address"
                     disabled={!activeTab}

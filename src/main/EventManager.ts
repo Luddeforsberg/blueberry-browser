@@ -34,6 +34,7 @@ export class EventManager {
       chrome: endpoint(this.mainWindow.chromeView),
       overlay: endpoint(this.mainWindow.overlayView),
       find: endpoint(this.mainWindow.findBar.chromeView),
+      suggestions: endpoint(this.mainWindow.addressSuggestions.chromeView),
       prompt: endpoint(this.mainWindow.permissionPrompt.chrome),
       // There's no such view while the feature is off, so nothing can claim to be it.
       desktop: this.mainWindow.desktopBerry.chromeView && endpoint(this.mainWindow.desktopBerry.chromeView),
@@ -86,6 +87,14 @@ export class EventManager {
     );
 
     this.handle("tab:navigate", (tabId, url) => this.mainWindow.navigateTab(tabId, url));
+
+    this.handle("history:suggest", (text) => this.mainWindow.suggestHistory(text));
+
+    this.handle("address:show", (request) => this.mainWindow.showAddressSuggestions(request));
+
+    this.handle("address:close", () => this.mainWindow.addressSuggestions.close());
+
+    this.handle("address:pick", (index) => this.mainWindow.pickAddressSuggestion(index));
 
     this.handle("history:recent", () => this.mainWindow.recentVisits);
 

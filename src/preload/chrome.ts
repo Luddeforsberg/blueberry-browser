@@ -126,6 +126,14 @@ const chromeAPI: ChromeAPI = {
     draft: () => invoke("recording:draft"),
     onUpdated: (callback) => subscribe("recording:updated", callback),
   },
+  address: {
+    suggestHistory: (text) => invoke("history:suggest", text),
+    show: (request) => invoke("address:show", request),
+    close: () => invoke("address:close"),
+    pick: (index) => invoke("address:pick", index),
+    onSuggestions: (callback) => subscribe("address:suggestions", callback),
+    onPicked: (callback) => subscribe("address:picked", callback),
+  },
   find: {
     search: (text) => invoke("find:search", text),
     step: (forward) => invoke("find:step", forward),

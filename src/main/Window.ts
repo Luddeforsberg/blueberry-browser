@@ -30,6 +30,7 @@ import { MemoryStore } from "./MemoryStore";
 import { PATTERN_WINDOW_MS } from "./suggestionPatterns";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
+import { AddressSuggestions } from "./AddressSuggestions";
 import { attachPageMenu, printPage } from "./pageMenu";
 import { SiteZoom } from "./siteZoom";
 import type { Downloads } from "./Downloads";
@@ -67,6 +68,7 @@ import type {
   TabInfo,
   ThemeState,
   Visit,
+  VisitedPage,
 } from "../shared/ipc";
 import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult, SavedSiteList } from "../shared/library";
 import { BERRY } from "../shared/mascots";
@@ -99,6 +101,8 @@ const MENU_CLICK_GRACE_MS = 1000;
 const AWAY_AFTER_IDLE_SECONDS = 60;
 const MAX_SUGGESTION_VISITS = 5000;
 const MAX_SUGGESTION_CHATS = 100;
+// What the address field sends to look up in the history, at most.
+const MAX_SUGGEST_TEXT = 200;
 // A page in the chrome that's stuck doesn't get to hold up the bird.
 const TAKE_OFF_ASK_MS = 300;
 
@@ -115,6 +119,7 @@ export class Window {
   private chrome: ChromeView;
   private overlay: ChromeView;
   readonly findBar: FindBar;
+  readonly addressSuggestions: AddressSuggestions;
   readonly siteZoom: SiteZoom;
   private floatingSidebarVisible = false;
   // What's open over the page from the horizontal toolbar, in the overlay view. Null when nothing is.
@@ -206,6 +211,8 @@ export class Window {
 
     this.findBar = new FindBar(this._baseWindow.contentView);
     this.openLinksInTabs(this.findBar.chromeView.view.webContents);
+    this.addressSuggestions = new AddressSuggestions(this._baseWindow.contentView);
+    this.openLinksInTabs(this.addressSuggestions.chromeView.view.webContents);
     this.siteZoom = new SiteZoom({
       levels: () => this.settings.siteZoom,
       save: (siteZoom) => {
@@ -532,6 +539,7 @@ export class Window {
       this.chrome.view.webContents.close();
       this.overlay.view.webContents.close();
       this.findBar.destroy();
+      this.addressSuggestions.destroy();
     });
   }
 
@@ -1092,6 +1100,7 @@ export class Window {
     }
 
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
+    this.addressSuggestions.close();
     // Opening anything from Chats or a card is done with it, even the tab already in front.
     this.closePopover(false);
     this.activeTabId = tabId;
@@ -1513,6 +1522,26 @@ export class Window {
     this.saveSessionSoon();
   }
 
+  // Pages in the history for the address field's suggestions. Only the chrome asks, and only while the field is edited.
+  suggestHistory(text: unknown): VisitedPage[] {
+    if (typeof text !== "string") return [];
+    return this.history.suggest(text.slice(0, MAX_SUGGEST_TEXT));
+  }
+
+  showAddressSuggestions(request: unknown): void {
+    const { width, height } = this._baseWindow.getContentBounds();
+    this.addressSuggestions.show(request, { width, height });
+  }
+
+  // A row pressed in the list goes back to the chrome, which acts on it as it would on Enter. The press took the keyboard
+  // to the list's view, so it comes back first.
+  pickAddressSuggestion(index: unknown): void {
+    const row = this.addressSuggestions.pick(index);
+    if (!row) return;
+    this.chrome.view.webContents.focus();
+    sendToRenderer(this.chrome.view.webContents, "address:picked", row);
+  }
+
   focusAddressBar(): void {
     this.chrome.view.webContents.focus();
     sendToRenderer(this.chrome.view.webContents, "toolbar:focus-address", null);
@@ -1635,6 +1664,7 @@ export class Window {
     }
     this.broadcast("theme:updated", this.theme);
     this.findBar.notifyTheme(this.theme);
+    this.addressSuggestions.notifyTheme(this.theme);
     this.desktopBerry.notifyTheme();
     sendToRenderer(this.permissionPrompt.chrome.view.webContents, "theme:updated", this.theme);
   }

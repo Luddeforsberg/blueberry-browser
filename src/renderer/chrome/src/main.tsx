@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { ChromeApp } from './ChromeApp'
 import { OverlayApp } from './OverlayApp'
 import { FindApp } from './FindApp'
+import { SuggestionsApp } from './SuggestionsApp'
 import { PromptApp } from './PromptApp'
 import { DesktopApp, DesktopComposerApp } from './DesktopApp'
 import './index.css'
@@ -22,6 +23,6 @@ const view = new URLSearchParams(window.location.search).get('view')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
+        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'suggestions' ? <SuggestionsApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
     </React.StrictMode>
 )

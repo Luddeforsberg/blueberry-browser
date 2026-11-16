@@ -7,8 +7,9 @@ import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, Mascot
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
 // nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own, and the
-// composer view is its prompt box, in another.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer";
+// composer view is its prompt box, in another. The suggestions view is the list under the address field while it's
+// being edited, over the page.
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -339,6 +340,40 @@ export interface ThemeState {
   platform: "mac" | "windows" | "other";
 }
 
+// One page in the history, for the address field: its newest visit and how many there were.
+export interface VisitedPage {
+  url: string;
+  title: string;
+  favicon: string | null;
+  lastVisit: number;
+  visits: number;
+}
+
+// A row under the address field. Titles and addresses are a page's own words, so they're only ever shown as text.
+export type AddressSuggestion =
+  | { kind: "tab"; tabId: string; title: string; url: string; favicon: string | null }
+  | { kind: "bookmark"; title: string; url: string; favicon: string | null }
+  // `when` is the last visit in words, such as "Yesterday".
+  | { kind: "history"; title: string; url: string; favicon: string | null; when: string }
+  // What Enter does today with the typed text: open it if it looks like an address, or search for it.
+  | { kind: "search"; text: string; url: string; opens: boolean }
+  // Asking the chosen mascot, as the new tab's composer does. `hidden` is Show Berry turned off.
+  | { kind: "ask"; text: string; name: string; look: MascotLook; hidden: boolean };
+
+// What the chrome asks the suggestions view to show. `field` is the address field, in the window.
+export interface AddressSuggestionsRequest {
+  rows: AddressSuggestion[];
+  selected: number | null;
+  field: Rect;
+}
+
+// What the suggestions view draws: the rows, and where the sheet goes in the view, from the layout owner.
+export interface AddressSuggestionsShown {
+  rows: AddressSuggestion[];
+  selected: number | null;
+  sheet: Rect;
+}
+
 // Where find in page has got to. `active` counts from 1.
 export interface FindResult {
   active: number;
@@ -438,6 +473,13 @@ export interface InvokeChannels {
   "history:clear": { region: "chrome"; args: []; result: boolean };
   "history:import-sources": { region: "chrome"; args: []; result: ImportSource[] };
   "history:import": { region: "chrome"; args: [sourceId: string]; result: HistoryImportResult };
+  // Pages in the history matching what's typed in the address field, one row per page, for its suggestions.
+  "history:suggest": { region: "chrome"; args: [text: string]; result: VisitedPage[] };
+  // Shows the list under the address field, or moves its selection. The chrome works out the rows.
+  "address:show": { region: "chrome"; args: [request: AddressSuggestionsRequest]; result: void };
+  "address:close": { region: "chrome"; args: []; result: void };
+  // A row pressed in the list, by its place in what's shown. Main hands that row back to the chrome to act on.
+  "address:pick": { region: "suggestions"; args: [index: number]; result: void };
   "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
   "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
@@ -461,7 +503,7 @@ export interface InvokeChannels {
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "overlay:open-popover": { region: "chrome"; args: [popover: Popover]; result: void };
   "overlay:close-popover": { region: "chrome" | "overlay"; args: [refocus: boolean]; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   // Moves a saved site on top as a tile, or into the bookmarks, at a place in that list. Dragging and the menu both use it.
@@ -647,6 +689,10 @@ export interface EventChannels {
   // A `blueberry://mascot/<id>` link was opened, so the Gallery shows that entry. Only ever a checked uuid.
   "gallery:linked": string;
   "toolbar:focus-address": null;
+  // To the suggestions view: what to draw, or null when it's hidden.
+  "address:suggestions": AddressSuggestionsShown | null;
+  // To the chrome: the row pressed in the list.
+  "address:picked": AddressSuggestion;
   "overlay:visibility": boolean;
   "overlay:popover": PopoverState;
   "recording:updated": RecordingState;
@@ -768,6 +814,15 @@ export interface RecordingAPI {
   discard: () => Promise<void>;
   draft: () => Promise<RecordedDraftResult>;
   onUpdated: (callback: (state: RecordingState) => void) => Unsubscribe;
+}
+
+export interface AddressAPI {
+  suggestHistory: (text: string) => Promise<VisitedPage[]>;
+  show: (request: AddressSuggestionsRequest) => Promise<void>;
+  close: () => Promise<void>;
+  pick: (index: number) => Promise<void>;
+  onSuggestions: (callback: (shown: AddressSuggestionsShown | null) => void) => Unsubscribe;
+  onPicked: (callback: (row: AddressSuggestion) => void) => Unsubscribe;
 }
 
 export interface FindAPI {
@@ -917,6 +972,7 @@ export interface ChromeAPI {
   work: WorkAPI;
   recording: RecordingAPI;
   find: FindAPI;
+  address: AddressAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
   memory: MemoryAPI;
