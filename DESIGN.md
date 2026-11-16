@@ -707,7 +707,7 @@ Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
 Opens as a tab with `⌘Y` (`Ctrl+Y` on Windows) and from the menu, with only one open at a time. The title, with **Clear…** raised on its right, one line saying it's the pages you've visited, kept on this computer, and the search field, which takes the keyboard. Then a group for each day, labelled Today, Yesterday or the date.
 
 - **A row** is 40px: the time in mono, the site's icon, the title at 14px medium, and the site at 13px in `ink-2`. Pressing it opens the page in a new tab. **Remove** shows on the row you're on.
-- **Visits in a row to the same site fold into one row,** with the site and how many, which opens in place to show them.
+- **Visits in a row to the same site fold into one row,** with the time of the newest, the site and how many in mono, which opens in place to show them. A search shows every match unfolded, since folding would hide what was found.
 - **Show more** loads the next hundred, and search covers titles and addresses. A search with nothing found says so in one sheet.
 
 Clear… asks first, in a native dialog, because it can't be undone. Deleting history also takes those pages out of tabs' back and forward lists, Reopen Closed Tab and the saved session, and an open tab keeps the page it's showing. Reloading a page isn't a new visit, and neither is coming back to one after a restart. Pages a mascot opens behind the chat stay out of history, and out of the address field's suggestions, until you go to that tab.
@@ -718,7 +718,7 @@ Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
 
 The title, with **Open folder** raised on its right, which shows the folder files are saved to, and one line under it. Then a group for each day, newest first.
 
-- **A row** has the kind of file on the 32px tile, as its ending in mono (`pdf`, `dmg`), its name at 14px medium, and one line at 13px in `ink-2`: its size, the site it came from, and while it's running how much has arrived and how long is left. A running one has a thin `ink` bar under the line.
+- **A row** has the kind of file on the 32px tile, as its ending in mono (`pdf`, `dmg`), or a file icon for a name with none, its name at 14px medium, and one line at 13px in `ink-2`: its size, the site it came from, and while it's running how much has arrived and how long is left. A running one has a thin `ink` bar under the line.
 - **What can be done shows on the row you're on:** Pause or Resume and Cancel while it runs, Open and Show in folder when it's finished, and Remove, which takes it off the list and leaves the file alone. Pressing a finished row opens the file.
 - A file that's gone says "File is missing" in `ask` and offers only Remove.
 

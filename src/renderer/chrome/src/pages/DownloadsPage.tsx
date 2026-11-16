@@ -1,29 +1,34 @@
 import React from 'react'
+import { Button } from '@common/components/Button'
 import { DownloadRow } from '../components/DownloadRow'
 import { useDownloads } from '../components/useDownloads'
+import { EmptySheet, PageFrame, PageHeader } from '../components/PageFrame'
+import { SettingsGroup } from '../components/SettingsRow'
+import { byDay } from './historyDays'
 
+// DESIGN.md section 10, Downloads: a page in a tab, with a group for each day, newest first. Open folder shows the
+// folder files are saved to, which main knows, so nothing here names a path.
 export const DownloadsPage: React.FC = () => {
     const downloads = useDownloads()
 
     return (
-        <div className="h-full overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-8 py-10">
-                <h1 className="text-20 font-semibold">Downloads</h1>
-                <p className="mt-1 text-14 text-ink-2">Files you download from the web.</p>
-                {downloads.length === 0 ? (
-                    <p className="mt-6 rounded-sheet border bg-sheet px-5 py-4 text-14 text-ink-2">Nothing here yet.</p>
-                ) : (
-                    <ul aria-label="Downloads" className="mt-6 rounded-sheet border bg-sheet divide-y overflow-hidden">
-                        {downloads.map((download) => (
-                            <DownloadRow
-                                key={download.id}
-                                download={download}
-                                onAction={(action) => void window.chromeAPI.downloads.act(download.id, action)}
-                            />
-                        ))}
-                    </ul>
-                )}
-            </div>
-        </div>
+        <PageFrame>
+            <PageHeader title="Downloads" actions={<Button variant="raised" onClick={() => void window.chromeAPI.downloads.openFolder()}>Open folder</Button>}>
+                Files you download from the web.
+            </PageHeader>
+            {downloads.length === 0 ? (
+                <EmptySheet>Nothing here yet. Files you download are saved straight to your folder and listed here.</EmptySheet>
+            ) : (
+                byDay(downloads, (download) => download.startedAt).map((day) => (
+                    <SettingsGroup key={day.key} label={day.label}>
+                        <ul aria-label={day.label}>
+                            {day.items.map((download) => (
+                                <DownloadRow key={download.id} download={download} onAction={(action) => void window.chromeAPI.downloads.act(download.id, action)} />
+                            ))}
+                        </ul>
+                    </SettingsGroup>
+                ))
+            )}
+        </PageFrame>
     )
 }

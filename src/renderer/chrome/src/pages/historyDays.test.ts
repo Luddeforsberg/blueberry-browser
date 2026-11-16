@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HistoryEntry } from '@shared/ipc'
-import { groupByDay } from './historyDays'
+import { foldVisits, groupByDay } from './historyDays'
 
 const at = (year: number, month: number, day: number, hour = 12): HistoryEntry => ({
     id: hour,
@@ -37,5 +37,24 @@ describe('groupByDay', () => {
     it('knows yesterday across a month boundary', () => {
         const [day] = groupByDay([at(2026, 9, 30)], new Date(2026, 9, 1, 12).getTime())
         expect(day.label).toBe('Yesterday')
+    })
+})
+
+describe('foldVisits', () => {
+    const visit = (id: number, url: string): HistoryEntry => ({ id, url, title: url, favicon: null, visitedAt: NOW - id })
+
+    it('folds visits in a row to the same site, and only in a row', () => {
+        const runs = foldVisits([
+            visit(1, 'https://www.klm.com/a'),
+            visit(2, 'https://klm.com/b'),
+            visit(3, 'https://svt.se/'),
+            visit(4, 'https://klm.com/c')
+        ])
+        expect(runs.map((run) => [run.site, run.entries.map((entry) => entry.id)])).toEqual([
+            ['klm.com', [1, 2]],
+            ['svt.se', [3]],
+            ['klm.com', [4]]
+        ])
+        expect(foldVisits([])).toEqual([])
     })
 })

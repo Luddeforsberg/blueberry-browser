@@ -122,6 +122,9 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await report.getByRole("button", { name: "Show report (1).txt in folder" }).click();
   const saved = join(folder, "report (1).txt");
   await expect.poll(shellCalls).toEqual([`open ${saved}`, `show ${saved}`]);
+  // The folder is main's to name: the page only asks for it.
+  await chrome.getByRole("button", { name: "Open folder" }).click();
+  await expect.poll(shellCalls).toEqual([`open ${saved}`, `show ${saved}`, `open ${folder}`]);
 
   // Cancelling leaves nothing behind.
   await switchToFiles();
