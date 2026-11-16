@@ -69,16 +69,14 @@ test.describe("attaching to a message", () => {
     const box = await newTab();
     await dialogChooses([file("notes.txt", "Booked for 2 080 kr.")]);
 
-    // By keyboard: the menu opens on its first row, and the list of tabs swaps in for it.
+    // By keyboard: the menu opens on its first row, which is the open tab itself.
     await plus().focus();
     await plus().press("Enter");
-    await expect(menu().getByRole("menuitem", { name: /An open tab/ })).toBeFocused();
+    await expect(menu().getByRole("menuitem", { name: /Flights to Lisbon/ })).toBeFocused();
     await chrome.keyboard.press("Enter");
-    const list = chrome.getByRole("menu", { name: "An open tab" });
-    await list.getByRole("menuitem", { name: /Flights to Lisbon/ }).click();
     await expect(plus()).toBeFocused();
     await plus().click();
-    await menu().getByRole("menuitem", { name: "A file" }).click();
+    await menu().getByRole("menuitem", { name: /A file/ }).click();
     await expect(chips().getByRole("group")).toHaveCount(2);
     await expect(chips().getByRole("group", { name: /The tab Flights to Lisbon/ })).toBeVisible();
     await expect(chips().getByRole("group", { name: "The file notes.txt" })).toBeVisible();
@@ -105,7 +103,7 @@ test.describe("attaching to a message", () => {
     const box = await newTab();
     await dialogChooses([1, 2, 3, 4, 5, 6].map((n) => file(`${n}.txt`, `File ${n}`)));
     await plus().click();
-    await menu().getByRole("menuitem", { name: "A file" }).click();
+    await menu().getByRole("menuitem", { name: /A file/ }).click();
     await expect(chips().getByRole("group")).toHaveCount(6);
     await expect(chips().getByRole("group", { name: "The file 6.txt, not added: 5 files at most" })).toBeVisible();
 
@@ -122,8 +120,7 @@ test.describe("attaching to a message", () => {
     // A job hands the user the tab to sign in, and waits.
     let box = await newTab();
     await plus().click();
-    await menu().getByRole("menuitem", { name: /An open tab/ }).click();
-    await chrome.getByRole("menu", { name: "An open tab" }).getByRole("menuitem", { name: /Flights to Lisbon/ }).click();
+    await menu().getByRole("menuitem", { name: /Flights to Lisbon/ }).click();
     model.callTools({ name: "hand_to_user", args: { need: "sign-in" } });
     await box.fill("Sign me in there");
     await box.press("Enter");
@@ -131,8 +128,7 @@ test.describe("attaching to a message", () => {
 
     box = await newTab();
     await plus().click();
-    await menu().getByRole("menuitem", { name: /An open tab/ }).click();
-    const held = chrome.getByRole("menu", { name: "An open tab" }).getByRole("menuitem", { name: /Flights to Lisbon/ });
+    const held = menu().getByRole("menuitem", { name: /Flights to Lisbon/ });
     await expect(held).toHaveAttribute("aria-disabled", "true");
     await expect(held).toContainText("You’re signing in there, so it stays yours");
     await chrome.keyboard.press("Escape");

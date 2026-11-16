@@ -143,7 +143,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         mascot: chosen,
         place: toRunner ? 'runner' : inCloud ? 'cloud' : 'here',
         // Show Berry how starts here too, for a routine shown rather than written.
-        showHow: { label: assistant === 'Assistant' ? 'Record a routine' : `Show ${assistant} how`, problem: recording ? 'It’s already watching' : null, onStart: () => void window.chromeAPI.recording.start() },
+        showHow: { label: assistant === 'Assistant' ? 'Record a routine' : `Show ${assistant} how`, note: assistant === 'Assistant' ? null : 'makes a routine', problem: recording ? 'It’s already watching' : null, onStart: () => void window.chromeAPI.recording.start() },
     })
 
     // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.

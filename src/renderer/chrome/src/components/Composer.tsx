@@ -354,7 +354,8 @@ export const Composer: React.FC<{
                 FOCUS
             )}
         >
-            <Plus className="size-4" strokeWidth={1.5} />
+            {/* Open, it's the way to close: the + turns to a ×. */}
+            <Plus className={cn('size-4 transition-transform duration-menu', adding && 'rotate-45')} strokeWidth={1.5} />
         </button>
     )
 
