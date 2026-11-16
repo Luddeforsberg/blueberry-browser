@@ -36,6 +36,9 @@ export const WhatLeaves: React.FC = () => {
                 >
                     <State on>When added</State>
                 </SettingsRow>
+                <SettingsRow id="leaves-routines" title="What a routine is told to do" description="When you save it, to give it a name, and each time it runs.">
+                    <State on>Always</State>
+                </SettingsRow>
                 <SettingsRow id="leaves-suggestions" title="Suggestions" description="Site names, page titles and searches from the last two weeks. Never page text." more={SUGGESTIONS_DETAIL}>
                     <State on={settings.suggestions}>{settings.suggestions ? 'On' : 'Off'}</State>
                 </SettingsRow>
