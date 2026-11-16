@@ -362,11 +362,13 @@ export const GalleryPage: React.FC = () => {
                             ]}
                             actions={{ onSay: () => undefined }}
                         />
-                        <WentWrong
-                            message="Couldn't reach the model. Check your connection and try again."
+                        <AssistantMessage
+                            content=""
+                            error="Couldn't reach the model. Check your connection and try again."
                             steps={[{ text: 'Opened klm.com', done: true, kind: 'open' }]}
                             actions={{ onSay: () => undefined }}
                         />
+                        <WentWrong message="Couldn't reach the model. Check your connection and try again." actions={{ onSay: () => undefined }} />
                         <ChatError message="The model is rate limited right now. Try again in a moment." />
                         <StepTrail
                             steps={[

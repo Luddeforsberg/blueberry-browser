@@ -15,8 +15,9 @@ const WORK_VIEW = 420
 const PICTURE_WIDTH = WORK_VIEW - 2 * 18
 const ROOM_FOR_WORK = WORK_VIEW + 480
 
-// The conversation and the prompt box share one column, so they line up however wide the page is.
-const COLUMN = 'w-full max-w-[720px] mx-auto px-7'
+// The conversation and the prompt box share one column, so they line up however wide the page is. A reply's face hangs
+// 36px out from it: 28px either side, or 36px where the page is too narrow for the face to go past the column's edge.
+const COLUMN = 'w-full max-w-[720px] mx-auto px-[clamp(28px,calc(396px_-_50%),36px)]'
 
 // A full page for talking to a mascot about anything, not about a web page.
 export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
@@ -93,13 +94,14 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     isStreaming={running && index === messages.length - 1}
                                     waiting={thread.approval !== null}
                                     mascot={mascot}
-                                    failed={message === failedReply}
+                                    error={message === failedReply && thread.error ? thread.error : undefined}
                                     memoryIds={message.memoryIds}
                                     pages={message.pages}
                                     startedAt={work && work.endedAt === null ? work.startedAt : undefined}
                                     actions={!running && index === messages.length - 1 ? actions : undefined}
                                     origin={index === firstReply ? origin : undefined}
                                     onShowWork={running && index === messages.length - 1 && work && roomBeside && workHidden ? () => setWorkHidden(false) : undefined}
+                                    gutter
                                 />
                             )
                         )}
@@ -112,7 +114,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         {thread.runner && running && !roomBeside && thread.approval?.handoff && (
                             <RunnerView chatId={chatId} steps={thread.steps} approval={thread.approval} />
                         )}
-                        {thread.error && !running && <WentWrong message={thread.error} steps={failedReply?.steps} mascot={mascot} actions={actions} />}
+                        {thread.error && !running && !failedReply && <WentWrong message={thread.error} mascot={mascot} actions={actions} gutter />}
                         {!running && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                     </div>
                 </div>

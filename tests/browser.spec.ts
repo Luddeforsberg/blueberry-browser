@@ -1106,10 +1106,13 @@ test("deleting the panel's chat starts it fresh", async () => {
   expect(model.requests.at(-1)?.messages.map((message) => message.role)).toEqual(["system", "user"]);
 });
 
-test("the thinking state says so beside the pips", async () => {
+test("the thinking state says so beside the mascot, whose face is the pips", async () => {
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("gallery"));
   const thinking = chrome.getByRole("status").filter({ hasText: "Thinking.." }).first();
-  await expect(thinking.locator("[data-pips=think]")).toBeVisible();
+  await expect(thinking).toBeVisible();
+  // The face and the words are the whole indicator, with no pips of the line's own.
+  await expect(thinking.locator("[data-pips]")).toHaveCount(0);
+  await expect(thinking.locator("xpath=../..").getByRole("img", { name: "Berry, thinking" })).toBeVisible();
 });
 
 test("a reply takes over from Thinking in place, and isn't redrawn when it ends", async () => {

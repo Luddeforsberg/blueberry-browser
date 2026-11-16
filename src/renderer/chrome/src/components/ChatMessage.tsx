@@ -15,6 +15,7 @@ import { useStill } from '@common/components/motion'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
+import type { Mood } from '@common/components/Mascot'
 import { Favicon, siteIcon } from './Favicon'
 import { RememberedLine } from './MemoryInChat'
 import { blankForm, setRoutinesView } from '../routinesView'
@@ -314,8 +315,57 @@ const OriginLine: React.FC<{ origin: ReplyOrigin }> = ({ origin }) => (
     </p>
 )
 
-// A mascot's reply: plain text on the sheet. While it works, the Working block comes first. Once it's done, the steps
-// fold into a chip beside the pages it used, then come Copy and Save as routine on the last reply.
+// A reply's face, beside its first line (DESIGN.md section 10). In the main chat it hangs in the gutter so the words keep
+// their column, and in the panel it's smaller and in line. Beside a Working block it lines up with the heading. With
+// Berry hidden there's no face, and the words take its place.
+const WithFace: React.FC<{
+    mascot?: MascotProfile
+    mood: Mood
+    still?: boolean
+    gutter: boolean
+    besideHeading?: boolean
+    className?: string
+    children: React.ReactNode
+}> = ({ mascot, mood, still, gutter, besideHeading = false, className, children }) => {
+    const { showBerry } = useShell().settings
+    const place = gutter ? cn('absolute -left-9', besideHeading ? 'top-[9px]' : 'top-0') : besideHeading ? 'mt-[11px]' : 'mt-0.5'
+    return (
+        <div className={cn('group/reply flex animate-fade-in', gutter ? 'relative' : 'gap-2')}>
+            {showBerry && <Berry mood={mood} size={gutter ? 24 : 20} mascot={mascot} still={still} className={cn('shrink-0', place)} />}
+            <div className={cn('min-w-0 flex-1', className)}>{children}</div>
+        </div>
+    )
+}
+
+// A line of its own and what to do about it, in a reply: for stopped and went wrong. The reply's face says which.
+const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.ReactNode }> = ({ words, alert, children }) => (
+    <div>
+        <p role={alert ? 'alert' : undefined} className="text-15 text-ink [overflow-wrap:anywhere]">{words}</p>
+        {children && <div className="mt-2.5 flex flex-wrap items-center gap-1.5">{children}</div>}
+    </div>
+)
+
+// What went wrong, in plain words, with Try again and the steps it got through. In the reply that went wrong, or on its
+// own when there's no reply.
+const WhatWentWrong: React.FC<{ message: string; steps: ChatStep[]; actions?: ReplyActions }> = ({ message, steps, actions }) => {
+    const [open, setOpen] = useState(false)
+    return (
+        <>
+            <TroubleLine words={message} alert>
+                {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
+                {steps.length > 0 && (
+                    <Button variant="outline" aria-expanded={open} onClick={() => setOpen(!open)}>
+                        {open ? 'Hide the steps' : `See the ${stepsWord(steps.length)}`}
+                    </Button>
+                )}
+            </TroubleLine>
+            {open && <StepList steps={steps} />}
+        </>
+    )
+}
+
+// A mascot's reply: plain text on the sheet, with its face beside it. While it works, the Working block comes first. Once
+// it's done, the steps fold into a chip beside the pages it used, then come Copy and Save as routine on the last reply.
 export const AssistantMessage: React.FC<{
     content: string
     steps?: ChatStep[]
@@ -325,8 +375,8 @@ export const AssistantMessage: React.FC<{
     // A card is waiting for the user's answer.
     waiting?: boolean
     mascot?: MascotProfile
-    // This reply went wrong on the way. What happened is said under it, by WentWrong.
-    failed?: boolean
+    // This reply went wrong on the way, and this is what happened.
+    error?: string
     // What its mascot went into this reply remembering.
     memoryIds?: string[]
     // The pages its job opened, which closed when it ended.
@@ -339,11 +389,16 @@ export const AssistantMessage: React.FC<{
     origin?: ReplyOrigin
     // While the working view is hidden.
     onShowWork?: () => void
-}> = ({ content, steps = [], statusLine, isStreaming = false, waiting = false, mascot, failed = false, memoryIds, pages = [], startedAt, actions, origin, onShowWork }) => {
+    // In the main chat, where the face hangs in the gutter.
+    gutter?: boolean
+}> = ({ content, steps = [], statusLine, isStreaming = false, waiting = false, mascot, error, memoryIds, pages = [], startedAt, actions, origin, onShowWork, gutter = false }) => {
     const [open, setOpen] = useState(false)
+    const { showBerry } = useShell().settings
+    const failed = error !== undefined
+    const working = isStreaming && steps.length > 0
     // While it runs: between steps, with no words yet, it says what it's doing. A step waiting on the user is already
-    // the live one.
-    const status = isStreaming && !content && !steps.some((step) => !step.done) ? statusRow(waiting) : null
+    // the live one. With no Working block the face is the pips, so the words stand alone.
+    const status = isStreaming && !content && !steps.some((step) => !step.done) ? statusRow(waiting, !working && showBerry) : null
     // Once it's done: a stopped reply says so in place of its last step, and the rest fold into a chip.
     const stopped = !isStreaming && steps.at(-1)?.text === STOPPED_STEP
     const done = stopped ? steps.slice(0, -1) : steps
@@ -351,16 +406,19 @@ export const AssistantMessage: React.FC<{
     const { shown, line } = trailFor(done, { running: false, open })
     const chip = !isStreaming && done.length > 1 && !failed
     const listed = isStreaming || failed ? [] : chip && !open ? shown.map(({ step }) => step) : chip ? done : []
+    // While it runs the face is the pips, which hold still beside a Working block, whose live step is what moves.
+    const mood: Mood = failed ? 'oops' : !isStreaming ? 'rest' : waiting ? 'asking' : 'thinking'
+    const besideHeading = working && !origin && !(statusLine && !content)
 
     // One tree whether it's running or done, with the words in the same place, so they aren't drawn again when it ends.
     return (
-        <div className="flex flex-col gap-4 animate-fade-in">
+        <WithFace mascot={mascot} mood={mood} still={working} gutter={gutter} besideHeading={besideHeading} className="flex flex-col gap-4">
             {origin && <OriginLine origin={origin} />}
             {mascot && <RememberedLine ids={memoryIds} />}
             {isStreaming ? (
                 <>
                     {statusLine && !content && <p role="status" className="text-15 text-ink-2 line-clamp-3">{statusLine}</p>}
-                    {steps.length > 0 ? (
+                    {working ? (
                         <WorkingBlock steps={steps} status={status} startedAt={startedAt} onShowWork={onShowWork} />
                     ) : (
                         status && <div role="status" className="h-6 flex items-center">{status}</div>
@@ -384,11 +442,12 @@ export const AssistantMessage: React.FC<{
             )}
             {listed.length > 0 && <StepList steps={listed} />}
             {stopped && (
-                <OneLine mascot={mascot} mood="rest" words={done.length ? `You stopped this after ${stepsWord(done.length)}.` : 'You stopped this.'}>
+                <TroubleLine words={done.length ? `You stopped this after ${stepsWord(done.length)}.` : 'You stopped this.'}>
                     {actions && <Button variant="outline" onClick={() => actions.onSay('Carry on')}>Carry on</Button>}
-                </OneLine>
+                </TroubleLine>
             )}
-            {actions && !isStreaming && !stopped && content && (
+            {failed && <WhatWentWrong message={error} steps={steps} actions={actions} />}
+            {actions && !isStreaming && !stopped && !failed && content && (
                 <div className="-mt-2 flex flex-wrap gap-1.5">
                     <CopyChip content={content} />
                     {actions.onSaveAsRoutine && (
@@ -399,46 +458,26 @@ export const AssistantMessage: React.FC<{
                     )}
                 </div>
             )}
-        </div>
+        </WithFace>
     )
 }
 
-// The mascot, a line of its own and what to do about it: for stopped and went wrong.
-const OneLine: React.FC<{ mascot?: MascotProfile; mood: 'rest' | 'oops'; words: string; alert?: boolean; children?: React.ReactNode }> = ({ mascot, mood, words, alert, children }) => {
+// A chat that went wrong before there was a reply to say so in: the face in Oops, and what happened.
+export const WentWrong: React.FC<{ message: string; mascot?: MascotProfile; actions?: ReplyActions; gutter?: boolean }> = ({ message, mascot, actions, gutter = false }) => (
+    <WithFace mascot={mascot} mood="oops" gutter={gutter}>
+        <WhatWentWrong message={message} steps={[]} actions={actions} />
+    </WithFace>
+)
+
+// Thinking, before a reply has anything to show, where there's no reply yet to show it in. The face is the pips.
+export const ThinkingMessage: React.FC<{ mascot?: MascotProfile; waiting?: boolean }> = ({ mascot, waiting = false }) => {
     const { showBerry } = useShell().settings
     return (
-        <div className="flex items-start gap-3 animate-fade-in">
-            {showBerry && <Berry mood={mood} size={26} mascot={mascot} className="shrink-0" />}
-            <div className="min-w-0 flex-1">
-                <p role={alert ? 'alert' : undefined} className={cn('text-15 text-ink [overflow-wrap:anywhere]', showBerry && 'mt-px')}>{words}</p>
-                {children && <div className="mt-2.5 flex flex-wrap items-center gap-1.5">{children}</div>}
-            </div>
-        </div>
+        <WithFace mascot={mascot} mood={waiting ? 'asking' : 'thinking'} gutter={false}>
+            <div role="status" className="h-6 flex items-center">{statusRow(waiting, showBerry)}</div>
+        </WithFace>
     )
 }
-
-// The last reply couldn't finish: what happened in plain words, Try again, and the steps it got through.
-export const WentWrong: React.FC<{ message: string; steps?: ChatStep[]; mascot?: MascotProfile; actions?: ReplyActions }> = ({ message, steps = [], mascot, actions }) => {
-    const [open, setOpen] = useState(false)
-    return (
-        <div className="flex flex-col gap-3">
-            <OneLine mascot={mascot} mood="oops" words={message} alert>
-                {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
-                {steps.length > 0 && (
-                    <Button variant="outline" aria-expanded={open} onClick={() => setOpen(!open)}>
-                        {open ? 'Hide the steps' : `See the ${stepsWord(steps.length)}`}
-                    </Button>
-                )}
-            </OneLine>
-            {open && <div className="pl-[38px]"><StepList steps={steps} /></div>}
-        </div>
-    )
-}
-
-// Thinking, before a reply has anything to show, where there's no reply yet to show it in.
-export const ThinkingMessage: React.FC<{ mascot?: MascotProfile }> = () => (
-    <div role="status" className="h-6 flex items-center animate-fade-in">{statusRow(false)}</div>
-)
 
 type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProfile }
 

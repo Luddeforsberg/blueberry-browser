@@ -70,16 +70,16 @@ export const Chat: React.FC = () => {
                                     isStreaming={message.isStreaming}
                                     waiting={approval !== null}
                                     mascot={mascot}
-                                    failed={message === failedReply}
+                                    error={message === failedReply && error ? error : undefined}
                                     memoryIds={message.memoryIds}
                                     pages={message.pages}
                                     actions={!isLoading && index === messages.length - 1 ? actions : undefined}
                                 />
                             )
                         )}
-                        {thinking && <ThinkingMessage mascot={mascot} />}
+                        {thinking && <ThinkingMessage mascot={mascot} waiting={approval !== null} />}
                         {chatId && approval && <div className="-mt-2"><ChatApprovalCard chatId={chatId} approval={approval} mascot={mascot} /></div>}
-                        {error && !isLoading && <WentWrong message={error} steps={failedReply?.steps} mascot={mascot} actions={actions} />}
+                        {error && !isLoading && !failedReply && <WentWrong message={error} mascot={mascot} actions={actions} />}
                         {!isLoading && <MemoryOffers key={chatId} sourceId={chatId} mascot={mascot} />}
                     </div>
                 )}

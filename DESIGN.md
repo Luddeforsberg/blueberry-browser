@@ -198,7 +198,7 @@ A finished step keeps one still mark for its kind: a diagonal for opened, the to
 
 **Where they go, and nowhere else:**
 
-1. **A mascot's face** while it works. The two eyes become the grid (section 9).
+1. **A mascot's face** while it works. The two eyes become the grid (section 9). Beside a reply that's still running, the face is the pips: on a bare Thinking line they move, and the face and the words are the whole indicator, with no pips of its own on the line. Beside a Working block they hold still, because the live step's pips are what moves there.
 2. **Status:** the address field while a mascot drives the tab, and the pills on the page.
 3. **Steps in a chat:** moving on the live one, a still mark on each finished one.
 4. **A loading tab,** where its favicon will be.
@@ -466,7 +466,8 @@ A full page for talking to a mascot about anything. A chat starts from the new t
 - **On a sheet.** The address field shows the chat's name.
 - **No line on top.** The conversation starts at the top of the sheet. The mascot is beside each reply, and the address field has the chat's name. Where a chat runs is only said when it isn't here: a cloud chat's first reply, and a runner chat's, starts with a quiet line in mono, the cloud icon and "in the cloud", over its words. One started from another app says so the same way, with no icon: "from Claude Code".
 - **One column.** The conversation and the prompt box share one column, at most 720px wide with 28px either side, so they line up however wide the page is.
-- **Your messages** are on `sheet-2`, at the right, with a small corner where a tail would be. A mascot's reply is plain text on the sheet.
+- **Your messages** are on `sheet-2`, at the right, with a small corner where a tail would be. A mascot's reply is plain text on the sheet, with its face, 24px, to the left of its first line. It hangs 36px out in the gutter, so the words keep the column. Where the page is too narrow for that, the column's sides grow from 28px to 36px. Beside a Working block the face lines up with its heading. With Berry hidden there's no face.
+- **One face per reply,** in the mood of what it's doing: the pips while it runs, asking while a card or a question waits, Oops when it went wrong, and at rest otherwise, stopped included. Stopped and went wrong say so in the reply, under its words, so their face is the reply's.
 - **While it works:** an outlined block headed **Working** with how long in mono, then its steps, each a pip mark and a line of mono. Finished ones are `ink-3`, the live one has moving pips and its words shimmer (section 7). While a job runs only its latest steps show, under a quiet line that opens the rest. Between steps the last line says "Thinking..", and while a card waits for you it says "Waiting for you.." with the pips in `ask`. A reply with no steps yet has that line alone, where its words will start.
 - **The prompt box** is at the bottom, and you can write while it works.
 - **What a step says:** what happened, in the user's terms: "Typed Lisbon in To", "Picked 12 to 16 Dec", "Clicked Search flights". Anything typed is cut at 24 characters. In a password, code or payment field it only ever names the field: "Typed in the password field".
@@ -482,8 +483,8 @@ Mock: [reply-states.html](./docs/design/mocks/reply-states.html).
 - **When the user is on the tab already,** Go to the tab goes, and **I'm done** is the filled one.
 - **Done.** The answer, then one row of chips: the steps folded into one ("7 steps on klm.com", which opens them) and each page it used, by icon and title, which open as your own tabs. Then **Copy** and, only after a job that did some work, **Save as routine**, as outlined chips, on the last reply only. A step worth seeing on any trail, something asked, refused or handed back, still shows under the chips while they're folded.
 - **Something to remember.** Rarely, under a finished reply, one strip on `sheet-2`: the mascot looking curious, the fact in the words it would be kept in, **Remember**, outlined, and **No thanks** as quiet text. Ignoring it is as good as No thanks. When and how seldom this appears, and what can never be kept, are unchanged: see What a bird remembers in the old document.
-- **Stopped.** The chips as for done, then the mascot at rest, "You stopped this after 3 steps.", and **Carry on**, outlined, which says "Carry on" as you.
-- **Went wrong.** The mascot in Oops, what happened in plain words, **Try again**, filled, which says "Try again" as you, and **See the 5 steps**, outlined, which opens them.
+- **Stopped.** The chips as for done, then "You stopped this after 3 steps.", with the reply's face at rest, and **Carry on**, outlined, which says "Carry on" as you.
+- **Went wrong.** The reply's face in Oops, what happened in plain words under anything it did write, **Try again**, filled, which says "Try again" as you, and **See the 5 steps**, outlined, which opens them.
 
 ### The working view
 
@@ -508,7 +509,7 @@ While a job uses tabs, it can be watched. On the right of the main chat, 420px w
 
 ### Chat panel
 
-A second sheet on the right, opened with `⌘E` (`Ctrl+E` on Windows), which pushes the page. Its header is the mascot, the chat's name, **New chat** and a close ×. Messages, steps, cards and the prompt box are the same components as the main chat, so the two sizes look like one chat: the steps sit in the same Working block, and the prompt box keeps its mascot pill.
+A second sheet on the right, opened with `⌘E` (`Ctrl+E` on Windows), which pushes the page. Its header is the mascot, the chat's name, **New chat** and a close ×. Messages, steps, cards and the prompt box are the same components as the main chat, so the two sizes look like one chat: the steps sit in the same Working block, and the prompt box keeps its mascot pill. A reply's face is 20px here, in line with an 8px gap, since the panel has no gutter to hang it in.
 
 - **One box everywhere.** The panel's prompt box and cards are the main chat's, white cards in `tray` shells. Mock 03 drew them as `sheet-2` cards in a `well` shell, to sit back from the panel's white sheet. Tried in the app, a grey card made an approval look switched off and took away the lift that marks it as needing you, and the page chip, `sheet-2` on `sheet-2`, all but vanished. In dark the two were nearly the same. So the panel keeps the one box.
 
