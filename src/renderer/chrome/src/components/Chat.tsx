@@ -23,16 +23,19 @@ export const Chat: React.FC = () => {
     const { find, chosen, choose } = useFlock()
     // A chat not started yet goes to whoever is chosen. After that, it stays with the mascot it started with.
     const mascot = chatId ? find(mascotId) : chosen
+    const library = useLibrary()
+    // An offer to remember arrives after the reply has ended, and has to be followed down like a step.
+    const offers = library.memory.offers.filter((offer) => offer.sourceId === chatId).length
     const scrollerRef = useFollowReply(
         messages.filter((message) => message.role === 'user').length,
         messages[messages.length - 1]?.content,
-        (messages[messages.length - 1]?.steps?.length ?? 0) + (approval ? 1 : 0)
+        (messages[messages.length - 1]?.steps?.length ?? 0) + (approval ? 1 : 0) + offers
     )
     const name = useAssistantName(mascot)
     const { activeTab } = useBrowser()
     const host = activeTab && !activeTab.page ? hostOf(activeTab.url) : null
     const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites)
-    const heldByUser = useLibrary().needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
+    const heldByUser = library.needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
 
     const last = messages.at(-1)
     // Before the reply has anything to show, there's no message for it yet.

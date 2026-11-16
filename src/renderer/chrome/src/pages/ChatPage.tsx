@@ -5,7 +5,7 @@ import { AssistantMessage, ChatApprovalCard, UserMessage, WentWrong, didWork, sa
 import { Berry, useAssistantName } from '../components/Berry'
 import { MemoryOffers } from '../components/MemoryInChat'
 import { ChatComposer } from '../components/Composer'
-import { useFlock } from '../contexts/LibraryContext'
+import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { useWorkView, WorkingStrip, WorkingView } from '../components/WorkingView'
 import { RunnerView } from '../components/RunnerView'
@@ -47,10 +47,12 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     // Nothing is captured while the view is hidden or has no room.
     const { view: work, frames } = useWorkView(chatId, roomBeside && !workHidden ? PICTURE_WIDTH : 0)
     const running = partial != null
+    // An offer to remember arrives after the reply has ended, and has to be followed down like a step.
+    const offers = useLibrary().memory.offers.filter((offer) => offer.sourceId === chatId).length
     const scrollerRef = useFollowReply(
         thread?.messages.filter((message) => message.role === 'user').length ?? 0,
         partial,
-        (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0)
+        (thread?.steps.length ?? 0) + (thread?.approval ? 1 : 0) + offers
     )
 
     // Chats begin on the new tab page, so this is only ever a moment while the chat loads, or one just deleted.
