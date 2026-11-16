@@ -110,17 +110,7 @@ export const LiveWords: React.FC<{ className?: string; children: React.ReactNode
 
 // What a job said it's doing, in its mascot's own words, while it works. Its answer replaces it.
 export const StatusLine: React.FC<{ text: string }> = ({ text }) => (
-    <p role="status" className="text-13 text-ink-2 line-clamp-2">{text}</p>
-)
-
-// Left foot, right foot.
-export const StepFootprint: React.FC<{ index: number }> = ({ index }) => (
-    <svg aria-hidden viewBox="-8 -8 16 16" className="size-4" style={{ transform: `rotate(${index % 2 ? 12 : -12}deg)` }} fill="currentColor">
-        <ellipse cx={0} cy={-3.6} rx={1.25} ry={2.9} />
-        <ellipse cx={-3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(-34 -3.2 -1.2)" />
-        <ellipse cx={3.2} cy={-1.2} rx={1.1} ry={2.5} transform="rotate(34 3.2 -1.2)" />
-        <ellipse cx={0} cy={3} rx={1} ry={2.1} />
-    </svg>
+    <p role="status" className="text-14 text-ink-2 line-clamp-2">{text}</p>
 )
 
 // Which pips a step has: the pattern while it's the live one, and its kind's still mark once it's done (DESIGN.md
@@ -174,7 +164,7 @@ const FoldLine: React.FC<{ open: boolean; onToggle: () => void; children: React.
         onClick={onToggle}
         className={cn('-mx-1.5 px-1.5 h-6 w-fit flex items-center gap-1.5 rounded-row font-mono text-11.5 text-ink-2 transition-colors hover:text-ink', FOCUS)}
     >
-        <ChevronDown aria-hidden className={cn('size-3 transition-transform duration-fast', !open && '-rotate-90')} strokeWidth={1.5} />
+        <ChevronDown aria-hidden className={cn('size-3 transition-transform duration-fast', !open && '-rotate-90')} strokeWidth={1.75} />
         {children}
     </button>
 )
@@ -221,7 +211,7 @@ const WorkingBlock: React.FC<{ steps: ChatStep[]; status: React.ReactNode; start
     const { shown, line } = trailFor(steps, { running: true, open })
     return (
         <section aria-label="Working" className="rounded-sheet px-3.5 pt-3 pb-[13px] shadow-[inset_0_0_0_1px_var(--line)]">
-            <h3 className="mb-[11px] h-[18px] flex items-center gap-2 text-13 font-medium text-ink">
+            <h3 className="mb-[11px] h-[18px] flex items-center gap-2 text-14 font-medium text-ink">
                 Working
                 {startedAt !== undefined && <Elapsed since={startedAt} />}
                 {/* Brings back the working view after Hide work. */}
@@ -229,7 +219,7 @@ const WorkingBlock: React.FC<{ steps: ChatStep[]; status: React.ReactNode; start
                     <button
                         type="button"
                         onClick={onShowWork}
-                        className={cn('-my-[3px] -mr-1.5 h-6 px-1.5 shrink-0 rounded-row text-12 font-regular text-ink-3 transition-colors hover:bg-hover hover:text-ink', startedAt === undefined && 'ml-auto', FOCUS)}
+                        className={cn('-my-[3px] -mr-1.5 h-6 px-1.5 shrink-0 rounded-row text-13 font-regular text-ink-3 transition-colors hover:bg-hover hover:text-ink', startedAt === undefined && 'ml-auto', FOCUS)}
                     >
                         Show work
                     </button>
@@ -248,7 +238,7 @@ const WorkingBlock: React.FC<{ steps: ChatStep[]; status: React.ReactNode; start
 // `tray` one keeps its fill and takes `hover` over it, so it darkens on a sheet as it does on the ground.
 export const chipClass = (bare = false) =>
     cn(
-        'h-7 max-w-full pl-[7px] pr-2.5 shrink-0 inline-flex items-center gap-[7px] rounded-row text-12 whitespace-nowrap transition-[background-color,color,transform] duration-fast active:scale-[.96]',
+        'h-7 max-w-full pl-[7px] pr-2.5 shrink-0 inline-flex items-center gap-[7px] rounded-row text-13 whitespace-nowrap transition-[background-color,color,transform] duration-fast active:scale-[.96]',
         bare
             ? 'shadow-[inset_0_0_0_1px_var(--line)] text-ink-2 hover:bg-hover hover:text-ink active:bg-press'
             : 'relative bg-tray text-ink-2 hover:text-ink after:absolute after:inset-0 after:rounded-[inherit] after:pointer-events-none after:bg-hover after:opacity-0 hover:after:opacity-100 active:after:bg-press',
@@ -290,7 +280,7 @@ const CopyAction: React.FC<{ content: string }> = ({ content }) => {
     }, [copied])
     return (
         <ReplyAction label={copied ? 'Copied' : 'Copy'} onClick={() => void navigator.clipboard.writeText(content).then(() => setCopied(true))}>
-            {copied ? <Check aria-hidden className="size-[15px]" strokeWidth={1.5} /> : <Copy aria-hidden className="size-[15px]" strokeWidth={1.5} />}
+            {copied ? <Check aria-hidden className="size-[15px]" strokeWidth={1.75} /> : <Copy aria-hidden className="size-[15px]" strokeWidth={1.75} />}
         </ReplyAction>
     )
 }
@@ -324,7 +314,7 @@ export interface ReplyOrigin {
 
 const OriginLine: React.FC<{ origin: ReplyOrigin }> = ({ origin }) => (
     <p className="-mb-3 h-[22px] flex items-center gap-1.5 font-mono text-11.5 text-ink-3">
-        {origin.cloud && <Cloud aria-hidden className="size-[13px] shrink-0" strokeWidth={1.5} />}
+        {origin.cloud && <Cloud aria-hidden className="size-[13px] shrink-0" strokeWidth={1.75} />}
         <span className="min-w-0 truncate">{origin.words}</span>
     </p>
 )
@@ -368,7 +358,7 @@ const WhatWentWrong: React.FC<{ message: string; steps: ChatStep[]; actions?: Re
             <TroubleLine words={message} alert>
                 {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
                 {steps.length > 0 && (
-                    <Button variant="outline" aria-expanded={open} onClick={() => setOpen(!open)}>
+                    <Button variant="raised" aria-expanded={open} onClick={() => setOpen(!open)}>
                         {open ? 'Hide the steps' : `See the ${stepsWord(steps.length)}`}
                     </Button>
                 )}
@@ -448,7 +438,7 @@ export const AssistantMessage: React.FC<{
                         <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={chipClass()}>
                             <Pips pattern="read" />
                             {line}
-                            <ChevronDown aria-hidden className={cn('size-3 transition-transform duration-fast', open && 'rotate-180')} strokeWidth={1.5} />
+                            <ChevronDown aria-hidden className={cn('size-3 transition-transform duration-fast', open && 'rotate-180')} strokeWidth={1.75} />
                         </button>
                     )}
                     <PageChips pages={pages} />
@@ -457,7 +447,7 @@ export const AssistantMessage: React.FC<{
             {listed.length > 0 && <StepList steps={listed} />}
             {stopped && (
                 <TroubleLine words={done.length ? `You stopped this after ${stepsWord(done.length)}.` : 'You stopped this.'}>
-                    {actions && <Button variant="outline" onClick={() => actions.onSay('Carry on')}>Carry on</Button>}
+                    {actions && <Button variant="raised" onClick={() => actions.onSay('Carry on')}>Carry on</Button>}
                 </TroubleLine>
             )}
             {failed && <WhatWentWrong message={error} steps={steps} actions={actions} />}
@@ -467,7 +457,7 @@ export const AssistantMessage: React.FC<{
                     <CopyAction content={content} />
                     {actions.onSaveAsRoutine && (
                         <ReplyAction label="Save as routine" onClick={actions.onSaveAsRoutine}>
-                            <Repeat aria-hidden className="size-[15px]" strokeWidth={1.5} />
+                            <Repeat aria-hidden className="size-[15px]" strokeWidth={1.75} />
                         </ReplyAction>
                     )}
                 </div>
@@ -503,7 +493,7 @@ const SendArrow: React.FC<{ label: string; ready: boolean }> = ({ label, ready }
         disabled={!ready}
         className={cn('size-[26px] shrink-0 rounded-full flex items-center justify-center bg-ink text-sheet transition-[background-color,transform] duration-fast hover:bg-ink/85 active:scale-[.96] disabled:bg-transparent disabled:text-faint', FOCUS)}
     >
-        <ArrowUp className="size-4" strokeWidth={1.5} />
+        <ArrowUp className="size-4" strokeWidth={1.75} />
     </button>
 )
 
@@ -529,13 +519,13 @@ const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =
                     value={answer}
                     placeholder="Type an answer"
                     onChange={(event) => setAnswer(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-13 text-ink outline-none placeholder:text-faint"
+                    className="min-w-0 flex-1 bg-transparent text-14 text-ink outline-none placeholder:text-faint"
                 />
                 <SendArrow label="Answer" ready={!!answer.trim()} />
             </form>
             <div className="mt-2 flex items-center gap-3">
                 <Button variant="ghost" className="-ml-1.5 px-1.5" onClick={() => send(false)}>Skip</Button>
-                <span className="ml-auto text-12 text-ink-2">Passwords and codes go in the page, never here.</span>
+                <span className="ml-auto text-13 text-ink-2">Passwords and codes go in the page, never here.</span>
             </div>
         </section>
     )
@@ -559,7 +549,7 @@ const HandoffActions: React.FC<{
     return (
         <div className="flex flex-wrap items-center gap-1.5">
             {!here && tabId && <Button onClick={() => void switchTab(tabId)}>Go to the tab</Button>}
-            <Button variant={here ? 'default' : 'outline'} onClick={() => send(true)}>I’m done</Button>
+            <Button variant={here ? 'default' : 'raised'} onClick={() => send(true)}>I’m done</Button>
             <Button variant="ghost" className="px-1.5" onClick={() => send(false)}>Not now</Button>
         </div>
     )
@@ -581,10 +571,10 @@ const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =>
     return (
         <CardInShell label={`${name} needs you`} note={<WaitingNote>{name} waits here until you say so</WaitingNote>}>
             <h3 className="mb-1.5 flex items-center gap-2 text-15 font-medium text-ink">
-                <Lock aria-hidden className="size-4 shrink-0" strokeWidth={1.5} />
+                <Lock aria-hidden className="size-4 shrink-0" strokeWidth={1.75} />
                 <span className="min-w-0 [overflow-wrap:anywhere]">{HANDOFF_TITLE[need]} {site}</span>
             </h3>
-            <p className="mb-3 text-13 leading-[1.45] text-ink-2">
+            <p className="mb-3 text-14 leading-[1.45] text-ink-2">
                 {name} has stepped back from this tab and can’t see it. What you type goes straight to the site.
             </p>
             <HandoffActions chatId={chatId} approval={approval} />
@@ -613,5 +603,5 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
 
 // Why something failed, worded with what to do about it.
 export const ChatError: React.FC<{ message: string }> = ({ message }) => (
-    <p role="alert" className="text-13 text-ask animate-fade-in">{message}</p>
+    <p role="alert" className="text-14 text-ask animate-fade-in">{message}</p>
 )

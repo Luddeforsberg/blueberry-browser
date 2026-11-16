@@ -16,7 +16,7 @@ import { lastExchange, type PublishValues } from '../flockView'
 import { useAccount } from '../useAccount'
 import { ExampleText, GalleryCard, Permissions } from './MascotGalleryPage'
 
-const INPUT = "w-full px-3 rounded-tile border bg-sheet text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+const INPUT = "w-full px-3 rounded-tile border bg-sheet text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
 const ROW = "py-5 border-b"
 const BIRD = 148
 // How far down the standing drawing its feet reach, so its toes grip the line under it.
@@ -24,16 +24,16 @@ const FEET_Y = 113 / 120
 
 const Field: React.FC<{ title: string; hint?: string; htmlFor?: string; children: React.ReactNode }> = ({ title, hint, htmlFor, children }) => (
     <div className={ROW}>
-        {htmlFor ? <label htmlFor={htmlFor} className="block text-13 font-medium">{title}</label> : <p className="text-13 font-medium">{title}</p>}
-        {hint && <p className="mt-0.5 text-13 text-ink-2">{hint}</p>}
+        {htmlFor ? <label htmlFor={htmlFor} className="block text-14 font-medium">{title}</label> : <p className="text-14 font-medium">{title}</p>}
+        {hint && <p className="mt-0.5 text-14 text-ink-2">{hint}</p>}
         <div className="mt-2">{children}</div>
     </div>
 )
 
 const Line: React.FC<{ term: string; children: React.ReactNode }> = ({ term, children }) => (
     <div className="grid grid-cols-[120px_1fr] gap-3 py-3 border-b last:border-b-0">
-        <dt className="text-13 text-ink-2">{term}</dt>
-        <dd className="min-w-0 text-13 [overflow-wrap:anywhere]">{children}</dd>
+        <dt className="text-14 text-ink-2">{term}</dt>
+        <dd className="min-w-0 text-14 [overflow-wrap:anywhere]">{children}</dd>
     </div>
 )
 
@@ -52,7 +52,7 @@ const Mark: React.FC<{ round?: boolean }> = ({ round = false }) => (
 
 const ExampleChoice: React.FC<{ checked: boolean; onPick?: () => void; children: React.ReactNode }> = ({ checked, onPick, children }) => (
     <li>
-        <label className="relative flex items-center gap-2 py-2 text-13">
+        <label className="relative flex items-center gap-2 py-2 text-14">
             <input type="radio" name="publish-example" className={REAL_INPUT} checked={checked} readOnly={!onPick} onChange={onPick} />
             <Mark round />
             {children}
@@ -189,8 +189,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     if (!mascot) {
         return (
             <>
-                <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft />Your mascots</Button>
-                <p className="mt-4 text-13 text-ink-2">This mascot is no longer one of yours.</p>
+                <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft strokeWidth={1.75} />Your mascots</Button>
+                <p className="mt-4 text-14 text-ink-2">This mascot is no longer one of yours.</p>
             </>
         )
     }
@@ -198,12 +198,12 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
     if (account.status === 'signed-in' && mascot.publishedId && !editing) {
         return (
             <div id="publish-top" className="max-w-2xl mx-auto">
-                <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Your mascots</Button>
+                <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft strokeWidth={1.75} />Your mascots</Button>
                 {/* It lands on the line under the heading with the job done, and the link is the next thing to do. */}
                 <header className="mt-3 flex items-end gap-6 border-b">
                     <div className="min-w-0 flex-1 pb-5 [overflow-wrap:anywhere]">
-                        <h1 className="text-18 font-medium">{mascot.name} is in the Gallery</h1>
-                        <p className="mt-1 text-13 text-ink-2">Anyone can read what it’s told and add their own copy. Send this to someone who’d like it.</p>
+                        <h1 className="text-20 font-semibold">{mascot.name} is in the Gallery</h1>
+                        <p className="mt-1 text-14 text-ink-2">Anyone can read what it’s told and add their own copy. Send this to someone who’d like it.</p>
                     </div>
                     <div key={mascot.publishedId} className="relative shrink-0" style={{ width: showBerry ? BIRD : 32, height: showBerry ? BIRD * FEET_Y : 32 }}>
                         <Berry mood="delivered" size={showBerry ? BIRD : 32} mascot={mascot} />
@@ -216,17 +216,17 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                             <p className="text-15 font-medium [overflow-wrap:anywhere]">{link}</p>
                             <div className="mt-3 flex flex-wrap gap-2">
                                 <CopyLink link={link} main />
-                                <Button variant="outline" size="sm" onClick={() => void window.chromeAPI.browser.createTab(link)}><ExternalLink />Open it</Button>
+                                <Button variant="raised" size="sm" onClick={() => void window.chromeAPI.browser.createTab(link)}><ExternalLink strokeWidth={1.75} />Open it</Button>
                             </div>
                         </>
                     ) : (
-                        <p className="text-13 text-ink-2">Its public page isn’t set up yet, so there’s no link to share. It’s in the Gallery all the same.</p>
+                        <p className="text-14 text-ink-2">Its public page isn’t set up yet, so there’s no link to share. It’s in the Gallery all the same.</p>
                     )}
                 </section>
 
                 {listed && (
                     <section aria-label="How it looks" className="pt-5">
-                        <h2 className="text-13 font-medium">How it looks in the Gallery</h2>
+                        <h2 className="text-14 font-medium">How it looks in the Gallery</h2>
                         <ul aria-label="Preview of the Gallery" className="mt-1 border-b-0 [&>li:last-child]:border-b">
                             <GalleryCard
                                 entry={{
@@ -250,26 +250,26 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     <Button variant="ghost" size="sm" className="text-ink-2" onClick={() => setEditing(true)}>Edit the listing</Button>
                     <Button variant="ghost" size="sm" className="text-ink-2" onClick={() => void unpublish()}>Unpublish</Button>
                 </div>
-                <p className="mt-1 text-12 text-ink-2">What you save on the mascot itself stays out of this until you edit the listing and update it.</p>
+                <p className="mt-1 text-13 text-ink-2">What you save on the mascot itself stays out of this until you edit the listing and update it.</p>
             </div>
         )
     }
 
     return (
         <div id="publish-top" className="max-w-2xl mx-auto">
-            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft />Your mascots</Button>
-            <h1 className="mt-3 text-18 font-medium [overflow-wrap:anywhere]">{mascot.publishedId ? `Edit ${mascot.name}’s listing` : `Publish ${mascot.name}`}</h1>
+            <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}><ArrowLeft strokeWidth={1.75} />Your mascots</Button>
+            <h1 className="mt-3 text-20 font-semibold [overflow-wrap:anywhere]">{mascot.publishedId ? `Edit ${mascot.name}’s listing` : `Publish ${mascot.name}`}</h1>
 
             {account.status === 'signed-out' && (
                 <>
-                    <p className="mt-1 mb-5 text-13 text-ink-2">Anyone can add a published mascot, so publishing needs an account. You’ll see everything that goes public before it does.</p>
+                    <p className="mt-1 mb-5 text-14 text-ink-2">Anyone can add a published mascot, so publishing needs an account. You’ll see everything that goes public before it does.</p>
                     <AccountForm problem={account.problem} onResult={setAccount} />
                 </>
             )}
 
             {account.status === 'signed-in' && (
                 <>
-                    <p className="mt-1 pb-5 border-b text-13 text-ink-2">{mascot.publishedId ? 'Nothing here changes what’s public until you press Update.' : 'Anyone will be able to read this and add a copy.'}</p>
+                    <p className="mt-1 pb-5 border-b text-14 text-ink-2">{mascot.publishedId ? 'Nothing here changes what’s public until you press Update.' : 'Anyone will be able to read this and add a copy.'}</p>
 
                     {draft && 'error' in draft && <div className="mt-4"><ChatError message={draft.error} /></div>}
 
@@ -289,8 +289,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     </Field>
 
                     <div className={ROW}>
-                        <h2 className="text-13 font-medium">An example</h2>
-                        <p className="mt-0.5 text-13 text-ink-2">Optional, and it shows people what it really does. Only these two pieces of text go, as you leave them. The rest of the chat, its pages, screenshots and steps stay here.</p>
+                        <h2 className="text-14 font-medium">An example</h2>
+                        <p className="mt-0.5 text-14 text-ink-2">Optional, and it shows people what it really does. Only these two pieces of text go, as you leave them. The rest of the chat, its pages, screenshots and steps stay here.</p>
                         <ul aria-label="Choose an example" className="mt-2 divide-y">
                             <ExampleChoice checked={!hasExample} onPick={() => void pickChat(null)}>No example</ExampleChoice>
                             {values.exampleChatId === 'published' && <ExampleChoice checked>The one already published</ExampleChoice>}
@@ -300,19 +300,19 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                                 </ExampleChoice>
                             ))}
                         </ul>
-                        {own.length === 0 && <p className="text-13 text-ink-2">{mascot.name} has no chats yet, so there’s nothing to pick. Chat with it first if you’d like an example.</p>}
+                        {own.length === 0 && <p className="text-14 text-ink-2">{mascot.name} has no chats yet, so there’s nothing to pick. Chat with it first if you’d like an example.</p>}
                         {hasExample && (
                             <div className="mt-3 flex flex-col gap-3">
-                                <label className="text-13">
+                                <label className="text-14">
                                     What you asked
                                     <textarea rows={3} maxLength={MAX_EXAMPLE_PROMPT} value={values.prompt} onChange={(event) => set({ prompt: event.target.value, checked: false })} className={cn(INPUT, "mt-1 py-2 resize-y")} />
                                 </label>
-                                <label className="text-13">
+                                <label className="text-14">
                                     What it gave you
                                     <textarea rows={8} value={values.answer} onChange={(event) => set({ answer: event.target.value, checked: false })} className={cn(INPUT, "mt-1 py-2 resize-y")} />
-                                    <span className={cn("block mt-1 text-12 tabular-nums", values.answer.length > MAX_EXAMPLE_ANSWER ? "text-ask" : "text-ink-2")}>{values.answer.length} of {MAX_EXAMPLE_ANSWER} characters</span>
+                                    <span className={cn("block mt-1 text-13 tabular-nums", values.answer.length > MAX_EXAMPLE_ANSWER ? "text-ask" : "text-ink-2")}>{values.answer.length} of {MAX_EXAMPLE_ANSWER} characters</span>
                                 </label>
-                                <label className="relative flex items-start gap-2 text-13">
+                                <label className="relative flex items-start gap-2 text-14">
                                     <input type="checkbox" className={REAL_INPUT} checked={values.checked} onChange={(event) => set({ checked: event.target.checked })} />
                                     <Mark />
                                     I’ve read both, and there’s nothing in them I wouldn’t show a stranger.
@@ -322,8 +322,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     </div>
 
                     <section aria-label="What goes public" className="mt-6">
-                        <h2 className="text-13 font-medium">Exactly what goes public</h2>
-                        <p className="mt-0.5 text-13 text-ink-2">This and nothing else: never your chats, your history or your account’s email.</p>
+                        <h2 className="text-14 font-medium">Exactly what goes public</h2>
+                        <p className="mt-0.5 text-14 text-ink-2">This and nothing else: never your chats, your history or your account’s email.</p>
                         <dl className="mt-2">
                             <Line term="Name and look">
                                 <span className="flex items-center gap-2">
@@ -341,7 +341,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     </section>
 
                     {warnings.length > 0 && (
-                        <ul aria-label="Before you publish" className="mt-4 flex flex-col gap-1 text-13 text-ask">
+                        <ul aria-label="Before you publish" className="mt-4 flex flex-col gap-1 text-14 text-ask">
                             {warnings.map((warning) => (
                                 <li key={warning} className="flex items-start gap-2">
                                     <AlertTriangle aria-hidden className="mt-[3px] size-4 shrink-0" />
@@ -354,7 +354,7 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                     {error && <div className="mt-4"><ChatError message={error} /></div>}
 
                     <div className="mt-6 flex items-center gap-3">
-                        {loadFailed && <Button variant="outline" onClick={() => setLoadTries((tries) => tries + 1)}>Try again</Button>}
+                        {loadFailed && <Button variant="raised" onClick={() => setLoadTries((tries) => tries + 1)}>Try again</Button>}
                         <Button disabled={busy || (Boolean(mascot.publishedId) && !values.filledIn) || (draft !== null && 'error' in draft)} onClick={() => void publish()}>{busy ? 'Publishing…' : mascot.publishedId ? 'Update what’s public' : 'Publish for anyone to read'}</Button>
                         <Button variant="ghost" onClick={mascot.publishedId ? () => setEditing(false) : onBack}>Cancel</Button>
                     </div>

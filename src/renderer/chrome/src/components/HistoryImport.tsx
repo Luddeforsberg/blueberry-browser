@@ -61,7 +61,7 @@ export const BringInHistory: React.FC = () => {
     const { sources, source, choose, busy, bringIn, message } = useHistoryImport()
     return (
         <>
-            <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-13 leading-[1.45] text-ink-2">
+            <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-14 leading-[1.45] text-ink-2">
                 {IMPORT_NOTES.join(' ')} <More text={IMPORT_DETAIL} />
             </p>
             {sources && source ? (
@@ -72,7 +72,7 @@ export const BringInHistory: React.FC = () => {
                         </SettingsRow>
                     )}
                     <SettingsRow id="setting-import" title="Your history there" description={message ? <span role="status">{message}</span> : undefined}>
-                        <Button variant="outline" size="sm" disabled={busy} onClick={() => void bringIn()}>
+                        <Button variant="raised" size="sm" disabled={busy} onClick={() => void bringIn()}>
                             {busy ? 'Bringing it in…' : `From ${source.name}`}
                         </Button>
                     </SettingsRow>

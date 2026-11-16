@@ -65,7 +65,7 @@ export const Onboarding: React.FC = () => {
             <main className="flex-1 flex flex-col items-center justify-center max-w-md text-center app-region-no-drag">
                 {name === 'meet' && (
                     <>
-                        <Berry mood="asking" size={160} />
+                        <Berry mood="rest" size={160} />
                         <h1 className="mt-6 text-30 font-medium">Hi, I’m Berry.</h1>
                         <p className="mt-3 text-15 text-ink-2">
                             Tell me what you’re working on and I’ll go and fetch what you need. I’ll always check with you before anything important.
@@ -89,7 +89,7 @@ export const Onboarding: React.FC = () => {
                                         aria-checked={settings.layoutMode === value}
                                         onClick={() => updateSettings({ layoutMode: value })}
                                         className={cn(
-                                            "p-3 pb-2 flex flex-col items-center gap-2 rounded-tile text-13 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                                            "p-3 pb-2 flex flex-col items-center gap-2 rounded-tile text-14 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
                                             settings.layoutMode === value ? "bg-sheet shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink"
                                         )}
                                     >
@@ -125,7 +125,7 @@ export const Onboarding: React.FC = () => {
                                 <SourceChoice sources={sources} source={source} choose={choose} />
                             </div>
                         )}
-                        <ul className="mt-4 flex flex-col gap-2 text-13 text-ink-2 text-left">
+                        <ul className="mt-4 flex flex-col gap-2 text-14 text-ink-2 text-left">
                             {IMPORT_NOTES.map((note, index) => <li key={note}>{note}{index === IMPORT_NOTES.length - 1 && <> <More text={IMPORT_DETAIL} /></>}</li>)}
                         </ul>
                         {message && <p role="status" className="mt-4 text-15">{message}</p>}
@@ -150,7 +150,7 @@ export const Onboarding: React.FC = () => {
                             <li>I only read a page when you ask, and the chat always shows which one.</li>
                             <li>I only speak up about work you started.</li>
                             <li>Your history stays on this computer, apart from a summary for suggestions, which you can turn off in Settings.</li>
-                            <li>I need an AI key to answer. For now it goes in Blueberry’s .env file.</li>
+                            <li>I need an AI key to answer.</li>
                         </ul>
                         <Button className="mt-8" onClick={finish}>Start browsing</Button>
                     </>

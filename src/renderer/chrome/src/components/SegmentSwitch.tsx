@@ -1,7 +1,7 @@
 import React from 'react'
 import { cn } from '@common/lib/utils'
 
-// A `tray` strip with the current side a sheet: the sidebar's Tabs and Chats, and Settings' five sections. `after` is
+// A `tray` strip with the current side a sheet with `chip`: the sidebar's Tabs and Chats, and Settings' five sections. `after` is
 // something said beside one side's name, such as the dot on Chats while anything needs you. The caller sizes it, with
 // its sides' radius two less than the strip's so the corners stay concentric.
 export const SegmentSwitch = <T extends string>({
@@ -27,7 +27,7 @@ export const SegmentSwitch = <T extends string>({
                 onClick={() => onChange(item.value)}
                 className={cn(
                     'min-w-0 px-1 flex items-center justify-center gap-1.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-focus',
-                    current === item.value ? 'bg-sheet text-ink font-medium shadow-rim' : 'text-ink-2 hover:text-ink'
+                    current === item.value ? 'bg-sheet text-ink font-medium shadow-chip' : 'text-ink-2 hover:text-ink'
                 )}
             >
                 <span className="truncate">{item.label}</span>

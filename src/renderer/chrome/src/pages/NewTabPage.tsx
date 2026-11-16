@@ -4,6 +4,7 @@ import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
 import { permissionsInWords } from '@shared/mascots'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
+import { LABEL } from '@common/components/StatusPill'
 import { looksLikeUrl, toUrl } from '@common/lib/url'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -84,7 +85,7 @@ const openJob = (item: Pick<NeedsYouItem, 'id' | 'job' | 'routineId'>) => {
 }
 
 const Label: React.FC<{ ask?: boolean; id: string; children: React.ReactNode }> = ({ ask, id, children }) => (
-    <h2 id={id} className={cn('mx-2 mb-1.5 font-mono text-11 lowercase', ask ? 'text-ask' : 'text-ink-3')}>{children}</h2>
+    <h2 id={id} className={cn('mx-3 mb-1.5', LABEL, ask && 'text-ask')}>{children}</h2>
 )
 
 const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
@@ -94,13 +95,14 @@ const WaitingRow: React.FC<{ item: NeedsYouItem }> = ({ item }) => {
     // An approval says what it would do, so it reads on from the mascot's name. A question or a handoff is already a sentence.
     const words = withSiteNames(approval.text)
     return (
-        <li className="h-11 pl-2 pr-[9px] flex items-center gap-[11px] rounded-tile bg-sheet text-13 text-ink shadow-rim">
-            <Berry mood="asking" size={24} mascot={mascot} />
+        <li className="min-h-12 py-2 pl-3 pr-2.5 flex items-center gap-[13px] rounded-[14px] bg-sheet text-14 text-ink shadow-chip">
+            <Berry mood="asking" size={26} mascot={mascot} />
             <span className="flex-1 min-w-0 truncate">
                 {approval.question || approval.handoff ? words : <><span className="font-medium">{name}</span> wants to {asContinuation(words)}</>}
                 <span className="text-ink-2">, on {item.job}</span>
             </span>
-            <Button size="sm" onClick={() => openJob(item)} aria-label={`Review ${item.job}`}>Review</Button>
+            {/* A row in a list never carries a filled button. */}
+            <Button size="sm" variant="raised" onClick={() => openJob(item)} aria-label={`Review ${item.job}`}>Review</Button>
         </li>
     )
 }
@@ -215,10 +217,11 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     return (
         <div className="relative h-full">
-            {/* The well's dot grid, fading towards the middle where the box is. */}
+            {/* The well's dot grid, which never sits behind text: it fades out across the column the box and the lists
+                are in, top to bottom. */}
             <div
                 aria-hidden
-                className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_62%_70%_at_50%_44%,transparent_0,transparent_46%,#000_100%)]"
+                className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:linear-gradient(90deg,#000_0,#000_calc(50%-420px),transparent_calc(50%-344px),transparent_calc(50%+344px),#000_calc(50%+420px),#000_100%)]"
             />
             {/* Placed by the page area's own height, not the window's: the box's middle at 43% of it, and the greeting
                 never nearer the top than 48px. 127px is from the greeting's top to the middle of the empty box. The lists
@@ -272,7 +275,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     <div className="w-full max-w-[640px] mt-[26px] flex flex-col gap-4">
                         {library.needsYou.length > 0 && (
                             <section aria-labelledby="new-tab-waiting">
-                                <Label ask id="new-tab-waiting">waiting for you</Label>
+                                <Label ask id="new-tab-waiting">Waiting for you</Label>
                                 <ul className="flex flex-col gap-1.5">
                                     {library.needsYou.map((item) => <WaitingRow key={item.id} item={item} />)}
                                 </ul>
@@ -280,8 +283,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         )}
                         {rows.length > 0 && (
                             <section aria-labelledby="new-tab-suggestions">
-                                <Label id="new-tab-suggestions">suggestions</Label>
-                                <ul>
+                                <Label id="new-tab-suggestions">Suggestions</Label>
+                                <ul className="flex flex-col gap-0.5">
                                     {rows.map((row) => (
                                         <SuggestionItem
                                             key={row.key}

@@ -152,11 +152,13 @@ Contrast, measured:
 
 - **Radius:** 9px for rows and small chips, 12px for tiles and groups, 16px for sheets and cards in the chat with 20px for the shell round one, 24px for the prompt card with 28px for its shell, and full for buttons, pills and Send.
 - **Spacing:** 4, 8, 12, 16, 24, 32, 48px. The mocks still carry a few values off this grid, and those go when it's built.
-- **Elevation** has three steps, and the last two are the only shadows:
+- **Elevation** has five steps. Everything that is a surface of its own has an edge you can see: a hairline and a soft shadow under it, never a flat fill on a flat ground.
 
 | Step | Light | Dark | Used for |
 |---|---|---|---|
-| `rim` | A 1px line at ink 7%, and `0 1px 2px` at ink 6% | A 1px line at white 8% | The page sheet, the active row |
+| `rim` | A 1px line at ink 7%, and `0 1px 2px` at ink 6% | A 1px line at white 8% | The page sheet |
+| `chip` | A 1px line at ink 9%, and `0 1px 2px` at ink 7% | A 1px line at white 10%, and `0 1px 2px` at black 40% | A raised button, the chosen side of a switch, a hovered row on the well |
+| `up` | A 1px line at ink 7%, `0 1px 1px` at ink 4%, `0 3px 6px -1px` at ink 5%, and `0 10px 20px -8px` at ink 10% | A 1px line at white 8%, and `0 10px 20px -8px` at black 50% | A group of rows on the well, the active row in the sidebar |
 | `card-lift` | `rim`, and `0 10px 24px -12px` at ink 20% | A 1px line at white 9%, and the same shadow at black 55% | A card in its shell |
 | `lift` | A 1px line at ink 6%, `0 1px 2px` at ink 5%, and `0 14px 34px -10px` at ink 16% | A 1px line at white 7%, and the same shadow at black 60% | Menus, the chat panel, the picture in the working view |
 
@@ -167,16 +169,18 @@ Two families, both bundled with the app and never fetched: **Geist** for words, 
 | Size | Family | Used for |
 |---|---|---|
 | 30px, medium, tight | Geist | The greeting on the new tab |
-| 18px | Geist | A page's title, such as History or Your mascots |
+| 20px, semibold, tight | Geist | A page's title, such as History or Your mascots |
 | 15px, regular or medium | Geist | The title of a card that needs you, what you type in any prompt box, and every message in a chat |
-| 13px | Geist | Everything else: rows, lists, body text outside a chat |
-| 12px | Geist | Buttons, pills, secondary lines |
-| 11.5px | Geist Mono | Status words, steps, exact words, times |
-| 11px | Geist Mono | Section labels, in lower case |
+| 14px | Geist | Everything else: rows, lists, body text outside a chat. A row's name is medium |
+| 13px | Geist | Buttons, and the second line of a row |
+| 12px, medium | Geist | Section labels, in words with a capital, in `ink-2`. Status pills |
+| 12px | Geist Mono | The exact words of what a mascot wants to do |
+| 11.5px | Geist Mono | Status words, steps, times, counts |
+| 11px | Geist Mono | A key on a keycap |
 
-- **Regular and medium only.**
+- **Regular and medium,** and semibold for a page's title alone.
 - **Tabular figures** wherever numbers line up, such as times and prices.
-- **Mono means "the machine's words":** what a mascot is doing or did, the exact words of what it wants to do, and labels. Never for a mascot's own reply.
+- **Mono means "the machine's words":** what a mascot is doing or did, the exact words of what it wants to do, a time, a count, a key. Never a label, never a value such as On or Not set up, never a mascot's limits, and never a mascot's own reply. A page of lower-case mono reads as a terminal, which this isn't.
 - **Status is present tense and ends in two dots** while it's happening: "Scanning fares..". A finished step is past tense with none: "Opened klm.com".
 - **Messages in a chat are 15px with a 1.55 line height,** yours and the mascot's, in the page and in the panel, because they're read at length. The mocks still draw them at 13px.
 
@@ -242,7 +246,7 @@ Crisp: quick to start, gently settling.
 
 ## 8. Component states
 
-Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell-and-chat.html).
+Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell-and-chat.html). The sizes, edges, pills and buttons as they are now: [polish.html](./docs/design/mocks/polish.html), which wins where the two differ.
 
 | State | Treatment |
 |---|---|
@@ -250,12 +254,18 @@ Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell
 | Hover | `hover` behind it. The filled button lightens a step |
 | Pressed | `press`, and it shrinks to 96%, in about 100ms |
 | Focused | A 2px `focus` ring with a 2px gap in the ground's colour, never removed. The prompt box is the exception, and so are the fields in the cards that make a mascot, which are built like it: the caret marks focus |
-| Current | A sheet: white, hairline, small shadow. The text stays regular, so rows don't shift |
+| Current | A sheet with `up`. The text stays regular, so rows don't shift |
 | Off | `tray` behind `faint` text, with a reason where possible, and based on real state |
 | Loading | The pips, only while work is really happening |
 | Error | `ask` with words and a way forward |
 
-- **Buttons have three roles:** filled in `ink` for the one decision, outlined beside it, and quiet text for everything else. A view has at most one filled button.
+- **Buttons have three roles:** filled in `ink` for the one decision, raised beside it, and quiet text for everything else. A view has at most one filled button, and a row in a list never carries one. A button is 32px tall with 13px medium text, or 28px where it belongs to a row. Filled has a 1px highlight along its top edge, white at 14%, and `0 1px 2px` at ink 25% under it. Raised is a sheet with `chip`, in `ink`: it replaces the outlined button everywhere, because a faint outline on a sheet reads as off.
+- **A row's own action shows on the row you're on:** Chat on a mascot, Pick up on a suggestion, as a 28px raised button on the hovered or focused row, with a faint arrow at rest. A decision is never hidden this way: Allow and Don't allow are always both on screen.
+- **State is a pill, never a mono word.** 24px tall, 12px medium, on `sheet-2`: "Not set up" in `ink-2`; "Connected" or "On" in `ink` after a 6px dot in `focus`; and in `ask` on `ask-bg` after an `ask` dot when it needs you, with what's wrong in two or three words. When there's a next step it's a raised button beside the pill, named for what it does: **Set up**, **Try again**.
+- **Icons** are 16px at a 1.75 stroke, in `ink-2` at rest and `ink` on anything current. An icon that stands for a thing, such as a connection, sits on a 32px tile with a 10px radius, `sheet-2` and a hairline, in `ink`.
+- **A row in a group** has its name at 14px medium and one line under it at 13px in `ink-2`. Text that doesn't fit is rewritten shorter before it's cut with an ellipsis.
+- **A section label** is words with a capital, 12px medium in `ink-2`, with its count and its + on the same line.
+- **The dot grid never sits behind text.** It fades out behind anything that's read.
 - **Send has three states:** off until there's something to send, filled when ready, and a filled stop square while a reply runs. It is always `ink`, never a mascot's colour.
 - **A switch between two things** is a segmented control, and the chosen side carries its name: "This Mac", "Cloud". The other side is its icon alone.
 - **Menus** are sheets with a 22px radius and `lift`. Rows are 40px, or 46px with a second line, and the hovered row gets a 14px-radius `sheet-2` fill.
@@ -356,15 +366,15 @@ Straight on the ground. Under the window controls is a switch between its two fa
 
 **Tabs** is a normal browser, with nothing of the assistant in the way of your tabs:
 
-- **Favourites:** a favourite is a bookmark kept on top, as a tile. Same things, two places: a saved site is in one or the other, and the star in the address field counts both. Tiles go four to a row, 40px tall on `tray` with a 12px radius, with the site's icon at 20px. The tile whose site is the tab in front looks selected, as the current tab does: a sheet with its rim. A favourite open in a tab behind gets no mark, and pressing it goes to that tab. With no favourites there's nothing here at all.
+- **Favourites:** a favourite is a bookmark kept on top, as a tile. Same things, two places: a saved site is in one or the other, and the star in the address field counts both. Tiles go four to a row, 40px tall on `tray` with a 12px radius, with the site's icon at 22px. The tile whose site is the tab in front looks selected, as the current tab does: a sheet lifted with `up`. A favourite open in a tab behind gets no mark, and pressing it goes to that tab. With no favourites there's nothing here at all.
 - **Moving between them is dragging,** with the menu saying the same. Drag a bookmark up onto the tiles to keep it on top where it's dropped, a tile down into the bookmarks to make it a plain bookmark there, or a tile along the others to reorder. A thin `ink` line shows where it lands, and what's dragged follows the pointer as a row on a sheet. While a bookmark is dragged with no favourites yet, a dashed, tile-high row says "Drop to keep on top". Escape puts it back. A bookmark's menu has **Keep on Top**, a tile's **Move to Bookmarks**, and both **Remove Bookmark**, so the keyboard reaches all of it through the menu key. The app menu's **Keep This Page on Top** does it for the page in front.
-- **Bookmarks:** a labelled section that folds, with folders. A folder row shows how many pages it holds and opens to them behind a dotted line. Rows are 27px with the site's icon. With nothing saved, the section keeps its place and says so in `faint`.
-- **A hairline,** then **Tabs** with a count and a plus. The current tab is a sheet, with its close ×. A loading tab shows the pips where its icon will be. An open chat is a tab like any page.
+- **Bookmarks:** a labelled section that folds, with folders. A folder row shows how many pages it holds and opens to them behind a dotted line. Rows are 32px, as every row in the sidebar is, with the site's icon at 18px. With nothing saved, the section keeps its place and says so in `faint`.
+- **A hairline,** then **Tabs** with a count and a plus. A row is 32px with its name at 14px in `ink` and its icon in `ink-2`. The current tab is a sheet lifted with `up`, with its close ×. A loading tab shows the pips where its icon will be. An open chat is a tab like any page.
 - **A job's tabs aren't yours.** While a job runs, its chat is a row with its mascot's face, on a `tray` group, and the tabs it opened sit under it, indented behind a dotted line. They close when the job ends, except any you took over.
 
 **Chats** is everything the mascots are doing, did and will do:
 
-- **Needs you** comes first, labelled in `ask` with a count. Each row is the asking mascot, the job's name and **Review**, which opens the chat at its card. Whenever anything is here, a dot in `ask` sits on the switch's Chats side, on either face.
+- **Needs you** comes first, labelled in `ask` with a count. Each row is a sheet with `chip` and is the button itself: the asking mascot, the job's name, and the waiting pips in `ask` at its end. Pressing it opens the chat at its card. Whenever anything is here, a dot in `ask` sits on the switch's Chats side, on either face.
 - **Working:** each running job, with its mascot's face the pips, and how long it's been going.
 - **Routines:** the next three by time, each with the mascot that runs it and when. The arrow on the label opens them all.
 - **Earlier:** past chats, newest first, each with the mascot that ran it and its age. **Show more** loads the rest.
@@ -373,7 +383,7 @@ Straight on the ground. Under the window controls is a switch between its two fa
 
 **A new profile starts with a flock,** so the dock and the pill have someone to show: Berry, and four starters from the Gallery, Plain Words, Competitor Watch, Meeting Prep and Newsletter Builder, one of each berry but the gooseberry. They're ordinary copies, to edit or delete, and they come once: deleting them never brings them back, and a profile that already has mascots of its own gets none.
 
-Section labels are 11px mono, lower case, in `ink-3`.
+Section labels are words with a capital, 12px medium in `ink-2`, with a count in mono and a + or an arrow on the same line.
 
 **The dock shows, it doesn't choose.** Pressing a mascot opens its card, above the dock and inside the sidebar: its name, what it may do, what you've allowed it without asking and a way to take each back, what it's doing now, its recent chats, and **New chat with** its name, which opens a new tab with it chosen. Under that, **All your mascots** in quiet text opens the mascots' page, which nothing else in the sidebar leads to. See [switching.html](./docs/design/mocks/switching.html).
 
@@ -383,7 +393,7 @@ Mock: [account-menu.html](./docs/design/mocks/account-menu.html).
 
 **You're beside the dock:** a 30px round button to its right, straight on the ground, with the first letter of your name on a sheet with its rim, or of your email until you've given a name. Signed out, it's a person glyph on `tray`. The dock keeps its room for Berry and four. While the menu is open the button has an `ink` ring.
 
-**The menu opens above the button, inside the sidebar,** as wide as the sidebar's rows, so it needs no overlay there. It's a sheet with a 16px radius and `lift`, and its rows are 30px like the sidebar's own, because it sits among them:
+**The menu opens above the button, inside the sidebar,** as wide as the sidebar's rows, so it needs no overlay there. It's a sheet with a 16px radius and `lift`, and its rows are 32px like the sidebar's own, because it sits among them:
 
 - **Who you are:** your name over your email, or the email alone with no name. Signed out, it says "Not signed in" beside a filled **Sign in**, which opens Settings at Account. With no server set up there's no account at all, so there's nothing here, and the button keeps the person glyph and is named as the menu.
 - **Theme:** Light, Dark and System as one segmented control, each with its icon and its name. It changes at once, and it's the same setting as in Settings. In dark the strip is `ground` with the chosen one on `sheet-2`, since `sheet-2` on the sheet would read as raised.
@@ -426,20 +436,20 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
 - **The greeting,** "Where to?", at 30px, with the chosen mascot at 40px beside it. It's a mark, not a control.
 - **The prompt box,** 640px.
-- **Under the box,** 26px down, at most two lists with mono labels. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with the asking mascot, one sentence and **Review**, filled. **Suggestions** follows, 16px under it. Mock: [under-the-prompt-box.html](./docs/design/mocks/under-the-prompt-box.html).
+- **Under the box,** 26px down, at most two lists with labels in words. **Waiting for you** comes first, labelled in `ask`, when anything is: each a row on a sheet with `chip`, with the asking mascot, one sentence and **Review**, raised, since a row in a list never carries a filled button. **Suggestions** follows, 16px under it. Mock: [under-the-prompt-box.html](./docs/design/mocks/under-the-prompt-box.html).
 - **Waiting for you reads as a sentence:** the asking mascot's name in medium, "wants to" and what it would do with addresses cut to their site, then the job's name in `ink-2`. A question or a sign-in is already a sentence, so it's shown as it is.
 - **Suggestions is one list of at most four rows,** in this order: the newest finished chat to **pick up**, one at most; then what Blueberry noticed, in the order it comes; then mascots to **try**, filling what's left, with the ones not chosen when the page opened first. It doesn't reorder while the page is open. Nothing is made up: every row is a real chat, a suggestion that passed its checks, or a mascot with an example from a real run. With nothing to show there's no list and no label.
-- **A row** is 34px, with a 9px radius: the mascot's face at 22px, one line with a title in medium `ink` and a reason in `ink-2`, cut with an ellipsis, and one mono word in `ink-3` at the right for its kind. The whole row is the button, with no pill.
+- **A row** has two lines and a 14px radius: the mascot's face at 26px, its title at 14px medium in `ink`, and under it a sentence on why it's there at 13px in `ink-2`, each cut with an ellipsis. The whole row is the button. At its right is a faint arrow, and on the row you're on, by pointer or keyboard, what pressing it does as a 28px raised button in its place.
 
-| Kind | Word | Face | Title, then reason | Pressing it |
+| Kind | Its button | Face | Title, then reason | Pressing it |
 |---|---|---|---|---|
-| A chat to pick up | `pick up` | its mascot, delivered | its title, then who finished it and when | opens the chat |
-| A prompt you repeat | `you repeat` | Berry | the suggestion, then why | puts the prompt in the box |
-| A routine | `routine` | its mascot | the suggestion, then why | opens a filled-in routine to save |
-| A mascot | `new mascot` | the draft's look, curious | the suggestion, then why | opens a filled-in mascot to save |
-| A mascot to try | `try` | it, at rest | its example prompt, then its name and limits in brief | chooses it, with the switch, and puts the example in the box |
+| A chat to pick up | Pick up | its mascot, delivered | its title, then who finished it and when, and "Pick up where it stopped." | opens the chat |
+| A prompt you repeat | Use | Berry | the suggestion, then why | puts the prompt in the box |
+| A routine | Set up | its mascot | the suggestion, then why | opens a filled-in routine to save |
+| A mascot | Make it | the draft's look, curious | the suggestion, then why | opens a filled-in mascot to save |
+| A mascot to try | Try | it, at rest | its example prompt, then its name and the first sentence of what it's for, since the renderer has no Gallery line for it there | chooses it, with the switch, and puts the example in the box |
 
-- **Its states:** at rest it's plain; hovered it takes `hover` on the row's radius; focused it has the standard ring; and **used**, while the box holds what it put there, it's a sheet with its rim, until the box is emptied or changed.
+- **Its states:** at rest it's plain; hovered or focused it's a sheet with `chip`, and focused it also has the standard ring; and **used**, while the box holds what it put there, it stays a sheet with `chip`, until the box is emptied or changed.
 - **A suggestion can be dismissed:** a × at the row's end, its own button beside the row's, shows on hover and while the row has the keyboard. Chats to pick up and mascots to try have none.
 - **With the sidebar collapsed,** a row of quiet buttons under the suggestions leads to Needs you, Routines, your mascots and Settings. The horizontal layout has none, since Chats, the dock and the menu are in its toolbar.
 
@@ -451,7 +461,7 @@ One component everywhere: the new tab, the chat as a page, the chat panel. It is
 
 - **The card** holds, from the top: chips for what it's been given to read, what you type, at 15px everywhere, over at least 50px on the new tab and 34px in a chat, and one row of tools. In a chat the card is 16px in a 20px shell, as an approval is, so the chat's cards read as one family, and its tools are the new tab's size. In a chat the card is `card`, which in dark is a step up from the page so it doesn't sink into it, and what's quiet on it is `card-2`: the +, the chips and the off Send. The mascot pill stays `sheet`, a step down from the card in dark, so it still reads as a pill. The new tab's card stays `sheet` on the well, where it already stands out. From the left: **+**, a 32px rounded square on the card's quiet fill, then the **This Mac / Cloud** switch. At the right: the **mascot pill**, then **Send**.
 - **What it's given to read** is chips at the top of the card, each with its ×: the page in front, by its icon and site and marked "this page"; an open tab, by its icon, title and site; a picture, by a small thumbnail and its name; any other file, by an icon, its name and a short fact where there's one worth saying, such as "3 pages" or "cut short". Chips are 28px on the card's quiet fill. No chip means the mascot sees no page and no file. Once sent, the same chips sit over the message, at the right, without ×.
-- **+ opens a menu** under the box on the new tab, and above it in a chat, as wide as the card. While it's open the + is turned to a × on `press`, and pressing it closes the menu. From the top: **This page**, in the chat panel while the page in front isn't a chip already; the user's **open tabs** under a mono label; a hairline; **A file**; and on the new tab **Show Berry how**. A row is one line: an icon, what it adds, and a quiet note at the right in mono 11px `ink-3`, which is a tab's site, "or drop it on the box" for a file and "makes a routine" for Show Berry how. The main chat has no page in front, so no This page.
+- **+ opens a menu** under the box on the new tab, and above it in a chat, as wide as the card. While it's open the + is turned to a × on `press`, and pressing it closes the menu. From the top: **This page**, in the chat panel while the page in front isn't a chip already; the user's **open tabs** under a label in words; a hairline; **A file**; and on the new tab **Show Berry how**. A row is one line: an icon, what it adds, and a quiet note at the right at 13px in `ink-3`, which is a tab's site, "or drop it on the box" for a file and "makes a routine" for Show Berry how. The main chat has no page in front, so no This page.
 - **The open tabs are in the menu itself,** newest first, so adding one is a single press. Up to four are listed. With more, three are, over **All 7 tabs**, which swaps the menu for the whole list under a quiet way back. A tab that can't go stays in the list, off, with why under its title in place of its site: "You're signing in there, so it stays yours" for a tab handed to the user, "Berry is working in it" for one another job is using, "Already added". Not listed: the tab in front, which is This page; Blueberry's own pages, which have nothing to read; and tabs a job opened, which aren't the user's to give. A mascot limited to sites is offered only tabs on them, and a line under the label says so in `permissionsInWords`'s words, "Deal Watcher only visits prisjakt.nu". With no tab to offer, one row, **An open tab**, stays in their place, off, and says why: "No other tabs are open".
 - **A file** opens the system's dialog. Pictures (PNG and JPEG), PDFs and plain text files, up to five a message and 10 MB each. Anything else is a chip in `ask` with the reason, such as "Videos can't be read", which never goes while the rest still do. Dropping files on the box does the same: while they're over it the shell takes a 1.5px `ink` ring and the card says "Drop to add" in place of its contents, at its own size. Pasting a picture or a file adds it, and pasted words stay typing.
 - **Rows that are ruled out stay and say why,** in `faint`, with the reason as their second line. A job going to the cloud can't take a tab from here: "A tab here can't go along to the cloud". One that runs with this computer off can't take a file either, and says so the same way. Chips already in the box take the same reason in `ask`, and don't go.
@@ -465,7 +475,7 @@ One component everywhere: the new tab, the chat as a page, the chat panel. It is
 
 Mock: [switching.html](./docs/design/mocks/switching.html), which is live.
 
-**One place:** the pill beside Send, on a box that's starting something new. It opens a menu under itself: one row per mascot with its face, its name and what it may do in a mono line, a tick on the current one, and a last line saying `@` in the box does the same. Typing `@` filters by name. Until `@` is built, that last line is **New mascot** instead, which opens the form for one. The menu opens above the pill in a chat, where the box sits at the bottom.
+**One place:** the pill beside Send, on a box that's starting something new. It opens a menu under itself: one row per mascot with its face, its name and what it may do in a line of words at 13px, a tick on the current one, and a last line saying `@` in the box does the same. Typing `@` filters by name. Until `@` is built, that last line is **New mascot** instead, which opens the form for one. The menu opens above the pill in a chat, where the box sits at the bottom.
 
 **What changes:**
 
@@ -503,15 +513,15 @@ A full page for talking to a mascot about anything. A chat starts from the new t
 
 Mock: [reply-states.html](./docs/design/mocks/reply-states.html).
 
-- **Asking, for leave to do something.** A card in a shell. The title is what it wants, as one sentence at 15px with addresses cut to their site. Under it, in a mono block on `card-2` and never cut, are the exact words from the tool, which are what's being allowed. Then **Allow**, filled, and **Don't allow**, outlined, in that order everywhere: here, on Needs you, on the phone page and in Telegram. The line under the card, with the pips in `ask`, says why it's asking, in words from code and never from a page or the model. Until the tool layer can say why, there's no line, and the Working block's last line says it's waiting. Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
+- **Asking, for leave to do something.** A card in a shell. The title is what it wants, as one sentence at 15px with addresses cut to their site. Under it, at 12px mono in an inset well on `card-2` with a hairline and a 10px radius, and never cut, are the exact words from the tool, which are what's being allowed. Then **Allow**, filled, and **Don't allow**, raised, both 32px, in that order everywhere: here, on Needs you, on the phone page and in Telegram. The line under the card, with the pips in `ask`, says why it's asking, in words from code and never from a page or the model. Until the tool layer can say why, there's no line, and the Working block's last line says it's waiting. Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
 - **Allow has three sizes.** Pressing Allow means just this once. Its arrow opens the other two: **For the rest of this job**, on this site, until the job ends, and **Always on** this site, for this mascot. Anything that pays, sends or deletes asks every time, and its Allow has no arrow. What's allowed for always is listed on the mascot's card, each with a way to take it back.
 - **A question.** Lighter on purpose, with no shell, because answering it lets nothing happen: the question at 15px, up to three answers to press, a field for your own on `sheet-2` with Send, and **Skip** as quiet text, with "Passwords and codes go in the page, never here." across from it. The field is a prompt box of its own, so the caret marks its focus. Passwords, codes and card details are never asked for here.
 - **Your turn.** A sign-in, a code or a captcha only the user can do. A card in a shell: a lock, "Sign in on", "Enter the code on" or "Solve the captcha on" and the site, and that the mascot has stepped back from the tab and can't see it, and what you type goes straight to the site. **Go to the tab**, then **I'm done**, which is the only thing that gives the tab back, and **Not now** as quiet text. The site comes from the tab's address and the words from code, so a page can't write them. The line under the card says the mascot waits here until you say so, with the pips in `ask` held still, because the live step above is already moving.
 - **When the user is on the tab already,** Go to the tab goes, and **I'm done** is the filled one.
 - **Done.** The answer, then one row of chips: the steps folded into one ("7 steps on klm.com", which opens them) and each page it used, by icon and title, which open as your own tabs. Then **Copy** and, only after a job that did some work, **Save as routine**, on the last reply only: 28px icons in `ink-3` with no words and no outline, each with its name as a tooltip and to assistive technology. They show only while the pointer is on that reply or the keyboard is in it, and their row keeps its height the rest of the time, so nothing moves. Copy turns to a tick for a moment once it's copied. The chips are what the reply found, so they always show. There's no thumbs up or down until pressing one would do something. A step worth seeing on any trail, something asked, refused or handed back, still shows under the chips while they're folded.
-- **Something to remember.** Rarely, under a finished reply, one strip on `sheet-2`: the mascot looking curious, the fact in the words it would be kept in, **Remember**, outlined, and **No thanks** as quiet text. Ignoring it is as good as No thanks. When and how seldom this appears, and what can never be kept, are unchanged: see What a bird remembers in the old document.
-- **Stopped.** The chips as for done, then "You stopped this after 3 steps.", with the reply's face at rest, and **Carry on**, outlined, which says "Carry on" as you.
-- **Went wrong.** The reply's face in Oops, what happened in plain words under anything it did write, **Try again**, filled, which says "Try again" as you, and **See the 5 steps**, outlined, which opens them.
+- **Something to remember.** Rarely, under a finished reply, one strip on `sheet-2`: the mascot looking curious, the fact in the words it would be kept in, **Remember**, raised, and **No thanks** as quiet text. Ignoring it is as good as No thanks. When and how seldom this appears, and what can never be kept, are unchanged: see What a bird remembers in the old document.
+- **Stopped.** The chips as for done, then "You stopped this after 3 steps.", with the reply's face at rest, and **Carry on**, raised, which says "Carry on" as you.
+- **Went wrong.** The reply's face in Oops, what happened in plain words under anything it did write, **Try again**, filled, which says "Try again" as you, and **See the 5 steps**, raised, which opens them.
 
 ### The working view
 
@@ -520,7 +530,7 @@ While a job uses tabs, it can be watched. On the right of the main chat, 420px w
 - **A heading** saying where the mascot is ("Berry is on klm.com"), or that it's waiting: "Waiting for your OK", "Has a question for you", or "Waiting for you" for a tab handed over. Once the job ends it says "Done", "Stopped here" or "It didn't finish". At its right, **Hide work**, which hides the view, and stops the pictures, until **Show work** at the right of the Working block's heading. Once the job has ended there's no Working block, and nothing to bring back: the reply's chips have its pages. While a card or a question waits, **Answer in the chat** is beside it, which goes to the card. A tab handed over is answered in the tab, so it has none.
 - **A picture** of the tab it's in, on a sheet with `lift`, the page's own shape, with its icon and site along its top on `sheet-2`. The page's own pills, and the mascot standing on what it acts on, are in the picture, because the tab counts as watched while it's on screen.
 - **A tab the user has,** handed over or taken over, is only that top row, with "You have this tab" at its end, and no picture.
-- **The job's tabs** as chips under it: the one it's in a sheet with its rim, the others on `tray`, a loading one with the pips for its icon. Pressing another goes to that tab, to watch. Then **Go to tab**, outlined, which goes to the one it's in. Neither takes the tab over.
+- **The job's tabs** as chips under it: the one it's in a sheet with its rim, the others on `tray`, a loading one with the pips for its icon. Pressing another goes to that tab, to watch. Then **Go to tab**, raised, which goes to the one it's in. Neither takes the tab over.
 - **A last line** in mono: how many tabs, that they're behind yours, and, while it works, that they close when it's done.
 - **No room:** with less than 900px of page, one line above the prompt box says where the mascot is or that it's waiting, with its face held still and **Go to tab** in mono, and pressing it goes there. There's no picture and nothing is captured.
 
@@ -575,24 +585,24 @@ Mock: [horizontal-layout.html](./docs/design/mocks/horizontal-layout.html). Thre
 
 Mock: [settings.html](./docs/design/mocks/settings.html).
 
-A page in a tab, on the well with no dot grid, in one column 620px wide. Under the title is a switch with five sections, as wide as the column and built like the sidebar's Tabs and Chats switch: a `tray` strip 32px tall, with the current section a sheet. There's no list down the side, because beside the sidebar it would be a second one. Each section is short enough to need no scrolling at the usual window size. The account menu opens General, and another page can open Settings at any section.
+A page in a tab, on the well with no dot grid, in one column 620px wide. The title is 20px semibold. Under it is a switch with five sections, as wide as the column and built like the sidebar's Tabs and Chats switch: a `tray` strip 32px tall, with the current section a sheet with `chip`. There's no list down the side, because beside the sidebar it would be a second one. Each section is short enough to need no scrolling at the usual window size. The account menu opens General, and another page can open Settings at any section.
 
-**A group is a sheet** with a 16px radius and its rim, under an 11px mono label. **A row** is 48px, or taller with a second line, with a hairline between rows that starts where the text does. Its name is on the left in `ink`, and on the right is one control: a switch, a segmented control, a quiet value with an outlined button, or an arrow to a page one step in. A row that opens something is a button from edge to edge. A row gets one sentence of explanation at most, in `ink-2` at 12px, which may run to a second line. Anything longer goes behind a quiet **More** at its end, or on a page one step in. Where setting something up needs a field, as on the pages behind Connections, it sits under the row's name at the row's full width.
+**A group is a sheet** with a 16px radius and `up`, under a label in words (section 8). **A row** is 52px, or taller with a second line, with a hairline between rows that starts where the text does. Its name is on the left at 14px medium in `ink`, and on the right is one control: a switch, a segmented control, a quiet value with a raised button, a state as a pill, or an arrow to a page one step in. A row that opens something is a button from edge to edge. A row gets one sentence of explanation at most, in `ink-2` at 13px, which may run to a second line. Anything longer goes behind a quiet **More** at its end, or on a page one step in. Where setting something up needs a field, as on the pages behind Connections, it sits under the row's name at the row's full width.
 
 - **A switch** is 34 by 20px. On is `focus` with a white knob, and off is `sheet-2` with a hairline.
 - **A choice with a picture:** Theme and Tabs are small drawings of the window, 86 by 56px, with the name under each. The chosen one has a 1.5px `ink` ring with a 2px gap. System is half light and half dark.
 
 **The sections:**
 
-- **General.** Under *look*: Theme (Light, Dark, System) and Tabs (On the side, On top). Under *browsing*: When Blueberry opens (Your tabs, A new tab), Save files to with **Change**, and Ask where to save each file.
-- **Mascots.** Under *at work*: Ask before acting (When risky, Always, Never), with a line under it saying what the chosen one means, and for Never what that risks. Then On the page they work in, and On your desktop, whose line names the shortcut or says another app has it. Under *how they look*: one choice, Moving, Still or Hidden, in place of two switches. Under *what they offer*: Suggestions and Offers to remember, each saying in one line what it sends.
-- **Privacy.** What leaves this computer, and Site permissions with how many sites have an answer saved. Under *history*: History, which opens the History page, and bringing it in from another browser, only when there's a browser to bring from.
-- **Connections.** Phone, Claude and other apps, and Cloud. Each is a row with an icon on a `sheet-2` tile, one line on what it's for, its state in mono (`off`, `on`, `ready`, and `pairing` while a phone is being connected) and an arrow to its page.
-- **Account.** Your name and email with **Sign out**. Under *you*: Name with **Change**, which makes it a field in the row, and Email. Under *published in the gallery*: each mascot you've published, with **Copy link** and **Unpublish**. Signed out, it's the sign-in form and one line on what an account is for. With no server, one row says this copy isn't set up for accounts.
+- **General.** Under *Look*: Theme (Light, Dark, System) and Tabs (On the side, On top). Under *Browsing*: When Blueberry opens (Your tabs, A new tab), Save files to with **Change**, and Ask where to save each file.
+- **Mascots.** Under *At work*: Ask before acting (When risky, Always, Never), with a line under it saying what the chosen one means, and for Never what that risks. Then On the page they work in, and On your desktop, whose line names the shortcut or says another app has it. Under *How they look*: one choice, Moving, Still or Hidden, in place of two switches. Under *What they offer*: Suggestions and Offers to remember, each saying in one line what it sends.
+- **Privacy.** What leaves this computer, and Site permissions with how many sites have an answer saved. Under *History*: History, which opens the History page, and bringing it in from another browser, only when there's a browser to bring from.
+- **Connections.** Phone, Claude and other apps, and Cloud. Each is a row with its icon on the 32px tile, one line on what it's for, its state as a pill and an arrow to its page. Phone is Not set up, Pairing while a phone is being connected, or Connected. Claude and other apps is Not set up, On, or Couldn't start in `ask`. Cloud is Not set up, Ready, Session open while one runs, or Session still open in `ask` when the provider didn't confirm the last end. Not set up has **Set up**, raised, in place of the arrow, which opens the same page as the row, and Session still open has **Try again**, which ends the session again.
+- **Account.** Your name and email with **Sign out**. Under *You*: Name with **Change**, which makes it a field in the row, and Email. Under *Published in the Gallery*: each mascot you've published, with **Copy link** and **Unpublish**. Signed out, it's the sign-in form and one line on what an account is for. With no server, one row says this copy isn't set up for accounts.
 
-**One step in.** A row's arrow opens its page in the same tab and the same column: a quiet back button naming the section it came from, the page's title at 18px, a line or two on what it is, then groups as above. The back button, the toolbar's Back and the Back shortcut all return to the section, because where Settings is lives in its tab, which is also how a restored session and another page find a section or a page. Two are drawn:
+**One step in.** A row's arrow opens its page in the same tab and the same column: a quiet back button naming the section it came from, the page's title at 20px semibold, a line or two on what it is, then groups as above. The back button, the toolbar's Back and the Back shortcut all return to the section, because where Settings is lives in its tab, which is also how a restored session and another page find a section or a page. Two are drawn:
 
-- **What leaves this computer** gathers what used to be rows of text, in three groups: *goes to the AI service* (your messages with the page you ask about, always, the tabs and files you attach, with the message you attach them to and, for a file, each later one in that chat, then Suggestions and Offers to remember with their state), *only when you start it* (publishing a mascot, a cloud job, answering from your phone) and *stays here*. It only says. The switches are in Mascots. Exactly what Suggestions and Offers to remember send is behind each row's **More**.
+- **What leaves this computer** gathers what used to be rows of text, in three groups: *Goes to the AI service* (your messages with the page you ask about, always, the tabs and files you attach, with the message you attach them to and, for a file, each later one in that chat, then Suggestions and Offers to remember with their state), *Only when you start it* (publishing a mascot, a cloud job, answering from your phone) and *Stays here*. It only says. The switches are in Mascots. Exactly what Suggestions and Offers to remember send is behind each row's **More**.
 - **Cloud:** the Browserbase key and session, the sites it's signed in to with **Add a site**, and what runs with this computer off. Add a site takes the keyboard to the field under the sites. The runner and ChatGPT or Claude keep their controls from before: the runner's email with **Link**, the address to copy with its steps and **Disconnect**, and the switch to run their jobs here.
 
 The pages behind Phone, Claude and other apps, Site permissions and bringing in history aren't drawn. Until they are, each keeps what it has today, laid out in these groups and rows.
@@ -603,34 +613,35 @@ Mocks: [your-mascots.html](./docs/design/mocks/your-mascots.html) and [making-a-
 
 A page in a tab, built like Settings: the well with no dot grid, one column 620px wide, groups as sheets. The dock, the account menu and New mascot in the chooser lead here. Where the page is lives in its tab, as in Settings, so Back, the toolbar's Back and a restored session all find the list, a mascot, one of its parts or its memory.
 
-**The list.** The title, with **Gallery** outlined and **New mascot** filled on its right, and one line under it. Then one sheet with a row per mascot, Berry first. A row is 66px and is a button from edge to edge that opens the mascot's page:
+**The list.** The title at 20px semibold, with **Gallery** raised and **New mascot** filled on its right, and one line under it. Then one sheet with `up` and a row per mascot, Berry first. A row is 64px and is a button from edge to edge that opens the mascot's page:
 
 - Its face at 36px, in the mood it's in: the pips while it works, round eyes with the `ask` dot while it waits for you.
-- Its name, one line on what it's for, and a mono line on what it may do, the same line the chooser and a mascot's card in the dock show (`limitsInBrief`). The mono line ends with how many routines it runs and how many things it remembers, when there are any.
-- On the right, what it's doing in mono: the pips and the site it's on while it works, or **working** while it has no page open, and **needs you** in `ask` while it waits. Only the pips move: the face beside them holds still. Then **Chat**, outlined, which starts a new chat with it, and the arrow.
+- Its name at 14px medium, and one line at 13px in `ink-2` on what it's for: Berry's own line, or the first sentence of its instructions, cut at a word. The Gallery's one-line description isn't on this page without asking the server, so it isn't used.
+- On the right, its limits as one pill, only where they're narrower than Berry's, in a few words (`narrowerLimits`): "Reads only", "This page · reads only", "Only klm.com". While it works, the pips and the site it's on in mono, or **working** with no page open, and while it waits, a **Needs you** pill in `ask` in place of its limits. Only the pips move: the face beside them holds still. Then a faint arrow.
+- **Chat**, which starts a new chat with it, is a 28px raised button that shows on the row you're on, by pointer or keyboard, in place of the pill.
 
 There are no cards and nothing to stand on. With mascots hidden a row starts with the plain icon.
 
-**A mascot's own page** is short. On top is a sheet that says who it is: its face at 64px, its name at 18px, the first three lines of what it's for, with the rest behind its row below, its limits as mono tags in the Gallery's words (`permissionsInWords`), and **Chat**. Under *change* is one row for each part, showing what it is now and an arrow: Look, Name, What it's for and Limits. Under *its things*: What it remembers with a count, Routines with their names and **New routine**, In the Gallery with its state, only where there's a Gallery server, and for a copy from the Gallery one line saying only its author can publish it, and Works in the cloud as a switch, only where the cloud is set up. Last, alone, **Delete** and its name in `ask`, which asks first. Nothing on this page needs Save, because each part saves where it's changed. Berry's page has no *change* group and no Delete.
+**A mascot's own page** is short. On top is a sheet that says who it is: its face at 64px, its name at 20px semibold, the first three lines of what it's for, with the rest behind its row below, its limits as pills in the Gallery's words (`permissionsInWords`), and **Chat**. Under *Change* is one row for each part, showing what it is now and an arrow: Look, Name, What it's for and Limits. Under *Its things*: What it remembers with a count, Routines with their names and **New routine**, In the Gallery with its state as a pill (Published, Not published, or A copy), only where there's a Gallery server, and for a copy from the Gallery one line saying only its author can publish it, and Works in the cloud as a switch, only where the cloud is set up. Last, alone, **Delete** and its name in `ask`, which asks first. Nothing on this page needs Save, because each part saves where it's changed. Berry's page has no *change* group and no Delete.
 
-**Making one is four questions,** one at a time, asked in the mascot's own voice. Each is a card set into a shell, 520px wide, like the prompt box. The mascot being made stands on the card's top edge at 72px, and changes as the answers do. In the card: the step in mono (`2 / 4`), the question at 18px, one line under it, and the answer. In the shell under the card: a round Back on the left, four dots in the middle with the current one long, and the filled button on the right.
+**Making one is four questions,** one at a time, asked in the mascot's own voice. Each is a card set into a shell, 520px wide, like the prompt box. The mascot being made stands on the card's top edge at 72px, and changes as the answers do. In the card: the step in mono (`2 / 4`), the question at 20px semibold, one line under it, and the answer. In the shell under the card: a round Back on the left, four dots in the middle with the current one long, and the filled button on the right.
 
 | Step | It asks | The answer | The button |
 |---|---|---|---|
 | 1 | What do I look like? | The six berries, then the six things to wear, drawn on the chosen berry. The berries not chosen are asleep, and the chosen one wakes. It starts on one picked at random, and **Surprise me** picks again, with a name | Continue |
 | 2 | What's my name? | One field, 30px, centred | Continue, once there's a name |
-| 3 | What should I do for you? | A text box at 15px. Under it, *or start from* and up to three of the bundled starters the user hasn't added, by name. Pressing one fills in its words and nothing else | Continue, once there are words. There's no Skip, because a mascot can't be saved without being told what it's for |
+| 3 | What should I do for you? | A text box at 15px. Under it, *Or start from* in words and up to three of the bundled starters the user hasn't added, by name. Pressing one fills in its words and nothing else | Continue, once there are words. There's no Skip, because a mascot can't be saved without being told what it's for |
 | 4 | Where can I go, and what can I do there? | Any site or Only these sites, with each site a mono chip with its ×, and Add a site. Then Go to pages, Click and choose, and Type, each a switch | Add and its name |
 
 - **The limits step uses plain words.** Its line says it can always read the pages it's allowed on, that it still asks before anything risky, and that no limit changes that. A site that isn't one is said under the chips in `ask`, and so is Only these sites with none.
-- **It ends on a card that reads it back:** the mascot looking pleased, *added to your mascots* in mono, its name at 30px, what it's for, its limits as tags, and **Give it a job**, which opens a new tab with it chosen, beside **Done**, which opens its page.
+- **It ends on a card that reads it back:** the mascot looking pleased, *Added to your mascots* as a label in words, its name at 30px, what it's for, its limits as pills, and **Give it a job**, which opens a new tab with it chosen, beside **Done**, which opens its page.
 - **Leaving** part way keeps nothing.
 - **Moving between steps** is a 200ms slide of the card's contents, and the mascot stays where it stands. Reduced motion and Still get a fade.
 - A suggestion that offers a mascot opens the same steps with its answers filled in.
 
-**Changing a part** is the same card, alone, one step in from the mascot's page: the mascot on top, the part's name in mono where the step number was, and **Cancel** and **Save** in the shell. Works in the cloud isn't a step, because all it does is preset a switch.
+**Changing a part** is the same card, alone, one step in from the mascot's page: the mascot on top, the part's name as a label in words where the step number was, and **Cancel** and **Save** in the shell. Works in the cloud isn't a step, because all it does is preset a switch.
 
-**What it remembers** is one step in from its page: the title with its name, one line saying that only what the user said yes to is kept, on this computer. An offer waiting for an answer is a card in a shell on top, with where it came from in mono, the words at 15px, and **Remember** and **Don't**. Then a group for each place, *anywhere* first, with a row per thing and **Change** and **Forget** on each. Change makes the row a field. **Forget everything** is last, in `ask`. With nothing kept, one sheet has the mascot and the sentence saying when it may ask.
+**What it remembers** is one step in from its page: the title with its name, one line saying that only what the user said yes to is kept, on this computer. An offer waiting for an answer is a card in a shell on top, with where it came from as a label in words, the words at 15px, and **Remember** and **Don't**. Then a group for each place, *Anywhere* first, with a row per thing and **Change** and **Forget** on each. Change makes the row a field. **Forget everything** is last, in `ask`. With nothing kept, one sheet has the mascot and the sentence saying when it may ask.
 
 ## 11. Not redrawn yet
 

@@ -45,7 +45,7 @@ const MascotMenu: React.FC<{ chosenId: string; above: boolean; onChoose: (id: st
                 }}
                 className={cn(menuRowClass(false), 'text-ink-2 hover:text-ink')}
             >
-                <span className="size-7 flex items-center justify-center"><Plus className="size-4" strokeWidth={1.5} /></span>
+                <span className="size-7 flex items-center justify-center"><Plus className="size-4" strokeWidth={1.75} /></span>
                 New mascot
             </button>
         </MenuSheet>
@@ -65,9 +65,9 @@ const MenuRow: React.FC<{ mascot: MascotProfile; checked: boolean; onChoose: () 
             <Berry size={28} mascot={mascot} still />
             <span className="flex-1 min-w-0">
                 <span className="block truncate">{name}</span>
-                <span className="block mt-px font-mono text-11 text-ink-3 truncate">{limitsInBrief(mascot)}</span>
+                <span className="block mt-px text-13 text-ink-2 truncate">{limitsInBrief(mascot)}</span>
             </span>
-            {checked && <Check className="size-4 shrink-0 text-ink" strokeWidth={1.5} />}
+            {checked && <Check className="size-4 shrink-0 text-ink" strokeWidth={1.75} />}
         </button>
     )
 }
@@ -83,7 +83,7 @@ const MascotPill: React.FC<{
 }> = ({ mascot, face, small, onCard, chooser }) => {
     const name = useAssistantName(mascot)
     const { keepBerryStill } = useShell().settings
-    const look = cn('shrink-0 flex items-center gap-[7px] rounded-full bg-sheet shadow-[inset_0_0_0_1px_var(--line)] text-12 text-ink', small ? 'h-7 pl-1 pr-2' : 'h-[30px] pl-[5px] pr-[9px]')
+    const look = cn('shrink-0 flex items-center gap-[7px] rounded-full bg-sheet shadow-[inset_0_0_0_1px_var(--line)] text-13 text-ink', small ? 'h-7 pl-1 pr-2' : 'h-[30px] pl-[5px] pr-[9px]')
     const drawn = (
         <span key={face?.arrival} className={cn('flex origin-[50%_70%]', face && face.arrival > 0 && (keepBerryStill ? 'animate-[mascot-fade_150ms_ease-out]' : 'animate-mascot-pop'))}>
             <Berry size={20} mascot={mascot} mood={face?.mood ?? 'rest'} shut={face?.shut} />
@@ -115,7 +115,7 @@ const MascotPill: React.FC<{
         >
             {drawn}
             <span className="max-w-28 truncate">{name}</span>
-            <ChevronDown className={cn('size-3 text-ink-3 transition-transform duration-menu', chooser.open && 'rotate-180')} strokeWidth={1.5} />
+            <ChevronDown className={cn('size-3 text-ink-3 transition-transform duration-menu', chooser.open && 'rotate-180')} strokeWidth={1.75} />
         </button>
     )
 }
@@ -140,13 +140,13 @@ const WhereSwitch: React.FC<{ on: boolean; onToggle: () => void; small: boolean 
                     title={chosen ? undefined : label}
                     onClick={() => !chosen && onToggle()}
                     className={cn(
-                        'flex items-center gap-1.5 rounded-full text-12 transition-colors duration-fast',
+                        'flex items-center gap-1.5 rounded-full text-13 transition-colors duration-fast',
                         small ? 'h-6 px-2' : 'h-7 px-2.5',
                         chosen ? 'bg-sheet text-ink shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(0_0_0/0.1)]' : 'text-ink-3 hover:text-ink',
                         FOCUS
                     )}
                 >
-                    <Icon className="size-4" strokeWidth={1.5} />
+                    <Icon className="size-4" strokeWidth={1.75} />
                     {chosen && <span>{label}</span>}
                 </button>
             )
@@ -294,7 +294,7 @@ export const Composer: React.FC<{
                 FOCUS
             )}
         >
-            {onStop ? <span aria-hidden className={cn('rounded-[2.5px] bg-current', small ? 'size-[9px]' : 'size-2.5')} /> : <ArrowUp className="size-4" strokeWidth={1.5} />}
+            {onStop ? <span aria-hidden className={cn('rounded-[2.5px] bg-current', small ? 'size-[9px]' : 'size-2.5')} /> : <ArrowUp className="size-4" strokeWidth={1.75} />}
         </button>
     )
 
@@ -355,7 +355,7 @@ export const Composer: React.FC<{
             )}
         >
             {/* Open, it's the way to close: the + turns to a ×. */}
-            <Plus className={cn('size-4 transition-transform duration-menu', adding && 'rotate-45')} strokeWidth={1.5} />
+            <Plus className={cn('size-4 transition-transform duration-menu', adding && 'rotate-45')} strokeWidth={1.75} />
         </button>
     )
 
@@ -413,8 +413,8 @@ export const Composer: React.FC<{
                     className={cn('grid transition-[grid-template-rows,visibility] duration-panel ease-crisp', limits ? 'grid-rows-[1fr] visible' : 'grid-rows-[0fr] invisible')}
                 >
                     <div className="min-h-0 overflow-hidden">
-                        <p className="min-h-[38px] px-3.5 py-[11px] flex items-start gap-2.5 text-12 text-ink-2">
-                            <Lock aria-hidden className="size-3.5 shrink-0 mt-px text-ink-3" strokeWidth={1.5} />
+                        <p className="min-h-[38px] px-3.5 py-[11px] flex items-start gap-2.5 text-13 text-ink-2">
+                            <Lock aria-hidden className="size-3.5 shrink-0 mt-px text-ink-3" strokeWidth={1.75} />
                             <span className="min-w-0">{limits || lastLimits}</span>
                         </p>
                     </div>

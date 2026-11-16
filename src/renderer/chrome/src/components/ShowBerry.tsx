@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Lock, Square } from 'lucide-react'
-import type { RecordingState, TrailStep } from '@shared/library'
+import type { RecordingState, TrailKind, TrailStep } from '@shared/library'
 import { Button } from '@common/components/Button'
+import { Pips, type PipMark } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
-import { StepFootprint } from './ChatMessage'
 
 const IDLE: RecordingState = { status: 'idle', startedAt: null, steps: [], cut: null, error: null }
 
@@ -50,7 +50,7 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
     const narrow = layout.page.width < NARROW_PAGE
 
     return (
-        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-sheet-2 text-13 app-region-no-drag">
+        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-sheet-2 text-14 app-region-no-drag">
             <span aria-hidden className="size-2 rounded-full bg-ask motion-safe:animate-pulse" />
             {showBerry && !narrow && <Berry mood="curious" size={24} />}
             <span className="font-medium">{!showBerry ? 'Recording' : narrow ? 'Watching' : `${name}’s watching`}</span>
@@ -60,8 +60,8 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
                     {steps.length === 1 ? '1 note' : `${steps.length} notes`}
                 </span>
             )}
-            <Button size="sm" variant="destructive" className="h-6 px-2.5 text-13" onClick={() => void window.chromeAPI.recording.stop()}>
-                <Square className="size-3 fill-current" aria-hidden />
+            <Button size="sm" variant="destructive" className="h-6 px-2.5 text-14" onClick={() => void window.chromeAPI.recording.stop()}>
+                <Square className="size-3 fill-current" aria-hidden strokeWidth={1.75} />
                 Stop
             </Button>
         </div>
@@ -69,7 +69,7 @@ export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state })
 }
 
 // Starts it from wherever this is. What it says stays the same everywhere, so it's one thing to learn.
-export const ShowHowButton: React.FC<{ className?: string; variant?: 'outline' | 'ghost'; size?: 'default' | 'sm' }> = ({ className, variant = 'ghost', size }) => {
+export const ShowHowButton: React.FC<{ className?: string; variant?: 'raised' | 'ghost'; size?: 'default' | 'sm' }> = ({ className, variant = 'ghost', size }) => {
     const { status } = useRecording()
     const name = useAssistantName()
     return (
@@ -100,33 +100,49 @@ const NoteWords: React.FC<{ step: TrailStep }> = ({ step }) => {
     )
 }
 
-// Notes rather than a list of cards: a footprint for each thing it saw, under the site it saw it on, with a thin line
+// Each kind of note keeps the still pip mark of the step it's like (DESIGN.md section 6). A secret field has a lock.
+const TRAIL_MARKS: Record<Exclude<TrailKind, 'secret'>, PipMark> = {
+    went: 'opened',
+    switched: 'opened',
+    searched: 'read',
+    frame: 'read',
+    copied: 'read',
+    clicked: 'clicked',
+    chose: 'clicked',
+    ticked: 'clicked',
+    file: 'clicked',
+    typed: 'typed',
+    pressed: 'typed',
+    pasted: 'typed'
+}
+
+// Notes rather than a list of cards: a mark for each thing it saw, under the site it saw it on, with a thin line
 // between sites. Everything's plain text, so a label from a page is only ever words.
 export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) => void }> = ({ steps, onRemove }) => {
-    const groups: Array<{ site: string; steps: Array<{ step: TrailStep; at: number }> }> = []
-    steps.forEach((step, at) => {
+    const groups: Array<{ site: string; steps: TrailStep[] }> = []
+    steps.forEach((step) => {
         const last = groups.at(-1)
-        if (last && (last.site === step.site || !step.site)) last.steps.push({ step, at })
-        else groups.push({ site: step.site, steps: [{ step, at }] })
+        if (last && (last.site === step.site || !step.site)) last.steps.push(step)
+        else groups.push({ site: step.site, steps: [step] })
     })
 
     return (
         <div className="divide-y">
             {groups.map(({ site, steps: notes }, group) => (
                 <section key={group} aria-label={`On ${site}`} className="py-5">
-                    <h2 className="text-13 font-medium text-ink-2">{site}</h2>
+                    <h2 className="text-14 font-medium text-ink-2">{site}</h2>
                     <ol className="mt-2 flex flex-col">
-                        {notes.map(({ step, at }) => (
+                        {notes.map((step) => (
                             <li key={step.id} className="group flex items-start gap-3 py-1.5">
                                 <span className={cn('mt-1 size-4 shrink-0 flex items-center justify-center', step.kind === 'secret' ? 'text-ink-2' : 'text-ink')}>
-                                    {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden /> : <StepFootprint index={at} />}
+                                    {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden strokeWidth={1.75} /> : <Pips pattern={TRAIL_MARKS[step.kind]} still />}
                                 </span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-15 [overflow-wrap:anywhere]">
                                         <NoteWords step={step} />
                                     </span>
                                     {step.path && step.path !== site && (
-                                        <span className="block text-12 text-ink-2 truncate">{step.path}</span>
+                                        <span className="block text-13 text-ink-2 truncate">{step.path}</span>
                                     )}
                                 </span>
                                 {onRemove && (
@@ -134,7 +150,7 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
                                         type="button"
                                         aria-label={`Leave out: ${step.text}`}
                                         onClick={() => onRemove(step.id)}
-                                        className="shrink-0 h-6 px-2 rounded-row text-13 text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
+                                        className="shrink-0 h-6 px-2 rounded-row text-14 text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                                     >
                                         Leave out
                                     </button>

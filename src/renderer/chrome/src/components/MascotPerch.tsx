@@ -33,7 +33,7 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
                         )}
                     >
                         <Berry size={40} mascot={mascot} />
-                        <span className="w-full px-1 truncate text-center text-12">{mascot.id === BERRY_ID ? berryName : mascot.name}{mascot.deletedAt !== null && ' (deleted)'}</span>
+                        <span className="w-full px-1 truncate text-center text-13">{mascot.id === BERRY_ID ? berryName : mascot.name}{mascot.deletedAt !== null && ' (deleted)'}</span>
                     </button>
                 </li>
             ))}
@@ -47,8 +47,8 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
                         }}
                         className="w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-tile text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
                     >
-                        <span className="size-10 flex items-center justify-center"><Plus className="size-5" /></span>
-                        <span className="text-12">New</span>
+                        <span className="size-10 flex items-center justify-center"><Plus className="size-5" strokeWidth={1.75} /></span>
+                        <span className="text-13">New</span>
                     </button>
                 </li>
             )}

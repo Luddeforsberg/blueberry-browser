@@ -46,7 +46,7 @@ export const PhoneSettings: React.FC = () => {
                 <SettingsRow id="setting-phone-reads" title="What Telegram sees" description={WHO_READS} />
             </SettingsGroup>
 
-            <SettingsGroup label="your bot">
+            <SettingsGroup label="Your bot">
                 {phone.status === 'off' && (
                     <SettingsRow
                         id="setting-phone-token"
@@ -63,11 +63,11 @@ export const PhoneSettings: React.FC = () => {
                                         value={token}
                                         onChange={(event) => setToken(event.target.value)}
                                         placeholder="Bot token"
-                                        className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                                        className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
                                     />
                                     <Button type="submit" disabled={busy || !token.trim()}>{busy ? 'Checking…' : 'Connect'}</Button>
                                 </form>
-                                {phone.problem && <p role="alert" className="mt-2 text-13 text-ask">{phone.problem}</p>}
+                                {phone.problem && <p role="alert" className="mt-2 text-14 text-ask">{phone.problem}</p>}
                             </>
                         }
                     />
@@ -85,17 +85,17 @@ export const PhoneSettings: React.FC = () => {
                                     <div className="flex items-center gap-5">
                                         <PairingCode link={phone.pairLink} />
                                         <div className="min-w-0">
-                                            <p className="text-13 text-ink-2">Telegram on this computer instead?</p>
-                                            <Button variant="outline" className="mt-2" onClick={() => void api.openLink()}>Open in my browser</Button>
+                                            <p className="text-14 text-ink-2">Telegram on this computer instead?</p>
+                                            <Button variant="raised" className="mt-2" onClick={() => void api.openLink()}>Open in my browser</Button>
                                         </div>
                                     </div>
                                 )
                             }
                         >
-                            <Button variant="outline" size="sm" onClick={() => void api.newLink().then(setPhone)}>New link</Button>
+                            <Button variant="raised" size="sm" onClick={() => void api.newLink().then(setPhone)}>New link</Button>
                         </SettingsRow>
                         <SettingsRow id="setting-phone-cancel" title="Changed your mind?" description="This forgets the token.">
-                            <Button variant="outline" size="sm" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
+                            <Button variant="raised" size="sm" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
                         </SettingsRow>
                     </>
                 )}
@@ -103,7 +103,7 @@ export const PhoneSettings: React.FC = () => {
                 {phone.status === 'connected' && (
                     <>
                         <SettingsRow id="setting-phone-bot" title={`Connected to @${phone.botName}`} description="Disconnecting forgets the token and the chat." more="To stop the bot for good, revoke it with @BotFather too.">
-                            <Button variant="outline" size="sm" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
+                            <Button variant="raised" size="sm" onClick={() => void api.disconnect().then(setPhone)}>Disconnect</Button>
                         </SettingsRow>
                         <SettingsRow id="setting-phone-always" title="Send even when I’m here" description="Normally it only sends when the Blueberry window isn’t in front, or after a minute with no input." more="This is for trying it out or filming.">
                             <Switch labelledBy="setting-phone-always" checked={settings.phoneAlways} onChange={(phoneAlways) => updateSettings({ phoneAlways })} />

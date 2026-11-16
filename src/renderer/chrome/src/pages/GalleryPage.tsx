@@ -13,6 +13,7 @@ import { Choice, Switch } from '@common/components/Controls'
 import { Cloud } from 'lucide-react'
 import { AccountButton, AccountMenu, Avatar } from '../components/AccountMenu'
 import { RowTile, SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
+import { LABEL } from '@common/components/StatusPill'
 import { SegmentSwitch } from '../components/SegmentSwitch'
 import { WindowPicture } from '../components/WindowPicture'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage, WentWrong } from '../components/ChatMessage'
@@ -215,7 +216,7 @@ const WORK_SAMPLES: Array<{ label: string; view: WorkView; asking?: boolean }> =
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <section className="mt-10">
-        <h2 className="text-18 font-medium">{title}</h2>
+        <h2 className="text-20 font-semibold">{title}</h2>
         <div className="mt-4">{children}</div>
     </section>
 )
@@ -233,17 +234,17 @@ export const GalleryPage: React.FC = () => {
     return (
         <div className="h-full overflow-y-auto">
             <div className="max-w-4xl mx-auto px-8 py-10">
-                <h1 className="text-18 font-medium">Component gallery</h1>
+                <h1 className="text-20 font-semibold">Component gallery</h1>
 
                 <Section title="Mascots">
-                    <label className="flex items-center gap-2 text-13">
+                    <label className="flex items-center gap-2 text-14">
                         <Switch label="Keep Berry still" checked={still} onChange={setStill} />
                         Keep Berry still
                     </label>
                     <div className="mt-4 grid grid-cols-2 gap-4">
                         {[false, true].map((dark) => (
                             <div key={String(dark)} className={cn("p-5 rounded-tile bg-ground text-ink", dark && "dark")}>
-                                <p className="font-mono text-11 text-ink-3">{dark ? 'dark' : 'light'}</p>
+                                <p className={LABEL}>{dark ? 'Dark' : 'Light'}</p>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {PALETTES.map(({ id, label }) => (
                                         <figure key={id} className="w-[60px] flex flex-col items-center gap-1.5">
@@ -272,13 +273,13 @@ export const GalleryPage: React.FC = () => {
                                     <Mascot mood="fetching" size={22} inverted still={still} />
                                     <span className="font-mono text-11.5">On the address field while it works</span>
                                 </div>
-                                <div className="mt-3 flex items-center gap-2 text-12 text-ink-2">
+                                <div className="mt-3 flex items-center gap-2 text-13 text-ink-2">
                                     <Mascot size={26} shut still={still} /> Eyes shut, as one mascot gives way to the next.
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="mt-4 flex items-center gap-3 text-12 text-ink-2">
+                    <div className="mt-4 flex items-center gap-3 text-13 text-ink-2">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
                     </div>
                 </Section>
@@ -321,7 +322,7 @@ export const GalleryPage: React.FC = () => {
                             label="limits"
                             question="Where can I go, and what can I do there?"
                             hint="I can always read the pages I’m allowed on. I still ask before anything risky, and no limit changes that."
-                            nav={<div className="h-[46px] px-1.5 flex items-center justify-between"><Button variant="outline">Cancel</Button><Button>Save</Button></div>}
+                            nav={<div className="h-[46px] px-1.5 flex items-center justify-between"><Button variant="raised">Cancel</Button><Button>Save</Button></div>}
                         >
                             <LimitTags mascot={SAMPLE_MASCOT} className="justify-center" />
                         </StepCard>
@@ -541,7 +542,7 @@ export const GalleryPage: React.FC = () => {
                         <div className="h-72 rounded-sheet border"><PageTrouble trouble="unresponsive" onReload={() => undefined} /></div>
                         <div className="h-72 rounded-sheet border"><PageTrouble trouble={{ url: 'https://example.com/missing', description: 'ERR_NAME_NOT_RESOLVED' }} onReload={() => undefined} /></div>
                     </div>
-                    <div className="mt-3 flex items-center gap-3 text-12 text-ink-2">
+                    <div className="mt-3 flex items-center gap-3 text-13 text-ink-2">
                         <TabIcon tab={{ page: null, favicon: null, isLoading: false, berryWorking: false, trouble: 'crashed' }} /> Its tab shows this until it’s reloaded.
                     </div>
                 </Section>
@@ -575,6 +576,7 @@ export const GalleryPage: React.FC = () => {
                         <DownloadsProgress downloads={[]} />
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(0, 1)} />
                         <DownloadsProgress downloads={SAMPLE_DOWNLOADS.slice(1, 2)} />
+                        <DownloadsProgress downloads={[{ ...SAMPLE_DOWNLOAD, id: 'starting', receivedBytes: 0 }]} />
                     </div>
                     <ul className="mt-4 rounded-sheet border bg-sheet divide-y overflow-hidden">
                         {SAMPLE_DOWNLOADS.map((download) => (
@@ -587,7 +589,7 @@ export const GalleryPage: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <ToolBarButton Icon={Star} label="Bookmark this page" onClick={() => undefined} />
                         <ToolBarButton label="Remove bookmark" toggled className="bg-transparent hover:bg-transparent" onClick={() => undefined}>
-                            <Star className="size-4 fill-current text-ink" />
+                            <Star className="size-4 fill-current text-ink" strokeWidth={1.75} />
                         </ToolBarButton>
                         <ToolBarButton Icon={Star} label="Bookmark this page (unavailable on internal pages)" active={false} />
                     </div>
@@ -618,7 +620,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Buttons">
                     <div className="flex flex-wrap items-center gap-3">
                         <Button>Primary</Button>
-                        <Button variant="outline">Outline</Button>
+                        <Button variant="raised">Raised</Button>
                         <Button variant="ghost" className="text-ink-2">Quiet</Button>
                         <Button disabled>Disabled</Button>
                         <Button variant="destructive">Stop recording</Button>
@@ -647,9 +649,9 @@ export const GalleryPage: React.FC = () => {
                             items={[{ value: 'one', label: 'One' }, { value: 'two', label: 'Two' }, { value: 'three', label: 'Three' }]}
                             current={section}
                             onChange={setSection}
-                            className="h-8 rounded-[11px] [&>button]:rounded-[9px] text-12"
+                            className="h-8 rounded-[11px] [&>button]:rounded-[9px] text-13"
                         />
-                        <SettingsGroup label="a group">
+                        <SettingsGroup label="A group">
                             <SettingsRow id="gallery-row-switch" title="A switch" description="One line on what it does." more="The rest, behind More.">
                                 <Switch labelledBy="gallery-row-switch" checked={on} onChange={setOn} />
                             </SettingsRow>
@@ -666,12 +668,14 @@ export const GalleryPage: React.FC = () => {
                                 />
                             </SettingsRow>
                             <SettingsRow id="gallery-row-avatar" lead={<Avatar name="Alex Lind" email={null} large />} title="A value and a button">
-                                <span className="text-12 text-ink-2">Alex Lind</span>
-                                <Button variant="outline" size="sm">Change</Button>
+                                <span className="text-13 text-ink-2">Alex Lind</span>
+                                <Button variant="raised" size="sm">Change</Button>
                             </SettingsRow>
                         </SettingsGroup>
-                        <SettingsGroup label="rows that open something">
-                            <SettingsLink lead={<RowTile><Cloud strokeWidth={1.5} /></RowTile>} title="With a state" description="And a line." state="ready" stateOn onOpen={() => undefined} />
+                        <SettingsGroup label="Rows that open something">
+                            <SettingsLink lead={<RowTile><Cloud strokeWidth={1.75} /></RowTile>} title="With a state" description="And a line." state={{ words: 'Connected', tone: 'on' }} onOpen={() => undefined} />
+                            <SettingsLink lead={<RowTile><Cloud strokeWidth={1.75} /></RowTile>} title="Not set up" description="A state and its next step." state={{ words: 'Not set up' }} action={{ label: 'Set up', onAct: () => undefined }} onOpen={() => undefined} />
+                            <SettingsLink lead={<RowTile><Cloud strokeWidth={1.75} /></RowTile>} title="Needs you" description="What's wrong in a few words." state={{ words: 'Session still open', tone: 'ask' }} action={{ label: 'Try again', onAct: () => undefined }} onOpen={() => undefined} />
                             <SettingsLink title="With a value" value="3 sites" onOpen={() => undefined} />
                         </SettingsGroup>
                     </div>
@@ -685,7 +689,7 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Status">
-                    <ul className="flex gap-6 text-13">
+                    <ul className="flex gap-6 text-14">
                         <li className="text-ink">Running now</li>
                         <li className="text-ink-2">Finished</li>
                         <li className="text-ask">Needs your OK</li>

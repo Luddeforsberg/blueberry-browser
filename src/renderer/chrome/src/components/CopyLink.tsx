@@ -13,5 +13,5 @@ export const CopyLink: React.FC<{ link: string; label?: string; main?: boolean }
         clearTimeout(timer.current)
         timer.current = setTimeout(() => setCopied(false), SAID_FOR_MS)
     }
-    return <Button variant={main ? 'default' : 'outline'} size="sm" aria-label={label} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy link'}</Button>
+    return <Button variant={main ? 'default' : 'raised'} size="sm" aria-label={label} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy link'}</Button>
 }

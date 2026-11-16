@@ -46,11 +46,11 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
         <>
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-18 font-medium">Routines</h1>
-                    <p className="mt-1 text-13 text-ink-2">Work done for you on a schedule, in tabs of its own.</p>
+                    <h1 className="text-20 font-semibold">Routines</h1>
+                    <p className="mt-1 text-14 text-ink-2">Work done for you on a schedule, in tabs of its own.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <ShowHowButton variant="outline" />
+                    <ShowHowButton variant="raised" />
                     <Button onClick={onNew}>New routine</Button>
                 </div>
             </div>
@@ -62,7 +62,7 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
             {routines.length === 0 ? (
                 <div className="mt-16 flex flex-col items-center gap-3 text-center">
                     <Berry mood="rest" size={88} />
-                    <p className="text-13 text-ink-2">
+                    <p className="text-14 text-ink-2">
                         {isBerry ? 'Nothing here yet. I looked under everything.' : 'No routines yet.'}
                     </p>
                 </div>
@@ -74,7 +74,7 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                             <button
                                 type="button"
                                 onClick={() => onOpen(routine.id)}
-                                className="w-full flex items-stretch gap-4 pr-3 text-13 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+                                className="w-full flex items-stretch gap-4 pr-3 text-14 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                             >
                                 <span className={cn("shrink-0", showBerry ? "self-end" : "self-center ml-3")} style={{ width: standing, height: showBerry ? standing * FEET_Y : standing }}>
                                     <Berry mood={moodFor(routine.status)} size={standing} mascot={find(routine.mascotId)} />
@@ -86,7 +86,7 @@ const List: React.FC<{ onNew: () => void; onOpen: (id: string) => void }> = ({ o
                                             {[routine.schedule, routine.cloudNote ?? routine.lastResult].filter(Boolean).join(' · ')}
                                         </span>
                                     </span>
-                                    <span className="shrink-0 text-13">
+                                    <span className="shrink-0">
                                         <RoutineStatusLabel status={routine.status} />
                                     </span>
                                 </span>
@@ -118,13 +118,13 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
     return (
         <>
             <Button variant="ghost" size="sm" className="-ml-3" onClick={onBack}>
-                <ChevronLeft />
+                <ChevronLeft strokeWidth={1.75} />
                 Routines
             </Button>
             <div className="mt-2 flex items-start justify-between gap-6">
                 <div className="min-w-0">
-                    <h1 className="text-18 font-medium [overflow-wrap:anywhere]">{routine.name}</h1>
-                    <p className="mt-1 text-13 text-ink-2">
+                    <h1 className="text-20 font-semibold [overflow-wrap:anywhere]">{routine.name}</h1>
+                    <p className="mt-1 text-14 text-ink-2">
                         {routine.schedule}
                         {routine.nextRunAt !== null && !routine.paused && ` · next ${formatTime(routine.nextRunAt)}`}
                         {routine.mascotId && ` · runs as ${mascot.name}`}
@@ -142,22 +142,22 @@ const Detail: React.FC<{ routine: Routine; onBack: () => void; onEdit: () => voi
                 >
                     Run now
                 </Button>
-                <Button variant="outline" onClick={() => void api().setPaused(routine.id, !routine.paused)}>
+                <Button variant="raised" onClick={() => void api().setPaused(routine.id, !routine.paused)}>
                     {routine.paused ? 'Resume' : 'Pause'}
                 </Button>
-                <Button variant="outline" onClick={onEdit}>Edit</Button>
+                <Button variant="raised" onClick={onEdit}>Edit</Button>
                 <Button variant="ghost" className="text-ask" onClick={() => void remove()}>Delete</Button>
             </div>
 
             <section aria-labelledby="routine-instructions" className="mt-8">
-                <h2 id="routine-instructions" className="text-13 font-medium">What it does</h2>
-                <p className="mt-2 text-13 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{routine.instructions}</p>
+                <h2 id="routine-instructions" className="text-14 font-medium">What it does</h2>
+                <p className="mt-2 text-14 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{routine.instructions}</p>
             </section>
 
             <section aria-labelledby="routine-history" className="mt-8">
-                <h2 id="routine-history" className="text-13 font-medium">Run history</h2>
+                <h2 id="routine-history" className="text-14 font-medium">Run history</h2>
                 {runs.length === 0 ? (
-                    <p className="mt-2 text-13 text-ink-2">It hasn’t run yet.</p>
+                    <p className="mt-2 text-14 text-ink-2">It hasn’t run yet.</p>
                 ) : (
                     <ol className="mt-3 flex flex-col gap-3">
                         {runs.map((run) => (

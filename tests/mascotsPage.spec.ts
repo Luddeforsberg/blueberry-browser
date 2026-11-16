@@ -39,7 +39,7 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
 
     // A starter only fills in the words.
     await expect(chrome.getByRole("heading", { name: "What should I do for you?" })).toBeVisible();
-    const starters = chrome.getByRole("button", { description: "or start from" });
+    const starters = chrome.getByRole("button", { description: "Or start from" });
     await expect(starters).toHaveCount(3);
     await starters.first().click();
     await expect(chrome.getByRole("textbox", { name: "What it’s for" })).not.toHaveValue("");
@@ -62,7 +62,7 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
 
     // Read back, then its own page.
     const made = chrome.getByRole("region", { name: "Scout is added" });
-    await expect(made).toContainText("added to your mascots");
+    await expect(made).toContainText("Added to your mascots");
     await expect(made).toContainText("Only visits 127.0.0.1.nip.io");
     await made.getByRole("button", { name: "Done" }).click();
     const scout = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!;
@@ -73,7 +73,7 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await back();
     await expect.poll(param).toBe("list");
     await expect(page().getByRole("listitem")).toHaveCount(2);
-    await expect(page().getByRole("listitem").nth(1)).toContainText("only 127.0.0.1.nip.io · clicks");
+    await expect(page().getByRole("listitem").nth(1)).toContainText("Only 127.0.0.1.nip.io · no typing");
 
     // Changing its limits changes only them.
     await page().getByRole("button", { name: "Scout", exact: true }).click();
@@ -100,6 +100,8 @@ test("a mascot is made in four steps, its limits are changed from its page, and 
     await expect.poll(param).toBe(`${scout.id}/memory`);
     const offer = chrome.getByRole("region", { name: "Offer to remember" });
     await expect(offer).toContainText(KEPT);
+    // Nothing is kept yet, but the offer is the news, so the page doesn't also say Nothing yet under it.
+    await expect(chrome.getByText(/^Nothing yet\./)).toHaveCount(0);
     await offer.getByRole("button", { name: "Remember" }).click();
     await expect(offer).toHaveCount(0);
     await expect(chrome.getByRole("region", { name: "anywhere" })).toContainText(KEPT);

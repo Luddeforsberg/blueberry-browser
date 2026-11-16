@@ -10,7 +10,7 @@ import { useShell } from '../contexts/ShellContext'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
 
-const FIELD = 'min-w-0 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus'
+const FIELD = 'min-w-0 h-8 rounded-tile border bg-sheet px-3 text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
 const statusLine = (cloud: CloudState): string => {
     const where = cloud.provider === 'local' ? 'The local test browser' : 'The cloud browser'
@@ -61,8 +61,8 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
         <SettingsGroup
             label="signed in to"
             trailing={
-                <button type="button" onClick={() => field.current?.focus()} className="h-[22px] -mr-1 px-1.5 flex items-center gap-1 rounded-[7px] font-sans text-12 normal-case text-ink-2 hover:bg-hover hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                    <Plus aria-hidden className="size-[13px]" strokeWidth={1.5} />
+                <button type="button" onClick={() => field.current?.focus()} className="h-[22px] -mr-1 px-1.5 flex items-center gap-1 rounded-[7px] font-sans text-13 normal-case text-ink-2 hover:bg-hover hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                    <Plus aria-hidden className="size-[13px]" strokeWidth={1.75} />
                     Add a site
                 </button>
             }
@@ -72,11 +72,11 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
                     {cloud.logins.map((login) => (
                         <li key={login.site} className="relative min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3 before:content-[''] before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden">
                             <div className="flex-1 min-w-0">
-                                <p className="text-13 truncate">{login.site}</p>
-                                <p className={login.status === 'signed-out' ? 'mt-0.5 text-12 text-ask' : 'mt-0.5 text-12 text-ink-2'}>{loginStatus(login)}</p>
+                                <p className="text-14 truncate">{login.site}</p>
+                                <p className={login.status === 'signed-out' ? 'mt-0.5 text-13 text-ask' : 'mt-0.5 text-13 text-ink-2'}>{loginStatus(login)}</p>
                             </div>
-                            <Button size="sm" variant="outline" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
-                            <Button size="sm" variant="outline" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
+                            <Button size="sm" variant="raised" disabled={working !== null} onClick={() => void run(login.site, () => api.checkLogin(login.site))}>Check</Button>
+                            <Button size="sm" variant="raised" disabled={working !== null} onClick={() => void run(login.site, () => api.revokeLogin(login.site))}>Remove</Button>
                         </li>
                     ))}
                 </ul>
@@ -102,21 +102,21 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
 
                         {suggestions.length > 0 && (
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <span className="text-13 text-ink-2">From your history:</span>
+                                <span className="text-14 text-ink-2">From your history:</span>
                                 {suggestions.map((suggestion) => (
-                                    <Button key={suggestion} size="xs" variant="outline" disabled={working !== null} aria-label={`Bring along ${suggestion}`} onClick={() => void bring(suggestion)}>{suggestion}</Button>
+                                    <Button key={suggestion} size="xs" variant="raised" disabled={working !== null} aria-label={`Bring along ${suggestion}`} onClick={() => void bring(suggestion)}>{suggestion}</Button>
                                 ))}
                             </div>
                         )}
 
-                        {problem && <p role="alert" className="mt-3 text-13 text-ask">{problem}</p>}
+                        {problem && <p role="alert" className="mt-3 text-14 text-ask">{problem}</p>}
                     </>
                 }
             />
 
             {cloud.logins.length > 0 && (
                 <SettingsRow id="setting-cloud-forget-logins" title="Every site above" description="Takes their sign-ins out of the cloud browser.">
-                    <Button variant="outline" size="sm" disabled={working !== null} onClick={() => void run('all', () => api.forgetLogins())}>Forget all cloud logins</Button>
+                    <Button variant="raised" size="sm" disabled={working !== null} onClick={() => void run('all', () => api.forgetLogins())}>Forget all cloud logins</Button>
                 </SettingsRow>
             )}
         </SettingsGroup>
@@ -150,7 +150,7 @@ const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
     }
 
     return (
-        <SettingsGroup label="with this computer off">
+        <SettingsGroup label="With this computer off">
             <SettingsRow
                 id="setting-cloud-runner"
                 title="Runner"
@@ -171,13 +171,13 @@ const Runner: React.FC<{ openAccount: () => void }> = ({ openAccount }) => {
                                     <Button type="submit" disabled={busy || !email.trim()}>{busy ? 'Linking…' : 'Link'}</Button>
                                 </form>
                             )}
-                            {runner.problem && <p role="alert" className="mt-2 text-13 text-ask">{runner.problem}</p>}
+                            {runner.problem && <p role="alert" className="mt-2 text-14 text-ask">{runner.problem}</p>}
                         </>
                     )
                 }
             >
                 {(runner.status === 'linked' || runner.status === 'waiting') && (
-                    <Button variant="outline" size="sm" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
+                    <Button variant="raised" size="sm" onClick={() => void api.unlinkRunner().then(setRunner)}>Unlink</Button>
                 )}
             </SettingsRow>
             {runner.status === 'linked' && runner.relayUrl && <FromOtherApps address={runner.relayUrl} />}
@@ -203,13 +203,13 @@ const FromOtherApps: React.FC<{ address: string }> = ({ address }) => {
                 more="They ask you here or on your phone before anything risky, and ChatGPT and Claude can’t answer for you."
                 below={
                     <>
-                        <pre aria-labelledby="setting-cloud-relay" className="rounded-row bg-sheet-2 px-3 py-2.5 text-12 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
-                        <ol className="mt-2 list-decimal pl-5 text-13 text-ink-2">
+                        <pre aria-labelledby="setting-cloud-relay" className="rounded-row bg-sheet-2 px-3 py-2.5 text-13 text-ink-2 whitespace-pre-wrap [overflow-wrap:anywhere]">{address}</pre>
+                        <ol className="mt-2 list-decimal pl-5 text-14 text-ink-2">
                             <li>In ChatGPT, turn on Settings &gt; Apps &amp; Connectors &gt; Advanced &gt; Developer mode, then create a connector with this address and OAuth. In Claude, add a custom connector with this address.</li>
                             <li>Sign in with this Blueberry account when it asks.</li>
                         </ol>
-                        <Button className="mt-3" variant="outline" size="sm" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
-                        {said && <p role="status" className="mt-2 text-13 text-ink-2">{said}</p>}
+                        <Button className="mt-3" variant="raised" size="sm" onClick={() => void disconnect()}>Disconnect ChatGPT and Claude</Button>
+                        {said && <p role="status" className="mt-2 text-14 text-ink-2">{said}</p>}
                     </>
                 }
             >
@@ -250,7 +250,7 @@ export const CloudSettings: React.FC = () => {
 
     return (
         <>
-            <SettingsGroup label="browserbase">
+            <SettingsGroup label="Browserbase">
                 {cloud.provider === 'local' && (
                     <SettingsRow id="setting-cloud-local" title="Local test browser" description="This copy of Blueberry was started with a Chrome on this computer standing in for the cloud, so Browserbase isn’t used." />
                 )}
@@ -274,17 +274,17 @@ export const CloudSettings: React.FC = () => {
 
                 {cloud.configured && (
                     <SettingsRow id="setting-cloud-forget" title="Key" description="Saved, encrypted on this computer. Forgetting it ends the cloud session too.">
-                        <Button variant="outline" size="sm" onClick={() => void api.forget().then(setCloud)}>Forget key</Button>
+                        <Button variant="raised" size="sm" onClick={() => void api.forget().then(setCloud)}>Forget key</Button>
                     </SettingsRow>
                 )}
 
                 <SettingsRow id="setting-cloud-status" title="Session" description={statusLine(cloud)}>
-                    {cloud.canEnd && <Button variant="outline" size="sm" onClick={() => void api.end().then(setCloud)}>End cloud session</Button>}
+                    {cloud.canEnd && <Button variant="raised" size="sm" onClick={() => void api.end().then(setCloud)}>End cloud session</Button>}
                 </SettingsRow>
 
                 {cloud.problem && (
                     <SettingsRow id="setting-cloud-problem" title={<span role="alert" className="text-ask">{cloud.problem}</span>}>
-                        {cloud.unreleased && <Button variant="outline" size="sm" onClick={() => void api.end().then(setCloud)}>Try again</Button>}
+                        {cloud.unreleased && <Button variant="raised" size="sm" onClick={() => void api.end().then(setCloud)}>Try again</Button>}
                     </SettingsRow>
                 )}
             </SettingsGroup>

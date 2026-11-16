@@ -92,7 +92,7 @@ const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
 const Picture: React.FC<{ tab: WorkTab; frames: WorkFrames; name: string; big?: boolean }> = ({ tab, frames, name, big = false }) => {
     const picture = useSyncExternalStore(frames.subscribe, () => frames.get(tab.id))
     if (tab.state !== 'picture') {
-        return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-13 text-ink-2">{WITHOUT_PICTURE[tab.state](name)}</div>
+        return <div className="absolute inset-0 flex items-center justify-center bg-tray p-3 text-center text-14 text-ink-2">{WITHOUT_PICTURE[tab.state](name)}</div>
     }
     if (tab.cloud) return big ? <CloudPicture tab={tab} /> : <div className="absolute inset-0 bg-tray" />
     return picture ? <img src={picture} alt="" decoding="sync" draggable={false} className="absolute inset-0 size-full object-cover object-top" /> : <div className="absolute inset-0 bg-tray" />
@@ -140,7 +140,7 @@ const TabChip: React.FC<{ tab: WorkTab; loading: boolean; onGo: () => void }> = 
     )
 }
 
-const QUIET = 'h-6 px-1.5 rounded-row text-12 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus'
+const QUIET = 'h-6 px-1.5 rounded-row text-13 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus'
 
 // Beside the main chat while a job uses tabs, in a well: where the mascot is, a picture of the tab it's in, the job's
 // tabs, and Go to tab, which only goes there to watch. Everything to answer stays in the chat, which this only points to.
@@ -163,7 +163,7 @@ export const WorkingView: React.FC<{
 
     return (
         <div className="flex-1 px-[18px] py-4 flex flex-col animate-fade-in">
-            <div className="h-[30px] flex items-center gap-3 text-13">
+            <div className="h-[30px] flex items-center gap-3 text-14">
                 <h2 role="status" className="min-w-0 truncate font-regular text-ink">
                     {ended ? OUTCOME[view.outcome!] : approval ? askingWords(approval) : `${name} is on ${current.site}`}
                 </h2>
@@ -218,7 +218,7 @@ export const WorkingStrip: React.FC<{ view: WorkView; mascot: MascotProfile; app
             type="button"
             onClick={() => void switchTab(current.id)}
             aria-label={`Go to the tab on ${current.site}`}
-            className="-mx-2 mb-2 w-[calc(100%+16px)] h-8 px-2 flex items-center gap-2 rounded-row text-13 text-ink-2 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
+            className="-mx-2 mb-2 w-[calc(100%+16px)] h-8 px-2 flex items-center gap-2 rounded-row text-14 text-ink-2 text-left outline-none transition-colors hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
             {showBerry && <Berry mood={approval ? 'asking' : 'rest'} size={20} mascot={mascot} still />}
             <span role="status" className="min-w-0 truncate text-ink">

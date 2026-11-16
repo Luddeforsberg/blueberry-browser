@@ -65,6 +65,9 @@ module.exports = {
     boxShadow: {
       none: "none",
       rim: "var(--shadow-rim)",
+      chip: "var(--shadow-chip)",
+      up: "var(--shadow-up)",
+      filled: "var(--shadow-filled)",
       "card-lift": "var(--shadow-card-lift)",
       lift: "var(--shadow-lift)",
       recording: "var(--shadow-recording)",
@@ -78,14 +81,17 @@ module.exports = {
       11: ["11px", "16px"],
       11.5: ["11.5px", "16px"],
       12: ["12px", "16px"],
-      13: ["13px", "18px"],
+      13: ["13px", "19px"],
+      14: ["14px", "20px"],
       15: ["15px", "23px"],
-      18: ["18px", { lineHeight: "26px", letterSpacing: "-0.01em" }],
+      20: ["20px", { lineHeight: "28px", letterSpacing: "-0.015em" }],
       30: ["30px", { lineHeight: "36px", letterSpacing: "-0.025em" }],
     },
+    // Semibold is a page's title alone.
     fontWeight: {
       regular: "400",
       medium: "500",
+      semibold: "600",
     },
     transitionDuration: {
       DEFAULT: "100ms",

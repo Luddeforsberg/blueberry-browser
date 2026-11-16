@@ -7,6 +7,6 @@ describe("cn", () => {
   });
 
   it("lets a later type size replace an earlier one", () => {
-    expect(cn("text-13", "text-18")).toBe("text-18");
+    expect(cn("text-13", "text-20")).toBe("text-20");
   });
 });

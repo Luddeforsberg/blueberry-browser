@@ -26,7 +26,7 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
     const line = (fact: MemoryFact) => <>{fact.text}{fact.site && <span className="whitespace-nowrap"> ({fact.site})</span>}</>
     if (used.length <= MAX_SHOWN) {
         return (
-            <div aria-label="What it’s keeping in mind" className="text-13 text-ink-2 [overflow-wrap:anywhere]">
+            <div aria-label="What it’s keeping in mind" className="text-14 text-ink-2 [overflow-wrap:anywhere]">
                 {used.map((fact, index) => (
                     <p key={fact.id}>
                         {index === 0 && 'Keeping in mind: '}{line(fact)}{index === used.length - 1 && <> <ChangeIt mascotId={fact.mascotId}>Change</ChangeIt></>}
@@ -36,14 +36,14 @@ export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
         )
     }
     return (
-        <div aria-label="What it’s keeping in mind" className="flex flex-col items-start gap-1.5 text-13 text-ink-2 [overflow-wrap:anywhere]">
+        <div aria-label="What it’s keeping in mind" className="flex flex-col items-start gap-1.5 text-14 text-ink-2 [overflow-wrap:anywhere]">
             <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpen(!open)}
                 className="-mx-1.5 px-1.5 h-6 flex items-center gap-1.5 rounded-row outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
             >
-                <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} />
+                <ChevronRight aria-hidden className={cn("size-3.5 transition-transform duration-100", open && "rotate-90")} strokeWidth={1.75} />
                 Keeping in mind {used.length} things you kept
             </button>
             {open && (
@@ -70,18 +70,18 @@ const MemoryOfferRow: React.FC<{ offer: Pick<MemoryOffer, 'text' | 'site'>; masc
     const { showBerry } = useShell().settings
     return (
         <li aria-label="Offer to remember">
-            <div className="min-h-11 py-[9px] pl-[11px] pr-[9px] flex flex-wrap items-center gap-x-[9px] gap-y-1.5 rounded-tile bg-sheet-2 text-13 text-ink">
+            <div className="min-h-11 py-[9px] pl-[11px] pr-[9px] flex flex-wrap items-center gap-x-[9px] gap-y-1.5 rounded-tile bg-sheet-2 text-14 text-ink">
                 {showBerry && <Berry mood="curious" size={24} mascot={mascot} className="shrink-0" />}
                 <p className="min-w-0 flex-1 basis-40">
                     {offer.text}
-                    {offer.site && <span className="text-12 text-ink-2"> Only on {offer.site}</span>}
+                    {offer.site && <span className="text-13 text-ink-2"> Only on {offer.site}</span>}
                 </p>
                 <span className="ml-auto flex items-center gap-1">
-                    <Button size="sm" variant="outline" className="text-ink" onClick={() => onAnswer(true)}>Remember</Button>
+                    <Button size="sm" variant="raised" className="text-ink" onClick={() => onAnswer(true)}>Remember</Button>
                     <Button size="sm" variant="ghost" className="px-1.5" onClick={() => onAnswer(false)}>No thanks</Button>
                 </span>
             </div>
-            {error && <p role="alert" className="mt-1.5 text-13 text-ask">{error}</p>}
+            {error && <p role="alert" className="mt-1.5 text-14 text-ask">{error}</p>}
         </li>
     )
 }
@@ -97,7 +97,7 @@ export const MemoryOffersLine: React.FC<{ offers: Pick<MemoryOffer, 'id' | 'text
                     {offers.map((offer) => <MemoryOfferRow key={offer.id} offer={offer} mascot={mascot} error={errors[offer.id]} onAnswer={(keep) => onAnswer(offer.id, keep)} />)}
                 </ul>
             )}
-            {kept && <p role="status" className="text-13 text-ink-2">Noted. <ChangeIt mascotId={keptBy ?? mascot.id}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
+            {kept && <p role="status" className="text-14 text-ink-2">Noted. <ChangeIt mascotId={keptBy ?? mascot.id}>See what {showBerry ? 'I remember' : 'it remembers'}</ChangeIt></p>}
         </div>
     )
 }

@@ -24,9 +24,9 @@ export const DownloadSettings: React.FC = () => {
                             Use Downloads
                         </Button>
                     ) : (
-                        <span className="text-12 text-ink-2">Your Downloads folder</span>
+                        <span className="text-13 text-ink-2">Your Downloads folder</span>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => void window.chromeAPI.downloads.chooseFolder()}>
+                    <Button size="sm" variant="raised" onClick={() => void window.chromeAPI.downloads.chooseFolder()}>
                         Change…
                     </Button>
                 </div>
@@ -73,7 +73,7 @@ export const SitePermissionsSettings: React.FC = () => {
                         <SettingsRow key={`${origin} ${permission}`} id={`setting-site-${origin}-${permission}`} title={site} description={name}>
                             <div className="shrink-0 flex items-center gap-2">
                                 {ASKS_EVERY_TIME.includes(permission) ? (
-                                    <span className="text-13 text-ink-2">Blocked</span>
+                                    <span className="text-14 text-ink-2">Blocked</span>
                                 ) : (
                                     <Choice<SiteDecision>
                                         label={`${name} for ${site}`}
@@ -95,7 +95,7 @@ export const SitePermissionsSettings: React.FC = () => {
                     )
                 })}
             </SettingsGroup>
-            <p className="mx-3 mt-2.5 text-12 text-ink-2">
+            <p className="mx-3 mt-2.5 text-13 text-ink-2">
                 A page already using something keeps it until you reload the page. Forgetting an answer makes the site ask again.
             </p>
         </>

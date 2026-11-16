@@ -52,7 +52,7 @@ export const Chat: React.FC = () => {
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center animate-fade-in">
                         <BerrySpot size={40} mascot={mascot} />
-                        <p className="text-13 text-ink-2">
+                        <p className="text-14 text-ink-2">
                             Ask about this page, or anything else.
                         </p>
                     </div>
@@ -97,9 +97,9 @@ export const Chat: React.FC = () => {
                     placeholder={name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
                     attachment={
                         heldByUser ? (
-                            <p className="basis-full px-2 py-1 text-12 text-ink-2">{name} can’t see this tab while it’s with you.</p>
+                            <p className="basis-full px-2 py-1 text-13 text-ink-2">{name} can’t see this tab while it’s with you.</p>
                         ) : host && !canUseSite ? (
-                            <p className="basis-full px-2 py-1 text-12 text-ink-2">{name} isn’t allowed on {host}, so it can’t see this page.</p>
+                            <p className="basis-full px-2 py-1 text-13 text-ink-2">{name} isn’t allowed on {host}, so it can’t see this page.</p>
                         ) : enabled && host ? (
                             <PageChip title={activeTab?.title || host} host={host} favicon={activeTab?.favicon} onRemove={() => change(false)} />
                         ) : undefined

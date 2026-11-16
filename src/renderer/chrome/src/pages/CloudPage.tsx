@@ -50,8 +50,8 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div role="alert" className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
                 <Berry mood="oops" size={88} />
                 <div>
-                    <h1 className="text-18 font-medium">This cloud tab has closed</h1>
-                    <p className="mt-1 max-w-md text-13 text-ink-2">Its page went when the cloud session ended. Nothing of it was kept on this computer.</p>
+                    <h1 className="text-20 font-semibold">This cloud tab has closed</h1>
+                    <p className="mt-1 max-w-md text-14 text-ink-2">Its page went when the cloud session ended. Nothing of it was kept on this computer.</p>
                 </div>
             </div>
         )
@@ -77,8 +77,8 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     return (
         <div className="h-full flex flex-col">
             <div className="flex items-center gap-3 px-4 py-2 border-b">
-                <Cloud className="size-4 shrink-0 text-ink-2" aria-hidden />
-                <p className="flex-1 min-w-0 truncate text-13">
+                <Cloud className="size-4 shrink-0 text-ink-2" aria-hidden strokeWidth={1.75} />
+                <p className="flex-1 min-w-0 truncate text-14">
                     <span className="font-medium">In the cloud</span>
                     <span className="text-ink-2">
                         {' · '}
@@ -88,11 +88,11 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 {checking && !answered && (
                     <>
                         <Button size="sm" onClick={() => mark(true)}>Yes, I’m signed in</Button>
-                        <Button variant="outline" size="sm" onClick={() => mark(false)}>No, I’m signed out</Button>
+                        <Button variant="raised" size="sm" onClick={() => mark(false)}>No, I’m signed out</Button>
                     </>
                 )}
                 {!takenOver && view && (
-                    <Button variant="outline" size="sm" onClick={takeOver}>Take over</Button>
+                    <Button variant="raised" size="sm" onClick={takeOver}>Take over</Button>
                 )}
             </div>
             <div ref={area} className="relative flex-1 min-h-0">
@@ -109,7 +109,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 )}
                 {pictures && (frame
                     ? <img alt={`Picture of ${tab.title}`} src={`data:image/jpeg;base64,${frame}`} className="absolute inset-0 size-full object-contain object-top" />
-                    : <p className="absolute inset-0 flex items-center justify-center text-13 text-ink-2">Waiting for the first picture…</p>
+                    : <p className="absolute inset-0 flex items-center justify-center text-14 text-ink-2">Waiting for the first picture…</p>
                 )}
             </div>
         </div>

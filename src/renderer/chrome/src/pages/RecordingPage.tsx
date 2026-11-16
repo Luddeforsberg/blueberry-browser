@@ -43,14 +43,14 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <div className="max-w-[672px] mx-auto px-8 pt-10 pb-8">
                     <div className="flex items-end justify-between gap-6 border-b">
                         <div className="min-w-0 pb-4">
-                            <h1 className="text-18 font-medium">{isBerry ? 'What I watched' : 'What was recorded'}</h1>
-                            <p className="mt-1 text-13 text-ink-2">
+                            <h1 className="text-20 font-semibold">{isBerry ? 'What I watched' : 'What was recorded'}</h1>
+                            <p className="mt-1 text-14 text-ink-2">
                                 {empty
                                     ? 'Nothing here. Scrolling and looking around don’t leave notes.'
                                     : `${steps.length === 1 ? 'One note' : `${steps.length} notes`} on ${[...new Set(steps.map(({ site }) => site))].join(', ')}. None of it has left this computer, and none of it is saved.`}
                             </p>
                             {cut && (
-                                <p className="mt-2 text-13 text-ask">
+                                <p className="mt-2 text-14 text-ask">
                                     {cut === 'full' ? 'That’s as much as can be kept in one go, so recording stopped there.' : 'It’s been half an hour, so recording stopped by itself.'}
                                 </p>
                             )}
@@ -67,7 +67,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div className="shrink-0 px-8 pb-4">
                 <div className="max-w-[608px] mx-auto border-t pt-4">
                     {drafting ? (
-                        <p role="status" className="h-9 flex items-center gap-2 text-13">
+                        <p role="status" className="h-9 flex items-center gap-2 text-14">
                             <LiveWords>Writing it up as a routine</LiveWords>
                         </p>
                     ) : (
@@ -81,7 +81,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 </Button>
                             </div>
                             {!empty && (
-                                <p className="mt-2 text-12 text-ink-2">
+                                <p className="mt-2 text-13 text-ink-2">
                                     This sends these notes as words to the model that writes it up, and you check what comes back before anything runs. It never gets pictures, or anything typed in a password, code or card field.
                                 </p>
                             )}

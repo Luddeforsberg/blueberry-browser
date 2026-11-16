@@ -47,9 +47,9 @@ export const FindBarCard: React.FC<{
                         onStep(!event.shiftKey)
                     }
                 }}
-                className="flex-1 min-w-0 h-8 px-2 rounded-tile bg-transparent text-13 outline-none placeholder:text-ink-2 focus-visible:ring-2 focus-visible:ring-focus"
+                className="flex-1 min-w-0 h-8 px-2 rounded-tile bg-transparent text-14 outline-none placeholder:text-ink-2 focus-visible:ring-2 focus-visible:ring-focus"
             />
-            <span aria-live="polite" className="shrink-0 px-1 text-12 tabular-nums text-ink-2">
+            <span aria-live="polite" className="shrink-0 px-1 text-13 tabular-nums text-ink-2">
                 {countText(value, result)}
             </span>
             <ToolBarButton Icon={ChevronUp} label="Previous match" active={hasMatches} onClick={() => onStep(false)} />

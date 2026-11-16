@@ -44,7 +44,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     // Signed out, Publish asks for an account first, in the page.
     const scoutId = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!.id;
     await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scoutId);
-    await expect(chrome.getByRole("button", { name: /^In the Gallery/ })).toContainText("not published");
+    await expect(chrome.getByRole("button", { name: /^In the Gallery/ })).toContainText("Not published");
     await chrome.getByRole("button", { name: /^In the Gallery/ }).click();
     const form = chrome.getByRole("form", { name: "Sign in" });
     await form.getByRole("radio", { name: "Create account" }).click();

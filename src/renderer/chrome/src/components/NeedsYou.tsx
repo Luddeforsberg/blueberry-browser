@@ -28,7 +28,7 @@ export const NeedsYouNotice: React.FC = () => {
         <button
             type="button"
             onClick={() => void window.chromeAPI.browser.openPage('needs-you')}
-            className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-row text-13 outline-none transition-colors app-region-no-drag hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
+            className="h-7 px-2 shrink-0 flex items-center gap-2 rounded-row text-14 outline-none transition-colors app-region-no-drag hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
         >
             <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-ask" />
             {count === 1 ? '1 thing needs you' : `${count} things need you`}
@@ -36,7 +36,8 @@ export const NeedsYouNotice: React.FC = () => {
     )
 }
 
-// Everything but the main action, until the row has the pointer or the keyboard. They can still be tabbed to.
+// Everything but the decision, until the row has the pointer or the keyboard. They can still be tabbed to. Allow and
+// Don't allow are never hidden this way.
 const QUIETLY = "opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
 
 const QuestionBox: React.FC<{ name: string; onAnswer: (words: string) => void }> = ({ name, onAnswer }) => {
@@ -53,7 +54,7 @@ const QuestionBox: React.FC<{ name: string; onAnswer: (words: string) => void }>
                 aria-label={`Your answer to ${name}`}
                 value={answer}
                 onChange={(event) => setAnswer(event.target.value)}
-                className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="min-w-0 flex-1 h-8 rounded-tile border bg-sheet px-3 text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
             />
             <Button size="sm" type="submit" disabled={!answer.trim()}>Answer</Button>
         </form>
@@ -98,19 +99,23 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
         >
             <div className="flex items-start gap-3">
                 <Berry mood="asking" size={32} mascot={mascot} className="shrink-0" />
-                {/* The one action shows on the right, and comes first from the keyboard, as Allow does on the card. */}
-                {!question && !handoff && <Button size="sm" className="shrink-0 order-last" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>}
+                {/* The decision shows on the right, and comes first from the keyboard, Allow then Don't allow, as on the card. */}
+                {!question && !handoff && (
+                    <span className="shrink-0 order-last flex items-center gap-1.5">
+                        <Button size="sm" onClick={() => send(true, `Allowed. ${name} carries on.`)}>Allow</Button>
+                        <Button size="sm" variant="raised" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>
+                    </span>
+                )}
                 {handoff && onThatTab && <Button size="sm" className="shrink-0 order-last" onClick={done}>I’m done</Button>}
-                {handoff && !onThatTab && canGoToTab && <Button size="sm" variant="outline" className="shrink-0 order-last" onClick={goToTab}>Go to the tab</Button>}
+                {handoff && !onThatTab && canGoToTab && <Button size="sm" variant="raised" className="shrink-0 order-last" onClick={goToTab}>Go to the tab</Button>}
                 <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                     <h2 className="pt-0.5 text-15">{shortened}</h2>
                     {shortened !== approval.text && <ExactWords className="mt-2">{approval.text}</ExactWords>}
                     {question && <QuestionBox name={name} onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)} />}
                     {/* One line, so the actions waiting unseen never leave an empty strip under it. */}
-                    <div className="mt-1 h-7 flex items-center gap-x-1.5 text-12 text-ink-2">
+                    <div className="mt-1 h-7 flex items-center gap-x-1.5 text-13 text-ink-2">
                         <span className="min-w-0 flex-1 truncate">{name} · {item.job}{item.from && ` · from ${item.from}`} · <span className="tabular-nums">{askedAgo(item.askedAt)}</span></span>
                         <span className={cn("shrink-0 flex items-center", QUIETLY)}>
-                            {!question && !handoff && <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => send(false, `Not allowed, and ${name} knows.`)}>Don’t allow</Button>}
                             {!handoff && canGoToTab && <Button size="xs" variant="ghost" className="text-ink-2" onClick={goToTab}>Go to the tab</Button>}
                             <Button size="xs" variant="ghost" className="text-ink-2" onClick={openJob}>{item.routineId ? 'Open the routine' : 'Open the chat'}</Button>
                             {question && <Button size="xs" variant="ghost" className="text-ink-2" onClick={() => send(false, `Skipped. ${name} carries on without it.`)}>Skip</Button>}
@@ -128,7 +133,7 @@ export const NeedsYouRow: React.FC<{ item: NeedsYouItem; onAnswered: OnAnswered;
 export const AnsweredRow: React.FC<{ item: NeedsYouItem; said: string }> = ({ item, said }) => {
     const mascot = useFlock().find(item.mascotId)
     return (
-        <li role="status" className="flex items-center gap-2 py-3 text-13 text-ink-2 motion-safe:animate-answered">
+        <li role="status" className="flex items-center gap-2 py-3 text-14 text-ink-2 motion-safe:animate-answered">
             <Berry mood="fetching" size={24} mascot={mascot} className="shrink-0" />
             {said}
         </li>

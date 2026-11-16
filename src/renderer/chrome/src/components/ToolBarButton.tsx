@@ -38,7 +38,7 @@ export const ToolBarButton: React.FC<ToolBarButtonProps> = ({
             )}
             onClick={onClick}
         >
-            {children || (Icon && <Icon className="size-4" strokeWidth={1.5} />)}
+            {children || (Icon && <Icon className="size-4" strokeWidth={1.75} />)}
         </button>
     );
 };

@@ -30,14 +30,14 @@ export const HistoryRow: React.FC<{
             type="button"
             onClick={onOpen}
             className={cn(
-                "w-full h-9 pl-2 pr-9 flex items-center gap-3 rounded-row text-13 text-left outline-none transition-colors",
+                "w-full h-9 pl-2 pr-9 flex items-center gap-3 rounded-row text-14 text-left outline-none transition-colors",
                 "hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus"
             )}
         >
-            <span className="w-12 shrink-0 text-12 text-ink-2 tabular-nums">{timeOf(entry.visitedAt)}</span>
+            <span className="w-12 shrink-0 text-13 text-ink-2 tabular-nums">{timeOf(entry.visitedAt)}</span>
             <Favicon src={entry.favicon} site={entry.url} />
             <span className="min-w-0 truncate">{entry.title}</span>
-            <span className="min-w-0 shrink-[2] truncate text-12 text-ink-2">{hostOf(entry.url)}</span>
+            <span className="min-w-0 shrink-[2] truncate text-13 text-ink-2">{hostOf(entry.url)}</span>
         </button>
         <button
             type="button"
@@ -48,7 +48,7 @@ export const HistoryRow: React.FC<{
                 "opacity-0 group-hover/visit:opacity-100 focus-visible:opacity-100 hover:bg-press hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
             )}
         >
-            <X className="size-3" />
+            <X className="size-3" strokeWidth={1.75} />
         </button>
     </li>
 )
@@ -93,16 +93,16 @@ export const HistoryPage: React.FC = () => {
             <div className="max-w-3xl mx-auto px-8 py-10">
                 <div className="flex items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-18 font-medium">History</h1>
-                        <p className="mt-1 text-13 text-ink-2">Pages you’ve visited, kept on this computer.</p>
+                        <h1 className="text-20 font-semibold">History</h1>
+                        <p className="mt-1 text-14 text-ink-2">Pages you’ve visited, kept on this computer.</p>
                     </div>
-                    <Button variant="outline" disabled={!entries?.length && !query} onClick={() => void clear()}>
+                    <Button variant="raised" disabled={!entries?.length && !query} onClick={() => void clear()}>
                         Clear history
                     </Button>
                 </div>
 
                 <div className="relative mt-6">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-2" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-2" strokeWidth={1.75} />
                     <input
                         type="search"
                         aria-label="Search history"
@@ -111,18 +111,18 @@ export const HistoryPage: React.FC = () => {
                         onChange={(event) => setQuery(event.target.value)}
                         spellCheck={false}
                         autoFocus
-                        className="w-full h-9 pl-9 pr-3 rounded-tile border bg-sheet text-13 outline-none placeholder:text-ink-2 focus-visible:ring-2 focus-visible:ring-focus"
+                        className="w-full h-9 pl-9 pr-3 rounded-tile border bg-sheet text-14 outline-none placeholder:text-ink-2 focus-visible:ring-2 focus-visible:ring-focus"
                     />
                 </div>
 
                 {failed && (
-                    <p role="alert" className="mt-6 text-13 text-ask">
+                    <p role="alert" className="mt-6 text-14 text-ask">
                         Your history couldn’t be read. Close this tab and try again.
                     </p>
                 )}
 
                 {entries?.length === 0 && !failed && (
-                    <p className="mt-10 text-center text-13 text-ink-2">
+                    <p className="mt-10 text-center text-14 text-ink-2">
                         {query.trim()
                             ? `No pages match “${query.trim()}”.`
                             : isBerry ? 'Nothing here yet. I looked under everything.' : 'Nothing here yet.'}
@@ -131,7 +131,7 @@ export const HistoryPage: React.FC = () => {
 
                 {groupByDay(entries ?? []).map((day) => (
                     <section key={day.key} aria-label={day.label} className="mt-6">
-                        <h2 className="px-4 pb-1 text-13 font-medium">{day.label}</h2>
+                        <h2 className="px-4 pb-1 text-14 font-medium">{day.label}</h2>
                         <ul className="rounded-sheet border bg-sheet p-2">
                             {day.entries.map((entry) => (
                                 <HistoryRow
@@ -147,7 +147,7 @@ export const HistoryPage: React.FC = () => {
 
                 {next && (
                     <div className="mt-6 flex justify-center">
-                        <Button variant="outline" onClick={() => void load(query, next)}>Show more</Button>
+                        <Button variant="raised" onClick={() => void load(query, next)}>Show more</Button>
                     </div>
                 )}
             </div>

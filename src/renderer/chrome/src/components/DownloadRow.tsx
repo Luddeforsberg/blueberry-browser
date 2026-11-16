@@ -17,9 +17,9 @@ export const DownloadRow: React.FC<{
 
     return (
         <li aria-label={download.filename} className="min-h-14 px-5 py-3 flex items-center gap-3">
-            <File className="size-4 shrink-0 text-ink-2" aria-hidden />
+            <File className="size-4 shrink-0 text-ink-2" aria-hidden strokeWidth={1.75} />
             <div className="flex-1 min-w-0">
-                <div className={cn("text-13 truncate", !openable && !active && "text-ink-2")} title={download.filename}>
+                <div className={cn("text-14 truncate", !openable && !active && "text-ink-2")} title={download.filename}>
                     {download.filename}
                 </div>
                 {active && fraction !== null && (
@@ -34,7 +34,7 @@ export const DownloadRow: React.FC<{
                         <div className="h-full bg-ink transition-[width] duration-panel" style={{ width: `${fraction * 100}%` }} />
                     </div>
                 )}
-                <div className="mt-0.5 text-12 truncate tabular-nums">
+                <div className="mt-0.5 text-13 truncate tabular-nums">
                     <span className={status.className}>{status.text}</span>
                     {download.source && <span className="text-ink-2"> · {download.source}</span>}
                 </div>
@@ -48,7 +48,7 @@ export const DownloadRow: React.FC<{
                 )}
                 {openable && (
                     <>
-                        <Button size="sm" variant="outline" onClick={() => onAction('open')}>Open</Button>
+                        <Button size="sm" variant="raised" onClick={() => onAction('open')}>Open</Button>
                         <ToolBarButton Icon={FolderOpen} label={`Show ${download.filename} in folder`} onClick={() => onAction('show')} />
                     </>
                 )}

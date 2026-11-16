@@ -32,7 +32,7 @@ const PublishedList: React.FC = () => {
 
     if (list === undefined) return null
     return (
-        <SettingsGroup label="published in the gallery">
+        <SettingsGroup label="Published in the Gallery">
             {list === null && <SettingsRow id="setting-published" title="Couldn’t reach the Gallery to see." />}
             {list?.length === 0 && <SettingsRow id="setting-published" title="Nothing yet" description="A mascot’s card on Your mascots has Publish." />}
             {list && list.length > 0 && (
@@ -40,14 +40,14 @@ const PublishedList: React.FC = () => {
                     {list.map((mascot) => (
                         <li key={mascot.id} className="relative min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3 before:content-[''] before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden">
                             <div className="flex-1 min-w-0">
-                                <p className="text-13 [overflow-wrap:anywhere]">{mascot.name}</p>
-                                <p className="mt-0.5 text-12 text-ink-2 [overflow-wrap:anywhere] tabular-nums">
+                                <p className="text-14 [overflow-wrap:anywhere]">{mascot.name}</p>
+                                <p className="mt-0.5 text-13 text-ink-2 [overflow-wrap:anywhere] tabular-nums">
                                     By {mascot.author} · {mascot.addCount === 1 ? '1 add' : `${mascot.addCount} adds`}
                                     {mascot.hidden && ' · Taken out of the Gallery by Blueberry'}
                                 </p>
                             </div>
                             {mascot.link && <CopyLink link={mascot.link} label={`Copy the link to ${mascot.name}`} />}
-                            <Button variant="outline" size="sm" aria-label={`Unpublish ${mascot.name}`} onClick={() => void unpublish(mascot.id)}>Unpublish</Button>
+                            <Button variant="raised" size="sm" aria-label={`Unpublish ${mascot.name}`} onClick={() => void unpublish(mascot.id)}>Unpublish</Button>
                         </li>
                     ))}
                 </ul>
@@ -87,18 +87,18 @@ const NameRow: React.FC = () => {
                         onKeyDown={(event) => {
                             if (event.key === 'Escape') setDraft(null)
                         }}
-                        className="w-48 h-[26px] rounded-row border bg-sheet px-2.5 text-13 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        className="w-48 h-[26px] rounded-row border bg-sheet px-2.5 text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
                     />
                     <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(null)}>Cancel</Button>
-                    <Button type="submit" variant="outline" size="sm">Save</Button>
+                    <Button type="submit" variant="raised" size="sm">Save</Button>
                 </form>
             </SettingsRow>
         )
     }
     return (
         <SettingsRow id="setting-name" title="Name" description="Only on this computer. It’s never sent anywhere.">
-            <span className="min-w-0 truncate text-12 text-ink-2">{settings.accountName ?? 'Not set'}</span>
-            <Button variant="outline" size="sm" aria-label="Change your name" onClick={() => setDraft(settings.accountName ?? '')}>Change</Button>
+            <span className="min-w-0 truncate text-13 text-ink-2">{settings.accountName ?? 'Not set'}</span>
+            <Button variant="raised" size="sm" aria-label="Change your name" onClick={() => setDraft(settings.accountName ?? '')}>Change</Button>
         </SettingsRow>
     )
 }
@@ -134,14 +134,14 @@ export const AccountSettings: React.FC = () => {
                     title={<span className="font-medium">{settings.accountName ?? account.email}</span>}
                     description={settings.accountName ? account.email : undefined}
                 >
-                    <Button variant="outline" size="sm" onClick={() => void window.chromeAPI.account.signOut().then(setAccount)}>Sign out</Button>
+                    <Button variant="raised" size="sm" onClick={() => void window.chromeAPI.account.signOut().then(setAccount)}>Sign out</Button>
                 </SettingsRow>
                 {account.problem && <SettingsRow id="setting-account-problem" title={<span role="alert" className="text-ask">{account.problem}</span>} />}
             </SettingsGroup>
-            <SettingsGroup label="you">
+            <SettingsGroup label="You">
                 <NameRow />
                 <SettingsRow id="setting-email" title="Email" description="Only you see it. It’s never published, and it’s kept encrypted on this computer.">
-                    <span className="min-w-0 truncate text-12 text-ink-2">{account.email}</span>
+                    <span className="min-w-0 truncate text-13 text-ink-2">{account.email}</span>
                 </SettingsRow>
             </SettingsGroup>
             <PublishedList />
