@@ -11,6 +11,7 @@ import { useShell } from '../contexts/ShellContext'
 import { Berry } from '../components/Berry'
 import { ChatError, Markdown } from '../components/ChatMessage'
 import { CopyLink } from '../components/CopyLink'
+import { openMascots } from '../flockView'
 import { filterGallery, freeName, GALLERY_VIEW_EVENT, galleryView, openLinked, setGalleryView, sortGallery, type GallerySort, type GalleryView } from '../galleryView'
 
 // From the start, not only while the page shows, so a link that comes while another tab is in front isn't missed.
@@ -318,7 +319,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                         : 'Mascots made for one job. Each one shows you what it’s told, word for word, before you add it, and what you add is your own copy.'}
                                 </p>
                             </div>
-                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => void window.chromeAPI.browser.openPage('flock')}>Your mascots</Button>
+                            <Button variant="ghost" size="sm" className="shrink-0" onClick={() => openMascots({ page: 'list' })}>Your mascots</Button>
                         </div>
                         <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-1">
                             <label className="flex-1 min-w-[200px] max-w-xs h-8 flex items-center gap-2 text-ink-2">

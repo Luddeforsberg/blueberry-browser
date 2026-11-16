@@ -3,11 +3,12 @@ import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus } from 'lucide-r
 import type { MascotProfile } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
+import { BIG_CARD, BIG_SHELL, SHELL } from '@common/components/cardShell'
 import { useFlock } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief } from '../shortWords'
-import { blankMascot, setFlockView } from '../flockView'
+import { startMascot } from '../flockView'
 
 // DESIGN.md section 10, The prompt box: one component everywhere, a card set into a shell.
 
@@ -67,8 +68,7 @@ const MascotMenu: React.FC<{ chosenId: string; above: boolean; onChoose: (id: st
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                    setFlockView({ page: 'form', values: blankMascot() })
-                    void window.chromeAPI.browser.openPage('flock')
+                    startMascot()
                     onClose(false)
                 }}
                 className="w-full h-10 px-2.5 flex items-center gap-[11px] rounded-[14px] text-left text-ink-2 outline-none hover:bg-sheet-2 focus-visible:bg-sheet-2 hover:text-ink"
@@ -332,12 +332,12 @@ export const Composer: React.FC<{
     return (
         <div ref={box} className="relative w-full">
             {/* At chat size it's a 16px card in a 20px shell, as an approval is, so the chat's cards read as one family. */}
-            <div className={cn('bg-tray p-1 shadow-[inset_0_0_0_1px_var(--line)]', hero ? 'rounded-shell' : 'rounded-card-shell')}>
+            <div className={hero ? BIG_SHELL : cn(SHELL, 'rounded-card-shell')}>
                 <div
                     onClick={(event) => {
                         if (!(event.target as Element).closest('button,[role=menu]')) textareaRef.current?.focus()
                     }}
-                    className={cn('relative shadow-card-lift cursor-text', onCard ? 'bg-card' : 'bg-sheet', hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4')}
+                    className={cn('relative cursor-text', onCard ? 'bg-card' : 'bg-sheet', hero ? cn(BIG_CARD, 'pt-[18px] pr-3 pb-3 pl-5') : 'rounded-sheet shadow-card-lift pt-[13px] pr-[9px] pb-[9px] pl-4')}
                 >
                     {attachment && <div className="mb-2 -ml-1.5 cursor-default">{attachment}</div>}
                     <div className={hero ? 'mb-1' : undefined}>{textarea}</div>

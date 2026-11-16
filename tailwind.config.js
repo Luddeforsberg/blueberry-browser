@@ -113,6 +113,10 @@ module.exports = {
         shimmer: "shimmer 2400ms linear infinite",
         // Overshoot is the mascots' alone: one pops when it arrives (DESIGN.md section 7).
         "mascot-pop": "mascot-pop 340ms cubic-bezier(.3, 1.5, .5, 1)",
+        // Moving between the steps of making a mascot: the card's contents slide, and with the motion held still, fade.
+        "step-next": "step-next 200ms cubic-bezier(.2, .8, .2, 1)",
+        "step-back": "step-back 200ms cubic-bezier(.2, .8, .2, 1)",
+        "step-fade": "mascot-fade 200ms cubic-bezier(.2, .8, .2, 1)",
       },
       keyframes: {
         shimmer: {
@@ -127,6 +131,14 @@ module.exports = {
         "mascot-fade": {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
+        },
+        "step-next": {
+          "0%": { opacity: "0", transform: "translateX(24px)" },
+          "100%": { opacity: "1", transform: "none" },
+        },
+        "step-back": {
+          "0%": { opacity: "0", transform: "translateX(-24px)" },
+          "100%": { opacity: "1", transform: "none" },
         },
         "mascot-pop": {
           "0%": { transform: "scale(.5)", opacity: ".2" },

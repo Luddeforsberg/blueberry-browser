@@ -7,6 +7,7 @@ import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
 import { openSettings } from '../openSettings'
+import { openMascots } from '../flockView'
 import { useAccount } from '../useAccount'
 import { Berry } from './Berry'
 
@@ -134,7 +135,7 @@ export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; classN
         act()
         onClose(false)
     }
-    const page = (name: 'history' | 'downloads' | 'flock' | 'routines' | 'mascot-gallery') => choose(() => void window.chromeAPI.browser.openPage(name))
+    const page = (name: 'history' | 'downloads' | 'routines' | 'mascot-gallery') => choose(() => void window.chromeAPI.browser.openPage(name))
 
     // The keyboard starts on its first row.
     useEffect(() => {
@@ -185,7 +186,7 @@ export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; classN
             <Row Icon={Clock} shortcut={shortcutWords(SHORTCUTS.history, mac)} onChoose={page('history')}>History</Row>
             <Row Icon={Download} shortcut={shortcutWords(SHORTCUTS.downloads, mac)} onChoose={page('downloads')}>Downloads</Row>
             <Rule />
-            <Row lead={<Berry size={16} still />} onChoose={page('flock')}>Your mascots</Row>
+            <Row lead={<Berry size={16} still />} onChoose={choose(() => openMascots({ page: 'list' }))}>Your mascots</Row>
             <Row Icon={Repeat} onChoose={page('routines')}>Routines</Row>
             <Row Icon={LayoutGrid} onChoose={page('mascot-gallery')}>Gallery</Row>
             {account.status === 'signed-in' && (

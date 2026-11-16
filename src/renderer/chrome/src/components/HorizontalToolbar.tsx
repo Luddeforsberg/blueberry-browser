@@ -6,7 +6,7 @@ import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
-import { dockFaces } from '../flockView'
+import { dockFaces, openMascots } from '../flockView'
 import { AccountButton } from './AccountMenu'
 import { AddressBar } from './AddressBar'
 import { DownloadsButton } from './DownloadsButton'
@@ -108,7 +108,7 @@ const Dock: React.FC<{ shown: Popover | null; room: number }> = ({ shown, room }
                     <button
                         type="button"
                         aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
-                        onClick={() => void window.chromeAPI.browser.openPage('flock')}
+                        onClick={() => openMascots({ page: 'list' })}
                         className={cn('h-6 px-1 flex items-center rounded-[7px] font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
                     >
                         +{faces.more}

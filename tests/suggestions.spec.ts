@@ -64,9 +64,13 @@ test("only suggestions whose evidence checks out show, a row fills things in, an
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     await row(DEMO_LINES.mascot).click();
-    await expect(chrome.getByRole("heading", { name: "New mascot" })).toBeVisible();
+    // The same steps as making one, with its answers filled in.
+    await expect(chrome.getByRole("heading", { name: "What do I look like?" })).toBeVisible();
+    await chrome.getByRole("button", { name: "Continue" }).click();
     await expect(chrome.getByRole("textbox", { name: "Name" })).toHaveValue("Linus");
-    await expect(chrome.getByLabel("Sites it may use")).toHaveValue("github.com, linear.app");
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await chrome.getByRole("button", { name: "Continue" }).click();
+    await expect(chrome.getByRole("list", { name: "Sites it may use" }).getByRole("listitem")).toHaveText(["github.com", "linear.app"]);
 
     await chrome.evaluate(() => window.chromeAPI.browser.createTab());
     await chrome.getByRole("button", { name: `Dismiss: ${words}` }).click();

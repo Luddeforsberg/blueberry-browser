@@ -4,7 +4,7 @@ import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { BERRY_ID } from '@shared/mascots'
 import { Berry, useAssistantName } from './Berry'
-import { blankMascot, setFlockView } from '../flockView'
+import { startMascot } from '../flockView'
 
 // Your mascots in a row, to choose who runs a routine. In the flow rather than floating, so it fits in the form.
 export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) => void; onClose?: () => void }> = ({ selectedId, onChoose, onClose }) => {
@@ -42,8 +42,7 @@ export const MascotPerch: React.FC<{ selectedId: string; onChoose: (id: string) 
                     <button
                         type="button"
                         onClick={() => {
-                            setFlockView({ page: 'form', values: blankMascot() })
-                            void window.chromeAPI.browser.openPage('flock')
+                            startMascot()
                             onClose()
                         }}
                         className="w-[72px] py-1.5 flex flex-col items-center gap-0.5 rounded-tile text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"

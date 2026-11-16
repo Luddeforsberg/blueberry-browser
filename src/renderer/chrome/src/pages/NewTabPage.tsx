@@ -11,7 +11,7 @@ import { Berry, useAssistantName } from '../components/Berry'
 import { Composer, type PillFace } from '../components/Composer'
 import { useCloud } from '../useCloud'
 import { useRunner } from '../useRunner'
-import { setFlockView, suggestedMascot } from '../flockView'
+import { startMascot, suggestedMascot } from '../flockView'
 import { setRoutinesView, suggestedForm } from '../routinesView'
 import { asContinuation, withSiteNames } from '../siteNames'
 import { SuggestionItem } from '../components/SuggestionItem'
@@ -151,8 +151,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             setRoutinesView({ page: 'form', values: suggestedForm(suggestion.draft, suggestion.id) })
             void browser.openPage('routines')
         } else {
-            setFlockView({ page: 'form', values: suggestedMascot(suggestion.draft, suggestion.id) })
-            void browser.openPage('flock')
+            startMascot(suggestedMascot(suggestion.draft, suggestion.id))
         }
     }
 

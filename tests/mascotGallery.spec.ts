@@ -15,7 +15,7 @@ test("a Gallery mascot is reviewed, added as a limited copy, chats, and can come
   try {
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
-    await chrome.getByRole("button", { name: "Browse the Gallery" }).click();
+    await chrome.getByRole("button", { name: "Gallery", exact: true }).click();
     const gallery = chrome.getByRole("list", { name: "Gallery", exact: true });
     await expect(gallery.getByRole("listitem", { name: "Prospector" })).toContainText("Can search the web and go anywhere");
     await expect(gallery.getByRole("listitem", { name: "Follow-up" })).toContainText("Only visits mail.google.com");

@@ -88,15 +88,17 @@ test("a bird offers to remember after a job, keeps it only on Remember, uses it 
 
   // Another bird never gets it.
   await chrome.evaluate(() => window.chromeAPI.mascots.save(null, { name: "Scout", look: { palette: "robin", accessory: "cap" }, instructions: "Find things.", sites: [], tools: [] }));
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
-  await expect(chrome.getByRole("button", { name: "What Scout remembers" })).toHaveText("Memory");
+  const scout = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Scout")!;
+  await chrome.evaluate((id) => window.chromeAPI.browser.openPage("flock", { param: id }), scout.id);
+  await expect(chrome.getByRole("button", { name: /^What it remembers/ })).toContainText("Nothing yet");
 
   // What it remembers can be read, edited under the same rules, and forgotten.
-  await chrome.getByRole("button", { name: "What Berry remembers" }).click();
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock", { param: "berry" }));
+  await chrome.getByRole("button", { name: /^What it remembers/ }).click();
   await expect(chrome.getByRole("heading", { name: "What Berry remembers" })).toBeVisible();
-  const site = chrome.getByRole("region", { name: "On 127.0.0.1" });
+  const site = chrome.getByRole("region", { name: "on 127.0.0.1" });
   await expect(site).toContainText(KEPT);
-  await site.getByRole("button", { name: /^Edit/ }).click();
+  await site.getByRole("button", { name: /^Change/ }).click();
   await chrome.getByLabel("What it remembers").fill("Your password is hunter2");
   await chrome.getByRole("button", { name: "Save" }).click();
   await expect(chrome.getByRole("alert")).toContainText("never kept");

@@ -1,4 +1,5 @@
 import type { InternalPage } from "../shared/ipc";
+import { flockBack } from "../shared/flockPlaces";
 import { settingsBack } from "../shared/settingsPlaces";
 
 const TITLES: Record<InternalPage, string> = {
@@ -17,7 +18,7 @@ const TITLES: Record<InternalPage, string> = {
 };
 
 // A tab whose page the chrome renderer draws, so it has no web view and no navigation history. The one step back it
-// has is Settings', from a page one step in to its section, which its param names.
+// has is Settings' and the mascots' page's, from a page one step in to where it came from, which its param names.
 export class InternalTab {
   readonly kind = "internal";
   readonly favicon = null;
@@ -38,12 +39,18 @@ export class InternalTab {
     this.title = title || TITLES[page];
   }
 
+  private get back(): string | null {
+    if (this.page === "settings") return settingsBack(this.param);
+    if (this.page === "flock") return flockBack(this.param);
+    return null;
+  }
+
   get canGoBack(): boolean {
-    return this.page === "settings" && settingsBack(this.param) !== null;
+    return this.back !== null;
   }
 
   goBack(): void {
-    if (this.page === "settings") this.param = settingsBack(this.param) ?? this.param;
+    this.param = this.back ?? this.param;
   }
 
   get url(): string {

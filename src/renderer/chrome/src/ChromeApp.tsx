@@ -1,6 +1,7 @@
 import React from 'react'
 import { Menu } from 'lucide-react'
 import type { Rect } from '@shared/ipc'
+import { flockPlace } from '@shared/flockPlaces'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
 import { LibraryProvider } from './contexts/LibraryContext'
 import { InternalPageView } from './pages/InternalPageView'
@@ -41,9 +42,10 @@ const Shell: React.FC = () => {
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     const trouble = activeTab?.trouble ?? activeTab?.loadError
-    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Settings is a
-    // column of sheets on the well too.
-    const well = (activeTab?.page === 'new-tab' || activeTab?.page === 'settings') && !trouble
+    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Settings and
+    // Your mascots are columns of sheets on the well too, apart from publishing one, which isn't redrawn yet.
+    const mascots = activeTab?.page === 'flock' && flockPlace(activeTab.pageParam).page !== 'publish'
+    const well = (activeTab?.page === 'new-tab' || activeTab?.page === 'settings' || mascots) && !trouble
 
     return (
         <div className="relative h-full bg-ground">

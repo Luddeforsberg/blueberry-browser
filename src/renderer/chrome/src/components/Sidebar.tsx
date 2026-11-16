@@ -13,7 +13,7 @@ import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
 import { setRoutinesView } from '../routinesView'
-import { dockFaces } from '../flockView'
+import { dockFaces, openMascots } from '../flockView'
 import { BERRY_ID } from '@shared/mascots'
 import { AccountButton, AccountMenu } from './AccountMenu'
 import { SegmentSwitch } from './SegmentSwitch'
@@ -545,7 +545,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
             <button
                 type="button"
                 onClick={() => {
-                    void window.chromeAPI.browser.openPage('flock')
+                    openMascots({ page: 'list' })
                     onClose()
                 }}
                 className={cn('mt-1 w-full h-7 rounded-full text-12 text-ink-3 hover:text-ink', FOCUS)}
@@ -594,7 +594,7 @@ const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = (
                         <button
                             type="button"
                             aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
-                            onClick={() => void window.chromeAPI.browser.openPage('flock')}
+                            onClick={() => openMascots({ page: 'list' })}
                             className={cn('size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
                         >
                             +{faces.more}
