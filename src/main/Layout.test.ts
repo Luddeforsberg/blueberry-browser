@@ -342,8 +342,8 @@ describe("suggestionsRect", () => {
   it("puts the list under the field, as wide as it, with room for its shadow but none over the field", () => {
     const field = { x: 400, y: 8, width: 560, height: 32 };
     const { view, sheet } = suggestionsRect(field, 4, true, { width: 1280, height: 800 });
-    expect(view).toEqual({ x: 388, y: 48, width: 584, height: 12 + 160 + 13 + 24 });
-    expect(sheet).toEqual({ x: 12, y: 0, width: 560, height: 12 + 160 + 13 });
+    expect(view).toEqual({ x: 376, y: 48, width: 608, height: 12 + 160 + 13 + 40 });
+    expect(sheet).toEqual({ x: 24, y: 0, width: 560, height: 12 + 160 + 13 });
   });
 
   it("stays inside the window at its edges", () => {

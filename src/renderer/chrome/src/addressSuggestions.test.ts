@@ -89,6 +89,13 @@ describe("addressSuggestions", () => {
     expect(settings.map((row) => (row.kind === "tab" ? row.tabId : row.kind))).toEqual(["settings", "search", "ask"]);
   });
 
+  it("never offers the page in front, as history or as a completion", () => {
+    const tabs = [tab("front", "https://klm.com/", "KLM", { isActive: true })];
+    const done = addressSuggestions(sources("kl", { tabs, history: [visited("https://klm.com/", "KLM"), visited("https://klm.com/flights", "Flights")] }));
+    expect(done.rows.map((row) => ("url" in row && row.kind !== "search" ? row.url : row.kind))).toEqual(["https://klm.com/flights", "search", "ask"]);
+    expect(done.completion).toBe("klm.com/flights");
+  });
+
   it("keeps to six rows, with search and asking always there", () => {
     const history = Array.from({ length: 10 }, (_, index) => visited(`https://klm.com/${index}`, `KLM ${index}`));
     const rows = addressSuggestions(sources("klm", { history, complete: false })).rows;

@@ -54,8 +54,8 @@ export const promptRect = (page: Rect, cardHeight: number): Rect => {
 
 // The list under the address field while it's being edited: a menu sheet as wide as the field, 8px under it, with 40px
 // rows, 6px inside its edges, and a hairline with 6px either side before asking a mascot. The view has room round the
-// sheet for its shadow, but none above it, so it never covers the field.
-const SUGGESTIONS = { gap: 8, row: 40, padding: 6, rule: 13, side: 12, below: 24 };
+// sheet for the whole of its `lift` shadow, but none above it, so it never covers the field.
+const SUGGESTIONS = { gap: 8, row: 40, padding: 6, rule: 13, side: 24, below: 40 };
 
 export const suggestionsRect = (
   field: Rect,

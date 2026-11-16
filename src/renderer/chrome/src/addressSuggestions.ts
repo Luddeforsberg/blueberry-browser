@@ -104,7 +104,10 @@ export const addressSuggestions = ({ text, tabs, saved, history, ask, complete, 
         ...list.filter(({ url }) => !hostStarts(lower, url))
     ]
 
-    const seen = new Set<string>()
+    // The page in front is where the field already is, so it's never offered.
+    const front = tabs.find((tab) => tab.isActive && !tab.page)
+    const here = front ? sameKey(front.url) : null
+    const seen = new Set<string>(here ? [here] : [])
     const fresh = (url: string) => {
         const key = sameKey(url)
         if (seen.has(key)) return false
@@ -143,7 +146,7 @@ export const addressSuggestions = ({ text, tabs, saved, history, ask, complete, 
         ? [...saved.map(({ url }) => url), ...history.map(({ url }) => url)]
               .filter((url) => {
                   const shown = shownAddress(url).toLowerCase()
-                  return shown.startsWith(bare) && shown.length > bare.length
+                  return shown.startsWith(bare) && shown.length > bare.length && sameKey(url) !== here
               })
               .sort((a, b) => shownAddress(a).length - shownAddress(b).length)[0]
         : undefined
