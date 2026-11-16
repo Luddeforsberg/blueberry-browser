@@ -17,6 +17,8 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { Berry, useAssistantName } from './Berry'
 import type { Mood } from '@common/components/Mascot'
 import { Favicon, siteIcon } from './Favicon'
+import { SentAttachments } from './AttachmentChips'
+import type { SentAttachment } from '@shared/attachments'
 import { RememberedLine } from './MemoryInChat'
 import { blankForm, setRoutinesView } from '../routinesView'
 
@@ -89,9 +91,13 @@ export const Markdown: React.FC<{ content: string; fromStranger?: boolean; class
 )
 
 // Your own words, on `sheet-2` at the right, with a small corner where a tail would be (DESIGN.md section 10, Main chat).
-export const UserMessage: React.FC<{ content: string }> = ({ content }) => (
-    <div className="max-w-[76%] ml-auto px-3.5 py-2.5 rounded-sheet rounded-br-[5px] bg-sheet-2 text-15 text-ink whitespace-pre-wrap [overflow-wrap:anywhere] animate-fade-in">
-        {content}
+// Yours, at the right, with what went with it over it.
+export const UserMessage: React.FC<{ content: string; attached?: readonly SentAttachment[] }> = ({ content, attached }) => (
+    <div className="flex flex-col items-end gap-1.5 animate-fade-in">
+        {attached && attached.length > 0 && <div className="max-w-[80%]"><SentAttachments attached={attached} /></div>}
+        <div className="max-w-[76%] px-3.5 py-2.5 rounded-sheet rounded-br-[5px] bg-sheet-2 text-15 text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">
+            {content}
+        </div>
     </div>
 )
 

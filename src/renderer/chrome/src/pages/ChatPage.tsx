@@ -84,7 +84,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     <div className={`${COLUMN} pt-6 pb-4 flex flex-col gap-6`}>
                         {messages.map((message, index) =>
                             message.role === 'user' ? (
-                                <UserMessage key={index} content={message.content} />
+                                <UserMessage key={index} content={message.content} attached={message.attached} />
                             ) : (
                                 <AssistantMessage
                                     key={index}
@@ -122,7 +122,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <div className={`${COLUMN} shrink-0 pb-4`}>
                     {work && !roomBeside && work.outcome === null && <WorkingStrip view={work} mascot={mascot} approval={thread.approval} />}
                     <ChatComposer
-                        onSend={(message) => void window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id })}
+                        onSend={(message, attached) => void window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id, ...attached })}
+                        // A runner chat goes on with this computer off, and a cloud chat works in its own browser there.
+                        attach={{ chatId, mascot, place: thread.runner ? 'runner' : inCloud ? 'cloud' : 'here' }}
                         disabled={running}
                         onStop={running ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
                         placeholder={name === 'Assistant' ? 'Write a message' : running ? `Tell ${name} something while it works` : `Tell ${name} something`}

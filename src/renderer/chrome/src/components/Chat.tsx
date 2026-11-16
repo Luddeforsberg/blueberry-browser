@@ -5,7 +5,7 @@ import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useAssistantName, BerrySpot } from './Berry'
 import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentWrong, didWork, saveChatAsRoutine, useFollowReply, type ReplyActions } from './ChatMessage'
 import { MemoryOffers } from './MemoryInChat'
-import { PageCard } from './PageCard'
+import { PageChip } from './AttachmentChips'
 import { ChatComposer } from './Composer'
 import { siteAllowed } from '@shared/mascots'
 
@@ -60,7 +60,7 @@ export const Chat: React.FC = () => {
                     <div className="px-3.5 pt-2 pb-4 flex flex-col gap-6">
                         {messages.map((message: Message, index) =>
                             message.role === 'user' ? (
-                                <UserMessage key={message.id} content={message.content} />
+                                <UserMessage key={message.id} content={message.content} attached={message.attached} />
                             ) : (
                                 <AssistantMessage
                                     key={message.id}
@@ -87,7 +87,7 @@ export const Chat: React.FC = () => {
 
             <div className="px-3.5 pb-3.5 pt-1">
                 <ChatComposer
-                    onSend={(message) => void sendMessage(message, mascot.id)}
+                    onSend={(message, attached) => void sendMessage(message, mascot.id, attached)}
                     mascot={mascot}
                     onChooseMascot={chatId ? undefined : choose}
                     draft={draft}
@@ -97,20 +97,23 @@ export const Chat: React.FC = () => {
                     placeholder={name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
                     attachment={
                         heldByUser ? (
-                            <p className="px-2 py-1 text-12 text-ink-2">{name} can’t see this tab while it’s with you.</p>
+                            <p className="basis-full px-2 py-1 text-12 text-ink-2">{name} can’t see this tab while it’s with you.</p>
                         ) : host && !canUseSite ? (
-                            <p className="px-2 py-1 text-12 text-ink-2">{name} isn’t allowed on {host}, so it can’t see this page.</p>
+                            <p className="basis-full px-2 py-1 text-12 text-ink-2">{name} isn’t allowed on {host}, so it can’t see this page.</p>
                         ) : enabled && host ? (
-                            <PageCard
-                                title={activeTab?.title || host}
-                                host={host}
-                                favicon={activeTab?.favicon}
-                                onRemove={() => change(false)}
-                            />
+                            <PageChip title={activeTab?.title || host} host={host} favicon={activeTab?.favicon} onRemove={() => change(false)} />
                         ) : undefined
                     }
-                    onAdd={!enabled && host && canUseSite ? () => change(true) : undefined}
-                    addLabel={!enabled && host && canUseSite ? 'Add this page' : undefined}
+                    attach={{
+                        chatId,
+                        mascot,
+                        place: 'here',
+                        // The page in front, while it isn't a chip already.
+                        thisPage:
+                            host && !enabled
+                                ? { site: host, favicon: activeTab?.favicon ?? null, problem: heldByUser ? 'It’s with you for now' : !canUseSite ? `${name} isn’t allowed on ${host}` : null, onAdd: () => change(true) }
+                                : undefined,
+                    }}
                 />
             </div>
         </div>

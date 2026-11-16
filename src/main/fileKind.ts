@@ -63,10 +63,19 @@ const decode = (bytes: Uint8Array): string | null => {
   }
 };
 
-// Control characters other than tabs, line and page breaks are what binary data is made of. A few can be in a log.
-const CONTROL = /[\u0000-\u0008\u000E-\u001A\u001C-\u001F\u007F]/g;
+// Control characters other than tabs, line and page breaks and escape are what binary data is made of. A few can be in
+// a log.
+const isBinaryControl = (code: number) => (code < 0x20 && ![0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x1b].includes(code)) || code === 0x7f;
 const MAX_CONTROL_SHARE = 0.001;
-const looksLikeText = (text: string): boolean => !text.includes("\u0000") && (text.match(CONTROL)?.length ?? 0) <= text.length * MAX_CONTROL_SHARE;
+const looksLikeText = (text: string): boolean => {
+  let controls = 0;
+  for (let at = 0; at < text.length; at++) {
+    const code = text.charCodeAt(at);
+    if (code === 0) return false;
+    if (isBinaryControl(code)) controls++;
+  }
+  return controls <= text.length * MAX_CONTROL_SHARE;
+};
 
 const SVG = /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!doctype\s+svg[^>]*>\s*)?<svg[\s>]/i;
 
@@ -99,13 +108,17 @@ export const sniffFile = (bytes: Uint8Array): Sniffed => {
   return { kind: "text", ...cutText(text) };
 };
 
+// Control characters, and the ones that hide or reorder text, so a name reads as what it is.
+const hidden = (code: number) =>
+  code < 0x20 || code === 0x7f || (code >= 0x200b && code <= 0x200f) || (code >= 0x202a && code <= 0x202e) || (code >= 0x2066 && code <= 0x2069) || code === 0xfeff;
+
 // What's left of a name once anything that could pass for a path, a line break or hidden text is taken out.
 export const cleanFileName = (name: unknown, maxLength: number): string => {
   const raw = typeof name === "string" ? name : "";
   const base = raw.split(/[\\/]/).at(-1) ?? "";
-  const clean = base
-    .replace(/\s+/g, " ")
-    .replace(/[\u0000-\u001F\u007F​-‏‪-‮⁦-⁩﻿]/g, "")
+  const clean = [...base.replace(/\s+/g, " ")]
+    .filter((char) => !hidden(char.codePointAt(0) ?? 0))
+    .join("")
     .trim();
   return [...clean].slice(0, maxLength).join("") || "Untitled";
 };

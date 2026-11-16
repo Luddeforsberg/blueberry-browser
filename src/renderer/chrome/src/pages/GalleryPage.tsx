@@ -17,7 +17,9 @@ import { SegmentSwitch } from '../components/SegmentSwitch'
 import { WindowPicture } from '../components/WindowPicture'
 import { AssistantMessage, ChatError, StepTrail, ThinkingMessage, UserMessage, WentWrong } from '../components/ChatMessage'
 import { ChatComposer, Composer } from '../components/Composer'
-import { PageCard } from '../components/PageCard'
+import { FileChip, PageChip, SentAttachments, TabChip } from '../components/AttachmentChips'
+import { AddMenu, type AddMenuOptions } from '../components/AddMenu'
+import { ATTACHMENT_WORDS, type TabChoice } from '@shared/attachments'
 import { PageTrouble } from '../components/PageTrouble'
 import { TabIcon } from '../components/TabIcon'
 import { HistoryRow } from './HistoryPage'
@@ -54,6 +56,18 @@ const PIP_WORDS: Record<PipPattern, string> = {
     searching: 'Searching..',
     waiting: 'Waiting for you'
 }
+
+// What the + menu shows, in each state.
+const SAMPLE_TABS: TabChoice[] = [
+    { id: 'g-1', title: 'Flights to Lisbon · KLM', site: 'klm.com', favicon: null, problem: null },
+    { id: 'g-2', title: 'Inbox · Linear', site: 'linear.app', favicon: null, problem: null },
+    { id: 'g-3', title: 'Mail', site: 'mail.example', favicon: null, problem: 'You’re signing in there, so it stays yours' },
+]
+const sampleAdd = (overrides: Partial<AddMenuOptions> = {}): AddMenuOptions => ({
+    tabs: { problem: null, note: null, load: async () => SAMPLE_TABS, added: [], onChoose: () => undefined },
+    files: { problem: null, onChoose: () => undefined },
+    ...overrides,
+})
 
 const SAMPLE_FACTS: MemoryFact[] = [
     { id: 'gallery-fact-1', mascotId: 'gallery', text: 'You want prices in kronor.', site: null, savedAt: 1 },
@@ -315,8 +329,46 @@ export const GalleryPage: React.FC = () => {
                             <Composer size="hero" label="Ready, limited" placeholder="Ask Scout" value="What happened in Malmö today?" onChange={() => undefined} onKeyDown={() => undefined} canSend onSend={() => undefined} mascot={SAMPLE_MASCOT} onChooseMascot={() => undefined} cloud={{ on: true, onToggle: () => undefined }} limits="Only visits github.com. Can’t type or click." />
                         </div>
                         <div className="max-w-[420px]">
-                            <Composer label="In a chat, while it replies" placeholder="Tell Berry something" value="" onChange={() => undefined} onKeyDown={() => undefined} canSend={false} onSend={() => undefined} onStop={() => undefined} onAdd={() => undefined} mascot={BERRY} />
+                            <Composer label="In a chat, while it replies" placeholder="Tell Berry something" value="" onChange={() => undefined} onKeyDown={() => undefined} canSend={false} onSend={() => undefined} onStop={() => undefined} add={sampleAdd()} mascot={BERRY} />
                         </div>
+                        <div className="max-w-[640px]">
+                            <Composer
+                                size="hero"
+                                label="With a tab, a picture, a PDF and a refused file"
+                                placeholder="Ask Berry, or type an address"
+                                value="Is this cheaper than what I booked?"
+                                onChange={() => undefined}
+                                onKeyDown={() => undefined}
+                                canSend
+                                onSend={() => undefined}
+                                mascot={BERRY}
+                                onChooseMascot={() => undefined}
+                                add={sampleAdd()}
+                                attachment={
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <TabChip tab={SAMPLE_TABS[0]} onRemove={() => undefined} />
+                                        <FileChip file={{ kind: 'picture', name: 'boarding-pass.png', fact: null, thumbnail: null }} onRemove={() => undefined} />
+                                        <FileChip file={{ kind: 'pdf', name: 'itinerary.pdf', fact: '3 pages', thumbnail: null }} onRemove={() => undefined} />
+                                        <FileChip file={{ kind: 'text', name: 'notes.txt', fact: ATTACHMENT_WORDS.cutShort, factInFull: ATTACHMENT_WORDS.cutShortInFull, thumbnail: null }} onRemove={() => undefined} />
+                                        <FileChip file={{ kind: null, name: 'holiday.mov', fact: null, thumbnail: null }} problem={ATTACHMENT_WORDS.video} onRemove={() => undefined} />
+                                        <TabChip tab={SAMPLE_TABS[1]} problem={ATTACHMENT_WORDS.tabToCloud} onRemove={() => undefined} />
+                                    </div>
+                                }
+                            />
+                        </div>
+                        <div className="max-w-[640px] flex flex-col gap-2">
+                            <UserMessage content="Is this cheaper than what I booked?" />
+                            <SentAttachments attached={[{ kind: 'tab', title: 'Flights to Lisbon', site: 'klm.com' }, { kind: 'pdf', name: 'itinerary.pdf', fact: '3 pages', thumbnail: null }]} />
+                        </div>
+                    </div>
+                </Section>
+
+                <Section title="The + menu">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-x-6 gap-y-[300px] p-6 pb-[300px] rounded-tile bg-well">
+                        <div className="relative h-0"><AddMenu {...sampleAdd({ showHow: { label: 'Show Berry how', problem: null, onStart: () => undefined } })} above={false} onClose={() => undefined} /></div>
+                        <div className="relative h-0"><AddMenu {...sampleAdd({ thisPage: { site: 'klm.com', favicon: null, problem: null, onAdd: () => undefined } })} above={false} onClose={() => undefined} /></div>
+                        <div className="relative h-0"><AddMenu {...sampleAdd({ tabs: { problem: null, note: 'Deal Watcher only visits prisjakt.nu', load: async () => [], added: [], onChoose: () => undefined } })} above={false} onClose={() => undefined} /></div>
+                        <div className="relative h-0"><AddMenu {...sampleAdd({ tabs: { problem: ATTACHMENT_WORDS.tabToCloud, note: null, load: async () => SAMPLE_TABS, added: [], onChoose: () => undefined }, files: { problem: ATTACHMENT_WORDS.fileToCloud, onChoose: () => undefined } })} above={false} onClose={() => undefined} /></div>
                     </div>
                 </Section>
 
@@ -391,7 +443,7 @@ export const GalleryPage: React.FC = () => {
                         <ChatComposer
                             onSend={() => undefined}
                             placeholder="With a page attached"
-                            attachment={<PageCard title="Jackdaw" host="en.wikipedia.org" onRemove={() => undefined} />}
+                            attachment={<PageChip title="Jackdaw" host="en.wikipedia.org" onRemove={() => undefined} />}
                         />
                         <ChatComposer onSend={() => undefined} placeholder="Disabled" disabled />
                         <ChatComposer onSend={() => undefined} onStop={() => undefined} placeholder="While replying" disabled />

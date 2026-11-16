@@ -8,6 +8,11 @@ import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from './Berry'
 import { limitsInBrief } from '../shortWords'
 import { blankMascot, setFlockView } from '../flockView'
+import { MenuRule, MenuSheet, menuRowClass } from './MenuSheet'
+import { AddMenu, type AddMenuOptions } from './AddMenu'
+import { BoxChips, useAddMenu } from './BoxAttachments'
+import { useAttachments, type Attached, type JobPlace } from '../useAttachments'
+import { BERRY } from '@shared/mascots'
 
 // DESIGN.md section 10, The prompt box: one component everywhere, a card set into a shell.
 
@@ -24,45 +29,12 @@ export interface PillFace {
 // The menu under the pill: one row per mascot, its face, its name and what it may do, with a tick on the current one.
 const MascotMenu: React.FC<{ chosenId: string; above: boolean; onChoose: (id: string) => void; onClose: (refocus: boolean) => void }> = ({ chosenId, above, onChoose, onClose }) => {
     const { flock } = useFlock()
-    const menu = useRef<HTMLDivElement>(null)
-    const items = () => [...(menu.current?.querySelectorAll<HTMLElement>('[role=menuitemradio],[role=menuitem]') ?? [])]
-
-    useEffect(() => {
-        const current = menu.current?.querySelector<HTMLElement>('[aria-checked=true]') ?? items()[0]
-        current?.focus()
-    }, [])
-
     return (
-        <div
-            ref={menu}
-            role="menu"
-            aria-label="Choose who to ask"
-            onKeyDown={(event) => {
-                const all = items()
-                const at = all.indexOf(document.activeElement as HTMLElement)
-                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-                    event.preventDefault()
-                    all[(at + (event.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length]?.focus()
-                } else if (event.key === 'Home' || event.key === 'End') {
-                    event.preventDefault()
-                    all[event.key === 'Home' ? 0 : all.length - 1]?.focus()
-                } else if (event.key === 'Escape') {
-                    event.preventDefault()
-                    onClose(true)
-                } else if (event.key === 'Tab') {
-                    onClose(false)
-                }
-            }}
-            className={cn(
-                'absolute right-0 z-30 w-[316px] max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-13 text-ink shadow-lift cursor-default',
-                'origin-top-right animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)]',
-                above ? 'bottom-full mb-2 origin-bottom-right' : 'top-full mt-2'
-            )}
-        >
+        <MenuSheet label="Choose who to ask" above={above} align="right" className="w-[316px]" onClose={onClose}>
             {flock.map((mascot) => (
                 <MenuRow key={mascot.id} mascot={mascot} checked={mascot.id === chosenId} onChoose={() => onChoose(mascot.id)} />
             ))}
-            <div aria-hidden className="h-px mx-2.5 my-1 bg-line" />
+            <MenuRule />
             <button
                 type="button"
                 role="menuitem"
@@ -71,12 +43,12 @@ const MascotMenu: React.FC<{ chosenId: string; above: boolean; onChoose: (id: st
                     void window.chromeAPI.browser.openPage('flock')
                     onClose(false)
                 }}
-                className="w-full h-10 px-2.5 flex items-center gap-[11px] rounded-[14px] text-left text-ink-2 outline-none hover:bg-sheet-2 focus-visible:bg-sheet-2 hover:text-ink"
+                className={cn(menuRowClass(false), 'text-ink-2 hover:text-ink')}
             >
                 <span className="size-7 flex items-center justify-center"><Plus className="size-4" strokeWidth={1.5} /></span>
                 New mascot
             </button>
-        </div>
+        </MenuSheet>
     )
 }
 
@@ -88,7 +60,7 @@ const MenuRow: React.FC<{ mascot: MascotProfile; checked: boolean; onChoose: () 
             role="menuitemradio"
             aria-checked={checked}
             onClick={onChoose}
-            className="w-full h-[46px] px-2.5 flex items-center gap-[11px] rounded-[14px] text-left outline-none hover:bg-sheet-2 focus-visible:bg-sheet-2"
+            className={menuRowClass(true)}
         >
             <Berry size={28} mascot={mascot} still />
             <span className="flex-1 min-w-0">
@@ -197,11 +169,12 @@ export const Composer: React.FC<{
     spellCheck?: boolean
     // The new tab's box is larger, with room for a longer ask. Everywhere else it's the chat's.
     size?: 'hero' | 'chat'
-    // Shown above the text, such as the page Berry can see.
+    // Shown above the text: the chips for what it's been given to read.
     attachment?: React.ReactNode
-    // The + button adds this. Without it, there's no +.
-    onAdd?: () => void
-    addLabel?: string
+    // What the + menu offers. Without it, there's no +.
+    add?: AddMenuOptions
+    // Files dropped or pasted onto the box, which go where A file's do.
+    onFiles?: (files: File[]) => void
     // With no box of its own, because the window it's in is the box.
     bare?: boolean
     canSend: boolean
@@ -220,11 +193,16 @@ export const Composer: React.FC<{
     cloud?: { on: boolean; onToggle: () => void }
     // The chosen mascot's limits, in words, in the shell under the card. Null or empty slides it away.
     limits?: string | null
-}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, size = 'chat', attachment, onAdd, addLabel, bare, canSend, onSend, onStop, mascot, onChooseMascot, chosenId, face, quietPlaceholder, cloud, limits }) => {
+}> = ({ label, placeholder, value, onChange, onKeyDown, rows = 1, autoFocus, focusKey, spellCheck, size = 'chat', attachment, add, onFiles, bare, canSend, onSend, onStop, mascot, onChooseMascot, chosenId, face, quietPlaceholder, cloud, limits }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
+    const [adding, setAdding] = useState(false)
+    // Files are being dragged over the box. Counted, as entering a child leaves the parent.
+    const [dropping, setDropping] = useState(false)
+    const dragDepth = useRef(0)
     const box = useRef<HTMLDivElement>(null)
     const pill = useRef<HTMLButtonElement>(null)
+    const plus = useRef<HTMLButtonElement>(null)
     const hero = size === 'hero'
     // The desktop's box is the only one with smaller tools. In a chat they're the new tab's size.
     const small = !!bare
@@ -238,13 +216,15 @@ export const Composer: React.FC<{
     }, [limits])
 
     useEffect(() => {
-        if (!choosing) return
+        if (!choosing && !adding) return
         const close = (event: PointerEvent) => {
-            if (!box.current?.contains(event.target as Node)) setChoosing(false)
+            if (box.current?.contains(event.target as Node)) return
+            setChoosing(false)
+            setAdding(false)
         }
         window.addEventListener('pointerdown', close)
         return () => window.removeEventListener('pointerdown', close)
-    }, [choosing])
+    }, [choosing, adding])
 
     useLayoutEffect(() => {
         const textarea = textareaRef.current
@@ -264,6 +244,41 @@ export const Composer: React.FC<{
         setChoosing(false)
         if (refocus) pill.current?.focus()
     }
+    const closeAdding = (refocus: boolean) => {
+        setAdding(false)
+        if (refocus) plus.current?.focus()
+    }
+
+    // Only files: a link or words dragged in aren't added.
+    const carriesFiles = (event: React.DragEvent) => !!onFiles && [...event.dataTransfer.types].includes('Files')
+    const dropHandlers = onFiles
+        ? {
+              onDragEnter: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  event.preventDefault()
+                  dragDepth.current++
+                  setDropping(true)
+              },
+              onDragOver: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = 'copy'
+              },
+              onDragLeave: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  dragDepth.current = Math.max(0, dragDepth.current - 1)
+                  if (dragDepth.current === 0) setDropping(false)
+              },
+              onDrop: (event: React.DragEvent) => {
+                  if (!carriesFiles(event)) return
+                  event.preventDefault()
+                  dragDepth.current = 0
+                  setDropping(false)
+                  onFiles([...event.dataTransfer.files])
+                  textareaRef.current?.focus()
+              },
+          }
+        : {}
 
     const sendButton = (
         <button
@@ -294,6 +309,13 @@ export const Composer: React.FC<{
             spellCheck={spellCheck}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={onKeyDown}
+            onPaste={(event) => {
+                // A picture or a file pasted is added, as A file adds it. Words pasted are typing, whatever else came with them.
+                const files = [...event.clipboardData.files]
+                if (!onFiles || files.length === 0 || event.clipboardData.types.includes('text/plain')) return
+                event.preventDefault()
+                onFiles(files)
+            }}
             className={cn(
                 'block w-full resize-none bg-transparent text-ink caret-ink outline-none placeholder:text-faint placeholder:transition-opacity placeholder:duration-[120ms]',
                 hero ? 'text-15 min-h-[50px]' : 'text-15 min-h-[34px]',
@@ -312,15 +334,22 @@ export const Composer: React.FC<{
         )
     }
 
-    const plusButton = onAdd && (
+    const plusButton = add && (
         <button
+            ref={plus}
             type="button"
-            aria-label={addLabel ?? 'Add to chat'}
-            title={addLabel}
-            onClick={onAdd}
+            aria-label="Add a tab or a file"
+            title="Add a tab or a file"
+            aria-haspopup="menu"
+            aria-expanded={adding}
+            onClick={() => {
+                setChoosing(false)
+                setAdding(!adding)
+            }}
             className={cn(
                 'shrink-0 flex items-center justify-center text-ink transition-[background-color,transform] duration-fast hover:bg-press active:scale-[.96]',
                 onCard ? 'bg-card-2' : 'bg-sheet-2',
+                adding && 'bg-press',
                 small ? 'size-7 rounded-row' : 'size-8 rounded-tile',
                 FOCUS
             )}
@@ -330,38 +359,50 @@ export const Composer: React.FC<{
     )
 
     return (
-        <div ref={box} className="relative w-full">
+        <div ref={box} className="relative w-full" {...dropHandlers}>
             {/* At chat size it's a 16px card in a 20px shell, as an approval is, so the chat's cards read as one family. */}
-            <div className={cn('bg-tray p-1 shadow-[inset_0_0_0_1px_var(--line)]', hero ? 'rounded-shell' : 'rounded-card-shell')}>
+            <div className={cn('bg-tray p-1', dropping ? 'shadow-[inset_0_0_0_1.5px_rgb(var(--ink))]' : 'shadow-[inset_0_0_0_1px_var(--line)]', hero ? 'rounded-shell' : 'rounded-card-shell')}>
                 <div
                     onClick={(event) => {
-                        if (!(event.target as Element).closest('button,[role=menu]')) textareaRef.current?.focus()
+                        if (!(event.target as Element).closest('button,[role=menu],[role=group]')) textareaRef.current?.focus()
                     }}
-                    className={cn('relative shadow-card-lift cursor-text', onCard ? 'bg-card' : 'bg-sheet', hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4')}
+                    data-sheet={onCard ? undefined : ''}
+                    className={cn(
+                        'group/box relative cursor-text',
+                        dropping ? 'bg-transparent' : cn('shadow-card-lift', onCard ? 'bg-card' : 'bg-sheet'),
+                        hero ? 'rounded-prompt pt-[18px] pr-3 pb-3 pl-5' : 'rounded-sheet pt-[13px] pr-[9px] pb-[9px] pl-4'
+                    )}
                 >
-                    {attachment && <div className="mb-2 -ml-1.5 cursor-default">{attachment}</div>}
-                    <div className={hero ? 'mb-1' : undefined}>{textarea}</div>
-                    <div className="-ml-2 flex items-center gap-[7px]">
-                        {plusButton}
-                        {cloud && <WhereSwitch on={cloud.on} onToggle={cloud.onToggle} small={small} />}
-                        <span className="flex-1" />
-                        {mascot && (
-                            <MascotPill
-                                mascot={mascot}
-                                face={face}
-                                small={small}
-                                onCard={onCard}
-                                chooser={
-                                    onChooseMascot && {
-                                        open: choosing,
-                                        onToggle: () => setChoosing(!choosing),
-                                        onOpen: () => setChoosing(true),
-                                        button: pill
+                    {/* Dropping: the box keeps its size, and says what letting go does. */}
+                    {dropping && <p aria-hidden className="absolute inset-0 flex items-center justify-center text-15 text-ink pointer-events-none">Drop to add</p>}
+                    <div className={cn(dropping && 'invisible')}>
+                        {attachment && <div className="mb-2.5 -ml-1.5 cursor-default">{attachment}</div>}
+                        <div className={hero ? 'mb-1' : undefined}>{textarea}</div>
+                        <div className="-ml-2 flex items-center gap-[7px]">
+                            {plusButton}
+                            {cloud && <WhereSwitch on={cloud.on} onToggle={cloud.onToggle} small={small} />}
+                            <span className="flex-1" />
+                            {mascot && (
+                                <MascotPill
+                                    mascot={mascot}
+                                    face={face}
+                                    small={small}
+                                    onCard={onCard}
+                                    chooser={
+                                        onChooseMascot && {
+                                            open: choosing,
+                                            onToggle: () => {
+                                            setAdding(false)
+                                            setChoosing(!choosing)
+                                        },
+                                            onOpen: () => setChoosing(true),
+                                            button: pill
+                                        }
                                     }
-                                }
-                            />
-                        )}
-                        {sendButton}
+                                />
+                            )}
+                            {sendButton}
+                        </div>
                     </div>
                 </div>
                 {/* The chosen mascot's limits, and nothing else, for as long as it's chosen. */}
@@ -378,6 +419,7 @@ export const Composer: React.FC<{
                     </div>
                 </div>
             </div>
+            {adding && add && <AddMenu {...add} above={!hero} onClose={closeAdding} />}
             {choosing && mascot && onChooseMascot && (
                 <MascotMenu
                     chosenId={chosenId ?? mascot.id}
@@ -396,22 +438,25 @@ export const Composer: React.FC<{
 
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
-    onSend: (message: string) => void
+    onSend: (message: string, attached: Attached) => void
     onStop?: () => void
     disabled?: boolean
     placeholder: string
+    // Shown first among the chips, such as the page in front.
     attachment?: React.ReactNode
-    onAdd?: () => void
-    addLabel?: string
+    // Where the + adds a tab or a file. Without it, there's no +.
+    attach?: { chatId: string | null; mascot: MascotProfile; place: JobPlace; thisPage?: AddMenuOptions['thisPage'] }
     autoFocus?: boolean
     // Text to add to whatever is already being written. It's never sent without the user.
     draft?: string | null
     onDraftTaken?: () => void
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-}> = ({ onSend, onStop, disabled = false, placeholder, attachment, onAdd, addLabel, autoFocus, draft, onDraftTaken, mascot, onChooseMascot }) => {
+}> = ({ onSend, onStop, disabled = false, placeholder, attachment, attach, autoFocus, draft, onDraftTaken, mascot, onChooseMascot }) => {
     const [value, setValue] = useState('')
     const [focusKey, setFocusKey] = useState(0)
+    const box = useAttachments(attach?.place ?? 'here')
+    const add = useAddMenu(box, { chatId: attach?.chatId ?? null, mascot: attach?.mascot ?? BERRY, place: attach?.place ?? 'here', thisPage: attach?.thisPage })
 
     // StrictMode runs this twice when the panel opens with a draft waiting, and it must only add it once.
     const draftTaken = useRef(false)
@@ -430,8 +475,9 @@ export const ChatComposer: React.FC<{
     const send = () => {
         const message = value.trim()
         if (!message || disabled) return
-        onSend(message)
+        onSend(message, box.sendable())
         setValue('')
+        box.clear()
     }
 
     return (
@@ -448,9 +494,9 @@ export const ChatComposer: React.FC<{
                     send()
                 }
             }}
-            attachment={attachment}
-            onAdd={onAdd}
-            addLabel={addLabel}
+            attachment={box.empty && !attachment ? undefined : <BoxChips box={box} before={attachment} />}
+            add={attach ? add : undefined}
+            onFiles={attach && attach.place !== 'runner' ? (files) => void box.addFiles(files) : undefined}
             canSend={!disabled && value.trim().length > 0}
             onSend={send}
             onStop={onStop}

@@ -16,6 +16,9 @@ import { setRoutinesView, suggestedForm } from '../routinesView'
 import { asContinuation, withSiteNames } from '../siteNames'
 import { SuggestionItem } from '../components/SuggestionItem'
 import { suggestionRows, type SuggestionRow } from '../newTabSuggestions'
+import { useAttachments } from '../useAttachments'
+import { BoxChips, useAddMenu } from '../components/BoxAttachments'
+import { useRecording } from '../components/ShowBerry'
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
 
@@ -130,6 +133,18 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     // One that only reads the page in front has no use for the cloud, where that page isn't.
     const cloudFits = (canUseRunner || canUseCloud) && chosen.tools.includes('visit')
     const inCloud = cloudFits && (cloudChoice ?? chosen.worksInCloud === true)
+    // The runner keeps going with this computer off, so it's used whenever there is one. The user never picks.
+    const toRunner = inCloud && canUseRunner
+    const box = useAttachments(toRunner ? 'runner' : inCloud ? 'cloud' : 'here')
+    const recording = useRecording().status === 'recording'
+    const assistant = useAssistantName()
+    const add = useAddMenu(box, {
+        chatId: null,
+        mascot: chosen,
+        place: toRunner ? 'runner' : inCloud ? 'cloud' : 'here',
+        // Show Berry how starts here too, for a routine shown rather than written.
+        showHow: { label: assistant === 'Assistant' ? 'Record a routine' : `Show ${assistant} how`, problem: recording ? 'It’s already watching' : null, onStart: () => void window.chromeAPI.recording.start() },
+    })
 
     // Saved cards, at once. New ones arrive when they're written, and the page never waits for them.
     useEffect(() => {
@@ -172,20 +187,22 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         const chat = await window.chromeAPI.chat.send(null, message, {
             seePage: false,
             mascotId: chosen.id,
-            // The runner keeps going with this computer off, so it's used whenever there is one. The user never picks.
-            runner: inCloud && canUseRunner,
-            cloud: inCloud && !canUseRunner && canUseCloud
+            runner: toRunner,
+            cloud: inCloud && !canUseRunner && canUseCloud,
+            ...box.sendable()
         })
         if (!chat) return
+        box.clear()
         await browser.openPage('chat', { param: chat.id, title: chat.title })
         await browser.closeTab(tab.id)
     }
 
-    // Enter opens anything that looks like an address and asks the mascot about everything else. ⌘Enter always asks.
+    // Enter opens anything that looks like an address and asks the mascot about everything else. ⌘Enter always asks, and
+    // so does anything with something attached, which is for the mascot.
     const submit = (alwaysAsk: boolean) => {
         const message = text.trim()
         if (!message) return
-        if (alwaysAsk || !looksLikeUrl(message)) void ask(message)
+        if (alwaysAsk || !box.empty || !looksLikeUrl(message)) void ask(message)
         else void browser.navigateTab(tab.id, toUrl(message))
     }
 
@@ -247,6 +264,9 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             onChooseMascot={choose}
                             limits={limitsOf(shown)}
                             cloud={cloudFits ? { on: inCloud, onToggle: () => setCloudChoice(!inCloud) } : undefined}
+                            attachment={box.empty ? undefined : <BoxChips box={box} />}
+                            add={add}
+                            onFiles={toRunner ? undefined : (files) => void box.addFiles(files)}
                         />
                     </div>
 

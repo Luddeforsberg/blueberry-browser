@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { ChatApproval, ChatStep, ChatThread, UsedPage } from '@shared/library'
+import type { SentAttachment } from '@shared/attachments'
+import type { Attached } from '../useAttachments'
 
 export interface Message {
     id: string
@@ -8,6 +10,7 @@ export interface Message {
     steps?: ChatStep[]
     memoryIds?: string[]
     pages?: UsedPage[]
+    attached?: SentAttachment[]
     isStreaming?: boolean
     statusLine?: string | null
 }
@@ -28,7 +31,7 @@ interface ChatContextType {
 
     // Chat actions
     // A new chat runs as `mascotId`. An open one keeps its own.
-    sendMessage: (content: string, mascotId: string) => Promise<void>
+    sendMessage: (content: string, mascotId: string, attached?: Attached) => Promise<void>
     stop: () => void
     clearChat: () => void
 
@@ -97,9 +100,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.chromeAPI.chat.setPageAccess(enabled).then(setPageAccessState)
     }, [])
 
-    const sendMessage = useCallback(async (content: string, mascotId: string) => {
+    const sendMessage = useCallback(async (content: string, mascotId: string, attached?: Attached) => {
         try {
-            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true, mascotId })
+            const sent = await window.chromeAPI.chat.send(chatId, content, { seePage: true, mascotId, ...attached })
             if (sent) setChatId(sent.id)
         } catch (error) {
             console.error('Failed to send message:', error)
