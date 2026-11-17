@@ -5,7 +5,7 @@ import { Pips } from '@common/components/Pips'
 import { useAssistantName } from '../components/Berry'
 import { ChatError, LiveWords } from '../components/ChatMessage'
 import { PageFrame, PageHeader } from '../components/PageFrame'
-import { RecordingNotice, stepCount, TrailNotes, useRecording } from '../components/ShowBerry'
+import { RecordingNotice, TrailNotes, useRecording } from '../components/ShowBerry'
 import { recordedForm, startRoutine } from '../routinesView'
 
 const api = () => window.chromeAPI.recording
@@ -44,7 +44,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <PageHeader title={isBerry ? 'What I watched' : 'What was recorded'}>
                 {empty
                     ? `${watching ? 'Nothing yet' : 'Nothing here'}. Scrolling and looking around don’t leave steps.`
-                    : `${stepCount(steps.length).replace(/^1 /, 'One ')} on ${[...new Set(steps.map(({ site }) => site))].join(', ')}. None of it has left this computer, and none of it is saved.`}
+                    : `${steps.length === 1 ? 'One step' : `${steps.length} steps`} on ${[...new Set(steps.map(({ site }) => site))].join(', ')}. None of it has left this computer, and none of it is saved.`}
             </PageHeader>
             <RecordingNotice inPage className="mx-3 mb-6" />
             {cut && (

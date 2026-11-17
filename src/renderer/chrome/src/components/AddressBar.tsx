@@ -8,7 +8,7 @@ import { Mascot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
 import { toUrl } from '@common/lib/url'
 import { useAssistantName } from './Berry'
-import { useRecorderCrowds } from './ShowBerry'
+import { useRecorderNeedsRoom } from './ShowBerry'
 import { TabIcon } from './TabIcon'
 import { useAddressSuggestions } from './useAddressSuggestions'
 import { openRoutines } from '../routinesView'
@@ -96,7 +96,7 @@ const openJob = (item: NeedsYouItem) => {
 export const AddressBar: React.FC = () => {
     const { activeTab, navigateToUrl } = useBrowser()
     const { bookmarks, pinned } = useLibrary()
-    const crowded = useRecorderCrowds()
+    const recorderNeedsRoom = useRecorderNeedsRoom()
     const [url, setUrl] = useState('')
     const [isFocused, setIsFocused] = useState(false)
     const job = useJobHere(activeTab)
@@ -217,7 +217,7 @@ export const AddressBar: React.FC = () => {
                     <span className="truncate text-faint">Search or enter address</span>
                 )}
             </button>
-            {web && !crowded && (
+            {web && !recorderNeedsRoom && (
                 <button
                     type="button"
                     aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}

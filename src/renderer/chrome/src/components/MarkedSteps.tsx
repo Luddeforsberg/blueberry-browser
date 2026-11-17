@@ -135,12 +135,12 @@ export const MarkedSteps: React.FC<{ label: string; values: RoutineFormValues; o
         element.focus()
         // Typing over a selection, and a line break, are done by hand, because the browser gets them wrong here: typed
         // over all or part of a value, the mark could go with the text it held, and a break at the end of one goes
-        // inside it, twice. Typing at the caret is left to the browser.
+        // inside it, twice. Typing or pasting a line at the caret is left to the browser.
         const typeOver = (event: InputEvent) => {
             const breaks = event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak'
             const typed = breaks ? '\n' : event.inputType.startsWith('insert') ? event.data ?? event.dataTransfer?.getData('text/plain') : null
             const [range] = event.getTargetRanges()
-            if (!typed || !range || (!breaks && range.collapsed)) return
+            if (!typed || !range || (range.collapsed && !typed.includes('\n'))) return
             const start = offsetOf(element, range.startContainer, range.startOffset)
             const end = offsetOf(element, range.endContainer, range.endOffset)
             const changed = typedInto(readPieces(element), start, end, typed)
@@ -167,8 +167,6 @@ export const MarkedSteps: React.FC<{ label: string; values: RoutineFormValues; o
                 aria-multiline
                 aria-label={label}
                 contentEditable="plaintext-only"
-                suppressContentEditableWarning
-                spellCheck={false}
                 onInput={() => {
                     const element = box.current
                     if (element) onChange(withStepsPieces(values, readPieces(element)))

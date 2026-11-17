@@ -38,8 +38,6 @@ const Elapsed: React.FC<{ since: number }> = ({ since }) => {
     return <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{clock(now - since)}</span>
 }
 
-export const stepCount = (count: number) => (count === 1 ? '1 step' : `${count} steps`)
-
 // The recorder: in the toolbar on every tab in both layouts until Done, and on top of What I watched. The toolbar's is
 // in the chrome, so no page can reach, cover or imitate it from where it is, and Done goes straight to main. Its pips
 // are the one thing that moves in the toolbar. The page's copy isn't a status, so it's read out once.
@@ -56,14 +54,14 @@ export const RecordingNotice: React.FC<{ state?: RecordingState; inPage?: boolea
             <Pips pattern="waiting" className="text-ask" />
             <span className={cn('font-medium', narrow && 'sr-only')}>{settings.showBerry ? 'Watching' : 'Recording'}</span>
             <Elapsed since={startedAt} />
-            {layout.page.width >= ROOM_FOR_COUNT && <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{stepCount(steps.length)}</span>}
+            {layout.page.width >= ROOM_FOR_COUNT && <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>}
             <Button size="xs" onClick={() => void window.chromeAPI.recording.stop()}>Done</Button>
         </div>
     )
 }
 
 // The bookmark star gives way to the recorder beside the chat panel on a narrow page.
-export const useRecorderCrowds = () => {
+export const useRecorderNeedsRoom = () => {
     const { layout } = useShell()
     return useRecording().status === 'recording' && layout.page.width < NARROW_PAGE
 }

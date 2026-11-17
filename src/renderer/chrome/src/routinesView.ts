@@ -89,7 +89,7 @@ export const askingLines = (rows: RecordedChangeValue[]) => rows.filter(({ ask }
 const askingText = (rows: RecordedChangeValue[]) => askingLines(rows).map((line) => `${line}\n\n`).join('')
 
 // The steps, after the lines asking for values.
-export const stepsText = ({ instructions, recorded = [] }: Pick<RoutineFormValues, 'instructions' | 'recorded'>) => {
+const stepsText = ({ instructions, recorded = [] }: Pick<RoutineFormValues, 'instructions' | 'recorded'>) => {
     const asking = askingText(recorded)
     return instructions.startsWith(asking) ? instructions.slice(asking.length) : instructions
 }
@@ -98,7 +98,7 @@ export const stepsText = ({ instructions, recorded = [] }: Pick<RoutineFormValue
 // 13:30, and a 10 is in 10px. An address's path isn't the value either, even where it looks like it, as a value of 1 in
 // /product/1, but what it searches for is. Taken as written, whatever's in it. -1 where it isn't there.
 const sameKind = (char: string) => (/\p{L}/u.test(char) ? '\\p{L}' : /\p{N}/u.test(char) ? '\\p{N}' : null)
-export const wholeValueAt = (text: string, value: string): number => {
+const wholeValueAt = (text: string, value: string): number => {
     if (!value) return -1
     const before = sameKind(value[0])
     const after = sameKind(value[value.length - 1])
