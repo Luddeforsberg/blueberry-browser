@@ -30,6 +30,13 @@ export interface ChatStep {
 
 export type StepKind = "open" | "read" | "scan" | "search" | "click" | "type" | "ask" | "wait";
 
+// Words a mascot wrote on the way to its answer, in a message that went on to use tools, after `after` of its steps.
+// Only for the screen, like a step's `shown`: the model, history, the cloud and other apps never get them.
+export interface SaidOnTheWay {
+  after: number;
+  text: string;
+}
+
 // An action waiting for the user to allow it.
 export interface ChatApproval {
   id: string;
@@ -82,6 +89,10 @@ export interface ChatThreadMessage {
   pages?: UsedPage[];
   // What the user sent with it from the prompt box's +, by name only.
   attached?: SentAttachment[];
+  // A reply's words between its steps, when it began and how long it took, in milliseconds. None from before these.
+  said?: SaidOnTheWay[];
+  startedAt?: number;
+  took?: number;
 }
 
 export interface UsedPage {
@@ -111,8 +122,10 @@ export interface ChatThread extends ChatThreadSummary {
   partial: string | null;
   // What the running reply said it's doing, until its answer starts. Only for the screen, and never saved.
   statusLine: string | null;
-  // What the running reply has done so far. Empty when no reply is running.
+  // What the running reply has done so far, what it said between, and when it began. Empty and null when none is running.
   steps: ChatStep[];
+  said: SaidOnTheWay[];
+  startedAt: number | null;
   approval: ChatApproval | null;
   // Why the last reply failed, until the next message.
   error: string | null;

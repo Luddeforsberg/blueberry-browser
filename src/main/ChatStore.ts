@@ -51,6 +51,8 @@ const MIGRATIONS = [
    CREATE INDEX message_files_by_chat ON message_files(chat_id, message_id, id);`,
   // Whether the user has looked at the chat since its last reply ended. Chats from before this count as seen.
   `ALTER TABLE chats ADD COLUMN seen INTEGER NOT NULL DEFAULT 1;`,
+  // How a reply's job went, for the screen: what it said between steps, when it began and how long it took.
+  `ALTER TABLE messages ADD COLUMN work TEXT;`,
 ];
 
 // A file kept with the message it went with, for the model only. Never part of a chat a renderer gets.
@@ -100,14 +102,15 @@ export class ChatStore {
       .get(id) as unknown as ChatThreadSummary | undefined;
     if (!summary) return null;
     const rows = this.db
-      .prepare("SELECT role, content, steps, memory, pages, attached FROM messages WHERE chat_id = ? ORDER BY id")
-      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null; pages: string | null; attached: string | null }>;
-    const messages = rows.map(({ steps, memory, pages, attached, ...message }): ChatThreadMessage => ({
+      .prepare("SELECT role, content, steps, memory, pages, attached, work FROM messages WHERE chat_id = ? ORDER BY id")
+      .all(id) as unknown as Array<Pick<ChatThreadMessage, "role" | "content"> & { steps: string | null; memory: string | null; pages: string | null; attached: string | null; work: string | null }>;
+    const messages = rows.map(({ steps, memory, pages, attached, work, ...message }): ChatThreadMessage => ({
       ...message,
       ...(steps ? { steps: JSON.parse(steps) } : {}),
       ...(memory ? { memoryIds: JSON.parse(memory) } : {}),
       ...(pages ? { pages: JSON.parse(pages) } : {}),
       ...(attached ? { attached: JSON.parse(attached) } : {}),
+      ...(work ? JSON.parse(work) : {}),
     }));
     return { ...summary, messages };
   }
@@ -154,7 +157,7 @@ export class ChatStore {
     this.db.exec("BEGIN");
     try {
       const { lastInsertRowid: messageId } = this.db
-        .prepare("INSERT INTO messages (chat_id, role, content, steps, memory, pages, attached) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .prepare("INSERT INTO messages (chat_id, role, content, steps, memory, pages, attached, work) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .run(
           chatId,
           message.role,
@@ -162,7 +165,8 @@ export class ChatStore {
           message.steps?.length ? JSON.stringify(message.steps) : null,
           message.memoryIds?.length ? JSON.stringify(message.memoryIds) : null,
           message.pages?.length ? JSON.stringify(message.pages) : null,
-          message.attached?.length ? JSON.stringify(message.attached) : null
+          message.attached?.length ? JSON.stringify(message.attached) : null,
+          message.startedAt !== undefined ? JSON.stringify({ said: message.said ?? [], startedAt: message.startedAt, took: message.took }) : null
         );
       const insert = this.db.prepare("INSERT INTO message_files (chat_id, message_id, kind, name, fact, mime, data, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
       files.forEach((file) => insert.run(chatId, messageId, file.kind, file.name, file.fact, file.mime, file.data, file.text));

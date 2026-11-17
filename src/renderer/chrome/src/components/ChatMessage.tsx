@@ -2,10 +2,13 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, StepKind, UsedPage } from '@shared/library'
+import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, StepKind, UsedPage } from '@shared/library'
 import { linkSite } from '@shared/publishing'
-import { ArrowUp, Check, ChevronDown, Cloud, Copy, Lock, Repeat } from 'lucide-react'
-import { ApprovalCard, CardInShell } from '@common/components/ApprovalCard'
+import { ArrowUpRight, Check, ChevronDown, ChevronRight, Cloud, Copy, Lock, Repeat } from 'lucide-react'
+import { ApprovalCard, CardInShell, Keycap, WhyLine } from '@common/components/ApprovalCard'
+import { useCardKeys } from '@common/components/cardKeys'
+import { whyWords } from '../askingWords'
+import { clock, foldedWords, keptWhenFolded, latestEntries, stepsWord, workEntries, type WorkEntry } from '../workLine'
 import { useShell } from '../contexts/ShellContext'
 import { asContinuation, withSiteNames } from '../siteNames'
 import { STOPPED_STEP, trailFor } from '../stepTrail'
@@ -182,55 +185,128 @@ export const StepTrail: React.FC<{ steps: ChatStep[]; running?: boolean; cutShor
     )
 }
 
-// "12s", "1m 12s".
-const elapsedWords = (ms: number): string => {
-    const seconds = Math.max(0, Math.floor(ms / 1000))
-    return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-}
-
+// Ticks while a reply works, in mono like the line it's on.
 const Elapsed: React.FC<{ since: number }> = ({ since }) => {
     const [now, setNow] = useState(() => Date.now())
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 1000)
         return () => clearInterval(timer)
     }, [])
-    return <span className="ml-auto font-mono text-11.5 font-regular text-ink-3 tabular-nums">{elapsedWords(now - since)}</span>
+    return <span className="text-ink-3 tabular-nums">{clock(now - since)}</span>
 }
 
 // What a reply is doing between its steps: thinking, or waiting for an answer to a card. Present tense, two dots. With
 // no steps yet the mascot's face beside it is the pips, so the words stand alone (`bare`).
 const statusRow = (waiting: boolean, bare = false) => {
     const words = waiting ? 'Waiting for you..' : 'Thinking..'
-    if (bare) return <LiveWords className="font-mono text-11.5">{words}</LiveWords>
+    // Waiting is in `ask`, like the face's pips beside it.
+    if (bare) return waiting ? <span className="font-mono text-11.5 text-ask">{words}</span> : <LiveWords className="font-mono text-11.5">{words}</LiveWords>
     return waiting ? <StepLine pips="waiting" live ask>{words}</StepLine> : <StepLine pips="think" live>{words}</StepLine>
 }
 
-// While a reply works: an outlined block headed Working, with its latest steps and the one it's on now. The one thing
-// that moves in a conversation is in here (DESIGN.md section 7).
-const WorkingBlock: React.FC<{ steps: ChatStep[]; status: React.ReactNode; startedAt?: number; onShowWork?: () => void }> = ({ steps, status, startedAt, onShowWork }) => {
+// Steps of one kind in a row on one site, as one line that opens to show them.
+const GroupItem: React.FC<{ entry: Extract<WorkEntry, { kind: 'group' }> }> = ({ entry }) => {
     const [open, setOpen] = useState(false)
-    const { shown, line } = trailFor(steps, { running: true, open })
     return (
-        <section aria-label="Working" className="rounded-sheet px-3.5 pt-3 pb-[13px] shadow-[inset_0_0_0_1px_var(--line)]">
-            <h3 className="mb-[11px] h-[18px] flex items-center gap-2 text-14 font-medium text-ink">
+        <li>
+            <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={cn('-mx-1 px-1 max-w-full flex items-center gap-1 rounded-row text-left transition-colors hover:bg-hover', FOCUS)}>
+                <StepLine pips={STEP_PIPS[entry.stepKind].done}>{entry.words}</StepLine>
+                <ChevronRight aria-hidden className={cn('size-3 shrink-0 text-faint transition-transform duration-fast', open && 'rotate-90')} strokeWidth={1.75} />
+            </button>
+            {open && (
+                <ol aria-label={entry.words} className="mt-2 pl-[22px] flex flex-col gap-2">
+                    {entry.steps.map((step, index) => <StepItem key={index} step={step} />)}
+                </ol>
+            )}
+        </li>
+    )
+}
+
+// The steps and what the mascot said between them, where it said it, in its own voice at 15px.
+const Entries: React.FC<{ entries: WorkEntry[]; status?: React.ReactNode }> = ({ entries, status }) => (
+    <ol aria-label="Steps" className="flex flex-col gap-2">
+        {entries.map((entry, index) =>
+            entry.kind === 'said' ? (
+                <li key={index} className="py-0.5 text-15 leading-[1.55] text-ink-2 [overflow-wrap:anywhere]">{entry.text}</li>
+            ) : entry.kind === 'group' ? (
+                <GroupItem key={index} entry={entry} />
+            ) : (
+                <StepItem key={index} step={entry.step} />
+            )
+        )}
+        {status && <li>{status}</li>}
+    </ol>
+)
+
+// The line that leads a reply for its job's whole life (DESIGN.md section 10, Main chat). While it works: the moving
+// pips, Working and how long, then its latest steps, and the line opens the rest.
+const WorkingLine: React.FC<{ steps: ChatStep[]; said: SaidOnTheWay[]; status: React.ReactNode; startedAt?: number; onShowWork?: () => void }> = ({ steps, said, status, startedAt, onShowWork }) => {
+    const [open, setOpen] = useState(false)
+    const entries = workEntries(steps, said)
+    const { shown, hidden } = latestEntries(entries)
+    const head = (
+        <>
+            <span className="h-4 shrink-0 flex items-center"><Pips pattern="think" /></span>
+            <span className="flex items-center gap-2">
                 Working
                 {startedAt !== undefined && <Elapsed since={startedAt} />}
+            </span>
+        </>
+    )
+    return (
+        <section aria-label="Working" className="flex flex-col gap-2">
+            <div className="h-6 flex items-center gap-2">
+                {hidden ? (
+                    <button
+                        type="button"
+                        aria-expanded={open}
+                        aria-label={open ? 'Working, showing every step' : 'Working, show the earlier steps'}
+                        onClick={() => setOpen(!open)}
+                        className={cn('-mx-1 px-1 h-6 min-w-0 flex items-center gap-3 rounded-row font-mono text-11.5 text-ink transition-colors hover:bg-hover', FOCUS)}
+                    >
+                        {head}
+                        <ChevronRight aria-hidden className={cn('size-3 text-faint transition-transform duration-fast', open && 'rotate-90')} strokeWidth={1.75} />
+                    </button>
+                ) : (
+                    <p className="h-6 min-w-0 flex items-center gap-3 font-mono text-11.5 text-ink">{head}</p>
+                )}
                 {/* Brings back the working view after Hide work. */}
                 {onShowWork && (
                     <button
                         type="button"
                         onClick={onShowWork}
-                        className={cn('-my-[3px] -mr-1.5 h-6 px-1.5 shrink-0 rounded-row text-13 font-regular text-ink-3 transition-colors hover:bg-hover hover:text-ink', startedAt === undefined && 'ml-auto', FOCUS)}
+                        className={cn('ml-auto -mr-1.5 h-6 px-1.5 shrink-0 rounded-row text-13 text-ink-3 transition-colors hover:bg-hover hover:text-ink', FOCUS)}
                     >
                         Show work
                     </button>
                 )}
-            </h3>
-            <div role="status" className="pl-[5px] flex flex-col items-start gap-[9px]">
-                {line && <FoldLine open={open} onToggle={() => setOpen(!open)}>{line}</FoldLine>}
-                <StepList steps={shown.map(({ step }) => step)} />
-                {status}
             </div>
+            <div role="status">
+                <Entries entries={open ? entries : shown} status={status} />
+            </div>
+        </section>
+    )
+}
+
+// When it ends, the line folds where it is: "Worked 0:48", then "7 steps on klm.com" and a faint arrow, in `ink-3`.
+// Pressing it opens the steps in place, above the answer. Folded, the steps worth seeing on any trail still show.
+const FoldedLine: React.FC<{ steps: ChatStep[]; said: SaidOnTheWay[]; took?: number }> = ({ steps, said, took }) => {
+    const [open, setOpen] = useState(false)
+    const words = foldedWords(steps, took)
+    const kept = keptWhenFolded(steps)
+    return (
+        <section aria-label="How it got there" className="flex flex-col gap-2">
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+                className={cn('-mx-1 px-1 h-6 w-fit max-w-full flex items-center gap-2 rounded-row font-mono text-11.5 text-ink-3 transition-colors hover:bg-hover hover:text-ink-2', FOCUS)}
+            >
+                {words.worked && <span className="shrink-0 tabular-nums">{words.worked}</span>}
+                <span className="min-w-0 truncate">{words.steps}</span>
+                <ChevronRight aria-hidden className={cn('size-3 shrink-0 text-faint transition-transform duration-fast', open && 'rotate-90')} strokeWidth={1.75} />
+            </button>
+            {open ? <Entries entries={workEntries(steps, said)} /> : kept.length > 0 && <StepList steps={kept} />}
         </section>
     )
 }
@@ -246,13 +322,22 @@ export const chipClass = (bare = false) =>
         FOCUS
     )
 
+// What a job found: each page it used as a chip on `sheet` with `chip`, its icon, title and site. Each opens as the
+// user's own tab.
 const PageChips: React.FC<{ pages: UsedPage[] }> = ({ pages }) => (
-    <ul aria-label="Pages it used" className="contents">
+    <ul aria-label="Pages it used" className="flex flex-wrap gap-1.5">
         {pages.map((page) => (
             <li key={page.url} className="min-w-0 max-w-full flex">
-                <button type="button" title={page.url} onClick={() => void window.chromeAPI.browser.createTab(page.url)} className={chipClass()}>
+                <button
+                    type="button"
+                    title={page.url}
+                    onClick={() => void window.chromeAPI.browser.createTab(page.url)}
+                    className={cn('h-[30px] max-w-full pl-[7px] pr-2 inline-flex items-center gap-2 rounded-[10px] bg-sheet dark:bg-sheet-2 text-13 text-ink shadow-chip whitespace-nowrap transition-[background-color,transform] duration-fast hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:scale-[.96]', FOCUS)}
+                >
                     <Favicon src={siteIcon(page.url)} site={page.url} />
-                    <span className="truncate max-w-56">{page.title || page.url}</span>
+                    <span className="min-w-0 truncate max-w-56">{page.title || page.url}</span>
+                    {linkSite(page.url) && <span className="shrink-0 text-ink-2">{linkSite(page.url)}</span>}
+                    <ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
                 </button>
             </li>
         ))}
@@ -299,7 +384,6 @@ export interface ReplyActions {
     routineFromChat?: () => RoutineFormValues
 }
 
-const stepsWord = (count: number) => `${count} ${count === 1 ? 'step' : 'steps'}`
 
 // Where a chat runs, said only when it isn't here, or who started it when it wasn't the user. Quiet, over its first reply.
 export interface ReplyOrigin {
@@ -344,32 +428,21 @@ const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.R
     </div>
 )
 
-// What went wrong, in plain words, with Try again and the steps it got through. In the reply that went wrong, or on its
-// own when there's no reply.
-const WhatWentWrong: React.FC<{ message: string; steps: ChatStep[]; actions?: ReplyActions }> = ({ message, steps, actions }) => {
-    const [open, setOpen] = useState(false)
-    return (
-        <>
-            <TroubleLine words={message} alert>
-                {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
-                {steps.length > 0 && (
-                    <Button variant="raised" aria-expanded={open} onClick={() => setOpen(!open)}>
-                        {open ? 'Hide the steps' : `See the ${stepsWord(steps.length)}`}
-                    </Button>
-                )}
-            </TroubleLine>
-            {open && <StepList steps={steps} />}
-        </>
-    )
-}
+// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through.
+const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions }> = ({ message, actions }) => (
+    <TroubleLine words={message} alert>
+        {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
+    </TroubleLine>
+)
 
-// A mascot's reply: plain text on the sheet, with its face beside it. While it works, the Working block comes first. Once
-// it's done, the steps fold into a chip beside the pages it used, then come Copy and Save as routine on the last reply.
+// A mascot's reply: plain text on the sheet, with its face beside it. While it works, one line leads it with its steps
+// under; once it's done, that line folds where it is, above the answer, and what it found comes after the answer, then
+// Copy and Save as routine on the last reply.
 export const AssistantMessage: React.FC<{
     content: string
     steps?: ChatStep[]
-    // What a running reply said it's doing, until its answer starts.
-    statusLine?: string | null
+    // What it wrote between its steps, where it wrote it.
+    said?: SaidOnTheWay[]
     isStreaming?: boolean
     // A card is waiting for the user's answer.
     waiting?: boolean
@@ -380,8 +453,9 @@ export const AssistantMessage: React.FC<{
     memoryIds?: string[]
     // The pages its job opened, which closed when it ended.
     pages?: UsedPage[]
-    // When the running reply started, where that's known.
+    // When the running reply started, and how long a finished one took, where that's known.
     startedAt?: number
+    took?: number
     // Set on the last reply only.
     actions?: ReplyActions
     // Set on the first reply only, where there's something to say.
@@ -390,63 +464,42 @@ export const AssistantMessage: React.FC<{
     onShowWork?: () => void
     // In the main chat, where the face hangs in the gutter.
     gutter?: boolean
-}> = ({ content, steps = [], statusLine, isStreaming = false, waiting = false, mascot, error, memoryIds, pages = [], startedAt, actions, origin, onShowWork, gutter = false }) => {
-    const [open, setOpen] = useState(false)
+}> = ({ content, steps = [], said = [], isStreaming = false, waiting = false, mascot, error, memoryIds, pages = [], startedAt, took, actions, origin, onShowWork, gutter = false }) => {
     const [routine, setRoutine] = useState<RoutineFormValues | null>(null)
     const { showBerry } = useShell().settings
     const failed = error !== undefined
-    const working = isStreaming && steps.length > 0
+    const working = isStreaming && (steps.length > 0 || said.length > 0)
     // While it runs: between steps, with no words yet, it says what it's doing. A step waiting on the user is already
-    // the live one. With no Working block the face is the pips, so the words stand alone.
+    // the live one. With no working line the face is the pips, so the words stand alone.
     const status = isStreaming && !content && !steps.some((step) => !step.done) ? statusRow(waiting, !working && showBerry) : null
-    // Once it's done: a stopped reply says so in place of its last step, and the rest fold into a chip.
+    // Once it's done: a stopped reply says so in place of its last step.
     const stopped = !isStreaming && steps.at(-1)?.text === STOPPED_STEP
     const done = stopped ? steps.slice(0, -1) : steps
-    // Folded, the steps worth seeing on any trail still show: anything asked, refused or handed back.
-    const { shown, line } = trailFor(done, { running: false, open })
-    const chip = !isStreaming && done.length > 1 && !failed
-    const listed = isStreaming || failed ? [] : chip && !open ? shown.map(({ step }) => step) : chip ? done : []
-    // While it runs the face is the pips, which hold still beside a Working block, whose live step is what moves.
+    // While it runs the face is the pips, which hold still beside the working line, whose live step is what moves.
     const mood: Mood = failed ? 'oops' : !isStreaming ? 'rest' : waiting ? 'asking' : 'thinking'
-    const besideHeading = working && !origin && !(statusLine && !content)
 
     // One tree whether it's running or done, with the words in the same place, so they aren't drawn again when it ends.
     return (
-        <WithFace mascot={mascot} mood={mood} still={working} gutter={gutter} besideHeading={besideHeading} className="flex flex-col gap-4">
+        <WithFace mascot={mascot} mood={mood} still={working} gutter={gutter} className="flex flex-col gap-4">
             {origin && <OriginLine origin={origin} />}
             {mascot && <RememberedLine ids={memoryIds} />}
             {isStreaming ? (
-                <>
-                    {statusLine && !content && <p role="status" className="text-15 text-ink-2 line-clamp-3">{statusLine}</p>}
-                    {working ? (
-                        <WorkingBlock steps={steps} status={status} startedAt={startedAt} onShowWork={onShowWork} />
-                    ) : (
-                        status && <div role="status" className="h-6 flex items-center">{status}</div>
-                    )}
-                </>
+                working ? (
+                    <WorkingLine steps={steps} said={said} status={status} startedAt={startedAt} onShowWork={onShowWork} />
+                ) : (
+                    status && <div role="status" className="h-6 flex items-center">{status}</div>
+                )
             ) : (
-                done.length === 1 && !failed && <StepList steps={done} />
+                done.length > 0 && <FoldedLine steps={done} said={said} took={took} />
             )}
             {content && <Markdown content={content} />}
-            {(chip || (!isStreaming && pages.length > 0)) && (
-                <div className="-mt-1 flex flex-wrap gap-1.5">
-                    {chip && (
-                        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className={chipClass()}>
-                            <Pips pattern="read" />
-                            {line}
-                            <ChevronDown aria-hidden className={cn('size-3 transition-transform duration-fast', open && 'rotate-180')} strokeWidth={1.75} />
-                        </button>
-                    )}
-                    <PageChips pages={pages} />
-                </div>
-            )}
-            {listed.length > 0 && <StepList steps={listed} />}
+            {!isStreaming && pages.length > 0 && <PageChips pages={pages} />}
             {stopped && (
                 <TroubleLine words={done.length ? `You stopped this after ${stepsWord(done.length)}.` : 'You stopped this.'}>
                     {actions && <Button variant="raised" onClick={() => actions.onSay('Carry on')}>Carry on</Button>}
                 </TroubleLine>
             )}
-            {failed && <WhatWentWrong message={error} steps={steps} actions={actions} />}
+            {failed && <WhatWentWrong message={error} actions={actions} />}
             {/* Only while the pointer or the keyboard is in this reply. The row keeps its height, so nothing moves. */}
             {actions && !isStreaming && !stopped && !failed && content && (
                 <div className="-mt-3.5 -ml-1.5 h-7 flex gap-0.5 opacity-0 transition-opacity duration-fast group-hover/reply:opacity-100 group-focus-within/reply:opacity-100">
@@ -466,7 +519,7 @@ export const AssistantMessage: React.FC<{
 // A chat that went wrong before there was a reply to say so in: the face in Oops, and what happened.
 export const WentWrong: React.FC<{ message: string; mascot?: MascotProfile; actions?: ReplyActions; gutter?: boolean }> = ({ message, mascot, actions, gutter = false }) => (
     <WithFace mascot={mascot} mood="oops" gutter={gutter}>
-        <WhatWentWrong message={message} steps={[]} actions={actions} />
+        <WhatWentWrong message={message} actions={actions} />
     </WithFace>
 )
 
@@ -482,50 +535,66 @@ export const ThinkingMessage: React.FC<{ mascot?: MascotProfile; waiting?: boole
 
 type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProfile }
 
-// The send button of a field that has one, off until there's something to send.
-const SendArrow: React.FC<{ label: string; ready: boolean }> = ({ label, ready }) => (
-    <button
-        type="submit"
-        aria-label={label}
-        disabled={!ready}
-        className={cn('size-[26px] shrink-0 rounded-full flex items-center justify-center bg-ink text-sheet transition-[background-color,transform] duration-fast hover:bg-ink/85 active:scale-[.96] disabled:bg-transparent disabled:text-faint', FOCUS)}
-    >
-        <ArrowUp className="size-4" strokeWidth={1.75} />
-    </button>
-)
+const LETTERS = ['A', 'B', 'C']
 
-// A mascot needs something only the user knows, and carries on with the answer. Lighter than a card, with no shell,
-// because answering lets nothing happen. Secrets go in the page, never here.
-const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) => {
-    const [answer, setAnswer] = useState('')
-    const name = useAssistantName(mascot)
-    const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow, allow ? answer : undefined)
+// A mascot needs something only the user knows, and carries on with the answer: a card in a shell, with the answers it
+// offered as rows to press. There's no field in it: in a chat the prompt box is where you answer. On Needs you, which
+// has no prompt box, `field` goes under the answers. While the keyboard is on the card, A, B and C pick an answer, and
+// the rows show those keys only then. Secrets go in the page, never here.
+export const QuestionCard: React.FC<{
+    approval: ChatApproval
+    name: string
+    onAnswer: (words: string) => void
+    onSkip: () => void
+    head?: React.ReactNode
+    field?: React.ReactNode
+    // Said in the shell after the passwords line, such as Open the chat.
+    more?: React.ReactNode
+    focusOnShow?: boolean
+}> = ({ approval, name, onAnswer, onSkip, head, field, more, focusOnShow = false }) => {
+    const answers = (approval.answers ?? []).slice(0, LETTERS.length)
+    const { region, on } = useCardKeys({ onPick: (index) => onAnswer(answers[index]), picks: answers.length, focusOnShow })
+    const showKeys = on !== 'none' && on !== 'field'
     return (
-        <section aria-label={`${name} is asking`} className="[overflow-wrap:anywhere] animate-fade-in">
-            <h3 className="mb-[9px] text-15 font-medium text-ink">{approval.text}</h3>
-            <form
-                onSubmit={(event) => {
-                    event.preventDefault()
-                    if (answer.trim()) send(true)
-                }}
-                className="h-9 pl-3 pr-[5px] flex items-center gap-2 rounded-tile bg-sheet-2"
-            >
-                <input
-                    aria-label="Your answer"
-                    autoFocus
-                    value={answer}
-                    placeholder="Type an answer"
-                    onChange={(event) => setAnswer(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-14 text-ink outline-none placeholder:text-faint"
-                />
-                <SendArrow label="Answer" ready={!!answer.trim()} />
-            </form>
-            <div className="mt-2 flex items-center gap-3">
-                <Button variant="ghost" className="-ml-1.5 px-1.5" onClick={() => send(false)}>Skip</Button>
-                <span className="ml-auto text-13 text-ink-2">Passwords and codes go in the page, never here.</span>
-            </div>
-        </section>
+        <CardInShell
+            label={`${name} is asking`}
+            region={region}
+            note={
+                <>
+                    <Button variant="ghost" size="sm" className="-ml-2 px-2" onClick={onSkip}>Skip</Button>
+                    <span className="min-w-0 flex-1">Passwords and codes go in the page, never here.</span>
+                    {more}
+                </>
+            }
+        >
+            {head}
+            <h3 className={cn('text-15 font-medium text-ink', (answers.length > 0 || field) && 'mb-2')}>{approval.text}</h3>
+            {answers.length > 0 && (
+                <ul aria-label="Answers" className="-mx-1.5 -mb-1 flex flex-col gap-0.5">
+                    {answers.map((answer, index) => (
+                        <li key={answer} className="flex">
+                            <button
+                                type="button"
+                                aria-keyshortcuts={showKeys ? LETTERS[index] : undefined}
+                                onClick={() => onAnswer(answer)}
+                                className={cn('h-10 flex-1 min-w-0 px-2.5 flex items-center gap-[11px] rounded-tile bg-card-2 text-left text-14 text-ink transition-[background-color,transform] duration-fast hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:scale-[.99]', FOCUS)}
+                            >
+                                {showKeys && <Keycap>{LETTERS[index]}</Keycap>}
+                                <span className="min-w-0 truncate">{answer}</span>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {field && <div className={cn(answers.length > 0 && 'mt-3')}>{field}</div>}
+        </CardInShell>
     )
+}
+
+const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) => {
+    const name = useAssistantName(mascot)
+    const send = (allow: boolean, answer?: string) => void window.chromeAPI.chat.decide(chatId, approval.id, allow, answer)
+    return <QuestionCard approval={approval} name={name} onAnswer={(words) => send(true, words)} onSkip={() => send(false)} />
 }
 
 const HANDOFF_TITLE: Record<HandoffNeed, string> = {
@@ -535,19 +604,19 @@ const HANDOFF_TITLE: Record<HandoffNeed, string> = {
 }
 
 // What the user can do about a tab they've been handed. Words are never typed here, so there's nowhere for a secret to go.
-const HandoffActions: React.FC<{
-    chatId: string
-    approval: ChatApproval
-}> = ({ chatId, approval }) => {
+export const HandoffActions: React.FC<{
+    tabId?: string
+    onDone: () => void
+    onNotNow: () => void
+}> = ({ tabId, onDone, onNotNow }) => {
     const { tabs, switchTab } = useBrowser()
-    const tabId = approval.handoff?.tabId
     const here = tabs.some((tab) => tab.id === tabId && tab.isActive)
-    const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
+    const there = tabs.some((tab) => tab.id === tabId)
     return (
         <div className="flex flex-wrap items-center gap-1.5">
-            {!here && tabId && <Button onClick={() => void switchTab(tabId)}>Go to the tab</Button>}
-            <Button variant={here ? 'default' : 'raised'} onClick={() => send(true)}>I’m done</Button>
-            <Button variant="ghost" className="px-1.5" onClick={() => send(false)}>Not now</Button>
+            {!here && there && tabId && <Button onClick={() => void switchTab(tabId)}>Go to the tab</Button>}
+            <Button variant={here || !there ? 'default' : 'raised'} onClick={onDone}>I’m done</Button>
+            <Button variant="ghost" className="px-1.5" onClick={onNotNow}>Not now</Button>
         </div>
     )
 }
@@ -561,12 +630,21 @@ const WaitingNote: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 )
 
 // Your turn: a sign-in, a code or a captcha only the user can do. The site comes from the tab's address and every word
-// from code, so a page can't write any of it.
-const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) => {
-    const name = useAssistantName(mascot)
+// from code, so a page can't write any of it. No key answers it: only a press of I'm done gives the tab back.
+export const HandoffCard: React.FC<{
+    approval: ChatApproval
+    name: string
+    onDone: () => void
+    onNotNow: () => void
+    head?: React.ReactNode
+    note?: React.ReactNode
+    focusOnShow?: boolean
+}> = ({ approval, name, onDone, onNotNow, head, note, focusOnShow = false }) => {
+    const { region } = useCardKeys({ focusOnShow })
     const { need = 'sign-in', site = '' } = approval.handoff ?? {}
     return (
-        <CardInShell label={`${name} needs you`} note={<WaitingNote>{name} waits here until you say so</WaitingNote>}>
+        <CardInShell label={`${name} needs you`} region={region} note={note ?? <WaitingNote>{name} waits here until you say so</WaitingNote>}>
+            {head}
             <h3 className="mb-1.5 flex items-center gap-2 text-15 font-medium text-ink">
                 <Lock aria-hidden className="size-4 shrink-0" strokeWidth={1.75} />
                 <span className="min-w-0 [overflow-wrap:anywhere]">{HANDOFF_TITLE[need]} {site}</span>
@@ -574,28 +652,40 @@ const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =>
             <p className="mb-3 text-14 leading-[1.45] text-ink-2">
                 {name} has stepped back from this tab and can’t see it. What you type goes straight to the site.
             </p>
-            <HandoffActions chatId={chatId} approval={approval} />
+            <HandoffActions tabId={approval.handoff?.tabId} onDone={onDone} onNotNow={onNotNow} />
         </CardInShell>
     )
 }
 
-// An action a mascot wants to take, which waits here until the user answers. The sentence names the sites, and the
-// exact words stay under it in full, because that's what is being allowed. With no address to shorten, the sentence is
-// them.
+const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) => {
+    const name = useAssistantName(mascot)
+    const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
+    return <HandoffCard approval={approval} name={name} onDone={() => send(true)} onNotNow={() => send(false)} />
+}
+
+// What an approval card says: the sentence, which names the sites, and the exact words under it in full, because
+// that's what's being allowed. With no address to shorten and nothing marked, the sentence is them. Why it asks comes
+// from the reason's code alone.
+export const approvalWords = (approval: ChatApproval, name: string, showBerry: boolean) => {
+    const mark = approval.why?.mark
+    return {
+        question: `${showBerry ? 'I’d like to ' : `${name} wants to `}${withSiteNames(asContinuation(approval.text))}`,
+        exactly: withSiteNames(approval.text) === approval.text && !mark ? undefined : approval.text,
+        mark,
+        why: approval.why ? whyWords(approval.why) : null,
+    }
+}
+
+// An action a mascot wants to take, which waits here until the user answers. The keyboard is never put on it here, so
+// Enter in the prompt box always sends what's typed.
 export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) => {
     const name = useAssistantName(mascot)
     const { showBerry } = useShell().settings
     const decide = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow)
     if (approval.question) return <ChatQuestionCard chatId={chatId} approval={approval} mascot={mascot} />
     if (approval.handoff) return <ChatHandoffCard chatId={chatId} approval={approval} mascot={mascot} />
-    return (
-        <ApprovalCard
-            question={`${showBerry ? 'I’d like to ' : `${name} wants to `}${withSiteNames(asContinuation(approval.text))}`}
-            exactly={withSiteNames(approval.text) === approval.text ? undefined : approval.text}
-            onConfirm={() => decide(true)}
-            onDeny={() => decide(false)}
-        />
-    )
+    const { question, exactly, mark, why } = approvalWords(approval, name, showBerry)
+    return <ApprovalCard question={question} exactly={exactly} mark={mark} note={why && <WhyLine>{why}</WhyLine>} onConfirm={() => decide(true)} onDeny={() => decide(false)} />
 }
 
 // Why something failed, worded with what to do about it.

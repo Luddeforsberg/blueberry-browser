@@ -1034,14 +1034,14 @@ export const createPageTools = <T extends PageTarget>({
     pageTool({
       name: "ask_user",
       kind: "ask",
-      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. When it's a choice between a few things, give them as answers to press, and leave answers out otherwise. They can always type their own. Never ask for a password, a code or card details: use hand_to_user, so they type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
+      description: "Ask the user a question and carry on with their answer, only for something the job can't go on without and that you can't find out yourself, such as which of two options they meant. Whenever the choices are few and known, such as two flights or three dates you found, always list them in answers, so the user can answer with one press. Leave answers out only when you can't know the choices, such as a name or a budget. They can always type their own. Never ask for a password, a code or card details: use hand_to_user, so they type those in the page themselves. Don't use this for permission to act, because the browser asks that by itself.",
       schema: z.object({
         question: z.string().min(1).max(500),
         answers: z
           .array(z.string().min(1).max(MAX_ANSWER_LENGTH))
           .max(MAX_ANSWERS)
           .optional()
-          .describe(`Up to ${MAX_ANSWERS} answers the user can press, each a few plain words, such as “Friday evening”.`),
+          .describe(`The choices, when they're few and known: up to ${MAX_ANSWERS} answers the user can press, each a few plain words, such as “Friday evening”.`),
       }),
       label: () => "Asked you something",
       run: async ({ question, answers = [] }) => {

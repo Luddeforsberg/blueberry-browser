@@ -9,6 +9,7 @@ import { ChatComposer } from '../components/Composer'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useWorkView, WorkingStrip, WorkingView } from '../components/WorkingView'
 import { RunnerView } from '../components/RunnerView'
+import { answerInBox } from '../components/Composer'
 
 // DESIGN.md section 2: the working view is 420px, with 18px either side of the picture, and goes beside the conversation
 // only while that keeps room to read.
@@ -66,6 +67,8 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         routineFromChat: didWork(thread.messages) ? () => chatRoutine(thread.title, thread.messages, thread.mascotId) : undefined,
     }
 
+    // While a question waits, the prompt box is where it's answered.
+    const question = thread.approval?.question ? thread.approval : null
     const onRunner = !!thread.runner && running && roomBeside
     const workBeside = !!work && roomBeside && !workHidden
     // There's no line on top: where it runs is said only when that's not here, and who started it only when it wasn't the
@@ -73,7 +76,9 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const origin: ReplyOrigin | undefined = thread.runner || inCloud ? { words: 'in the cloud', cloud: true } : thread.from ? { words: `from ${thread.from}`, cloud: false } : undefined
 
     // The reply being written holds the place it's saved in, so it stays the same element when it ends.
-    const messages = running ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps, memoryIds: thread.memoryIds }] : thread.messages
+    const messages = running
+        ? [...thread.messages, { role: 'assistant' as const, content: partial, steps: thread.steps, said: thread.said, startedAt: thread.startedAt ?? undefined, memoryIds: thread.memoryIds }]
+        : thread.messages
     const last = messages.at(-1)
     const failedReply = thread.error && last?.role === 'assistant' ? last : null
     const firstReply = messages.findIndex((message) => message.role === 'assistant')
@@ -91,14 +96,15 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     key={index}
                                     content={message.content}
                                     steps={message.steps}
-                                    statusLine={thread.statusLine}
+                                    said={message.said}
                                     isStreaming={running && index === messages.length - 1}
                                     waiting={thread.approval !== null}
                                     mascot={mascot}
                                     error={message === failedReply && thread.error ? thread.error : undefined}
                                     memoryIds={message.memoryIds}
                                     pages={message.pages}
-                                    startedAt={work && work.endedAt === null ? work.startedAt : undefined}
+                                    startedAt={message.startedAt}
+                                    took={message.took}
                                     actions={!running && index === messages.length - 1 ? actions : undefined}
                                     origin={index === firstReply ? origin : undefined}
                                     onShowWork={running && index === messages.length - 1 && work && roomBeside && workHidden ? () => setWorkHidden(false) : undefined}
@@ -123,12 +129,15 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 <div className={`${COLUMN} shrink-0 pb-4`}>
                     {work && !roomBeside && work.outcome === null && <WorkingStrip view={work} mascot={mascot} approval={thread.approval} />}
                     <ChatComposer
-                        onSend={(message, attached) => window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id, ...attached }).then((sent) => sent !== null, () => false)}
+                        onSend={(message, attached) =>
+                            question ? answerInBox(chatId, question.id, message, attached) : window.chromeAPI.chat.send(chatId, message, { seePage: false, mascotId: mascot.id, ...attached }).then((sent) => sent !== null, () => false)
+                        }
+                        answering={!!question}
                         // A runner chat goes on with this computer off, and a cloud chat works in its own browser there.
                         attach={{ chatId, mascot, place: thread.runner ? 'runner' : inCloud ? 'cloud' : 'here' }}
-                        disabled={running}
+                        disabled={running && !question}
                         onStop={running ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
-                        placeholder={name === 'Assistant' ? 'Write a message' : running ? `Tell ${name} something while it works` : `Tell ${name} something`}
+                        placeholder={question ? `Answer ${name}, or pick one above` : name === 'Assistant' ? 'Write a message' : running ? `Tell ${name} something while it works` : `Tell ${name} something`}
                         autoFocus
                         mascot={mascot}
                     />

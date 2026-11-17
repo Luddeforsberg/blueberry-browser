@@ -45,7 +45,7 @@ const Shell: React.FC = () => {
     // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Every page
     // built on `PageFrame` is a column of sheets on the well too, apart from publishing a mascot, which isn't redrawn yet.
     const mascots = activeTab?.page === 'flock' && flockPlace(activeTab.pageParam).page !== 'publish'
-    const framed = activeTab?.page === 'settings' || activeTab?.page === 'routines' || activeTab?.page === 'history' || activeTab?.page === 'downloads' || mascots
+    const framed = activeTab?.page === 'settings' || activeTab?.page === 'routines' || activeTab?.page === 'history' || activeTab?.page === 'downloads' || activeTab?.page === 'needs-you' || mascots
     const well = (activeTab?.page === 'new-tab' || framed) && !trouble
 
     return (

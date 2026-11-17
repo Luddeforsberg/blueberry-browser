@@ -74,6 +74,9 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
+// When a reply began and how long it took are saved with it, with what it said between its steps.
+const timed = (said: { after: number; text: string }[] = []) => ({ said, startedAt: expect.any(Number), took: expect.any(Number) });
+
 describe("Chats", () => {
   describe("offering to remember", () => {
     const remembering = (stream: StreamReply, pages: Tab[] = [], mascotOf?: (id: string | null) => MascotProfile) => {
@@ -523,7 +526,7 @@ describe("Chats", () => {
 
     const thread = chats.thread(id);
     expect(thread).toMatchObject({ partial: null, error: null });
-    expect(thread?.messages.at(-1)).toEqual({ role: "assistant", content: "partial", steps: [{ text: "Stopped here", done: true }] });
+    expect(thread?.messages.at(-1)).toEqual({ role: "assistant", content: "partial", steps: [{ text: "Stopped here", done: true }], ...timed() });
   });
 
   it("says it was stopped when stopped before anything was written or done", async () => {
@@ -541,7 +544,7 @@ describe("Chats", () => {
     chats.stop(id);
     await ended;
 
-    expect(chats.thread(id)?.messages.at(-1)).toEqual({ role: "assistant", content: "", steps: [{ text: "Stopped here", done: true }] });
+    expect(chats.thread(id)?.messages.at(-1)).toEqual({ role: "assistant", content: "", steps: [{ text: "Stopped here", done: true }], ...timed() });
   });
 
   it("counts a reply as new only when it ended, not stopped, with its tab behind, until the tab comes to the front", async () => {
@@ -1162,6 +1165,7 @@ describe("Chats", () => {
         role: "assistant",
         content: "Let me look.\n\nFound it.",
         steps: [{ text: "Read a.com", done: true }],
+        ...timed(),
       });
 
       ended = replyEnded();
@@ -1180,7 +1184,7 @@ describe("Chats", () => {
       yield "it.";
     };
 
-    it("shows what it's doing above the reply until the answer starts, and keeps it out of the answer", async () => {
+    it("keeps what it said on the way where it said it, out of the answer, with how long it took", async () => {
       const { chats, chunks, threads, replyEnded } = setup(working);
       const ended = replyEnded();
       const { id } = send(chats, null, "Who leads sales?")!;
@@ -1191,7 +1195,27 @@ describe("Chats", () => {
       expect(shown).toContainEqual(["", "I'll check their careers page."]);
       expect(shown).toContainEqual(["Found ", null]);
       expect(chats.thread(id)?.statusLine).toBeNull();
-      expect(chats.thread(id)?.messages.at(-1)).toEqual({ role: "assistant", content: "Found it.", steps: [{ text: "Read a.com", done: true }] });
+      expect(chats.thread(id)?.messages.at(-1)).toEqual({
+        role: "assistant",
+        content: "Found it.",
+        steps: [{ text: "Read a.com", done: true }],
+        ...timed([{ after: 0, text: "I'll check their careers page." }]),
+      });
+    });
+
+    it("says words once when what looked like the way there was the answer after all", async () => {
+      const cutDown: StreamReply = async function* (_, __, { onStep }) {
+        yield { statusLine: "Looking." };
+        onStep("Read a.com")();
+        yield { statusLine: "Here it is" };
+        yield { statusLine: "Here it is, the list." };
+        yield "Here it is, the list.";
+      };
+      const { chats, replyEnded } = setup(cutDown);
+      const ended = replyEnded();
+      const { id } = send(chats, null, "Find it")!;
+      await ended;
+      expect(chats.thread(id)?.messages.at(-1)).toMatchObject({ content: "Here it is, the list.", said: [{ after: 0, text: "Looking." }] });
     });
 
     it("keeps the status line out of a task's answer, and takes back the words it had sent", async () => {
@@ -1261,6 +1285,7 @@ describe("Chats", () => {
         role: "assistant",
         content: "",
         steps: [{ text: "Read a.com", done: true }, { text: "Stopped here", done: true }],
+        ...timed(),
       });
     });
   });

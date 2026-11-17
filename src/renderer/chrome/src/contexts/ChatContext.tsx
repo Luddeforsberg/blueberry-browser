@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { ChatApproval, ChatStep, ChatThread, UsedPage } from '@shared/library'
+import type { ChatApproval, ChatStep, ChatThread, SaidOnTheWay, UsedPage } from '@shared/library'
 import type { SentAttachment } from '@shared/attachments'
 import type { Attached } from '../useAttachments'
 
@@ -8,6 +8,9 @@ export interface Message {
     role: 'user' | 'assistant'
     content: string
     steps?: ChatStep[]
+    said?: SaidOnTheWay[]
+    startedAt?: number
+    took?: number
     memoryIds?: string[]
     pages?: UsedPage[]
     attached?: SentAttachment[]
@@ -69,7 +72,7 @@ const toMessages = (thread: ChatThread | null): Message[] => {
     const saved: Message[] = thread.messages.map((message, index) => ({ id: `msg-${index}`, ...message }))
     // Before the first words arrive, the thinking state stands in for the reply.
     return thread.partial || thread.statusLine || thread.steps.length > 0 || thread.approval
-        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', statusLine: thread.statusLine, steps: thread.steps, memoryIds: thread.memoryIds, isStreaming: true }]
+        ? [...saved, { id: 'partial', role: 'assistant', content: thread.partial ?? '', statusLine: thread.statusLine, steps: thread.steps, said: thread.said, startedAt: thread.startedAt ?? undefined, memoryIds: thread.memoryIds, isStreaming: true }]
         : saved
 }
 

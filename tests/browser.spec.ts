@@ -399,6 +399,8 @@ test("Berry reads a page with a tool and shows the step, and only where it can s
   model.callTools({ name: "find_in_page", args: { query: "HELLO" } });
   await askInPanel("Does it say hello?");
   await expect(panel.getByText("A reply from the model")).toBeVisible();
+  // The working line folds when it's done, and opens to show the step.
+  await panel.getByRole("button", { name: `1 step on ${site}` }).click();
   await expect(panel.getByRole("list", { name: "Steps" }).getByText(`Searched ${site}`)).toBeVisible();
 
   const [offered, answered] = model.requests;
@@ -500,8 +502,14 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   // The answers to press arrive with it, without the one shaped like a code.
   const asked = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval));
   expect(asked).toMatchObject({ text: "Which colour?", question: true, answers: ["Blue", "Green"] });
-  await question.getByRole("textbox", { name: "Your answer" }).fill("Blue");
-  await question.getByRole("button", { name: "Answer" }).click();
+  await expect(question.getByRole("button", { name: "Green" })).toBeVisible();
+  // There's no field in the card: the prompt box is where it's answered, and says so.
+  await expect(question.getByRole("textbox")).toHaveCount(0);
+  // The chat's prompt box, now that the new tab has become the chat.
+  const answer = chrome.getByRole("textbox", { name: "Message" });
+  await expect(answer).toHaveAttribute("placeholder", "Answer Berry, or pick one above");
+  await answer.fill("Blue");
+  await answer.press("Enter");
 
   await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("The user answered: Blue");
   expect(JSON.stringify(model.requests.at(-1)?.messages)).toContain("never go through this chat");

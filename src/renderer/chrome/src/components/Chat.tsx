@@ -7,7 +7,7 @@ import { AssistantMessage, ChatApprovalCard, ThinkingMessage, UserMessage, WentW
 import { chatRoutine } from '../routinesView'
 import { MemoryOffers } from './MemoryInChat'
 import { PageChip } from './AttachmentChips'
-import { ChatComposer } from './Composer'
+import { ChatComposer, answerInBox } from './Composer'
 import { siteAllowed } from '@shared/mascots'
 
 const hostOf = (url: string) => {
@@ -38,6 +38,8 @@ export const Chat: React.FC = () => {
     const canUseSite = !!activeTab && siteAllowed(activeTab.url, mascot.sites)
     const heldByUser = library.needsYou.some(({ approval }) => !!activeTab && approval.handoff?.tabId === activeTab.id)
 
+    // While a question waits, the prompt box is where it's answered.
+    const question = approval?.question ? approval : null
     const last = messages.at(-1)
     // Before the reply has anything to show, there's no message for it yet.
     const thinking = isLoading && last?.role === 'user'
@@ -67,7 +69,9 @@ export const Chat: React.FC = () => {
                                     key={message.id}
                                     content={message.content}
                                     steps={message.steps}
-                                    statusLine={message.statusLine}
+                                    said={message.said}
+                                    startedAt={message.startedAt}
+                                    took={message.took}
                                     isStreaming={message.isStreaming}
                                     waiting={approval !== null}
                                     mascot={mascot}
@@ -88,14 +92,15 @@ export const Chat: React.FC = () => {
 
             <div className="px-3.5 pb-3.5 pt-1">
                 <ChatComposer
-                    onSend={(message, attached) => sendMessage(message, mascot.id, attached)}
+                    onSend={(message, attached) => (chatId && question ? answerInBox(chatId, question.id, message, attached) : sendMessage(message, mascot.id, attached))}
+                    answering={!!question}
                     mascot={mascot}
                     onChooseMascot={chatId ? undefined : choose}
                     draft={draft}
                     onDraftTaken={takeDraft}
-                    disabled={isLoading}
+                    disabled={isLoading && !question}
                     onStop={isLoading ? stop : undefined}
-                    placeholder={name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
+                    placeholder={question ? `Answer ${name}, or pick one above` : name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
                     attachment={
                         heldByUser ? (
                             <p className="basis-full px-2 py-1 text-13 text-ink-2">{name} can’t see this tab while it’s with you.</p>
