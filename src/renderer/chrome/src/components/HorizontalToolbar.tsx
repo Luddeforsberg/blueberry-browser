@@ -248,7 +248,7 @@ export const HorizontalToolbar: React.FC = () => {
     return (
         <div className="h-full flex flex-col">
             {/* Off a Mac, the app's menu ends the row, where the layout puts it, so the row stops short of it. */}
-            <div ref={row} className="h-11 shrink-0 flex items-center gap-1 pl-2 app-region-drag" style={{ paddingRight: layout.menuButton.width > 0 ? layout.toolbar.width - layout.menuButton.x + 4 : 8 }}>
+            <div ref={row} className="h-11 shrink-0 flex items-center gap-1 pl-2 app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]" style={{ paddingRight: layout.menuButton.width > 0 ? layout.toolbar.width - layout.menuButton.x + 4 : 8 }}>
                 <ToolBarButton Icon={ChevronLeft} label="Back" onClick={goBack} active={activeTab?.canGoBack ?? false} className={BUTTON} />
                 <ToolBarButton Icon={ChevronRight} label="Forward" onClick={goForward} active={activeTab?.canGoForward ?? false} className={BUTTON} />
                 {activeTab?.isLoading ? (

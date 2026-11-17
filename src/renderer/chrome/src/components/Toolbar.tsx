@@ -37,7 +37,7 @@ const VerticalToolbar: React.FC = () => {
     return (
         <div className="h-full flex flex-col">
             <div
-                className="relative h-12 shrink-0 flex items-center gap-0.5 app-region-drag"
+                className="relative h-12 shrink-0 flex items-center gap-0.5 app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]"
                 style={{ paddingLeft: leftClear, paddingRight: rightClear }}
             >
                 {!layout.sidebarOpen && (
