@@ -7,6 +7,7 @@ import type { PageTool } from "./browserTools";
 import type { ActionApproval } from "../shared/ipc";
 import type { AskWhy } from "../shared/asking";
 import type { ChatThreadMessage, StepKind } from "../shared/library";
+import { NO_KEY, type AiService } from "../shared/aiKey";
 
 // Load environment variables from .env file
 dotenv.config({ path: join(__dirname, "../../.env") });
@@ -162,24 +163,35 @@ export const shortenOldResults = async (messages: BaseMessage[]): Promise<BaseMe
   return messages.map((message, at) => (old.has(at) ? shortened(message, ToolMessage) : message));
 };
 
-export const NO_KEY = "Berry needs an AI key to answer. For now that goes in Blueberry’s .env file, and then Blueberry needs a restart.";
+// The key the user saved in Settings, which comes before one in the .env file. Only the app sets this: the cloud runner
+// and the evals never do, so they use the .env file alone.
+export interface SavedKey {
+  service: AiService;
+  key: string;
+}
+let savedKey: () => SavedKey | null = () => null;
+export const useSavedKey = (read: () => SavedKey | null): void => {
+  savedKey = read;
+};
 
-export const modelConfig = (env: Record<string, string | undefined> = process.env) => {
+// The .env file's choice of models only applies to a key for its own provider.
+export const modelsFor = (provider: AiService, env: Record<string, string | undefined> = process.env) => {
+  const chosen = (env.LLM_PROVIDER?.toLowerCase() || "openai") === provider;
+  return {
+    model: (chosen && env.LLM_MODEL) || DEFAULT_MODELS[provider],
+    titleModel: (chosen && env.LLM_TITLE_MODEL) || TITLE_MODELS[provider],
+  };
+};
+
+export const modelConfig = (env: Record<string, string | undefined> = process.env, saved: SavedKey | null = savedKey()) => {
+  if (saved) return { provider: saved.service, apiKey: saved.key, ...modelsFor(saved.service, env) };
   const provider = env.LLM_PROVIDER?.toLowerCase() || "openai";
   if (provider !== "openai" && provider !== "anthropic") {
     throw new ModelConfigError(`LLM_PROVIDER in the .env file must be openai or anthropic, not "${provider}".`);
   }
   const apiKey = env[API_KEYS[provider]];
-  if (!apiKey) {
-    // Keys only come from the .env file for now, as Settings has nowhere to put one.
-    throw new ModelConfigError(NO_KEY);
-  }
-  return {
-    provider,
-    apiKey,
-    model: env.LLM_MODEL || DEFAULT_MODELS[provider],
-    titleModel: env.LLM_TITLE_MODEL || TITLE_MODELS[provider],
-  };
+  if (!apiKey) throw new ModelConfigError(NO_KEY);
+  return { provider, apiKey, ...modelsFor(provider, env) };
 };
 
 // LangChain and the providers load on first use, so opening the browser never waits for them.

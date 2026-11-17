@@ -4,7 +4,8 @@ import { AIMessage, fakeModel, ToolMessage } from "langchain";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { PageTool } from "./browserTools";
-import { forProvider, generateTitle, ModelConfigError, modelConfig, NO_KEY, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
+import { forProvider, generateTitle, ModelConfigError, modelConfig, ReplySorter, shortenOldResults, streamReply, systemPrompt, type ReplyPart } from "./agent";
+import { NO_KEY } from "../shared/aiKey";
 
 const NO_TOOLS = {
   tools: [],
@@ -50,6 +51,13 @@ describe("modelConfig", () => {
 
   it("rejects an unknown provider instead of picking another", () => {
     expect(() => modelConfig({ LLM_PROVIDER: "gemini", OPENAI_API_KEY: "key" })).toThrow(/gemini/);
+  });
+
+  it("uses a key saved in Settings before the .env one, with the .env models only for their own provider", () => {
+    const env = { OPENAI_API_KEY: "env-key", LLM_MODEL: "custom", LLM_TITLE_MODEL: "custom-title" };
+    expect(modelConfig(env, { service: "openai", key: "saved-key" })).toEqual({ provider: "openai", apiKey: "saved-key", model: "custom", titleModel: "custom-title" });
+    expect(modelConfig(env, { service: "anthropic", key: "saved-key" })).toEqual({ provider: "anthropic", apiKey: "saved-key", model: "claude-sonnet-5-5", titleModel: "claude-haiku-5-5" });
+    expect(modelConfig({ LLM_PROVIDER: "gemini" }, { service: "openai", key: "saved-key" }).apiKey).toBe("saved-key");
   });
 });
 
