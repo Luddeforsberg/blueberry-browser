@@ -26,10 +26,10 @@ export const ExactWords: React.FC<{ children: string; mark?: string; className?:
 };
 
 // A key on a button, shown only while pressing it would do what it says. On the filled button it takes the button's
-// own colours.
-export const Keycap: React.FC<{ children: string; label: string; onInk?: boolean }> = ({ children, label, onInk = false }) => (
+// own colours. Assistive technology hears the key from the button's `aria-keyshortcuts`, not from this.
+export const Keycap: React.FC<{ children: string; onInk?: boolean }> = ({ children, onInk = false }) => (
   <kbd
-    aria-label={label}
+    aria-hidden
     className={cn(
       "-mr-[3px] h-[18px] min-w-[18px] px-1 inline-grid place-items-center rounded-[5px] font-mono text-11 font-medium leading-none",
       onInk ? "bg-ground/15 text-ground/80" : "bg-sheet-2 text-ink-2 shadow-[inset_0_0_0_1px_var(--line)]"
@@ -83,13 +83,13 @@ export const ApprovalCard: React.FC<{
       <h3 className="mb-2.5 text-15 font-medium text-ink">{question}</h3>
       {exactly && <ExactWords mark={mark} className="mb-3.5 bg-card-2">{exactly}</ExactWords>}
       <div className="flex flex-wrap items-center gap-2">
-        <Button data-card-key="allow" onClick={onConfirm}>
+        <Button data-card-key="allow" aria-keyshortcuts={enterAllows ? "Enter" : undefined} onClick={onConfirm}>
           Allow
-          {enterAllows && <Keycap label="Enter" onInk>↵</Keycap>}
+          {enterAllows && <Keycap onInk>↵</Keycap>}
         </Button>
-        <Button variant="raised" onClick={onDeny}>
+        <Button variant="raised" aria-keyshortcuts={on !== "none" ? "Escape" : undefined} onClick={onDeny}>
           Don’t allow
-          {on !== "none" && <Keycap label="Escape">esc</Keycap>}
+          {on !== "none" && <Keycap>esc</Keycap>}
         </Button>
       </div>
     </CardInShell>

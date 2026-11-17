@@ -199,7 +199,8 @@ const Elapsed: React.FC<{ since: number }> = ({ since }) => {
 // no steps yet the mascot's face beside it is the pips, so the words stand alone (`bare`).
 const statusRow = (waiting: boolean, bare = false) => {
     const words = waiting ? 'Waiting for you..' : 'Thinking..'
-    if (bare) return <LiveWords className="font-mono text-11.5">{words}</LiveWords>
+    // Waiting is in `ask`, like the face's pips beside it.
+    if (bare) return waiting ? <span className="font-mono text-11.5 text-ask">{words}</span> : <LiveWords className="font-mono text-11.5">{words}</LiveWords>
     return waiting ? <StepLine pips="waiting" live ask>{words}</StepLine> : <StepLine pips="think" live>{words}</StepLine>
 }
 
@@ -574,10 +575,11 @@ export const QuestionCard: React.FC<{
                         <li key={answer} className="flex">
                             <button
                                 type="button"
+                                aria-keyshortcuts={showKeys ? LETTERS[index] : undefined}
                                 onClick={() => onAnswer(answer)}
                                 className={cn('h-10 flex-1 min-w-0 px-2.5 flex items-center gap-[11px] rounded-tile bg-card-2 text-left text-14 text-ink transition-[background-color,transform] duration-fast hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:scale-[.99]', FOCUS)}
                             >
-                                {showKeys && <Keycap label={`Key ${LETTERS[index]}`}>{LETTERS[index]}</Keycap>}
+                                {showKeys && <Keycap>{LETTERS[index]}</Keycap>}
                                 <span className="min-w-0 truncate">{answer}</span>
                             </button>
                         </li>

@@ -48,8 +48,8 @@ test("an approval answered from Needs you lets the job carry on", async () => {
 
     // The open card has the keyboard, so its keys show and Enter allows, once it has been there half a second.
     await expect(card).toBeFocused();
-    await expect(card.getByLabel("Enter")).toBeVisible();
-    await expect(card.getByLabel("Escape")).toBeVisible();
+    await expect(card.getByRole("button", { name: "Allow", exact: true })).toHaveAttribute("aria-keyshortcuts", "Enter");
+    await expect(card.locator("kbd")).toHaveText(["↵", "esc"]);
     await chrome.waitForTimeout(600);
     await chrome.keyboard.press("Enter");
 
@@ -92,7 +92,7 @@ test("Enter in the prompt box while an approval waits never allows it", async ()
 
     // The keyboard was never put on the card, so it shows no keys and Enter went to the box. A reply that's running
     // takes no new message, so the words stay there to send, and the approval still waits.
-    await expect(card.getByLabel("Enter")).toHaveCount(0);
+    await expect(card.locator("kbd")).toHaveCount(0);
     await expect(box).toHaveValue("Actually, use the other account");
     await chrome.waitForTimeout(300);
     expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou.length))).toBe(1);
