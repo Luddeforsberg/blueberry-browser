@@ -1,66 +1,249 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import type { TabInfo } from '@shared/ipc'
 import type { NeedsYouItem } from '@shared/library'
+import { ApprovalCard, CardInShell, WhyLine } from '@common/components/ApprovalCard'
+import { Button } from '@common/components/Button'
+import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
+import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
-import { AnsweredRow, NeedsYouRow } from '../components/NeedsYou'
+import { HandoffCard, QuestionCard, approvalWords } from '../components/ChatMessage'
+import { EmptySheet, PageFrame, PageHeader } from '../components/PageFrame'
 import { usePhone } from '../usePhone'
 import { openSettings } from '../openSettings'
+import { openRoutines } from '../routinesView'
+import { withSiteNames } from '../siteNames'
+import { tallyWords, waitedFor, waitingLine } from '../needsYouWords'
 
-const ANSWERED_MS = 1600
+// DESIGN.md section 10, Needs you: everything waiting, one open at a time as the card its chat shows, the oldest first,
+// and the rest a line each. It answers through `chat:decide`, like the card in a chat.
 
+// How long the card says what happened, before the next one opens.
+const ANSWERED_MS = 1500
 const MAX_RESTING = 6
+const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
+const LINK = cn('rounded-row text-13 text-ink underline decoration-line underline-offset-[3px] hover:decoration-ink-3', FOCUS)
 
-// Nothing waiting. Anyone working says so, because "resting" has to be true.
+// Whatever answers says so at once, because the card keeps those words for a moment.
+type OnAnswered = (said: string) => void
+
+const useNow = () => {
+    const [now, setNow] = useState(() => Date.now())
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 30_000)
+        return () => clearInterval(timer)
+    }, [])
+    return now
+}
+
+const openJob = (item: NeedsYouItem) => {
+    if (item.routineId) openRoutines({ page: 'routine', id: item.routineId })
+    else void window.chromeAPI.browser.openPage('chat', { param: item.id, title: item.job })
+}
+
+const OpenJob: React.FC<{ item: NeedsYouItem }> = ({ item }) => (
+    <button type="button" onClick={() => openJob(item)} className={cn('ml-auto shrink-0', LINK)}>
+        {item.routineId ? 'Open the routine' : 'Open the chat'}
+    </button>
+)
+
+// What it wants, as one line: the sentence with addresses cut to their site.
+const wants = (item: NeedsYouItem) => withSiteNames(item.approval.text)
+
+const jobWords = (name: string, item: NeedsYouItem) => `${name} · ${item.job}${item.from ? ` · from ${item.from}` : ''}`
+
+// The mascot that's asking, with the `ask` dot.
+const Asking: React.FC<{ item: NeedsYouItem; size: number }> = ({ item, size }) => {
+    const mascot = useFlock().find(item.mascotId)
+    return (
+        <span className="relative shrink-0">
+            <Berry mood="asking" size={size} mascot={mascot} still />
+            <span aria-hidden className="absolute -top-px -right-px size-[7px] rounded-full bg-ask ring-[1.5px] ring-card" />
+        </span>
+    )
+}
+
+// The one that's open: the real card, with who's asking, for what and how long over its words.
+export const WaitingCard: React.FC<{ item: NeedsYouItem; now: number; onAnswered: OnAnswered }> = ({ item, now, onAnswered }) => {
+    const mascot = useFlock().find(item.mascotId)
+    const name = useAssistantName(mascot)
+    const { showBerry } = useShell().settings
+    const [answer, setAnswer] = useState('')
+    const { id, approval } = item
+    const send = (allow: boolean, said: string, words?: string) => {
+        onAnswered(said)
+        void window.chromeAPI.chat.decide(id, approval.id, allow, words)
+    }
+    const head = (
+        <p className="mb-2.5 flex items-center gap-2 text-13 text-ink-2">
+            <Asking item={item} size={20} />
+            <span className="min-w-0 flex-1 truncate">{jobWords(name, item)}</span>
+            <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">{waitedFor(item.askedAt, now)}</span>
+        </p>
+    )
+
+    if (approval.question) {
+        const answerTyped = () => {
+            if (answer.trim()) send(true, `Answered. ${name} carries on.`, answer)
+        }
+        return (
+            <QuestionCard
+                approval={approval}
+                name={name}
+                head={head}
+                focusOnShow
+                onAnswer={(words) => send(true, `Answered. ${name} carries on.`, words)}
+                onSkip={() => send(false, `Skipped. ${name} carries on without it.`)}
+                more={<OpenJob item={item} />}
+                field={
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault()
+                            answerTyped()
+                        }}
+                        className="flex items-center gap-2"
+                    >
+                        <input
+                            aria-label={`Your answer to ${name}`}
+                            value={answer}
+                            placeholder="Or type an answer"
+                            onChange={(event) => setAnswer(event.target.value)}
+                            className="min-w-0 flex-1 h-9 px-3 rounded-tile bg-card-2 shadow-[inset_0_0_0_1px_var(--line)] text-14 text-ink outline-none placeholder:text-faint focus-visible:ring-2 focus-visible:ring-focus"
+                        />
+                        <Button type="submit" disabled={!answer.trim()}>Answer</Button>
+                    </form>
+                }
+            />
+        )
+    }
+
+    if (approval.handoff) {
+        return (
+            <HandoffCard
+                approval={approval}
+                name={name}
+                head={head}
+                focusOnShow
+                onDone={() => send(true, `${name} has the tab back.`)}
+                onNotNow={() => send(false, `${name} carries on without it.`)}
+                note={
+                    <>
+                        <span className="min-w-0 truncate">{name} waits until you say so</span>
+                        <OpenJob item={item} />
+                    </>
+                }
+            />
+        )
+    }
+
+    const { question, exactly, mark, why } = approvalWords(approval, name, showBerry)
+    return (
+        <ApprovalCard
+            question={question}
+            exactly={exactly}
+            mark={mark}
+            head={head}
+            focusOnShow
+            onConfirm={() => send(true, `Allowed. ${name} carries on.`)}
+            onDeny={() => send(false, `Not allowed, and ${name} knows.`)}
+            note={
+                <>
+                    {why && <WhyLine>{why}</WhyLine>}
+                    <OpenJob item={item} />
+                </>
+            }
+        />
+    )
+}
+
+// The card just after an answer, saying what happened.
+const AnsweredCard: React.FC<{ item: NeedsYouItem; said: string }> = ({ item, said }) => {
+    const mascot = useFlock().find(item.mascotId)
+    return (
+        <CardInShell label="Answered">
+            <p role="status" className="min-h-8 flex items-center gap-2.5 text-15 text-ink">
+                <Berry mood="fetching" size={24} mascot={mascot} className="shrink-0" />
+                {said}
+            </p>
+        </CardInShell>
+    )
+}
+
+// One of the rest, as one line. Pressing it opens it as the card.
+export const WaitingRow: React.FC<{ item: NeedsYouItem; now: number; onOpen: () => void }> = ({ item, now, onOpen }) => {
+    const mascot = useFlock().find(item.mascotId)
+    const name = useAssistantName(mascot)
+    return (
+        <li className="relative [&+&]:before:absolute [&+&]:before:left-[58px] [&+&]:before:right-0 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-line">
+            <button type="button" onClick={onOpen} className={cn('w-full px-4 py-3 flex items-center gap-3.5 text-left transition-colors hover:bg-hover', FOCUS)}>
+                <Asking item={item} size={28} />
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-14 font-medium text-ink">{wants(item)}</span>
+                    <span className="block truncate text-13 text-ink-2">{jobWords(name, item)}</span>
+                </span>
+                <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">{waitedFor(item.askedAt, now)}</span>
+                <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
+            </button>
+        </li>
+    )
+}
+
+// Nothing waiting. Anyone working is named, because "resting" has to be true.
 const AllClear: React.FC = () => {
     const { chats, routines } = useLibrary()
     const { flock, find } = useFlock()
     const working = new Set([
         ...chats.filter((chat) => chat.running).map((chat) => find(chat.mascotId).id),
-        ...routines.filter((routine) => routine.status === 'running').map((routine) => find(routine.mascotId).id)
+        ...routines.filter((routine) => routine.status === 'running').map((routine) => find(routine.mascotId).id),
     ])
     const anyone = useAssistantName(flock.find((mascot) => working.has(mascot.id)))
-
     return (
-        <div className="mt-20 flex flex-col items-center gap-5 text-center">
-            <ul aria-hidden className="flex items-end justify-center gap-3">
-                {flock.slice(0, MAX_RESTING).map((mascot) => (
-                    <li key={mascot.id}>
-                        <Berry mood={working.has(mascot.id) ? 'fetching' : 'off-duty'} size={88} mascot={mascot} />
-                    </li>
-                ))}
-            </ul>
-            <div>
-                <p className="text-15">Nothing needs you right now.</p>
-                <p className="mt-1 text-14 text-ink-2">
-                    {working.size === 0
-                        ? 'Your mascots are resting. If a job gets stuck, it waits here.'
-                        : `${working.size === 1 ? `${anyone} is` : `${working.size} of them are`} working. If a job gets stuck, it waits here.`}
-                </p>
-            </div>
-        </div>
+        <EmptySheet
+            face={
+                <ul aria-hidden className="flex items-end justify-center gap-2">
+                    {flock.slice(0, MAX_RESTING).map((mascot) => (
+                        <li key={mascot.id}>
+                            <Berry mood={working.has(mascot.id) ? 'fetching' : 'off-duty'} size={40} mascot={mascot} />
+                        </li>
+                    ))}
+                </ul>
+            }
+        >
+            <span className="block text-15 text-ink">Nothing needs you right now.</span>
+            {working.size > 0 && <span className="block mt-1">{working.size === 1 ? `${anyone} is` : `${working.size} of them are`} working, and waits here if it gets stuck.</span>}
+        </EmptySheet>
     )
 }
 
-// One true line about the phone, or a quiet way to set it up.
+// One true line about the phone, or a way to set it up.
 const PhoneLine: React.FC = () => {
     const [phone] = usePhone()
     const openPhoneSettings = () => openSettings('phone')
-    const link = "text-14 text-ink rounded-row outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
-    if (phone.status === 'connected' && !phone.problem) return <p className="text-14 text-ink-2">Replies from your phone are on</p>
-    if (phone.status === 'connected') return <button type="button" onClick={openPhoneSettings} className={link}>Replies from your phone are paused</button>
-    return <button type="button" onClick={openPhoneSettings} className={link}>Answer these from your phone</button>
+    if (phone.status === 'connected' && !phone.problem) return <span className="text-13 text-ink-2">Replies from your phone are on</span>
+    if (phone.status === 'connected') return <button type="button" onClick={openPhoneSettings} className={LINK}>Replies from your phone are paused</button>
+    return <button type="button" onClick={openPhoneSettings} className={LINK}>Answer these from your phone</button>
 }
 
-// Everything the flock is waiting on, from every chat and routine, answered right here.
+// Everything the flock is waiting on, from every chat and routine, answered here one at a time.
 export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { needsYou } = useLibrary()
-    const [answered, setAnswered] = useState<{ item: NeedsYouItem; said: string }[]>([])
+    const now = useNow()
+    // Answered on this visit, for the tally, and the one whose card still says what happened.
+    const [answeredIds, setAnsweredIds] = useState<string[]>([])
+    const [justAnswered, setJustAnswered] = useState<{ item: NeedsYouItem; said: string } | null>(null)
+    const [chosen, setChosen] = useState<string | null>(tab.pageParam ?? null)
 
     const onAnswered = (item: NeedsYouItem) => (said: string) => {
-        setAnswered((list) => [...list, { item, said }])
-        setTimeout(() => setAnswered((list) => list.filter((entry) => entry.item.approval.id !== item.approval.id)), ANSWERED_MS)
+        setAnsweredIds((ids) => (ids.includes(item.approval.id) ? ids : [...ids, item.approval.id]))
+        setJustAnswered({ item, said })
+        setChosen(null)
     }
+    useEffect(() => {
+        if (!justAnswered) return undefined
+        const timer = setTimeout(() => setJustAnswered(null), ANSWERED_MS)
+        return () => clearTimeout(timer)
+    }, [justAnswered])
 
     // An answer from the phone may arrive after its row has gone from the list, so rows are remembered for it.
     const seen = useRef(new Map<string, NeedsYouItem>())
@@ -75,38 +258,37 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             }),
         []
     )
+    // Opened for one in particular, from the sidebar or a notification.
+    useEffect(() => setChosen(tab.pageParam ?? null), [tab.pageParam])
 
-    const waiting = needsYou.filter((item) => !answered.some((entry) => entry.item.approval.id === item.approval.id))
-    const rows = [
-        ...waiting.map((item) => ({ item, said: null as string | null })),
-        ...answered
-    ].sort((a, b) => a.item.askedAt - b.item.askedAt)
+    const waiting = needsYou.filter((item) => !answeredIds.includes(item.approval.id)).sort((a, b) => a.askedAt - b.askedAt)
+    const open = justAnswered ? null : (waiting.find((item) => item.approval.id === chosen) ?? waiting[0] ?? null)
+    const rest = waiting.filter((item) => item !== open)
 
     return (
-        <div className="h-full overflow-y-auto">
-            <div className="mx-auto max-w-3xl px-8 py-10">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                    <h1 className="text-20 font-semibold">Needs you</h1>
-                    <PhoneLine />
-                </div>
-
-                {rows.length === 0 ? (
-                    <AllClear />
-                ) : (
-                    <>
-                        <ul aria-label="Waiting for you" className="mt-4 border-y divide-y">
-                            {rows.map(({ item, said }) =>
-                                said === null ? (
-                                    <NeedsYouRow key={item.approval.id} item={item} onAnswered={onAnswered(item)} highlighted={tab.pageParam === item.approval.id} />
-                                ) : (
-                                    <AnsweredRow key={item.approval.id} item={item} said={said} />
-                                )
-                            )}
+        <PageFrame>
+            <PageHeader title="Needs you">{waitingLine(waiting, now) ?? undefined}</PageHeader>
+            {waiting.length === 0 && !justAnswered ? (
+                <AllClear />
+            ) : (
+                <>
+                    {justAnswered ? (
+                        <AnsweredCard item={justAnswered.item} said={justAnswered.said} />
+                    ) : (
+                        open && <WaitingCard key={open.approval.id} item={open} now={now} onAnswered={onAnswered(open)} />
+                    )}
+                    {rest.length > 0 && (
+                        <ul aria-label="Also waiting" className="mt-2.5 rounded-sheet bg-sheet shadow-up overflow-hidden">
+                            {rest.map((item) => <WaitingRow key={item.approval.id} item={item} now={now} onOpen={() => setChosen(item.approval.id)} />)}
                         </ul>
-                        <p className="mt-3 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
-                    </>
-                )}
+                    )}
+                </>
+            )}
+            <div className="mt-3 mx-1 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                {answeredIds.length > 0 || waiting.length > 0 ? <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answeredIds.length, waiting.length)}</span> : <span />}
+                <PhoneLine />
             </div>
-        </div>
+            <p className="mt-6 mx-1 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
+        </PageFrame>
     )
 }

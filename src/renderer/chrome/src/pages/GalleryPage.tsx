@@ -6,7 +6,8 @@ import { ToolBarButton } from '../components/ToolBarButton'
 import { Mascot, MOOD_LABELS, type Mood } from '@common/components/Mascot'
 import { PIP_MARKS, PIP_PATTERNS, Pips, type PipPattern } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
-import { ApprovalCard } from '@common/components/ApprovalCard'
+import { ApprovalCard, WhyLine } from '@common/components/ApprovalCard'
+import { whyWords } from '../askingWords'
 import { PermissionCard } from '@common/components/PermissionCard'
 import { Button } from '@common/components/Button'
 import { Choice, Switch } from '@common/components/Controls'
@@ -39,7 +40,7 @@ import { SuggestionItem } from '../components/SuggestionItem'
 import type { SuggestionRow } from '../newTabSuggestions'
 import { RoutineRunRow } from '../components/RoutineRunRow'
 import { ScheduleSentence, WhenAnswer } from './RoutineSteps'
-import { NeedsYouRow } from '../components/NeedsYou'
+import { WaitingCard, WaitingRow } from './NeedsYouPage'
 import { blankForm } from '../routinesView'
 import { WorkingStrip, WorkingView, type WorkFrames } from '../components/WorkingView'
 import type { RoutineRun } from '@shared/library'
@@ -163,8 +164,8 @@ const waitingSample = (id: string, approval: Omit<NeedsYouItem['approval'], 'id'
 })
 
 const SAMPLE_WAITING: NeedsYouItem[] = [
-    waitingSample('sample-allow', { text: 'Click the button “Send” on https://example.com/' }, 'Reply to Anna'),
-    waitingSample('sample-question', { text: 'Which of the two flights did you mean?', question: true }, 'Book the flight'),
+    waitingSample('sample-allow', { text: 'Open https://klm.com/orders?from=inbox0 in a new tab', why: { reason: 'carries-data', mark: '?from=inbox0' } }, 'Check flight reservations'),
+    waitingSample('sample-question', { text: 'Which of the two flights did you mean?', question: true, answers: ['The 07:10', 'The 16:45'] }, 'Book the flight'),
     waitingSample('sample-code', { text: 'Berry needs a code for linkedin.com', handoff: { need: 'code', tabId: 'none', site: 'linkedin.com' } }, 'Check my messages'),
     waitingSample('sample-handoff', { text: 'Berry needs you to sign in on example.com', handoff: { need: 'sign-in', tabId: 'none', site: 'example.com' } }, 'Check my orders')
 ]
@@ -556,6 +557,8 @@ export const GalleryPage: React.FC = () => {
                         <ApprovalCard
                             question="I’d like to open github.com in a new tab"
                             exactly="Open https://github.com/acme/checkout/pull/412?diff=split in a new tab"
+                            mark="?diff=split"
+                            note={<WhyLine>{whyWords({ reason: 'carries-data', mark: '?diff=split' })}</WhyLine>}
                             onConfirm={() => undefined}
                             onDeny={() => undefined}
                         />
@@ -563,9 +566,12 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Needs you">
-                    <ul className="border-y divide-y">
-                        {SAMPLE_WAITING.map((item) => <NeedsYouRow key={item.approval.id} item={item} onAnswered={() => undefined} />)}
-                    </ul>
+                    <div className="max-w-[620px] flex flex-col gap-3">
+                        {SAMPLE_WAITING.slice(0, 2).map((item) => <WaitingCard key={item.approval.id} item={item} now={4 * 60_000} onAnswered={() => undefined} />)}
+                        <ul className="rounded-sheet bg-sheet shadow-up overflow-hidden">
+                            {SAMPLE_WAITING.map((item) => <WaitingRow key={item.approval.id} item={item} now={4 * 60_000} onOpen={() => undefined} />)}
+                        </ul>
+                    </div>
                 </Section>
 
                 <Section title="Site permission card">
