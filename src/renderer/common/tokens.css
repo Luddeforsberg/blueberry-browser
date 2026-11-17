@@ -53,6 +53,7 @@
     /* The mascots' own colours (DESIGN.md section 9), never the chrome's. */
     --berry-blueberry: #3f51dc;
     --berry-blueberry-crown: #2a39b0;
+    --berry-blueberry-crown-hollow: #1d2878;
     --berry-lingon: #df4b3b;
     --berry-cloudberry: #f2ae35;
     --berry-gooseberry: #86bf4e;
@@ -60,13 +61,22 @@
     --berry-currant: #262433;
     --berry-stem: #6b4a2b;
     --berry-leaf: #4e9a4a;
+    --berry-lingon-leaf: #2f7a3f;
+    --berry-lingon-leaf-small: #3f8f4a;
     --berry-cloudberry-leaf: #8a9a3a;
-    --berry-gooseberry-stripe: #b4dc84;
+    --berry-gooseberry-stripe: #c4e69a;
     --berry-gooseberry-tuft: #7a5a33;
+    --berry-raspberry-rim: #c4447a;
     --berry-currant-tuft: #9a7a52;
+    --berry-currant-stem: #7b8a4a;
+    --berry-currant-bloom: #9d93d6;
     --berry-gold: #f0b429;
     --berry-cap: #2536c9;
     --berry-headphones: #1d1e27;
+    --berry-bow: #ffffff;
+    --berry-bow-knot: #e86a9b;
+    /* Ink in both modes, so they never look like a second pair of eyes. Light on the currant, below. */
+    --berry-glasses: #1d1e27;
     /* White eyes unless the body is pale, and the colours a mascot takes on the inverted address field. */
     --berry-eye: #ffffff;
     --berry-inverted-body: #eeede8;
@@ -109,6 +119,7 @@
 
     /* The currant turns dusty so it still shows. */
     --berry-currant: #6c6792;
+    --berry-blueberry-crown-hollow: #16205e;
     --berry-headphones: #e9e8e3;
     --berry-inverted-body: #1d1e27;
     --berry-inverted-eye: #ffffff;
@@ -146,6 +157,10 @@
   [data-mascot="parakeet"],
   [data-mascot="flamingo"] {
     --berry-eye: #1d1e27;
+  }
+
+  [data-mascot="jackdaw"] {
+    --berry-glasses: #f4f3ee;
   }
 
   [data-inverted] {

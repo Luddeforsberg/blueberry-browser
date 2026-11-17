@@ -78,6 +78,8 @@ a { color: inherit; }
 .s72 { width: 72px; height: 72px; }
 .s84 { width: 84px; height: 84px; }
 .s96 { width: 96px; height: 96px; }
+/* Each pose is drawn once, at full detail, so under 48px its texture goes (DESIGN.md section 9, The six). */
+:is(.s28, .s32, .s40) [data-texture] { display: none; }
 
 /* The dot grid, fading down from the top. It's a mask, so the black here is only how much shows. */
 .dots {

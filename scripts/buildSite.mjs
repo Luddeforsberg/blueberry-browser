@@ -59,7 +59,8 @@ await build({
         sitting: pose("sitting", id),
         thinking: pose("thinking", id),
         asking: pose("asking", id),
-        marker: pose("rest", id, 24),
+        // Drawn at 28px, so with the detail of that size.
+        marker: pose("rest", id, 28),
       }]));
       // The phone page's poses, still and whole, even where it draws them small. Colours again come from the palette
       // attribute. The page's CSP refuses inline styles, so there are none.
