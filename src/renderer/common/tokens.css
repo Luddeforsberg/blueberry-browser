@@ -20,6 +20,9 @@
     --ask: 198 43 49;
     --ask-bg: 251 228 227;
     --focus: 63 81 220;
+    /* A tooltip: near-black in both modes, with white words. */
+    --tip: 20 20 22;
+    --tip-ink: 255 255 255;
     /* Ink at a strength, so these are whole colours rather than channels. */
     --line: rgb(20 20 22 / 0.09);
     --dot: rgb(20 20 22 / 0.16);
@@ -35,6 +38,7 @@
     --shadow-filled: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(20 20 22 / 0.25);
     --shadow-card-lift: 0 0 0 1px rgb(20 20 22 / 0.07), 0 1px 2px rgb(20 20 22 / 0.06), 0 10px 24px -12px rgb(20 20 22 / 0.2);
     --shadow-lift: 0 0 0 1px rgb(20 20 22 / 0.06), 0 1px 2px rgb(20 20 22 / 0.05), 0 14px 34px -10px rgb(20 20 22 / 0.16);
+    --shadow-tip: 0 4px 14px -4px rgb(0 0 0 / 0.35);
 
     /* A site with no icon shows its letter on one of these, picked by its name (DESIGN.md section 8). */
     --site-1: #3a3f47;
@@ -87,6 +91,7 @@
     --ask: 255 107 107;
     --ask-bg: 58 31 31;
     --focus: 143 160 255;
+    --tip: 11 11 11;
     --line: rgb(255 255 255 / 0.09);
     --dot: rgb(255 255 255 / 0.13);
     --hover: rgb(255 255 255 / 0.06);
@@ -99,6 +104,8 @@
     --shadow-filled: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-card-lift: 0 0 0 1px rgb(255 255 255 / 0.09), 0 10px 24px -12px rgb(0 0 0 / 0.55);
     --shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 34px -10px rgb(0 0 0 / 0.6);
+    /* A ring, so it shows on the ground. */
+    --shadow-tip: 0 0 0 1px rgb(255 255 255 / 0.12), 0 6px 16px -4px rgb(0 0 0 / 0.6);
 
     /* The currant turns dusty so it still shows. */
     --berry-currant: #6c6792;
@@ -120,6 +127,14 @@
       animation-duration: 1ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
+    }
+
+    /* A tooltip and an icon that changes still fade, with nothing moving or growing (DESIGN.md section 7). */
+    [data-fade] {
+      transform: none !important;
+      filter: none !important;
+      transition-property: opacity !important;
+      transition-duration: 110ms !important;
     }
   }
 }

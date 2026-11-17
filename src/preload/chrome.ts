@@ -136,6 +136,11 @@ const chromeAPI: ChromeAPI = {
     onSuggestions: (callback) => subscribe("address:suggestions", callback),
     onPicked: (callback) => subscribe("address:picked", callback),
   },
+  tooltip: {
+    show: (request) => invoke("tooltip:show", request),
+    hide: () => invoke("tooltip:hide"),
+    onShown: (callback) => subscribe("tooltip:shown", callback),
+  },
   find: {
     search: (text) => invoke("find:search", text),
     step: (forward) => invoke("find:step", forward),

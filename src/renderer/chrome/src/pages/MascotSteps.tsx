@@ -14,6 +14,7 @@ import { ChatError } from '../components/ChatMessage'
 import { BETWEEN } from '../components/PageFrame'
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from '../components/StepCard'
 import { blankMascot, keepTabDraft, mascotForm, NEW_MASCOT_EVENT, openMascots, sitesFrom, surprise, tabDraft, takeStartedMascot, toMascotDraft, withPart, type MascotFormValues } from '../flockView'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, Your mascots: making one is four questions, one at a time, each a card set into a shell like the
 // prompt box, with the mascot being made standing on it. Changing one part later is the same card, alone.
@@ -305,9 +306,11 @@ export const NewMascot: React.FC<{ tabId: string }> = ({ tabId }) => {
             from={making.from}
             nav={
                 <StepNav step={step} steps={STEPS.length} onBack={step > 0 ? () => { setError(null); setMaking({ ...making, step: step - 1, from: 'back' }) } : undefined}>
-                    <Button disabled={!!off || saving} title={off ?? undefined} onClick={() => void next()}>
-                        {last ? `Add ${values.name.trim() || 'mascot'}` : 'Continue'}
-                    </Button>
+                    <Tooltip words={off}>
+                        <Button disabled={!!off || saving} onClick={() => void next()}>
+                            {last ? `Add ${values.name.trim() || 'mascot'}` : 'Continue'}
+                        </Button>
+                    </Tooltip>
                 </StepNav>
             }
         >

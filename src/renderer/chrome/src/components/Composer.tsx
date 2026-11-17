@@ -15,6 +15,10 @@ import { AddMenu, type AddMenuOptions } from './AddMenu'
 import { BoxChips, useAddMenu } from './BoxAttachments'
 import { useAttachments, type Attached, type JobPlace } from '../useAttachments'
 import { BERRY } from '@shared/mascots'
+import { Tooltip } from '@common/components/Tooltip'
+import { SwitchSheet } from '@common/components/Controls'
+import { IconSwap } from '@common/components/IconSwap'
+import { usePresence } from '@common/components/motion'
 
 // DESIGN.md section 10, The prompt box: one component everywhere, a card set into a shell.
 
@@ -29,10 +33,10 @@ export interface PillFace {
 }
 
 // The menu under the pill: one row per mascot, its face, its name and what it may do, with a tick on the current one.
-const MascotMenu: React.FC<{ chosenId: string; above: boolean; onChoose: (id: string) => void; onClose: (refocus: boolean) => void }> = ({ chosenId, above, onChoose, onClose }) => {
+const MascotMenu: React.FC<{ chosenId: string; above: boolean; leaving: boolean; onChoose: (id: string) => void; onClose: (refocus: boolean) => void }> = ({ chosenId, above, leaving, onChoose, onClose }) => {
     const { flock } = useFlock()
     return (
-        <MenuSheet label="Choose who to ask" above={above} align="right" className="w-[316px]" onClose={onClose}>
+        <MenuSheet label="Choose who to ask" above={above} align="right" className="w-[316px]" leaving={leaving} onClose={onClose}>
             {flock.map((mascot) => (
                 <MenuRow key={mascot.id} mascot={mascot} checked={mascot.id === chosenId} onChoose={() => onChoose(mascot.id)} />
             ))}
@@ -99,60 +103,77 @@ const MascotPill: React.FC<{
         )
     }
     return (
-        <button
-            ref={chooser.button}
-            type="button"
-            aria-label={`Asking ${name}. Choose who to ask`}
-            aria-haspopup="menu"
-            aria-expanded={chooser.open}
-            onClick={chooser.onToggle}
-            onKeyDown={(event) => {
-                if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !chooser.open) {
-                    event.preventDefault()
-                    chooser.onOpen()
-                }
-            }}
-            className={cn(look, 'transition-[background-color,transform] duration-fast active:scale-[.96]', onCard ? 'hover:bg-card-2' : 'hover:bg-sheet-2', chooser.open && (onCard ? 'bg-card-2' : 'bg-sheet-2'), FOCUS)}
-        >
-            {drawn}
-            <span className="max-w-28 truncate">{name}</span>
-            <ChevronDown className={cn('size-3 text-ink-3 transition-transform duration-menu', chooser.open && 'rotate-180')} strokeWidth={1.75} />
-        </button>
+        <Tooltip words="Choose a mascot">
+            <button
+                ref={chooser.button}
+                type="button"
+                aria-label={`Asking ${name}. Choose who to ask`}
+                aria-haspopup="menu"
+                aria-expanded={chooser.open}
+                onClick={chooser.onToggle}
+                onKeyDown={(event) => {
+                    if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !chooser.open) {
+                        event.preventDefault()
+                        chooser.onOpen()
+                    }
+                }}
+                className={cn(look, 'press', onCard ? 'hover:bg-card-2' : 'hover:bg-sheet-2', chooser.open && (onCard ? 'bg-card-2' : 'bg-sheet-2'), FOCUS)}
+            >
+                {drawn}
+                <span className="max-w-28 truncate">{name}</span>
+                <ChevronDown className={cn('size-3 text-ink-3 transition-transform duration-menu ease-crisp', chooser.open && 'rotate-180')} strokeWidth={1.75} />
+            </button>
+        </Tooltip>
     )
 }
 
-// This Mac or Cloud, as a segmented control. The chosen side carries its name, the other is its icon alone.
+// This Mac or Cloud, as a segmented control. The chosen side carries its name, the other is its icon alone, and choosing
+// the other slides the sheet across as one name opens out and the other closes.
 const WhereSwitch: React.FC<{ on: boolean; onToggle: () => void; small: boolean }> = ({ on, onToggle, small }) => {
+    const group = useRef<HTMLDivElement>(null)
+    const ruler = useRef<HTMLSpanElement>(null)
     // The words follow the platform (DESIGN.md section 14).
-    const here = useShell().theme.platform === 'mac' ? 'This Mac' : 'This PC'
+    const mac = useShell().theme.platform === 'mac'
+    const here = mac ? 'This Mac' : 'This PC'
+    const sides = ([false, true] as const).map((cloud) => ({
+        chosen: on === cloud,
+        Icon: cloud ? Cloud : Laptop,
+        label: cloud ? 'Cloud' : here,
+        // What each side does, in the state it's in.
+        tip: cloud
+            ? `${on ? 'Runs' : 'Run'} in the cloud, with your ${mac ? 'Mac' : 'PC'} off`
+            : `${on ? 'Run' : 'Runs'} on ${mac ? 'this Mac' : 'this PC'}`
+    }))
+    const side = cn('flex items-center rounded-full text-13', small ? 'h-6 px-2' : 'h-7 px-2.5')
+    const name = (chosen: boolean) => cn('whitespace-nowrap overflow-hidden', chosen ? 'max-w-20 ml-1.5 opacity-100' : 'max-w-0 ml-0 opacity-0')
     return (
-    <div role="radiogroup" aria-label="Where it runs" className="shrink-0 flex p-0.5 rounded-full bg-sheet-2">
-        {([false, true] as const).map((cloud) => {
-            const chosen = on === cloud
-            const Icon = cloud ? Cloud : Laptop
-            const label = cloud ? 'Cloud' : here
-            return (
-                <button
-                    key={label}
-                    type="button"
-                    role="radio"
-                    aria-checked={chosen}
-                    aria-label={label}
-                    title={chosen ? undefined : label}
-                    onClick={() => !chosen && onToggle()}
-                    className={cn(
-                        'flex items-center gap-1.5 rounded-full text-13 transition-colors duration-fast',
-                        small ? 'h-6 px-2' : 'h-7 px-2.5',
-                        chosen ? 'bg-sheet text-ink shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(0_0_0/0.1)]' : 'text-ink-3 hover:text-ink',
-                        FOCUS
-                    )}
-                >
-                    <Icon className="size-4" strokeWidth={1.75} />
-                    {chosen && <span>{label}</span>}
-                </button>
-            )
-        })}
-    </div>
+        <div ref={group} role="radiogroup" aria-label="Where it runs" className="relative shrink-0 flex p-0.5 rounded-full bg-sheet-2">
+            {/* The sides as they'll end, for the sheet to head for. */}
+            <span ref={ruler} aria-hidden className="absolute inset-0 p-0.5 flex invisible pointer-events-none">
+                {sides.map(({ chosen, Icon, label }) => (
+                    <span key={label} data-side className={side}>
+                        <Icon className="size-4" strokeWidth={1.75} />
+                        <span className={name(chosen)}>{label}</span>
+                    </span>
+                ))}
+            </span>
+            <SwitchSheet group={group} ruler={ruler} chosen={on ? 1 : 0} className="bg-sheet shadow-[0_0_0_1px_var(--line),0_1px_2px_rgb(0_0_0/0.1)]" />
+            {sides.map(({ chosen, Icon, label, tip }) => (
+                <Tooltip key={label} words={tip}>
+                    <button
+                        type="button"
+                        role="radio"
+                        aria-checked={chosen}
+                        aria-label={label}
+                        onClick={() => !chosen && onToggle()}
+                        className={cn(side, 'press relative', chosen ? 'text-ink' : 'text-ink-3 hover:text-ink', FOCUS)}
+                    >
+                        <Icon className="size-4" strokeWidth={1.75} />
+                        <span aria-hidden className={cn(name(chosen), 'transition-[max-width,margin,opacity] duration-slide ease-crisp')}>{label}</span>
+                    </button>
+                </Tooltip>
+            ))}
+        </div>
     )
 }
 
@@ -198,6 +219,9 @@ export const Composer: React.FC<{
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [choosing, setChoosing] = useState(false)
     const [adding, setAdding] = useState(false)
+    // Each menu stays a moment after it closes, to go back into its button.
+    const choosingMenu = usePresence(choosing)
+    const addingMenu = usePresence(adding)
     // Files are being dragged over the box. Counted, as entering a child leaves the parent.
     const [dropping, setDropping] = useState(false)
     const dragDepth = useRef(0)
@@ -281,22 +305,28 @@ export const Composer: React.FC<{
           }
         : {}
 
+    const sendLabel = onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'
     const sendButton = (
-        <button
-            type="button"
-            aria-label={onStop ? 'Stop' : cloud?.on ? 'Send to the cloud' : 'Send'}
-            onClick={onStop ?? onSend}
-            disabled={!onStop && !canSend}
-            className={cn(
-                'shrink-0 rounded-full flex items-center justify-center transition-[background-color,color,transform] duration-fast active:scale-[.96]',
-                small ? 'size-7' : 'size-8',
-                'bg-ink text-sheet hover:bg-ink/85 disabled:text-faint disabled:active:scale-100',
-                onCard ? 'disabled:bg-card-2' : 'disabled:bg-sheet-2',
-                FOCUS
-            )}
-        >
-            {onStop ? <span aria-hidden className={cn('rounded-[2.5px] bg-current', small ? 'size-[9px]' : 'size-2.5')} /> : <ArrowUp className="size-4" strokeWidth={1.75} />}
-        </button>
+        <Tooltip words={sendLabel}>
+            <button
+                type="button"
+                aria-label={sendLabel}
+                onClick={onStop ?? onSend}
+                disabled={!onStop && !canSend}
+                className={cn(
+                    'shrink-0 rounded-full flex items-center justify-center transition-[background-color,color,transform] duration-move ease-crisp active:scale-[.96]',
+                    small ? 'size-7' : 'size-8',
+                    'bg-ink text-sheet hover:bg-ink/85 disabled:text-faint disabled:active:scale-100',
+                    onCard ? 'disabled:bg-card-2' : 'disabled:bg-sheet-2',
+                    FOCUS
+                )}
+            >
+                <IconSwap
+                    shown={onStop ? 'stop' : 'send'}
+                    icons={{ send: <ArrowUp className="size-4" strokeWidth={1.75} />, stop: <span className={cn('block rounded-[2.5px] bg-current', small ? 'size-[9px]' : 'size-2.5')} /> }}
+                />
+            </button>
+        </Tooltip>
     )
 
     const textarea = (
@@ -336,28 +366,29 @@ export const Composer: React.FC<{
     }
 
     const plusButton = add && (
-        <button
-            ref={plus}
-            type="button"
-            aria-label="Add a tab or a file"
-            title="Add a tab or a file"
-            aria-haspopup="menu"
-            aria-expanded={adding}
-            onClick={() => {
-                setChoosing(false)
-                setAdding(!adding)
-            }}
-            className={cn(
-                'shrink-0 flex items-center justify-center text-ink transition-[background-color,transform] duration-fast hover:bg-press active:scale-[.96]',
-                onCard ? 'bg-card-2' : 'bg-sheet-2',
-                adding && 'bg-press',
-                small ? 'size-7 rounded-row' : 'size-8 rounded-tile',
-                FOCUS
-            )}
-        >
-            {/* Open, it's the way to close: the + turns to a ×. */}
-            <Plus className={cn('size-4 transition-transform duration-menu', adding && 'rotate-45')} strokeWidth={1.75} />
-        </button>
+        <Tooltip words="Add a tab or a file">
+            <button
+                ref={plus}
+                type="button"
+                aria-label="Add a tab or a file"
+                aria-haspopup="menu"
+                aria-expanded={adding}
+                onClick={() => {
+                    setChoosing(false)
+                    setAdding(!adding)
+                }}
+                className={cn(
+                    'press shrink-0 flex items-center justify-center text-ink hover:bg-press',
+                    onCard ? 'bg-card-2' : 'bg-sheet-2',
+                    adding && 'bg-press',
+                    small ? 'size-7 rounded-row' : 'size-8 rounded-tile',
+                    FOCUS
+                )}
+            >
+                {/* Open, it's the way to close: the + turns to a ×. */}
+                <Plus className={cn('size-4 transition-transform duration-menu ease-crisp', adding && 'rotate-45')} strokeWidth={1.75} />
+            </button>
+        </Tooltip>
     )
 
     return (
@@ -421,11 +452,12 @@ export const Composer: React.FC<{
                     </div>
                 </div>
             </div>
-            {adding && add && <AddMenu {...add} above={!hero} onClose={closeAdding} />}
-            {choosing && mascot && onChooseMascot && (
+            {addingMenu.shown && add && <AddMenu {...add} above={!hero} leaving={addingMenu.leaving} onClose={closeAdding} />}
+            {choosingMenu.shown && mascot && onChooseMascot && (
                 <MascotMenu
                     chosenId={chosenId ?? mascot.id}
                     above={!hero}
+                    leaving={choosingMenu.leaving}
                     onChoose={(id) => {
                         onChooseMascot(id)
                         setChoosing(false)

@@ -19,6 +19,9 @@ import { dockFaces, openMascots } from '../flockView'
 import { BERRY_ID } from '@shared/mascots'
 import { AccountButton, AccountMenu } from './AccountMenu'
 import { SegmentSwitch } from './SegmentSwitch'
+import { usePresence } from '@common/components/motion'
+import { SHORTCUTS } from '@shared/shortcuts'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, Sidebar: straight on the ground, with two faces and the dock under both.
 
@@ -43,10 +46,12 @@ const Label: React.FC<{ id?: string; ask?: boolean; trailing?: React.ReactNode; 
 )
 
 // A small icon button in a label, such as the new tab plus or the arrow that opens a page.
-const LabelButton: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className={cn('size-6 -mr-1.5 flex items-center justify-center rounded-[7px] text-faint hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}>
-        {children}
-    </button>
+const LabelButton: React.FC<{ label: string; shortcut?: string; onClick: () => void; children: React.ReactNode }> = ({ label, shortcut, onClick, children }) => (
+    <Tooltip words={label} shortcut={shortcut}>
+        <button type="button" aria-label={label} onClick={onClick} className={cn('press size-6 -mr-1.5 flex items-center justify-center rounded-[7px] text-faint hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}>
+            {children}
+        </button>
+    </Tooltip>
 )
 
 const Rule: React.FC = () => <div aria-hidden className="h-px mx-1.5 my-2 bg-line" />
@@ -105,27 +110,28 @@ const Favourites: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, st
                 const selected = !!activeTab && !activeTab.page && sameSite(activeTab.url, site.url)
                 return (
                     <li key={site.id} data-saved-site={site.id} onDragStart={(event) => event.preventDefault()}>
-                        <button
-                            type="button"
-                            aria-label={site.title}
-                            aria-current={selected ? 'page' : undefined}
-                            title={site.title}
-                            onPointerDown={(event) => start(event, site, 'favourites')}
-                            onClick={() => {
-                                const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
-                                if (open) void switchTab(open.id)
-                                else createTab(site.url)
-                            }}
-                            onContextMenu={(event) => savedSiteMenu(event, site)}
-                            className={cn(
-                                'w-full h-10 flex items-center justify-center rounded-tile transition-colors app-region-no-drag',
-                                selected ? CURRENT : 'bg-tray hover:bg-press',
-                                drag?.site.id === site.id && 'opacity-40',
-                                FOCUS
-                            )}
-                        >
-                            <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-[22px] rounded-[6px] text-[12px]" />
-                        </button>
+                        <Tooltip words={site.title}>
+                            <button
+                                type="button"
+                                aria-label={site.title}
+                                aria-current={selected ? 'page' : undefined}
+                                onPointerDown={(event) => start(event, site, 'favourites')}
+                                onClick={() => {
+                                    const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
+                                    if (open) void switchTab(open.id)
+                                    else createTab(site.url)
+                                }}
+                                onContextMenu={(event) => savedSiteMenu(event, site)}
+                                className={cn(
+                                    'press w-full h-10 flex items-center justify-center rounded-tile app-region-no-drag',
+                                    selected ? CURRENT : 'bg-tray hover:bg-press',
+                                    drag?.site.id === site.id && 'opacity-40',
+                                    FOCUS
+                                )}
+                            >
+                                <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-[22px] rounded-[6px] text-[12px]" />
+                            </button>
+                        </Tooltip>
                     </li>
                 )
             })}
@@ -160,16 +166,18 @@ const Bookmarks: React.FC<{ dragging: SiteDragging }> = ({ dragging: { drag, sta
                 <ul aria-label="Bookmarks">
                     {shown.map((site) => (
                         <li key={site.id} data-saved-site={site.id} onDragStart={(event) => event.preventDefault()}>
-                            <button
-                                type="button"
-                                onPointerDown={(event) => start(event, site, 'bookmarks')}
-                                onClick={() => createTab(site.url)}
-                                onContextMenu={(event) => savedSiteMenu(event, site)}
-                                className={cn(ROW, 'hover:bg-hover', drag?.site.id === site.id && 'opacity-40')}
-                            >
-                                <span className={LEAD}><Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className={SITE_ICON} /></span>
-                                <span className="flex-1 truncate">{site.title}</span>
-                            </button>
+                            <Tooltip words={site.title} whenCut>
+                                <button
+                                    type="button"
+                                    onPointerDown={(event) => start(event, site, 'bookmarks')}
+                                    onClick={() => createTab(site.url)}
+                                    onContextMenu={(event) => savedSiteMenu(event, site)}
+                                    className={cn(ROW, 'hover:bg-hover', drag?.site.id === site.id && 'opacity-40')}
+                                >
+                                    <span className={LEAD}><Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className={SITE_ICON} /></span>
+                                    <span className="flex-1 truncate">{site.title}</span>
+                                </button>
+                            </Tooltip>
                         </li>
                     ))}
                 </ul>
@@ -217,7 +225,7 @@ const TabsFace: React.FC = () => {
                     trailing={
                         <>
                             <span className="tabular-nums" aria-label={`${tabs.length} open`}>{tabs.length}</span>
-                            <LabelButton label="New tab" onClick={() => createTab()}>
+                            <LabelButton label="New tab" shortcut={SHORTCUTS.newTab} onClick={() => createTab()}>
                                 <Plus className="size-4" strokeWidth={1.75} />
                             </LabelButton>
                         </>
@@ -298,35 +306,39 @@ export const ChatRow: React.FC<{
                 void showMenu()
             }}
         >
-            <button
-                type="button"
-                aria-current={selected ? 'page' : undefined}
-                onClick={onOpen}
-                className={cn(ROW, 'pr-8', selected ? CURRENT : 'hover:bg-hover')}
-            >
-                {/* The row is named by its chat, so the face is left out of it and the mascot comes after. */}
-                <span aria-hidden className={LEAD}>
-                    <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} />
-                </span>
-                <span className={cn('flex-1 truncate', fresh && 'font-medium')}>{chat.title}</span>
-                <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}{fresh && ', new'}</span>
-                {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />}
-                {trailing && (
-                    <span className="-mr-6 shrink-0 flex items-center font-mono text-11.5 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
-                )}
-            </button>
-            <button
-                type="button"
-                aria-label={`More options for ${chat.title}`}
-                onClick={() => void showMenu()}
-                className={cn(
-                    'absolute right-1 top-1 size-6 flex items-center justify-center rounded-[7px] text-ink-3 transition-opacity app-region-no-drag',
-                    'opacity-0 group-hover/chat:opacity-100 group-focus-within/chat:opacity-100 hover:bg-hover hover:text-ink',
-                    FOCUS
-                )}
-            >
-                <Ellipsis className={ICON} strokeWidth={1.75} />
-            </button>
+            <Tooltip words={chat.title} whenCut>
+                <button
+                    type="button"
+                    aria-current={selected ? 'page' : undefined}
+                    onClick={onOpen}
+                    className={cn(ROW, 'pr-8', selected ? CURRENT : 'hover:bg-hover')}
+                >
+                    {/* The row is named by its chat, so the face is left out of it and the mascot comes after. */}
+                    <span aria-hidden className={LEAD}>
+                        <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} />
+                    </span>
+                    <span className={cn('flex-1 truncate', fresh && 'font-medium')}>{chat.title}</span>
+                    <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}{fresh && ', new'}</span>
+                    {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />}
+                    {trailing && (
+                        <span className="-mr-6 shrink-0 flex items-center font-mono text-11.5 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
+                    )}
+                </button>
+            </Tooltip>
+            <Tooltip words="More options">
+                <button
+                    type="button"
+                    aria-label={`More options for ${chat.title}`}
+                    onClick={() => void showMenu()}
+                    className={cn(
+                        'press absolute right-1 top-1 size-6 flex items-center justify-center rounded-[7px] text-ink-3 app-region-no-drag',
+                        'opacity-0 group-hover/chat:opacity-100 group-focus-within/chat:opacity-100 hover:bg-hover hover:text-ink',
+                        FOCUS
+                    )}
+                >
+                    <Ellipsis className={ICON} strokeWidth={1.75} />
+                </button>
+            </Tooltip>
         </li>
     )
 }
@@ -385,16 +397,18 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                             const mascot = find(item.mascotId)
                             return (
                                 <li key={item.id}>
-                                    <button
-                                        type="button"
-                                        aria-label={`Review ${item.job}`}
-                                        onClick={() => (item.routineId ? openRoutine({ id: item.routineId }) : openChat({ id: item.id, title: item.job }))}
-                                        className={cn(ROW, onSheet ? 'bg-sheet-2 hover:bg-press' : 'bg-sheet shadow-chip hover:[background-image:linear-gradient(var(--hover),var(--hover))]')}
-                                    >
-                                        <span className={LEAD}><Berry mood="asking" size={20} mascot={mascot} /></span>
-                                        <span className="flex-1 truncate">{item.job}</span>
-                                        <Pips pattern="waiting" className="text-ask" still />
-                                    </button>
+                                    <Tooltip words={item.job} whenCut>
+                                        <button
+                                            type="button"
+                                            aria-label={`Review ${item.job}`}
+                                            onClick={() => (item.routineId ? openRoutine({ id: item.routineId }) : openChat({ id: item.id, title: item.job }))}
+                                            className={cn(ROW, 'bridged', onSheet ? 'bg-sheet-2 hover:bg-press' : 'bg-sheet shadow-chip hover:[background-image:linear-gradient(var(--hover),var(--hover))]')}
+                                        >
+                                            <span className={LEAD}><Berry mood="asking" size={20} mascot={mascot} /></span>
+                                            <span className="flex-1 truncate">{item.job}</span>
+                                            <Pips pattern="waiting" className="text-ask" still />
+                                        </button>
+                                    </Tooltip>
                                 </li>
                             )
                         })}
@@ -446,20 +460,22 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                     <ul>
                         {routines.map((routine) => (
                             <li key={routine.id}>
-                                <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover')}>
-                                    <span className={LEAD}>
-                                        <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
-                                    </span>
-                                    <span className="flex-1 truncate">{routine.name}</span>
-                                    {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
-                                    {routine.unseen ? (
-                                        <span className="shrink-0 font-mono text-11.5 text-ink">news<span className="sr-only">. Has news</span></span>
-                                    ) : (
-                                        <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">
-                                            {routine.paused ? 'paused' : routine.nextRunAt ? rowTime(routine.nextRunAt) : ''}
+                                <Tooltip words={routine.name} whenCut>
+                                    <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover')}>
+                                        <span className={LEAD}>
+                                            <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
                                         </span>
-                                    )}
-                                </button>
+                                        <span className="flex-1 truncate">{routine.name}</span>
+                                        {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
+                                        {routine.unseen ? (
+                                            <span className="shrink-0 font-mono text-11.5 text-ink">news<span className="sr-only">. Has news</span></span>
+                                        ) : (
+                                            <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">
+                                                {routine.paused ? 'paused' : routine.nextRunAt ? rowTime(routine.nextRunAt) : ''}
+                                            </span>
+                                        )}
+                                    </button>
+                                </Tooltip>
                             </li>
                         ))}
                     </ul>
@@ -625,14 +641,16 @@ const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = (
                 ))}
                 {faces.more > 0 && (
                     <li className="shrink-0">
-                        <button
-                            type="button"
-                            aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
-                            onClick={() => openMascots({ page: 'list' })}
-                            className={cn('size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
-                        >
-                            +{faces.more}
-                        </button>
+                        <Tooltip words="All your mascots">
+                            <button
+                                type="button"
+                                aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
+                                onClick={() => openMascots({ page: 'list' })}
+                                className={cn('press size-7 flex items-center justify-center rounded-row font-mono text-11 text-ink-3 hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
+                            >
+                                +{faces.more}
+                            </button>
+                        </Tooltip>
                     </li>
                 )}
             </ul>
@@ -650,6 +668,7 @@ const SidebarFoot: React.FC = () => {
     const foot = useRef<HTMLDivElement>(null)
     const mascotId = open?.kind === 'mascot' ? open.id : null
     const shown = flock.find((mascot) => mascot.id === mascotId)
+    const accountMenu = usePresence(open?.kind === 'account')
 
     useEffect(() => {
         if (!open) return
@@ -672,7 +691,7 @@ const SidebarFoot: React.FC = () => {
     return (
         <div ref={foot} className="relative shrink-0 mx-0.5 flex items-center gap-2">
             {shown && <MascotCard key={shown.id} mascot={shown} onClose={() => close(true)} />}
-            {open?.kind === 'account' && <AccountMenu onClose={close} className="absolute inset-x-0 bottom-[54px] z-20" />}
+            {accountMenu.shown && <AccountMenu above leaving={accountMenu.leaving} onClose={close} className="absolute inset-x-0 bottom-[54px] z-20" />}
             <Dock open={mascotId} onPress={(id) => setOpen(mascotId === id ? null : { kind: 'mascot', id })} />
             <AccountButton open={open?.kind === 'account'} onPress={() => setOpen(open?.kind === 'account' ? null : { kind: 'account' })} />
         </div>
@@ -683,18 +702,20 @@ const SidebarFoot: React.FC = () => {
 export const DockMascot: React.FC<{ mascot: MascotProfile; mood: 'asking' | 'fetching' | 'rest'; open: boolean; onPress: (button: HTMLButtonElement) => void; small?: boolean }> = ({ mascot, mood, open, onPress, small = false }) => {
     const name = useAssistantName(mascot)
     return (
-        <button
-            type="button"
-            data-dock-mascot={mascot.id}
-            aria-label={`${name}${mood === 'asking' ? ', needs you' : mood === 'fetching' ? ', working' : ''}`}
-            aria-expanded={open}
-            aria-haspopup="dialog"
-            onClick={(event) => onPress(event.currentTarget)}
-            className={cn(small ? 'size-6 rounded-[7px]' : 'size-7 rounded-row', 'flex items-center justify-center transition-colors hover:bg-hover app-region-no-drag', open && 'bg-press', FOCUS)}
-        >
-            {/* The dock's faces stay still: in the sidebar only the working mascot's own row moves. */}
-            <Berry mood={mood} size={small ? 22 : 26} mascot={mascot} still />
-        </button>
+        <Tooltip words={name}>
+            <button
+                type="button"
+                data-dock-mascot={mascot.id}
+                aria-label={`${name}${mood === 'asking' ? ', needs you' : mood === 'fetching' ? ', working' : ''}`}
+                aria-expanded={open}
+                aria-haspopup="dialog"
+                onClick={(event) => onPress(event.currentTarget)}
+                className={cn(small ? 'size-6 rounded-[7px]' : 'size-7 rounded-row', 'press flex items-center justify-center hover:bg-hover app-region-no-drag', open && 'bg-press', FOCUS)}
+            >
+                {/* The dock's faces stay still: in the sidebar only the working mascot's own row moves. */}
+                <Berry mood={mood} size={small ? 22 : 26} mascot={mascot} still />
+            </button>
+        </Tooltip>
     )
 }
 
@@ -772,7 +793,7 @@ export const Sidebar: React.FC<{ floating?: boolean }> = ({ floating = false }) 
                     paddingLeft: theme.platform === 'mac' ? layout.controls.width : undefined
                 }}
             >
-                <ToolBarButton Icon={PanelLeft} label={floating ? 'Keep sidebar open' : 'Hide sidebar'} onClick={toggleSidebar} />
+                <ToolBarButton Icon={PanelLeft} label={floating ? 'Keep sidebar open' : 'Hide sidebar'} shortcut={SHORTCUTS.sidebar} onClick={toggleSidebar} />
             </div>
 
             <FaceSwitch face={face} onChange={setFace} />

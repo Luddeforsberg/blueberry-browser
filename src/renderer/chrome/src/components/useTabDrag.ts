@@ -89,7 +89,8 @@ export const useTabDrag = (
             if (!current) {
                 if (Math.abs(delta) < DRAG_THRESHOLD) return
                 item.setPointerCapture(pointerId)
-                const slots = [...list.children].map(slotOf)
+                // A tab still folding away after it closed isn't a place to drop.
+                const slots = [...list.children].filter((child) => !child.hasAttribute('data-folding')).map(slotOf)
                 const gap = slots[1].start - slots[0].start - slots[0].size
                 current = { tabId, order, from, to: from, offset: 0, slots, room: slots[from].size + gap, settling: false }
             }

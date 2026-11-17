@@ -138,7 +138,8 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   await copy.getByRole("button", { name: "Cancel large (1).bin" }).click();
   await expect(copy.getByText("Cancelled")).toBeVisible();
   slow!.destroy();
-  await expect(chrome.locator('button[title="Downloads"]')).toBeVisible();
+  // The toolbar button says only Downloads again: nothing is running.
+  await expect(chrome.locator('button[aria-label="Downloads"]')).toBeVisible();
   await expect.poll(() => readdirSync(folder).sort()).toEqual(["large.bin", "pixel.gif", "report (1).txt", "report.txt"]);
 
   // The list survives a restart, and a file that's gone says so and can't be opened.

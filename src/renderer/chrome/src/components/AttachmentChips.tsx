@@ -3,6 +3,7 @@ import { File, FileText, Image, X } from 'lucide-react'
 import type { FileChip as FileChipInfo, SentAttachment, TabChoice } from '@shared/attachments'
 import { cn } from '@common/lib/utils'
 import { Favicon, siteIcon } from './Favicon'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, The prompt box: what a mascot is given to read is chips at the top of the card, each with its ×,
 // and once sent, the same chips over the message without one. Mock: docs/design/mocks/the-plus.html.
@@ -26,34 +27,36 @@ const Chip: React.FC<{
 }> = ({ icon, name, fact, factInFull, problem, label, hint, onRemove, removeLabel, sheet }) => {
     const said = problem ?? fact
     return (
-        <span
-            role="group"
-            aria-label={problem ? `${label}, not added: ${problem}` : factInFull || fact ? `${label}, ${factInFull ?? fact}` : label}
-            title={problem ?? factInFull ?? hint}
-            className={cn(
-                'h-7 max-w-[240px] pl-1.5 inline-flex items-center gap-[7px] rounded-row text-13 whitespace-nowrap',
-                onRemove ? 'pr-0.5' : 'pr-2',
-                problem ? 'bg-ask-bg text-ask' : cn('text-ink', sheet ? 'bg-sheet-2' : QUIET)
-            )}
-        >
-            {icon}
-            <span className="min-w-0 truncate">{name}</span>
-            {said && <span className={cn('shrink-0', problem ? 'text-ask' : 'text-ink-3', problem && 'min-w-0 truncate')}>{said}</span>}
-            {onRemove && (
-                <button
-                    type="button"
-                    aria-label={removeLabel ?? `Remove ${name}`}
-                    title={removeLabel ?? `Remove ${name}`}
-                    onClick={onRemove}
-                    className={cn(
-                        'size-6 shrink-0 flex items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus',
-                        problem ? 'text-ask hover:bg-hover' : 'text-ink-3 hover:bg-hover hover:text-ink'
-                    )}
-                >
-                    <X className="size-[11px]" strokeWidth={1.75} />
-                </button>
-            )}
-        </span>
+        <Tooltip words={problem ?? factInFull ?? hint}>
+            <span
+                role="group"
+                aria-label={problem ? `${label}, not added: ${problem}` : factInFull || fact ? `${label}, ${factInFull ?? fact}` : label}
+                className={cn(
+                    'h-7 max-w-[240px] pl-1.5 inline-flex items-center gap-[7px] rounded-row text-13 whitespace-nowrap',
+                    onRemove ? 'pr-0.5' : 'pr-2',
+                    problem ? 'bg-ask-bg text-ask' : cn('text-ink', sheet ? 'bg-sheet-2' : QUIET)
+                )}
+            >
+                {icon}
+                <span className="min-w-0 truncate">{name}</span>
+                {said && <span className={cn('shrink-0', problem ? 'text-ask' : 'text-ink-3', problem && 'min-w-0 truncate')}>{said}</span>}
+                {onRemove && (
+                    <Tooltip words="Remove">
+                        <button
+                            type="button"
+                            aria-label={removeLabel ?? `Remove ${name}`}
+                                onClick={onRemove}
+                            className={cn(
+                                'press size-6 shrink-0 flex items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus',
+                                problem ? 'text-ask hover:bg-hover' : 'text-ink-3 hover:bg-hover hover:text-ink'
+                            )}
+                        >
+                            <X className="size-[11px]" strokeWidth={1.75} />
+                        </button>
+                    </Tooltip>
+                )}
+            </span>
+        </Tooltip>
     )
 }
 

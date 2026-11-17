@@ -183,7 +183,7 @@ export const WaitingRow: React.FC<{ item: NeedsYouItem; now: number; onOpen: () 
                     <span className="block truncate text-13 text-ink-2">{jobWords(name, item)}</span>
                 </span>
                 <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">{waitedFor(item.askedAt, now)}</span>
-                <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
+                <ChevronRight aria-hidden className="leans size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
             </button>
         </li>
     )

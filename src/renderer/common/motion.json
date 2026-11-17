@@ -1,0 +1,13 @@
+{
+  "ease": "cubic-bezier(.2, .8, .2, 1)",
+  "ms": {
+    "fast": 100,
+    "tip": 110,
+    "menu": 150,
+    "move": 170,
+    "slide": 180,
+    "panel": 280,
+    "switch": 420
+  },
+  "tipRestMs": 350
+}

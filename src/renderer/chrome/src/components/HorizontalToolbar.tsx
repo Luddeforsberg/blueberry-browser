@@ -14,8 +14,10 @@ import { Favicon, siteIcon } from './Favicon'
 import { RecordingNotice } from './ShowBerry'
 import { DockMascot, sameSite, savedSiteMenu, SiteDragGhost, useMascotState } from './Sidebar'
 import { ToolBarButton } from './ToolBarButton'
+import { SHORTCUTS } from '@shared/shortcuts'
 import { ZoomButton } from './Toolbar'
 import { useSiteDrag, type SiteLayouts } from './useSiteDrag'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, Horizontal layout: one toolbar from edge to edge, then the bookmarks bar when anything's saved.
 
@@ -67,7 +69,7 @@ const ChatsPill: React.FC<{ shown: Popover | null }> = ({ shown }) => {
             aria-expanded={open}
             onClick={(event) => toggle(open, event.currentTarget, () => ({ kind: 'chats', anchor: anchorOf(event.currentTarget) }))}
             className={cn(
-                'h-[30px] ml-1 px-[11px] shrink-0 flex items-center gap-[7px] rounded-row text-13 text-ink transition-colors app-region-no-drag',
+                'press h-[30px] ml-1 px-[11px] shrink-0 flex items-center gap-[7px] rounded-row text-13 text-ink app-region-no-drag',
                 open ? 'bg-sheet shadow-rim font-medium' : 'bg-tray hover:bg-press',
                 FOCUS
             )}
@@ -105,14 +107,16 @@ const Dock: React.FC<{ shown: Popover | null; room: number }> = ({ shown, room }
             })}
             {faces.more > 0 && (
                 <li className="shrink-0">
-                    <button
-                        type="button"
-                        aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
-                        onClick={() => openMascots({ page: 'list' })}
-                        className={cn('h-6 px-1 flex items-center rounded-[7px] font-mono text-11 text-ink-3 transition-colors hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
-                    >
-                        +{faces.more}
-                    </button>
+                    <Tooltip words="All your mascots">
+                        <button
+                            type="button"
+                            aria-label={`${faces.more} more ${faces.more === 1 ? 'mascot' : 'mascots'}`}
+                            onClick={() => openMascots({ page: 'list' })}
+                            className={cn('press h-6 px-1 flex items-center rounded-[7px] font-mono text-11 text-ink-3 hover:bg-hover hover:text-ink app-region-no-drag', FOCUS)}
+                        >
+                            +{faces.more}
+                        </button>
+                    </Tooltip>
                 </li>
             )}
         </ul>
@@ -122,7 +126,7 @@ const Dock: React.FC<{ shown: Popover | null; room: number }> = ({ shown, room }
 const BAR_LAYOUTS: SiteLayouts = { favourites: 'tiles', bookmarks: 'tiles' }
 
 // A saved site on the bar: its icon and its name, cut where a long one would crowd the rest.
-const SAVED_SITE = 'h-7 max-w-[180px] px-2 flex items-center gap-2 rounded-row text-13 whitespace-nowrap transition-colors app-region-no-drag hover:bg-hover hover:text-ink'
+const SAVED_SITE = 'press h-7 max-w-[180px] px-2 flex items-center gap-2 rounded-row text-13 whitespace-nowrap app-region-no-drag hover:bg-hover hover:text-ink'
 
 // Favourites, then a hairline, then bookmarks, each its icon and its name with nothing behind it, as a bookmarks bar
 // is anywhere. The favourite in front is in `ink`. Dragging between the two and the right-click menus work as in the
@@ -149,23 +153,24 @@ const BookmarksBar: React.FC = () => {
                         const selected = !!activeTab && !activeTab.page && sameSite(activeTab.url, site.url)
                         return (
                             <li key={site.id} data-saved-site={site.id} onDragStart={(event) => event.preventDefault()}>
-                                <button
-                                    type="button"
-                                    aria-label={site.title}
-                                    aria-current={selected ? 'page' : undefined}
-                                    title={site.title}
-                                    onPointerDown={(event) => start(event, site, 'favourites')}
-                                    onClick={() => {
-                                        const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
-                                        if (open) void switchTab(open.id)
-                                        else createTab(site.url)
-                                    }}
-                                    onContextMenu={(event) => savedSiteMenu(event, site)}
-                                    className={cn(SAVED_SITE, selected ? 'text-ink' : 'text-ink-2', drag?.site.id === site.id && 'opacity-40', FOCUS)}
-                                >
-                                    <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-4 rounded-[4px]" />
-                                    <span className="truncate">{site.title}</span>
-                                </button>
+                                <Tooltip words={site.title} whenCut>
+                                    <button
+                                        type="button"
+                                        aria-label={site.title}
+                                        aria-current={selected ? 'page' : undefined}
+                                        onPointerDown={(event) => start(event, site, 'favourites')}
+                                        onClick={() => {
+                                            const open = tabs.find((tab) => !tab.page && sameSite(tab.url, site.url))
+                                            if (open) void switchTab(open.id)
+                                            else createTab(site.url)
+                                        }}
+                                        onContextMenu={(event) => savedSiteMenu(event, site)}
+                                        className={cn(SAVED_SITE, selected ? 'text-ink' : 'text-ink-2', drag?.site.id === site.id && 'opacity-40', FOCUS)}
+                                    >
+                                        <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-4 rounded-[4px]" />
+                                        <span className="truncate">{site.title}</span>
+                                    </button>
+                                </Tooltip>
                             </li>
                         )
                     })}
@@ -187,16 +192,18 @@ const BookmarksBar: React.FC = () => {
             <ul ref={zone('bookmarks')} aria-label="Bookmarks" className="min-w-0 flex items-center gap-0.5">
                 {shown.map((site) => (
                     <li key={site.id} data-saved-site={site.id} className="shrink-0" onDragStart={(event) => event.preventDefault()}>
-                        <button
-                            type="button"
-                            onPointerDown={(event) => start(event, site, 'bookmarks')}
-                            onClick={() => createTab(site.url)}
-                            onContextMenu={(event) => savedSiteMenu(event, site)}
-                            className={cn(SAVED_SITE, 'text-ink-2', drag?.site.id === site.id && 'opacity-40', FOCUS)}
-                        >
-                            <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-4 rounded-[4px]" />
-                            <span className="truncate">{site.title}</span>
-                        </button>
+                        <Tooltip words={site.title} whenCut>
+                            <button
+                                type="button"
+                                onPointerDown={(event) => start(event, site, 'bookmarks')}
+                                onClick={() => createTab(site.url)}
+                                onContextMenu={(event) => savedSiteMenu(event, site)}
+                                className={cn(SAVED_SITE, 'text-ink-2', drag?.site.id === site.id && 'opacity-40', FOCUS)}
+                            >
+                                <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-4 rounded-[4px]" />
+                                <span className="truncate">{site.title}</span>
+                            </button>
+                        </Tooltip>
                     </li>
                 ))}
             </ul>
@@ -245,12 +252,12 @@ export const HorizontalToolbar: React.FC = () => {
         <div className="h-full flex flex-col">
             {/* Off a Mac, the app's menu ends the row, where the layout puts it, so the row stops short of it. */}
             <div ref={row} className="h-11 shrink-0 flex items-center gap-1 pl-2 app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]" style={{ paddingRight: layout.menuButton.width > 0 ? layout.toolbar.width - layout.menuButton.x + 4 : 8 }}>
-                <ToolBarButton Icon={ChevronLeft} label="Back" onClick={goBack} active={activeTab?.canGoBack ?? false} className={BUTTON} />
-                <ToolBarButton Icon={ChevronRight} label="Forward" onClick={goForward} active={activeTab?.canGoForward ?? false} className={BUTTON} />
+                <ToolBarButton Icon={ChevronLeft} label="Back" shortcut={SHORTCUTS.back} onClick={goBack} active={activeTab?.canGoBack ?? false} className={BUTTON} />
+                <ToolBarButton Icon={ChevronRight} label="Forward" shortcut={SHORTCUTS.forward} onClick={goForward} active={activeTab?.canGoForward ?? false} className={BUTTON} />
                 {activeTab?.isLoading ? (
                     <ToolBarButton Icon={X} label="Stop loading" onClick={stop} className={BUTTON} />
                 ) : (
-                    <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null && !activeTab.page} className={BUTTON} />
+                    <ToolBarButton Icon={RotateCw} label="Reload" shortcut={SHORTCUTS.reload} onClick={reload} active={activeTab !== null && !activeTab.page} className={BUTTON} />
                 )}
                 <div data-flex="address" className="flex-1 min-w-0 mx-1.5">
                     <AddressBar />
@@ -261,7 +268,7 @@ export const HorizontalToolbar: React.FC = () => {
                 )}
                 <DownloadsButton small />
                 {activeTab?.page !== 'chat' && activeTab?.page !== 'new-tab' && (
-                    <ToolBarButton Icon={PanelRight} label={layout.chatOpen ? 'Hide Berry' : 'Show Berry'} onClick={toggleChat} toggled={layout.chatOpen} className={BUTTON} />
+                    <ToolBarButton Icon={PanelRight} label={layout.chatOpen ? 'Hide Berry' : 'Show Berry'} shortcut={SHORTCUTS.chat} onClick={toggleChat} toggled={layout.chatOpen} className={BUTTON} />
                 )}
                 <ChatsPill shown={shown} />
                 <div data-flex="dock" className="shrink-0 flex">

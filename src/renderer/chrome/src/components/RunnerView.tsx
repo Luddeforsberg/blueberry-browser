@@ -39,7 +39,7 @@ export const RunnerView: React.FC<{ chatId: string; steps: ChatStep[]; approval:
             <div className="relative aspect-[4/3] overflow-hidden rounded-tile border bg-tray">
                 {url ? (
                     <iframe
-                        title="Live view of the page in the cloud"
+                        aria-label="Live view of the page in the cloud"
                         src={url}
                         sandbox="allow-same-origin allow-scripts"
                         inert={lock.inert}

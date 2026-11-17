@@ -43,6 +43,28 @@
   .app-region-no-drag {
     -webkit-app-region: no-drag;
   }
+
+  /* A button, chip or tile shrinks to 96% while it's pressed (DESIGN.md section 8). Its own colours change with it. */
+  .press {
+    @apply transition-[color,background-color,box-shadow,opacity,transform] duration-fast ease-crisp active:scale-[.96] disabled:active:scale-100 aria-disabled:active:scale-100;
+  }
+
+  /* A row in a list the pointer runs down reaches over the gap under it, so its highlight never drops out on the way to
+     the next one (DESIGN.md section 7). The next row is drawn over it, so it never takes that row's own space. */
+  .bridged {
+    @apply relative after:absolute after:inset-x-0 after:top-full after:h-1.5;
+  }
+
+  /* A row's arrow leans towards where it goes while the row is pointed at. */
+  .leans {
+    @apply transition-transform duration-fast ease-crisp;
+  }
+
+  :hover > .leans,
+  :focus-visible > .leans,
+  .row-on:is(:hover, :has(:focus-visible)) .leans {
+    transform: translateX(3px);
+  }
 }
 
 #root {

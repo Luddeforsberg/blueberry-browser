@@ -54,7 +54,7 @@ const Row: React.FC<
             {why && <span className="block mt-px text-13 truncate">{why}</span>}
         </span>
         {!why && note && <span className="shrink-0 max-w-[60%] truncate text-13 text-ink-3">{note}</span>}
-        {!why && opens && <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />}
+        {!why && opens && <ChevronRight aria-hidden className="leans size-3.5 shrink-0 text-faint" strokeWidth={1.75} />}
     </button>
 )
 
@@ -62,7 +62,7 @@ const SiteIcon: React.FC<{ favicon: string | null; site: string; off: boolean }>
     <span className={cn('flex shrink-0', off && 'opacity-50')}><Favicon src={favicon} site={site} /></span>
 )
 
-export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refocus: boolean) => void }> = ({ thisPage, tabs, files, showHow, above, onClose }) => {
+export const AddMenu: React.FC<AddMenuOptions & { above: boolean; leaving?: boolean; onClose: (refocus: boolean) => void }> = ({ thisPage, tabs, files, showHow, above, leaving, onClose }) => {
     const [view, setView] = useState<'main' | 'tabs'>('main')
     // Back from the list, the keyboard goes to the row that opened it.
     const [cameBack, setCameBack] = useState(false)
@@ -111,6 +111,7 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refo
                 view="tabs"
                 // The keyboard goes to the first tab, as the pointer would, with the way back above it.
                 focusFirst="[data-tab-row]"
+                leaving={leaving}
                 onClose={onClose}
                 onKey={(event) => {
                     if (event.key !== 'ArrowLeft') return false
@@ -130,7 +131,7 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; onClose: (refo
 
     const many = choices.length > TABS_SHOWN
     return (
-        <MenuSheet label="Add to the message" above={above} align="box" view="main" focusFirst={cameBack ? '[data-all-row]' : undefined} onClose={onClose}>
+        <MenuSheet label="Add to the message" above={above} align="box" view="main" focusFirst={cameBack ? '[data-all-row]' : undefined} leaving={leaving} onClose={onClose}>
             {thisPage && (
                 <Row
                     icon={<SiteIcon favicon={thisPage.favicon} site={thisPage.site} off={thisPage.problem !== null} />}

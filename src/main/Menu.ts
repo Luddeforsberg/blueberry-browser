@@ -35,7 +35,7 @@ export class AppMenu {
           },
           {
             label: "New Tab",
-            accelerator: "CmdOrCtrl+T",
+            accelerator: SHORTCUTS.newTab,
             click: () => this.handleNewTab(),
           },
           {
@@ -45,7 +45,7 @@ export class AppMenu {
           },
           {
             label: "Bookmark This Page",
-            accelerator: "CmdOrCtrl+D",
+            accelerator: SHORTCUTS.bookmark,
             click: () => this.mainWindow.toggleBookmark(),
           },
           {
@@ -54,7 +54,7 @@ export class AppMenu {
           },
           {
             label: "Close Tab",
-            accelerator: "CmdOrCtrl+W",
+            accelerator: SHORTCUTS.closeTab,
             click: () => this.handleCloseTab(),
           },
           { type: "separator" },
@@ -109,7 +109,7 @@ export class AppMenu {
         submenu: [
           {
             label: "Reload",
-            accelerator: "CmdOrCtrl+R",
+            accelerator: SHORTCUTS.reload,
             click: () => this.handleReload(),
           },
           {
@@ -147,12 +147,12 @@ export class AppMenu {
           { type: "separator" },
           {
             label: "Toggle Sidebar",
-            accelerator: "CmdOrCtrl+S",
+            accelerator: SHORTCUTS.sidebar,
             click: () => this.mainWindow.toggleSidebar(),
           },
           {
             label: "Toggle Chat",
-            accelerator: "CmdOrCtrl+E",
+            accelerator: SHORTCUTS.chat,
             click: () => this.mainWindow.toggleChat(),
           },
           {
@@ -192,12 +192,12 @@ export class AppMenu {
         submenu: [
           {
             label: "Back",
-            accelerator: "CmdOrCtrl+Left",
+            accelerator: SHORTCUTS.back,
             click: () => this.handleGoBack(),
           },
           {
             label: "Forward",
-            accelerator: "CmdOrCtrl+Right",
+            accelerator: SHORTCUTS.forward,
             click: () => this.handleGoForward(),
           },
           { type: "separator" },

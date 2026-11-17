@@ -33,9 +33,10 @@ const buttonVariants = cva(
     }
 );
 
+// No `title`: the chrome doesn't use the system's tooltip. Wrap the button in `Tooltip` instead (DESIGN.md section 8).
 const Button = React.forwardRef<
     HTMLButtonElement,
-    React.ComponentProps<"button"> &
+    Omit<React.ComponentProps<"button">, "title"> &
     VariantProps<typeof buttonVariants> & {
         asChild?: boolean;
     }

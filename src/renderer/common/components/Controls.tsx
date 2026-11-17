@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -32,6 +32,49 @@ export const Switch: React.FC<{
         />
     </button>
 )
+
+// The chosen side's sheet in a segmented control, which travels to the side that's pressed (DESIGN.md section 7). It
+// goes where the chosen one of the group's `[data-side]` children is, with its corners. Where the sides change size as
+// they're chosen, `ruler` is a copy of them laid out as they'll end, so the sheet heads straight for where it stops.
+// It appears in place the first time. The group is `relative`, with its sides above the sheet.
+export const SwitchSheet: React.FC<{
+    group: React.RefObject<HTMLElement | null>
+    chosen: number
+    ruler?: React.RefObject<HTMLElement | null>
+    className?: string
+}> = ({ group, chosen, ruler, className }) => {
+    const [place, setPlace] = useState<React.CSSProperties | null>(null)
+    const [moves, setMoves] = useState(false)
+    const measure = useRef(() => {})
+    measure.current = () => {
+        const side = (ruler?.current ?? group.current)?.querySelectorAll<HTMLElement>(':scope > [data-side]')[chosen]
+        if (!side || side.offsetWidth === 0) return setPlace(null)
+        const next = { left: side.offsetLeft, top: side.offsetTop, width: side.offsetWidth, height: side.offsetHeight, borderRadius: getComputedStyle(side).borderRadius }
+        setPlace((was) => (was && Object.entries(next).every(([key, value]) => was[key as keyof typeof next] === value) ? was : next))
+    }
+    // After every render, since what's around it may have moved it, and whenever the group changes size by itself.
+    useLayoutEffect(() => measure.current())
+    useLayoutEffect(() => {
+        const observer = new ResizeObserver(() => measure.current())
+        if (group.current) observer.observe(group.current)
+        return () => observer.disconnect()
+    }, [group])
+    // Only once it has been drawn where it starts, so it never flies in from the corner.
+    useLayoutEffect(() => {
+        if (!place || moves) return
+        const frame = requestAnimationFrame(() => setMoves(true))
+        return () => cancelAnimationFrame(frame)
+    }, [place, moves])
+    if (!place) return null
+    return (
+        <span
+            aria-hidden
+            data-sheet
+            style={place}
+            className={cn('absolute pointer-events-none', moves && 'transition-[left,top,width,height] duration-slide ease-crisp', className)}
+        />
+    )
+}
 
 // A segmented control (DESIGN.md section 8). The left and right arrows move the choice along, as in any group of radio
 // buttons, and only the chosen one is a stop for Tab. `fill` shares the width out evenly, and an option can carry an icon.
@@ -78,8 +121,10 @@ export const Choice = <T extends string>({
                 event.stopPropagation()
                 step(by)
             }}
-            className={cn(pictures ? 'flex shrink-0 gap-2.5' : 'p-0.5 rounded-full bg-sheet-2', !pictures && (fill ? 'grid grid-flow-col auto-cols-fr' : 'inline-flex shrink-0'), className)}
+            className={cn(pictures ? 'flex shrink-0 gap-2.5' : 'relative p-0.5 rounded-full bg-sheet-2', !pictures && (fill ? 'grid grid-flow-col auto-cols-fr' : 'inline-flex shrink-0'), className)}
         >
+            {/* The row of pictures isn't a sliding switch: the chosen one is ringed where it is. */}
+            {!pictures && <SwitchSheet group={group} chosen={options.findIndex((option) => option.value === value)} className="bg-sheet shadow-chip" />}
             {options.map((option, index) => {
                 const chosen = value === option.value
                 const tabIndex = chosen || (!anyChosen && index === 0) ? 0 : -1
@@ -115,11 +160,12 @@ export const Choice = <T extends string>({
                         role="radio"
                         aria-checked={chosen}
                         tabIndex={tabIndex}
+                        data-side
                         onClick={() => onChange(option.value)}
                         className={cn(
-                            "h-7 flex items-center justify-center rounded-full text-13 whitespace-nowrap outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus",
+                            "press relative h-7 flex items-center justify-center rounded-full text-13 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-focus",
                             fill ? "px-1 gap-[5px]" : "px-2.5 gap-1.5",
-                            chosen ? "bg-sheet text-ink shadow-chip" : "text-ink-2 hover:text-ink"
+                            chosen ? "text-ink" : "text-ink-2 hover:text-ink"
                         )}
                     >
                         {option.Icon && <option.Icon aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />}

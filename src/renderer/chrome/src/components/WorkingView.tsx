@@ -8,6 +8,7 @@ import { Favicon } from './Favicon'
 import { Pips } from '@common/components/Pips'
 import { chipClass } from './ChatMessage'
 import { liveFrameLock, useCloudView } from '../cloudView'
+import { Tooltip } from '@common/components/Tooltip'
 
 // Pictures arrive many times a second, so they go straight to the picture showing them, and nothing else draws again.
 export interface WorkFrames {
@@ -80,7 +81,7 @@ const CloudPicture: React.FC<{ tab: WorkTab }> = ({ tab }) => {
     const { view, frame } = useCloudView(tab.id)
     if (view?.kind === 'live') {
         const lock = liveFrameLock(false)
-        return <iframe title={`Live view of ${tab.title}`} src={view.url} sandbox="allow-same-origin allow-scripts" inert={lock.inert} tabIndex={lock.tabIndex} className={cn('absolute inset-0 size-full border-0', lock.className)} />
+        return <iframe aria-label={`Live view of ${tab.title}`} src={view.url} sandbox="allow-same-origin allow-scripts" inert={lock.inert} tabIndex={lock.tabIndex} className={cn('absolute inset-0 size-full border-0', lock.className)} />
     }
     return view?.kind === 'frames' && frame
         ? <img src={`data:image/jpeg;base64,${frame}`} alt="" draggable={false} className="absolute inset-0 size-full object-contain object-top" />
@@ -132,9 +133,11 @@ const TabChip: React.FC<{ tab: WorkTab; loading: boolean; onGo: () => void }> = 
             {tab.current ? (
                 <span className={cn(chipClass(), 'bg-sheet text-ink shadow-rim pointer-events-none')}>{look}</span>
             ) : (
-                <button type="button" title="Go to this tab" onClick={onGo} className={chipClass()}>
-                    {look}
-                </button>
+                <Tooltip words="Go to this tab">
+                    <button type="button" onClick={onGo} className={chipClass()}>
+                        {look}
+                    </button>
+                </Tooltip>
             )}
         </li>
     )

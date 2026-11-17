@@ -9,6 +9,7 @@ import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
 import { finishedWhen, firstSentence } from '../shortWords'
 import type { SuggestionRow } from '../newTabSuggestions'
+import { Tooltip } from '@common/components/Tooltip'
 
 const nameOf = (mascot: MascotProfile) => (mascot.id === BERRY.id ? BERRY.name : mascot.name)
 
@@ -37,7 +38,7 @@ export const SuggestionItem: React.FC<{ row: SuggestionRow; used?: boolean; onPr
     return (
         <li
             className={cn(
-                'group flex items-center rounded-[14px] transition-[background-color,box-shadow]',
+                'bridged group flex items-center rounded-[14px] transition-[background-color,box-shadow]',
                 used ? 'bg-sheet shadow-chip' : 'hover:bg-sheet hover:shadow-chip focus-within:bg-sheet focus-within:shadow-chip'
             )}
         >
@@ -60,15 +61,16 @@ export const SuggestionItem: React.FC<{ row: SuggestionRow; used?: boolean; onPr
                 </span>
             </button>
             {onDismiss && (
-                <button
-                    type="button"
-                    aria-label={`Dismiss: ${title}`}
-                    title="Dismiss"
-                    onClick={onDismiss}
-                    className="hidden group-hover:flex group-focus-within:flex size-7 mr-1.5 shrink-0 items-center justify-center rounded-row text-ink-3 hover:bg-hover hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                    <X className="size-3.5" strokeWidth={1.75} />
-                </button>
+                <Tooltip words="Dismiss">
+                    <button
+                        type="button"
+                        aria-label={`Dismiss: ${title}`}
+                        onClick={onDismiss}
+                        className="press hidden group-hover:flex group-focus-within:flex size-7 mr-1.5 shrink-0 items-center justify-center rounded-row text-ink-3 hover:bg-hover hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                        <X className="size-3.5" strokeWidth={1.75} />
+                    </button>
+                </Tooltip>
             )}
         </li>
     )

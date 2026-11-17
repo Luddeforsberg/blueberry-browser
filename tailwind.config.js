@@ -1,3 +1,7 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const motion = require("./src/renderer/common/motion.json");
+const ms = (name) => `${motion.ms[name]}ms`;
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
@@ -33,6 +37,8 @@ module.exports = {
       ask: "rgb(var(--ask) / <alpha-value>)",
       "ask-bg": "rgb(var(--ask-bg) / <alpha-value>)",
       focus: "rgb(var(--focus) / <alpha-value>)",
+      tip: "rgb(var(--tip) / <alpha-value>)",
+      "tip-ink": "rgb(var(--tip-ink) / <alpha-value>)",
     },
     borderColor: ({ theme }) => ({
       ...theme("colors"),
@@ -71,6 +77,7 @@ module.exports = {
       "card-lift": "var(--shadow-card-lift)",
       lift: "var(--shadow-lift)",
       recording: "var(--shadow-recording)",
+      tip: "var(--shadow-tip)",
     },
     fontFamily: {
       sans: ['"Geist Variable"', "system-ui", "sans-serif"],
@@ -93,16 +100,20 @@ module.exports = {
       medium: "500",
       semibold: "600",
     },
+    // DESIGN.md section 7, from motion.json, which the renderers' timers read too.
     transitionDuration: {
-      DEFAULT: "100ms",
-      fast: "100ms",
-      menu: "150ms",
-      panel: "280ms",
-      switch: "420ms",
+      DEFAULT: ms("fast"),
+      fast: ms("fast"),
+      tip: ms("tip"),
+      menu: ms("menu"),
+      move: ms("move"),
+      slide: ms("slide"),
+      panel: ms("panel"),
+      switch: ms("switch"),
     },
     transitionTimingFunction: {
-      DEFAULT: "cubic-bezier(.2, .8, .2, 1)",
-      crisp: "cubic-bezier(.2, .8, .2, 1)",
+      DEFAULT: motion.ease,
+      crisp: motion.ease,
     },
     extend: {
       spacing: {
@@ -123,6 +134,13 @@ module.exports = {
         "step-next": "step-next 200ms cubic-bezier(.2, .8, .2, 1)",
         "step-back": "step-back 200ms cubic-bezier(.2, .8, .2, 1)",
         "step-fade": "mascot-fade 200ms cubic-bezier(.2, .8, .2, 1)",
+        // A menu grows from its button, and goes back into it a little quicker (DESIGN.md section 7).
+        // Words arriving in place of others, as a tooltip's do when it moves to a neighbour.
+        fade: `mascot-fade ${ms("move")} ${motion.ease}`,
+        "menu-in": `menu-in ${ms("menu")} ${motion.ease}`,
+        "menu-in-above": `menu-in-above ${ms("menu")} ${motion.ease}`,
+        "menu-out": `menu-out ${ms("fast")} ${motion.ease} forwards`,
+        "menu-out-above": `menu-out-above ${ms("fast")} ${motion.ease} forwards`,
       },
       keyframes: {
         shimmer: {
@@ -133,6 +151,18 @@ module.exports = {
         "menu-in": {
           "0%": { transform: "scale(.96) translateY(-4px)", opacity: "0" },
           "100%": { transform: "none", opacity: "1" },
+        },
+        "menu-in-above": {
+          "0%": { transform: "scale(.96) translateY(4px)", opacity: "0" },
+          "100%": { transform: "none", opacity: "1" },
+        },
+        "menu-out": {
+          "0%": { transform: "none", opacity: "1" },
+          "100%": { transform: "scale(.96) translateY(-4px)", opacity: "0" },
+        },
+        "menu-out-above": {
+          "0%": { transform: "none", opacity: "1" },
+          "100%": { transform: "scale(.96) translateY(4px)", opacity: "0" },
         },
         "mascot-fade": {
           "0%": { opacity: "0" },

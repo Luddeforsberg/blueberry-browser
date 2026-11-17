@@ -34,6 +34,7 @@ import { PATTERN_WINDOW_MS } from "./suggestionPatterns";
 import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
 import { AddressSuggestions } from "./AddressSuggestions";
+import { TooltipView } from "./TooltipView";
 import { attachPageMenu, printPage } from "./pageMenu";
 import { SiteZoom } from "./siteZoom";
 import type { Downloads } from "./Downloads";
@@ -125,6 +126,7 @@ export class Window {
   private overlay: ChromeView;
   readonly findBar: FindBar;
   readonly addressSuggestions: AddressSuggestions;
+  readonly tooltip: TooltipView;
   readonly siteZoom: SiteZoom;
   private floatingSidebarVisible = false;
   // What's open over the page from the horizontal toolbar, in the overlay view. Null when nothing is.
@@ -226,6 +228,8 @@ export class Window {
     this.openLinksInTabs(this.findBar.chromeView.view.webContents);
     this.addressSuggestions = new AddressSuggestions(this._baseWindow.contentView);
     this.openLinksInTabs(this.addressSuggestions.chromeView.view.webContents);
+    this.tooltip = new TooltipView(this._baseWindow.contentView);
+    this.openLinksInTabs(this.tooltip.chromeView.view.webContents);
     this.siteZoom = new SiteZoom({
       levels: () => this.settings.siteZoom,
       save: (siteZoom) => {
@@ -567,6 +571,7 @@ export class Window {
       this.overlay.view.webContents.close();
       this.findBar.destroy();
       this.addressSuggestions.destroy();
+      this.tooltip.destroy();
     });
   }
 
@@ -1155,6 +1160,7 @@ export class Window {
 
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
     this.addressSuggestions.close();
+    this.tooltip.hide();
     // Opening anything from Chats or a card is done with it, even the tab already in front.
     this.closePopover(false);
     this.activeTabId = tabId;
@@ -1612,6 +1618,11 @@ export class Window {
 
   // A row pressed in the list goes back to the chrome, which acts on it as it would on Enter. The press took the keyboard
   // to the list's view, so it comes back first.
+  showTooltip(request: unknown): void {
+    const { width, height } = this._baseWindow.getContentBounds();
+    this.tooltip.show(request, { width, height });
+  }
+
   pickAddressSuggestion(index: unknown): void {
     const row = this.addressSuggestions.pick(index);
     if (!row) return;
@@ -1722,6 +1733,8 @@ export class Window {
     if (layout.popover.width === 0) this.closePopover(false);
     else if (this.popover) this.overlay.view.setBounds(layout.popover);
     this.findBar.setBounds(layout.findBar);
+    // Whatever it hung from may have moved.
+    this.tooltip.hide();
     this.broadcast("layout:updated", layout);
     this.permissionPrompt.sync();
   }
@@ -1742,6 +1755,7 @@ export class Window {
     this.broadcast("theme:updated", this.theme);
     this.findBar.notifyTheme(this.theme);
     this.addressSuggestions.notifyTheme(this.theme);
+    this.tooltip.notifyTheme(this.theme);
     this.desktopBerry.notifyTheme();
     sendToRenderer(this.permissionPrompt.chrome.view.webContents, "theme:updated", this.theme);
   }

@@ -124,7 +124,7 @@ export const SettingsLink: React.FC<{
     return (
         <button type="button" onClick={onOpen} className={cn(row, 'active:bg-press', FOCUS)}>
             {words}
-            <ChevronRight aria-hidden className="size-3.5 shrink-0 -ml-1 text-faint" strokeWidth={1.75} />
+            <ChevronRight aria-hidden className="leans size-3.5 shrink-0 -ml-1 text-faint" strokeWidth={1.75} />
         </button>
     )
 }

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Menu } from 'lucide-react'
 import type { Rect } from '@shared/ipc'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
@@ -17,6 +17,7 @@ import { ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
 import { AppIconSender } from './components/AppIconSender'
 import { cn } from '@common/lib/utils'
+import { TooltipProvider, type TipElsewhere } from '@common/components/Tooltip'
 
 // Regions sit exactly where main's layout puts them, so the tab view lines up with the page's sheet.
 const Region: React.FC<{
@@ -97,12 +98,40 @@ const Shell: React.FC = () => {
     )
 }
 
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+// A tooltip that would hang over a web page, or over what the horizontal toolbar opened, can't be drawn here, since
+// those views cover the chrome. It goes to the tooltip view over them instead (DESIGN.md section 2, View stack).
+const ChromeTips: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { layout, theme } = useShell()
+    const { activeTab } = useBrowser()
+    const [popover, setPopover] = useState(false)
+    useEffect(() => window.chromeAPI.layout.onPopover(({ shown }) => setPopover(!!shown)), [])
+    const page = !!activeTab && !activeTab.page && !activeTab.trouble && !activeTab.loadError
+    const covered = popover ? layout.popover : page ? layout.page : null
+    const elsewhere = useMemo<TipElsewhere>(
+        () => ({
+            takes: (box) => !!covered && overlaps(box, covered),
+            show: (tip) => void window.chromeAPI.tooltip.show(tip),
+            hide: () => void window.chromeAPI.tooltip.hide()
+        }),
+        [covered]
+    )
+    return (
+        <TooltipProvider mac={theme.platform === 'mac'} elsewhere={elsewhere}>
+            {children}
+        </TooltipProvider>
+    )
+}
+
 export const ChromeApp: React.FC = () => (
     <ShellProvider>
         <BrowserProvider>
             <LibraryProvider>
                 <ChatProvider>
-                    <Shell />
+                    <ChromeTips>
+                        <Shell />
+                    </ChromeTips>
                     <AppIconSender />
                 </ChatProvider>
             </LibraryProvider>

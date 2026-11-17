@@ -74,6 +74,20 @@ export const suggestionsRect = (
   return { view: { x, y, width, height }, sheet };
 };
 
+// A tooltip over the page: a strip as wide as the window, with room under the pill for its shadow and only a little above
+// it, so the strip never reaches the control it belongs to. Along a row the strip stays where it is and the pill slides
+// inside it, so moving to a neighbour moves nothing native, which would judder.
+const TOOLTIP_ROOM = { above: 2, below: 14 };
+export const tooltipRect = (pill: Rect, window: { width: number; height: number }): { view: Rect; pill: Rect } => {
+  const { above, below } = TOOLTIP_ROOM;
+  const y = Math.min(Math.max(Math.round(pill.y) - above, 0), window.height);
+  const height = Math.max(Math.min(Math.round(pill.height) + above + below, window.height - y), 0);
+  return {
+    view: { x: 0, y, width: Math.max(window.width, 0), height },
+    pill: { x: Math.round(pill.x), y: Math.round(pill.y) - y, width: Math.round(pill.width), height: Math.round(pill.height) },
+  };
+};
+
 // The bird on the edge of the screen. Its window keeps one size wherever it stands, so nothing resizes while it moves or
 // speaks, and the bird tucks by being moved past the side of the window that lies along the edge.
 export const DESKTOP_BIRD_SIZE = 72;
