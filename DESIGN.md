@@ -1,6 +1,6 @@
 # Blueberry design
 
-Blueberry is an AI browser that should feel like a good desktop app with one capable colleague inside it. The direction is **Pips**: a quiet window in warm grey, white sheets for pages, and a small family of berries who do the work. A pip is the seed of a fruit and a dot on a die, and both are meant. The mascots are berries, and what they're doing is said in dots.
+Blueberry is an AI browser that should feel like a good desktop app with one capable colleague inside it. The direction is **Pips**: a quiet window in light grey, white sheets for pages, and a small family of berries who do the work. A pip is the seed of a fruit and a dot on a die, and both are meant. The mascots are berries, and what they're doing is said in dots.
 
 This document is the source of truth for the UI. Values marked *to tune* are starting points, to be adjusted on real windows without changing the intent.
 
@@ -109,17 +109,17 @@ Components use tokens only, never raw colours.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `ground` | `#ECEBE7` | `#131312` | The window |
-| `tray` | `#E1E0DB` | `#1F1F1D` | Tucked and recessed surfaces |
-| `well` | `#E6E5E0` | `#191918` | Where a page will go |
+| `ground` | `#F5F5F6` | `#131312` | The window |
+| `tray` | `#E8E8EB` | `#1F1F1D` | Tucked and recessed surfaces |
+| `well` | `#F0F0F2` | `#191918` | Where a page will go |
 | `sheet` | `#FFFFFF` | `#272725` | Content |
-| `sheet-2` | `#F3F2EF` | `#313130` | Quiet fill on a sheet |
+| `sheet-2` | `#F3F3F5` | `#313130` | Quiet fill on a sheet |
 | `card` | `#FFFFFF` | `#313130` | A card set into a shell in a chat: the prompt box, an approval, your turn. A sheet in light, and a step up from the sheet in dark, so it doesn't sink into the page it's on |
-| `card-2` | `#F3F2EF` | `#3D3D3B` | Quiet fill on a card: the off Send, the +, the page chip, the exact words |
-| `ink` | `#151514` | `#EEEDE8` | Text, and the one filled button |
-| `ink-2` | `#5F5E5A` | `#A6A49D` | Secondary text |
-| `ink-3` | `#6C6A65` | `#97958E` | Labels, times, finished steps |
-| `faint` | `#8C8A84` | `#77756F` | Placeholders and hints only, never something that must be read |
+| `card-2` | `#F3F3F5` | `#3D3D3B` | Quiet fill on a card: the off Send, the +, the page chip, the exact words |
+| `ink` | `#141416` | `#EEEDE8` | Text, and the one filled button |
+| `ink-2` | `#5C5C61` | `#A6A49D` | Secondary text |
+| `ink-3` | `#69696E` | `#97958E` | Labels, times, finished steps |
+| `faint` | `#8A8A8F` | `#77756F` | Placeholders and hints only, never something that must be read |
 | `line` | ink at 9% | white at 9% | Hairlines |
 | `dot` | ink at 16% | white at 13% | The dot grid in a well |
 | `hover` | ink at 5% | white at 6% | Hovered rows and outline buttons |
@@ -128,24 +128,26 @@ Components use tokens only, never raw colours.
 | `ask-bg` | `#FBE4E3` | `#3A1F1F` | Behind `ask` text, where it needs a fill |
 | `focus` | `#3F51DC` | `#8FA0FF` | Blueberry blue: the focus ring, and a switch that's on. Nothing else in the chrome |
 
-The grey is warm on purpose. A cooler grey and a warmer oat were tried beside it and this one was chosen.
+**The light paper is a light, neutral grey, a shade towards cool.** A warm grey was the first choice, and was tried in the running app beside a neutral grey of the same lightness and this lighter one, which was chosen. Every neutral in light mode has the same faint tint, so nothing looks tinted against its neighbour. Dark mode keeps its own greys.
+
+**How the light surfaces step,** from furthest back to nearest: `tray` (232), `well` (240), `ground` (245), then `sheet` (255). The window is nearly white, so a sheet is told from the ground by its edge, the `rim`, `chip` or `up` shadow it always carries there, more than by its fill. What's set into the ground, such as the address field, the switch strips and the dock, is a `tray`, the darkest step, so it reads as a hollow. `sheet-2` (243) is only for a quiet fill on a sheet or a card: a field, a hovered row, your own message. It's close to the ground's own colour, so it never goes straight on the ground or the well, where it would vanish: there a fill is a `tray`, and anything raised is a sheet with `chip`.
 
 Contrast, measured:
 
 | Text | On ground | On tray | On well | On sheet | On sheet 2 |
 |---|---|---|---|---|---|
-| `ink`, light | 15.3 | 13.8 | 14.5 | 18.3 | 16.3 |
-| `ink-2`, light | 5.4 | 4.9 | 5.1 | 6.5 | 5.8 |
-| `ink-3`, light | 4.5 | 4.1 | 4.3 | 5.4 | 4.8 |
-| `faint`, light | 2.9 | 2.6 | 2.7 | 3.5 | 3.1 |
+| `ink`, light | 16.9 | 15.0 | 16.2 | 18.4 | 16.6 |
+| `ink-2`, light | 6.1 | 5.4 | 5.8 | 6.6 | 6.0 |
+| `ink-3`, light | 5.0 | 4.5 | 4.8 | 5.5 | 4.9 |
+| `faint`, light | 3.2 | 2.8 | 3.0 | 3.4 | 3.1 |
 | `ink`, dark | 15.9 | 14.1 | 15.0 | 12.8 | 11.1 |
 | `ink-2`, dark | 7.5 | 6.6 | 7.1 | 6.0 | 5.2 |
 | `ink-3`, dark | 6.2 | 5.5 | 5.9 | 5.0 | 4.3 |
 | `faint`, dark | 4.0 | 3.6 | 3.8 | 3.2 | 2.8 |
 
-- **`ink-3` is under 4.5:1 on a tray and in a well in light mode, and on sheet 2 in dark.** Use `ink-2` there for anything that must be read.
-- **`ask`** is 4.6:1 on `ask-bg` and on the ground and 5.5:1 on a sheet in light, and at least 5.4:1 in dark.
-- **The filled button** is `ground` on `ink`: 15.3:1 light, 15.9:1 dark.
+- **`ink-3` is only just 4.5:1 on a tray in light mode, and under it on sheet 2 in dark.** Use `ink-2` there for anything that must be read.
+- **`ask`** is 4.6:1 on `ask-bg`, 5.1:1 on the ground and 5.5:1 on a sheet in light, and at least 5.4:1 in dark.
+- **The filled button** is `ground` on `ink`: 16.9:1 light, 15.9:1 dark.
 - The mascots' own colours are in section 9.
 
 ### Radius, spacing, elevation
@@ -629,7 +631,7 @@ A page in a tab, on the frame (A page in a tab): the sheet, in one column 620px 
 **A group is a label in words (section 8) and its rows,** straight on the page, with no sheet around them. **A row** is 52px, or taller with a second line, with a hairline between rows that starts where the text does. Its name is on the left at 14px medium in `ink`, and on the right is one control: a switch, a segmented control, a quiet value with a raised button, a state as a pill, or an arrow to a page one step in. A row that opens something is a button from edge to edge. A row gets one sentence of explanation at most, in `ink-2` at 13px, which may run to a second line. Anything longer goes behind a quiet **More** at its end, or on a page one step in. Where setting something up needs a field, as on the pages behind Connections, it sits under the row's name at the row's full width.
 
 - **A switch** is 34 by 20px. On is `focus` with a white knob, and off is `sheet-2` with a hairline.
-- **A choice with a picture:** Theme and Tabs are small drawings of the window, 86 by 56px, with the name under each. The chosen one has a 1.5px `ink` ring with a 2px gap. System is half light and half dark.
+- **A choice with a picture:** Theme and Tabs are small drawings of the window, 86 by 56px, with a hairline round each, since a light window is nearly the colour of the sheet it's drawn on, and the name under each. The chosen one has a 1.5px `ink` ring with a 2px gap. System is half light and half dark.
 
 **The sections:**
 
