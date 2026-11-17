@@ -100,7 +100,7 @@ export const Chat: React.FC = () => {
                     onDraftTaken={takeDraft}
                     disabled={isLoading && !question}
                     onStop={isLoading ? stop : undefined}
-                    placeholder={question ? `Answer ${name}, or pick one above` : name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
+                    placeholder={question ? (question.answers?.length ? `Answer ${name}, or pick one above` : `Answer ${name}`) : name === 'Assistant' ? 'Write a message' : isLoading ? `Tell ${name} something while it works` : `Tell ${name} something`}
                     attachment={
                         heldByUser ? (
                             <p className="basis-full px-2 py-1 text-13 text-ink-2">{name} can’t see this tab while it’s with you.</p>

@@ -137,7 +137,7 @@ export const ChatPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         attach={{ chatId, mascot, place: thread.runner ? 'runner' : inCloud ? 'cloud' : 'here' }}
                         disabled={running && !question}
                         onStop={running ? () => void window.chromeAPI.chat.stop(chatId) : undefined}
-                        placeholder={question ? `Answer ${name}, or pick one above` : name === 'Assistant' ? 'Write a message' : running ? `Tell ${name} something while it works` : `Tell ${name} something`}
+                        placeholder={question ? (question.answers?.length ? `Answer ${name}, or pick one above` : `Answer ${name}`) : name === 'Assistant' ? 'Write a message' : running ? `Tell ${name} something while it works` : `Tell ${name} something`}
                         autoFocus
                         mascot={mascot}
                     />

@@ -105,8 +105,10 @@ const TOOLS_PROMPT =
 // Only where the user is there to answer. Everywhere else the rule above stands.
 const ASK_FIRST_PROMPT =
   "\n\nThe user is here to answer. When a request leaves open something that would change the result, such as which team, which market, how many or what counts as a fit, " +
-  "or it's a long job where a wrong start would waste it, you may first reply with one or two short questions, or a short plan of a few steps to confirm, and then stop without using tools. Their next message answers it. " +
-  "Never do this for a simple lookup, never to ask what you can find out yourself, and never more than once before starting. Ask in your reply, not with ask_user.";
+  "ask before you start, with ask_user rather than in your reply, so they can answer with one press: one question in each call, with its choices as answers whenever you can name them. Then carry on with what they said. " +
+  "When a job later comes down to a choice only they can make between things you found, such as two flights, ask the same way rather than ending your reply with the question. " +
+  "For a long job where a wrong start would waste it, you may instead first reply with a short plan of a few steps to confirm, and then stop without using tools. Their next message answers it. " +
+  "Never do any of this for a simple lookup or to ask what you can find out yourself, and before you start, ask two questions at most or give one plan.";
 
 const DECLINED = "The user said no. Nothing happened. Don't try this another way unless they ask.";
 const CHANGED =

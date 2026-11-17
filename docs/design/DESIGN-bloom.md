@@ -486,7 +486,6 @@ On a job of more than one step, Berry first says in one sentence what it'll do, 
 - **The status line:** that sentence, and any short note it writes between steps later, shows at the top of the reply while it works, above the trail, at 14px in `muted-foreground`, two lines at most. It's plain words with no icon and no shimmer, since the trail under it already shows the work going on. The newest replaces the one before, and it goes as soon as the answer starts.
 - **Not the answer:** the answer is only Berry's last message. The status line isn't saved with the reply, and nothing else gets it: not the model next time, a routine's result, the cloud or the phone page, or another app. A routine's run card shows it the same way while the run is going.
 - **Words that turn out to be on the way:** the model's words can only be told apart from the answer once it calls a tool, so they stream as the answer until then and move up into the status line when it does.
-- **Asking first:** when you typed the request in Blueberry's own composer, and it leaves open something that would change the result, or it's a long job a wrong start would waste, Berry may answer with one or two short questions, or a short plan to confirm, before it does anything. Your next message answers it. It's an ordinary reply, not a card, so nothing waits on it. Routines, the cloud, other apps and the bird on the desktop never do this, as nobody may be there to answer.
 
 ### The working view
 
