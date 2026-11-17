@@ -1,10 +1,10 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, StepKind, UsedPage } from '@shared/library'
 import { linkSite } from '@shared/publishing'
-import { ArrowUpRight, Check, ChevronDown, ChevronRight, Cloud, Copy, Lock, Repeat } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Cloud, Copy, Lock, Repeat } from 'lucide-react'
 import { ApprovalCard, CardInShell, Keycap, WhyLine } from '@common/components/ApprovalCard'
 import { useCardKeys } from '@common/components/cardKeys'
 import { whyWords } from '../askingWords'
@@ -537,6 +537,31 @@ type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProf
 
 const LETTERS = ['A', 'B', 'C']
 
+// What never goes through a question, behind a ? at the end of the shell so the card stays the question. It shows
+// beside the mark, in the shell, so it never covers an answer, while the pointer or the keyboard is on the mark.
+const SecretsHint: React.FC = () => {
+    const id = useId()
+    return (
+        <span className="group/hint relative flex shrink-0">
+            <button
+                type="button"
+                aria-label="About passwords and codes"
+                aria-describedby={id}
+                className={cn('size-7 grid place-items-center rounded-row text-ink-3 transition-colors duration-fast hover:bg-hover hover:text-ink', FOCUS)}
+            >
+                <CircleHelp aria-hidden className="size-4" strokeWidth={1.75} />
+            </button>
+            <span
+                id={id}
+                role="tooltip"
+                className="pointer-events-none absolute right-full top-1/2 z-30 mr-1.5 w-max max-w-[calc(100cqi-40px)] -translate-y-1/2 rounded-row bg-sheet px-2.5 py-1.5 text-13 text-ink shadow-lift opacity-0 transition-opacity duration-fast group-hover/hint:opacity-100 group-focus-within/hint:opacity-100"
+            >
+                Passwords and codes go in the page, never here.
+            </span>
+        </span>
+    )
+}
+
 // A mascot needs something only the user knows, and carries on with the answer: a card in a shell, with the answers it
 // offered as rows to press. There's no field in it: in a chat the prompt box is where you answer. On Needs you, which
 // has no prompt box, `field` goes under the answers. While the keyboard is on the card, A, B and C pick an answer, and
@@ -548,7 +573,7 @@ export const QuestionCard: React.FC<{
     onSkip: () => void
     head?: React.ReactNode
     field?: React.ReactNode
-    // Said in the shell after the passwords line, such as Open the chat.
+    // Said in the shell before the ?, such as Open the chat.
     more?: React.ReactNode
     focusOnShow?: boolean
 }> = ({ approval, name, onAnswer, onSkip, head, field, more, focusOnShow = false }) => {
@@ -560,11 +585,13 @@ export const QuestionCard: React.FC<{
             label={`${name} is asking`}
             region={region}
             note={
-                <>
+                // A container, so the hint can be as wide as this row and no wider, and wraps in the narrow panel.
+                <span className="flex min-w-0 flex-1 items-center gap-2.5 [container-type:inline-size]">
                     <Button variant="ghost" size="sm" className="-ml-2 px-2" onClick={onSkip}>Skip</Button>
-                    <span className="min-w-0 flex-1">Passwords and codes go in the page, never here.</span>
+                    <span className="flex-1" />
                     {more}
-                </>
+                    <SecretsHint />
+                </span>
             }
         >
             {head}
