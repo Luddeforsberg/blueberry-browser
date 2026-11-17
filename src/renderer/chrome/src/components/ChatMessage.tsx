@@ -430,10 +430,15 @@ const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.R
     </div>
 )
 
-// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through.
+// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no
+// key, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
 const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions }> = ({ message, actions }) => (
     <TroubleLine words={message} alert>
-        {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
+        {message === NO_KEY ? (
+            <Button onClick={() => openSettings('ai-service')}>Add a key</Button>
+        ) : (
+            actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>
+        )}
     </TroubleLine>
 )
 
@@ -717,13 +722,7 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
     return <ApprovalCard question={question} exactly={exactly} mark={mark} note={why && <WhyLine>{why}</WhyLine>} onConfirm={() => decide(true)} onDeny={() => decide(false)} />
 }
 
-// Why something failed, worded with what to do about it. With no key, that's a way to add one.
-export const ChatError: React.FC<{ message: string }> = ({ message }) =>
-    message === NO_KEY ? (
-        <div className="flex flex-col items-start gap-2 animate-fade-in">
-            <p role="alert" className="text-14 text-ask">{message}</p>
-            <Button variant="raised" size="sm" onClick={() => openSettings('ai-service')}>Add a key</Button>
-        </div>
-    ) : (
-        <p role="alert" className="text-14 text-ask animate-fade-in">{message}</p>
-    )
+// Why something failed, worded with what to do about it.
+export const ChatError: React.FC<{ message: string }> = ({ message }) => (
+    <p role="alert" className="text-14 text-ask animate-fade-in">{message}</p>
+)

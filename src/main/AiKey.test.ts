@@ -92,21 +92,21 @@ describe("AiKey", () => {
 });
 
 describe("tryAiKey", () => {
-  const answering = (status: number) => vi.fn(async () => new Response("{}", { status }));
+  const answering = (status: number) => vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response("{}", { status }));
 
   it("sends one short message to the service's cheap model with the key", async () => {
     const fetch = answering(200);
     expect(await tryAiKey("openai", KEY, { fetch, env: {} })).toBe("works");
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetch.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/chat/completions");
-    expect(init.headers).toMatchObject({ authorization: `Bearer ${KEY}` });
-    expect(JSON.parse(init.body as string)).toMatchObject({ model: "gpt-6-luna" });
+    expect(init?.headers).toMatchObject({ authorization: `Bearer ${KEY}` });
+    expect(JSON.parse(String(init?.body))).toMatchObject({ model: "gpt-6-luna" });
 
     const anthropic = answering(200);
     await tryAiKey("anthropic", KEY, { fetch: anthropic, env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9/" } });
-    const [anthropicUrl, anthropicInit] = anthropic.mock.calls[0] as unknown as [string, RequestInit];
+    const [anthropicUrl, anthropicInit] = anthropic.mock.calls[0];
     expect(anthropicUrl).toBe("http://127.0.0.1:9/v1/messages");
-    expect(anthropicInit.headers).toMatchObject({ "x-api-key": KEY });
+    expect(anthropicInit?.headers).toMatchObject({ "x-api-key": KEY });
   });
 
   it("tells a key the service turned down from a service it couldn't reach", async () => {

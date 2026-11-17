@@ -25,11 +25,11 @@ const api = window.chromeAPI
 
 const LINK = 'text-ink underline decoration-line underline-offset-[3px] rounded-row outline-none hover:decoration-ink-3 focus-visible:ring-2 focus-visible:ring-focus'
 
-// The filled button names its key, since Enter presses it.
+// The filled button names its key while Enter presses it.
 const Primary: React.FC<{ disabled?: boolean; onClick: () => void; children: React.ReactNode }> = ({ disabled, onClick, children }) => (
     <Button disabled={disabled} onClick={onClick}>
         {children}
-        <kbd aria-hidden className="h-4 min-w-4 px-1 grid place-items-center rounded-[5px] bg-ground/15 font-mono text-[10.5px] font-medium text-ground/80">↵</kbd>
+        {!disabled && <kbd aria-hidden className="h-4 min-w-4 px-1 grid place-items-center rounded-[5px] bg-ground/15 font-mono text-[10.5px] font-medium text-ground/80">↵</kbd>}
     </Button>
 )
 
