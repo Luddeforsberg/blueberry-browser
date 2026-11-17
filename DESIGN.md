@@ -358,6 +358,32 @@ Every feature keeps working either way, and turning it off never prompts the use
 
 Mock for all of this section unless one is named: [shell-and-chat.html](./docs/design/mocks/shell-and-chat.html).
 
+### First run
+
+Mock: [first-run.html](./docs/design/mocks/first-run.html).
+
+The first launch is Berry and one card in the middle of an empty window: the well with its dot grid, and no sidebar, toolbar or tabs yet, because there's nothing to browse with until it's set up. Each step is the card that makes a mascot (Your mascots): 520px wide, set into a shell, Berry standing on its top edge at 64px, the step in mono (`2 / 5`), a question at 20px semibold in Berry's voice, one line under it, and the answer. In the shell: a round Back, a dot for each step with the current one long, and the filled button, which Enter presses.
+
+| Step | It says | The answer | The button |
+|---|---|---|---|
+| | Hi, I'm Berry. | Berry at 88px and the greeting at 30px medium. Two sentences on what it does and that it always asks before anything that matters, and under them, in `ink-3`, that this takes two minutes and all of it can be changed later. No step number | Get started, with **I already have an account** as a link across from it |
+| 1 | First, who are you? | Your name, Email and Password, each a 40px field under its label, the password with an eye to show it and "At least 8 characters." under it. The line under the question says what an account is for: publishing mascots, jobs in the cloud and answering from your phone, and that what you browse stays on this computer | Create account |
+| 2 | Make it yours. | The card is 680px and in two halves. On the left, Theme and Tabs as the pictures from Settings. On the right, on `tray`, a small drawing of the window that changes as they're pressed, and the real window changes with it | Continue |
+| 3 | Give me a brain. | OpenAI and Anthropic as two rows, each a letter on a tile, the name and one line. The chosen row opens a field, "Paste your key", with **Paste**, raised, and under it **Where do I find a key?**, which opens the service's own page for making one | Try the key, then Continue |
+| 4 | Shall I bring your history over? | The browsers found, as rows to choose from, and three short lines: what comes across, what never does, and that it stays here | Bring it in, with **Skip** under the card |
+| 5 | What I can see. | The rules as rows: reading a page only when asked and asking before acting, each with Always, then Suggestions and Offers to remember as real switches | Start browsing |
+
+- **An account is asked for on the first run and can't be skipped.** A problem is said under the field it's about, in `ask`: an email already in use, a password that's too short, no connection. **I already have an account** turns the card into "Welcome back." with Email and Password, **Sign in**, and **Make a new account** as a link. Signed in that way, the name step is done. A copy with no server has no account step, and the dots are one fewer.
+- **Only the first run asks.** Signing out later, in Settings, leaves the browser as it is, and what needs an account says so where it's used, as today.
+- **The key isn't done until Berry has answered with it.** Try the key sends one short message to the service. While it waits, the field shows the key as its service's prefix, dots and its last four characters with a lock, and Berry says "Trying it.." with the pips. When it works, Berry answers in words, "Hello, Sam. That works. I can think now.", with a Works pill, and the button becomes Continue. A key the service turns down says so in `ask`, in a sentence saying what to check, and one that couldn't be tried because the service wasn't reached says that instead, and both leave the key in the field.
+- **The key may be put off.** Under the card, **I'll do this later**, and that without a key Berry can't answer but everything else works. A chat with no key then says so and offers **Add a key**, which opens Settings where it's kept.
+- **Where the key lives.** It's typed in the chrome's own form and goes to the main process once. It's kept encrypted on this computer, as the cloud's key is, and never comes back to a page of ours: Settings shows only the service and the key's last four characters. Settings > Connections has **AI service** first, with the service and those characters, or Not set up, and its page one step in is the same two rows, with **Remove**. A key saved here is used before one in the `.env` file, which stays for development. No tool, mascot, app or phone can reach it.
+- **History** is only a step when another browser is found. Only addresses, page titles and visit times from the last 90 days come across, from every profile of that browser, and never passwords, cookies or what was typed. Afterwards the card says how many visits came across, with a Done pill, or that it couldn't read them, which can be tried again or skipped.
+- **Leaving part way** keeps what's been done: an account that was made stays made, and the next launch starts at the first step that isn't done.
+- **Moving between steps** is the same 200ms slide as making a mascot, with Berry staying where it stands.
+
+**Then the new tab, with First jobs.** Where suggestions will be once there's something to suggest from, a group labelled First jobs, with how many are done in mono ("1 of 3"), and a row for each: a ring that becomes a check, what it is at 14px medium, and one line on why. Bring your history in, a first job to try, which puts its words in the prompt box and sends nothing, and meeting a mascot that only reads, which opens Plain Words in the Gallery. With the key put off, **Give Berry a key** is first. A row that's done is struck through and can't be pressed, **Try it**, raised, shows on the row you're on, and the group goes when every row is done or **Hide** is pressed.
+
 ### Sidebar
 
 Mock: [sidebar-address-approvals.html](./docs/design/mocks/sidebar-address-approvals.html).
@@ -795,7 +821,6 @@ It answers through `chat:decide`, like the card in a chat, and the job goes on b
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
 
-- Onboarding
 - Find in page, zoom and printing, the page menu
 - Gallery and Publishing
 - Answering from the phone
