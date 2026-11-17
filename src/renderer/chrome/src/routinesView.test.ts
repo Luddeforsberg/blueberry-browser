@@ -83,7 +83,10 @@ describe('what might change', () => {
 
     it('is marked again from a saved routine that asks for it, and only from the lines as they were made', () => {
         const saved = switchAsking(form('Search for usb', 'usb'), 0).instructions
-        const routine = (instructions: string) => ({ id: 'r1', name: 'Job', instructions, mascotId: null, sites: [], scheduleSpec: { kind: 'manual' } }) as unknown as Routine
+        const routine = (instructions: string): Routine => ({
+            id: 'r1', name: 'Job', instructions, scheduleSpec: { kind: 'manual' }, mascotId: null, sites: [], inCloud: false,
+            schedule: 'Only when you ask', paused: false, nextRunAt: null, lastResult: '', status: 'idle', latestRun: null, unseen: false
+        })
         const again = formFor(routine(saved))
         expect(again.recorded).toEqual([{ label: 'Search', value: 'usb', ask: true, at: 11 }])
         expect(switchAsking(again, 0).instructions).toBe('Search for usb')
