@@ -2,9 +2,9 @@ import React, { useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Pips } from '@common/components/Pips'
-import { useAssistantName } from '../components/Berry'
+import { Berry, useAssistantName } from '../components/Berry'
 import { ChatError, LiveWords } from '../components/ChatMessage'
-import { PageFrame, PageHeader } from '../components/PageFrame'
+import { EmptyPage, PageFrame, PageHeader } from '../components/PageFrame'
 import { RecordingNotice, TrailNotes, useRecording } from '../components/ShowBerry'
 import { recordedForm, startRoutine } from '../routinesView'
 
@@ -20,6 +20,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const watching = status === 'recording'
     const drafting = status === 'drafting'
     const empty = steps.length === 0
+    const nothingNoted = empty && status === 'review'
 
     const writeUp = async () => {
         setFailed(null)
@@ -43,7 +44,7 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         <PageFrame>
             <PageHeader title={isBerry ? 'What I watched' : 'What was recorded'}>
                 {empty
-                    ? `${watching ? 'Nothing yet' : 'Nothing here'}. Scrolling and looking around don’t leave steps.`
+                    ? watching && 'Nothing yet. Scrolling and looking around don’t leave steps.'
                     : `${steps.length === 1 ? 'One step' : `${steps.length} steps`} on ${[...new Set(steps.map(({ site }) => site))].join(', ')}. None of it has left this computer, and none of it is saved.`}
             </PageHeader>
             <RecordingNotice inPage className="mx-3 mb-6" />
@@ -56,7 +57,21 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             {!empty && <TrailNotes steps={steps} onRemove={status === 'review' ? (id) => void api().removeStep(id) : undefined} />}
             {(failed || error) && <div className="mx-3 mt-4"><ChatError message={failed || error || ''} /></div>}
 
-            {!watching && (
+            {nothingNoted ? (
+                <EmptyPage
+                    face={<Berry mood="oops" size={64} />}
+                    title={isBerry ? 'I didn’t catch anything.' : 'Nothing was recorded.'}
+                    actions={
+                        <>
+                            {/* Starts watching again, as pressing Show Berry how does, and this page goes with the old trail. */}
+                            <Button onClick={() => void api().start()}>{isBerry ? 'Show me again' : 'Record again'}</Button>
+                            <Button variant="ghost" onClick={() => void throwAway()}>Close</Button>
+                        </>
+                    }
+                >
+                    Clicking, typing and going to a page leave steps. Scrolling and looking around don’t.
+                </EmptyPage>
+            ) : !watching && !empty && (
                 <div className="mx-3 mt-8">
                     {drafting ? (
                         <p role="status" className="h-8 flex items-center gap-2.5 text-14">
@@ -66,18 +81,12 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                     ) : (
                         <>
                             <div className="flex flex-wrap items-center gap-2">
-                                <Button disabled={empty} title={empty ? 'There’s nothing left to use' : undefined} onClick={() => void writeUp()}>
-                                    Turn this into a routine
-                                </Button>
-                                <Button variant="ghost" onClick={() => void throwAway()}>
-                                    {empty ? 'Close' : 'Throw it all away'}
-                                </Button>
+                                <Button onClick={() => void writeUp()}>Turn this into a routine</Button>
+                                <Button variant="ghost" onClick={() => void throwAway()}>Throw it all away</Button>
                             </div>
-                            {!empty && (
-                                <p className="mt-2 max-w-[520px] text-13 text-ink-2">
-                                    This sends these steps as words to the model that writes it up, and you check what comes back before anything runs. It never gets pictures, or anything typed in a password, code or card field.
-                                </p>
-                            )}
+                            <p className="mt-2 max-w-[520px] text-13 text-ink-2">
+                                This sends these steps as words to the model that writes it up, and you check what comes back before anything runs. It never gets pictures, or anything typed in a password, code or card field.
+                            </p>
                         </>
                     )}
                 </div>
