@@ -1032,13 +1032,19 @@ export class Window {
     return browserDataFor(process.platform, {
       appData: app.getPath("appData"),
       localAppData: process.env.LOCALAPPDATA,
+      home: app.getPath("home"),
+      programFiles: [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]],
       override: process.env.BLUEBERRY_BROWSER_DATA,
       packaged: app.isPackaged,
     });
   }
 
+  // Each browser with the icon of its app as installed here, read by the system, never fetched.
   importSources(): Promise<ImportSource[]> {
-    return findBrowsers(this.browserData);
+    return findBrowsers(this.browserData, async (file) => {
+      const icon = await app.getFileIcon(file, { size: "normal" });
+      return icon.isEmpty() ? null : icon.toDataURL();
+    });
   }
 
   async importHistory(sourceId: string): Promise<HistoryImportResult> {

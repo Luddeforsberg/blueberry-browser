@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Check, Eye, EyeOff, HardDrive, ShieldOff } from 'lucide-react'
-import type { Appearance, ImportSource, LayoutMode } from '@shared/ipc'
+import { Check, Eye, EyeOff, Lock, X } from 'lucide-react'
+import type { ActionApproval, Appearance, LayoutMode } from '@shared/ipc'
 import { BERRY } from '@shared/mascots'
 import { firstJobsFor, firstRunStart, firstRunSteps, type FirstRunStep } from '@shared/firstRun'
 import { Button } from '@common/components/Button'
@@ -9,10 +9,9 @@ import { Choice, Switch } from '@common/components/Controls'
 import { LABEL, StatusPill } from '@common/components/StatusPill'
 import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
-import { AiServiceRows, useKeyTry } from './AiKeyForm'
+import { AiKeyForm, useKeyTry } from './AiKeyForm'
 import { Berry, BerrySpot } from './Berry'
-import { Favicon } from './Favicon'
-import { useHistoryImport } from './HistoryImport'
+import { SourceRows, useHistoryImport } from './HistoryImport'
 import { FIELD, StepCard, StepNav } from './StepCard'
 import { WindowPicture } from './WindowPicture'
 
@@ -133,9 +132,9 @@ const MiniWindow: React.FC<{ tabs: LayoutMode }> = ({ tabs }) => {
     )
 }
 
-// What I can see: the rules as rows, two that always hold and the two settings that send something, as real switches.
-const Rule: React.FC<{ id: string; title: string; line: string; children: React.ReactNode }> = ({ id, title, line, children }) => (
-    <div className="relative py-[11px] px-3 flex items-center gap-3 text-left [&+&]:before:absolute [&+&]:before:left-3 [&+&]:before:right-0 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-line">
+// What I can see: one of the settings under Up to you, its name and a line on the left and its control on the right.
+const Setting: React.FC<{ id: string; title: string; line: string; children: React.ReactNode }> = ({ id, title, line, children }) => (
+    <div className="py-[11px] flex items-center gap-4 text-left [&+&]:border-t [&+&]:border-line">
         <span className="flex-1 min-w-0">
             <span id={id} className="block text-14 font-medium text-ink">{title}</span>
             <span className="block text-13 text-ink-2">{line}</span>
@@ -146,36 +145,9 @@ const Rule: React.FC<{ id: string; title: string; line: string; children: React.
 
 const SOURCE_FACTS = [
     { Icon: Check, text: 'Addresses, page titles and visit times, from the last 90 days' },
-    { Icon: ShieldOff, text: 'Never passwords, cookies or what you typed' },
-    { Icon: HardDrive, text: 'It stays on this computer. Suggestions send a short summary to the AI service, and you can turn that off next.' }
+    { Icon: X, text: 'Never passwords, cookies or what you typed' },
+    { Icon: Lock, text: 'It stays on this computer' }
 ]
-
-const SourceRows: React.FC<{ sources: ImportSource[]; chosen: string; choose: (id: string) => void }> = ({ sources, chosen, choose }) => (
-    <div role="radiogroup" aria-label="Browser to bring history from" className="mt-3.5 -mx-1 flex flex-col gap-1">
-        {sources.map(({ id, name, profiles }) => {
-            const on = id === chosen
-            return (
-                <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => choose(id)}
-                    className={cn('p-2.5 flex items-center gap-3 rounded-[14px] text-left shadow-[inset_0_0_0_1px_var(--line)] outline-none focus-visible:ring-2 focus-visible:ring-focus', on && 'bg-card-2')}
-                >
-                    <Favicon site={name} className="mx-1 size-6 rounded-[7px] text-12" />
-                    <span className="flex-1 min-w-0">
-                        <span className="block text-14 font-medium text-ink">{name}</span>
-                        <span className="block text-13 text-ink-2">{profiles === 1 ? '1 profile' : `${profiles} profiles`}</span>
-                    </span>
-                    <span aria-hidden className={cn('mr-1 size-[18px] shrink-0 grid place-items-center rounded-full', on ? 'bg-ink text-ground' : 'shadow-[inset_0_0_0_1.5px_rgb(var(--faint))]')}>
-                        {on && <Check className="size-[11px]" strokeWidth={2.6} />}
-                    </span>
-                </button>
-            )
-        })}
-    </div>
-)
 
 interface Start {
     steps: FirstRunStep[]
@@ -411,12 +383,10 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
                 <StepCard
                     {...card}
                     question="Give me a brain."
-                    hint="I think with an AI service, using a key that’s yours. It’s kept encrypted on this computer, and you pay the service for what I use."
+                    hint="I think with an AI service, using a key that’s yours."
                     nav={nav(<Primary disabled={!primary} onClick={() => primary?.()}>{keyTry.works ? 'Continue' : 'Try the key'}</Primary>)}
                 >
-                    <div className="mt-3.5 -mx-1">
-                        <AiServiceRows keyTry={keyTry} inCard />
-                    </div>
+                    <AiKeyForm keyTry={keyTry} inCard />
                 </StepCard>
                 {!keyTry.works && <Under label="I’ll do this later" onPress={next}>Without a key I can’t answer, but everything else works.</Under>}
             </>
@@ -430,27 +400,21 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
                 <StepCard
                     {...card}
                     question="Shall I bring your history over?"
-                    hint={history.done ? undefined : 'Then I can suggest things from day one, and the address field knows where you’ve been.'}
+                    hint="Then I can suggest things from day one, and the address field knows where you’ve been."
                     nav={nav(<Primary disabled={!primary} onClick={() => primary?.()}>{history.done ? 'Continue' : failed ? 'Try again' : 'Bring it in'}</Primary>)}
                 >
-                    {history.done ? (
-                        <Says pill="Done">{history.message}</Says>
+                    <SourceRows history={history} />
+                    {failed ? (
+                        <p role="alert" className="mt-3 mx-1 text-14 text-ask text-left">{history.message}</p>
                     ) : (
-                        <>
-                            {history.sources && history.source && <SourceRows sources={history.sources} chosen={history.source.id} choose={history.choose} />}
-                            {failed ? (
-                                <p role="alert" className="mt-3 mx-1 text-14 text-ask text-left">{history.message}</p>
-                            ) : (
-                                <ul className="mt-3.5 mx-1 flex flex-col gap-[7px] text-left">
-                                    {SOURCE_FACTS.map(({ Icon, text }) => (
-                                        <li key={text} className="flex gap-[9px] text-13 text-ink-2">
-                                            <Icon aria-hidden className="mt-[3px] size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />
-                                            {text}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </>
+                        <ul className="mt-3.5 mx-1 flex flex-col gap-1.5 text-left">
+                            {SOURCE_FACTS.map(({ Icon, text }) => (
+                                <li key={text} className="flex gap-[9px] text-13 text-ink-2">
+                                    <Icon aria-hidden className="mt-[3px] size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />
+                                    {text}
+                                </li>
+                            ))}
+                        </ul>
                     )}
                 </StepCard>
                 {!history.done && <Under label="Skip" onPress={next}>You can bring it in later, from Settings.</Under>}
@@ -462,23 +426,35 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
         <StepCard
             {...card}
             question="What I can see."
-            hint="These are the real settings, not a notice. Change them here or later."
+            hint="One thing is always true. The rest are real settings, here or later."
             nav={nav(<Primary onClick={finish}>Start browsing</Primary>)}
         >
-            <div className="mt-3.5 -mx-1.5 rounded-[14px] shadow-[inset_0_0_0_1px_var(--line)] overflow-hidden">
-                <Rule id="rule-read" title="I read a page only when you ask" line="And the chat always shows which one.">
-                    <StatusPill>Always</StatusPill>
-                </Rule>
-                <Rule id="rule-ask" title="I ask before anything risky" line="Before I delete, send or buy. You can make me ask about everything, in Settings.">
-                    <StatusPill>Always</StatusPill>
-                </Rule>
-                <Rule id="rule-suggestions" title="A summary of your history, for suggestions" line="It goes to the AI service. Everything else stays here.">
-                    <Switch labelledBy="rule-suggestions" checked={settings.suggestions} onChange={(suggestions) => updateSettings({ suggestions })} />
-                </Rule>
-                <Rule id="rule-memory" title="Offers to remember what you tell me" line="Only what you say yes to is kept, on this computer.">
-                    <Switch labelledBy="rule-memory" checked={settings.memoryOffers} onChange={(memoryOffers) => updateSettings({ memoryOffers })} />
-                </Rule>
-            </div>
+            <p className="py-3 px-3.5 flex gap-[11px] rounded-[14px] bg-card-2 text-13 leading-[20px] text-ink-2 text-left">
+                <Eye aria-hidden className="mt-0.5 size-4 shrink-0 text-ink" strokeWidth={1.75} />
+                <span>
+                    <b className="font-medium text-ink">I read a page only when you ask,</b> and the chat always shows which one. That part isn’t a setting.
+                </span>
+            </p>
+            <p className={cn('mt-3.5 text-left', LABEL)}>Up to you</p>
+            <Setting id="see-ask" title="Ask before I act" line="When risky is before I delete, send or buy.">
+                {/* Never is only in Settings, where what it risks is said. */}
+                <Choice<ActionApproval>
+                    label="Ask before I act"
+                    value={settings.actionApproval}
+                    onChange={(actionApproval) => updateSettings({ actionApproval })}
+                    options={[
+                        { value: 'risky', label: 'When risky' },
+                        { value: 'always', label: 'Always' }
+                    ]}
+                    className="bg-card-2"
+                />
+            </Setting>
+            <Setting id="see-suggestions" title="Suggestions from your history" line="A summary of it goes to the AI service.">
+                <Switch labelledBy="see-suggestions" checked={settings.suggestions} onChange={(suggestions) => updateSettings({ suggestions })} />
+            </Setting>
+            <Setting id="see-memory" title="Offers to remember what you tell me" line="Only what you say yes to is kept, on this computer.">
+                <Switch labelledBy="see-memory" checked={settings.memoryOffers} onChange={(memoryOffers) => updateSettings({ memoryOffers })} />
+            </Setting>
         </StepCard>
     )
 }

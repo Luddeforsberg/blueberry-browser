@@ -10,3 +10,6 @@ export const cleanAccountName = (value: unknown, fallback: string | null): strin
   if (name === "") return null;
   return [...name].length <= ACCOUNT_NAME_MAX && !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(name) ? name : fallback;
 };
+
+// The name the new tab greets with, the one place it's said: "Where to, Sam?", or "Where to?" with no name.
+export const greetingName = (name: string | null): string | null => name?.trim() || null;

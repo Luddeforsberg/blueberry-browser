@@ -255,6 +255,8 @@ export interface ImportSource {
   id: string;
   name: string;
   profiles: number;
+  // A picture of its app on this computer, as a data address, or null where it couldn't be read.
+  icon: string | null;
 }
 
 export type HistoryImportResult = { ok: true; added: number } | { ok: false };

@@ -10,7 +10,8 @@ import { SegmentSwitch } from '../components/SegmentSwitch'
 import { PageFrame, PageHeader } from '../components/PageFrame'
 import { WindowPicture } from '../components/WindowPicture'
 import { BringInHistory } from '../components/HistoryImport'
-import { AiServiceRows, aiServiceName, useAiKey, useKeyTry } from '../components/AiKeyForm'
+import { AiKeyForm, aiServiceName, useAiKey, useKeyTry } from '../components/AiKeyForm'
+import { ServiceMark } from '../components/ServiceMark'
 import { openSettings } from '../openSettings'
 import { usePhone } from '../usePhone'
 import { useCloud } from '../useCloud'
@@ -225,7 +226,7 @@ const AiService: React.FC = () => {
     const keyTry = useKeyTry()
     return (
         <div className="mt-4">
-            <AiServiceRows keyTry={keyTry} tryButton onRemove={() => void window.chromeAPI.aiKey.remove()} />
+            <AiKeyForm keyTry={keyTry} tryButton onRemove={() => void window.chromeAPI.aiKey.remove()} />
         </div>
     )
 }
@@ -242,7 +243,7 @@ const Connections: React.FC = () => {
     return (
         <SettingsGroup>
             <SettingsLink
-                lead={<RowTile><Brain strokeWidth={1.75} /></RowTile>}
+                lead={<RowTile>{aiKey.service ? <ServiceMark service={aiKey.service} size={16} /> : <Brain strokeWidth={1.75} />}</RowTile>}
                 title="AI service"
                 description="What Berry thinks with, using your own key."
                 value={aiKey.service && aiKey.last4 ? `${aiServiceName(aiKey.service)} · ${aiKey.last4}` : undefined}

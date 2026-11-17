@@ -3,6 +3,7 @@ import type { TabInfo } from '@shared/ipc'
 import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
 import { BERRY_ID, permissionsInWords } from '@shared/mascots'
 import { firstJobRows, PLAIN_WORDS, type FirstJob } from '@shared/firstRun'
+import { greetingName } from '@shared/accountName'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { LABEL } from '@common/components/StatusPill'
@@ -187,6 +188,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     // First jobs, after the first run, in place of suggestions until every row is done or it's hidden.
     const firstJobsShown = firstJobRows(settings.firstJobs, settings.firstJobsDone).length > 0
+    const greeting = greetingName(settings.accountName)
     const pressFirstJob = (job: FirstJob) => {
         if (job === 'key') openSettings('ai-service')
         else if (job === 'history') openSettings('bring-in-history')
@@ -246,13 +248,14 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div className="absolute inset-0 overflow-y-auto [container-type:size]">
                 <div className="min-h-full flex flex-col items-center px-6 pt-[max(48px,calc(43cqh-127px))] pb-12">
                     {/* A mark, not a control. Blueberry on the desktop flies out from here. */}
-                    <h1 className="mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
-                        <span data-berry-perched className="-mt-1.5 flex" style={away ? { opacity: 0 } : undefined}>
+                    <h1 className="max-w-[640px] mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
+                        <span data-berry-perched className="-mt-1.5 shrink-0 flex" style={away ? { opacity: 0 } : undefined}>
                             <span key={face.arrival} className={cn('flex origin-[50%_70%]', face.arrival > 0 && (still ? 'animate-[mascot-fade_150ms_ease-out]' : 'animate-mascot-pop'))}>
                                 <Berry size={40} mascot={shown} mood={face.mood} shut={face.shut} />
                             </span>
                         </span>
-                        Where to?
+                        {/* A long name is cut, never wrapped, at the box's width. */}
+                        <span className="min-w-0 truncate">{greeting ? `Where to, ${greeting}?` : 'Where to?'}</span>
                     </h1>
 
                     <div className="w-full max-w-[640px]">
