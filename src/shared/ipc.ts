@@ -624,8 +624,9 @@ export interface InvokeChannels {
   "ai-key:remove": { region: "chrome"; args: []; result: AiKeyState };
   // Opens the service's own page for making a key.
   "ai-key:find": { region: "chrome"; args: [service: AiService]; result: void };
-  // Pastes into the chrome's focused field, as the Edit menu's Paste does, so the chrome never reads the clipboard.
-  "edit:paste": { region: "chrome"; args: []; result: void };
+  // What's on the clipboard, for the key field's Paste, only if it looks like a key. Null otherwise, so nothing else on
+  // the clipboard can be read this way.
+  "ai-key:paste": { region: "chrome"; args: []; result: string | null };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };
@@ -896,7 +897,7 @@ export interface AiKeyAPI {
   tryKey: (service: AiService, key: string) => Promise<{ outcome: AiKeyTried; state: AiKeyState }>;
   remove: () => Promise<AiKeyState>;
   find: (service: AiService) => Promise<void>;
-  paste: () => Promise<void>;
+  paste: () => Promise<string | null>;
   onUpdated: (callback: (state: AiKeyState) => void) => Unsubscribe;
 }
 

@@ -30,9 +30,10 @@ export const useAiKey = () => {
 
 export const aiServiceName = (service: AiService) => SERVICES[service].name
 
-type Said = AiKeyTried | 'trying' | null
+type Said = AiKeyTried | 'trying' | 'nothing-to-paste' | null
 
-const PROBLEMS: Record<Exclude<AiKeyTried, 'works'>, (service: AiService) => string> = {
+const PROBLEMS: Record<Exclude<Said, 'works' | 'trying' | null>, (service: AiService) => string> = {
+    'nothing-to-paste': () => 'There’s no key on the clipboard. Copy it from the service’s page, then press Paste.',
     refused: () => 'The service turned that key down. Check that it’s whole, and that the account behind it can still be charged.',
     unreachable: (service) => `I couldn’t reach ${SERVICES[service].name} to try it, so I can’t tell yet. Check your connection and try again.`,
     'not-a-key': () => 'That doesn’t look like a key. Paste the whole key, with nothing around it.',
@@ -70,6 +71,11 @@ export const useKeyTry = () => {
         },
         said,
         tryKey,
+        paste: async () => {
+            const pasted = await window.chromeAPI.aiKey.paste()
+            if (pasted) setKey(pasted)
+            setSaid(pasted ? null : 'nothing-to-paste')
+        },
         works: saved.service === service && said !== 'trying' && !key,
         canTry: !!key.trim() && said !== 'trying'
     }
@@ -154,14 +160,14 @@ const ChosenRow: React.FC<{ keyTry: KeyTry; name: string | null; onRemove?: () =
                     }}
                     className="flex-1 min-w-0 h-full bg-transparent font-mono text-12 text-ink caret-ink outline-none placeholder:font-sans placeholder:text-14 placeholder:text-faint"
                 />
-                {/* Main pastes into the field, as the Edit menu does, so nothing here reads the clipboard. */}
+                {/* Main gives back the clipboard only if it holds a key, so nothing else on it can be read this way. */}
                 <Button
                     type="button"
                     variant="raised"
                     size="sm"
                     onClick={() => {
                         field.current?.focus()
-                        void window.chromeAPI.aiKey.paste()
+                        void keyTry.paste()
                     }}
                 >
                     <ClipboardPaste aria-hidden strokeWidth={1.75} />

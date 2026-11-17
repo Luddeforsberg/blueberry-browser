@@ -114,7 +114,7 @@ export const CHANNEL_REGIONS: {
   "ai-key:try": ["chrome"],
   "ai-key:remove": ["chrome"],
   "ai-key:find": ["chrome"],
-  "edit:paste": ["chrome"],
+  "ai-key:paste": ["chrome"],
   "suggestions:list": ["chrome"],
   "suggestions:dismiss": ["chrome"],
   "suggestions:used": ["chrome"],

@@ -183,7 +183,7 @@ const chromeAPI: ChromeAPI = {
     tryKey: (service, key) => invoke("ai-key:try", service, key),
     remove: () => invoke("ai-key:remove"),
     find: (service) => invoke("ai-key:find", service),
-    paste: () => invoke("edit:paste"),
+    paste: () => invoke("ai-key:paste"),
     onUpdated: (callback) => subscribe("ai-key:updated", callback),
   },
   phone: {
