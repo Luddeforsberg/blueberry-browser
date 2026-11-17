@@ -35,8 +35,8 @@ const EARLIER_SHOWN = 8
 
 // Section labels: words with a capital, 12px medium in ink-2. `trailing` sits at the right, such as a count in mono or
 // an arrow.
-const Label: React.FC<{ id?: string; ask?: boolean; trailing?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ id, ask, trailing, className, children }) => (
-    <h2 id={id} className={cn('h-7 mt-1.5 mx-2 flex items-center gap-1.5', LABEL, ask && 'text-ask', className)}>
+const Label: React.FC<{ id?: string; ask?: boolean; trailing?: React.ReactNode; children: React.ReactNode }> = ({ id, ask, trailing, children }) => (
+    <h2 id={id} className={cn('h-7 mt-1.5 mx-2 flex items-center gap-1.5', LABEL, ask && 'text-ask')}>
         {children}
         {trailing && <span className="ml-auto flex items-center gap-2 font-mono text-11.5 font-regular text-ink-3">{trailing}</span>}
     </h2>
@@ -360,7 +360,7 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
                 New chat
             </button>
             {library.chats.length === 0 && library.needsYou.length === 0 && (
-                <p className="px-2 py-1.5 text-13 text-faint">Your chats, and what your mascots are doing, show up here.</p>
+                <p className="px-2 py-1.5 text-13 text-faint">Chats and jobs show up here.</p>
             )}
 
             {library.needsYou.length > 0 && (
