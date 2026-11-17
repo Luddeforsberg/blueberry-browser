@@ -704,6 +704,47 @@ There are no cards and nothing to stand on. With mascots hidden a row starts wit
 
 **What it remembers** is one step in from its page: the title with its name, one line saying that only what the user said yes to is kept, on this computer. An offer waiting for an answer is a card in a shell on top, with where it came from as a label in words, the words at 15px, and **Remember** and **Don't**. Then a group for each place, *Anywhere* first, with a row per thing and **Change** and **Forget** on each. Change makes the row a field. **Forget everything** is last, in `ask`. With nothing kept, the mascot and the sentence saying when it may ask stand alone on the page.
 
+### Gallery
+
+Mock: [gallery.html](./docs/design/mocks/gallery.html). Mascots made for one job, from Blueberry and from people using it, ready to add a copy of. It's a page in a tab, one open at a time, from **Gallery** on Your mascots, the account menu and the Go menu. It's on the sheet like any page in a tab, but it uses the page's whole width, because it's a collection, and then a list beside a page. Browsing and adding need no account. With no server set up, only Blueberry's own show, and nothing about accounts appears.
+
+**A berry's colour** is what tells mascots apart here. Every tile, card, swatch and page band is its berry's `berry-*` colour mixed 24% into `sheet`, with the berry's name, Blueberry, Lingonberry, Cloudberry, Gooseberry, Raspberry or Blackcurrant, in mono in that colour mixed 62% into `ink`. Nothing else on the page is coloured.
+
+**The whole Gallery** is what it opens on, with no mascot's page open.
+
+- **On top,** the title at 20px semibold, with the search field (A page in a tab) and **Your mascots** as quiet text on its right, and one line under it: "Mascots made for one job. Pick one to read what it's told, then add your own copy." Then the kinds of job as chips, each with its count in mono, **All** first, and only the kinds that have any.
+- **Most added:** the three published mascots with the most adds, as cards 150px tall with a 22px radius, three to a row. Each has its place faint at its top left, its name at 16.5px semibold, its line in two lines at most, and its adds and author in mono at the foot. The mascot stands at 112px in the bottom right corner, tilted and leaning out past the card's edge. There are none until something has adds, and none while searching or with a kind chosen, so nothing shows twice.
+- **From people** and **From Blueberry,** each a label with its count, and the first with "Written by people using Blueberry, and not checked by us." on its right. Each is a grid of tiles with a 22px radius, the mascot at 70px and the berry's name under it. Under the tile are its name at 13.5px medium and its line in two lines at most in `ink-2`. Five to a row, fewer as the page narrows, and three at the narrowest.
+- **Pointed at,** a tile lifts 3px with a shadow and its mascot tilts, and a card's mascot rises. The keyboard's ring is the usual one. One already in your flock has **Yours** on a small pill at the tile's top right.
+
+**Picking one** folds the tiles into a list 320px wide down the left, and its page opens beside it. Where the page is, and which one, lives in its tab, so Back, the toolbar's Back and a restored session find it.
+
+- **The list** has the title and the search on top, then the kinds of job as one row of chips that scrolls sideways, then *From people* and *From Blueberry* with their counts. A row is 50px: a 36px swatch with an 11px radius and the face at 28px, the name at 13.5px medium, and under it "by" and the author, with the adds after it in a person's, in `ink-3`. The one picked is on `sheet-2`, and **Yours** ends a row you already have. ↑ and ↓ move through the list, and the page follows.
+- **Closing:** the × on the page's band, or Esc, closes the page and the tiles come back, with the one you looked at keeping the keyboard.
+- **Searching** keeps only what matches, by name, line, what it's told or a site it may visit, as one group with how many were found. Nothing found is the mascot in Oops, "Nothing in the Gallery for “…”. You can make one yourself.", and **New mascot**.
+
+**A mascot's page** is everything you need to decide, with **Add** on its first screen.
+
+- **On top,** its berry's colour as a band 132px tall, with the berry's name at its top left and the × at its right. The mascot stands over the band's lower edge at 108px, with **Add**, filled, on the right of it.
+- **Then who it is:** its name at 24px semibold; "by" and the author, and for a person's the number of adds, which a starter doesn't have; its line at 14.5px in `ink-2`; and its limits as pills in the words of `permissionsInWords`, read from the sites and tools the tool layer enforces, never from what the entry says about itself. Only a real limit has a padlock, so one with no limits can't look like one with some.
+- **Who wrote it:** for a person's, a box on `sheet-2`: "*Author* wrote this, not Blueberry, and nobody has checked it. Read what it's told before you add it. Its limits are real either way: they're set here, not by what it says about itself." For Blueberry's, one line: "You get your own copy. It asks before anything risky, like all of yours, and you can change it any time."
+- **What it's told, word for word,** on `sheet-2`, always in full and never cut, as plain text, because it's exactly what the model reads.
+- **An example,** from a real run, and none without one: the question as the user's bubble, and the answer beside the mascot's face, its first lines fading out, with **Read the whole answer** opening the rest in place. The answer is markdown, as in a chat, but nothing in it can load or go anywhere: no raw HTML, an image is only its description, and a link is its words and its site as text.
+- **Scrolled,** the name and **Add** stay pinned at the top of the page on a 54px bar, with its swatch.
+
+**Adding** adds exactly what was on the screen, even if its author has changed it since.
+
+- **Added:** the mascot turns Delivered, **Add** becomes **Its page**, raised, and **Chat**, filled, which chooses it and opens a new tab. The note says it's added and that it's a copy, so nothing in the Gallery can change it, and its row and tile say **Yours**. One already yours, or your own published one, opens like that.
+- **A name you already use:** in the note's place, a row on `sheet-2` says so, with a field starting from "Meeting Prep 2", and **Add** uses it. A deleted copy can be added again.
+- **From a link:** a `blueberry://mascot/<id>` link from the public page brings the window forward and opens the Gallery on that mascot's page, asked of the server again and picked in the list, with "from a link you opened" in mono above its name. Nothing is added until **Add**. One that's been removed, or can't be reached, is the mascot in Oops and "That mascot isn't in the Gallery any more, so nothing was added." A link reads nothing but the id.
+- **If the server can't be reached,** Blueberry's own still show, and a line on `sheet-2` above them says only those are here, with **Try again**.
+
+- **A narrow page,** such as beside the chat: the whole Gallery has one card and three tiles to a row, and the search is its magnifier until pressed. Picking one shows its page alone, with **Gallery** as a way back on its band.
+- **Motion:** the tiles folding into the list and back, and the page opening, take `panel`. With reduced motion or mascots kept still, it's a fade.
+- **With mascots hidden,** tiles, cards and swatches keep their colour and berry's name, with the pips glyph in place of the face.
+- **A copy is independent.** It's a mascot like one made by hand, with the same checks, approvals and limits, and nothing in the Gallery can reach it afterwards.
+- **What strangers can't do:** take the name Berry or Blueberry, write as Blueberry, or limit a mascot to this computer or the user's own network. Text a person can't see, such as invisible characters, is taken out. A row from the server breaking any of this isn't shown, and a name reaches the prompt in its own tag that says it's only a name.
+
 ### A page in a tab
 
 Mocks: [fewer-cards.html](./docs/design/mocks/fewer-cards.html), and [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html) for the steps.
@@ -719,7 +760,7 @@ Every page of Blueberry's own that opens in a tab uses one frame, from one compo
 - **One step in** works as in Settings: a quiet back button naming where it came from, in the same tab and the same column, and where the page is lives in its tab, so Back, the toolbar's Back and a restored session find it.
 - **A search field,** where a page has one, is beside the title's actions: 32px, round, on `sheet-2`, 190px wide, and wider while it has the keyboard. It doesn't take the keyboard when the page opens. The first key typed on the page goes to it, so searching is still just typing, and no ring is lit before the user has done anything.
 
-Settings, Your mascots, Routines, History, Downloads and Needs you are on it. The Gallery moves to it when it's redrawn.
+Settings, Your mascots, Routines, History, Downloads and Needs you are on it. The Gallery is on the sheet too, but uses the page's whole width (Gallery).
 
 ### Routines
 
@@ -895,7 +936,7 @@ A mascot on the edge of the screen while you're in other apps: it shows what the
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
 
 - Find in page, zoom and printing, the page menu
-- Gallery and Publishing
+- Publishing
 - Answering from the phone
 - Restoring tabs, A page in trouble, Damaged saved data
 - The cloud tab
