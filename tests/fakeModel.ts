@@ -32,6 +32,9 @@ export const startFakeModel = async () => {
   const memoryRequests: FakeModelRequest[] = [];
   let suggest: ((digest: string) => string) | null = null;
   const suggestionRequests: FakeModelRequest[] = [];
+  // The keys each request came with, and the ones it turns down, as the real service would.
+  const keys: string[] = [];
+  const refused = new Set<string>();
 
   const server = createServer(async (request, response) => {
     if (request.method !== "POST" || !request.url?.endsWith("/chat/completions")) {
@@ -42,6 +45,13 @@ export const startFakeModel = async () => {
     let body = "";
     for await (const part of request) body += part;
     const parsed = JSON.parse(body);
+    const key = request.headers.authorization?.replace(/^Bearer /, "") ?? "";
+    keys.push(key);
+    if (refused.has(key)) {
+      response.statusCode = 401;
+      response.end(JSON.stringify({ error: { message: "Incorrect API key provided", code: "invalid_api_key" } }));
+      return;
+    }
 
     if (parsed.model === TITLE_MODEL) {
       const asksWhatToRemember = JSON.stringify(parsed.messages[0]).includes("offer to remember");
@@ -103,9 +113,12 @@ export const startFakeModel = async () => {
     },
     requests,
     titleRequests,
+    keys,
     memoryRequests,
     suggestionRequests,
     reset() {
+      keys.length = 0;
+      refused.clear();
       memory = '{"facts":[]}';
       memoryRequests.length = 0;
       tokens = DEFAULT_TOKENS;
@@ -142,6 +155,10 @@ export const startFakeModel = async () => {
     // How long each answer takes, as a real model's does, for anything watching the time between steps.
     thinkFor(ms: number) {
       thinkMs = ms;
+    },
+    // Answers this key with 401, as the service does a wrong key.
+    refuseKey(key: string) {
+      refused.add(key);
     },
     replyWith(...next: string[]) {
       tokens = next;
