@@ -997,6 +997,31 @@ test("a chat is named once it has a topic, and keeps its first message until the
   expect(model.titleRequests).toHaveLength(2);
 });
 
+test("a chat that finishes behind another tab is Done until it's opened, and one that finishes in front isn't", async () => {
+  const chatsFace = chrome.getByRole("tabpanel", { name: "Chats" });
+  const done = chatsFace.getByRole("region", { name: /^Done/ });
+  const earlier = chatsFace.getByRole("region", { name: /^Earlier/ });
+
+  await startChat("Plan a weekend");
+  await showChats();
+  await expect(earlier.getByRole("button", { name: /^Plan a weekend/ })).toBeVisible();
+  await expect(done).toHaveCount(0);
+
+  const finish = model.holdBeforeFirstToken();
+  const message = chrome.getByRole("textbox", { name: "Message" });
+  await message.fill("And the food?");
+  await message.press("Enter");
+  await chrome.evaluate(() => window.chromeAPI.browser.createTab());
+  await expect.poll(async () => (await activeTab()).page).toBe("new-tab");
+  finish();
+
+  await expect(done).toContainText("1 new");
+  await done.getByRole("button", { name: /^Plan a weekend.*new/ }).click();
+  await expect.poll(async () => (await activeTab()).page).toBe("chat");
+  await expect(done).toHaveCount(0);
+  await expect(earlier.getByRole("button", { name: /^Plan a weekend/ })).toBeVisible();
+});
+
 for (const change of ["renamed", "generated"] as const) {
   test(`reopening a closed chat uses its ${change} title`, async () => {
     await startChat("Original title");
@@ -1452,14 +1477,18 @@ test("asking Berry from the new tab page opens a chat that the sidebar lists", a
 });
 
 test("the sidebar opens Routines and Settings as tabs, once each", async () => {
-  // Routines from the arrow on Chats, which is there with nothing scheduled too, and Settings from the menu beside the dock.
+  // Both from the menu beside the dock. Chats has no Routines group with nothing scheduled, so no arrow to them either.
+  const fromMenu = async (name: RegExp) => {
+    await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Settings and more" }).click();
+    await chrome.getByRole("dialog", { name: "Account" }).getByRole("button", { name }).click();
+  };
   await showChats();
-  await chrome.getByRole("button", { name: "Open Routines" }).click();
+  await expect(chrome.getByRole("button", { name: "Open Routines" })).toHaveCount(0);
+  await fromMenu(/^Routines/);
   await expect(chrome.getByRole("heading", { name: "Routines", level: 1 })).toBeVisible();
 
-  await chrome.getByRole("navigation", { name: "Sidebar" }).getByRole("button", { name: "Settings and more" }).click();
-  await chrome.getByRole("dialog", { name: "Account" }).getByRole("button", { name: /^Settings/ }).click();
-  await chrome.getByRole("button", { name: "Open Routines" }).click();
+  await fromMenu(/^Settings/);
+  await fromMenu(/^Routines/);
 
   const pages = (await getTabs()).map((tab) => tab.page).filter(Boolean);
   expect(pages.filter((page) => page === "routines")).toHaveLength(1);

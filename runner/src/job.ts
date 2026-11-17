@@ -91,6 +91,7 @@ const NO_CHATS: ChatStoreLike = {
   deleteChat: () => false,
   needsTitle: () => false,
   setGeneratedTitle: () => false,
+  setSeen: () => false,
 };
 
 export interface RunJobOptions {

@@ -101,6 +101,8 @@ export interface ChatThreadSummary {
   running?: boolean;
   // Its jobs are done in the cloud.
   cloud?: boolean;
+  // Its last reply ended, not stopped, while its tab wasn't in front, and the user hasn't opened it since.
+  unseen?: boolean;
 }
 
 export interface ChatThread extends ChatThreadSummary {

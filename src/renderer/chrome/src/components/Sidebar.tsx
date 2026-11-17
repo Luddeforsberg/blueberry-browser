@@ -13,7 +13,7 @@ import { LABEL } from '@common/components/StatusPill'
 import { buttonVariants } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { Berry, useAssistantName } from './Berry'
-import { limitsInBrief, shortAge, shortWhen } from '../shortWords'
+import { limitsInBrief, rowTime } from '../shortWords'
 import { openRoutines } from '../routinesView'
 import { dockFaces, openMascots } from '../flockView'
 import { BERRY_ID } from '@shared/mascots'
@@ -51,13 +51,14 @@ const LabelButton: React.FC<{ label: string; onClick: () => void; children: Reac
 
 const Rule: React.FC = () => <div aria-hidden className="h-px mx-1.5 my-2 bg-line" />
 
-// A minute's tick, for rows that say how long something has been going.
-const useMinute = () => {
+// A tick for rows that say when: every second while something is going, since that counts seconds, and otherwise
+// often enough for minutes.
+const useTick = (going: boolean) => {
     const [, setNow] = useState(0)
     useEffect(() => {
-        const timer = window.setInterval(() => setNow(Date.now()), 30_000)
+        const timer = window.setInterval(() => setNow(Date.now()), going ? 1000 : 30_000)
         return () => window.clearInterval(timer)
-    }, [])
+    }, [going])
 }
 
 // --- Tabs -----------------------------------------------------------------------------------------------------------
@@ -236,14 +237,17 @@ const openChat = (chat: Pick<ChatThreadSummary, 'id' | 'title'>) => void window.
 // Named in the page's param, which also works from Chats over a page, where this runs in the overlay's view.
 const openRoutine = (routine: Pick<Routine, 'id'>) => openRoutines({ page: 'routine', id: routine.id })
 
-// A chat in the sidebar. Its menu, from a right click or the button that shows on hover, renames or deletes it.
+// A chat in the sidebar. The row is the button. Its menu, from a right click or the quiet ⋯ that takes the place of
+// what's at its end on the row you're on, renames or deletes it.
 export const ChatRow: React.FC<{
     chat: ChatThreadSummary
     selected: boolean
     onOpen: () => void
-    // What's said at the right: an age, a time, or nothing.
+    // What's said at the right: a time, the dot of a chat that's new, or nothing.
     trailing?: React.ReactNode
-}> = ({ chat, selected, onOpen, trailing }) => {
+    // Done and not opened yet: its name in medium.
+    fresh?: boolean
+}> = ({ chat, selected, onOpen, trailing, fresh = false }) => {
     const [editing, setEditing] = useState(false)
     // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
     const finished = useRef(false)
@@ -304,11 +308,11 @@ export const ChatRow: React.FC<{
                 <span aria-hidden className={LEAD}>
                     <Berry mood={chat.running ? 'fetching' : 'rest'} size={20} mascot={mascot} />
                 </span>
-                <span className="flex-1 truncate">{chat.title}</span>
-                <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}</span>
+                <span className={cn('flex-1 truncate', fresh && 'font-medium')}>{chat.title}</span>
+                <span className="sr-only">{chat.running ? `, ${name} is working` : `, with ${name}`}{fresh && ', new'}</span>
                 {chat.cloud && <Cloud role="img" aria-label="In the cloud" className="size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} />}
                 {trailing && (
-                    <span className="-mr-6 shrink-0 font-mono text-11.5 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
+                    <span className="-mr-6 shrink-0 flex items-center font-mono text-11.5 text-ink-3 tabular-nums group-hover/chat:invisible group-focus-within/chat:invisible">{trailing}</span>
                 )}
             </button>
             <button
@@ -317,7 +321,7 @@ export const ChatRow: React.FC<{
                 onClick={() => void showMenu()}
                 className={cn(
                     'absolute right-1 top-1 size-6 flex items-center justify-center rounded-[7px] text-ink-3 transition-opacity app-region-no-drag',
-                    'opacity-0 group-hover/chat:opacity-100 focus-visible:opacity-100 hover:bg-hover hover:text-ink',
+                    'opacity-0 group-hover/chat:opacity-100 group-focus-within/chat:opacity-100 hover:bg-hover hover:text-ink',
                     FOCUS
                 )}
             >
@@ -328,32 +332,42 @@ export const ChatRow: React.FC<{
 }
 
 // Also what Chats opens over the page in the horizontal layout, so the two are one list. There it's on a sheet already,
-// so what needs you sits on `sheet-2` rather than a sheet of its own.
+// so what needs you sits on `sheet-2` rather than a sheet of its own. A group with nothing in it isn't shown.
 export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) => {
     const library = useLibrary()
     const { find } = useFlock()
-    const { activeTab } = useBrowser()
+    const { activeTab, createTab } = useBrowser()
     const [allEarlier, setAllEarlier] = useState(false)
-    useMinute()
     const browser = window.chromeAPI.browser
 
     const isOpen = (id: string) => activeTab?.page === 'chat' && activeTab.pageParam === id
     const asking = new Set(library.needsYou.map(({ id }) => id))
     const working = library.chats.filter((chat) => chat.running && !asking.has(chat.id))
-    const earlier = library.chats.filter((chat) => !chat.running && !asking.has(chat.id))
+    const ended = library.chats.filter((chat) => !chat.running && !asking.has(chat.id))
+    // Finished while the user was somewhere else, until they open it.
+    const done = ended.filter((chat) => chat.unseen)
+    const earlier = ended.filter((chat) => !chat.unseen)
     // The next three by time: what runs soonest, then any paused.
     const routines = [...library.routines]
         .sort((a, b) => (a.paused ? Infinity : (a.nextRunAt ?? Infinity)) - (b.paused ? Infinity : (b.nextRunAt ?? Infinity)))
         .slice(0, 3)
+    useTick(working.length > 0)
 
     return (
         <>
+            <button type="button" onClick={() => createTab()} className={cn(ROW, 'text-ink-2 hover:bg-hover hover:text-ink')}>
+                <span className={LEAD}><Plus className={ICON} strokeWidth={1.75} /></span>
+                New chat
+            </button>
+            {library.chats.length === 0 && library.needsYou.length === 0 && (
+                <p className="px-2 py-1.5 text-13 text-faint">Your chats, and what your mascots are doing, show up here.</p>
+            )}
+
             {library.needsYou.length > 0 && (
                 <section aria-labelledby="sidebar-needs-you">
                     <Label
                         id="sidebar-needs-you"
                         ask
-                        className="mt-0"
                         trailing={
                             <>
                                 <span className="tabular-nums">{library.needsYou.length}</span>
@@ -390,58 +404,74 @@ export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) 
 
             {working.length > 0 && (
                 <section aria-labelledby="sidebar-working">
-                    <Label id="sidebar-working" className={library.needsYou.length === 0 ? 'mt-0' : undefined}>Working</Label>
+                    <Label id="sidebar-working">Working</Label>
                     <ul>
                         {working.map((chat) => (
-                            <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={shortAge(chat.updatedAt)} />
+                            <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={rowTime(chat.updatedAt, { going: true })} />
                         ))}
                     </ul>
                 </section>
             )}
 
-            {/* Always here, with nothing scheduled too, because its arrow is the sidebar's way to Routines. */}
-            <section aria-labelledby="sidebar-routines">
-                <Label
-                    id="sidebar-routines"
-                    className={library.needsYou.length + working.length === 0 ? 'mt-0' : undefined}
-                    trailing={
-                        <LabelButton label="Open Routines" onClick={() => void browser.openPage('routines')}>
-                            <ChevronRight className="size-3.5" strokeWidth={1.75} />
-                        </LabelButton>
-                    }
-                >
-                    Routines
-                </Label>
-                <ul>
-                    {routines.map((routine) => (
-                        <li key={routine.id}>
-                            <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover')}>
-                                <span className={LEAD}>
-                                    <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
-                                </span>
-                                <span className="flex-1 truncate">{routine.name}</span>
-                                {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
-                                {routine.unseen ? (
-                                    <span className="shrink-0 font-mono text-11.5 text-ink">news<span className="sr-only">. Has news</span></span>
-                                ) : (
-                                    <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">
-                                        {routine.paused ? 'paused' : routine.nextRunAt ? shortWhen(routine.nextRunAt) : ''}
+            {done.length > 0 && (
+                <section aria-labelledby="sidebar-done">
+                    <Label id="sidebar-done" trailing={<span className="tabular-nums">{done.length} new</span>}>Done</Label>
+                    <ul>
+                        {done.map((chat) => (
+                            <ChatRow
+                                key={chat.id}
+                                chat={chat}
+                                selected={isOpen(chat.id)}
+                                onOpen={() => openChat(chat)}
+                                fresh
+                                trailing={<span aria-hidden className="size-1.5 mx-1 rounded-full bg-focus" />}
+                            />
+                        ))}
+                    </ul>
+                </section>
+            )}
+
+            {routines.length > 0 && (
+                <section aria-labelledby="sidebar-routines">
+                    <Label
+                        id="sidebar-routines"
+                        trailing={
+                            <LabelButton label="Open Routines" onClick={() => void browser.openPage('routines')}>
+                                <ChevronRight className="size-3.5" strokeWidth={1.75} />
+                            </LabelButton>
+                        }
+                    >
+                        Routines
+                    </Label>
+                    <ul>
+                        {routines.map((routine) => (
+                            <li key={routine.id}>
+                                <button type="button" onClick={() => openRoutine(routine)} className={cn(ROW, 'hover:bg-hover')}>
+                                    <span className={LEAD}>
+                                        <Berry mood={routine.status === 'running' ? 'fetching' : 'rest'} size={20} mascot={find(routine.mascotId)} />
                                     </span>
-                                )}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-                {routines.length === 0 && <p className="h-8 px-2 flex items-center text-13 text-faint">Nothing scheduled yet.</p>}
-            </section>
+                                    <span className="flex-1 truncate">{routine.name}</span>
+                                    {/* A run ended since Routines was last opened, which may be one that couldn't finish. */}
+                                    {routine.unseen ? (
+                                        <span className="shrink-0 font-mono text-11.5 text-ink">news<span className="sr-only">. Has news</span></span>
+                                    ) : (
+                                        <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">
+                                            {routine.paused ? 'paused' : routine.nextRunAt ? rowTime(routine.nextRunAt) : ''}
+                                        </span>
+                                    )}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
 
             {earlier.length > 0 && (
                 <section aria-labelledby="sidebar-earlier">
-                    <Rule />
                     <Label id="sidebar-earlier">Earlier</Label>
                     <ul>
                         {(allEarlier ? earlier : earlier.slice(0, EARLIER_SHOWN)).map((chat) => (
-                            <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={shortWhen(chat.updatedAt)} />
+                            <ChatRow key={chat.id} chat={chat} selected={isOpen(chat.id)} onOpen={() => openChat(chat)} trailing={rowTime(chat.updatedAt)} />
                         ))}
                     </ul>
                     {!allEarlier && earlier.length > EARLIER_SHOWN && (
@@ -476,6 +506,7 @@ export const useMascotState = () => {
 export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; className?: string }> = ({ mascot, onClose, className = 'absolute inset-x-0 bottom-[54px] z-20' }) => {
     const stateOf = useMascotState()
     const { mood, asking, running, recent } = stateOf(mascot)
+    useTick(running.length > 0)
     const name = useAssistantName(mascot)
     const { choose } = useFlock()
     const { createTab } = useBrowser()
@@ -519,7 +550,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                         <button type="button" onClick={() => openChat(chat)} className={cn(line, 'text-ink hover:bg-hover', FOCUS)}>
                             <Pips pattern="think" still />
                             <span className="flex-1 truncate">{chat.title}</span>
-                            <span className="font-mono text-11.5 text-ink-3 tabular-nums">{shortAge(chat.updatedAt)}</span>
+                            <span className="font-mono text-11.5 text-ink-3 tabular-nums">{rowTime(chat.updatedAt, { going: true })}</span>
                         </button>
                     </li>
                 ))}
@@ -528,7 +559,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                         <button type="button" onClick={() => openChat(chat)} className={cn(line, 'hover:bg-hover hover:text-ink', FOCUS)}>
                             <Pips pattern="read" />
                             <span className="flex-1 truncate">{chat.title}</span>
-                            <span className="font-mono text-11.5 text-ink-3 tabular-nums">{shortWhen(chat.updatedAt)}</span>
+                            <span className="font-mono text-11.5 text-ink-3 tabular-nums">{rowTime(chat.updatedAt)}</span>
                         </button>
                     </li>
                 ))}

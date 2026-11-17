@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { finishedWhen, firstSentence, limitsInBrief, narrowerLimits, shortAge, shortWhen } from "./shortWords";
+import { finishedWhen, firstSentence, limitsInBrief, narrowerLimits, rowTime, shortWhen } from "./shortWords";
 
 // A Sunday afternoon.
 const NOW = new Date(2026, 10, 15, 14, 30).getTime();
@@ -33,14 +33,45 @@ describe("finishedWhen", () => {
   });
 });
 
-describe("shortAge", () => {
-  it("counts up in the largest whole unit", () => {
-    expect(shortAge(NOW, NOW)).toBe("now");
-    expect(shortAge(NOW - 59_999, NOW)).toBe("now");
-    expect(shortAge(NOW - 60_000, NOW)).toBe("1m");
-    expect(shortAge(NOW - 59 * 60_000, NOW)).toBe("59m");
-    expect(shortAge(NOW - 60 * 60_000, NOW)).toBe("1h");
-    expect(shortAge(NOW - 1440 * 60_000, NOW)).toBe("1d");
+describe("rowTime", () => {
+  const MINUTE = 60_000;
+  const HOUR = 60 * MINUTE;
+
+  it("counts something going on in minutes and seconds, then hours", () => {
+    expect(rowTime(NOW, { now: NOW, going: true })).toBe("0:00");
+    expect(rowTime(NOW - 48_000, { now: NOW, going: true })).toBe("0:48");
+    expect(rowTime(NOW - 59 * MINUTE - 59_000, { now: NOW, going: true })).toBe("59:59");
+    expect(rowTime(NOW - HOUR, { now: NOW, going: true })).toBe("1:00:00");
+    expect(rowTime(NOW - HOUR - 2 * MINUTE - 5_000, { now: NOW, going: true })).toBe("1:02:05");
+    // A clock a little behind main's never shows a time before it started.
+    expect(rowTime(NOW + 5_000, { now: NOW, going: true })).toBe("0:00");
+  });
+
+  it("says how long ago, in the largest whole unit, for under a day", () => {
+    expect(rowTime(NOW, { now: NOW })).toBe("now");
+    expect(rowTime(NOW - 59_999, { now: NOW })).toBe("now");
+    expect(rowTime(NOW - MINUTE, { now: NOW })).toBe("1m");
+    expect(rowTime(NOW - 59 * MINUTE, { now: NOW })).toBe("59m");
+    expect(rowTime(NOW - HOUR, { now: NOW })).toBe("1h");
+    expect(rowTime(NOW - 23 * HOUR - 59 * MINUTE, { now: NOW })).toBe("23h");
+  });
+
+  it("names the weekday from a day ago to six days, and the date from the seventh", () => {
+    // Yesterday afternoon is a day ago, so it's its weekday rather than a word of its own.
+    expect(rowTime(at(14, 14, 30), { now: NOW })).toBe("Sat");
+    expect(rowTime(at(14, 8), { now: NOW })).toBe("Sat");
+    expect(rowTime(at(9), { now: NOW })).toBe("Mon");
+    expect(rowTime(at(8, 23, 59), { now: NOW })).toBe("8 Nov");
+    expect(rowTime(new Date(2026, 9, 3, 8).getTime(), { now: NOW })).toBe("3 Oct");
+  });
+
+  it("says when for the future: the time today, tomorrow, the weekday within a week, then the date", () => {
+    expect(rowTime(at(15, 14, 31), { now: NOW })).toBe("14:31");
+    expect(rowTime(at(15, 23, 59), { now: NOW })).toBe("23:59");
+    expect(rowTime(at(16, 0, 0), { now: NOW })).toBe("tomorrow");
+    expect(rowTime(at(17), { now: NOW })).toBe("Tue");
+    expect(rowTime(at(21, 23, 59), { now: NOW })).toBe("Sat");
+    expect(rowTime(at(22, 0, 0), { now: NOW })).toBe("22 Nov");
   });
 });
 

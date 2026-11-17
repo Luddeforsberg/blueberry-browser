@@ -248,7 +248,7 @@ export interface TaskProgress {
 }
 
 // A runner with no window has no saved chats, so only what a task uses has to be there.
-export type ChatStoreLike = Pick<ChatStore, "chat" | "createChat" | "addMessage" | "filesOf" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle">;
+export type ChatStoreLike = Pick<ChatStore, "chat" | "createChat" | "addMessage" | "filesOf" | "renameChat" | "deleteChat" | "needsTitle" | "setGeneratedTitle" | "setSeen">;
 
 export interface TaskResult {
   text: string;
@@ -304,6 +304,8 @@ export class Chats {
       actionApproval: () => ActionApproval;
       // What Berry goes by right now, since Hide Berry changes it.
       assistantName?: () => string;
+      // Whether the chat's tab is the one in front. With none, as on a runner, every chat counts as seen.
+      chatInFront?: (chatId: string) => boolean;
     },
     private readonly events: ChatEvents,
     // Who a chat runs as, read when each reply starts. It must never answer with more than the mascot was given.
@@ -1005,6 +1007,11 @@ export class Chats {
     this.events.onListChanged();
   }
 
+  // The chat's tab came to the front.
+  markSeen(chatId: string): void {
+    if (this.store.setSeen(chatId, true)) this.events.onListChanged();
+  }
+
   rename(chatId: string, title: string): boolean {
     const name = title.trim().slice(0, MAX_RENAME_LENGTH);
     if (!name || !this.store.renameChat(chatId, name)) return false;
@@ -1081,6 +1088,8 @@ export class Chats {
       this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
     }
     const error = this.errors.get(chatId) ?? null;
+    // Finished while the user was somewhere else, so the sidebar shows it as done until they open it.
+    if (!signal.aborted && this.browser.chatInFront && !this.browser.chatInFront(chatId)) this.store.setSeen(chatId, false);
     run.onEnd?.({ reply: run.partial, steps, outcome: run.controller.signal.aborted ? "stopped" : error ? "failed" : "done", error });
     this.notify(chatId);
     if (run.partial && !this.errors.has(chatId)) void this.nameChat(chatId);

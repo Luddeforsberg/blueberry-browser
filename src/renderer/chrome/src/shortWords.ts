@@ -2,6 +2,10 @@ import type { MascotDraft } from '@shared/library'
 
 const DAY_MS = 86_400_000
 
+const weekday = (time: number) => new Date(time).toLocaleDateString('en-GB', { weekday: 'short' })
+const dayAndMonth = (time: number) => new Date(time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+const twoDigits = (n: number) => String(n).padStart(2, '0')
+
 const dayOf = (time: number) => {
     const date = new Date(time)
     return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS
@@ -14,8 +18,8 @@ export const shortWhen = (time: number, now = Date.now()): string => {
     if (days === 0) return new Date(time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     if (days === -1) return 'yesterday'
     if (days === 1) return 'tomorrow'
-    if (Math.abs(days) < 7) return new Date(time).toLocaleDateString('en-GB', { weekday: 'short' })
-    return new Date(time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    if (Math.abs(days) < 7) return weekday(time)
+    return dayAndMonth(time)
 }
 
 // When something finished, to follow "finished it": "at 08:00" today, "yesterday", "on Mon" within the week, and
@@ -26,13 +30,22 @@ export const finishedWhen = (time: number, now = Date.now()): string => {
     return when === 'yesterday' ? when : `on ${when}`
 }
 
-// How long something has been going: "now", "4m", "2h", "3d".
-export const shortAge = (since: number, now = Date.now()): string => {
-    const minutes = Math.floor((now - since) / 60_000)
+// The one way a row writes a time (DESIGN.md section 10, Sidebar). Something going on is how long so far, "0:48",
+// then "1:02:05". The past is how long ago, "now", "12m", "2h", then the weekday for a week, "Sat", then the date,
+// "3 Nov". The future is when, as `shortWhen` says it.
+export const rowTime = (time: number, { now = Date.now(), going = false }: { now?: number; going?: boolean } = {}): string => {
+    if (going) {
+        const seconds = Math.max(0, Math.floor((now - time) / 1000))
+        const hours = Math.floor(seconds / 3600)
+        const minutes = Math.floor(seconds / 60) % 60
+        return hours > 0 ? `${hours}:${twoDigits(minutes)}:${twoDigits(seconds % 60)}` : `${minutes}:${twoDigits(seconds % 60)}`
+    }
+    if (time > now) return shortWhen(time, now)
+    const minutes = Math.floor((now - time) / 60_000)
     if (minutes < 1) return 'now'
     if (minutes < 60) return `${minutes}m`
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h`
-    return `${Math.floor(minutes / 1440)}d`
+    return dayOf(now) - dayOf(time) < 7 ? weekday(time) : dayAndMonth(time)
 }
 
 // What a mascot may do, in one line of words: where, then what with its hands. "Goes anywhere · clicks and types".

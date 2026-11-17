@@ -49,6 +49,8 @@ const MIGRATIONS = [
      text TEXT
    );
    CREATE INDEX message_files_by_chat ON message_files(chat_id, message_id, id);`,
+  // Whether the user has looked at the chat since its last reply ended. Chats from before this count as seen.
+  `ALTER TABLE chats ADD COLUMN seen INTEGER NOT NULL DEFAULT 1;`,
 ];
 
 // A file kept with the message it went with, for the model only. Never part of a chat a renderer gets.
@@ -68,9 +70,10 @@ export class ChatStore {
   }
 
   summaries(): ChatThreadSummary[] {
-    return this.db
-      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\" FROM chats ORDER BY updated_at DESC, rowid DESC")
-      .all() as unknown as ChatThreadSummary[];
+    const rows = this.db
+      .prepare("SELECT id, title, updated_at AS updatedAt, mascot_id AS mascotId, source AS \"from\", seen FROM chats ORDER BY updated_at DESC, rowid DESC")
+      .all() as unknown as Array<ChatThreadSummary & { seen: number }>;
+    return rows.map(({ seen, ...chat }) => ({ ...chat, unseen: seen === 0 }));
   }
 
   // What each of the newest chats began with, for noticing what the user keeps asking. A chat another app started
@@ -135,6 +138,11 @@ export class ChatStore {
       .prepare("UPDATE chats SET title = ?, title_settled = 1 WHERE id = ? AND title_settled = 0")
       .run(title, id);
     return changes > 0;
+  }
+
+  // False if nothing changed, so a chat already seen isn't sent again.
+  setSeen(id: string, seen: boolean): boolean {
+    return this.db.prepare("UPDATE chats SET seen = ? WHERE id = ? AND seen <> ?").run(seen ? 1 : 0, id, seen ? 1 : 0).changes > 0;
   }
 
   deleteChat(id: string): boolean {

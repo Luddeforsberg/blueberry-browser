@@ -544,6 +544,54 @@ describe("Chats", () => {
     expect(chats.thread(id)?.messages.at(-1)).toEqual({ role: "assistant", content: "", steps: [{ text: "Stopped here", done: true }] });
   });
 
+  it("counts a reply as new only when it ended, not stopped, with its tab behind, until the tab comes to the front", async () => {
+    const store = new ChatStore(":memory:");
+    let inFront = false;
+    let ended = () => {};
+    const abortable: StreamReply = async function* (_, signal) {
+      yield "partial";
+      await new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))));
+    };
+    let stream: StreamReply = replying("done");
+    const chats = new Chats(store, (...args) => stream(...args), async () => null, {
+      activeTab: () => null,
+      allTabs: () => [],
+      openBackgroundTab: () => tab(),
+      closeTab: () => true,
+      actionApproval: () => "always",
+      chatInFront: () => inFront,
+    }, {
+      onChunk: () => {},
+      onThread: (thread) => thread.partial === null && ended(),
+      onListChanged: () => {},
+      onWorkingTabs: () => {},
+    });
+    const reply = async (chatId: string | null, stop = false) => {
+      const end = new Promise<void>((resolve) => (ended = resolve));
+      const { id } = chats.send(chatId, "go", { seePage: false })!;
+      if (stop) {
+        await vi.waitFor(() => expect(chats.thread(id)?.partial).toBe("partial"));
+        chats.stop(id);
+      }
+      await end;
+      return id;
+    };
+    const unseen = (id: string) => store.summaries().find((chat) => chat.id === id)?.unseen;
+
+    const away = await reply(null);
+    expect(unseen(away)).toBe(true);
+    chats.markSeen(away);
+    expect(unseen(away)).toBe(false);
+
+    inFront = true;
+    expect(unseen(await reply(null))).toBe(false);
+    inFront = false;
+
+    stream = abortable;
+    const stopped = await reply(null, true);
+    expect(unseen(stopped)).toBe(false);
+  });
+
   it("shows why a reply failed until the next message, and leaves no empty reply", async () => {
     const reply = vi.fn<StreamReply>(() => {
       throw new Error("429 Too Many Requests");

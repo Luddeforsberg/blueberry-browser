@@ -327,6 +327,7 @@ export class Window {
       },
       actionApproval: () => this.settings.actionApproval,
       assistantName: () => (this.settings.showBerry ? BERRY.name : "Assistant"),
+      chatInFront: (chatId) => this.isChatInFront(chatId),
     }, {
       onChunk: (chatId, content) =>
         sendToRenderer(this.chrome.view.webContents, "chat:chunk", { chatId, content }),
@@ -720,6 +721,11 @@ export class Window {
     return entry instanceof Tab ? entry : null;
   }
 
+  private isChatInFront(chatId: string): boolean {
+    const entry = this.activeEntry;
+    return entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId;
+  }
+
   get activeEntry(): BrowserTab | null {
     return (this.activeTabId && this.tabsMap.get(this.activeTabId)) || null;
   }
@@ -1106,6 +1112,7 @@ export class Window {
     // Opening anything from Chats or a card is done with it, even the tab already in front.
     this.closePopover(false);
     this.activeTabId = tabId;
+    if (tab instanceof InternalTab && tab.page === "chat" && tab.param) this.chats.markSeen(tab.param);
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
     const unvisited = this.unvisitedTabs.delete(tabId);
     if ((this.backgroundTabs.delete(tabId) || unvisited) && tab instanceof Tab) {
