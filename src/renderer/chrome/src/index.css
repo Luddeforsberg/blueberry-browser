@@ -85,6 +85,12 @@
     background-color: color-mix(in srgb, var(--berry) 24%, rgb(var(--sheet)));
   }
 
+  /* Pointed at, a tile or card steps its colour up a little, as a hovered row's fill does. Nothing moves. */
+  .group:hover > .berry-tint,
+  button.berry-tint:hover {
+    background-color: color-mix(in srgb, var(--berry) 32%, rgb(var(--sheet)));
+  }
+
   .berry-ink {
     color: color-mix(in srgb, var(--berry) 62%, rgb(var(--ink)));
   }

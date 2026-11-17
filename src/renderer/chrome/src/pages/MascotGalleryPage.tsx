@@ -141,13 +141,13 @@ const AddedCard: React.FC<{ entry: GalleryMascot; place: number; onPick: () => v
         data-tint={tint(entry)}
         aria-label={`${entry.draft.name}, ${addsWords(entry.addCount ?? 0)}`}
         onClick={onPick}
-        className="press group berry-tint relative h-[150px] rounded-[22px] px-[18px] py-3.5 overflow-hidden flex flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-sheet"
+        className="press group berry-tint transition-colors duration-fast relative h-[150px] rounded-[22px] px-[18px] py-3.5 overflow-hidden flex flex-col text-left outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-sheet"
     >
         <span aria-hidden className="text-20 font-semibold leading-none opacity-[.35]">{place}</span>
         <span className="mt-2 max-w-[60%] text-[16.5px] leading-tight font-semibold [overflow-wrap:anywhere]">{entry.draft.name}</span>
         <span className="mt-0.5 max-w-[58%] text-[12.5px] leading-[1.4] text-ink-2 line-clamp-2">{entry.description}</span>
         <span className="berry-ink mt-auto font-mono text-11 truncate max-w-[60%]">{addsWords(entry.addCount ?? 0)} · by {entry.author}</span>
-        <span className="absolute -right-1 -bottom-3.5 -rotate-6 drop-shadow-[0_12px_14px_rgb(0_0_0/.16)] transition-transform duration-move ease-crisp group-hover:-rotate-2 group-hover:-translate-y-1.5">
+        <span className="absolute -right-1 -bottom-3.5 -rotate-6">
             <Face entry={entry} size={112} />
         </span>
     </button>
@@ -161,9 +161,9 @@ export const GalleryTile: React.FC<{ entry: GalleryMascot; yours?: boolean; narr
         <>
             <span
                 data-tint={tint(entry)}
-                className="berry-tint relative aspect-[1/.9] rounded-[22px] grid place-items-center transition-[transform,box-shadow] duration-move ease-crisp group-hover:-translate-y-[3px] group-hover:shadow-[0_14px_26px_-14px_rgb(0_0_0/.4)] group-focus-visible:ring-2 group-focus-visible:ring-focus group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-sheet"
+                className="berry-tint relative aspect-[1/.9] rounded-[22px] grid place-items-center transition-colors duration-fast group-focus-visible:ring-2 group-focus-visible:ring-focus group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-sheet"
             >
-                <span className={cn('drop-shadow-[0_8px_10px_rgb(0_0_0/.13)] transition-transform duration-move ease-crisp group-hover:-translate-y-[3px] group-hover:-rotate-[5deg]', !narrow && 'mb-3')}>
+                <span className={cn(!narrow && 'mb-3')}>
                     <Face entry={entry} size={70} />
                 </span>
                 {!narrow && <BerryName entry={entry} className="absolute inset-x-0 bottom-[9px] text-center text-[9.5px]" />}
