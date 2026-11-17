@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, StepKind, UsedPage } from '@shared/library'
 import { linkSite } from '@shared/publishing'
+import { NO_KEY } from '@shared/aiKey'
 import { ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Cloud, Copy, Lock, Repeat } from 'lucide-react'
 import { ApprovalCard, CardInShell, Keycap, WhyLine } from '@common/components/ApprovalCard'
 import { useCardKeys } from '@common/components/cardKeys'
@@ -25,6 +26,7 @@ import type { SentAttachment } from '@shared/attachments'
 import { RememberedLine } from './MemoryInChat'
 import type { RoutineFormValues } from '../routinesView'
 import { SaveAsRoutineCard } from './SaveAsRoutine'
+import { openSettings } from '../openSettings'
 
 const FOLLOW_DISTANCE = 120
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
@@ -428,10 +430,15 @@ const TroubleLine: React.FC<{ words: string; alert?: boolean; children?: React.R
     </div>
 )
 
-// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through.
+// What went wrong, in plain words, with Try again. The folded line above it opens the steps it got through. With no
+// key, trying again can't work, so it's Add a key, which opens Settings where the key is kept.
 const WhatWentWrong: React.FC<{ message: string; actions?: ReplyActions }> = ({ message, actions }) => (
     <TroubleLine words={message} alert>
-        {actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>}
+        {message === NO_KEY ? (
+            <Button onClick={() => openSettings('ai-service')}>Add a key</Button>
+        ) : (
+            actions && <Button onClick={() => actions.onSay('Try again')}>Try again</Button>
+        )}
     </TroubleLine>
 )
 

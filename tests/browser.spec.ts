@@ -1563,31 +1563,6 @@ test("Close Tab in the menu closes internal pages too", async () => {
   await expect.poll(async () => (await getTabs()).some((tab) => tab.page === "settings")).toBe(false);
 });
 
-test("first launch shows onboarding until it's finished or skipped", async () => {
-  const profile = mkdtempSync(join(tmpdir(), "blueberry-first-"));
-  await app.close();
-  app = await launchApp(profile, { firstLaunch: true });
-  chrome = await findView(app, "view=chrome");
-
-  await expect(chrome.getByRole("heading", { name: "Hi, I’m Berry." })).toBeVisible();
-  // No browser to bring history from, so that step isn't counted.
-  await expect(chrome.getByLabel("Step 1 of 3")).toBeVisible();
-  await chrome.getByRole("button", { name: "Nice to meet you" }).click();
-  await chrome.getByRole("radio", { name: "Tabs along the top" }).click();
-  await chrome.getByRole("button", { name: "Skip setup" }).click();
-
-  await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
-  expect(await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).toMatchObject({
-    onboarded: true,
-    layoutMode: "horizontal",
-  });
-
-  await app.close();
-  app = await launchApp(profile, { firstLaunch: true });
-  chrome = await findView(app, "view=chrome");
-  await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
-});
-
 test("the new tab composer sends only when there is text, and asks Berry unless it's an address", async () => {
   const send = chrome.getByRole("button", { name: "Send" });
   await expect(send).toBeDisabled();

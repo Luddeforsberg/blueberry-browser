@@ -35,7 +35,7 @@ describe("reading another browser's history", () => {
     vi.restoreAllMocks();
   });
 
-  it("names only browsers with a History file in a profile, Default or Profile N", async () => {
+  it("names only browsers with a History file in a profile, Default or Profile N, and counts their profiles", async () => {
     expect(await findBrowsers(data)).toEqual([]);
     mkdirSync(join(base, "Google", "Chrome", "Crashpad"), { recursive: true });
     mkdirSync(join(base, "Arc", "User Data", "Profile 2"), { recursive: true });
@@ -45,7 +45,8 @@ describe("reading another browser's history", () => {
 
     writeFileSync(join(base, "Arc", "User Data", "Profile 2", "History"), "");
     fixture([]);
-    expect(await findBrowsers(data)).toEqual([{ id: "chrome", name: "Chrome" }, { id: "arc", name: "Arc" }]);
+    fixture([], "Profile 1");
+    expect(await findBrowsers(data)).toEqual([{ id: "chrome", name: "Chrome", profiles: 2 }, { id: "arc", name: "Arc", profiles: 1 }]);
     expect(await findBrowsers(null)).toEqual([]);
   });
 

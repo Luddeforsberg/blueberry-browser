@@ -11,7 +11,7 @@ import { TabStrip } from './components/TabStrip'
 import { Toolbar } from './components/Toolbar'
 import { ChatPanel } from './components/ChatPanel'
 import { ResizeHandle } from './components/ResizeHandle'
-import { Onboarding } from './components/Onboarding'
+import { FirstRun } from './components/FirstRun'
 import { PageTrouble } from './components/PageTrouble'
 import { ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
@@ -38,7 +38,7 @@ const Shell: React.FC = () => {
     const { activeTab, reload } = useBrowser()
     const recording = useRecording().status === 'recording'
 
-    if (!settings.onboarded) return <Onboarding />
+    if (!settings.onboarded) return <FirstRun />
     const { page, floatingSidebar } = layout
     const trouble = activeTab?.trouble ?? activeTab?.loadError
     // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Every other

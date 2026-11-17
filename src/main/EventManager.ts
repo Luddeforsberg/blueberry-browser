@@ -1,4 +1,5 @@
-import { ipcMain } from "electron";
+import { clipboard, ipcMain } from "electron";
+import { isAiService, looksLikeAiKey } from "../shared/aiKey";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
 import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
@@ -169,9 +170,20 @@ export class EventManager {
 
     this.handle("settings:get", () => this.mainWindow.settings);
 
-    this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));
+    // First jobs are done by what main sees happen, so a renderer can't say so.
+    this.handle("settings:update", (patch) => this.mainWindow.updateSettings({ ...patch, firstJobsDone: this.mainWindow.settings.firstJobsDone }));
     this.handle("settings:set-appearance", (appearance) => {
       if (appearance === "system" || appearance === "light" || appearance === "dark") this.mainWindow.updateSettings({ appearance });
+    });
+
+    this.handle("ai-key:state", () => this.mainWindow.aiKey.state);
+    this.handle("ai-key:try", (service, key) => this.mainWindow.aiKey.try(service, key));
+    this.handle("ai-key:remove", () => this.mainWindow.aiKey.remove());
+    this.handle("ai-key:find", (service) => this.mainWindow.findKey(service));
+    this.handle("ai-key:paste", async (service) => {
+      if (!isAiService(service)) return null;
+      const text = (await clipboard.readText()).trim();
+      return looksLikeAiKey(service, text) ? text : null;
     });
 
     this.handle("phone:state", () => this.mainWindow.telegram.state);
@@ -214,7 +226,10 @@ export class EventManager {
       const files = attachments.peek(fileIds);
       if (!files) return null;
       const thread = chats.send(chatId, text, { ...options, files, tabs, userPresent: true });
-      if (thread) attachments.drop(fileIds);
+      if (thread) {
+        attachments.drop(fileIds);
+        this.mainWindow.sentFromChrome(thread);
+      }
       return thread;
     });
     this.handle("attachments:choose-files", (kept) => this.mainWindow.attachments.chooseFiles(kept));

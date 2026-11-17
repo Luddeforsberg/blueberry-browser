@@ -72,11 +72,16 @@ const historyFiles = async ({ base, layout }: BrowserData, browser: (typeof BROW
   }
 };
 
-// Only names, and it opens nothing.
+// Only names and how many profiles, and it opens nothing.
 export const findBrowsers = async (data: BrowserData | null): Promise<ImportSource[]> => {
   if (!data) return [];
-  const found = await Promise.all(BROWSERS.map(async (browser) => ((await historyFiles(data, browser)).length > 0 ? [browser] : [])));
-  return found.flat().map(({ id, name }) => ({ id, name }));
+  const found = await Promise.all(
+    BROWSERS.map(async (browser) => {
+      const profiles = (await historyFiles(data, browser)).length;
+      return profiles > 0 ? [{ id: browser.id, name: browser.name, profiles }] : [];
+    })
+  );
+  return found.flat();
 };
 
 const copyIfThere = (from: string, to: string): Promise<void> =>

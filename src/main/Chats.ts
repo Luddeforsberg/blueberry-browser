@@ -79,7 +79,7 @@ const errorMessage = (error: unknown): string => {
   if (error instanceof ModelConfigError || error instanceof CloudBusyError) return error.message;
   const message = error instanceof Error ? error.message.toLowerCase() : "";
   if (message.includes("401") || message.includes("unauthorized")) {
-    return "The API key was rejected. Check it in the .env file and restart.";
+    return "The AI service turned down the key. Check it in Settings, under Connections.";
   }
   if (message.includes("429") || message.includes("rate limit")) {
     return "The model is rate limited right now. Try again in a moment.";

@@ -9,6 +9,7 @@ export const SETTINGS_PAGES = {
   "what-leaves": "privacy",
   "site-permissions": "privacy",
   "bring-in-history": "privacy",
+  "ai-service": "connections",
   phone: "connections",
   claude: "connections",
   cloud: "connections",

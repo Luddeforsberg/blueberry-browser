@@ -178,6 +178,14 @@ const chromeAPI: ChromeAPI = {
     signOut: () => invoke("account:sign-out"),
     onUpdated: (callback) => subscribe("account:updated", callback),
   },
+  aiKey: {
+    state: () => invoke("ai-key:state"),
+    tryKey: (service, key) => invoke("ai-key:try", service, key),
+    remove: () => invoke("ai-key:remove"),
+    find: (service) => invoke("ai-key:find", service),
+    paste: (service) => invoke("ai-key:paste", service),
+    onUpdated: (callback) => subscribe("ai-key:updated", callback),
+  },
   phone: {
     state: () => invoke("phone:state"),
     connect: (token) => invoke("phone:connect", token),

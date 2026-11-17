@@ -19,7 +19,8 @@ const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
 export const FIELD = 'w-full rounded-sheet bg-card-2 text-ink caret-ink outline-none placeholder:text-faint'
 
 // The card in its shell, with the mascot standing on its top edge. `motionKey` changes when the contents do, so they
-// slide in from the side they came from, or fade with the motion held still.
+// slide in from the side they came from, or fade with the motion held still. The first run's mascot stands at 64px, and
+// `aside` makes the card 680px with a picture beside the answers, as Make it yours has.
 export const StepCard: React.FC<{
     mascot: MascotProfile | null
     mood: Mood
@@ -30,28 +31,31 @@ export const StepCard: React.FC<{
     motionKey?: string
     from?: 'next' | 'back'
     nav: React.ReactNode
+    mascotSize?: number
+    aside?: React.ReactNode
     children: React.ReactNode
-}> = ({ mascot, mood, label, action, question, hint, motionKey, from = 'next', nav, children }) => {
+}> = ({ mascot, mood, label, action, question, hint, motionKey, from = 'next', nav, mascotSize = 72, aside, children }) => {
     const still = useStill()
     return (
-        <section aria-label={question} className="w-[520px] max-w-full mx-auto flex flex-col items-center">
+        <section aria-label={question} className={cn(aside ? 'w-[680px]' : 'w-[520px]', 'max-w-full mx-auto flex flex-col items-center')}>
             {mascot && (
                 <div className="relative z-[1] -mb-1">
-                    <BerrySpot size={72} mascot={mascot} mood={mood} />
+                    <BerrySpot size={mascotSize} mascot={mascot} mood={mood} />
                 </div>
             )}
             <div className={cn(BIG_SHELL, 'w-full')}>
-                <div className={cn(BIG_CARD, 'bg-card px-5 pt-4 pb-5 overflow-hidden')}>
-                    <div key={motionKey} className={still ? 'animate-step-fade' : from === 'next' ? 'animate-step-next' : 'animate-step-back'}>
+                <div className={cn(BIG_CARD, 'bg-card overflow-hidden', aside ? 'flex' : 'px-5 pt-4 pb-5')}>
+                    <div key={motionKey} className={cn(still ? 'animate-step-fade' : from === 'next' ? 'animate-step-next' : 'animate-step-back', aside && 'flex-1 min-w-0 px-5 pt-4 pb-5')}>
                         <div className="h-7 flex items-center justify-between">
                             {/* The step as a count in mono, or the part being changed in words. */}
                             <span className={/^\d/.test(label) ? 'font-mono text-11.5 text-ink-3' : LABEL}>{label}</span>
                             {action}
                         </div>
-                        <h2 className="mt-0.5 mb-1 text-center text-20 font-semibold">{question}</h2>
-                        {hint && <p className="mx-auto mb-4 max-w-[380px] text-center text-13 leading-[1.45] text-ink-2">{hint}</p>}
+                        <h2 className={cn('mt-0.5 mb-1 text-20 font-semibold', !aside && 'text-center')}>{question}</h2>
+                        {hint && <p className={cn('mb-4 max-w-[380px] text-13 leading-[1.45] text-ink-2', !aside && 'mx-auto text-center')}>{hint}</p>}
                         {children}
                     </div>
+                    {aside}
                 </div>
                 {nav}
             </div>

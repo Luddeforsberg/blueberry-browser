@@ -2,7 +2,7 @@ import { safeStorage } from "electron";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import type { AccountState } from "../shared/ipc";
-import { ServerError, Unreachable, type GalleryServer, type ServerSession } from "./galleryServer";
+import { ServerError, type GalleryServer, type ServerSession } from "./galleryServer";
 
 // Who's signed in, for publishing. The session stays in here: main never sends a token to a renderer, no tool can reach
 // this, and only the email goes out, to Settings. The password passes through one call and isn't kept or logged.
@@ -13,6 +13,9 @@ const NO_NETWORK = "Couldn’t reach the sign-in service. Try again in a moment.
 const SIGN_IN_AGAIN = "Your sign-in has ended. Please sign in again.";
 const NOT_SAVED = "You’re signed in until you quit. This computer has no safe place to keep it, so you’ll sign in again next time.";
 const CONFIRM_FIRST = "Check your email to confirm the address, then sign in here.";
+
+const SHORT_PASSWORD = "Use at least 8 characters.";
+const MIN_PASSWORD = 8;
 
 const WORDS: Record<string, string> = {
   invalid_credentials: "That email and password don’t match an account.",
@@ -26,10 +29,18 @@ const WORDS: Record<string, string> = {
   signup_disabled: "New accounts are turned off on this server.",
   email_provider_disabled: "Email sign-in is turned off on this server.",
 };
-const inWords = (error: unknown): string => {
-  if (error instanceof Unreachable) return NO_NETWORK;
-  if (error instanceof ServerError) return WORDS[error.code] ?? "The sign-in service said no. Try again in a moment.";
-  return NO_NETWORK;
+// The field each problem is about, so the form says it under that one.
+const ABOUT: Record<string, AccountState["problemAbout"]> = {
+  invalid_credentials: "password",
+  email_not_confirmed: "email",
+  user_already_exists: "email",
+  email_exists: "email",
+  weak_password: "password",
+  validation_failed: "email",
+};
+const inWords = (error: unknown): [string, AccountState["problemAbout"]] => {
+  if (error instanceof ServerError) return [WORDS[error.code] ?? "The sign-in service said no. Try again in a moment.", ABOUT[error.code] ?? null];
+  return [NO_NETWORK, null];
 };
 
 const isEnded = (error: unknown) => error instanceof ServerError && [400, 401, 403].includes(error.status);
@@ -37,6 +48,7 @@ const isEnded = (error: unknown) => error instanceof ServerError && [400, 401, 4
 export class Account {
   private session: ServerSession | null = null;
   private problem: string | null = null;
+  private problemAbout: AccountState["problemAbout"] = null;
   private refreshing: Promise<string | null> | null = null;
   // Counts every sign-in and sign-out, so the answer to one that's been overtaken changes nothing.
   private generation = 0;
@@ -51,8 +63,9 @@ export class Account {
   }
 
   get state(): AccountState {
-    if (!this.server) return { status: "not-set-up", email: null, problem: null };
-    return this.session ? { status: "signed-in", email: this.session.email, problem: this.problem } : { status: "signed-out", email: null, problem: this.problem };
+    if (!this.server) return { status: "not-set-up", email: null, problem: null, problemAbout: null };
+    const { problem, problemAbout } = this;
+    return this.session ? { status: "signed-in", email: this.session.email, problem, problemAbout } : { status: "signed-out", email: null, problem, problemAbout };
   }
 
   signIn(email: unknown, password: unknown): Promise<AccountState> {
@@ -60,14 +73,20 @@ export class Account {
   }
 
   signUp(email: unknown, password: unknown): Promise<AccountState> {
-    return this.start(email, password, (server, address, secret) => server.signUp(address, secret));
+    return this.start(email, password, (server, address, secret) => server.signUp(address, secret), MIN_PASSWORD);
   }
 
-  private async start(email: unknown, password: unknown, call: (server: GalleryServer, email: string, password: string) => Promise<ServerSession | null>): Promise<AccountState> {
+  private async start(
+    email: unknown,
+    password: unknown,
+    call: (server: GalleryServer, email: string, password: string) => Promise<ServerSession | null>,
+    minLength = 0
+  ): Promise<AccountState> {
     if (!this.server) return this.state;
     const address = typeof email === "string" ? email.trim() : "";
     const secret = typeof password === "string" ? password : "";
     if (!address || !secret) return this.say("Enter your email and a password.");
+    if (secret.length < minLength) return this.say(SHORT_PASSWORD, "password");
     const generation = ++this.generation;
     try {
       const session = await call(this.server, address, secret);
@@ -78,9 +97,10 @@ export class Account {
       }
       if (!session) return this.say(CONFIRM_FIRST);
       this.problem = null;
+      this.problemAbout = null;
       this.keep(session);
     } catch (error) {
-      return generation === this.generation ? this.say(inWords(error)) : this.state;
+      return generation === this.generation ? this.say(...inWords(error)) : this.state;
     }
     this.onChange();
     return this.state;
@@ -92,6 +112,7 @@ export class Account {
     const token = this.session?.accessToken;
     this.session = null;
     this.problem = null;
+    this.problemAbout = null;
     this.forget();
     this.onChange();
     if (token) await this.server?.signOut(token).catch(() => console.error("Couldn't end the session on the server."));
@@ -129,8 +150,9 @@ export class Account {
     }
   }
 
-  private say(problem: string): AccountState {
+  private say(problem: string, about: AccountState["problemAbout"] = null): AccountState {
     this.problem = problem;
+    this.problemAbout = about;
     this.onChange();
     return this.state;
   }
