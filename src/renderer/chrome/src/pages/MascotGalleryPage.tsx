@@ -236,7 +236,13 @@ const Example: React.FC<{ entry: GalleryMascot; copy: MascotProfile | null }> = 
     const [whole, setWhole] = useState(false)
     useLayoutEffect(() => {
         const box = answer.current
-        if (box) setLong(box.scrollHeight > box.clientHeight + 1)
+        if (!box) return undefined
+        const measure = () => setLong(box.scrollHeight > box.clientHeight + 1)
+        measure()
+        const watch = new ResizeObserver(measure)
+        watch.observe(box)
+        if (box.firstElementChild) watch.observe(box.firstElementChild)
+        return () => watch.disconnect()
     }, [entry.example])
     if (!entry.example) return null
     const clipped = long && !whole
@@ -437,8 +443,10 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const [linkedAnswer, setLinkedAnswer] = useState<{ key: string; answer: GalleryLinked } | null>(null)
     const root = useRef<HTMLDivElement>(null)
     const [width, setWidth] = useState(0)
-    // The one looked at last, which keeps the keyboard when the tiles come back.
+    // The one open before, which keeps the keyboard when the tiles come back, however the page was closed.
     const lookedAt = useRef<string | null>(null)
+    // Whether the keyboard was on a tile when one was picked, so it moves on to that one's row.
+    const onTile = useRef(false)
     // Publishing or unpublishing changes this, and that changes what the page should show.
     const ownPublished = flock.map((mascot) => mascot.publishedId ?? '').join()
 
@@ -469,8 +477,13 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         return () => watch.disconnect()
     }, [])
 
+    const asked = useRef(0)
     const load = useCallback(() => {
-        window.chromeAPI.mascots.gallery().then(setListing).catch(() => setListing({ entries: [], status: 'unreachable' }))
+        const ask = ++asked.current
+        window.chromeAPI.mascots
+            .gallery()
+            .catch((): GalleryListing => ({ entries: [], status: 'unreachable' }))
+            .then((answer) => ask === asked.current && setListing(answer))
     }, [])
     useEffect(load, [load, ownPublished])
 
@@ -481,11 +494,15 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         window.chromeAPI.mascots
             .galleryLinked(linkedId)
             .catch((): GalleryLinked => ({ entry: null, status: 'unreachable' }))
-            .then((answer) => !left && setLinkedAnswer({ key: linkKey, answer }))
+            .then((answer) => {
+                if (left) return
+                setLinkedAnswer({ key: linkKey, answer })
+                if (!answer.entry && answer.status === 'live') load()
+            })
         return () => {
             left = true
         }
-    }, [linkedId, linkKey])
+    }, [linkedId, linkKey, load])
 
     const entries = listing?.entries ?? []
     const narrow = width > 0 && width < NARROW
@@ -498,10 +515,12 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     // Still being asked, so nothing shows rather than something wrong.
     const waiting = pickedId !== null && !picked && (place.page === 'linked' ? !linked : !listing)
 
-    const close = useCallback(() => {
-        lookedAt.current = pickedId
-        openPlace(galleryParam({ page: 'all' }))
-    }, [pickedId])
+    const close = useCallback(() => openPlace(galleryParam({ page: 'all' })), [])
+    // From the tiles or cards: with the keyboard in the page, it goes on to the picked one's row.
+    const pick = (id: string) => {
+        onTile.current = root.current?.contains(document.activeElement) ?? false
+        openEntry(id)
+    }
 
     // Esc closes the page, unless it's clearing a field that has words in it.
     useEffect(() => {
@@ -509,7 +528,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== 'Escape' || event.defaultPrevented) return
             const target = event.target
-            if (target instanceof HTMLInputElement && target.value) return
+            if (target instanceof HTMLInputElement && target.type === 'search' && target.value) return
             event.preventDefault()
             close()
         }
@@ -519,16 +538,14 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
 
     // Back on the tiles, the one looked at has the keyboard. Opened, the row picked has it, so ↑ and ↓ go on from there.
     useEffect(() => {
+        const before = lookedAt.current
+        lookedAt.current = pickedId
         if (pickedId === null) {
-            const id = lookedAt.current
-            lookedAt.current = null
-            if (id) root.current?.querySelector<HTMLElement>(`[data-gallery-tile="${CSS.escape(id)}"]`)?.focus()
+            if (before) root.current?.querySelector<HTMLElement>(`[data-gallery-tile="${CSS.escape(before)}"]`)?.focus()
             return
         }
-        const active = document.activeElement
-        if (active instanceof HTMLElement && active.closest('[data-gallery-tile]')) {
-            root.current?.querySelector<HTMLElement>(`[data-gallery-row="${CSS.escape(pickedId)}"]`)?.focus()
-        }
+        if (onTile.current) root.current?.querySelector<HTMLElement>(`[data-gallery-row="${CSS.escape(pickedId)}"]`)?.focus()
+        onTile.current = false
     }, [pickedId])
 
     // The tiles fold into the list and back, unless the motion is held still, when they fade.
@@ -628,7 +645,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                         <GroupLabel label="Most added" className="mt-6 mb-3" />
                         <div className={cn('grid gap-3.5', narrow ? 'grid-cols-1' : 'grid-cols-3')}>
                             {shownCards.map((entry, index) => (
-                                <AddedCard key={entry.id} entry={entry} place={index + 1} onPick={() => openEntry(entry.id)} />
+                                <AddedCard key={entry.id} entry={entry} place={index + 1} onPick={() => pick(entry.id)} />
                             ))}
                         </div>
                     </section>
@@ -647,7 +664,7 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             <ul className="grid gap-x-3.5 gap-y-[22px]" style={{ gridTemplateColumns: `repeat(${tileColumns(width)}, minmax(0, 1fr))` }}>
                                 {group.entries.map((entry) => (
                                     <li key={entry.id}>
-                                        <GalleryTile entry={entry} yours={copyOf(entry) !== null} narrow={narrow} onPick={() => openEntry(entry.id)} />
+                                        <GalleryTile entry={entry} yours={copyOf(entry) !== null} narrow={narrow} onPick={() => pick(entry.id)} />
                                     </li>
                                 ))}
                             </ul>

@@ -60,10 +60,13 @@ test("a Gallery mascot is picked, read, added as a limited copy, chats, and can 
     await chrome.evaluate(async () => window.chromeAPI.browser.goBack((await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)!.id));
     await expect(blueberry).toBeVisible();
     expect(await param()).toBe("all");
+    await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
 
-    // Esc closes the page, and the one looked at keeps the keyboard.
-    await blueberry.getByRole("button", { name: /^Follow-up/ }).click();
+    // Picked with the keyboard, its row has it, so ↓ goes on from there. Esc closes the page, and the one looked at
+    // keeps the keyboard.
+    await chrome.keyboard.press("Enter");
     await expect(chrome.getByRole("article", { name: "Follow-up" })).toBeVisible();
+    await expect(list.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
     await chrome.keyboard.press("Escape");
     await expect(blueberry.getByRole("button", { name: /^Follow-up/ })).toBeFocused();
 
