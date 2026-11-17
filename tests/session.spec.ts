@@ -98,7 +98,7 @@ test("a restart brings tabs back without loading them all, and history is kept",
   });
   // Visits in a row to one site fold into one row, which opens in place.
   const today = chrome.getByRole("region", { name: "Today" });
-  await today.getByRole("button", { name: /127\.0\.0\.1\s*5 visits/ }).click();
+  await today.getByRole("button", { name: /127\.0\.0\.1\s*5 pages/ }).click();
   const list = today.getByRole("list", { name: "Visits to 127.0.0.1" }).getByRole("listitem");
   await expect(list).toHaveCount(5);
   await expect(list.first()).toContainText("Title of page-one");
@@ -112,7 +112,7 @@ test("a restart brings tabs back without loading them all, and history is kept",
   await expect(chrome.getByText("No pages match “page-tw”.")).toBeVisible();
 
   await chrome.getByRole("searchbox", { name: "Search history" }).fill("");
-  await expect(today.getByRole("button", { name: /4 visits/ })).toBeVisible();
+  await expect(today.getByRole("button", { name: /4 pages/ })).toBeVisible();
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
   });

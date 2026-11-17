@@ -37,7 +37,7 @@ describe('fractionDone', () => {
 
 describe('downloadStatus', () => {
     it('says so when a finished file is missing, whatever else is true', () => {
-        expect(downloadStatus(download({ missing: true })).text).toBe('File is missing')
+        expect(downloadStatus(download({ missing: true })).text).toBe('Moved or deleted')
     })
 
     it('tells an unknown size apart from a known one', () => {

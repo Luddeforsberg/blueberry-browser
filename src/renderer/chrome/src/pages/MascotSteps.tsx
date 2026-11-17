@@ -11,7 +11,7 @@ import { LABEL, StatusPill } from '@common/components/StatusPill'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry, BerrySpot } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { BETWEEN } from '../components/SettingsRow'
+import { BETWEEN } from '../components/PageFrame'
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from '../components/StepCard'
 import { blankMascot, keepTabDraft, mascotForm, NEW_MASCOT_EVENT, openMascots, sitesFrom, surprise, tabDraft, takeStartedMascot, toMascotDraft, withPart, type MascotFormValues } from '../flockView'
 
@@ -56,7 +56,7 @@ const LookChoice: React.FC<{ label: string; chosen: boolean; onChoose: () => voi
             type="button"
             aria-pressed={chosen}
             onClick={onChoose}
-            className={cn('w-full pt-2.5 pb-2 flex flex-col items-center gap-1.5 rounded-tile text-13 transition-colors', chosen ? 'bg-sheet-2 text-ink font-medium' : 'text-ink-2 hover:bg-hover hover:text-ink', FOCUS)}
+            className={cn('w-full pt-2.5 pb-2 flex flex-col items-center gap-1.5 rounded-tile text-13 transition-colors', chosen ? 'bg-card-2 text-ink font-medium' : 'text-ink-2 hover:bg-hover hover:text-ink', FOCUS)}
         >
             <span aria-hidden>{children}</span>
             {label}
@@ -202,7 +202,7 @@ const MadeCard: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
     return (
         <section aria-label={`${mascot.name} is added`} className="w-[520px] max-w-full mx-auto">
             <div className={BIG_SHELL}>
-                <div className={cn(BIG_CARD, 'bg-sheet px-7 pt-[30px] pb-[26px] text-center animate-fade-in')}>
+                <div className={cn(BIG_CARD, 'bg-card px-7 pt-[30px] pb-[26px] text-center animate-fade-in')}>
                     <div className="mb-3 flex justify-center"><BerrySpot size={72} mascot={mascot} mood="delivered" /></div>
                     <p className={LABEL}>Added to your mascots</p>
                     <h2 className="mt-1 mb-2 text-30 font-medium [overflow-wrap:anywhere]">{mascot.name}</h2>

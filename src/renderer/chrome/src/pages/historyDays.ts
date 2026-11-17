@@ -3,41 +3,45 @@ import type { HistoryEntry } from '@shared/ipc'
 export interface HistoryDay {
     key: string
     label: string
+    date: string
     entries: HistoryEntry[]
 }
 
 const dayStart = (time: number) => new Date(time).setHours(0, 0, 0, 0)
 
-const dayLabel = (time: number, now: number) => {
-    const start = dayStart(time)
-    const today = dayStart(now)
-    if (start === today) return 'Today'
-    // Worked out from the date rather than by counting hours, because a day can have 23 or 25 of them.
-    const yesterday = new Date(today).setDate(new Date(today).getDate() - 1)
-    if (start === yesterday) return 'Yesterday'
-    // The app is in English, whatever language the system is in.
-    return new Date(time).toLocaleDateString('en-GB', {
-        weekday: 'long',
+// The app is in English, whatever language the system is in.
+const dateWords = (time: number, now: number, weekday: boolean) =>
+    new Date(time).toLocaleDateString('en-GB', {
+        weekday: weekday ? 'long' : undefined,
         month: 'long',
         day: 'numeric',
         year: new Date(time).getFullYear() === new Date(now).getFullYear() ? undefined : 'numeric'
     })
+
+// Today, Yesterday or the weekday, with the date beside it. Today and Yesterday say their weekday in the date.
+const dayLabel = (time: number, now: number): { label: string; date: string } => {
+    const start = dayStart(time)
+    const today = dayStart(now)
+    // Worked out from the date rather than by counting hours, because a day can have 23 or 25 of them.
+    const yesterday = new Date(today).setDate(new Date(today).getDate() - 1)
+    if (start === today || start === yesterday) return { label: start === today ? 'Today' : 'Yesterday', date: dateWords(time, now, true) }
+    return { label: new Date(time).toLocaleDateString('en-GB', { weekday: 'long' }), date: dateWords(time, now, false) }
 }
 
 // By the day on this computer's calendar, for anything with a time. The items are already newest first.
-export const byDay = <T,>(items: T[], timeOf: (item: T) => number, now = Date.now()): { key: string; label: string; items: T[] }[] => {
-    const days: { key: string; label: string; items: T[] }[] = []
+export const byDay = <T,>(items: T[], timeOf: (item: T) => number, now = Date.now()): { key: string; label: string; date: string; items: T[] }[] => {
+    const days: { key: string; label: string; date: string; items: T[] }[] = []
     for (const item of items) {
         const key = String(dayStart(timeOf(item)))
         const last = days.at(-1)
         if (last?.key === key) last.items.push(item)
-        else days.push({ key, label: dayLabel(timeOf(item), now), items: [item] })
+        else days.push({ key, ...dayLabel(timeOf(item), now), items: [item] })
     }
     return days
 }
 
 export const groupByDay = (entries: HistoryEntry[], now = Date.now()): HistoryDay[] =>
-    byDay(entries, (entry) => entry.visitedAt, now).map(({ key, label, items }) => ({ key, label, entries: items }))
+    byDay(entries, (entry) => entry.visitedAt, now).map(({ key, label, date, items }) => ({ key, label, date, entries: items }))
 
 export const siteOf = (url: string) => {
     try {

@@ -2,30 +2,31 @@ import React, { useId, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@common/lib/utils'
 import { Button } from '@common/components/Button'
-import { LABEL, StatusPill, type PillTone } from '@common/components/StatusPill'
+import { StatusPill, type PillTone } from '@common/components/StatusPill'
+import { LINE_BETWEEN, ON_ROW, ROW } from './PageFrame'
 
-// DESIGN.md section 10, Settings: groups are sheets under a label in words, and a row has its name on the left, at most
-// one line of explanation, and one control on the right. Anything longer waits behind More, or on a page one step in.
+// DESIGN.md section 10, Settings and A page in a tab: a group is a label in words and its rows, straight on the page,
+// and a row has its name on the left, at most one line of explanation, and one control on the right. Anything longer
+// waits behind More, or on a page one step in.
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
-// The hairline between two rows starts where the text does, after an icon when the rows have one, so a row that leads
-// with something sets `before:left-*` to where its text starts.
-export const BETWEEN = "relative before:content-[''] before:absolute before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden"
 
-// A label over a group. `trailing` sits at its right, such as a button that adds a row.
-export const SettingsLabel: React.FC<{ id?: string; trailing?: React.ReactNode; children: React.ReactNode }> = ({ id, trailing, children }) => (
-    <h3 id={id} className={cn('h-[18px] mt-5 mb-2 mx-3 flex items-center gap-1.5', LABEL)}>
+// A label over a group, 13px medium. `count` is beside it in mono, and `trailing` sits at its right, such as a button
+// that adds a row.
+export const SettingsLabel: React.FC<{ id?: string; count?: number; tone?: 'ask'; trailing?: React.ReactNode; children: React.ReactNode }> = ({ id, count, tone, trailing, children }) => (
+    <h3 id={id} className={cn('min-h-[18px] mt-6 mb-1.5 px-2 flex items-baseline gap-[7px] text-13 font-medium', tone === 'ask' ? 'text-ask' : 'text-ink-2')}>
         {children}
-        {trailing && <span className="ml-auto flex items-center">{trailing}</span>}
+        {count !== undefined && <span className="font-mono text-11.5 font-normal text-faint tabular-nums">{count}</span>}
+        {trailing && <span className="ml-auto self-center flex items-center">{trailing}</span>}
     </h3>
 )
 
-export const SettingsGroup: React.FC<{ label?: string; trailing?: React.ReactNode; children: React.ReactNode }> = ({ label, trailing, children }) => {
+export const SettingsGroup: React.FC<{ label?: React.ReactNode; count?: number; tone?: 'ask'; trailing?: React.ReactNode; children: React.ReactNode }> = ({ label, count, tone, trailing, children }) => {
     const id = useId()
     return (
         <section aria-labelledby={label ? id : undefined} className={label ? undefined : 'mt-4'}>
-            {label && <SettingsLabel id={id} trailing={trailing}>{label}</SettingsLabel>}
-            <div className="rounded-sheet bg-sheet shadow-up">{children}</div>
+            {label && <SettingsLabel id={id} count={count} tone={tone} trailing={trailing}>{label}</SettingsLabel>}
+            <div>{children}</div>
         </section>
     )
 }
@@ -43,6 +44,9 @@ const Words: React.FC<{ id: string; title: React.ReactNode; description?: React.
     </div>
 )
 
+// Where the hairline between rows starts: where the text does, after the 32px tile when a row has one.
+const lineFrom = (lead: React.ReactNode) => (lead ? 'before:left-[52px]' : 'before:left-2')
+
 // A row. `children` is its one control, at the right. `below` is what can't fit beside its name, such as a form, and goes
 // under it at the row's full width. `lead` is an icon or face before the name.
 export const SettingsRow: React.FC<{
@@ -56,7 +60,7 @@ export const SettingsRow: React.FC<{
     top?: boolean
     children?: React.ReactNode
 }> = ({ id, title, description, more, lead, below, top = false, children }) => (
-    <div className={cn(BETWEEN, lead ? 'before:left-[60px]' : 'before:left-4', 'min-h-[52px] pl-4 pr-3.5', top ? 'pt-3.5 pb-3' : 'py-[11px]')}>
+    <div className={cn(ROW, LINE_BETWEEN, lineFrom(lead), 'min-h-[52px]', top ? 'pt-3.5 pb-3' : 'py-[11px]')}>
         <div className={cn('min-h-[30px] flex gap-3', top ? 'items-start' : 'items-center')}>
             {lead}
             <Words id={id} title={title} description={description} more={more} />
@@ -81,11 +85,7 @@ export const SettingsLink: React.FC<{
     onOpen: () => void
 }> = ({ title, description, lead, value, state, action, onOpen }) => {
     const descriptionId = useId()
-    const row = cn(
-        BETWEEN,
-        lead ? 'before:left-[60px]' : 'before:left-4',
-        'w-full min-h-[52px] py-[11px] pl-4 pr-3.5 flex items-center gap-3 text-left transition-colors hover:bg-hover first:rounded-t-sheet last:rounded-b-sheet'
-    )
+    const row = cn(ROW, ON_ROW, LINE_BETWEEN, lineFrom(lead), 'w-full min-h-[52px] py-[11px] flex items-center gap-3 text-left')
     const words = (
         <>
             {lead}
@@ -99,7 +99,7 @@ export const SettingsLink: React.FC<{
     )
     if (action) {
         return (
-            <div className={cn(row, 'relative has-[>button:first-child:active]:bg-press')}>
+            <div className={cn(row, 'has-[>button:first-child:active]:bg-press')}>
                 <button
                     type="button"
                     aria-label={state ? `${title}, ${state.words}` : title}
@@ -129,7 +129,7 @@ export const RowTile: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 // A quiet way back, naming where it goes.
 export const BackButton: React.FC<{ back: string; onBack: () => void }> = ({ back, onBack }) => (
-    <button type="button" onClick={onBack} className={cn('h-[26px] mx-1.5 mb-2.5 pl-1 pr-2.5 inline-flex items-center gap-1 rounded-row text-13 text-ink-2 transition-colors hover:bg-hover hover:text-ink', FOCUS)}>
+    <button type="button" onClick={onBack} className={cn('self-start h-[26px] -ml-1.5 mb-3 pl-1 pr-2.5 inline-flex items-center gap-1 rounded-row text-13 text-ink-2 transition-colors hover:bg-hover hover:text-ink', FOCUS)}>
         <ChevronLeft aria-hidden className="size-3.5" strokeWidth={1.75} />
         <span><span className="sr-only">Back to </span>{back}</span>
     </button>
@@ -139,8 +139,8 @@ export const BackButton: React.FC<{ back: string; onBack: () => void }> = ({ bac
 export const StepInHeader: React.FC<{ back: string; onBack: () => void; title: string; children?: React.ReactNode }> = ({ back, onBack, title, children }) => (
     <>
         <BackButton back={back} onBack={onBack} />
-        <h2 className="mx-3 mb-3.5 text-20 font-semibold">{title}</h2>
-        {children && <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-14 leading-[1.45] text-ink-2">{children}</p>}
+        <h2 className="text-20 font-semibold">{title}</h2>
+        {children && <p className="mt-1 max-w-[520px] text-14 leading-[1.45] text-ink-2">{children}</p>}
     </>
 )
 

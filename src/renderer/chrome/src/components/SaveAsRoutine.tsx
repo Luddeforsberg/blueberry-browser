@@ -36,7 +36,7 @@ export const SaveAsRoutineCard: React.FC<{ from: RoutineFormValues; onClose: () 
     return (
         <CardInShell label="Save as routine" note="What to do and who does it come from this chat. Change them later on the routine’s page.">
             <h3 className="mb-3 text-15 font-medium text-ink">When should I do this again?</h3>
-            <WhenAnswer values={values} set={(patch) => setValues({ ...values, ...patch })} often={['daily', 'weekdays', 'weekly', 'monthly']} centred={false} cloud={false} onCard />
+            <WhenAnswer values={values} set={(patch) => setValues({ ...values, ...patch })} often={['daily', 'weekdays', 'weekly', 'monthly']} centred={false} cloud={false} />
             {error && <div className="mt-3"><ChatError message={error} /></div>}
             <div className="mt-3.5 flex flex-wrap items-center gap-2">
                 <Button disabled={saving} onClick={() => void save()}>Save routine</Button>

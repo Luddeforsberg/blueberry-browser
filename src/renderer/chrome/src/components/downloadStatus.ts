@@ -25,7 +25,7 @@ const progressText = ({ receivedBytes, totalBytes }: DownloadInfo): string =>
 
 // Status colours always come with words, so colour is never the only signal.
 export const downloadStatus = (download: DownloadInfo): { text: string; className: string } => {
-    if (download.missing) return { text: 'File is missing', className: 'text-ask' }
+    if (download.missing) return { text: 'Moved or deleted', className: 'text-ink-2' }
     switch (download.state) {
         case 'progressing':
             return { text: download.path ? progressText(download) : 'Choosing where to save', className: 'text-ink-2' }

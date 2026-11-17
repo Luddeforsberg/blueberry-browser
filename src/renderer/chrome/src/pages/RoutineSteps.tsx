@@ -12,7 +12,7 @@ import { cn } from '@common/lib/utils'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry, BerrySpot, useAssistantName } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { BETWEEN } from '../components/SettingsRow'
+import { BETWEEN } from '../components/PageFrame'
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from '../components/StepCard'
 import { formatTime } from '../components/RoutineRunRow'
 import { narrowerLimits } from '../shortWords'
@@ -72,7 +72,7 @@ const blocked = (part: RoutinePart, values: RoutineFormValues): string | null =>
 
 type Set = (patch: Partial<RoutineFormValues>) => void
 
-// A choice of one, as a pill: `ink` when chosen, quiet on `sheet-2` otherwise. Times are the machine's words, in mono.
+// A choice of one, as a pill: `ink` when chosen, quiet on `card-2` otherwise. Times are the machine's words, in mono.
 const Pill: React.FC<{ chosen: boolean; onChoose: () => void; mono?: boolean; quiet: string; children: React.ReactNode }> = ({ chosen, onChoose, mono = false, quiet, children }) => (
     <button
         type="button"
@@ -154,20 +154,20 @@ const DAYS = [
     { value: 0, short: 'Sun', name: 'Sunday' }
 ]
 
-// The schedule read back, with the parts that were chosen on `sheet-2`.
+// The schedule read back, with the parts that were chosen on `card-2`.
 export const ScheduleSentence: React.FC<{ values: RoutineFormValues; className?: string }> = ({ values, className }) => (
     <p className={cn('text-15 text-ink-2', className)}>
         {scheduleSentence(values).map(({ text, chosen }, at) =>
-            chosen ? <b key={at} className="px-[7px] py-0.5 rounded-[7px] bg-sheet-2 font-medium text-ink">{text}</b> : <span key={at}>{text}</span>
+            chosen ? <b key={at} className="px-[7px] py-0.5 rounded-[7px] bg-card-2 font-medium text-ink">{text}</b> : <span key={at}>{text}</span>
         )}
     </p>
 )
 
 // How often as pills, the time as chips with Other…, and what each needs besides. `often` limits the pills, as the card
-// under a chat offers only the ones that repeat. `centred` is for the step card, and `onCard` for a card in a chat,
-// whose quiet fill is `card-2`.
-export const WhenAnswer: React.FC<{ values: RoutineFormValues; set: Set; often?: HowOften[]; centred?: boolean; cloud?: boolean; onCard?: boolean }> = ({ values, set, often, centred = true, cloud = true, onCard = false }) => {
-    const quiet = onCard ? 'bg-card-2' : 'bg-sheet-2'
+// under a chat offers only the ones that repeat. `centred` is for the step card. It's always on a card, the step's or
+// the one under a chat, whose quiet fill is `card-2`.
+export const WhenAnswer: React.FC<{ values: RoutineFormValues; set: Set; often?: HowOften[]; centred?: boolean; cloud?: boolean }> = ({ values, set, often, centred = true, cloud = true }) => {
+    const quiet = 'bg-card-2'
     const [runner] = useRunner()
     const [other, setOther] = useState(() => !TIME_CHIPS.includes(values.time))
     const scheduled = values.kind !== 'manual'
@@ -376,7 +376,7 @@ const SavedCard: React.FC<{ routine: Routine | null; values: RoutineFormValues; 
     return (
         <section aria-label="Saved as a routine" className="w-[520px] max-w-full mx-auto">
             <div className={BIG_SHELL}>
-                <div className={cn(BIG_CARD, 'bg-sheet px-7 pt-[30px] pb-[26px] text-center animate-fade-in')}>
+                <div className={cn(BIG_CARD, 'bg-card px-7 pt-[30px] pb-[26px] text-center animate-fade-in')}>
                     <div className="mb-3 flex justify-center"><BerrySpot size={72} mascot={mascot} mood="delivered" /></div>
                     <p className={LABEL}>Saved as a routine</p>
                     <h2 className="mt-1.5 mb-2 text-20 font-medium line-clamp-3 [overflow-wrap:anywhere]">{readBack(shown, name)}</h2>

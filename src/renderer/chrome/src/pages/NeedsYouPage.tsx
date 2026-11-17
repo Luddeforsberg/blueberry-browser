@@ -9,7 +9,7 @@ import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { HandoffCard, QuestionCard, approvalWords } from '../components/ChatMessage'
-import { EmptySheet, PageFrame, PageHeader } from '../components/PageFrame'
+import { EmptyPage, LINE_BETWEEN, ON_ROW, PageFrame, PageHeader, ROW } from '../components/PageFrame'
 import { usePhone } from '../usePhone'
 import { openSettings } from '../openSettings'
 import { openRoutines } from '../routinesView'
@@ -175,8 +175,8 @@ export const WaitingRow: React.FC<{ item: NeedsYouItem; now: number; onOpen: () 
     const mascot = useFlock().find(item.mascotId)
     const name = useAssistantName(mascot)
     return (
-        <li className="relative [&+&]:before:absolute [&+&]:before:left-[58px] [&+&]:before:right-0 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-line">
-            <button type="button" onClick={onOpen} className={cn('w-full px-4 py-3 flex items-center gap-3.5 text-left transition-colors hover:bg-hover', FOCUS)}>
+        <li className={cn(ROW, ON_ROW, LINE_BETWEEN, 'before:left-12 px-0')}>
+            <button type="button" onClick={onOpen} className={cn('w-full px-2 py-3 flex items-center gap-3 text-left rounded-[inherit] active:bg-press', FOCUS)}>
                 <Asking item={item} size={28} />
                 <span className="min-w-0 flex-1">
                     <span className="block truncate text-14 font-medium text-ink">{wants(item)}</span>
@@ -199,7 +199,7 @@ const AllClear: React.FC = () => {
     ])
     const anyone = useAssistantName(flock.find((mascot) => working.has(mascot.id)))
     return (
-        <EmptySheet
+        <EmptyPage
             face={
                 <ul aria-hidden className="flex items-end justify-center gap-2">
                     {flock.slice(0, MAX_RESTING).map((mascot) => (
@@ -212,7 +212,7 @@ const AllClear: React.FC = () => {
         >
             <span className="block text-15 text-ink">Nothing needs you right now.</span>
             {working.size > 0 && <span className="block mt-1">{working.size === 1 ? `${anyone} is` : `${working.size} of them are`} working, and waits here if it gets stuck.</span>}
-        </EmptySheet>
+        </EmptyPage>
     )
 }
 
@@ -274,24 +274,24 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             {waiting.length === 0 && !justAnswered ? (
                 <AllClear />
             ) : (
-                <>
+                <div className="mt-5">
                     {justAnswered ? (
                         <AnsweredCard item={justAnswered.item} said={justAnswered.said} />
                     ) : (
                         open && <WaitingCard key={open.approval.id} item={open} now={now} onAnswered={onAnswered(open)} />
                     )}
                     {rest.length > 0 && (
-                        <ul aria-label="Also waiting" className="mt-2.5 rounded-sheet bg-sheet shadow-up overflow-hidden">
+                        <ul aria-label="Also waiting" className="mt-3">
                             {rest.map((item) => <WaitingRow key={item.approval.id} item={item} now={now} onOpen={() => setChosen(item.approval.id)} />)}
                         </ul>
                     )}
-                </>
+                </div>
             )}
-            <div className="mt-3 mx-1 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <div className="mt-3 px-2 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                 {answered > 0 || waiting.length > 0 ? <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answered, waiting.length)}</span> : <span />}
                 <PhoneLine />
             </div>
-            <p className="mt-6 mx-1 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
+            <p className="mt-6 px-2 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>
         </PageFrame>
     )
 }

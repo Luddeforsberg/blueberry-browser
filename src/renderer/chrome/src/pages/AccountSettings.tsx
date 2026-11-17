@@ -5,6 +5,8 @@ import { Button } from '@common/components/Button'
 import { AccountForm } from '../components/AccountForm'
 import { Avatar } from '../components/AccountMenu'
 import { CopyLink } from '../components/CopyLink'
+import { cn } from '@common/lib/utils'
+import { LINE_BETWEEN, ROW } from '../components/PageFrame'
 import { SettingsGroup, SettingsRow } from '../components/SettingsRow'
 import { useShell } from '../contexts/ShellContext'
 import { useLibrary } from '../contexts/LibraryContext'
@@ -38,7 +40,7 @@ const PublishedList: React.FC = () => {
             {list && list.length > 0 && (
                 <ul aria-label="What you’ve published">
                     {list.map((mascot) => (
-                        <li key={mascot.id} className="relative min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3 before:content-[''] before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden">
+                        <li key={mascot.id} className={cn(ROW, LINE_BETWEEN, 'before:left-2 min-h-12 py-[9px] flex items-center gap-3')}>
                             <div className="flex-1 min-w-0">
                                 <p className="text-14 [overflow-wrap:anywhere]">{mascot.name}</p>
                                 <p className="mt-0.5 text-13 text-ink-2 [overflow-wrap:anywhere] tabular-nums">

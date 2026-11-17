@@ -16,7 +16,7 @@ import { BerrySpot } from './Berry'
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
 // The card is like the prompt box, so as there, the caret marks focus in a field (DESIGN.md section 8).
-export const FIELD = 'w-full rounded-sheet bg-sheet-2 text-ink caret-ink outline-none placeholder:text-faint'
+export const FIELD = 'w-full rounded-sheet bg-card-2 text-ink caret-ink outline-none placeholder:text-faint'
 
 // The card in its shell, with the mascot standing on its top edge. `motionKey` changes when the contents do, so they
 // slide in from the side they came from, or fade with the motion held still.
@@ -41,7 +41,7 @@ export const StepCard: React.FC<{
                 </div>
             )}
             <div className={cn(BIG_SHELL, 'w-full')}>
-                <div className={cn(BIG_CARD, 'bg-sheet px-5 pt-4 pb-5 overflow-hidden')}>
+                <div className={cn(BIG_CARD, 'bg-card px-5 pt-4 pb-5 overflow-hidden')}>
                     <div key={motionKey} className={still ? 'animate-step-fade' : from === 'next' ? 'animate-step-next' : 'animate-step-back'}>
                         <div className="h-7 flex items-center justify-between">
                             {/* The step as a count in mono, or the part being changed in words. */}
@@ -113,7 +113,7 @@ export const SiteChips: React.FC<{ sites: string[]; onChange: (sites: string[]) 
         <>
             <ul aria-label="Sites it may use" className="flex flex-wrap justify-center items-center gap-1.5">
                 {sites.map((site) => (
-                    <li key={site} className="h-[26px] pl-[9px] pr-[3px] inline-flex items-center gap-1 rounded-row bg-sheet-2 font-mono text-11.5 text-ink">
+                    <li key={site} className="h-[26px] pl-[9px] pr-[3px] inline-flex items-center gap-1 rounded-row bg-card-2 font-mono text-11.5 text-ink">
                         {site}
                         <button type="button" aria-label={`Remove ${site}`} onClick={() => onChange(sites.filter((each) => each !== site))} className={cn('size-5 grid place-items-center rounded-[6px] text-ink-3 hover:bg-hover hover:text-ink', FOCUS)}>
                             <X aria-hidden className="size-[11px]" strokeWidth={1.75} />
@@ -148,7 +148,7 @@ export const SiteChips: React.FC<{ sites: string[]; onChange: (sites: string[]) 
                                 }
                             }}
                             onBlur={() => add(adding)}
-                            className="h-[26px] w-40 px-[9px] rounded-row bg-sheet-2 font-mono text-11.5 text-ink caret-ink outline-none placeholder:text-faint"
+                            className="h-[26px] w-40 px-[9px] rounded-row bg-card-2 font-mono text-11.5 text-ink caret-ink outline-none placeholder:text-faint"
                         />
                     )}
                 </li>

@@ -1,5 +1,6 @@
 import type { RecordedChange, RecordedDraft, Routine, RoutineDraft, RoutineSchedule } from '@shared/library'
 import { routinesParam, type RoutinePart, type RoutinePlace } from '@shared/routinePlaces'
+import { withSiteNames } from './siteNames'
 
 export interface RoutineFormValues {
     // Null for a new routine.
@@ -247,7 +248,48 @@ export const nextInWords = (at: number, now = Date.now()): string => {
     if (days <= 0) return `today ${time}`
     if (days === 1) return `tomorrow ${time}`
     if (days < 7) return `${new Date(at).toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`
-    return new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    return `${new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${time}`
+}
+
+// --- The list --------------------------------------------------------------------------------------------------------
+
+// Grouped by what matters, in this order. A one-off that has run waits with those that only run when asked.
+export type RoutineGroupKey = 'needs-you' | 'running' | 'scheduled' | 'paused' | 'manual'
+
+export const ROUTINE_GROUPS: { key: RoutineGroupKey; label: string }[] = [
+    { key: 'needs-you', label: 'Needs you' },
+    { key: 'running', label: 'Running' },
+    { key: 'scheduled', label: 'Scheduled' },
+    { key: 'paused', label: 'Paused' },
+    { key: 'manual', label: 'Only when you ask' }
+]
+
+const groupOf = (routine: Routine): RoutineGroupKey => {
+    if (routine.status === 'needs-approval') return 'needs-you'
+    if (routine.status === 'running' || routine.status === 'queued') return 'running'
+    if (routine.paused) return 'paused'
+    return routine.scheduleSpec.kind !== 'manual' && routine.nextRunAt !== null ? 'scheduled' : 'manual'
+}
+
+// Empty groups are left out. Scheduled ones are soonest first, and the rest keep the order they came in.
+export const groupRoutines = (routines: Routine[]): { key: RoutineGroupKey; label: string; routines: Routine[] }[] =>
+    ROUTINE_GROUPS.map(({ key, label }) => {
+        const mine = routines.filter((routine) => groupOf(routine) === key)
+        return { key, label, routines: key === 'scheduled' ? mine.sort((a, b) => (a.nextRunAt ?? 0) - (b.nextRunAt ?? 0)) : mine }
+    }).filter((group) => group.routines.length > 0)
+
+// A row's second line. One waiting for you says what it wants, in the card's own sentence, and a running one where it
+// is. Otherwise it's the schedule, which the group already says for one only run when asked, then how the last run
+// went, in `ask` when it went wrong.
+export const routineLine = (routine: Routine): { words: string | null; last: { text: string; ask: boolean } | null } => {
+    const run = routine.latestRun
+    if (routine.status === 'needs-approval') return { words: run?.approval ? withSiteNames(run.approval.text) : routine.lastResult, last: null }
+    if (routine.status === 'running') return { words: run?.statusLine ?? run?.steps.at(-1)?.text ?? 'Starting..', last: null }
+    const wrong = !routine.cloudNote && (run?.status === 'failed' || run?.status === 'interrupted')
+    return {
+        words: routine.scheduleSpec.kind === 'manual' ? null : sentenceText(scheduleSentence(formFor(routine))),
+        last: { text: routine.cloudNote ?? routine.lastResult, ask: wrong }
+    }
 }
 
 // --- Where it is -----------------------------------------------------------------------------------------------------

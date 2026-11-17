@@ -1,7 +1,6 @@
 import React from 'react'
 import { Menu } from 'lucide-react'
 import type { Rect } from '@shared/ipc'
-import { flockPlace } from '@shared/flockPlaces'
 import { BrowserProvider, useBrowser } from './contexts/BrowserContext'
 import { LibraryProvider } from './contexts/LibraryContext'
 import { InternalPageView } from './pages/InternalPageView'
@@ -42,11 +41,9 @@ const Shell: React.FC = () => {
     if (!settings.onboarded) return <Onboarding />
     const { page, floatingSidebar } = layout
     const trouble = activeTab?.trouble ?? activeTab?.loadError
-    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Every page
-    // built on `PageFrame` is a column of sheets on the well too, apart from publishing a mascot, which isn't redrawn yet.
-    const mascots = activeTab?.page === 'flock' && flockPlace(activeTab.pageParam).page !== 'publish'
-    const framed = activeTab?.page === 'settings' || activeTab?.page === 'routines' || activeTab?.page === 'history' || activeTab?.page === 'downloads' || activeTab?.page === 'needs-you' || mascots
-    const well = (activeTab?.page === 'new-tab' || framed) && !trouble
+    // The new tab has no page yet, so no sheet: it's the well, where a page will go (DESIGN.md section 3). Every other
+    // page is a sheet, as a web page is, the ones on `PageFrame` included (A page in a tab).
+    const well = activeTab?.page === 'new-tab' && !trouble
 
     return (
         <div className="relative h-full bg-ground">

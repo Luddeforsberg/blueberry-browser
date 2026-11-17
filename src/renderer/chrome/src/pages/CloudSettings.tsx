@@ -4,6 +4,8 @@ import type { CloudLogin, CloudState, RunnerState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Switch } from '@common/components/Controls'
 import { CopyLink } from '../components/CopyLink'
+import { cn } from '@common/lib/utils'
+import { LINE_BETWEEN, ROW } from '../components/PageFrame'
 import { SettingsGroup, SettingsRow } from '../components/SettingsRow'
 import { openSettings } from '../openSettings'
 import { useShell } from '../contexts/ShellContext'
@@ -70,7 +72,7 @@ const SignedInTo: React.FC<{ cloud: CloudState }> = ({ cloud }) => {
             {cloud.logins.length > 0 && (
                 <ul aria-label="Sites signed in in the cloud">
                     {cloud.logins.map((login) => (
-                        <li key={login.site} className="relative min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3 before:content-[''] before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden">
+                        <li key={login.site} className={cn(ROW, LINE_BETWEEN, 'before:left-2 min-h-12 py-[9px] flex items-center gap-3')}>
                             <div className="flex-1 min-w-0">
                                 <p className="text-14 truncate">{login.site}</p>
                                 <p className={login.status === 'signed-out' ? 'mt-0.5 text-13 text-ask' : 'mt-0.5 text-13 text-ink-2'}>{loginStatus(login)}</p>
