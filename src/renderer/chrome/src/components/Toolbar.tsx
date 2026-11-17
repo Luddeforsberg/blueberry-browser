@@ -36,10 +36,11 @@ const VerticalToolbar: React.FC = () => {
 
     return (
         <div className="h-full flex flex-col">
-            <div
-                className="relative h-12 shrink-0 flex items-center gap-0.5 app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]"
-                style={{ paddingLeft: leftClear, paddingRight: rightClear }}
-            >
+            {/* Three columns, with the two outer ones sharing what's left equally, so the address field is over the middle
+                of the page, in line with what's centred on it, and not pushed aside by however many buttons are on one
+                side. It only leaves the middle when a side needs more than its half. */}
+            <div className="relative h-12 shrink-0 grid grid-cols-[minmax(max-content,1fr)_minmax(0,584px)_minmax(max-content,1fr)] items-center app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]">
+                <div className="flex items-center gap-0.5" style={{ paddingLeft: leftClear }}>
                 {!layout.sidebarOpen && (
                     <ToolBarButton Icon={PanelLeft} label="Show sidebar" onClick={toggleSidebar} />
                 )}
@@ -50,13 +51,13 @@ const VerticalToolbar: React.FC = () => {
                 ) : (
                     <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null && !activeTab.page} />
                 )}
-
-                <div className="flex-1 min-w-0 px-3 flex justify-center">
-                    <div className="w-full max-w-[560px]">
-                        <AddressBar />
-                    </div>
                 </div>
 
+                <div className="min-w-0 px-3">
+                    <AddressBar />
+                </div>
+
+                <div className="flex items-center justify-end gap-0.5" style={{ paddingRight: rightClear }}>
                 <RecordingNotice className="mx-1 app-region-no-drag" />
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
@@ -76,6 +77,7 @@ const VerticalToolbar: React.FC = () => {
                         toggled={layout.chatOpen}
                     />
                 )}
+                </div>
             </div>
         </div>
     )

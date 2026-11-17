@@ -155,9 +155,9 @@ describe("computeLayout", () => {
 
     const saved = computeLayout({ width: 1280, height: 800 }, { ...both, mode: "horizontal", savedSites: true });
     // The bookmarks bar is under the address row, and the popover area starts above it, so it covers the bar too.
-    expect(saved.toolbar).toEqual({ x: 0, y: 42, width: 1280, height: 74 });
+    expect(saved.toolbar).toEqual({ x: 0, y: 42, width: 1280, height: 84 });
     expect(saved.addressRow).toEqual({ x: 0, y: 42, width: 1280, height: 44 });
-    expect(saved.page).toEqual({ x: 8, y: 116, width: 896, height: 676 });
+    expect(saved.page).toEqual({ x: 8, y: 126, width: 896, height: 666 });
     expect(saved.popover).toEqual({ x: 0, y: 86, width: 1280, height: 714 });
   });
 

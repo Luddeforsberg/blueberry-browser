@@ -121,8 +121,12 @@ const Dock: React.FC<{ shown: Popover | null; room: number }> = ({ shown, room }
 
 const BAR_LAYOUTS: SiteLayouts = { favourites: 'tiles', bookmarks: 'tiles' }
 
-// Favourites as icon tiles, the one in front selected, then a hairline, then bookmarks with their names. Dragging
-// between the two and the right-click menus work as in the sidebar.
+// A saved site on the bar: its icon and its name, cut where a long one would crowd the rest.
+const SAVED_SITE = 'h-7 max-w-[180px] px-2 flex items-center gap-2 rounded-row text-13 whitespace-nowrap transition-colors app-region-no-drag hover:bg-hover hover:text-ink'
+
+// Favourites, then a hairline, then bookmarks, each its icon and its name with nothing behind it, as a bookmarks bar
+// is anywhere. The favourite in front is in `ink`. Dragging between the two and the right-click menus work as in the
+// sidebar.
 const BookmarksBar: React.FC = () => {
     const { pinned, bookmarks } = useLibrary()
     const { activeTab, tabs, createTab, switchTab } = useBrowser()
@@ -137,10 +141,10 @@ const BookmarksBar: React.FC = () => {
             onWheel={(event) => {
                 if (event.deltaX === 0) event.currentTarget.scrollLeft += event.deltaY
             }}
-            className="h-[30px] shrink-0 flex items-center gap-1 px-2.5 pb-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            className="h-10 shrink-0 flex items-center gap-0.5 px-2 pb-2.5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
         >
             {pinned.length > 0 ? (
-                <ul ref={zone('favourites')} aria-label="Favourites" className="shrink-0 flex items-center gap-1">
+                <ul ref={zone('favourites')} aria-label="Favourites" className="shrink-0 flex items-center gap-0.5">
                     {pinned.map((site) => {
                         const selected = !!activeTab && !activeTab.page && sameSite(activeTab.url, site.url)
                         return (
@@ -157,14 +161,10 @@ const BookmarksBar: React.FC = () => {
                                         else createTab(site.url)
                                     }}
                                     onContextMenu={(event) => savedSiteMenu(event, site)}
-                                    className={cn(
-                                        'w-7 h-6 flex items-center justify-center rounded-row transition-colors app-region-no-drag',
-                                        selected ? 'bg-sheet shadow-rim' : 'bg-tray hover:bg-press',
-                                        drag?.site.id === site.id && 'opacity-40',
-                                        FOCUS
-                                    )}
+                                    className={cn(SAVED_SITE, selected ? 'text-ink' : 'text-ink-2', drag?.site.id === site.id && 'opacity-40', FOCUS)}
                                 >
-                                    <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-3.5 rounded-[4px]" />
+                                    <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-4 rounded-[4px]" />
+                                    <span className="truncate">{site.title}</span>
                                 </button>
                             </li>
                         )
@@ -175,7 +175,7 @@ const BookmarksBar: React.FC = () => {
                     <div
                         ref={zone('favourites')}
                         className={cn(
-                            'h-6 px-2 shrink-0 flex items-center rounded-row border border-dashed text-13 transition-colors',
+                            'h-7 px-2 shrink-0 flex items-center rounded-row border border-dashed text-13 transition-colors',
                             drag.over?.list === 'favourites' ? 'border-ink-3 bg-hover text-ink' : 'border-line text-ink-3'
                         )}
                     >
@@ -184,7 +184,7 @@ const BookmarksBar: React.FC = () => {
                 )
             )}
             {(pinned.length > 0 || dropPlace) && shown.length > 0 && <span aria-hidden className="w-px h-3.5 mx-[7px] shrink-0 bg-line" />}
-            <ul ref={zone('bookmarks')} aria-label="Bookmarks" className="min-w-0 flex items-center gap-1">
+            <ul ref={zone('bookmarks')} aria-label="Bookmarks" className="min-w-0 flex items-center gap-0.5">
                 {shown.map((site) => (
                     <li key={site.id} data-saved-site={site.id} className="shrink-0" onDragStart={(event) => event.preventDefault()}>
                         <button
@@ -192,14 +192,10 @@ const BookmarksBar: React.FC = () => {
                             onPointerDown={(event) => start(event, site, 'bookmarks')}
                             onClick={() => createTab(site.url)}
                             onContextMenu={(event) => savedSiteMenu(event, site)}
-                            className={cn(
-                                'h-6 px-2 flex items-center gap-[7px] rounded-row text-13 text-ink-2 whitespace-nowrap transition-colors app-region-no-drag hover:bg-hover hover:text-ink',
-                                drag?.site.id === site.id && 'opacity-40',
-                                FOCUS
-                            )}
+                            className={cn(SAVED_SITE, 'text-ink-2', drag?.site.id === site.id && 'opacity-40', FOCUS)}
                         >
-                            <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-3.5 rounded-[4px]" />
-                            {site.title}
+                            <Favicon src={site.favicon ?? siteIcon(site.url)} site={site.url} className="size-4 rounded-[4px]" />
+                            <span className="truncate">{site.title}</span>
                         </button>
                     </li>
                 ))}

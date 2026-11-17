@@ -56,8 +56,8 @@ Sizes (*to tune*):
 |---|---|
 | Sidebar | 248px default, resizable 200 to 360px, collapses fully |
 | Chat panel | 348px default, resizable 320 to 480px |
-| Toolbar | 48px, the address field 32px tall and at most 560px wide |
-| Horizontal rows | Tab row 42px, toolbar 44px, bookmarks bar 30px |
+| Toolbar | 48px, the address field 32px tall and at most 560px wide, over the middle of the page, so it lines up with what's centred there. It only leaves the middle when the buttons on one side need more than their half |
+| Horizontal rows | Tab row 42px, toolbar 44px, bookmarks bar 40px |
 | Horizontal tab | Equal shares up to 196px, down to 36px with only its icon. The one in front keeps room for its name |
 | Chats over the page | 296px wide |
 | Gutter round the page | 8px |
@@ -395,6 +395,7 @@ Straight on the ground. Under the window controls is a switch between its two fa
 
 **Tabs** is a normal browser, with nothing of the assistant in the way of your tabs:
 
+- **A site's icon** is drawn as the site gives it, with nothing behind it, wherever it shows: a tab, a favourite, a bookmark, a chip. No plate and no edge is added, in either mode. The one change is in dark mode, to an icon that's dark all over, such as a black mark with nothing behind it: it would vanish, so it's drawn as the same shape in `ink`. An icon with any light or colour in it is left exactly as it is, and one that comes with its own white square or circle keeps it, as that's the site's picture.
 - **Favourites:** a favourite is a bookmark kept on top, as a tile. Same things, two places: a saved site is in one or the other, and the star in the address field counts both. Tiles go four to a row, 40px tall on `tray` with a 12px radius, with the site's icon at 22px. The tile whose site is the tab in front looks selected, as the current tab does: a sheet lifted with `up`. A favourite open in a tab behind gets no mark, and pressing it goes to that tab. With no favourites there's nothing here at all.
 - **Moving between them is dragging,** with the menu saying the same. Drag a bookmark up onto the tiles to keep it on top where it's dropped, a tile down into the bookmarks to make it a plain bookmark there, or a tile along the others to reorder. A thin `ink` line shows where it lands, and what's dragged follows the pointer as a row on a sheet. While a bookmark is dragged with no favourites yet, a dashed, tile-high row says "Drop to keep on top". Escape puts it back. A bookmark's menu has **Keep on Top**, a tile's **Move to Bookmarks**, and both **Remove Bookmark**, so the keyboard reaches all of it through the menu key. The app menu's **Keep This Page on Top** does it for the page in front.
 - **Bookmarks:** a labelled section that folds, with folders. A folder row shows how many pages it holds and opens to them behind a dotted line. Rows are 32px, as every row in the sidebar is, with the site's icon at 18px. With nothing saved, the section keeps its place and says so in `faint`.
@@ -619,7 +620,7 @@ Mock: [horizontal-layout.html](./docs/design/mocks/horizontal-layout.html). Thre
 - **Chats** is a `tray` pill with the word, and the `ask` dot while anything needs you. It opens a panel under itself, 296px wide, with the sidebar's Chats face: New chat, needs you, working, done, routines, earlier. Its arrows lead to Needs you and Routines.
 - **The dock** is a `tray` pill with every mascot's face at 22px. Pressing one opens its card, the same as in the sidebar, under it. Its **All your mascots** leads to the mascots' page. When the faces don't all fit beside an address field of at least 320px, it folds to the chosen mascot, any that are asking or working, and a count of the rest, which opens the mascots' page.
 - **Chats and a card open over the page,** in an overlay view, since a tab's view covers the chrome. Escape or a press anywhere outside closes them, and the keyboard goes back to what opened them. Opening a chat or a page from them closes them too.
-- **The bookmarks bar:** favourites first, as icon tiles, the one in front selected as in the sidebar, then a hairline, then bookmarks with icon and name. Dragging between the two and the right-click menus work as in the sidebar. With nothing saved there's no bar at all.
+- **The bookmarks bar:** favourites first, then a hairline, then bookmarks. Each is its icon at 16px and its name at 13px in `ink-2`, 28px tall, with nothing behind it until it's pointed at, as a bookmarks bar is in any browser. The bar is 40px, with 10px of that under the names, so they don't sit on the page's edge. A long name is cut at 180px. The favourite whose site is the tab in front is in `ink`. Dragging between the two and the right-click menus work as in the sidebar. With nothing saved there's no bar at all.
 - **The new tab** is the vertical layout's. Settings is in the account menu, so nothing else needs a link under the box.
 
 ### Settings

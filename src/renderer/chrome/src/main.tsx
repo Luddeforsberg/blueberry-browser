@@ -6,6 +6,7 @@ import { FindApp } from './FindApp'
 import { SuggestionsApp } from './SuggestionsApp'
 import { PromptApp } from './PromptApp'
 import { DesktopApp, DesktopComposerApp } from './DesktopApp'
+import { DarkMarkFilter } from './components/Favicon'
 import './index.css'
 
 // A scroll shows the thumb for a moment, as hovering does, since the keyboard can scroll with the pointer elsewhere.
@@ -23,6 +24,7 @@ const view = new URLSearchParams(window.location.search).get('view')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
+        <DarkMarkFilter />
         {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'suggestions' ? <SuggestionsApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
     </React.StrictMode>
 )

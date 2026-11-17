@@ -11,7 +11,7 @@ export const TOOLBAR_HEIGHT = 48;
 // something saved, since there's no sidebar to hold the bookmarks.
 export const TAB_ROW_HEIGHT = 42;
 const HORIZONTAL_TOOLBAR_HEIGHT = 44;
-const BOOKMARKS_BAR_HEIGHT = 30;
+const BOOKMARKS_BAR_HEIGHT = 40;
 // The gutter: the ground showing between the page's sheet and the window's right and bottom edges, and between sheets.
 export const PAGE_INSET = 8;
 export const FLOATING_INSET = 8;

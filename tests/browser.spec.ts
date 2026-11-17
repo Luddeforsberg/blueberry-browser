@@ -1814,7 +1814,7 @@ test("bookmarks are in the sidebar when vertical, and in a bar under the toolbar
   await openFixture();
   await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
   await expect(chrome.getByRole("list", { name: "Bookmarks" }).getByRole("button", { name: "Fixture" })).toBeVisible();
-  await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).page.y).toBe(before + 30);
+  await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).page.y).toBe(before + 40);
 });
 
 test("right-clicking Berry beside the greeting opens its menu", async () => {
