@@ -1,50 +1,96 @@
 import { describe, expect, it } from 'vitest'
-import { applyRecordedValue, askForRecordedValue, blankForm, changeRecordedValue, howOften, nextInWords, readBack, recordedForm, scheduleSentence, sentenceText, toDraft, WEEKDAYS, withHowOften, withRoutinePart } from './routinesView'
+import type { Routine } from '@shared/library'
+import { blankForm, formFor, howOften, nextInWords, readBack, recordedForm, scheduleSentence, sentenceText, stepsPieces, switchAsking, toDraft, typedInto, WEEKDAYS, withHowOften, withRoutinePart, withStepsPieces, type RoutineFormValues } from './routinesView'
 
 const form = (instructions: string, value: string) =>
     recordedForm({ name: 'Job', instructions, sites: [], changes: [{ label: 'Search', value }] })
 
+// The value's mark as the box shows it, or null when it isn't marked.
+const marked = (values: RoutineFormValues) => stepsPieces(values).find(({ row }) => row !== undefined)?.text ?? null
+
+// The box after the user has made the value's mark say something else, as the browser would leave it.
+const typedInMark = (values: RoutineFormValues, next: string) =>
+    withStepsPieces(values, stepsPieces(values).map((piece) => (piece.row === undefined ? piece : { ...piece, text: next })))
+
 describe('what might change', () => {
-    it('survives being cleared and retyped, a letter at a time', () => {
-        let values = form('Search for usb cable on the shop', 'usb cable')
-        for (const typed of ['', 'h', 'hd', 'hdmi']) values = changeRecordedValue(values, 0, typed)
-        expect(values.instructions).toBe('Search for usb cable on the shop')
-        expect(applyRecordedValue(values, 0).instructions).toBe('Search for hdmi on the shop')
-    })
-
-    it('goes back to what it was if left empty', () => {
-        const values = applyRecordedValue(changeRecordedValue(form('Search for usb', 'usb'), 0, '  '), 0)
-        expect(values.instructions).toBe('Search for usb')
-        expect(values.recorded?.[0].value).toBe('usb')
-    })
-
-    it("doesn't touch a short value inside other words or numbers", () => {
-        const values = applyRecordedValue(changeRecordedValue(form('Book 3 seats at 13:30 for $3', '3'), 0, '4'), 0)
-        expect(values.instructions).toBe('Book 4 seats at 13:30 for $4')
-    })
-
-    it('reaches a number with a unit on it, and leaves a word inside a longer one', () => {
-        expect(applyRecordedValue(changeRecordedValue(form('Set the width to 10px', '10'), 0, '20'), 0).instructions).toBe('Set the width to 20px')
-        expect(applyRecordedValue(changeRecordedValue(form('Find a cat in the category', 'cat'), 0, 'dog'), 0).instructions).toBe('Find a dog in the category')
+    it('is marked where it stands, as a whole value', () => {
+        expect(stepsPieces(form('Book 3 seats at 13:30 for $3', '3'))).toEqual([{ text: 'Book ' }, { text: '3', row: 0 }, { text: ' seats at 13:30 for $3' }])
+        expect(marked(form('Set the width to 10px', '10'))).toBe('10')
+        expect(stepsPieces(form('Find a cat in the category', 'cat'))[1]).toEqual({ text: 'cat', row: 0 })
+        expect(marked(form('Find a category', 'cat'))).toBeNull()
     })
 
     it("leaves an address's path alone, but not what it's searching for", () => {
-        expect(applyRecordedValue(changeRecordedValue(form('Go to shop.example/product/1 and buy 1', '1'), 0, '2'), 0).instructions).toBe('Go to shop.example/product/1 and buy 2')
-        expect(applyRecordedValue(changeRecordedValue(form('Go to https://shop.example/usb?q=usb', 'usb'), 0, 'hdmi'), 0).instructions).toBe('Go to https://shop.example/usb?q=hdmi')
-        expect(applyRecordedValue(changeRecordedValue(form('Book it on 12/03', '12/03'), 0, '14/03'), 0).instructions).toBe('Book it on 14/03')
+        expect(stepsPieces(form('Go to shop.example/product/1 and buy 1', '1')).at(-1)).toEqual({ text: '1', row: 0 })
+        expect(stepsPieces(form('Go to https://shop.example/usb?q=usb', 'usb')).at(-1)).toEqual({ text: 'usb', row: 0 })
+        expect(marked(form('Book it on 12/03', '12/03'))).toBe('12/03')
     })
 
-    it('takes a value as written, and a pending one still gets saved', () => {
-        const pending = changeRecordedValue(form('Find a+b now', 'a+b'), 0, '$& c')
-        expect(toDraft(pending).instructions).toBe('Find $& c now')
+    it('reads back as exactly the text it was made from', () => {
+        const values = form('1. Go to the shop\n2. Search for usb cable\n\nThen say how it went.', 'usb cable')
+        expect(withStepsPieces(values, stepsPieces(values))).toEqual(values)
+        expect(stepsPieces(values).map(({ text }) => text).join('')).toBe(values.instructions)
     })
 
-    it('keeps the question in step with the value', () => {
-        const asking = askForRecordedValue(form('Search for usb', 'usb'), 0, true)
-        const changed = applyRecordedValue(changeRecordedValue(asking, 0, 'hdmi'), 0)
-        expect(changed.instructions).toContain('Last time it was hdmi.')
-        expect(changed.instructions).toContain('Search for hdmi')
-        expect(askForRecordedValue(changed, 0, false).instructions).toBe('Search for hdmi')
+    it('is edited where it stands, and only there, taken as written', () => {
+        const values = typedInMark(form('Search for usb, then pick the cheapest usb', 'usb'), '$& hdmi')
+        expect(values.instructions).toBe('Search for $& hdmi, then pick the cheapest usb')
+        expect(values.recorded).toEqual([{ label: 'Search', value: '$& hdmi', ask: false, at: 11 }])
+        expect(toDraft(values).instructions).toBe(values.instructions)
+    })
+
+    it('stays marked while text is typed before it', () => {
+        const values = form('Search for usb', 'usb')
+        const typed = withStepsPieces(values, [{ text: 'Then search for ' }, { text: 'usb', row: 0 }])
+        expect(typed.recorded?.[0].at).toBe(16)
+        expect(marked(typed)).toBe('usb')
+    })
+
+    it('keeps what is typed over all or part of it in it, and only then', () => {
+        const pieces = stepsPieces(form('Search for usb cable now', 'usb cable'))
+        expect(typedInto(pieces, 11, 20, 'hdmi')).toEqual([{ text: 'Search for ' }, { text: 'hdmi', row: 0 }, { text: ' now' }])
+        expect(typedInto(pieces, 15, 20, 'wire')).toEqual([{ text: 'Search for ' }, { text: 'usb wire', row: 0 }, { text: ' now' }])
+        // Over the value and what's beside it, what's typed is plain, and what's left of the value stays one.
+        expect(typedInto(pieces, 15, 24, '!')).toEqual([{ text: 'Search for ' }, { text: 'usb ', row: 0 }, { text: '!' }])
+    })
+
+    it('never holds a line break: a value one lands in ends there', () => {
+        const pieces = stepsPieces(form('Search for usb cable now', 'usb cable'))
+        expect(typedInto(pieces, 20, 20, '\n')).toEqual([{ text: 'Search for ' }, { text: 'usb cable', row: 0 }, { text: '\n now' }])
+        expect(typedInto(pieces, 15, 15, '\n')).toEqual([{ text: 'Search for ' }, { text: 'usb ', row: 0 }, { text: '\ncable now' }])
+        expect(typedInto(pieces, 11, 11, '\n')).toEqual([{ text: 'Search for \n' }, { text: 'usb cable', row: 0 }, { text: ' now' }])
+        expect(typedInto(pieces, 11, 20, '\n')).toEqual([{ text: 'Search for \n now' }])
+    })
+
+    it('stops being a value once its mark is emptied, and stops being asked for', () => {
+        const asking = switchAsking(form('Search for usb', 'usb'), 0)
+        for (const left of ['', '  ']) {
+            const values = typedInMark(asking, left)
+            expect(values.recorded).toEqual([])
+            expect(values.instructions).toBe(`Search for ${left}`)
+            expect(marked(values)).toBeNull()
+        }
+    })
+
+    it('asks each run with a line before the steps, which follows the value', () => {
+        const asking = switchAsking(form('Search for usb', 'usb'), 0)
+        expect(asking.instructions).toBe('Before you start, ask me for the search to use. Last time it was usb.\n\nSearch for usb')
+        expect(marked(asking)).toBe('usb')
+        const changed = typedInMark(asking, 'hdmi')
+        expect(changed.instructions).toBe('Before you start, ask me for the search to use. Last time it was hdmi.\n\nSearch for hdmi')
+        expect(switchAsking(changed, 0).instructions).toBe('Search for hdmi')
+    })
+
+    it('is marked again from a saved routine that asks for it, and only from the lines as they were made', () => {
+        const saved = switchAsking(form('Search for usb', 'usb'), 0).instructions
+        const routine = (instructions: string) => ({ id: 'r1', name: 'Job', instructions, mascotId: null, sites: [], scheduleSpec: { kind: 'manual' } }) as unknown as Routine
+        const again = formFor(routine(saved))
+        expect(again.recorded).toEqual([{ label: 'Search', value: 'usb', ask: true, at: 11 }])
+        expect(switchAsking(again, 0).instructions).toBe('Search for usb')
+        expect(formFor(routine(`${saved} cable`)).recorded).toHaveLength(1)
+        expect(formFor(routine(saved.replace('Search for usb', 'Search for hdmi'))).recorded).toBeUndefined()
+        expect(formFor(routine(saved.replace('\n\n', '\n'))).recorded).toBeUndefined()
+        expect(formFor(routine('Search for usb')).recorded).toBeUndefined()
     })
 })
 

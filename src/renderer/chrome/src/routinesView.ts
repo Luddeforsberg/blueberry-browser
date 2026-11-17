@@ -28,8 +28,8 @@ export interface RoutineFormValues {
 
 export interface RecordedChangeValue extends RecordedChange {
     ask: boolean
-    // What the instructions say at the moment, which `value` differs from while it's being typed.
-    applied: string
+    // Where `value` stands in the steps, after any lines asking for values, so it stays marked while it's edited.
+    at: number
 }
 
 const pad = (value: number) => String(value).padStart(2, '0')
@@ -67,7 +67,7 @@ const withSchedule = (blank: RoutineFormValues, schedule: RoutineSchedule): Rout
 }
 
 export const formFor = ({ id, name, instructions, mascotId, sites, inCloud, scheduleSpec }: Routine): RoutineFormValues =>
-    withSchedule({ ...blankForm(name, instructions, mascotId), id, onlySomeSites: sites.length > 0, sites, inCloud }, scheduleSpec)
+    withSchedule({ ...blankForm(name, instructions, mascotId), id, onlySomeSites: sites.length > 0, sites, inCloud, recorded: askedFor(instructions) }, scheduleSpec)
 
 // It does nothing by itself until the user gives it a time, and the sites are the ones they used.
 export const recordedForm = ({ name, instructions, sites, changes }: RecordedDraft): RoutineFormValues => ({
@@ -75,62 +75,120 @@ export const recordedForm = ({ name, instructions, sites, changes }: RecordedDra
     kind: 'manual',
     onlySomeSites: sites.length > 0,
     sites,
-    recorded: changes.map((change) => ({ ...change, ask: false, applied: change.value }))
+    recorded: placed(instructions, changes.map((change) => ({ ...change, ask: false, at: wholeValueAt(instructions, change.value) })))
 })
 
+// --- What might change -----------------------------------------------------------------------------------------------
+
+// Each value a run should ask for is a line before the steps, so the instructions say so and a run asks through the same
+// question as any other. The lines come from the values, and are never typed.
 const askLine = (label: string, value: string) => `Before you start, ask me for the ${label.toLowerCase()} to use. Last time it was ${value}.`
+const ASK_LINE = /^Before you start, ask me for the (.+?) to use\. Last time it was (.+?)\.\n\n/
 
-// Only as a whole value: a digit beside a digit or a letter beside a letter is part of something else. So changing a 3
-// leaves 13:30 alone, and changing a 10 still reaches 10px. Taken as written, whatever's in it.
+export const askingLines = (rows: RecordedChangeValue[]) => rows.filter(({ ask }) => ask).map(({ label, value }) => askLine(label, value.trim()))
+const askingText = (rows: RecordedChangeValue[]) => askingLines(rows).map((line) => `${line}\n\n`).join('')
+
+// The steps, after the lines asking for values.
+export const stepsText = ({ instructions, recorded = [] }: Pick<RoutineFormValues, 'instructions' | 'recorded'>) => {
+    const asking = askingText(recorded)
+    return instructions.startsWith(asking) ? instructions.slice(asking.length) : instructions
+}
+
+// Only as a whole value: a digit beside a digit or a letter beside a letter is part of something else. So a 3 isn't in
+// 13:30, and a 10 is in 10px. An address's path isn't the value either, even where it looks like it, as a value of 1 in
+// /product/1, but what it searches for is. Taken as written, whatever's in it. -1 where it isn't there.
 const sameKind = (char: string) => (/\p{L}/u.test(char) ? '\\p{L}' : /\p{N}/u.test(char) ? '\\p{N}' : null)
-const swapValue = (text: string, from: string, to: string) => {
-    const before = sameKind(from[0])
-    const after = sameKind(from[from.length - 1])
-    const value = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const whole = `${before ? `(?<!${before})` : ''}${value}${after ? `(?!${after})` : ''}`
-    // An address's path isn't the value, even where it looks like it, as a value of 1 in /product/1. Matched first to be passed over.
-    if (from.includes('/')) return text.replace(new RegExp(whole, 'gu'), () => to)
-    return text.replace(new RegExp(`\\S*/[^\\s?]*|${whole}`, 'gu'), (found) => (found.includes('/') ? found : to))
+export const wholeValueAt = (text: string, value: string): number => {
+    if (!value) return -1
+    const before = sameKind(value[0])
+    const after = sameKind(value[value.length - 1])
+    const whole = `${before ? `(?<!${before})` : ''}${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${after ? `(?!${after})` : ''}`
+    if (value.includes('/')) return text.search(new RegExp(whole, 'u'))
+    for (const found of text.matchAll(new RegExp(`\\S*/[^\\s?]*|${whole}`, 'gu'))) if (!found[0].includes('/')) return found.index ?? -1
+    return -1
 }
 
-// While it's being typed, only the row changes. A half-typed value, or none, would wreck the instructions.
-export const changeRecordedValue = (values: RoutineFormValues, at: number, next: string): RoutineFormValues => ({
-    ...values,
-    recorded: values.recorded?.map((row, index) => (index === at ? { ...row, value: next } : row))
-})
+// Each value where it stands, once: one that isn't there, or overlaps one before it, isn't one.
+const placed = (steps: string, rows: RecordedChangeValue[]) =>
+    rows.filter((row, index) => row.at >= 0 && steps.slice(row.at, row.at + row.value.length) === row.value
+        && rows.slice(0, index).every((other) => row.at >= other.at + other.value.length || other.at >= row.at + row.value.length))
 
-// Once it's finished with, the instructions come to say what the row says. Left empty, the row goes back to what they say.
-export const applyRecordedValue = (values: RoutineFormValues, at: number): RoutineFormValues => {
-    const rows = values.recorded ?? []
-    const row = rows[at]
-    const next = row.value.trim()
-    const settled = next ? { ...row, value: next, applied: next } : { ...row, value: row.applied }
-    return {
-        ...values,
-        instructions: next && next !== row.applied
-            ? swapValue(values.instructions.replace(askLine(row.label, row.applied), () => askLine(row.label, next)), row.applied, next)
-            : values.instructions,
-        recorded: rows.map((other, index) => (index === at ? settled : other))
+// A saved routine that asks for values says so before its steps, so changing it marks them again. Only when the lines
+// are exactly what they'd be made as, and each value is in the steps.
+const askedFor = (instructions: string): RecordedChangeValue[] | undefined => {
+    const asked: RecordedChange[] = []
+    let steps = instructions
+    for (let line = ASK_LINE.exec(steps); line; line = ASK_LINE.exec(steps)) {
+        asked.push({ label: line[1].charAt(0).toUpperCase() + line[1].slice(1), value: line[2] })
+        steps = steps.slice(line[0].length)
     }
+    const rows = placed(steps, asked.map((row) => ({ ...row, ask: true, at: wholeValueAt(steps, row.value) })))
+    return asked.length > 0 && rows.length === asked.length && askingText(rows) + steps === instructions ? rows : undefined
 }
 
-// A question goes through the same `ask_user` as any other, and it waits on Needs you.
-export const askForRecordedValue = (values: RoutineFormValues, at: number, ask: boolean): RoutineFormValues => {
-    const rows = values.recorded ?? []
-    const line = askLine(rows[at].label, rows[at].applied)
-    return {
-        ...values,
-        instructions: ask ? `${line}\n\n${values.instructions}` : values.instructions.replace(`${line}\n\n`, () => ''),
-        recorded: rows.map((other, index) => (index === at ? { ...other, ask } : other))
+// The steps as they're shown: plain text, and each value, with its row, where it stands.
+export type StepsPiece = { text: string; row?: number }
+
+export const stepsPieces = (values: Pick<RoutineFormValues, 'instructions' | 'recorded'>): StepsPiece[] => {
+    const steps = stepsText(values)
+    const marks = placed(steps, values.recorded ?? []).map((row) => ({ ...row, index: values.recorded?.indexOf(row) ?? -1 })).sort((a, b) => a.at - b.at)
+    const pieces: StepsPiece[] = []
+    let from = 0
+    for (const { at, value, index } of marks) {
+        if (at > from) pieces.push({ text: steps.slice(from, at) })
+        pieces.push({ text: value, row: index })
+        from = at + value.length
     }
+    if (from < steps.length) pieces.push({ text: steps.slice(from) })
+    return pieces
+}
+
+// The box as the user left it: the steps are what it says and each value what its mark holds. A value with nothing left
+// in its mark has been edited away, so it isn't one any more, and nor is any line asking for it.
+export const withStepsPieces = (values: RoutineFormValues, pieces: StepsPiece[]): RoutineFormValues => {
+    const rows = values.recorded ?? []
+    const kept = new Map<number, RecordedChangeValue>()
+    let steps = ''
+    for (const { text, row } of pieces) {
+        if (row !== undefined && rows[row] && !kept.has(row) && text.trim()) kept.set(row, { ...rows[row], value: text, at: steps.length })
+        steps += text
+    }
+    const recorded = rows.flatMap((_, index) => kept.get(index) ?? [])
+    return { ...values, instructions: askingText(recorded) + steps, recorded }
+}
+
+// What the box says once [start, end) is replaced with `typed`. Typed over all or part of one value, it's part of that
+// value. A line break is never part of one: a value it lands in ends there, and what was after it is plain text.
+export const typedInto = (pieces: StepsPiece[], start: number, end: number, typed: string): StepsPiece[] => {
+    const text = pieces.map((piece) => piece.text).join('')
+    const rows = pieces.flatMap(({ text: said, row }) => Array<number | undefined>(said.length).fill(row))
+    const over = rows.slice(start, end)
+    const breaks = typed.includes('\n')
+    const into = !breaks && over.length > 0 && over.every((row) => row !== undefined && row === over[0]) ? over[0] : undefined
+    const after = rows.slice(end)
+    const cut = breaks ? rows[start - 1] : undefined
+    for (let at = 0; cut !== undefined && after[at] === cut; at++) after[at] = undefined
+    const next = text.slice(0, start) + typed + text.slice(end)
+    const nextRows = [...rows.slice(0, start), ...Array<number | undefined>(typed.length).fill(into), ...after]
+    return nextRows.reduce<StepsPiece[]>((built, row, at) => {
+        const last = built.at(-1)
+        if (last && last.row === row) last.text += next[at]
+        else built.push(row === undefined ? { text: next[at] } : { text: next[at], row })
+        return built
+    }, [])
+}
+
+// Same each run, or ask me each run.
+export const switchAsking = (values: RoutineFormValues, at: number): RoutineFormValues => {
+    const recorded = (values.recorded ?? []).map((row, index) => (index === at ? { ...row, ask: !row.ask } : row))
+    return { ...values, instructions: askingText(recorded) + stepsText(values), recorded }
 }
 
 export const suggestedForm = ({ name, instructions, mascotId, schedule }: RoutineDraft, suggestionId: string): RoutineFormValues =>
     withSchedule({ ...blankForm(name, instructions, mascotId ?? null), suggestionId }, schedule)
 
 export const toDraft = (form: RoutineFormValues): RoutineDraft => {
-    // Saving with Enter leaves a field that hasn't been finished with.
-    const { name, instructions, kind, time, date, days, day, mascotId, onlySomeSites, sites, inCloud } = (form.recorded ?? []).reduce((values, _, at) => applyRecordedValue(values, at), form)
+    const { name, instructions, kind, time, date, days, day, mascotId, onlySomeSites, sites, inCloud } = form
     const schedule = (): RoutineSchedule => {
         switch (kind) {
             case 'manual':
