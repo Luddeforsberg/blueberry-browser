@@ -170,7 +170,7 @@ export interface SavedKey {
   key: string;
 }
 let savedKey: () => SavedKey | null = () => null;
-export const useSavedKey = (read: () => SavedKey | null): void => {
+export const setSavedKeyReader = (read: () => SavedKey | null): void => {
   savedKey = read;
 };
 

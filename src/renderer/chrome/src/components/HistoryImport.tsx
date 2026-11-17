@@ -41,7 +41,7 @@ export const useHistoryImport = () => {
           ? `I couldn’t read ${outcome.name}’s history. Close ${outcome.name} and try again.`
           : outcome.result.added === 0
             ? `Nothing new came across from ${outcome.name}.`
-            : `Brought in ${outcome.result.added.toLocaleString()} ${outcome.result.added === 1 ? 'visit' : 'visits'} from ${outcome.name}.`
+            : `${outcome.result.added.toLocaleString()} ${outcome.result.added === 1 ? 'visit came' : 'visits came'} across from ${outcome.name}.`
 
     return { sources, source, choose, busy, bringIn, message, done: outcome?.result.ok ?? false }
 }

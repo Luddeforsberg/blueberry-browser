@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Cloud, Plug, Smartphone } from 'lucide-react'
+import { Cloud, Plug, Smartphone, Brain } from 'lucide-react'
 import type { ActionApproval, Appearance, ImportSource, LayoutMode, StartupChoice, TabInfo } from '@shared/ipc'
 import { SETTINGS_SECTIONS, settingsPlace, type SettingsPage as StepInPage, type SettingsSection } from '@shared/settingsPlaces'
 import { shortcutWords, SHORTCUTS } from '@shared/shortcuts'
@@ -10,6 +10,7 @@ import { SegmentSwitch } from '../components/SegmentSwitch'
 import { PageFrame, PageHeader } from '../components/PageFrame'
 import { WindowPicture } from '../components/WindowPicture'
 import { BringInHistory } from '../components/HistoryImport'
+import { AiServiceRows, aiServiceName, useAiKey, useKeyTry } from '../components/AiKeyForm'
 import { openSettings } from '../openSettings'
 import { usePhone } from '../usePhone'
 import { useCloud } from '../useCloud'
@@ -35,6 +36,7 @@ const PAGE_TITLES: Record<StepInPage, string> = {
     'what-leaves': 'What leaves this computer',
     'site-permissions': 'Site permissions',
     'bring-in-history': 'Bring in history',
+    'ai-service': 'AI service',
     phone: 'Phone',
     claude: 'Claude and other apps',
     cloud: 'Cloud'
@@ -218,9 +220,20 @@ const Privacy: React.FC = () => {
     )
 }
 
+// The service and the key's last four characters, never the key, which main doesn't send.
+const AiService: React.FC = () => {
+    const keyTry = useKeyTry()
+    return (
+        <div className="mt-4">
+            <AiServiceRows keyTry={keyTry} tryButton onRemove={() => void window.chromeAPI.aiKey.remove()} />
+        </div>
+    )
+}
+
 // Each row's state is a pill, and only what's true: a next step is a raised button beside it, and Set up opens the same
 // page as the row.
 const Connections: React.FC = () => {
+    const aiKey = useAiKey()
     const [phone] = usePhone()
     const [mcp] = useMcp()
     const [cloud, setCloud] = useCloud()
@@ -228,6 +241,15 @@ const Connections: React.FC = () => {
     const cloudSetUp = cloud.provider === 'local' || cloud.configured
     return (
         <SettingsGroup>
+            <SettingsLink
+                lead={<RowTile><Brain strokeWidth={1.75} /></RowTile>}
+                title="AI service"
+                description="What Berry thinks with, using your own key."
+                value={aiKey.service && aiKey.last4 ? `${aiServiceName(aiKey.service)} · ${aiKey.last4}` : undefined}
+                state={aiKey.service ? undefined : { words: 'Not set up' }}
+                action={aiKey.service ? undefined : setUp('ai-service')}
+                onOpen={() => openSettings('ai-service')}
+            />
             <SettingsLink
                 lead={<RowTile><Smartphone strokeWidth={1.75} /></RowTile>}
                 title="Phone"
@@ -276,6 +298,10 @@ const STEP_IN: Record<StepInPage, { about?: React.ReactNode; Body: React.FC }> =
     'what-leaves': { about: 'Everything is kept on this computer unless it’s listed here, and nothing is synced. Berry only reads a page when you ask, and only speaks up about work you started.', Body: WhatLeaves },
     'site-permissions': { about: 'When a site asks for your camera, location or similar, your answer shows up here.', Body: SitePermissionsSettings },
     'bring-in-history': { Body: BringInHistory },
+    'ai-service': {
+        about: <>Berry thinks with an AI service, using a key that’s yours, and you pay the service for what it uses. <More text="The key is kept encrypted on this computer and only ever goes to the service. Settings shows only its last four characters." /></>,
+        Body: AiService
+    },
     phone: {
         about: <>When a job needs you and you’re away, your own Telegram bot asks you, and your reply goes straight to the job. <More text="It runs from this computer, so it only works while Blueberry is open." /></>,
         Body: PhoneSettings

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
-import { permissionsInWords } from '@shared/mascots'
+import { BERRY_ID, permissionsInWords } from '@shared/mascots'
+import { firstJobRows, PLAIN_WORDS, type FirstJob } from '@shared/firstRun'
 import { Button } from '@common/components/Button'
 import { cn } from '@common/lib/utils'
 import { LABEL } from '@common/components/StatusPill'
@@ -20,6 +21,9 @@ import { suggestionRows, type SuggestionRow } from '../newTabSuggestions'
 import { useAttachments } from '../useAttachments'
 import { BoxChips, useAddMenu } from '../components/BoxAttachments'
 import { useRecording } from '../components/ShowBerry'
+import { FIRST_JOB_PROMPT, FirstJobs } from '../components/FirstJobs'
+import { setGalleryView } from '../galleryView'
+import { openSettings } from '../openSettings'
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
 
@@ -118,7 +122,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
     const browser = window.chromeAPI.browser
     const library = useLibrary()
-    const { layout } = useShell()
+    const { layout, settings } = useShell()
     const { chosen, choose, flock } = useFlock()
     // Who was chosen as the page opened, so choosing one from a row doesn't reorder the rows.
     const [chosenAtOpen] = useState(chosen.id)
@@ -178,6 +182,21 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
         else {
             choose(row.mascot.id)
             fill(row.key, null, row.prompt)
+        }
+    }
+
+    // First jobs, after the first run, in place of suggestions until every row is done or it's hidden.
+    const firstJobsShown = firstJobRows(settings.firstJobs, settings.firstJobsDone).length > 0
+    const pressFirstJob = (job: FirstJob) => {
+        if (job === 'key') openSettings('ai-service')
+        else if (job === 'history') openSettings('bring-in-history')
+        else if (job === 'try') {
+            // Its words are Berry's to act on. Nothing is sent until the user sends it.
+            choose(BERRY_ID)
+            fill('first-job-try', null, FIRST_JOB_PROMPT)
+        } else {
+            setGalleryView({ reviewing: PLAIN_WORDS, linked: null, query: '', category: null })
+            void browser.openPage('mascot-gallery')
         }
     }
 
@@ -279,7 +298,9 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 </ul>
                             </section>
                         )}
-                        {rows.length > 0 && (
+                        {firstJobsShown ? (
+                            <FirstJobs onPress={pressFirstJob} />
+                        ) : rows.length > 0 && (
                             <section aria-labelledby="new-tab-suggestions">
                                 <Label id="new-tab-suggestions">Suggestions</Label>
                                 <ul className="flex flex-col gap-0.5">

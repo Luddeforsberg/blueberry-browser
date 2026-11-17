@@ -26,7 +26,7 @@ import { PLAIN_WORDS, type FirstJob } from "../shared/firstRun";
 import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
-import { generateTitle, hasModel, streamReply, useSavedKey, writeWithCheapModel } from "./agent";
+import { generateTitle, hasModel, streamReply, setSavedKeyReader, writeWithCheapModel } from "./agent";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
 import { MemoryStore } from "./MemoryStore";
@@ -252,7 +252,7 @@ export class Window {
       sendToRenderer(this.chrome.view.webContents, "ai-key:updated", this.aiKey.state);
       if (this.aiKey.inUse) this.firstJobDone("key");
     });
-    useSavedKey(() => this.aiKey.inUse);
+    setSavedKeyReader(() => this.aiKey.inUse);
     this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
       this.broadcast("library:updated", this.librarySnapshot);
     });

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AccountState } from '@shared/ipc'
 
 // Starts as not set up, so no control shows until main has said there's a server.
-const UNKNOWN: AccountState = { status: 'not-set-up', email: null, problem: null }
+const UNKNOWN: AccountState = { status: 'not-set-up', email: null, problem: null, problemAbout: null }
 
 export const useAccount = () => {
     const [state, setState] = useState(UNKNOWN)

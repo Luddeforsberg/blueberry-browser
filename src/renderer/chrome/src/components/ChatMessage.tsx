@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, StepKind, UsedPage } from '@shared/library'
 import { linkSite } from '@shared/publishing'
+import { NO_KEY } from '@shared/aiKey'
 import { ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Cloud, Copy, Lock, Repeat } from 'lucide-react'
 import { ApprovalCard, CardInShell, Keycap, WhyLine } from '@common/components/ApprovalCard'
 import { useCardKeys } from '@common/components/cardKeys'
@@ -25,6 +26,7 @@ import type { SentAttachment } from '@shared/attachments'
 import { RememberedLine } from './MemoryInChat'
 import type { RoutineFormValues } from '../routinesView'
 import { SaveAsRoutineCard } from './SaveAsRoutine'
+import { openSettings } from '../openSettings'
 
 const FOLLOW_DISTANCE = 120
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
@@ -715,7 +717,13 @@ export const ChatApprovalCard: React.FC<SpokenProps> = ({ chatId, approval, masc
     return <ApprovalCard question={question} exactly={exactly} mark={mark} note={why && <WhyLine>{why}</WhyLine>} onConfirm={() => decide(true)} onDeny={() => decide(false)} />
 }
 
-// Why something failed, worded with what to do about it.
-export const ChatError: React.FC<{ message: string }> = ({ message }) => (
-    <p role="alert" className="text-14 text-ask animate-fade-in">{message}</p>
-)
+// Why something failed, worded with what to do about it. With no key, that's a way to add one.
+export const ChatError: React.FC<{ message: string }> = ({ message }) =>
+    message === NO_KEY ? (
+        <div className="flex flex-col items-start gap-2 animate-fade-in">
+            <p role="alert" className="text-14 text-ask">{message}</p>
+            <Button variant="raised" size="sm" onClick={() => openSettings('ai-service')}>Add a key</Button>
+        </div>
+    ) : (
+        <p role="alert" className="text-14 text-ask animate-fade-in">{message}</p>
+    )
