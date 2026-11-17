@@ -248,13 +248,13 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div className="absolute inset-0 overflow-y-auto [container-type:size]">
                 <div className="min-h-full flex flex-col items-center px-6 pt-[max(48px,calc(43cqh-127px))] pb-12">
                     {/* A mark, not a control. Blueberry on the desktop flies out from here. */}
-                    <h1 className="max-w-full mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
+                    <h1 className="max-w-[640px] mb-[26px] flex items-center gap-3 text-30 font-medium text-ink">
                         <span data-berry-perched className="-mt-1.5 shrink-0 flex" style={away ? { opacity: 0 } : undefined}>
                             <span key={face.arrival} className={cn('flex origin-[50%_70%]', face.arrival > 0 && (still ? 'animate-[mascot-fade_150ms_ease-out]' : 'animate-mascot-pop'))}>
                                 <Berry size={40} mascot={shown} mood={face.mood} shut={face.shut} />
                             </span>
                         </span>
-                        {/* A long name is cut, never wrapped. */}
+                        {/* A long name is cut, never wrapped, at the box's width. */}
                         <span className="min-w-0 truncate">{greeting ? `Where to, ${greeting}?` : 'Where to?'}</span>
                     </h1>
 

@@ -400,7 +400,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
                 <StepCard
                     {...card}
                     question="Shall I bring your history over?"
-                    hint={history.done ? undefined : 'Then I can suggest things from day one, and the address field knows where you’ve been.'}
+                    hint="Then I can suggest things from day one, and the address field knows where you’ve been."
                     nav={nav(<Primary disabled={!primary} onClick={() => primary?.()}>{history.done ? 'Continue' : failed ? 'Try again' : 'Bring it in'}</Primary>)}
                 >
                     <SourceRows history={history} />
