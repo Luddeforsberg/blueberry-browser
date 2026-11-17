@@ -102,6 +102,16 @@ test("a routine is created, runs behind the user, asks first, and doesn't act af
   await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id!), routinesTab?.id);
   expect(requested).toEqual([]);
 
+  // On the list it's under Needs you with what it wants, and Answer opens its card on Needs you.
+  await chrome.getByRole("button", { name: "Back to Routines" }).click();
+  await expect(chrome.getByRole("region", { name: "Needs you" }).getByRole("listitem")).toContainText("Open 127.0.0.1 in a new tab");
+  await chrome.getByRole("button", { name: "Answer: Flight watch" }).click();
+  await expect(chrome.getByRole("heading", { name: "Needs you" })).toBeVisible();
+  await expect(chrome.getByRole("region", { name: "Approval needed" }).getByText(question)).toBeVisible();
+  await chrome.evaluate((id) => window.chromeAPI.browser.closeTab(id), (await tabs()).find((tab) => tab.page === "needs-you")!.id);
+  await chrome.evaluate((id) => window.chromeAPI.browser.switchTab(id!), routinesTab?.id);
+  await chrome.getByRole("button", { name: "Flight watch", exact: true }).click();
+
   // Allowed, the run opens its tab behind the current view and closes it when it's done.
   await cards.getByRole("button", { name: "Allow", exact: true }).click();
   await expect.poll(() => requested).toContain("/prices?from=ARN");

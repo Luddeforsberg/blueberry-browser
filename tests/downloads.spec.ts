@@ -148,7 +148,7 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   chrome = await findView(app, "view=chrome");
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));
   const gone = chrome.getByRole("listitem", { name: "report.txt" });
-  await expect(gone.getByText("File is missing")).toBeVisible();
+  await expect(gone.getByText("Moved or deleted")).toBeVisible();
   await expect(gone.getByRole("button", { name: "Open", exact: true })).toHaveCount(0);
   await expect(chrome.getByRole("listitem", { name: "large.bin" }).getByRole("button", { name: "Open", exact: true })).toBeVisible();
   await expect(chrome.getByRole("listitem", { name: "large (1).bin" }).getByText("Cancelled")).toBeVisible();
