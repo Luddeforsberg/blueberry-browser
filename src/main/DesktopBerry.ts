@@ -132,6 +132,7 @@ export class DesktopBerry {
   private panelOpen: "box" | "sheets" | null = null;
   private trayOpen = false;
   private asking: ShownAsk | null = null;
+  private asksShown = 0;
   private said: string | null = null;
   private opened = 0;
   private closing = false;
@@ -570,7 +571,7 @@ export class DesktopBerry {
     if (this.panelOpen !== "sheets" || this.closing) this.opened++;
     this.panelOpen = "sheets";
     this.trayOpen = withTray;
-    this.asking = { item: structuredClone(item), decided: false };
+    this.asking = { key: `a${++this.asksShown}`, item: structuredClone(item), decided: false };
     this.said = null;
     void this.showPanel();
   }
@@ -584,14 +585,15 @@ export class DesktopBerry {
     this.hovering = false;
     void this.comeOut();
     await this.whenLoaded(this.panel?.view.webContents);
-    if (!this.panelOpen || this.panelWindow !== window) return;
+    // Closed while it waited, so it stays closed, and the keyboard stays where it is.
+    if (!this.panelOpen || this.closing || this.panelWindow !== window) return;
     // The tray and the ask are as tall as what's in them, so the window waits to hear that before it shows.
     const sized = this.panelOpen === "sheets" ? this.nextHeight() : Promise.resolve();
     this.placePanel();
     this.publishPanel();
     this.publish();
     await sized;
-    if (!this.panelOpen || this.panelWindow !== window || window.isDestroyed()) return;
+    if (!this.panelOpen || this.closing || this.panelWindow !== window || window.isDestroyed()) return;
     this.placePanel();
     this.publishPanel();
     window.showInactive();
@@ -694,7 +696,8 @@ export class DesktopBerry {
   }
 
   trayPress(key: string): void {
-    const target = typeof key === "string" && this.trayOpen ? this.trayKeys.get(key) : undefined;
+    // Not while it's going away: what was pressed is no longer there to press.
+    const target = typeof key === "string" && this.trayOpen && !this.closing ? this.trayKeys.get(key) : undefined;
     if (!target) return;
     if (target.kind === "ask") {
       const item = this.facts.needsYou.find(({ id, approval }) => id === target.chatId && approval.id === target.approvalId);
@@ -708,8 +711,10 @@ export class DesktopBerry {
   }
 
   // Applied to the ask main showed, through the same path as Needs you, once. Nothing goes if that ask isn't the one
-  // waiting any more or has changed since it was shown, and a handoff or a code never goes from here.
+  // waiting any more or has changed since it was shown, if the press was on an earlier showing, or once the sheet is
+  // going away, and a handoff or a code never goes from here.
   decide(decision: unknown): DesktopDecided {
+    if (this.panelOpen !== "sheets" || this.closing) return "gone";
     const shown = this.asking;
     const check = checkDecision(shown, this.facts.needsYou, decision);
     if (!check.ok || !shown) {
@@ -905,7 +910,7 @@ export class DesktopBerry {
       anchor: place?.anchor ?? { x: 0, y: 0 },
       box: this.box,
       tray,
-      ask: shown && askFace ? { ...desktopAsk(shown.item, askFace), said: this.said } : null,
+      ask: shown && askFace ? { ...desktopAsk(shown.item, askFace), key: shown.key, said: this.said } : null,
       showBerry,
       still: this.still,
     };

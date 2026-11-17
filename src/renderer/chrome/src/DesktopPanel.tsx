@@ -419,7 +419,7 @@ const AskSheet: React.FC<{ ask: DesktopAsk; state: DesktopPanelState }> = ({ ask
     const decide = async (allow: boolean, words?: string) => {
         if (sent) return
         setSent(true)
-        const result = await desktop().decide(words === undefined ? { allow } : { allow, answer: words })
+        const result = await desktop().decide(words === undefined ? { key: ask.key, allow } : { key: ask.key, allow, answer: words })
         if (result === 'code') {
             setSent(false)
             setProblem('That looks like a code. Codes only go into the page itself, never through here.')
@@ -525,7 +525,7 @@ const Sheets: React.FC<{ state: DesktopPanelState; mac: boolean }> = ({ state, m
     const { tray, ask, edge, closing, still } = state
     const root = useRef<HTMLDivElement>(null)
     // What's in them at their own height, however much of it the window has room for, whenever any of it changes.
-    const shown = `${!!tray}:${ask ? `${ask.kind}:${ask.text}` : ''}`
+    const shown = `${!!tray}:${ask?.key ?? ''}`
     useLayoutEffect(() => {
         const element = root.current
         if (!element) return
@@ -536,7 +536,7 @@ const Sheets: React.FC<{ state: DesktopPanelState; mac: boolean }> = ({ state, m
         contents.forEach((content) => observer.observe(content))
         return () => observer.disconnect()
     }, [shown])
-    const sheets = [tray && <TraySheet key="tray" tray={tray} state={state} mac={mac} />, ask && <AskSheet key={`${ask.kind}:${ask.text}`} ask={ask} state={state} />]
+    const sheets = [tray && <TraySheet key="tray" tray={tray} state={state} mac={mac} />, ask && <AskSheet key={ask.key} ask={ask} state={state} />]
     const align: Record<DesktopEdge, string> = { right: 'items-center justify-end', left: 'items-center justify-start', top: 'items-start justify-center', bottom: 'items-end justify-center' }
     return (
         <div

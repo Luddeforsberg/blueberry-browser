@@ -65,9 +65,9 @@ test("the drop takes a job from any app, comes out when it asks without saying w
 
     // Only each view can use its own channels, and nothing else can answer from here.
     await expect(chrome.evaluate(() => window.chromeAPI.desktop.send("From the wrong view", false))).rejects.toThrow(/Rejected/);
-    await expect(chrome.evaluate(() => window.chromeAPI.desktop.decide({ allow: true }))).rejects.toThrow(/Rejected/);
+    await expect(chrome.evaluate(() => window.chromeAPI.desktop.decide({ key: "a1", allow: true }))).rejects.toThrow(/Rejected/);
     await expect(desktop.evaluate(() => window.chromeAPI.desktop.send("From the drop", false))).rejects.toThrow(/Rejected/);
-    await expect(desktop.evaluate(() => window.chromeAPI.desktop.decide({ allow: true }))).rejects.toThrow(/Rejected/);
+    await expect(desktop.evaluate(() => window.chromeAPI.desktop.decide({ key: "a1", allow: true }))).rejects.toThrow(/Rejected/);
     await expect(panel.evaluate(() => window.chromeAPI.desktop.press("drop"))).rejects.toThrow(/Rejected/);
     await expect(panel.evaluate(() => window.chromeAPI.chat.send(null, "Around the box", { seePage: true }))).rejects.toThrow(/Rejected/);
     await expect(panel.evaluate(() => window.chromeAPI.chat.decide("chat", "approval", true))).rejects.toThrow(/Rejected/);
@@ -125,11 +125,28 @@ test("the drop takes a job from any app, comes out when it asks without saying w
     await expect(ask).toContainText(address);
     await expect(drop).toHaveAttribute("data-says", "rest");
 
+    // A press on an earlier showing answers nothing and leaves this one be, and nothing is answered once it's going away.
+    const showingKey = async () => (await panel.evaluate(() => window.chromeAPI.desktop.panelState())).ask!.key;
+    expect(await panel.evaluate(() => window.chromeAPI.desktop.decide({ key: "a0", allow: true }))).toBe("gone");
+    await expect(ask).toBeVisible();
+    const goingAway = await panel.evaluate((key) => {
+      void window.chromeAPI.desktop.closePanel();
+      return window.chromeAPI.desktop.decide({ key, allow: true });
+    }, await showingKey());
+    expect(goingAway).toBe("gone");
+    await expect.poll(() => showing(app, "composer")).toBe(false);
+    await expect(drop).toHaveAttribute("data-says", "asking");
+    expect(await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).toHaveLength(before.length);
+    await desktop.locator('[data-desktop-part="answer"]').click();
+    await expect.poll(() => showing(app, "composer")).toBe(true);
+    await expect(ask).toBeVisible();
+
     // Allow goes once, to that approval, through the same path as Needs you, and a second press sends nothing.
+    const key = await showingKey();
     await ask.getByRole("button", { name: "Allow", exact: true }).click();
     await expect(ask.getByRole("status")).toHaveText("Allowed. Berry carries on.");
-    expect(await panel.evaluate(() => window.chromeAPI.desktop.decide({ allow: true }))).toBe("gone");
-    expect(await panel.evaluate(() => window.chromeAPI.desktop.decide({ allow: false }))).toBe("gone");
+    expect(await panel.evaluate((key) => window.chromeAPI.desktop.decide({ key, allow: true }), key)).toBe("gone");
+    expect(await panel.evaluate((key) => window.chromeAPI.desktop.decide({ key, allow: false }), key)).toBe("gone");
     await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.browser.getTabs())).length).toBe(before.length + 1);
     await expect.poll(() => showing(app, "composer"), { timeout: 4000 }).toBe(false);
 

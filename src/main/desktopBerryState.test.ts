@@ -184,51 +184,57 @@ describe("desktopAsk", () => {
 });
 
 describe("checkDecision", () => {
-  const shown = (item: NeedsYouItem, decided = false): ShownAsk => ({ item: structuredClone(item), decided });
+  const shown = (item: NeedsYouItem, decided = false): ShownAsk => ({ key: "k1", item: structuredClone(item), decided });
   const approval = asking("a1");
   const question = asking("q1", { question: true, text: "Which size?", answers: ["S", "M"] });
 
+  it("refuses a press on an earlier showing, whatever is showing now", () => {
+    expect(checkDecision(shown(approval), [approval], { key: "k0", allow: true })).toEqual({ ok: false, why: "stale" });
+    expect(checkDecision(shown(question), [question], { key: "", allow: true, answer: "S" })).toEqual({ ok: false, why: "stale" });
+  });
+
   it("sends a decision to the ask that was shown, and only that one", () => {
-    expect(checkDecision(shown(approval), [approval], { allow: true })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: true });
-    expect(checkDecision(shown(approval), [approval], { allow: false })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: false });
+    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: true })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: true });
+    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: false })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: false });
     // Whatever else is waiting, older or newer.
     const other = { ...asking("b1"), id: "other-chat" } as NeedsYouItem;
-    expect(checkDecision(shown(approval), [other, approval], { allow: true })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: true });
-    expect(checkDecision(shown(other), [approval, other], { allow: false })).toEqual({ ok: true, chatId: "other-chat", approvalId: "b1", allow: false });
+    expect(checkDecision(shown(approval), [other, approval], { key: "k1", allow: true })).toEqual({ ok: true, chatId: "chat", approvalId: "a1", allow: true });
+    expect(checkDecision(shown(other), [approval, other], { key: "k1", allow: false })).toEqual({ ok: true, chatId: "other-chat", approvalId: "b1", allow: false });
   });
 
   it("sends nothing twice, nothing with no ask shown, and nothing once it's gone or another is waiting in its place", () => {
-    expect(checkDecision(null, [approval], { allow: true })).toEqual({ ok: false, why: "gone" });
-    expect(checkDecision(shown(approval, true), [approval], { allow: true })).toEqual({ ok: false, why: "gone" });
-    expect(checkDecision(shown(approval), [], { allow: true })).toEqual({ ok: false, why: "gone" });
-    expect(checkDecision(shown(approval), [asking("a2")], { allow: true })).toEqual({ ok: false, why: "gone" });
+    expect(checkDecision(null, [approval], { key: "k1", allow: true })).toEqual({ ok: false, why: "gone" });
+    expect(checkDecision(shown(approval, true), [approval], { key: "k1", allow: true })).toEqual({ ok: false, why: "gone" });
+    expect(checkDecision(shown(approval), [], { key: "k1", allow: true })).toEqual({ ok: false, why: "gone" });
+    expect(checkDecision(shown(approval), [asking("a2")], { key: "k1", allow: true })).toEqual({ ok: false, why: "gone" });
   });
 
   it("sends nothing if the ask has changed since it was shown", () => {
-    expect(checkDecision(shown(approval), [{ ...approval, approval: { ...approval.approval, text: "Click Delete account" } }], { allow: true })).toEqual({ ok: false, why: "gone" });
-    expect(checkDecision(shown(question), [{ ...question, approval: { ...question.approval, answers: ["S", "M", "Delete"] } }], { allow: true, answer: "S" })).toEqual({ ok: false, why: "gone" });
+    expect(checkDecision(shown(approval), [{ ...approval, approval: { ...approval.approval, text: "Click Delete account" } }], { key: "k1", allow: true })).toEqual({ ok: false, why: "gone" });
+    expect(checkDecision(shown(question), [{ ...question, approval: { ...question.approval, answers: ["S", "M", "Delete"] } }], { key: "k1", allow: true, answer: "S" })).toEqual({ ok: false, why: "gone" });
   });
 
   it("never answers a handoff from here", () => {
     const handoff = asking("h1", { handoff: { need: "sign-in", tabId: "t", site: "github.com" } });
-    expect(checkDecision(shown(handoff), [handoff], { allow: true })).toEqual({ ok: false, why: "not-here" });
-    expect(checkDecision(shown(handoff), [handoff], { allow: false })).toEqual({ ok: false, why: "not-here" });
+    expect(checkDecision(shown(handoff), [handoff], { key: "k1", allow: true })).toEqual({ ok: false, why: "not-here" });
+    expect(checkDecision(shown(handoff), [handoff], { key: "k1", allow: false })).toEqual({ ok: false, why: "not-here" });
   });
 
   it("answers a question in words, skips it with none, and sends nothing shaped like a code", () => {
-    expect(checkDecision(shown(question), [question], { allow: true, answer: "Medium, please" })).toEqual({ ok: true, chatId: "chat", approvalId: "q1", allow: true, answer: "Medium, please" });
-    expect(checkDecision(shown(question), [question], { allow: false })).toEqual({ ok: true, chatId: "chat", approvalId: "q1", allow: false });
-    expect(checkDecision(shown(question), [question], { allow: true, answer: "482 913" })).toEqual({ ok: false, why: "code" });
-    expect(checkDecision(shown(question), [question], { allow: true, answer: "AB12CD" })).toEqual({ ok: false, why: "code" });
-    expect(checkDecision(shown(question), [question], { allow: true })).toEqual({ ok: false, why: "invalid" });
-    expect(checkDecision(shown(question), [question], { allow: true, answer: "   " })).toEqual({ ok: false, why: "invalid" });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "Medium, please" })).toEqual({ ok: true, chatId: "chat", approvalId: "q1", allow: true, answer: "Medium, please" });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: false })).toEqual({ ok: true, chatId: "chat", approvalId: "q1", allow: false });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "482 913" })).toEqual({ ok: false, why: "code" });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "AB12CD" })).toEqual({ ok: false, why: "code" });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true })).toEqual({ ok: false, why: "invalid" });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: "   " })).toEqual({ ok: false, why: "invalid" });
   });
 
   it("takes only a plain decision", () => {
     expect(checkDecision(shown(approval), [approval], null)).toEqual({ ok: false, why: "invalid" });
-    expect(checkDecision(shown(approval), [approval], { allow: "yes" })).toEqual({ ok: false, why: "invalid" });
-    expect(checkDecision(shown(approval), [approval], { allow: true, answer: "Yes" })).toEqual({ ok: false, why: "invalid" });
-    expect(checkDecision(shown(question), [question], { allow: true, answer: 5 })).toEqual({ ok: false, why: "invalid" });
+    expect(checkDecision(shown(approval), [approval], { allow: true })).toEqual({ ok: false, why: "invalid" });
+    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: "yes" })).toEqual({ ok: false, why: "invalid" });
+    expect(checkDecision(shown(approval), [approval], { key: "k1", allow: true, answer: "Yes" })).toEqual({ ok: false, why: "invalid" });
+    expect(checkDecision(shown(question), [question], { key: "k1", allow: true, answer: 5 })).toEqual({ ok: false, why: "invalid" });
   });
 });
 

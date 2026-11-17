@@ -181,7 +181,7 @@ export const desktopTray = (facts: DesktopFacts, flock: MascotProfile[], keyFor:
 };
 
 // The ask, as the sheet shows it after Answer: the tool's exact words, never cut.
-export const desktopAsk = (item: NeedsYouItem, face: DesktopFace): Omit<DesktopAsk, "said"> => {
+export const desktopAsk = (item: NeedsYouItem, face: DesktopFace): Omit<DesktopAsk, "key" | "said"> => {
   const { approval } = item;
   return {
     face,
@@ -193,8 +193,10 @@ export const desktopAsk = (item: NeedsYouItem, face: DesktopFace): Omit<DesktopA
   };
 };
 
-// The ask that's showing, as it was when it was shown. Main holds it, and the view only ever sends a decision.
+// The ask that's showing, as it was when it was shown, under a key made for this one showing. Main holds it, and the
+// view only ever sends a decision with that key, so a press on a sheet that has since been replaced answers nothing.
 export interface ShownAsk {
+  key: string;
   item: NeedsYouItem;
   decided: boolean;
 }
@@ -210,15 +212,17 @@ export const sameAsk = (shown: ChatApproval, live: ChatApproval): boolean =>
 
 export type DecisionCheck =
   | { ok: true; chatId: string; approvalId: string; allow: boolean; answer?: string }
-  | { ok: false; why: "gone" | "code" | "not-here" | "invalid" };
+  | { ok: false; why: "gone" | "stale" | "code" | "not-here" | "invalid" };
 
-// Whether a decision from the ask may go, and to which approval: only the one that was shown, only while it's still the
-// one waiting and unchanged, and only once. A handoff isn't answered here, and an answer shaped like a code isn't sent.
+// Whether a decision from the ask may go, and to which approval: only the one that was shown, only from a press on that
+// showing (`stale` otherwise, which leaves the one showing now alone), only while it's still the one waiting and
+// unchanged, and only once. A handoff isn't answered here, and an answer shaped like a code isn't sent.
 export const checkDecision = (shown: ShownAsk | null, waiting: readonly NeedsYouItem[], decision: unknown): DecisionCheck => {
   if (!shown || shown.decided) return { ok: false, why: "gone" };
   if (typeof decision !== "object" || decision === null) return { ok: false, why: "invalid" };
-  const { allow, answer } = decision as { allow?: unknown; answer?: unknown };
-  if (typeof allow !== "boolean" || (answer !== undefined && typeof answer !== "string")) return { ok: false, why: "invalid" };
+  const { key, allow, answer } = decision as { key?: unknown; allow?: unknown; answer?: unknown };
+  if (typeof key !== "string" || typeof allow !== "boolean" || (answer !== undefined && typeof answer !== "string")) return { ok: false, why: "invalid" };
+  if (key !== shown.key) return { ok: false, why: "stale" };
   const live = waiting.find((item) => item.id === shown.item.id);
   if (!live || !sameAsk(shown.item.approval, live.approval)) return { ok: false, why: "gone" };
   const { approval } = live;

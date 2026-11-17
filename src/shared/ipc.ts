@@ -159,6 +159,8 @@ export interface DesktopTray {
 
 // The ask, only ever after Answer was pressed: the exact words, which are what's being allowed.
 export interface DesktopAsk {
+  // Made by main for this one showing, and sent back with a decision. It says nothing of the chat or the approval.
+  key: string;
   face: DesktopFace;
   kind: "approval" | "question" | "handoff";
   // The tool's exact words, or the question.
@@ -188,13 +190,15 @@ export interface DesktopPanelState {
   still: boolean;
 }
 
-// An answer from the ask. Main applies it to the ask it showed, and only once.
+// An answer from the ask, with the key of the showing it was pressed on. Main applies it to the ask it showed under
+// that key, and only once.
 export interface DesktopDecision {
+  key: string;
   allow: boolean;
   answer?: string;
 }
 
-// "done" went through. "gone" means that ask isn't the one waiting any more, or was answered here already. "code" is an
+// "done" went through. "gone" means that ask isn't the one waiting or the one showing any more, or was answered here already. "code" is an
 // answer shaped like a code, which isn't sent.
 export type DesktopDecided = "done" | "gone" | "code";
 
