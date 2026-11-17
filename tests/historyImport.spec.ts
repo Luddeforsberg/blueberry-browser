@@ -32,7 +32,8 @@ test("the first run brings in another browser's history, and the birds speak abo
     expect(model.suggestionRequests).toHaveLength(0);
 
     await chrome.getByRole("button", { name: "Bring it in" }).click();
-    await expect(chrome.getByRole("status")).toHaveText(/^[\d,  ]+ visits came across from Chrome\.Done$/);
+    await expect(chrome.getByRole("status")).toHaveText(/^[\d,  ]+ visits came across from Chrome\.$/);
+    await expect(chrome.getByRole("radio", { name: /^Chrome[\d,  ]+ visits came acrossDone$/ })).toBeChecked();
     await chrome.getByRole("button", { name: "Continue" }).click();
     await chrome.getByRole("button", { name: "Start browsing" }).click();
 

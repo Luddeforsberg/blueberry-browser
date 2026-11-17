@@ -45,8 +45,14 @@ test("the first run makes an account, keeps a key the service answered, and ends
     // A key the service turns down isn't kept, and one it answers is.
     await expect(chrome.getByRole("heading", { name: "Give me a brain." })).toBeVisible();
     await chrome.getByLabel("OpenAI key").fill(BAD_KEY);
+    // The services are a choice of one by keyboard too, and the other one never gets this one's key.
+    await chrome.getByRole("radio", { name: /^OpenAI/ }).press("ArrowRight");
+    await expect(chrome.getByRole("radio", { name: /^Anthropic/ })).toBeChecked();
+    await expect(chrome.getByLabel("Anthropic key")).toHaveValue("");
+    await chrome.getByRole("radio", { name: /^Anthropic/ }).press("ArrowLeft");
+    await chrome.getByLabel("OpenAI key").fill(BAD_KEY);
     await chrome.getByRole("button", { name: "Try the key" }).click();
-    await expect(chrome.getByRole("alert")).toContainText("The service turned that key down.");
+    await expect(chrome.getByRole("alert")).toContainText("OpenAI turned that key down.");
     await expect(chrome.getByLabel("OpenAI key")).toHaveValue(BAD_KEY);
     await chrome.getByLabel("OpenAI key").fill(GOOD_KEY);
     await chrome.getByLabel("OpenAI key").press("Enter");
@@ -57,16 +63,21 @@ test("the first run makes an account, keeps a key the service answered, and ends
 
     // No other browser here, so no history step.
     await expect(chrome.getByRole("heading", { name: "What I can see." })).toBeVisible();
+    // Never is only in Settings, where what it risks is said.
+    const asking = chrome.getByRole("radiogroup", { name: "Ask before I act" });
+    await expect(asking.getByRole("radio")).toHaveText(["When risky", "Always"]);
+    await asking.getByRole("radio", { name: "Always" }).click();
     await chrome.getByRole("switch", { name: "Offers to remember what you tell me" }).click();
     await chrome.getByRole("button", { name: "Start browsing" }).click();
 
-    await expect(chrome.getByRole("heading", { name: "Where to?" })).toBeVisible();
+    await expect(chrome.getByRole("heading", { name: "Where to, Sam?" })).toBeVisible();
     const firstJobs = chrome.getByRole("region", { name: "First jobs" });
     await expect(firstJobs).toContainText("0 of 2");
     expect(await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).toMatchObject({
       onboarded: true,
       accountName: "Sam",
       layoutMode: "horizontal",
+      actionApproval: "always",
       memoryOffers: false,
       firstJobs: ["try", "meet"],
     });
