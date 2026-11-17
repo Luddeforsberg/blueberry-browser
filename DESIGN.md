@@ -236,6 +236,9 @@ Crisp: quick to start, gently settling.
 | Hover, press | about 100ms |
 | A menu opening | about 150ms |
 | A line sliding out from under a card, a panel | about 280ms |
+| A tooltip appearing, after the pointer has rested 350ms | about 110ms |
+| A tooltip moving to a neighbour, an icon changing | about 170ms |
+| A segmented switch's pill sliding, a row folding away or opening | 150 to 200ms |
 | Switching mascots, the longest in the chrome | 420ms in all |
 
 - **Easing:** `cubic-bezier(.2, .8, .2, 1)` (*to tune*).
@@ -243,8 +246,15 @@ Crisp: quick to start, gently settling.
 - **Overshoot is the mascots' alone:** a mascot pops when it arrives. Nothing else in the chrome bounces.
 - **Loops** only while real work is happening, stopping as soon as it ends.
 - **Interruptible:** every transition can reverse from wherever it is.
+- **A control answering you isn't counted** in one thing per area. That rule is about what moves by itself. What follows are all answers to a press or to the pointer, short, and with no overshoot. Mock, which can be tried: [tooltips-and-motion.html](./docs/design/mocks/tooltips-and-motion.html).
+- **A segmented switch slides.** The chosen side's sheet travels to the side that's pressed, and where the chosen side carries its name, as This PC and Cloud do, the name opens out as the other closes. Every segmented switch does it, at one speed.
+- **An icon that changes, changes in place:** the old one shrinks to half and blurs out as the new one comes in. Copy to a tick and back, the bookmark star filling, the eye on a password, Send turning to Stop. Send also goes from off to filled as the first word is typed, over about 160ms.
+- **A menu belongs to its button.** It grows from the corner nearest the button, the button keeps its pressed look while the menu is open, and an arrow on the button turns over. Closing is the same in reverse, in about 100ms.
+- **A row that's added or removed** in a list the user is working in, a tab above all, opens from nothing or folds to nothing, so the rows under it slide rather than jump. A list that's only being read, such as History, doesn't.
+- **A row's arrow** leans 3px towards where it goes while the row is pointed at. **A hovered row's highlight** has no gap to the next row's, so it never drops out on the way down a list.
+- **The sidebar and the chat panel don't slide open.** The page beside them is a native view that would have to be resized on every frame, which judders.
 - **Web pages:** never animate page content.
-- **Reduced motion:** follow the system setting and the CSS media query. Pips show one still frame, the live line's words stop shimmering, a mascot changes with a short fade, and nothing slides.
+- **Reduced motion:** follow the system setting and the CSS media query. Pips show one still frame, the live line's words stop shimmering, a mascot changes with a short fade, and nothing slides: a tooltip and a changed icon fade, a switch's sheet is simply on the other side, and a row is there or gone.
 
 ## 8. Component states
 
@@ -270,6 +280,9 @@ Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell
 - **The dot grid never sits behind text.** It fades out behind anything that's read.
 - **Send has three states:** off until there's something to send, filled when ready, and a filled stop square while a reply runs. It is always `ink`, never a mascot's colour.
 - **A switch between two things** is a segmented control, and the chosen side carries its name: "This Mac", "Cloud". The other side is its icon alone.
+- **A tooltip** is a near-black pill in both modes, `tip`: 26px tall, an 8px radius, 8px at its sides, its words in white at 12px medium, with a soft shadow, and in dark mode a 1px ring of white at 12% so it shows on the ground. A shortcut follows the words, each key on its own small chip of white at 16%, written as this computer writes it. It sits 7px under its control, or over it where there's no room, in the middle of it, kept inside the window, and it never covers the control.
+- **When a tooltip shows:** after the pointer has rested on the control for 350ms, or at once when the keyboard reaches it. Along a row of controls it's one tooltip that follows the pointer, sliding and resizing, with no wait and no blink between neighbours. It goes when the pointer leaves, on a press, on Escape and when anything scrolls.
+- **What gets a tooltip:** every control that's only an icon, a control whose words don't say what pressing it does, such as the mascot in the prompt box ("Choose a mascot") and the two sides of This PC and Cloud, and words cut with an ellipsis, which it gives in full. A button whose words already say it gets none. A tooltip says what the control does in two or three words, in the state it's in: "Bookmark this page", then "Remove bookmark". The system's own tooltip isn't used anywhere in the chrome.
 - **Menus** are sheets with a 22px radius and `lift`. Rows are 40px, or 46px with a second line, and the hovered row gets a 14px-radius `sheet-2` fill.
 - **Favicons:** a page with no icon shows the first letter of its site on a small coloured tile.
 
