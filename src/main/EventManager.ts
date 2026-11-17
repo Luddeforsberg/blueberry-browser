@@ -335,15 +335,21 @@ export class EventManager {
     const { desktopBerry } = this.mainWindow;
     this.handle("desktop:shortcut-taken", () => desktopBerry.shortcutTaken);
     this.handle("desktop:state", () => desktopBerry.state);
-    this.handle("desktop:line-box", (box) => desktopBerry.setLineBox(box));
-    this.handle("desktop:press", () => desktopBerry.press());
+    this.handle("desktop:drop-box", (box, frame) => desktopBerry.setDropBox(box, frame));
+    this.handle("desktop:press", (part) => desktopBerry.press(part));
     this.handle("desktop:drag-start", () => desktopBerry.dragStart());
     this.handle("desktop:drag-end", () => desktopBerry.dragEnd());
     this.handle("desktop:menu", () => desktopBerry.showMenu());
-    this.handle("desktop:composer-state", () => desktopBerry.composerState);
-    this.handle("desktop:composer-height", (height) => desktopBerry.setComposerHeight(height));
-    this.handle("desktop:send", (text) => desktopBerry.send(text));
-    this.handle("desktop:close-composer", () => desktopBerry.closeComposer());
+    this.handle("desktop:panel-state", () => desktopBerry.panelState);
+    this.handle("desktop:panel-height", (height) => desktopBerry.setPanelHeight(height));
+    this.handle("desktop:send", (text, cloud) => desktopBerry.send(text, cloud));
+    this.handle("desktop:choose", (mascotId) => desktopBerry.choose(mascotId));
+    this.handle("desktop:open-box", () => desktopBerry.openBox());
+    this.handle("desktop:close-panel", () => desktopBerry.closePanel());
+    this.handle("desktop:open-blueberry", () => desktopBerry.openBlueberry());
+    this.handle("desktop:tray-press", (key) => desktopBerry.trayPress(key));
+    this.handle("desktop:decide", (decision) => desktopBerry.decide(decision));
+    this.handle("desktop:see-page", () => desktopBerry.seePage());
   }
 
   public cleanup(): void {

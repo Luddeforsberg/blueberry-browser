@@ -211,7 +211,7 @@ const Mascots: React.FC = () => {
                             ? `Another app already uses ${shortcut}, so press the mascot to give it a job instead.`
                             : `When you leave Blueberry, the mascot waits at the edge of your screen, and ${shortcut} gives it a job from any app.`
                     }
-                    more={`${shortcutTaken ? '' : 'Drag it to any edge. '}It can’t see your screen or other apps, and jobs ask just as a chat does. Closing Blueberry’s window takes it away and stops what’s running.`}
+                    more={`${shortcutTaken ? '' : 'Drag it to any edge. '}It can’t see your screen or other apps, and jobs ask just as a chat does, there or in Blueberry. Closing Blueberry’s window takes it away and stops what’s running.`}
                 >
                     <Switch labelledBy="setting-desktop-berry" checked={settings.desktopBerry} onChange={(desktopBerry) => updateSettings({ desktopBerry })} />
                 </SettingsRow>

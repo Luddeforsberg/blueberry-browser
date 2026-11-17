@@ -1,4 +1,5 @@
-import type { DesktopBerrySpot, DesktopEdge, DesktopLineAnchor, Layout, LayoutMode, Point, Rect } from "../shared/ipc";
+import type { DesktopBerrySpot, DesktopEdge, Layout, LayoutMode, Point, Rect } from "../shared/ipc";
+import { DESKTOP_BOX, DESKTOP_DROP, DESKTOP_DROP_MOST, DESKTOP_FILLET, DESKTOP_SHADOW } from "../shared/desktopSizes";
 
 export type { Layout, LayoutMode, Rect };
 
@@ -88,120 +89,111 @@ export const tooltipRect = (pill: Rect, window: { width: number; height: number 
   };
 };
 
-// The bird on the edge of the screen. Its window keeps one size wherever it stands, so nothing resizes while it moves or
-// speaks, and the bird tucks by being moved past the side of the window that lies along the edge.
-export const DESKTOP_BIRD_SIZE = 72;
-// Along the edge it keeps this much room, because its tail and wings go past the drawing.
-const DESKTOP_ROOM = 96;
-const DESKTOP_WINDOW = { width: 430, height: 112 };
-// How much of it shows when tucked: the top of its head and its eye. More when something is waiting on the user.
-export const DESKTOP_PEEK = 30;
-export const DESKTOP_PEEK_WAITING = 42;
-// Its toes are a little inside the drawing, so that much goes past the edge.
-const DESKTOP_TOES_PAST = 2;
-const DESKTOP_GAP = 8;
-const DESKTOP_MARGIN = 8;
+// The drop on the edge of the screen (DESIGN.md, On your desktop), with its sizes in src/shared/desktopSizes.ts. Its
+// window keeps one size wherever it stands, big enough for everything the drop says by itself, so nothing native moves
+// or resizes while it grows.
+const DESKTOP_SHEETS_FROM_EDGE = DESKTOP_DROP.out + 8;
 // Let go this close to a corner, and that's where it goes.
 const DESKTOP_CORNER_SNAP = 56;
-// The middle of its head, along the drawing, and how wide a target that makes.
-const DESKTOP_HEAD_AT = 40;
-const DESKTOP_HEAD_WIDTH = 52;
-// With nothing saved, right of the middle of the bottom: on top of a Dock of the usual width, and clear of most work.
-export const DESKTOP_DEFAULT_SPOT = { edge: "bottom", fraction: 0.66 } as const;
+// With nothing saved, the right edge, a little below the middle, where no taskbar or Dock is under it.
+export const DESKTOP_DEFAULT_SPOT = { edge: "right", fraction: 0.6 } as const;
+
+type Spot = Pick<DesktopBerrySpot, "edge" | "fraction">;
 
 export interface DesktopPlace {
   window: Rect;
-  // The top left of the bird in the window, out in full.
-  out: Point;
-  // Which way along the edge it faces, so that it looks towards the middle of the screen.
-  flip: boolean;
-  line: DesktopLineAnchor;
+  // The middle of the drop, on the edge, in the window. It can be outside the window, for the sheets beside it.
+  anchor: Point;
 }
 
 const clamp = (value: number, low: number, high: number): number => Math.min(Math.max(value, low), Math.max(low, high));
 
-// On the screen, the bird's top left when it's out, and which way the middle of the screen is.
-const birdOnScreen = (area: Rect, { edge, fraction }: Pick<DesktopBerrySpot, "edge" | "fraction">) => {
-  const along = (start: number, length: number) =>
-    Math.round(start + clamp(fraction, 0, 1) * Math.max(length - DESKTOP_ROOM, 0) + (DESKTOP_ROOM - DESKTOP_BIRD_SIZE) / 2);
-  const x =
-    edge === "left"
-      ? area.x - DESKTOP_TOES_PAST
-      : edge === "right"
-        ? area.x + area.width - DESKTOP_BIRD_SIZE + DESKTOP_TOES_PAST
-        : along(area.x, area.width);
-  const y =
-    edge === "top"
-      ? area.y - DESKTOP_TOES_PAST
-      : edge === "bottom"
-        ? area.y + area.height - DESKTOP_BIRD_SIZE + DESKTOP_TOES_PAST
-        : along(area.y, area.height);
-  return { x, y, towardsRight: x + DESKTOP_BIRD_SIZE / 2 <= area.x + area.width / 2 };
+export const sideEdge = (edge: DesktopEdge): boolean => edge === "left" || edge === "right";
+
+// From its middle to the end of a fillet, along the edge, so that at rest it's wholly on screen however far along it is.
+const DESKTOP_REACH = DESKTOP_FILLET + DESKTOP_DROP.along / 2;
+
+// The middle of the drop on the screen: a point on the edge.
+const dropMiddle = (area: Rect, { edge, fraction }: Spot): Point => {
+  const across = sideEdge(edge);
+  const start = across ? area.y : area.x;
+  const length = across ? area.height : area.width;
+  const along = Math.round(start + Math.min(DESKTOP_REACH, length / 2) + clamp(fraction, 0, 1) * Math.max(length - 2 * DESKTOP_REACH, 0));
+  if (edge === "right") return { x: area.x + area.width, y: along };
+  if (edge === "left") return { x: area.x, y: along };
+  if (edge === "top") return { x: along, y: area.y };
+  return { x: along, y: area.y + area.height };
 };
 
-// Where the bird's window goes for a spot on the edge, always wholly inside the work area, with the words on the side
-// towards the middle of the screen.
-export const desktopPlace = (area: Rect, spot: Pick<DesktopBerrySpot, "edge" | "fraction">): DesktopPlace => {
+// A window against the edge, `out` from it and `along` it, centred on the drop and wholly inside the work area.
+const againstEdge = (area: Rect, edge: DesktopEdge, middle: Point, out: number, along: number): Rect => {
+  const width = Math.min(sideEdge(edge) ? out : along, area.width);
+  const height = Math.min(sideEdge(edge) ? along : out, area.height);
+  const x = edge === "right" ? area.x + area.width - width : edge === "left" ? area.x : clamp(middle.x - width / 2, area.x, area.x + area.width - width);
+  const y = edge === "bottom" ? area.y + area.height - height : edge === "top" ? area.y : clamp(middle.y - height / 2, area.y, area.y + area.height - height);
+  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+};
+
+const placed = (window: Rect, middle: Point): DesktopPlace => ({ window, anchor: { x: middle.x - window.x, y: middle.y - window.y } });
+
+// The drop's own window. Along a side edge it grows out of it, and along the top or bottom it grows along it.
+export const desktopPlace = (area: Rect, spot: Spot): DesktopPlace => {
+  const middle = dropMiddle(area, spot);
+  const { long, thick } = DESKTOP_DROP_MOST;
+  const across = thick + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW);
+  return placed(
+    sideEdge(spot.edge)
+      ? againstEdge(area, spot.edge, middle, long + DESKTOP_SHADOW, across)
+      : againstEdge(area, spot.edge, middle, thick + DESKTOP_SHADOW, long + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW)),
+    middle
+  );
+};
+
+// The drop at rest in its window, without its fillets: what takes the pointer until the view says what it's drawing.
+export const desktopRestingDrop = ({ anchor }: Pick<DesktopPlace, "anchor">, edge: DesktopEdge): Rect => {
+  const { along, out } = DESKTOP_DROP;
+  if (sideEdge(edge)) return { x: edge === "right" ? anchor.x - out : anchor.x, y: anchor.y - along / 2, width: out, height: along };
+  return { x: anchor.x - along / 2, y: edge === "bottom" ? anchor.y - out : anchor.y, width: along, height: out };
+};
+
+// The prompt box's window: from the same place on the edge, so the drop can grow into it. Along a side edge it grows
+// out of the edge, and along the top or bottom it grows along it. `thick` is the box's own, taller with more lines.
+export const desktopBoxPlace = (area: Rect, spot: Spot, thick: number = DESKTOP_BOX.thick): DesktopPlace => {
+  const middle = dropMiddle(area, spot);
+  const across = Math.max(thick, DESKTOP_BOX.thick) + 2 * DESKTOP_BOX.around;
+  return placed(
+    sideEdge(spot.edge)
+      ? againstEdge(area, spot.edge, middle, DESKTOP_BOX.long + DESKTOP_SHADOW, across)
+      : againstEdge(area, spot.edge, middle, across, DESKTOP_BOX.long + 2 * (DESKTOP_FILLET + DESKTOP_SHADOW)),
+    middle
+  );
+};
+
+// The tray and the ask: beside the drop, towards the middle of the screen, and wholly on screen at any size.
+export const desktopSheetsPlace = (area: Rect, spot: Spot, size: { width: number; height: number }): DesktopPlace => {
+  const middle = dropMiddle(area, spot);
   const { edge } = spot;
-  const bird = birdOnScreen(area, spot);
-  const { towardsRight } = bird;
-  const width = Math.min(DESKTOP_WINDOW.width, area.width);
-  const height = Math.min(DESKTOP_WINDOW.height, area.height);
-  const wantedX =
-    edge === "left"
-      ? area.x
-      : edge === "right"
-        ? area.x + area.width - width
-        : towardsRight
-          ? bird.x - (DESKTOP_ROOM - DESKTOP_BIRD_SIZE) / 2
-          : bird.x + DESKTOP_BIRD_SIZE + (DESKTOP_ROOM - DESKTOP_BIRD_SIZE) / 2 - width;
-  const wantedY =
-    edge === "top" ? area.y : edge === "bottom" ? area.y + area.height - height : bird.y + DESKTOP_BIRD_SIZE / 2 - height / 2;
-  const window: Rect = {
-    x: Math.round(clamp(wantedX, area.x, area.x + area.width - width)),
-    y: Math.round(clamp(wantedY, area.y, area.y + area.height - height)),
-    width,
-    height,
+  const width = Math.min(size.width, area.width);
+  const height = Math.min(size.height, area.height);
+  const x =
+    edge === "right"
+      ? area.x + area.width - DESKTOP_SHEETS_FROM_EDGE - width
+      : edge === "left"
+        ? area.x + DESKTOP_SHEETS_FROM_EDGE
+        : middle.x - width / 2;
+  const y =
+    edge === "bottom"
+      ? area.y + area.height - DESKTOP_SHEETS_FROM_EDGE - height
+      : edge === "top"
+        ? area.y + DESKTOP_SHEETS_FROM_EDGE
+        : middle.y - height / 2;
+  const window = {
+    x: Math.round(clamp(x, area.x, area.x + area.width - width)),
+    y: Math.round(clamp(y, area.y, area.y + area.height - height)),
+    width: Math.round(width),
+    height: Math.round(height),
   };
-  const out = { x: bird.x - window.x, y: bird.y - window.y };
-  const fromSide = towardsRight ? out.x + DESKTOP_BIRD_SIZE + DESKTOP_GAP : width - out.x + DESKTOP_GAP;
-  return {
-    window,
-    out,
-    flip: edge === "left" ? bird.y + DESKTOP_BIRD_SIZE / 2 > area.y + area.height / 2 : edge === "right" ? bird.y + DESKTOP_BIRD_SIZE / 2 <= area.y + area.height / 2 : !towardsRight,
-    line: {
-      side: towardsRight ? "left" : "right",
-      fromSide,
-      maxWidth: Math.max(width - fromSide - DESKTOP_MARGIN, 0),
-      across: edge === "top" ? "top" : edge === "bottom" ? "bottom" : "middle",
-      // Two lines of words stay inside the window, wherever along the edge it is.
-      middle: Math.round(clamp(out.y + DESKTOP_BIRD_SIZE / 2, 32, height - 32)),
-    },
-  };
-};
-
-// Where the bird is when tucked: past the edge, by all but what shows.
-export const desktopTucked = ({ out }: Pick<DesktopPlace, "out">, edge: DesktopEdge, peek: number): Point => {
-  const hidden = DESKTOP_BIRD_SIZE - DESKTOP_TOES_PAST - peek;
-  return {
-    x: out.x + (edge === "left" ? -hidden : edge === "right" ? hidden : 0),
-    y: out.y + (edge === "top" ? -hidden : edge === "bottom" ? hidden : 0),
-  };
-};
-
-// The part of a tucked bird that's on screen, in the window: its head, showing past the edge. This is all it takes the
-// pointer with, so nothing else in the window can get in the way of what's beneath.
-export const desktopPeekHit = (place: Pick<DesktopPlace, "out" | "flip">, edge: DesktopEdge, peek: number): Rect => {
-  const { x, y } = desktopTucked(place, edge, peek);
-  const head = place.flip ? DESKTOP_BIRD_SIZE - DESKTOP_HEAD_AT : DESKTOP_HEAD_AT;
-  const start = head - DESKTOP_HEAD_WIDTH / 2;
-  if (edge === "bottom") return { x: x + start, y, width: DESKTOP_HEAD_WIDTH, height: peek };
-  if (edge === "top") return { x: x + start, y: y + DESKTOP_BIRD_SIZE - peek, width: DESKTOP_HEAD_WIDTH, height: peek };
-  // On its side, the top of the drawing points away from the edge and its length runs along it.
-  const along = edge === "left" ? y + start : y + DESKTOP_BIRD_SIZE - start - DESKTOP_HEAD_WIDTH;
-  return edge === "left"
-    ? { x: x + DESKTOP_BIRD_SIZE - peek, y: along, width: peek, height: DESKTOP_HEAD_WIDTH }
-    : { x, y: along, width: peek, height: DESKTOP_HEAD_WIDTH };
+  return placed(window, middle);
 };
 
 // The nearest edge to a point on a display, and how far along it. Near a corner, it's the corner.
@@ -213,34 +205,14 @@ export const desktopSpotAt = (area: Rect, displayId: number, point: Point): Desk
     ["right", area.x + area.width - point.x],
   ];
   const [edge] = distances.reduce((nearest, next) => (next[1] < nearest[1] ? next : nearest));
-  const horizontal = edge === "top" || edge === "bottom";
+  const horizontal = !sideEdge(edge);
   const start = horizontal ? area.x : area.y;
   const length = horizontal ? area.width : area.height;
   const at = (horizontal ? point.x : point.y) - start;
   if (at < DESKTOP_CORNER_SNAP) return { displayId, edge, fraction: 0 };
   if (length - at < DESKTOP_CORNER_SNAP) return { displayId, edge, fraction: 1 };
-  const room = length - DESKTOP_ROOM;
-  return { displayId, edge, fraction: room > 0 ? clamp((at - DESKTOP_ROOM / 2) / room, 0, 1) : 0 };
-};
-
-// The composer, beside the bird on the side towards the middle of the screen, and wholly on screen at any size.
-export const desktopComposerBounds = (area: Rect, spot: Pick<DesktopBerrySpot, "edge" | "fraction">, size: { width: number; height: number }): Rect => {
-  const bird = birdOnScreen(area, spot);
-  const width = Math.min(size.width, area.width - 2 * DESKTOP_MARGIN);
-  const height = Math.min(size.height, area.height - 2 * DESKTOP_MARGIN);
-  const x = bird.towardsRight ? bird.x + DESKTOP_BIRD_SIZE + DESKTOP_GAP : bird.x - DESKTOP_GAP - width;
-  const y =
-    spot.edge === "top"
-      ? area.y + DESKTOP_MARGIN
-      : spot.edge === "bottom"
-        ? area.y + area.height - DESKTOP_MARGIN - height
-        : bird.y + DESKTOP_BIRD_SIZE / 2 - height / 2;
-  return {
-    x: Math.round(clamp(x, area.x + DESKTOP_MARGIN, area.x + area.width - DESKTOP_MARGIN - width)),
-    y: Math.round(clamp(y, area.y + DESKTOP_MARGIN, area.y + area.height - DESKTOP_MARGIN - height)),
-    width: Math.round(width),
-    height: Math.round(height),
-  };
+  const room = length - 2 * DESKTOP_REACH;
+  return { displayId, edge, fraction: room > 0 ? clamp((at - DESKTOP_REACH) / room, 0, 1) : 0 };
 };
 
 export const desktopHit = (point: Point, window: Rect, hits: Rect[]): boolean =>
@@ -249,17 +221,6 @@ export const desktopHit = (point: Point, window: Rect, hits: Rect[]): boolean =>
     const top = window.y + y;
     return point.x >= left && point.x < left + width && point.y >= top && point.y < top + height;
   });
-
-// The way there, as an arc over the straight line, for `t` from 0 to 1. It starts and lands gently.
-export const desktopFlightPoint = (from: Point, to: Point, t: number): Point => {
-  const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-  const peak = Math.max(Math.min(from.y, to.y) - Math.min(Math.hypot(to.x - from.x, to.y - from.y) * 0.18, 120), 0);
-  const rest = 1 - eased;
-  return {
-    x: Math.round(from.x + (to.x - from.x) * eased),
-    y: Math.round(rest * rest * from.y + 2 * rest * eased * peak + eased * eased * to.y),
-  };
-};
 
 // The only place that decides where the window's regions go.
 export function computeLayout(
