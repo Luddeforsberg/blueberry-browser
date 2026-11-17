@@ -220,7 +220,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                     </SettingsRow>
                 )}
             </SettingsGroup>
-            {error && <div className="mt-3 mx-3"><ChatError message={error} /></div>}
+            {error && <div className="mt-3 px-2"><ChatError message={error} /></div>}
 
             {!isBerry && (
                 <Button size="sm" variant="ghost" className="self-start mt-5 text-ask hover:text-ask" onClick={() => void remove()}>

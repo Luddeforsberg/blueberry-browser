@@ -274,7 +274,7 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             {waiting.length === 0 && !justAnswered ? (
                 <AllClear />
             ) : (
-                <>
+                <div className="mt-5">
                     {justAnswered ? (
                         <AnsweredCard item={justAnswered.item} said={justAnswered.said} />
                     ) : (
@@ -285,7 +285,7 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             {rest.map((item) => <WaitingRow key={item.approval.id} item={item} now={now} onOpen={() => setChosen(item.approval.id)} />)}
                         </ul>
                     )}
-                </>
+                </div>
             )}
             <div className="mt-3 px-2 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                 {answered > 0 || waiting.length > 0 ? <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answered, waiting.length)}</span> : <span />}

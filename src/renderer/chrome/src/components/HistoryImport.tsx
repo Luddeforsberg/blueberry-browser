@@ -61,7 +61,7 @@ export const BringInHistory: React.FC = () => {
     const { sources, source, choose, busy, bringIn, message } = useHistoryImport()
     return (
         <>
-            <p className="-mt-2 mx-3 mb-4 max-w-[520px] text-14 leading-[1.45] text-ink-2">
+            <p className="mt-1 max-w-[520px] text-14 leading-[1.45] text-ink-2">
                 {IMPORT_NOTES.join(' ')} <More text={IMPORT_DETAIL} />
             </p>
             {sources && source ? (

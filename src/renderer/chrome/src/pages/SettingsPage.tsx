@@ -20,7 +20,7 @@ import { CloudSettings } from './CloudSettings'
 import { AccountSettings } from './AccountSettings'
 import { WhatLeaves } from './WhatLeaves'
 
-// DESIGN.md section 10, Settings: one column on the well, five sections along the top, and pages one step in. Where it
+// DESIGN.md section 10, Settings: one column on the page, five sections along the top, and pages one step in. Where it
 // is lives in the tab's param, so the toolbar's Back steps out of a page and another page can open it anywhere.
 
 const SECTION_NAMES: Record<SettingsSection, string> = {
@@ -309,7 +309,7 @@ export const SettingsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                             items={SETTINGS_SECTIONS.map((value) => ({ value, label: SECTION_NAMES[value] }))}
                             current={section}
                             onChange={openSettings}
-                            className="h-8 rounded-[11px] [&>button]:rounded-[9px] text-13"
+                            className="mt-3.5 h-8 rounded-[11px] [&>button]:rounded-[9px] text-13"
                         />
                         <section role="tabpanel" aria-label={SECTION_NAMES[section]}>
                             <Section />

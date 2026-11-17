@@ -95,7 +95,7 @@ export const SitePermissionsSettings: React.FC = () => {
                     )
                 })}
             </SettingsGroup>
-            <p className="mx-3 mt-2.5 text-13 text-ink-2">
+            <p className="px-2 mt-2.5 text-13 text-ink-2">
                 A page already using something keeps it until you reload the page. Forgetting an answer makes the site ask again.
             </p>
         </>
