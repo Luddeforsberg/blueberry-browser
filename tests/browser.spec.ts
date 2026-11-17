@@ -500,8 +500,12 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   // The answers to press arrive with it, without the one shaped like a code.
   const asked = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval));
   expect(asked).toMatchObject({ text: "Which colour?", question: true, answers: ["Blue", "Green"] });
-  await question.getByRole("textbox", { name: "Your answer" }).fill("Blue");
-  await question.getByRole("button", { name: "Answer" }).click();
+  await expect(question.getByRole("button", { name: "Green" })).toBeVisible();
+  // There's no field in the card: the prompt box is where it's answered, and says so.
+  await expect(question.getByRole("textbox")).toHaveCount(0);
+  await expect(message).toHaveAttribute("placeholder", "Answer Berry, or pick one above");
+  await message.fill("Blue");
+  await message.press("Enter");
 
   await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("The user answered: Blue");
   expect(JSON.stringify(model.requests.at(-1)?.messages)).toContain("never go through this chat");
