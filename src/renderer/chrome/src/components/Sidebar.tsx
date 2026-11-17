@@ -588,9 +588,10 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
                     createTab()
                     onClose()
                 }}
-                className={cn(buttonVariants({ variant: 'raised' }), 'mt-1.5 w-full')}
+                className={cn(buttonVariants({ variant: 'raised' }), 'mt-1.5 w-full min-w-0')}
             >
-                New chat with {name}
+                {/* A long name ends in an ellipsis inside the button, rather than running past the card's edges. */}
+                <span className="min-w-0 truncate">New chat with {name}</span>
             </button>
             <button
                 type="button"
