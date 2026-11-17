@@ -312,7 +312,7 @@ Each is drawn on a 48-unit square, body bottom at 46 so it stands on whatever is
 
 - **Every body** has a soft shine at its top left and a soft shade underneath, so it looks round.
 - **Texture fades to about a third** over the face, an ellipse round the eyes and mouth, so it never crowds them. Beads under the face have no rim or glint at all.
-- **By size:** at 48px and up, everything. From 28px, no texture, but the shine and the mouth. Under 28px, only the outline, what grows on top, and the eyes, which are a little heavier there, 4.8 by 9.6 units.
+- **By size:** at 48px and up, everything. From 28px, no texture, but the shine, the shade and the mouth. Under 28px, the outline, what grows on top, the shade and the eyes, which are a little heavier there, 4.8 by 9.6 units, as are the pips. The gooseberry keeps two of its veins at every size under 48px, since they're most of what tells it from the lingon.
 - **Berry is the blueberry,** with nothing on. Its saved look changes from Jackdaw to Blueberry.
 - **"Replaces"** is how a look saved under the old names carries over, keeping each mascot near the colour its owner chose.
 - **No colour picker,** because every body has to work in both modes and beside the others.
