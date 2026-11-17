@@ -52,6 +52,7 @@ export const CHANNEL_REGIONS: {
   "settings:get": BOTH,
   "settings:update": ["chrome"],
   "settings:set-appearance": BOTH,
+  "settings:app-icon": ["chrome"],
   "desktop:shortcut-taken": ["chrome"],
   "desktop:state": ["desktop"],
   "desktop:line-box": ["desktop"],

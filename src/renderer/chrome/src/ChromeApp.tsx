@@ -15,6 +15,7 @@ import { FirstRun } from './components/FirstRun'
 import { PageTrouble } from './components/PageTrouble'
 import { ToolBarButton } from './components/ToolBarButton'
 import { useRecording } from './components/ShowBerry'
+import { AppIconSender } from './components/AppIconSender'
 import { cn } from '@common/lib/utils'
 
 // Regions sit exactly where main's layout puts them, so the tab view lines up with the page's sheet.
@@ -102,6 +103,7 @@ export const ChromeApp: React.FC = () => (
             <LibraryProvider>
                 <ChatProvider>
                     <Shell />
+                    <AppIconSender />
                 </ChatProvider>
             </LibraryProvider>
         </BrowserProvider>

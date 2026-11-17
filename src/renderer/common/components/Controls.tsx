@@ -36,6 +36,7 @@ export const Switch: React.FC<{
 // A segmented control (DESIGN.md section 8). The left and right arrows move the choice along, as in any group of radio
 // buttons, and only the chosen one is a stop for Tab. `fill` shares the width out evenly, and an option can carry an icon.
 // With a `picture` for each option, it's a row of small drawings with the name under each instead, as Settings' Theme.
+// `pictureClassName` sizes and shapes the drawings when they aren't the window's 86 by 56, as the app icon's aren't.
 export const Choice = <T extends string>({
     label,
     value,
@@ -43,7 +44,8 @@ export const Choice = <T extends string>({
     onChange,
     fill = false,
     describedBy,
-    className
+    className,
+    pictureClassName = 'w-full h-14 rounded-[10px]'
 }: {
     label: string
     value: T
@@ -52,6 +54,7 @@ export const Choice = <T extends string>({
     fill?: boolean
     describedBy?: string
     className?: string
+    pictureClassName?: string
 }) => {
     const group = useRef<HTMLDivElement>(null)
     const pictures = options.every((option) => option.picture)
@@ -94,13 +97,14 @@ export const Choice = <T extends string>({
                             <span
                                 aria-hidden
                                 className={cn(
-                                    'relative block w-full h-14 rounded-[10px] overflow-hidden group-focus-visible:ring-2 group-focus-visible:ring-focus',
+                                    'relative block overflow-hidden group-focus-visible:ring-2 group-focus-visible:ring-focus',
+                                    pictureClassName,
                                     chosen ? 'shadow-[0_0_0_2px_rgb(var(--sheet)),0_0_0_3.5px_rgb(var(--ink))]' : 'shadow-[inset_0_0_0_1px_var(--line)]'
                                 )}
                             >
                                 {option.picture}
                             </span>
-                            {option.label}
+                            <span className="max-w-full truncate">{option.label}</span>
                         </button>
                     )
                 }

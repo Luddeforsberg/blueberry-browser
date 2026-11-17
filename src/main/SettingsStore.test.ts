@@ -74,6 +74,31 @@ describe("downloadFolder", () => {
   });
 });
 
+describe("the app icon", () => {
+  const chosen = { ...DEFAULT_SETTINGS, appIconMascotId: "4b0c6a5e-1f2d-4c3b-9a8e-7d6c5b4a3f21", appIconGround: "glow" as const };
+
+  it("starts as Berry on Paper, and keeps a mascot's id and any of the four grounds", () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({ appIconMascotId: null, appIconGround: "paper" });
+    expect(sanitizeSettings({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" })).toMatchObject({ appIconMascotId: chosen.appIconMascotId, appIconGround: "night" });
+    for (const ground of ["paper", "night", "colour", "glow"]) expect(sanitizeSettings({ appIconGround: ground }).appIconGround).toBe(ground);
+  });
+
+  it("takes Berry's own id, or null, as Berry", () => {
+    expect(sanitizeSettings({ appIconMascotId: "berry" }, chosen).appIconMascotId).toBeNull();
+    expect(sanitizeSettings({ appIconMascotId: null }, chosen).appIconMascotId).toBeNull();
+  });
+
+  it("keeps what it had for anything that isn't an id or a ground", () => {
+    for (const appIconMascotId of ["", "a".repeat(65), "../mascots.json", "id with spaces", 7, {}]) {
+      expect(sanitizeSettings({ appIconMascotId }, chosen).appIconMascotId).toBe(chosen.appIconMascotId);
+    }
+    expect(sanitizeSettings({ appIconMascotId: "a".repeat(64) }, chosen).appIconMascotId).toBe("a".repeat(64));
+    for (const appIconGround of ["", "Paper", "colour ", "plum", null]) {
+      expect(sanitizeSettings({ appIconGround }, chosen).appIconGround).toBe("glow");
+    }
+  });
+});
+
 describe("SettingsStore", () => {
   it("survives a missing or corrupt file", () => {
     const file = tempFile();

@@ -75,6 +75,8 @@ import type {
 } from "../shared/ipc";
 import type { ChatThread, LibrarySnapshot, NeedsYouItem, PublishResult, SavedSiteList } from "../shared/library";
 import { BERRY } from "../shared/mascots";
+import { iconMascotId } from "../shared/appIcon";
+import { AppIcon } from "./AppIcon";
 
 export type BrowserTab = Tab | InternalTab;
 
@@ -164,6 +166,7 @@ export class Window {
   readonly cloud: CloudTabs;
   readonly runnerJobs: RunnerJobs;
   private readonly macJobs: MacJobs;
+  readonly appIcon: AppIcon;
 
   constructor(
     private readonly settingsStore: SettingsStore,
@@ -206,6 +209,10 @@ export class Window {
         : {}),
     });
 
+    this.appIcon = new AppIcon(app.getPath("userData"), this._baseWindow, () => ({
+      mascotId: iconMascotId(this.settings.appIconMascotId, this.mascotStore.all()),
+      ground: this.settings.appIconGround,
+    }));
     this.chrome = createChromeView("chrome");
     this._baseWindow.contentView.addChildView(this.chrome.view);
     this.openLinksInTabs(this.chrome.view.webContents);
