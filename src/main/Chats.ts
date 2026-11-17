@@ -17,7 +17,7 @@ import type { ActionApproval } from "../shared/ipc";
 import type { ChatStore, StoredChat } from "./ChatStore";
 import type { Tab } from "./Tab";
 import type { CdpTab } from "./CdpTab";
-import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, StepKind, UsedPage, WorkTabState } from "../shared/library";
+import type { ChatApproval, ChatStep, ChatThread, ChatThreadMessage, HandoffNeed, MascotProfile, MemoryFact, SaidOnTheWay, StepKind, UsedPage, WorkTabState } from "../shared/library";
 import type { JobWork } from "./WorkViews";
 import { BERRY, narrowSites, permissionsInWords, siteAllowed } from "../shared/mascots";
 import { asHistoryMessage } from "../shared/phone";
@@ -91,6 +91,13 @@ const errorMessage = (error: unknown): string => {
   return "Something went wrong with this reply. Try again.";
 };
 
+// A status line grows as its message streams, so it replaces what that message said so far, until a step comes between.
+const keepSaid = (said: SaidOnTheWay[], after: number, text: string): void => {
+  const last = said.at(-1);
+  if (last && last.after === after && text.startsWith(last.text)) last.text = text;
+  else said.push({ after, text });
+};
+
 // The model sees what it did earlier by notes of its steps, not by the pages themselves, which aren't saved.
 const toReplyMessage = (message: ChatThreadMessage): ReplyMessage => asHistoryMessage(message);
 
@@ -100,6 +107,8 @@ interface Run {
   // What it said it's doing, in a message that went on to use tools, until its answer starts. Never saved or sent on.
   statusLine: string | null;
   steps: ChatStep[];
+  // What it wrote on the way, kept where it was said, for the screen only.
+  said: SaidOnTheWay[];
   // Words after a step start a new paragraph, not the end of the sentence before it.
   breakBeforeText: boolean;
   approval: (ChatApproval & { askedAt: number; answer: (allow: boolean, text?: string) => void }) | null;
@@ -828,6 +837,8 @@ export class Chats {
         partial: progress?.reply ?? null,
         statusLine: null,
         steps: progress?.steps ?? [],
+        said: [],
+        startedAt: null,
         approval: progress?.approval ? publicApproval(progress.approval) : null,
         error: this.errors.get(chat.id) ?? null,
         memoryIds: [],
@@ -839,6 +850,8 @@ export class Chats {
       partial: run?.partial ?? null,
       statusLine: run?.statusLine ?? null,
       steps: run?.steps ?? [],
+      said: run ? this.saidOf(run) : [],
+      startedAt: run?.startedAt ?? null,
       approval: run?.approval ? publicApproval(run.approval) : null,
       error: this.errors.get(chat.id) ?? null,
       memoryIds: run?.memoryIds ?? [],
@@ -936,7 +949,7 @@ export class Chats {
     this.finished.delete(id);
     this.memory?.dropOffers(id);
 
-    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
+    const run: Run = { controller: new AbortController(), partial: "", statusLine: null, steps: [], said: [], breakBeforeText: false, approval: null, tabs: new Set(), used: new Set(), sites: new Set(), startedAt: Date.now(), withPage: false, mascot, earlierSites: new Set([...(earlier?.earlierSites ?? []), ...(earlier?.sites ?? [])]), memoryIds: [], memoryNote: "", answers: [], handedOver: false, cloud: inCloud, askAtLeast, onEnd, userPresent };
     if (inCloud) this.cloudChats.add(id);
     this.runs.set(id, run);
     // A page in this window never goes with a job in the cloud.
@@ -1078,7 +1091,16 @@ export class Chats {
     this.publishWorkingTabs();
     const steps = endedSteps(run.steps, signal.aborted);
     if (run.partial || steps.length > 0) {
-      this.store.addMessage(chatId, { role: "assistant", content: run.partial, steps, memoryIds: run.memoryIds, ...(pages.length > 0 ? { pages } : {}) });
+      this.store.addMessage(chatId, {
+        role: "assistant",
+        content: run.partial,
+        steps,
+        memoryIds: run.memoryIds,
+        ...(pages.length > 0 ? { pages } : {}),
+        said: this.saidOf(run),
+        startedAt: run.startedAt,
+        took: Date.now() - run.startedAt,
+      });
     }
     const error = this.errors.get(chatId) ?? null;
     run.onEnd?.({ reply: run.partial, steps, outcome: run.controller.signal.aborted ? "stopped" : error ? "failed" : "done", error });
@@ -1155,6 +1177,7 @@ export class Chats {
         run.partial = "";
         run.breakBeforeText = false;
         run.statusLine = part.statusLine;
+        keepSaid(run.said, run.steps.length, part.statusLine);
         this.publish(id, run);
         if (tookBack) onWords("");
         continue;
@@ -1165,6 +1188,8 @@ export class Chats {
       // The answer has started, so the line saying what it's doing goes, and the whole reply goes out with it.
       if (run.statusLine === null) onWords(content);
       else {
+        // Words taken for a status line that turn out to be the answer, as a long job's last call can, are said once.
+        if (run.said.at(-1)?.after === run.steps.length && run.said.at(-1)?.text === part.trim()) run.said.pop();
         run.statusLine = null;
         this.publish(id, run);
         onWords("");
@@ -1191,6 +1216,7 @@ export class Chats {
       partial: "",
       statusLine: null,
       steps: [],
+      said: [],
       breakBeforeText: false,
       approval: null,
       tabs: new Set(),
@@ -1245,6 +1271,11 @@ export class Chats {
       tokens,
       tabIds,
     };
+  }
+
+  // What it wrote on the way, cleaned as anything a page could have put in it.
+  private saidOf(run: Run): SaidOnTheWay[] {
+    return run.said.map(({ after, text }) => ({ after, text: this.withoutCodes(text) }));
   }
 
   private publishWorkingTabs(): void {
