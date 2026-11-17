@@ -97,7 +97,7 @@ const TAB_PREVIEW_GAP = { sidebar: 8, row: 6, edge: 8 };
 const TAB_PREVIEW_SHADOW = { side: 24, below: 40 };
 
 // The tallest the card can be, counting its title as two lines.
-export const tabPreviewHeight = (card: { picture: boolean; working: boolean }): number =>
+const tabPreviewHeight = (card: { picture: boolean; working: boolean }): number =>
   (card.picture ? TAB_PREVIEW.picture : 0) + TAB_PREVIEW.words + (card.working ? TAB_PREVIEW.working : 0);
 
 // Where a tab's card goes, for a tab whose row is at `row` in the window. Its view starts at the sidebar's edge or the tab
