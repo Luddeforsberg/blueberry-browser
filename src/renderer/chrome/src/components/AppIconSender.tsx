@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from 'react'
 import { APP_ICON_SIZE, iconMascotId } from '@shared/appIcon'
 import { useShell } from '../contexts/ShellContext'
 import { useFlock } from '../contexts/LibraryContext'
-import { AppIcon, iconPicture } from './AppIcon'
+import { AppIcon } from './AppIcon'
+import { iconPicture } from '../iconPicture'
 
 // Draws the chosen app icon off screen and hands main the picture, whenever the choice or that mascot's look changes,
 // and once when the window opens. A mascot that's gone draws as Berry. Main only takes it if it's for what's chosen.

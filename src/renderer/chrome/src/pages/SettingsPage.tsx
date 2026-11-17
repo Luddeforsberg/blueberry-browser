@@ -91,7 +91,6 @@ const AppIconRow: React.FC = () => {
             id="setting-app-icon"
             title="App icon"
             description={`The mascot on Blueberry’s icon in your ${mac ? 'Dock' : 'taskbar'}, and what’s behind it.`}
-            top
             below={
                 <>
                     <div className={label}>Who</div>
