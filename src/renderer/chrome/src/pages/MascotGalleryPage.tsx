@@ -497,7 +497,10 @@ export const MascotGalleryPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             .then((answer) => {
                 if (left) return
                 setLinkedAnswer({ key: linkKey, answer })
-                if (!answer.entry && answer.status === 'live') load()
+                if (answer.entry || answer.status !== 'live') return
+                // Gone: its row goes now, not when the list comes back.
+                setListing((shown) => shown && { ...shown, entries: shown.entries.filter((entry) => entry.id !== linkedId) })
+                load()
             })
         return () => {
             left = true
