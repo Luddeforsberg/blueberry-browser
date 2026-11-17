@@ -437,6 +437,11 @@ export const Composer: React.FC<{
     )
 }
 
+// While a question waits, what's sent from the prompt box is its answer, through `chat:decide` like a pressed one. An
+// answer is words only, so with anything attached it isn't sent, and stays in the box.
+export const answerInBox = (chatId: string, approvalId: string, words: string, attached: Attached): Promise<boolean> =>
+    attached.files.length > 0 || attached.tabs.length > 0 ? Promise.resolve(false) : window.chromeAPI.chat.decide(chatId, approvalId, true, words).catch(() => false)
+
 // A composer that sends on Enter, for both chats.
 export const ChatComposer: React.FC<{
     // Whether main took the message. It may refuse one, as when an attached tab has been handed to the user since.
@@ -454,7 +459,9 @@ export const ChatComposer: React.FC<{
     onDraftTaken?: () => void
     mascot?: MascotProfile
     onChooseMascot?: (id: string) => void
-}> = ({ onSend, onStop, disabled = false, placeholder, attachment, attach, autoFocus, draft, onDraftTaken, mascot, onChooseMascot }) => {
+    // A question waits, so sending answers it, and Send shows over Stop once there's an answer to send.
+    answering?: boolean
+}> = ({ onSend, onStop, disabled = false, placeholder, attachment, attach, autoFocus, draft, onDraftTaken, mascot, onChooseMascot, answering = false }) => {
     const [value, setValue] = useState('')
     const [focusKey, setFocusKey] = useState(0)
     const box = useAttachments(attach?.place ?? 'here')
@@ -505,7 +512,7 @@ export const ChatComposer: React.FC<{
             onFiles={attach && attach.place !== 'runner' ? (files) => void box.addFiles(files) : undefined}
             canSend={!disabled && value.trim().length > 0}
             onSend={() => void send()}
-            onStop={onStop}
+            onStop={answering && value.trim() ? undefined : onStop}
             mascot={mascot}
             onChooseMascot={onChooseMascot}
         />

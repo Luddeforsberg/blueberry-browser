@@ -10,6 +10,8 @@ export const STOPPED_STEP = 'Stopped here'
 // The words come from the tools' labels in `browserTools.ts` and from `STOPPED_STEP` in `Chats.ts`.
 const WORTH_KEEPING = /^(Asked you|Stayed off|Left the tab you took over|Stopped here)/
 
+export const worthKeeping = (step: ChatStep): boolean => WORTH_KEEPING.test(step.text)
+
 export type TrailStep = { step: ChatStep; index: number }
 
 export interface Trail {
@@ -22,7 +24,7 @@ export interface Trail {
 }
 
 // Each step names its site in plain words, so this is only ever a host.
-const SITE = /\b(?:localhost|(?:[a-z0-9-]+\.)+[a-z0-9-]+)\b/gi
+export const SITE = /\b(?:localhost|(?:[a-z0-9-]+\.)+[a-z0-9-]+)\b/gi
 
 const sitesIn = (steps: ChatStep[]): string[] => {
     const counts = new Map<string, number>()
@@ -32,7 +34,7 @@ const sitesIn = (steps: ChatStep[]): string[] => {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([site]) => site)
 }
 
-const onSites = (steps: ChatStep[]): string => {
+export const onSites = (steps: ChatStep[]): string => {
     const sites = sitesIn(steps)
     if (sites.length === 0) return ''
     if (sites.length === 1) return ` on ${sites[0]}`
@@ -50,6 +52,6 @@ export const trailFor = (steps: ChatStep[], { running, cutShort = false, open = 
     const line = tail ? `${all.length - LATEST} earlier steps` : `${all.length} steps${onSites(steps)}`
     if (open) return { shown: all, hidden: 0, line }
     const latest = tail ? all.slice(-LATEST) : []
-    const shown = all.filter((item) => latest.includes(item) || WORTH_KEEPING.test(item.step.text))
+    const shown = all.filter((item) => latest.includes(item) || worthKeeping(item.step))
     return { shown, hidden: all.length - shown.length, line }
 }

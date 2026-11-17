@@ -403,10 +403,11 @@ export const GalleryPage: React.FC = () => {
                         <AssistantMessage
                             content=""
                             isStreaming
-                            statusLine="I'll check their careers page and LinkedIn first."
+                            said={[{ after: 0, text: "I'll check their careers page and LinkedIn first." }, { after: 3, text: 'They list two open roles so far.' }]}
                             startedAt={Date.now() - 72_000}
                             steps={[
                                 { text: 'Opened strawberrybrowser.com/careers', done: true, kind: 'open' },
+                                { text: 'Read strawberrybrowser.com', done: true, kind: 'read' },
                                 { text: 'Read strawberrybrowser.com', done: true, kind: 'read' },
                                 { text: 'Clicked something on strawberrybrowser.com', done: true, kind: 'click' },
                                 { text: 'Typed into a field on strawberrybrowser.com', done: false, kind: 'type' },
@@ -416,6 +417,7 @@ export const GalleryPage: React.FC = () => {
                         <ThinkingMessage />
                         <AssistantMessage
                             content="The cheapest direct flight is **KLM at 07:10**, 1 840 kr return."
+                            took={48_000}
                             steps={[
                                 { text: 'Opened klm.com', done: true, kind: 'open' },
                                 { text: 'Read klm.com', done: true, kind: 'read' },
