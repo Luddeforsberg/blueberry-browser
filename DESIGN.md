@@ -679,7 +679,7 @@ Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
 **The list.** The title, with **Show Berry how** raised and **New routine** filled on its right, and one line under it. Then the routines, grouped by what matters and in this order, with a group left out when it's empty:
 
 - **Needs you,** its label in `ask`: a routine with a run waiting for you. Its second line says what it's waiting to do, in the card's own sentence, and **Answer**, raised, is always showing at its end, and opens it on Needs you.
-- **Running:** the face shows the pips, the second line says where it is, and **Stop** shows on the row you're on.
+- **Running:** the face shows the pips, the second line says where it is, and **Stop** shows on the row you're on. A run waiting to start is here too.
 - **Scheduled,** with how many: when it's next is at the end in mono, in a few words ("tomorrow 09:00", "25 Nov 08:00").
 - **Paused,** then **Only when you ask,** which also holds a one-off that has run.
 
@@ -760,7 +760,7 @@ Mock: [pages-and-routines.html](./docs/design/mocks/pages-and-routines.html).
 
 The title, with **Open folder** as quiet text with a folder icon on its right, which shows the folder files are saved to, and no line under it. Then a group for each day, newest first.
 
-- **A row** has the kind of file on a 36px tile, as its ending in mono (`pdf`, `dmg`), or a file icon for a name with none, its name at 14px medium, and one line at 13px in `ink-2`: its size and the site it came from, and while it's running how much has arrived and how long is left. At the end, in mono, is when it finished. A running one has a thin `ink` bar under the line and its share at the end, "38%".
+- **A row** has the kind of file on a 36px tile, as its ending in mono (`pdf`, `dmg`), or a file icon for a name with none, its name at 14px medium, and one line at 13px in `ink-2`: its size and the site it came from, and while it's running how much has arrived and how long is left. At the end, in mono, is when it started, since that's the time that's kept. A running one has a thin `ink` bar under the line and its share at the end, "38%".
 - **What can be done shows on the row you're on:** Open, raised, then Show in folder and Remove as icons, when it's finished. Remove takes it off the list and leaves the file alone, and pressing a finished row opens the file. A running one always shows Pause or Resume and Cancel, since a download is something to act on while it runs.
 - A file that's gone has its name struck through in `ink-3`, says "Moved or deleted", and offers only Remove.
 
