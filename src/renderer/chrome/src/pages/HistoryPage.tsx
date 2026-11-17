@@ -145,7 +145,7 @@ export const HistoryPage: React.FC = () => {
             )}
 
             {groupByDay(entries ?? []).map((day) => (
-                <SettingsGroup key={day.key} label={<>{day.label}{' '}<span className="font-normal text-faint">{day.date}</span></>}>
+                <SettingsGroup list key={day.key} label={<>{day.label}{' '}<span className="font-normal text-faint">{day.date}</span></>}>
                     <ul aria-label={day.label}>
                         {/* A search shows every match, so nothing it found is folded away. */}
                         {(searching ? day.entries.map((entry): VisitRun => ({ key: String(entry.id), site: '', entries: [entry] })) : foldVisits(day.entries)).map((run) =>

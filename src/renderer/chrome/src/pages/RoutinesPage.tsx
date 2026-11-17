@@ -115,7 +115,7 @@ const List: React.FC<{ routines: Routine[] }> = ({ routines }) => {
                 </EmptyPage>
             ) : (
                 groupRoutines(routines).map((group) => (
-                    <SettingsGroup key={group.key} label={group.label} count={group.key === 'needs-you' ? undefined : group.routines.length} tone={group.key === 'needs-you' ? 'ask' : undefined}>
+                    <SettingsGroup list key={group.key} label={group.label} count={group.key === 'needs-you' ? undefined : group.routines.length} tone={group.key === 'needs-you' ? 'ask' : undefined}>
                         <ul aria-label={group.label}>
                             {group.routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)}
                         </ul>
@@ -238,6 +238,7 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
             </section>
 
             <SettingsLabel
+                list
                 trailing={
                     <Button size="sm" variant="ghost" aria-label="Edit what it does" onClick={part('does')}>
                         <Pencil className="size-3.5" strokeWidth={1.75} />
@@ -255,7 +256,7 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
                 <Fact label={PART_NAMES.where} onOpen={part('where')}><span>{routine.sites.length > 0 ? routine.sites.join(', ') : 'Anywhere'}</span></Fact>
             </div>
 
-            <SettingsLabel>Runs</SettingsLabel>
+            <SettingsLabel list>Runs</SettingsLabel>
             {runs.length === 0 ? (
                 <p className="px-2 text-14 text-ink-2">It hasn’t run yet.</p>
             ) : (

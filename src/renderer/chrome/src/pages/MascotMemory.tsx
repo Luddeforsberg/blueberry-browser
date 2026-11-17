@@ -122,7 +122,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
             ) : (
                 <>
                     {places.map((place) => (
-                        <SettingsGroup key={place} label={place === ANYWHERE ? 'Anywhere' : `On ${place}`}>
+                        <SettingsGroup list key={place} label={place === ANYWHERE ? 'Anywhere' : `On ${place}`}>
                             <ul>
                                 {(groups.get(place) ?? []).map((fact) => (
                                     <FactRow

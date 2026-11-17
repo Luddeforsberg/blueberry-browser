@@ -27,7 +27,7 @@ export const DownloadsPage: React.FC = () => {
                 <EmptyPage>Nothing here yet. Files you download are saved straight to your folder and listed here.</EmptyPage>
             ) : (
                 byDay(downloads, (download) => download.startedAt).map((day) => (
-                    <SettingsGroup key={day.key} label={<>{day.label}{' '}<span className="font-normal text-faint">{day.date}</span></>}>
+                    <SettingsGroup list key={day.key} label={<>{day.label}{' '}<span className="font-normal text-faint">{day.date}</span></>}>
                         <ul aria-label={day.label}>
                             {day.items.map((download) => (
                                 <DownloadRow key={download.id} download={download} onAction={(action) => void window.chromeAPI.downloads.act(download.id, action)} />

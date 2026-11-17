@@ -11,21 +11,30 @@ import { LINE_BETWEEN, ON_ROW, ROW } from './PageFrame'
 
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
-// A label over a group, 13px medium. `count` is beside it in mono, and `trailing` sits at its right, such as a button
+// What a group is called. Over named settings it's a heading, 15px semibold in `ink` with a hairline under it, so it's
+// never weaker than the rows it names. In a `list`, where it only divides rows of content, such as the days of History,
+// it's a label, 13px medium in `ink-2`. `count` is beside it in mono, and `trailing` sits at its right, such as a button
 // that adds a row.
-export const SettingsLabel: React.FC<{ id?: string; count?: number; tone?: 'ask'; trailing?: React.ReactNode; children: React.ReactNode }> = ({ id, count, tone, trailing, children }) => (
-    <h3 id={id} className={cn('min-h-[18px] mt-6 mb-1.5 px-2 flex items-baseline gap-[7px] text-13 font-medium', tone === 'ask' ? 'text-ask' : 'text-ink-2')}>
+export const SettingsLabel: React.FC<{ id?: string; list?: boolean; count?: number; tone?: 'ask'; trailing?: React.ReactNode; children: React.ReactNode }> = ({ id, list = false, count, tone, trailing, children }) => (
+    <h3
+        id={id}
+        className={cn(
+            'flex items-baseline gap-[7px]',
+            list ? 'min-h-[18px] mt-6 mb-1.5 px-2 text-13 font-medium' : 'mt-8 mx-2 pb-[9px] border-b border-line text-15 font-semibold',
+            tone === 'ask' ? 'text-ask' : list ? 'text-ink-2' : 'text-ink'
+        )}
+    >
         {children}
         {count !== undefined && <span className="font-mono text-11.5 font-normal text-faint tabular-nums">{count}</span>}
         {trailing && <span className="ml-auto self-center flex items-center">{trailing}</span>}
     </h3>
 )
 
-export const SettingsGroup: React.FC<{ label?: React.ReactNode; count?: number; tone?: 'ask'; trailing?: React.ReactNode; children: React.ReactNode }> = ({ label, count, tone, trailing, children }) => {
+export const SettingsGroup: React.FC<{ label?: React.ReactNode; list?: boolean; count?: number; tone?: 'ask'; trailing?: React.ReactNode; children: React.ReactNode }> = ({ label, list, count, tone, trailing, children }) => {
     const id = useId()
     return (
         <section aria-labelledby={label ? id : undefined} className={label ? undefined : 'mt-4'}>
-            {label && <SettingsLabel id={id} count={count} tone={tone} trailing={trailing}>{label}</SettingsLabel>}
+            {label && <SettingsLabel id={id} list={list} count={count} tone={tone} trailing={trailing}>{label}</SettingsLabel>}
             <div>{children}</div>
         </section>
     )
