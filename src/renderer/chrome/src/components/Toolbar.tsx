@@ -57,7 +57,7 @@ const VerticalToolbar: React.FC = () => {
                     </div>
                 </div>
 
-                <RecordingNotice />
+                <RecordingNotice className="mx-1 app-region-no-drag" />
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
                 )}

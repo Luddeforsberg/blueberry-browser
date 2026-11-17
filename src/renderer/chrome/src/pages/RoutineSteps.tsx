@@ -13,16 +13,14 @@ import { useFlock } from '../contexts/LibraryContext'
 import { Berry, BerrySpot, useAssistantName } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
 import { BETWEEN } from '../components/PageFrame'
+import { MarkedSteps } from '../components/MarkedSteps'
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from '../components/StepCard'
 import { formatTime } from '../components/RoutineRunRow'
 import { narrowerLimits } from '../shortWords'
 import { useRunner } from '../useRunner'
 import { keepTabDraft, tabDraft } from '../flockView'
 import {
-    applyRecordedValue,
-    askForRecordedValue,
     blankForm,
-    changeRecordedValue,
     formFor,
     howOften,
     NEW_ROUTINE_EVENT,
@@ -56,6 +54,10 @@ const QUESTIONS: Record<RoutinePart, { question: string; hint?: string; mood: Mo
     where: { question: 'Where may I go?', hint: 'I can only go where I’m let. I still ask before anything risky, and no limit changes that.', mood: 'rest' },
     name: { question: 'What’s it called?', hint: 'Call it anything you like. A name you choose is never changed for you.', mood: 'rest' }
 }
+
+// While there's a value marked in the steps, the line under the question says what pressing it does.
+const hintFor = (part: RoutinePart, values: RoutineFormValues) =>
+    part === 'does' && (values.recorded?.length ?? 0) > 0 ? 'In your own words, as in a chat. Press a marked word to choose whether I ask for it each run.' : QUESTIONS[part].hint
 
 const isTime = (time: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time)
 
@@ -92,8 +94,12 @@ const Pill: React.FC<{ chosen: boolean; onChoose: () => void; mono?: boolean; qu
 
 // --- Step 1: what it does --------------------------------------------------------------------------------------------
 
-const DoesAnswer: React.FC<{ values: RoutineFormValues; onChange: (values: RoutineFormValues) => void }> = ({ values, onChange }) => (
-    <>
+// From Show Berry how, the steps carry their values marked where they stand, and switching one is pressing its mark.
+// Chosen when it opens, so editing the last value away doesn't swap the box under the caret.
+const DoesAnswer: React.FC<{ values: RoutineFormValues; onChange: (values: RoutineFormValues) => void }> = ({ values, onChange }) => {
+    const [marked] = useState(() => (values.recorded?.length ?? 0) > 0)
+    if (marked) return <MarkedSteps label="What should I do?" values={values} onChange={onChange} />
+    return (
         <textarea
             autoFocus
             aria-label="What should I do?"
@@ -104,33 +110,8 @@ const DoesAnswer: React.FC<{ values: RoutineFormValues; onChange: (values: Routi
             onChange={(event) => onChange({ ...values, instructions: event.target.value })}
             className={cn(FIELD, 'block min-h-[76px] max-h-[260px] px-4 py-[13px] resize-none text-15 leading-[1.5] [field-sizing:content]')}
         />
-        {values.recorded && values.recorded.length > 0 && (
-            <section aria-labelledby="what-might-change" className="mt-4">
-                <h3 id="what-might-change" className={cn(LABEL, 'mx-1 mb-1.5')}>What might change</h3>
-                <ul className="rounded-sheet shadow-[inset_0_0_0_1px_var(--line)]">
-                    {values.recorded.map((row, at) => (
-                        <li key={at} className={cn(BETWEEN, 'before:left-3.5 min-h-12 py-2 pl-3.5 pr-3 flex items-center gap-3')}>
-                            <label className="flex-1 min-w-0 flex items-center gap-3">
-                                <span className="w-24 shrink-0 text-13 text-ink-2 truncate">{row.label}</span>
-                                <input
-                                    aria-label={row.label}
-                                    value={row.value}
-                                    onChange={(event) => onChange(changeRecordedValue(values, at, event.target.value))}
-                                    onBlur={() => onChange(applyRecordedValue(values, at))}
-                                    className={cn(FIELD, 'h-8 px-3 rounded-row text-14')}
-                                />
-                            </label>
-                            <span className="shrink-0 flex items-center gap-2 text-13 text-ink-2">
-                                <span id={`recorded-ask-${at}`}>Ask me each run</span>
-                                <Switch labelledBy={`recorded-ask-${at}`} checked={row.ask} onChange={(on) => onChange(askForRecordedValue(values, at, on))} />
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            </section>
-        )}
-    </>
-)
+    )
+}
 
 // --- Step 2: when ----------------------------------------------------------------------------------------------------
 
@@ -460,7 +441,7 @@ export const NewRoutine: React.FC<{ tabId: string; routines: Routine[] }> = ({ t
             mood={QUESTIONS[part].mood}
             label={`${step + 1} / ${STEPS.length}`}
             question={QUESTIONS[part].question}
-            hint={QUESTIONS[part].hint}
+            hint={hintFor(part, values)}
             motionKey={part}
             from={making.from}
             nav={
@@ -506,7 +487,7 @@ export const ChangeRoutinePart: React.FC<{ tabId: string; routine: Routine; part
             mood={QUESTIONS[part].mood}
             label={PART_NAMES[part]}
             question={QUESTIONS[part].question}
-            hint={QUESTIONS[part].hint}
+            hint={hintFor(part, values)}
             nav={<PartNav off={off} saving={saving} onCancel={back} onSave={() => void commit()} />}
         >
             <Answer part={part} values={values} onChange={setValues} onEnter={() => void commit()} />

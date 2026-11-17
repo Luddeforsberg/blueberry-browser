@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Lock, Square } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import type { RecordingState, TrailKind, TrailStep } from '@shared/library'
 import { Button } from '@common/components/Button'
 import { Pips, type PipMark } from '@common/components/Pips'
 import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
-import { Berry, useAssistantName } from './Berry'
+import { useAssistantName } from './Berry'
+import { Favicon } from './Favicon'
 
 const IDLE: RecordingState = { status: 'idle', startedAt: null, steps: [], cut: null, error: null }
 
@@ -34,38 +35,35 @@ const Elapsed: React.FC<{ since: number }> = ({ since }) => {
         return () => clearInterval(timer)
     }, [])
     // A status is read out when it changes, and nobody wants this read out every second.
-    return <span aria-hidden className="tabular-nums">{clock(now - since)}</span>
+    return <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{clock(now - since)}</span>
 }
 
-// In the toolbar, on every tab in both layouts, and it stays there until Stop. It's in the chrome, so no page can reach,
-// cover or imitate it from where it is, and Stop goes straight to main.
-export const RecordingNotice: React.FC<{ state?: RecordingState }> = ({ state }) => {
+// The recorder: in the toolbar on every tab in both layouts until Done, and on top of What I watched. The toolbar's is
+// in the chrome, so no page can reach, cover or imitate it from where it is, and Done goes straight to main. Its pips
+// are the one thing that moves in the toolbar. The page's copy isn't a status, so it's read out once.
+export const RecordingNotice: React.FC<{ state?: RecordingState; inPage?: boolean; className?: string }> = ({ state, inPage = false, className }) => {
     const live = useRecording()
     const { status, startedAt, steps } = state ?? live
     const { settings, layout } = useShell()
-    const { showBerry } = settings
-    const name = useAssistantName()
     if (status !== 'recording' || startedAt === null) return null
     // Beside the chat panel, the page and its toolbar can be as narrow as they go.
     const narrow = layout.page.width < NARROW_PAGE
 
     return (
-        <div role="status" className="h-8 shrink-0 flex items-center gap-2 pl-2 pr-1 mx-1 rounded-full bg-sheet-2 text-14 app-region-no-drag">
-            <span aria-hidden className="size-2 rounded-full bg-ask motion-safe:animate-pulse" />
-            {showBerry && !narrow && <Berry mood="curious" size={24} />}
-            <span className="font-medium">{!showBerry ? 'Recording' : narrow ? 'Watching' : `${name}’s watching`}</span>
-            {!narrow && <Elapsed since={startedAt} />}
-            {layout.page.width >= ROOM_FOR_COUNT && (
-                <span aria-hidden className="text-ink-2 tabular-nums">
-                    {steps.length === 1 ? '1 note' : `${steps.length} notes`}
-                </span>
-            )}
-            <Button size="sm" variant="destructive" className="h-6 px-2.5 text-14" onClick={() => void window.chromeAPI.recording.stop()}>
-                <Square className="size-3 fill-current" aria-hidden strokeWidth={1.75} />
-                Stop
-            </Button>
+        <div role={inPage ? undefined : 'status'} className={cn('h-8 w-max shrink-0 flex items-center gap-2.5 pl-3 pr-1 rounded-full bg-sheet shadow-chip text-13', className)}>
+            <Pips pattern="waiting" className="text-ask" />
+            <span className={cn('font-medium', narrow && 'sr-only')}>{settings.showBerry ? 'Watching' : 'Recording'}</span>
+            <Elapsed since={startedAt} />
+            {layout.page.width >= ROOM_FOR_COUNT && <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>}
+            <Button size="xs" onClick={() => void window.chromeAPI.recording.stop()}>Done</Button>
         </div>
     )
+}
+
+// The bookmark star gives way to the recorder beside the chat panel on a narrow page.
+export const useRecorderNeedsRoom = () => {
+    const { layout } = useShell()
+    return useRecording().status === 'recording' && layout.page.width < NARROW_PAGE
 }
 
 // Starts it from wherever this is. What it says stays the same everywhere, so it's one thing to learn.
@@ -116,9 +114,10 @@ const TRAIL_MARKS: Record<Exclude<TrailKind, 'secret'>, PipMark> = {
     pasted: 'typed'
 }
 
-// Notes rather than a list of cards: a mark for each thing it saw, under the site it saw it on, with a thin line
-// between sites. Everything's plain text, so a label from a page is only ever words.
+// The steps under the site they were on: its icon and name as a label, then the steps on a thread, a hairline down the
+// left from each step's mark to the next. Everything's plain text, so a label from a page is only ever words.
 export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) => void }> = ({ steps, onRemove }) => {
+    const isBerry = useAssistantName() !== 'Assistant'
     const groups: Array<{ site: string; steps: TrailStep[] }> = []
     steps.forEach((step) => {
         const last = groups.at(-1)
@@ -127,33 +126,41 @@ export const TrailNotes: React.FC<{ steps: TrailStep[]; onRemove?: (id: string) 
     })
 
     return (
-        <div className="divide-y">
+        <div>
             {groups.map(({ site, steps: notes }, group) => (
-                <section key={group} aria-label={`On ${site}`} className="py-5">
-                    <h2 className="text-14 font-medium text-ink-2">{site}</h2>
-                    <ol className="mt-2 flex flex-col">
+                <section key={group} aria-label={`On ${site}`} className="mt-6 first:mt-0">
+                    <h2 className="mb-1.5 px-2 flex items-center gap-2 text-13 font-medium">
+                        <Favicon site={site} />
+                        <span className="min-w-0 truncate">{site}</span>
+                    </h2>
+                    <ol className="flex flex-col">
                         {notes.map((step) => (
-                            <li key={step.id} className="group flex items-start gap-3 py-1.5">
-                                <span className={cn('mt-1 size-4 shrink-0 flex items-center justify-center', step.kind === 'secret' ? 'text-ink-2' : 'text-ink')}>
+                            <li key={step.id} className="group relative flex items-start gap-3 p-2 rounded-[11px] transition-colors duration-fast hover:bg-hover focus-within:bg-hover after:absolute after:left-[15px] after:top-7 after:-bottom-2 after:w-px after:bg-line last:after:hidden">
+                                <span className={cn('w-[15px] h-5 shrink-0 grid place-items-center', step.kind === 'secret' ? 'text-ink-3' : 'text-ink')}>
                                     {step.kind === 'secret' ? <Lock className="size-3.5" aria-hidden strokeWidth={1.75} /> : <Pips pattern={TRAIL_MARKS[step.kind]} still />}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="block text-15 [overflow-wrap:anywhere]">
+                                    <span className="block text-14 leading-5 [overflow-wrap:anywhere]">
                                         <NoteWords step={step} />
                                     </span>
-                                    {step.path && step.path !== site && (
-                                        <span className="block text-13 text-ink-2 truncate">{step.path}</span>
+                                    {step.kind === 'secret' ? (
+                                        <span className="block text-13 text-ink-3">
+                                            {isBerry ? 'Never saved. I’ll hand the page to you here.' : 'Never saved. The page is handed to you here.'}
+                                        </span>
+                                    ) : (
+                                        step.path && step.path !== site && <span className="block text-13 text-ink-3 truncate">{step.path}</span>
                                     )}
                                 </span>
                                 {onRemove && (
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         aria-label={`Leave out: ${step.text}`}
                                         onClick={() => onRemove(step.id)}
-                                        className="shrink-0 h-6 px-2 rounded-row text-14 text-ink-2 outline-none transition-colors hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-focus"
+                                        className="-my-1 text-13 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                                     >
                                         Leave out
-                                    </button>
+                                    </Button>
                                 )}
                             </li>
                         ))}

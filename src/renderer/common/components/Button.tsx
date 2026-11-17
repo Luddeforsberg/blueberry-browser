@@ -9,15 +9,12 @@ const buttonVariants = cva(
     {
         variants: {
             // DESIGN.md section 8. Three roles: filled for the one decision, raised beside it, and quiet text for the
-            // rest. Off is `faint`, on `tray` where it has a fill. Destructive is only the recording's Stop, where red is
-            // the status itself. Raised takes `hover` over its own sheet, and in dark the sheet a step up, so it still
-            // stands off the sheet it's on.
+            // rest. Off is `faint`, on `tray` where it has a fill. Raised takes `hover` over its own sheet, and in dark
+            // the sheet a step up, so it still stands off the sheet it's on.
             variant: {
                 default: "bg-ink text-ground shadow-filled hover:bg-ink/85 disabled:bg-tray disabled:text-faint disabled:shadow-none",
                 raised: "bg-sheet dark:bg-sheet-2 text-ink shadow-chip hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:[background-image:linear-gradient(var(--press),var(--press))] disabled:bg-tray disabled:text-faint disabled:shadow-none",
                 ghost: "text-ink-2 hover:bg-hover hover:text-ink active:bg-press disabled:text-faint",
-                destructive:
-                    "bg-ask text-ground hover:brightness-95 active:brightness-90",
             },
             // 32px, or 28px where the button belongs to a row.
             size: {
