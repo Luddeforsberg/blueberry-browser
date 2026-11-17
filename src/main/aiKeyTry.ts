@@ -1,20 +1,26 @@
 import type { AiService } from "../shared/aiKey";
-import { modelsFor } from "./agent";
+import { modelsFor, SERVICE_ADDRESS } from "./agent";
 
 // Trying a key is one short message to the service's cheap model, from main. A 4xx answer is the service turning the
-// key down: a wrong key, or an account that can't be charged. No answer, or the service failing, is told apart, since the
-// key may be fine. Nothing about the call is logged, as its headers hold the key.
+// key down: a wrong key, or an account that can't be charged. No answer, the service failing, or a reply that isn't a
+// model's answer is told apart, since the key may be fine. Nothing about the call is logged, as its headers hold the key.
 
 const TIMEOUT_MS = 15_000;
 const HELLO = "Say hello.";
 
 export type TryOutcome = "works" | "refused" | "unreachable";
 
-const request = (service: AiService, key: string, env: Record<string, string | undefined>): { url: string; init: RequestInit } => {
+// Where the try goes: the service's own address, or in an unpackaged app the one the environment gives, which is the
+// same one the providers' own clients would use, so a test's stand-in gets this too.
+const addressOf = (service: AiService, env: Record<string, string | undefined>, ownAddressOnly: boolean): string => {
+  const other = service === "anthropic" ? env.ANTHROPIC_BASE_URL : env.OPENAI_BASE_URL;
+  return ((!ownAddressOnly && other) || SERVICE_ADDRESS[service]).replace(/\/+$/, "");
+};
+
+const request = (service: AiService, key: string, env: Record<string, string | undefined>, ownAddressOnly: boolean): { url: string; init: RequestInit } => {
   const { titleModel } = modelsFor(service, env);
+  const base = addressOf(service, env, ownAddressOnly);
   if (service === "anthropic") {
-    // The same addresses the providers' own clients use, so a test's fake service gets this too.
-    const base = (env.ANTHROPIC_BASE_URL || "https://api.anthropic.com").replace(/\/+$/, "");
     return {
       url: `${base}/v1/messages`,
       init: {
@@ -24,7 +30,6 @@ const request = (service: AiService, key: string, env: Record<string, string | u
       },
     };
   }
-  const base = (env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
   return {
     url: `${base}/chat/completions`,
     init: {
@@ -35,16 +40,28 @@ const request = (service: AiService, key: string, env: Record<string, string | u
   };
 };
 
+// Whether the reply is a model's answer in the service's own shape, so an empty 200 from something in between isn't
+// taken for one.
+const answered = (service: AiService, reply: unknown): boolean => {
+  if (!reply || typeof reply !== "object") return false;
+  const said = service === "anthropic" ? (reply as { content?: unknown }).content : (reply as { choices?: unknown }).choices;
+  return Array.isArray(said) && said.length > 0;
+};
+
 export const tryAiKey = async (
   service: AiService,
   key: string,
-  { fetch = globalThis.fetch, env = process.env }: { fetch?: typeof globalThis.fetch; env?: Record<string, string | undefined> } = {}
+  {
+    fetch = globalThis.fetch,
+    env = process.env,
+    ownAddressOnly = false,
+  }: { fetch?: typeof globalThis.fetch; env?: Record<string, string | undefined>; ownAddressOnly?: boolean } = {}
 ): Promise<TryOutcome> => {
-  const { url, init } = request(service, key, env);
+  const { url, init } = request(service, key, env, ownAddressOnly);
   try {
     const response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (response.ok) return answered(service, await response.json().catch(() => null)) ? "works" : "unreachable";
     await response.body?.cancel().catch(() => {});
-    if (response.ok) return "works";
     return response.status >= 400 && response.status < 500 ? "refused" : "unreachable";
   } catch {
     return "unreachable";

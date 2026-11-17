@@ -62,6 +62,8 @@ export const useKeyTry = () => {
         service,
         choose: (next: AiService) => {
             setChosen(next)
+            // What's in the field was for the other service, and must never be tried with this one.
+            if (next !== service) setKey('')
             setSaid(null)
         },
         key,
@@ -72,7 +74,7 @@ export const useKeyTry = () => {
         said,
         tryKey,
         paste: async () => {
-            const pasted = await window.chromeAPI.aiKey.paste()
+            const pasted = await window.chromeAPI.aiKey.paste(service)
             if (pasted) setKey(pasted)
             setSaid(pasted ? null : 'nothing-to-paste')
         },

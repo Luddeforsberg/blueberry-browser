@@ -15,13 +15,16 @@ export interface AiKeyState {
 // answer from it at all.
 export type AiKeyTried = "works" | "refused" | "unreachable" | "not-a-key" | "not-safe" | "not-saved";
 
-// A key is one word of printable characters. The longest real ones are a little over 200.
+// A key is its service's prefix, then letters, digits, dashes and underscores. The longest real ones are a little over
+// 200. Anthropic's start with OpenAI's prefix too, so OpenAI's shape leaves those out. Being this strict is what keeps a
+// password on the clipboard from coming back through Paste, and one service's key from being sent to the other.
 export const AI_KEY_LENGTH = { min: 20, max: 400 };
-export const looksLikeAiKey = (key: string): boolean =>
-  key.length >= AI_KEY_LENGTH.min && key.length <= AI_KEY_LENGTH.max && /^[\x21-\x7e]+$/.test(key);
+const PREFIXES: Record<AiService, string> = { openai: "sk-", anthropic: "sk-ant-" };
+const KEY_SHAPE: Record<AiService, RegExp> = { openai: /^sk-(?!ant-)[A-Za-z0-9_-]+$/, anthropic: /^sk-ant-[A-Za-z0-9_-]+$/ };
+export const looksLikeAiKey = (service: AiService, key: string): boolean =>
+  key.length >= AI_KEY_LENGTH.min && key.length <= AI_KEY_LENGTH.max && KEY_SHAPE[service].test(key);
 
 // How a key shows once it's out of the field: its service's prefix, dots and its last four characters.
-const PREFIXES: Record<AiService, string> = { openai: "sk-", anthropic: "sk-ant-" };
 export const maskedKey = (service: AiService, last4: string): string => `${PREFIXES[service]}${"•".repeat(16)}${last4}`;
 
 export const NO_KEY = "Berry needs an AI key to answer.";

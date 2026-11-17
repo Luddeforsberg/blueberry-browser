@@ -1,4 +1,4 @@
-import { safeStorage } from "electron";
+import { app, safeStorage } from "electron";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import { isAiService, looksLikeAiKey, type AiKeyState, type AiKeyTried } from "../shared/aiKey";
@@ -24,7 +24,9 @@ export class AiKey {
   constructor(
     private readonly file: string,
     private readonly onChange: () => void,
-    private readonly tryKey: (service: SavedKey["service"], key: string) => Promise<TryOutcome> = tryAiKey
+    // A packaged app only ever tries a key at the service's own address.
+    private readonly tryKey: (service: SavedKey["service"], key: string) => Promise<TryOutcome> = (service, key) =>
+      tryAiKey(service, key, { ownAddressOnly: app.isPackaged })
   ) {
     this.saved = this.load();
   }
@@ -40,7 +42,7 @@ export class AiKey {
   async try(service: unknown, key: unknown): Promise<{ outcome: AiKeyTried; state: AiKeyState }> {
     const text = typeof key === "string" ? key.trim() : "";
     const answer = (outcome: AiKeyTried) => ({ outcome, state: this.state });
-    if (!isAiService(service) || !looksLikeAiKey(text)) return answer("not-a-key");
+    if (!isAiService(service) || !looksLikeAiKey(service, text)) return answer("not-a-key");
     if (!safeStorage.isEncryptionAvailable()) return answer("not-safe");
     const generation = ++this.generation;
     const outcome = await this.tryKey(service, text);
@@ -82,7 +84,7 @@ export class AiKey {
       const { service, key } = JSON.parse(readFileSync(this.file, "utf8"));
       if (!isAiService(service) || typeof key !== "string") return null;
       const plain = safeStorage.decryptString(Buffer.from(key, "base64"));
-      return looksLikeAiKey(plain) ? { service, key: plain } : null;
+      return looksLikeAiKey(service, plain) ? { service, key: plain } : null;
     } catch {
       return null;
     }

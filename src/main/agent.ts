@@ -170,8 +170,14 @@ export interface SavedKey {
   key: string;
 }
 let savedKey: () => SavedKey | null = () => null;
-export const setSavedKeyReader = (read: () => SavedKey | null): void => {
+// Each service's own address. With `ownAddressOnly`, which the packaged app sets, a saved key is only ever sent there,
+// whatever the environment says about another address. An unpackaged app keeps the environment's, which is how tests
+// point it at a stand-in.
+export const SERVICE_ADDRESS: Record<AiService, string> = { openai: "https://api.openai.com/v1", anthropic: "https://api.anthropic.com" };
+let savedKeyStaysHome = false;
+export const setSavedKeyReader = (read: () => SavedKey | null, { ownAddressOnly = false }: { ownAddressOnly?: boolean } = {}): void => {
   savedKey = read;
+  savedKeyStaysHome = ownAddressOnly;
 };
 
 // The .env file's choice of models only applies to a key for its own provider.
@@ -183,28 +189,39 @@ export const modelsFor = (provider: AiService, env: Record<string, string | unde
   };
 };
 
-export const modelConfig = (env: Record<string, string | undefined> = process.env, saved: SavedKey | null = savedKey()) => {
-  if (saved) return { provider: saved.service, apiKey: saved.key, ...modelsFor(saved.service, env) };
+export const modelConfig = (
+  env: Record<string, string | undefined> = process.env,
+  saved: SavedKey | null = savedKey(),
+  ownAddressOnly = savedKeyStaysHome
+) => {
+  if (saved) return { provider: saved.service, apiKey: saved.key, ownAddressOnly, ...modelsFor(saved.service, env) };
   const provider = env.LLM_PROVIDER?.toLowerCase() || "openai";
   if (provider !== "openai" && provider !== "anthropic") {
     throw new ModelConfigError(`LLM_PROVIDER in the .env file must be openai or anthropic, not "${provider}".`);
   }
   const apiKey = env[API_KEYS[provider]];
   if (!apiKey) throw new ModelConfigError(NO_KEY);
-  return { provider, apiKey, ...modelsFor(provider, env) };
+  return { provider, apiKey, ownAddressOnly: false, ...modelsFor(provider, env) };
 };
 
 // LangChain and the providers load on first use, so opening the browser never waits for them.
 const createModel = async (use: "model" | "titleModel" = "model"): Promise<BaseChatModel> => {
-  const { provider, apiKey, [use]: model } = modelConfig();
+  const { provider, apiKey, ownAddressOnly, [use]: model } = modelConfig();
+  // An address given here comes before any the client would take from the environment.
   if (provider === "anthropic") {
     const { ChatAnthropic } = await import("@langchain/anthropic");
-    return new ChatAnthropic({ apiKey, model, maxRetries: MAX_RETRIES });
+    return new ChatAnthropic({ apiKey, model, maxRetries: MAX_RETRIES, ...(ownAddressOnly && { anthropicApiUrl: SERVICE_ADDRESS.anthropic }) });
   }
   const { ChatOpenAI } = await import("@langchain/openai");
   // Newer models only take tools through the Responses API. A custom address, such as the tests' fake model,
   // may only speak the older one.
-  return new ChatOpenAI({ apiKey, model, maxRetries: MAX_RETRIES, useResponsesApi: !process.env.OPENAI_BASE_URL });
+  return new ChatOpenAI({
+    apiKey,
+    model,
+    maxRetries: MAX_RETRIES,
+    useResponsesApi: ownAddressOnly || !process.env.OPENAI_BASE_URL,
+    ...(ownAddressOnly && { configuration: { baseURL: SERVICE_ADDRESS.openai } }),
+  });
 };
 
 // The installed LangChain has no one shape for a PDF that both providers read: the older file block goes to Anthropic

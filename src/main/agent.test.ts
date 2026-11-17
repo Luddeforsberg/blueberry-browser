@@ -40,6 +40,7 @@ describe("modelConfig", () => {
       apiKey: "key",
       model: "custom",
       titleModel: "claude-haiku-5-5",
+      ownAddressOnly: false,
     });
     expect(() => modelConfig({ LLM_PROVIDER: "anthropic", OPENAI_API_KEY: "key" })).toThrow(NO_KEY);
   });
@@ -55,8 +56,10 @@ describe("modelConfig", () => {
 
   it("uses a key saved in Settings before the .env one, with the .env models only for their own provider", () => {
     const env = { OPENAI_API_KEY: "env-key", LLM_MODEL: "custom", LLM_TITLE_MODEL: "custom-title" };
-    expect(modelConfig(env, { service: "openai", key: "saved-key" })).toEqual({ provider: "openai", apiKey: "saved-key", model: "custom", titleModel: "custom-title" });
-    expect(modelConfig(env, { service: "anthropic", key: "saved-key" })).toEqual({ provider: "anthropic", apiKey: "saved-key", model: "claude-sonnet-5-5", titleModel: "claude-haiku-5-5" });
+    expect(modelConfig(env, { service: "openai", key: "saved-key" })).toEqual({ provider: "openai", apiKey: "saved-key", model: "custom", titleModel: "custom-title", ownAddressOnly: false });
+    expect(modelConfig(env, { service: "anthropic", key: "saved-key" }, true)).toEqual({ provider: "anthropic", apiKey: "saved-key", model: "claude-sonnet-5-5", titleModel: "claude-haiku-5-5", ownAddressOnly: true });
+    // A key from the .env file is the developer's, and goes where their environment says.
+    expect(modelConfig(env, null, true).ownAddressOnly).toBe(false);
     expect(modelConfig({ LLM_PROVIDER: "gemini" }, { service: "openai", key: "saved-key" }).apiKey).toBe("saved-key");
   });
 });

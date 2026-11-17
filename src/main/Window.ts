@@ -252,7 +252,7 @@ export class Window {
       sendToRenderer(this.chrome.view.webContents, "ai-key:updated", this.aiKey.state);
       if (this.aiKey.inUse) this.firstJobDone("key");
     });
-    setSavedKeyReader(() => this.aiKey.inUse);
+    setSavedKeyReader(() => this.aiKey.inUse, { ownAddressOnly: app.isPackaged });
     this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
       this.broadcast("library:updated", this.librarySnapshot);
     });

@@ -1,5 +1,5 @@
 import { clipboard, ipcMain } from "electron";
-import { looksLikeAiKey } from "../shared/aiKey";
+import { isAiService, looksLikeAiKey } from "../shared/aiKey";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
 import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
@@ -180,9 +180,10 @@ export class EventManager {
     this.handle("ai-key:try", (service, key) => this.mainWindow.aiKey.try(service, key));
     this.handle("ai-key:remove", () => this.mainWindow.aiKey.remove());
     this.handle("ai-key:find", (service) => this.mainWindow.findKey(service));
-    this.handle("ai-key:paste", async () => {
+    this.handle("ai-key:paste", async (service) => {
+      if (!isAiService(service)) return null;
       const text = (await clipboard.readText()).trim();
-      return looksLikeAiKey(text) ? text : null;
+      return looksLikeAiKey(service, text) ? text : null;
     });
 
     this.handle("phone:state", () => this.mainWindow.telegram.state);

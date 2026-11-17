@@ -45,7 +45,7 @@ describe("AiKey", () => {
 
   it.each(["refused", "unreachable"] as const)("says a key the service %s and keeps nothing", async (answer) => {
     const { store, changes, file } = start(answer);
-    expect(await store.try("anthropic", KEY)).toEqual({ outcome: answer, state: { service: null, last4: null } });
+    expect(await store.try("openai", KEY)).toEqual({ outcome: answer, state: { service: null, last4: null } });
     expect(store.inUse).toBeNull();
     expect(changes).not.toHaveBeenCalled();
     expect(existsSync(file)).toBe(false);
@@ -57,6 +57,9 @@ describe("AiKey", () => {
     ["a key that's too short", "openai", "sk-123"],
     ["a key that's too long", "openai", `sk-${"a".repeat(400)}`],
     ["a key with a space in it", "openai", "sk-proj-abcdefghij klmnopqrstuvwxyz"],
+    ["something that isn't a key, such as a password", "openai", "this-is-my-bank-password-123"],
+    ["the other service's key", "openai", "sk-ant-api03-abcdefghijklmnopqrstuvwxyz"],
+    ["a key without its service's prefix", "anthropic", KEY],
   ])("refuses %s without trying it", async (_, service, key) => {
     const { store, tries } = start();
     expect((await store.try(service, key)).outcome).toBe("not-a-key");
@@ -92,21 +95,41 @@ describe("AiKey", () => {
 });
 
 describe("tryAiKey", () => {
-  const answering = (status: number) => vi.fn<typeof fetch>(async () => new Response("{}", { status }));
+  const ANSWERS = { openai: { choices: [{ message: { content: "Hello." } }] }, anthropic: { content: [{ type: "text", text: "Hello." }] } };
+  const answering = (status: number, body: unknown = {}) => vi.fn<typeof fetch>(async () => new Response(status === 204 ? null : JSON.stringify(body), { status }));
 
   it("sends one short message to the service's cheap model with the key", async () => {
-    const fetch = answering(200);
+    const fetch = answering(200, ANSWERS.openai);
     expect(await tryAiKey("openai", KEY, { fetch, env: {} })).toBe("works");
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/chat/completions");
     expect(init?.headers).toMatchObject({ authorization: `Bearer ${KEY}` });
     expect(JSON.parse(String(init?.body))).toMatchObject({ model: "gpt-6-luna" });
 
-    const anthropic = answering(200);
-    await tryAiKey("anthropic", KEY, { fetch: anthropic, env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9/" } });
+    const anthropic = answering(200, ANSWERS.anthropic);
+    expect(await tryAiKey("anthropic", KEY, { fetch: anthropic, env: { ANTHROPIC_BASE_URL: "http://127.0.0.1:9/" } })).toBe("works");
     const [anthropicUrl, anthropicInit] = anthropic.mock.calls[0];
     expect(anthropicUrl).toBe("http://127.0.0.1:9/v1/messages");
     expect(anthropicInit?.headers).toMatchObject({ "x-api-key": KEY });
+  });
+
+  it("only goes to the service's own address when told to, whatever the environment says", async () => {
+    const env = { OPENAI_BASE_URL: "https://elsewhere.example/v1", ANTHROPIC_BASE_URL: "https://elsewhere.example" };
+    const openai = answering(200, ANSWERS.openai);
+    await tryAiKey("openai", KEY, { fetch: openai, env, ownAddressOnly: true });
+    expect(openai.mock.calls[0][0]).toBe("https://api.openai.com/v1/chat/completions");
+    const anthropic = answering(200, ANSWERS.anthropic);
+    await tryAiKey("anthropic", KEY, { fetch: anthropic, env, ownAddressOnly: true });
+    expect(anthropic.mock.calls[0][0]).toBe("https://api.anthropic.com/v1/messages");
+  });
+
+  it.each([
+    ["an empty reply", 204, undefined],
+    ["a reply with nothing in it", 200, {}],
+    ["a reply with no answer in it", 200, { choices: [] }],
+    ["the other service's kind of answer", 200, ANSWERS.anthropic],
+  ])("doesn't take %s for a key that works", async (_, status, body) => {
+    expect(await tryAiKey("openai", KEY, { fetch: answering(status, body), env: {} })).toBe("unreachable");
   });
 
   it("tells a key the service turned down from a service it couldn't reach", async () => {

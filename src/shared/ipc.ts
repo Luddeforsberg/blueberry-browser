@@ -624,9 +624,9 @@ export interface InvokeChannels {
   "ai-key:remove": { region: "chrome"; args: []; result: AiKeyState };
   // Opens the service's own page for making a key.
   "ai-key:find": { region: "chrome"; args: [service: AiService]; result: void };
-  // What's on the clipboard, for the key field's Paste, only if it looks like a key. Null otherwise, so nothing else on
-  // the clipboard can be read this way.
-  "ai-key:paste": { region: "chrome"; args: []; result: string | null };
+  // What's on the clipboard, for the key field's Paste, only if it has the shape of that service's key. Null otherwise,
+  // so nothing else on the clipboard, such as a password, can be read this way.
+  "ai-key:paste": { region: "chrome"; args: [service: AiService]; result: string | null };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };
@@ -897,7 +897,7 @@ export interface AiKeyAPI {
   tryKey: (service: AiService, key: string) => Promise<{ outcome: AiKeyTried; state: AiKeyState }>;
   remove: () => Promise<AiKeyState>;
   find: (service: AiService) => Promise<void>;
-  paste: () => Promise<string | null>;
+  paste: (service: AiService) => Promise<string | null>;
   onUpdated: (callback: (state: AiKeyState) => void) => Unsubscribe;
 }
 
