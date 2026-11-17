@@ -1,195 +1,171 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { DesktopBerryState, DesktopComposerState, DesktopEdge, ThemeState } from '@shared/ipc'
-import { Mascot } from '@common/components/Mascot'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
+import type { DesktopDropPart, DesktopDropState, Point } from '@shared/ipc'
+import { DESKTOP_DROP } from '@shared/desktopSizes'
+import { SHORTCUTS, shortcutKeys } from '@shared/shortcuts'
 import { Pips } from '@common/components/Pips'
+import { TIP_KEY } from '@common/components/Tooltip'
 import { cn } from '@common/lib/utils'
-import { Composer } from './components/Composer'
+import { DropFaces, DropShape } from './DesktopDrop'
+import { FADES_IN, dropAt, elapsed, restingSize, thickness } from './desktopShape'
+import { useDesktopTheme } from './useDesktopTheme'
 
 const desktop = () => window.chromeAPI.desktop
 
-const BIRD_SIZE = 72
-// Past this much movement a press on the bird is a drag.
+// Past this much movement a press on the drop is a drag.
 const DRAG_FROM_PX = 3
-const GLIDE = 'transform 240ms cubic-bezier(.32, .72, 0, 1)'
-// Its feet towards the edge it's on: standing on the bottom, hanging from the top, and on its side on the sides.
-const FEET_TOWARDS: Record<DesktopEdge, string> = { bottom: '', top: 'scaleY(-1)', left: 'rotate(90deg)', right: 'rotate(-90deg)' }
-const POSE_CHANGES_AFTER_TUCK_MS = 260
+// The words of a finished reply, in two lines at most.
+const RESULT_WIDTH = 200
+const TITLE_WIDTH = 200
 
-const useTheme = (): ThemeState | null => {
-    const [theme, setTheme] = useState<ThemeState | null>(null)
+const useNow = (every: number | null): number => {
+    const [now, setNow] = useState(() => Date.now())
     useEffect(() => {
-        const apply = (next: ThemeState) => {
-            document.documentElement.classList.toggle('dark', next.isDark)
-            setTheme(next)
-        }
-        void window.chromeAPI.theme.getTheme().then(apply)
-        return window.chromeAPI.theme.onThemeUpdated(apply)
-    }, [])
-    return theme
+        if (every === null) return
+        setNow(Date.now())
+        const timer = setInterval(() => setNow(Date.now()), every)
+        return () => clearInterval(timer)
+    }, [every])
+    return now
 }
 
-// The bird on the edge of the screen, in a transparent window of its own. Main decides everything it says and shows,
-// and the window doesn't change size for any of it. All the movement is transforms, so it stays smooth by itself.
+const useRoom = () => {
+    const [room, setRoom] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
+    useEffect(() => {
+        const resized = () => setRoom({ width: window.innerWidth, height: window.innerHeight })
+        window.addEventListener('resize', resized)
+        return () => window.removeEventListener('resize', resized)
+    }, [])
+    return room
+}
+
+// A button on the drop, which is pressed for itself and not as the drop.
+const PartButton: React.FC<{ part: DesktopDropPart; label: string; className: string; children: React.ReactNode }> = ({ part, label, className, children }) => (
+    <button
+        type="button"
+        aria-label={label}
+        data-desktop-part={part}
+        tabIndex={-1}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+            event.stopPropagation()
+            void desktop().press(part)
+        }}
+        className={cn('press shrink-0 outline-none', className)}
+    >
+        {children}
+    </button>
+)
+
+// The drop on the edge of the screen, in a clear window of its own that lets clicks through everywhere but here. Main
+// decides everything it says, and the window doesn't change size for any of it: the shape grows inside it.
 export const DesktopApp: React.FC = () => {
-    const [state, setState] = useState<DesktopBerryState | null>(null)
-    const [settledTucked, setSettledTucked] = useState(false)
-    const [words, setWords] = useState<string | null>(null)
-    const mover = useRef<HTMLDivElement>(null)
-    const body = useRef<HTMLDivElement>(null)
-    const lineBox = useRef<HTMLDivElement>(null)
-    const lastFrame = useRef(0)
+    const [state, setState] = useState<DesktopDropState | null>(null)
+    const theme = useDesktopTheme()
+    const room = useRoom()
+    const row = useRef<HTMLDivElement>(null)
+    const [natural, setNatural] = useState({ width: 0, height: 0 })
     const drag = useRef<{ startX: number; startY: number; moved: boolean } | null>(null)
-    const latest = useRef<DesktopBerryState | null>(null)
+    const [held, setHeld] = useState<Point | null>(null)
+    const latest = useRef<DesktopDropState | null>(null)
     latest.current = state
-    useTheme()
+    const now = useNow(state?.says.kind === 'working' && state.says.since !== null ? 1000 : null)
+    const dragging = state?.dragging ?? false
+    // A new row for each thing it says, so its words fade in.
+    const rowKey = state === null ? null : dragging ? 'held' : state.says.kind
 
     useEffect(() => {
         void desktop().state().then(setState)
         return desktop().onState(setState)
     }, [])
 
-    const x = state?.at.x
-    const y = state?.at.y
+    // Laid out at its own size, so the shape can grow to it.
+    useLayoutEffect(() => {
+        const element = row.current
+        if (!element) return
+        const measure = () => setNatural({ width: element.offsetWidth, height: element.offsetHeight })
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, [rowKey])
+
+    useEffect(() => {
+        if (!dragging) setHeld(null)
+    }, [dragging])
+
+    const edge = state?.edge ?? 'right'
+    const kind = state?.says.kind ?? 'rest'
+    const resting = restingSize(edge)
+    const width = dragging ? DESKTOP_DROP.along : Math.max(resting.width, natural.width)
+    const height = dragging ? DESKTOP_DROP.along : Math.max(thickness(kind, edge), natural.height)
+    const at = dragging && held ? held : dropAt(edge, state?.anchor ?? { x: 0, y: 0 }, { width, height }, room)
+
+    // What takes the pointer: the shape as it will be, not as it is part way through growing.
     const frame = state?.frame
-    const still = state?.still ?? false
-    const dragging = state?.dragging ?? false
-    const flight = state?.flight ?? null
-    const tucked = state?.tucked ?? true
-    const lineShowing = state?.lineShowing ?? false
-    const line = state?.line ?? null
-
-    // Glides when it's the bird that moved. When it's the window that moved, the bird just has a new place in it.
+    const shown = state?.shown ?? false
     useLayoutEffect(() => {
-        const element = mover.current
-        if (!element || x === undefined || y === undefined) return
-        const sameWindow = frame === lastFrame.current
-        lastFrame.current = frame ?? 0
-        // The pointer moves it for as long as it has it, from where it was when the window changed.
-        if (dragging && sameWindow) return
-        element.style.transition = sameWindow && !still ? GLIDE : 'none'
-        element.style.transform = `translate3d(${x}px, ${y}px, 0)`
-    }, [x, y, frame, still, dragging])
-
-    useEffect(() => {
-        const element = mover.current
-        if (!element || !flight) return
-        const animation = element.animate(
-            flight.path.map((point) => ({ transform: `translate3d(${point.x}px, ${point.y}px, 0)` })),
-            { duration: flight.ms, easing: 'linear', fill: 'forwards' }
-        )
-        return () => animation.cancel()
-        // By its id: every state message brings a new object, and that mustn't start the flight over.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [flight?.id])
-
-    // Settles once it lands, with its weight going down through its feet.
-    const wasFlying = useRef(false)
-    useEffect(() => {
-        if (wasFlying.current && !flight && !still) {
-            body.current?.animate([{ transform: 'scale(1.06, 0.9)' }, { transform: 'scale(1, 1)' }], { duration: 220, easing: 'ease-out' })
-        }
-        wasFlying.current = !!flight
-    }, [flight, still])
-
-    // Only out of sight does it go back to resting, so a mood isn't seen changing on its way down.
-    useEffect(() => {
-        if (!tucked) return setSettledTucked(false)
-        const timer = setTimeout(() => setSettledTucked(true), POSE_CHANGES_AFTER_TUCK_MS)
-        return () => clearTimeout(timer)
-    }, [tucked])
-
-    // The words stay while they fade away.
-    useEffect(() => {
-        if (lineShowing && line) setWords(line)
-    }, [lineShowing, line])
-
-    useLayoutEffect(() => {
-        const element = lineBox.current
-        if (!lineShowing || !element) {
-            void desktop().lineBox(null)
-            return
-        }
-        const { x: left, y: top, width, height } = element.getBoundingClientRect()
-        void desktop().lineBox({ x: left, y: top, width, height })
-    }, [lineShowing, words, frame, state?.lineAnchor.fromSide, state?.lineAnchor.middle])
+        if (frame === undefined || !shown || dragging) return
+        void desktop().dropBox({ x: at.x, y: at.y, width, height }, frame)
+    }, [at.x, at.y, width, height, frame, shown, dragging])
 
     if (!state) return null
-
-    const pose = flight ? 'fetching' : settledTucked && state.mood !== 'asking' ? 'rest' : state.mood
-    const anchor = state.lineAnchor
-    const turned = flight
-        ? (flight.left ? 'scaleX(-1)' : '')
-        : dragging
-          ? (state.flip ? 'scaleX(-1)' : '')
-          : `${FEET_TOWARDS[state.edge]} ${state.flip ? 'scaleX(-1)' : ''}`
+    const { says, faces, working, still, showBerry } = state
+    const thick = thickness(kind, edge)
+    const inside = Math.min(Math.max((thick - 20) / 2, 4), 12)
+    // Hidden mascots: the glyph is the pips already.
+    const pips = working && showBerry && (says.kind === 'rest' || says.kind === 'working' || says.kind === 'counts')
+    // At rest it's 28 out of the edge around the face, and a little more with the pips beside it.
+    const padding =
+        kind === 'rest'
+            ? pips || faces.length > 1 ? '0 6px' : `0 ${(resting.width - 20) / 2}px`
+            : `0 ${says.kind === 'asking' || says.kind === 'finished' ? 9 : inside}px 0 ${inside}px`
+    const front = faces[0]
+    const keys = shortcutKeys(SHORTCUTS.desktop, theme?.platform === 'mac')
 
     return (
-        <div className={cn("fixed inset-0 overflow-hidden transition-opacity duration-150", state.shown ? "opacity-100" : "opacity-0")}>
-            <div
-                ref={lineBox}
-                className="absolute"
-                style={{
-                    [anchor.side]: anchor.fromSide,
-                    maxWidth: anchor.maxWidth,
-                    width: 'max-content',
-                    ...(anchor.across === 'middle'
-                        ? { top: anchor.middle, transform: 'translateY(-50%)' }
-                        : { [anchor.across]: 10 })
-                }}
-            >
-                <button
-                    type="button"
-                    data-desktop-line={lineShowing ? '' : undefined}
-                    tabIndex={-1}
-                    aria-hidden={!lineShowing}
-                    onClick={() => void desktop().press()}
-                    className={cn(
-                        "block px-3 py-1.5 rounded-tile border bg-sheet text-14 leading-[18px] text-left outline-none line-clamp-2",
-                        "shadow-lift",
-                        !still && "transition-[opacity,transform] duration-200 ease-out",
-                        lineShowing ? "opacity-100 translate-x-0" : cn("opacity-0 pointer-events-none", anchor.side === 'left' ? "-translate-x-1.5" : "translate-x-1.5")
-                    )}
-                    style={{ textWrap: 'pretty' }}
-                >
-                    {words}
-                </button>
-            </div>
-            <div
-                ref={mover}
-                data-desktop-bird
-                data-mood={state.mood}
-                data-tucked={state.tucked}
-                data-edge={state.edge}
+        <div className="fixed inset-0 overflow-hidden">
+            <DropShape
+                edge={edge}
+                x={at.x}
+                y={at.y}
+                width={width}
+                height={height}
+                still={still || dragging}
+                out={state.shown}
+                loose={dragging}
                 role="button"
-                aria-label={line ?? `Give ${state.name} a job`}
-                className="absolute left-0 top-0 select-none will-change-transform"
-                style={{ width: BIRD_SIZE, height: BIRD_SIZE }}
+                aria-label={says.kind === 'asking' ? says.words : says.kind === 'finished' ? says.text : `Give ${state.faces[0]?.name ?? 'Berry'} a job`}
+                data-desktop-drop
+                data-says={says.kind}
+                data-edge={edge}
+                data-mood={front?.mood}
                 onContextMenu={(event) => {
                     event.preventDefault()
                     void desktop().menu()
                 }}
                 onPointerDown={(event) => {
-                    if (event.button === 0) drag.current = { startX: event.screenX, startY: event.screenY, moved: false }
+                    if (event.button !== 0) return
+                    drag.current = { startX: event.screenX, startY: event.screenY, moved: false }
+                    // From the press, since the drop is small enough for a quick drag to leave it before it counts as one.
+                    event.currentTarget.setPointerCapture(event.pointerId)
                 }}
                 onPointerMove={(event) => {
-                    const held = drag.current
-                    if (!held) return
-                    if (!held.moved) {
-                        if (Math.hypot(event.screenX - held.startX, event.screenY - held.startY) < DRAG_FROM_PX) return
-                        // Only now, because a captured press would click this box rather than the bird in it, which reacts.
-                        event.currentTarget.setPointerCapture(event.pointerId)
-                        held.moved = true
+                    const pressed = drag.current
+                    if (!pressed) return
+                    if (!pressed.moved) {
+                        if (Math.hypot(event.screenX - pressed.startX, event.screenY - pressed.startY) < DRAG_FROM_PX) return
+                        pressed.moved = true
                         void desktop().dragStart()
                     }
                     const current = latest.current
                     if (!current?.dragging) return
-                    event.currentTarget.style.transition = 'none'
-                    event.currentTarget.style.transform = `translate3d(${event.screenX - current.origin.x - BIRD_SIZE / 2}px, ${event.screenY - current.origin.y - BIRD_SIZE / 2}px, 0)`
+                    setHeld({ x: event.screenX - current.origin.x - DESKTOP_DROP.along / 2, y: event.screenY - current.origin.y - DESKTOP_DROP.along / 2 })
                 }}
                 onPointerUp={() => {
                     if (drag.current?.moved) void desktop().dragEnd()
                 }}
-                // However a drag gets cut off, or the bird's window would go on taking clicks across the screen.
+                // However a drag gets cut off, or the window would go on taking clicks across the screen.
                 onLostPointerCapture={() => {
                     if (drag.current?.moved) void desktop().dragEnd()
                 }}
@@ -198,99 +174,59 @@ export const DesktopApp: React.FC = () => {
                     drag.current = null
                 }}
                 onClickCapture={(event) => {
-                    // The end of a drag isn't a click, for the bird's reaction or for what it opens.
+                    // The end of a drag isn't a press.
                     if (drag.current?.moved) event.stopPropagation()
                     drag.current = null
                 }}
-                onClick={() => void desktop().press()}
+                onClick={() => void desktop().press('drop')}
             >
+                {/* Laid out at its own size from the drop's start, and the shape around it shows as much as it has grown. */}
                 <div
-                    className="absolute inset-0"
-                    style={{ transform: turned, transition: still ? undefined : 'transform 200ms cubic-bezier(.32, .72, 0, 1)' }}
+                    ref={row}
+                    key={rowKey}
+                    className={cn('dark absolute left-0 top-0 w-max flex items-center whitespace-nowrap text-13 font-medium text-tip-ink', !still && FADES_IN)}
+                    style={{ minHeight: dragging ? DESKTOP_DROP.along : thick, padding: dragging ? `0 ${(DESKTOP_DROP.along - 20) / 2}px` : padding, gap: kind === 'rest' ? 6 : 8 }}
                 >
-                    <div ref={body} className="absolute inset-0" style={{ transformOrigin: '48% 100%' }}>
-                        <Mascot
-                            mood={pose}
-                            size={BIRD_SIZE}
-                            look={state.look}
-                            name={state.name}
-                            hidden={!state.showBerry}
-                            still={state.still}
-                            lively
-                            className={cn(!flight && "drop-shadow-[0_1px_2px_rgb(var(--ink)/0.45)]")}
-                        />
-                        {state.sign && (
-                            <span data-desktop-sign={state.sign} className="absolute left-1 top-2">
-                                {state.sign === 'working' ? <Pips pattern="think" still={state.still} className="text-ink-2" /> : <span aria-hidden className="block size-2 rounded-full bg-ask" />}
-                            </span>
-                        )}
-                    </div>
+                    <DropFaces faces={dragging ? faces.slice(0, 1) : faces} showBerry={showBerry} still={still} />
+                    {pips && !dragging && <Pips pattern="think" still={still} className="text-tip-ink" />}
+                    {!dragging && says.kind === 'job' && (
+                        <>
+                            <span>Give {front?.name ?? 'Berry'} a job</span>
+                            {says.shortcut && (
+                                <span className="flex gap-[3px]">
+                                    {keys.map((key) => (
+                                        <kbd key={key} className={TIP_KEY}>{key}</kbd>
+                                    ))}
+                                </span>
+                            )}
+                        </>
+                    )}
+                    {!dragging && says.kind === 'working' && (
+                        <>
+                            <span className="truncate" style={{ maxWidth: TITLE_WIDTH }}>Working on “{says.title}”</span>
+                            {says.since !== null && <span className="font-mono text-11.5 font-regular text-tip-ink/60 tabular-nums">{elapsed(says.since, now)}</span>}
+                        </>
+                    )}
+                    {!dragging && says.kind === 'counts' && says.counts.map((count, index) => (
+                        <span key={count} className={cn(index > 0 && 'text-tip-ink/60')}>{count}</span>
+                    ))}
+                    {!dragging && says.kind === 'asking' && (
+                        <>
+                            <span>{says.words}</span>
+                            <PartButton part="answer" label="Answer" className="h-[26px] px-[11px] rounded-full bg-tip-ink text-tip text-13 font-medium">Answer</PartButton>
+                        </>
+                    )}
+                    {!dragging && says.kind === 'finished' && (
+                        <>
+                            <span className="py-2.5 whitespace-normal font-regular leading-[17px] line-clamp-2" style={{ width: RESULT_WIDTH }}>{says.text}</span>
+                            <PartButton part="open" label="Open" className="h-[26px] px-[11px] rounded-full bg-tip-ink/[.16] text-tip-ink text-13 font-medium">Open</PartButton>
+                            <PartButton part="dismiss" label="Not now" className="-ml-1 size-[22px] grid place-items-center rounded-full text-tip-ink/60 hover:text-tip-ink">
+                                <X className="size-[13px]" strokeWidth={2} />
+                            </PartButton>
+                        </>
+                    )}
                 </div>
-            </div>
-        </div>
-    )
-}
-
-// The prompt box, in a window of its own. With glass, the window's own material is behind this, tinted so that the words
-// read over any wallpaper.
-export const DesktopComposerApp: React.FC = () => {
-    const [state, setState] = useState<DesktopComposerState | null>(null)
-    const [draft, setDraft] = useState('')
-    const [focusKey, setFocusKey] = useState(0)
-    const content = useRef<HTMLDivElement>(null)
-    const theme = useTheme()
-    const open = state?.open ?? false
-
-    useEffect(() => {
-        void desktop().composerState().then(setState)
-        return desktop().onComposerState(setState)
-    }, [])
-
-    useEffect(() => {
-        if (open) setFocusKey((key) => key + 1)
-    }, [open])
-
-    useLayoutEffect(() => {
-        const element = content.current
-        if (!element) return
-        const observer = new ResizeObserver(() => void desktop().composerHeight(element.offsetHeight))
-        observer.observe(element)
-        return () => observer.disconnect()
-    }, [state !== null])
-
-    const send = useCallback(async () => {
-        const message = draft.trim()
-        if (message && (await desktop().send(message))) setDraft('')
-    }, [draft])
-
-    if (!state) return null
-    const glass = theme?.glass && theme.platform === 'mac'
-    const words = `Give ${state.name} a job`
-
-    return (
-        <div className={cn("h-screen overflow-hidden", glass ? "bg-sheet/60" : "bg-sheet border rounded-prompt")}>
-            <div ref={content}>
-                <Composer
-                    label={words}
-                    placeholder={words}
-                    value={draft}
-                    onChange={setDraft}
-                    focusKey={focusKey}
-                    bare
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault()
-                            void send()
-                        }
-                        if (event.key === 'Escape') {
-                            event.preventDefault()
-                            void desktop().closeComposer()
-                        }
-                    }}
-                    canSend={draft.trim().length > 0}
-                    onSend={() => void send()}
-                />
-            </div>
+            </DropShape>
         </div>
     )
 }

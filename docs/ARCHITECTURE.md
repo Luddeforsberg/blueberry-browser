@@ -110,7 +110,7 @@ What a bird remembers is in `memory.json` ([src/main/MemoryStore.ts](../src/main
 
 ## Berry on the desktop
 
-With it on, Berry waits at the edge of the screen when the user is in another app ([src/main/DesktopBerry.ts](../src/main/DesktopBerry.ts)). It's two small `panel` windows: a transparent one for the bird, drawn by [DesktopApp.tsx](../src/renderer/chrome/src/DesktopApp.tsx), and one for the prompt box that ⌥Space opens. [src/main/desktopBerryState.ts](../src/main/desktopBerryState.ts) decides who shows and what it says, for example that a job finished or needs the user. All it can do is send a job through `Chats.send` and bring Blueberry forward, so it adds nothing a chat can't do. It never reads the screen, the clipboard or another app.
+With it on, a mascot waits at the edge of the screen when the user is in another app ([src/main/DesktopBerry.ts](../src/main/DesktopBerry.ts)), as a small near-black drop. It's two `panel` windows: a clear one that lets clicks through everywhere but the drop, drawn by [DesktopApp.tsx](../src/renderer/chrome/src/DesktopApp.tsx), and one that can take the keyboard without bringing Blueberry forward, drawn by [DesktopPanel.tsx](../src/renderer/chrome/src/DesktopPanel.tsx), for the prompt box that ⌥Space opens, the tray and the ask. [src/main/desktopBerryState.ts](../src/main/desktopBerryState.ts) decides what the drop and the tray say, for example that a job finished or needs the user, and whether an answer from the ask may go. All it can do is send a job through `Chats.send`, answer what Needs you answers through `Chats.decide`, and bring Blueberry forward, so it adds nothing a chat can't do. It never reads the screen, the clipboard or another app.
 
 ## The cloud path
 

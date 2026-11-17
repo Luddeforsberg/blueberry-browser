@@ -617,7 +617,7 @@ const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =
     return <QuestionCard approval={approval} name={name} onAnswer={(words) => send(true, words)} onSkip={() => send(false)} />
 }
 
-const HANDOFF_TITLE: Record<HandoffNeed, string> = {
+export const HANDOFF_TITLE: Record<HandoffNeed, string> = {
     'sign-in': 'Sign in on',
     code: 'Enter the code on',
     captcha: 'Solve the captcha on',

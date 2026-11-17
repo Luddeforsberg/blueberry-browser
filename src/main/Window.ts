@@ -110,8 +110,8 @@ const MAX_SUGGESTION_VISITS = 5000;
 const MAX_SUGGESTION_CHATS = 100;
 // What the address field sends to look up in the history, at most.
 const MAX_SUGGEST_TEXT = 200;
-// A page in the chrome that's stuck doesn't get to hold up the bird.
-const TAKE_OFF_ASK_MS = 300;
+// Jobs sent before, as chips over the desktop's prompt box.
+const DESKTOP_RECENT_JOBS = 3;
 
 export const HORIZONTAL_TABS_MENU_ID = "horizontal-tabs";
 // App menu items that only do something on a web page.
@@ -472,23 +472,39 @@ export class Window {
       inFront: () => this._baseWindow.isFocused() && this.windowShowing,
       stillMotion: () => systemPreferences.getAnimationSettings().prefersReducedMotion,
       theme: () => this.theme,
-      takeOffPoint: () => this.birdOnScreen(),
-      setAway: (away) => sendToRenderer(this.chrome.view.webContents, "desktop:away", away),
       ended: (chatId) => {
         const chat = this.chats.thread(chatId);
         if (!chat || this.chats.work(chatId)?.outcome === "stopped") return null;
         const last = chat.messages.at(-1);
-        return { mascotId: chat.mascotId ?? BERRY.id, error: chat.error, text: last?.role === "assistant" ? last.content : "" };
+        return { mascotId: chat.mascotId ?? BERRY.id, title: chat.title, error: chat.error, text: last?.role === "assistant" ? last.content : "" };
       },
       chatOnScreen: (chatId) => {
         const entry = this.activeEntry;
         return this._baseWindow.isFocused() && this.windowShowing && entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId;
       },
-      send: (text, mascotId) => this.chats.send(null, text, { seePage: false, mascotId }) !== null,
+      progress: (chatId) => {
+        const chat = this.chats.thread(chatId);
+        return { step: chat?.steps.at(-1)?.text ?? chat?.statusLine ?? null, since: chat?.startedAt ?? null };
+      },
+      // The user's own chats, newest first, each sent once, however many times it was asked.
+      recentJobs: () =>
+        [...new Map(chatStore.firstMessages(DESKTOP_RECENT_JOBS * 4).map((chat) => [chat.firstMessage, chat])).values()]
+          .slice(0, DESKTOP_RECENT_JOBS)
+          .map(({ title, firstMessage }) => ({ label: title, prompt: firstMessage })),
+      cloud: () => ({ runner: this.runnerJobs.available(), cloud: this.cloud.state.status !== "off" }),
+      send: (text, mascotId, { runner, cloud }) => this.chats.send(null, text, { seePage: false, mascotId, runner, cloud }) !== null,
+      decide: (chatId, approvalId, allow, answer) => this.chats.decide(chatId, approvalId, allow, answer),
       open: (target) => {
         this.bringForward();
         if (target.page === "chat") this.openPage("chat", { param: target.chatId });
-        else this.openPage("needs-you", { param: target.approvalId });
+        else this.openPage("routines");
+      },
+      seePage: (item) => {
+        this.bringForward();
+        const tabId = item.approval.handoff?.tabId ?? item.tabId;
+        if (tabId && this.getTab(tabId)) this.switchActiveTab(tabId);
+        else if (item.routineId) this.openPage("routines");
+        else this.openPage("chat", { param: item.id });
       },
       showBlueberry: () => this.bringForward(),
     });
@@ -1552,7 +1568,7 @@ export class Window {
     if (after.suggestions !== before.suggestions) this.publishSuggestions();
     if (after.phoneAlways !== before.phoneAlways) this.phone.sync();
     if (after.relayOnMac !== before.relayOnMac) this.macJobs.sync();
-    this.desktopBerry.sync(after.desktopBerry && !before.desktopBerry);
+    this.desktopBerry.sync();
 
     this.broadcast("settings:updated", after);
     this.updateAllBounds();
@@ -1680,22 +1696,6 @@ export class Window {
     this._baseWindow.show();
     app.focus({ steal: true });
     this._baseWindow.focus();
-  }
-
-  // The chrome's own bird, on the screen, or the middle of the window if it isn't drawing one right now.
-  private async birdOnScreen(): Promise<{ x: number; y: number }> {
-    const { x, y, width, height } = this._baseWindow.getContentBounds();
-    const middle = { x: x + width / 2, y: y + height / 2 };
-    const asked = this.chrome.view.webContents
-      .executeJavaScript(
-        `(() => {
-          const drawn = [...document.querySelectorAll("[data-berry-perched] svg")].map((bird) => bird.getBoundingClientRect()).find(({ width }) => width > 0);
-          return drawn ? { x: drawn.x + drawn.width / 2, y: drawn.y + drawn.height / 2 } : null;
-        })()`
-      )
-      .catch(() => null) as Promise<{ x: number; y: number } | null>;
-    const inChrome = await Promise.race([asked, new Promise<null>((resolve) => setTimeout(() => resolve(null), TAKE_OFF_ASK_MS))]);
-    return inChrome ? { x: x + inChrome.x, y: y + inChrome.y } : middle;
   }
 
   close(): void {

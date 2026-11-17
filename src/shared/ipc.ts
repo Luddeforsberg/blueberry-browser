@@ -5,12 +5,12 @@ import type { AiKeyState, AiKeyTried, AiService } from "./aiKey";
 import type { AppIconGround } from "./appIcon";
 import type { FileChip, TabChoice } from "./attachments";
 import type { FirstJob, FirstRunStep } from "./firstRun";
-import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
+import type { ChatThread, GalleryLinked, GalleryListing, HandoffNeed, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
-// nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own, and the
-// composer view is its prompt box, in another. The suggestions view is the list under the address field while it's
+// nothing else can answer it. The desktop view is the drop on the edge of the screen, in a window of its own, and the
+// composer view is the window beside it that can take the keyboard: the prompt box, the tray and the ask. The suggestions view is the list under the address field while it's
 // being edited, over the page.
 export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview";
 
@@ -92,49 +92,111 @@ export interface Point {
   y: number;
 }
 
-// Where the words go beside the bird, in its window: on the side towards the middle of the screen.
-export interface DesktopLineAnchor {
-  side: "left" | "right";
-  // How far in from that side of the window.
-  fromSide: number;
-  maxWidth: number;
-  across: "top" | "bottom" | "middle";
-  middle: number;
+// A mascot as the desktop draws it, in the mood it's in.
+export interface DesktopFace {
+  name: string;
+  look: MascotLook;
+  mood: "rest" | "fetching" | "asking" | "delivered" | "oops";
 }
 
-// Everything the bird's view draws. Main works all of it out, so the view knows nothing about chats or approvals.
-export interface DesktopBerryState {
-  // False while it's fading away, just before the window hides.
+// What the drop says besides its faces. Main decides all of it. What comes out by itself, asking and finished, never
+// has a site, a step or the exact words of an approval in it: only who and what kind of thing, and a finished reply's
+// own first sentence.
+export type DesktopDropSays =
+  | { kind: "rest" }
+  // Pointed at with nothing going on: what a press does, with the shortcut's keys if it's ours.
+  | { kind: "job"; shortcut: boolean }
+  // Pointed at while one job works: its name and when it started.
+  | { kind: "working"; title: string; since: number | null }
+  // Pointed at with several things going: "2 working", "1 finished".
+  | { kind: "counts"; counts: string[] }
+  // Something needs you, with Answer.
+  | { kind: "asking"; words: string }
+  // A job ended while you were away, with Open and a cross.
+  | { kind: "finished"; text: string };
+
+// Everything the drop's view draws. The view never names a chat or an approval: a press only says which part.
+export interface DesktopDropState {
+  // False while it goes back into the edge, just before the window hides.
   shown: boolean;
-  // Goes up each time the window moves or changes size, when anything in it jumps with it rather than gliding.
+  // Goes up each time the window moves or changes size, when anything in it jumps rather than gliding.
   frame: number;
   // The window's top left on the screen.
   origin: Point;
-  // The bird's top left in the window.
-  at: Point;
   edge: DesktopEdge;
-  flip: boolean;
-  tucked: boolean;
+  // The middle of the drop on the edge, in the window.
+  anchor: Point;
   dragging: boolean;
-  // A flight across the screen, drawn in the view so it doesn't depend on the main process keeping time.
-  flight: { id: number; path: Point[]; ms: number; left: boolean } | null;
-  mood: "rest" | "fetching" | "asking" | "delivered" | "oops";
-  name: string;
-  look: MascotLook;
+  // Up to three, the one with the most to say first.
+  faces: DesktopFace[];
+  // Something is working, so the pips move beside the faces.
+  working: boolean;
+  says: DesktopDropSays;
   showBerry: boolean;
   still: boolean;
-  // The small mark beside a tucked bird, and only then.
-  sign: "working" | "waiting" | null;
-  line: string | null;
-  lineShowing: boolean;
-  lineAnchor: DesktopLineAnchor;
 }
 
-// The prompt box, in a window of its own with real glass.
-export interface DesktopComposerState {
-  open: boolean;
-  name: string;
+// What a press on the drop was on.
+export type DesktopDropPart = "drop" | "answer" | "open" | "dismiss";
+
+// The prompt box: who goes, where, and jobs sent before, whose words go in the box.
+export interface DesktopBox {
+  chosen: { id: string; name: string; look: MascotLook };
+  flock: Array<{ id: string; name: string; look: MascotLook }>;
+  // This computer or the cloud, where the chosen mascot can work there, and which it starts on.
+  cloud: { fits: boolean; on: boolean };
+  recent: Array<{ label: string; prompt: string }>;
+  shortcut: boolean;
 }
+
+// The tray's rows carry a key main made for this one showing, never a chat's or an approval's id.
+export interface DesktopTray {
+  flock: Array<DesktopFace & { chosen: boolean }>;
+  asks: Array<DesktopFace & { key: string; words: string; since: number }>;
+  working: Array<DesktopFace & { key: string; title: string; step: string | null; since: number | null }>;
+  finished: Array<DesktopFace & { key: string; title: string; problem: string | null; at: number }>;
+}
+
+// The ask, only ever after Answer was pressed: the exact words, which are what's being allowed.
+export interface DesktopAsk {
+  face: DesktopFace;
+  kind: "approval" | "question" | "handoff";
+  // The tool's exact words, or the question.
+  text: string;
+  answers: string[];
+  handoff: { need: HandoffNeed; site: string } | null;
+  // What job it's for.
+  job: string;
+  // What happened, for a moment after it was answered here, and then the sheet closes.
+  said: string | null;
+}
+
+// The window that can take the keyboard: the prompt box, or the tray and the ask beside the drop.
+export interface DesktopPanelState {
+  open: "box" | "sheets" | null;
+  // Goes up each time it opens, so the view grows it again and puts the keyboard in it.
+  opened: number;
+  // Going away, for as long as the view takes to shrink it.
+  closing: boolean;
+  edge: DesktopEdge;
+  // The middle of the drop on the edge, in this window.
+  anchor: Point;
+  box: DesktopBox;
+  tray: DesktopTray | null;
+  ask: DesktopAsk | null;
+  showBerry: boolean;
+  still: boolean;
+}
+
+// An answer from the ask. Main applies it to the ask it showed, and only once.
+export interface DesktopDecision {
+  allow: boolean;
+  answer?: string;
+}
+
+// "done" went through. "gone" means that ask isn't the one waiting any more, or was answered here already. "code" is an
+// answer shaped like a code, which isn't sent.
+export type DesktopDecided = "done" | "gone" | "code";
 
 // Replies from the phone, for Settings and Needs you. Nothing here can be used to read the bot's token, which never
 // comes back from main once it's saved.
@@ -580,19 +642,31 @@ export interface InvokeChannels {
   "settings:app-icon": { region: "chrome"; args: [png: string, mascotId: string | null, ground: AppIconGround]; result: boolean };
   // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
   "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
-  "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
-  // Where the words are in the window, so the pointer can land on them, or null when they aren't showing.
-  "desktop:line-box": { region: "desktop"; args: [box: Rect | null]; result: void };
-  // The bird or its words were pressed. Main decides what that opens, so the view never names a chat or an approval.
-  "desktop:press": { region: "desktop"; args: []; result: void };
+  "desktop:state": { region: "desktop"; args: []; result: DesktopDropState };
+  // Where the drop is drawn in its window, for the frame it was drawn for, so the pointer can land on it and nowhere else.
+  "desktop:drop-box": { region: "desktop"; args: [box: Rect, frame: number]; result: void };
+  // The drop, or a button on it, was pressed. Main decides what that opens, so the view never names a chat or an approval.
+  "desktop:press": { region: "desktop"; args: [part: DesktopDropPart]; result: void };
   "desktop:drag-start": { region: "desktop"; args: []; result: void };
   "desktop:drag-end": { region: "desktop"; args: []; result: void };
   "desktop:menu": { region: "desktop"; args: []; result: void };
-  "desktop:composer-state": { region: "composer"; args: []; result: DesktopComposerState };
-  "desktop:composer-height": { region: "composer"; args: [height: number]; result: void };
-  // Starts a job with no page, as whoever is chosen. It's the same as a chat started from the new tab page.
-  "desktop:send": { region: "composer"; args: [text: string]; result: boolean };
-  "desktop:close-composer": { region: "composer"; args: []; result: void };
+  "desktop:panel-state": { region: "composer"; args: []; result: DesktopPanelState };
+  // How tall what's showing needs to be: the box with its lines, or the tray and the ask with their room.
+  "desktop:panel-height": { region: "composer"; args: [height: number]; result: void };
+  // Starts a job with no page, as whoever is chosen, here or in the cloud where that mascot can work there. It's the
+  // same as a chat started from the new tab page.
+  "desktop:send": { region: "composer"; args: [text: string, cloud: boolean]; result: boolean };
+  // Who the next job goes to, from the box's own picker or Tab.
+  "desktop:choose": { region: "composer"; args: [mascotId: string]; result: void };
+  "desktop:open-box": { region: "composer"; args: []; result: void };
+  "desktop:close-panel": { region: "composer"; args: []; result: void };
+  "desktop:open-blueberry": { region: "composer"; args: []; result: void };
+  // A row in the tray, by the key main gave it: Answer on an ask, or a job to open in Blueberry.
+  "desktop:tray-press": { region: "composer"; args: [key: string]; result: void };
+  // The answer to the ask that's showing. Main holds which ask that is.
+  "desktop:decide": { region: "composer"; args: [decision: DesktopDecision]; result: DesktopDecided };
+  // Opens the page the ask is about in Blueberry, or its chat when it has none here.
+  "desktop:see-page": { region: "composer"; args: []; result: void };
   "chat:send": {
     region: "chrome";
     args: [chatId: string | null, text: string, options: ChatSendOptions];
@@ -758,10 +832,8 @@ export interface EventChannels {
   "cloud:frame": CloudFrame;
   "layout:updated": Layout;
   "theme:updated": ThemeState;
-  "desktop:state": DesktopBerryState;
-  "desktop:composer-state": DesktopComposerState;
-  // Whether the bird is out on the desktop, so the chrome doesn't draw a second one.
-  "desktop:away": boolean;
+  "desktop:state": DesktopDropState;
+  "desktop:panel-state": DesktopPanelState;
   "settings:updated": Settings;
   "library:updated": LibrarySnapshot;
   // A `blueberry://mascot/<id>` link was opened, so the Gallery shows that entry. Only ever a checked uuid.
@@ -1049,21 +1121,26 @@ export interface CloudAPI {
 }
 
 export interface DesktopAPI {
-  // For Settings and the chrome's own bird. The chrome can't call the rest.
+  // For Settings. The chrome can't call the rest.
   shortcutTaken: () => Promise<boolean>;
-  onAway: (callback: (away: boolean) => void) => Unsubscribe;
-  state: () => Promise<DesktopBerryState>;
-  lineBox: (box: Rect | null) => Promise<void>;
-  press: () => Promise<void>;
+  state: () => Promise<DesktopDropState>;
+  dropBox: (box: Rect, frame: number) => Promise<void>;
+  press: (part: DesktopDropPart) => Promise<void>;
   dragStart: () => Promise<void>;
   dragEnd: () => Promise<void>;
   menu: () => Promise<void>;
-  onState: (callback: (state: DesktopBerryState) => void) => Unsubscribe;
-  composerState: () => Promise<DesktopComposerState>;
-  composerHeight: (height: number) => Promise<void>;
-  send: (text: string) => Promise<boolean>;
-  closeComposer: () => Promise<void>;
-  onComposerState: (callback: (state: DesktopComposerState) => void) => Unsubscribe;
+  onState: (callback: (state: DesktopDropState) => void) => Unsubscribe;
+  panelState: () => Promise<DesktopPanelState>;
+  panelHeight: (height: number) => Promise<void>;
+  send: (text: string, cloud: boolean) => Promise<boolean>;
+  choose: (mascotId: string) => Promise<void>;
+  openBox: () => Promise<void>;
+  closePanel: () => Promise<void>;
+  openBlueberry: () => Promise<void>;
+  trayPress: (key: string) => Promise<void>;
+  decide: (decision: DesktopDecision) => Promise<DesktopDecided>;
+  seePage: () => Promise<void>;
+  onPanelState: (callback: (state: DesktopPanelState) => void) => Unsubscribe;
 }
 
 export interface ChromeAPI {

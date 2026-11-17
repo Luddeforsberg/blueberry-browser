@@ -48,13 +48,13 @@ const { ms, ease } = motion
 
 // The label and a key, the same in the pill and in the ruler that measures it.
 const LABEL = 'h-[26px] px-2 inline-flex items-center gap-1.5 text-12 font-medium whitespace-nowrap'
-const KEY = 'min-w-4 px-1 font-sans py-[3px] rounded-[4px] bg-tip-ink/[.16] text-center text-[10.5px] leading-none font-medium text-tip-ink/[.85]'
+export const TIP_KEY = 'min-w-4 px-1 font-sans py-[3px] rounded-[4px] bg-tip-ink/[.16] text-center text-[10.5px] leading-none font-medium text-tip-ink/[.85]'
 
 const TipLabel: React.FC<{ tip: TipWords; className?: string }> = ({ tip, className }) => (
     <span className={cn(LABEL, 'max-w-full', className)}>
         <span className="min-w-0 truncate">{tip.words}</span>
         {tip.keys.map((key) => (
-            <kbd key={key} className={cn(KEY, 'shrink-0')}>
+            <kbd key={key} className={cn(TIP_KEY, 'shrink-0')}>
                 {key}
             </kbd>
         ))}
@@ -155,7 +155,7 @@ export const TooltipProvider: React.FC<{ mac: boolean; elsewhere?: TipElsewhere;
             document.createTextNode(tip.words),
             ...tip.keys.map((key) => {
                 const kbd = document.createElement('kbd')
-                kbd.className = KEY
+                kbd.className = TIP_KEY
                 kbd.textContent = key
                 return kbd
             })
