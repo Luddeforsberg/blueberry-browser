@@ -92,7 +92,7 @@ describe("AiKey", () => {
 });
 
 describe("tryAiKey", () => {
-  const answering = (status: number) => vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response("{}", { status }));
+  const answering = (status: number) => vi.fn<typeof fetch>(async () => new Response("{}", { status }));
 
   it("sends one short message to the service's cheap model with the key", async () => {
     const fetch = answering(200);
