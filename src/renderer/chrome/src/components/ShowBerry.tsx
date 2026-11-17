@@ -55,18 +55,20 @@ export const RecordingNotice: React.FC<{ state?: RecordingState; inPage?: boolea
     if (status !== 'recording' || startedAt === null) return null
     // Beside the chat panel, the page and its toolbar can be as narrow as they go.
     const narrow = layout.page.width < NARROW_PAGE
+    const roomForCount = layout.page.width >= ROOM_FOR_COUNT
 
     return (
         <div role={inPage ? undefined : 'status'} className={cn('h-8 w-max shrink-0 flex items-center gap-2.5 pl-3 pr-1 rounded-full bg-sheet shadow-chip text-13', className)}>
             <Pips pattern="waiting" className="text-ask" />
             <span className={cn('font-medium', narrow && 'sr-only')}>{settings.showBerry ? 'Watching' : 'Recording'}</span>
-            {/* Until the first step it says what to do, where the time and the steps will be. Narrow, it's as it was. */}
-            {steps.length === 0 && !narrow ? (
+            {/* Until the first step it says what to do, where the time and the steps will be. With no room for the steps,
+                it would squeeze the address field, so it's the time as before. */}
+            {steps.length === 0 && roomForCount ? (
                 <span className="text-ink-2">Do the job once, then press Done</span>
             ) : (
                 <>
                     <Elapsed since={startedAt} />
-                    {layout.page.width >= ROOM_FOR_COUNT && <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>}
+                    {roomForCount && <span aria-hidden className="font-mono text-11.5 text-ink-3 tabular-nums">{steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>}
                 </>
             )}
             <Button size="xs" onClick={() => void window.chromeAPI.recording.stop()}>Done</Button>
