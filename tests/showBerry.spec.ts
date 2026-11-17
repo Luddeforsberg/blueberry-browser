@@ -177,10 +177,21 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     expect(library.routines).toHaveLength(0);
     expect((await chrome.evaluate(() => window.chromeAPI.recording.state())).steps).toHaveLength(0);
 
-    // Changing what might change changes the instructions.
-    await chrome.getByRole("textbox", { name: "Search term" }).fill("hdmi cable");
-    await chrome.getByRole("textbox", { name: "Search term" }).blur();
-    await expect(chrome.getByRole("textbox", { name: "What should I do?" })).toHaveValue(/hdmi cable/);
+    // What might change is marked where it stands. Typing over it changes it, and it stays marked.
+    const steps = chrome.getByRole("textbox", { name: "What should I do?" });
+    await steps.getByText("usb-c cable").selectText();
+    await chrome.keyboard.type("hdmi cable");
+    await expect(steps).toHaveText(`1. Go to ${origin}/shop\n2. Search for hdmi cablesame each run`);
+    // Its mark is a button that says what happens to it, and switches it, from the keyboard or the pointer.
+    const asking = "Before you start, ask me for the search term to use. Last time it was hdmi cable.";
+    await chrome.keyboard.press("Tab");
+    await expect(chrome.getByRole("button", { name: "Search term: same each run" })).toBeFocused();
+    await chrome.keyboard.press("Enter");
+    await expect(chrome.getByRole("button", { name: "Search term: ask me each run" })).toBeFocused();
+    await expect(chrome.getByText(asking)).toBeVisible();
+    await chrome.getByRole("button", { name: "Search term: ask me each run" }).click();
+    await expect(chrome.getByText(asking)).toHaveCount(0);
+    await chrome.getByRole("button", { name: "Search term: same each run" }).click();
 
     // Only when asked, by Berry, and only on the sites it was shown.
     await chrome.getByRole("button", { name: "Continue" }).click();
@@ -200,7 +211,15 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
     await expect(chrome.getByText("Only when you ask").first()).toBeVisible();
     await expect(chrome.getByText("Done, and I stayed where you showed me.").first()).toBeVisible({ timeout: 20_000 });
     await expect(chrome.getByText(/Stayed off evil\.example/).first()).toBeVisible();
-    expect(JSON.stringify(model.requests[0].messages)).toContain("hdmi cable");
+    // It asks through the line before the steps, like any question.
+    expect(JSON.stringify(model.requests[0].messages)).toContain(asking);
+
+    // Changing what it does from its page marks the value again, and switching it there takes the line away.
+    const [routine] = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).routines;
+    await chrome.evaluate((id) => window.chromeAPI.browser.openPage("routines", { param: `${id}/does` }), routine.id);
+    await chrome.getByRole("button", { name: "Search term: ask me each run" }).click();
+    await chrome.getByRole("button", { name: "Save" }).click();
+    await expect.poll(async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).routines[0].instructions).toBe(`1. Go to ${origin}/shop\n2. Search for hdmi cable`);
 
   } finally {
     await app.close();

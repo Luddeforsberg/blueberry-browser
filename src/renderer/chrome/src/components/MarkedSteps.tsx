@@ -13,8 +13,9 @@ const MARK = 'data-value'
 const SWITCH = 'data-switch'
 // The value in medium on a tint of `focus`, and the switch carrying on the tint, so the two read as one mark.
 const VALUE = 'rounded-l-[7px] bg-focus/10 py-[3px] pl-1.5 font-medium [box-decoration-break:clone]'
-const SWITCHED = 'group/switch rounded-r-[7px] bg-focus/10 py-[3px] pl-1.5 pr-[3px] select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-focus'
-const SAYS = 'rounded-[5px] bg-sheet px-[5px] py-px font-mono text-11 text-ink-2 shadow-[0_0_0_1px_rgb(var(--focus)/0.18)] group-hover/switch:text-ink'
+// The focus ring goes round the words on the switch, so its gap never covers the value beside it.
+const SWITCHED = 'group/switch rounded-r-[7px] bg-focus/10 py-[3px] pl-1.5 pr-[3px] select-none cursor-pointer outline-none'
+const SAYS = 'rounded-[5px] bg-sheet px-[5px] py-px font-mono text-11 text-ink-2 shadow-[0_0_0_1px_rgb(var(--focus)/0.18)] group-hover/switch:text-ink group-focus-visible/switch:ring-2 group-focus-visible/switch:ring-focus'
 
 const said = (row: RecordedChangeValue) => (row.ask ? 'ask me each run' : 'same each run')
 
