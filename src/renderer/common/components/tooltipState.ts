@@ -5,6 +5,8 @@ import motion from '../motion.json'
 
 // The pointer rests this long before the first tooltip shows. The keyboard shows one at once.
 export const REST_MS = motion.tipRestMs
+// A tab's preview card is bigger, so it waits longer. Along the tabs it follows with no wait, as a tooltip does.
+export const PREVIEW_REST_MS = motion.previewRestMs
 // Leaving a control, a neighbour has this long to take the tooltip over before it goes, so moving along a row has no
 // blink.
 export const GRACE_MS = 90

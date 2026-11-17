@@ -251,7 +251,8 @@ export const Tooltip: React.FC<{ words: string | null | undefined; shortcut?: st
     )
     useEffect(() => api?.changed(id), [api, id, words, shortcut])
 
-    if (!api || !words) return children
+    // Always through a Slot, so words coming and going never makes the control anew, which would drop its focus.
+    if (!api || !words) return <Slot>{children}</Slot>
     return (
         <Slot
             onPointerEnter={(event: React.PointerEvent<HTMLElement>) => {

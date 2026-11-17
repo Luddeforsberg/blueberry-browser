@@ -12,7 +12,7 @@ import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, Mascot
 // nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own, and the
 // composer view is its prompt box, in another. The suggestions view is the list under the address field while it's
 // being edited, over the page.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip";
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -404,6 +404,31 @@ export interface TooltipRequest {
 // What the tooltip view draws, placed in the view by the layout owner.
 export type TooltipShown = TooltipRequest;
 
+// A tab's preview card, which hangs beside or under its tab and so over the page, in a view of its own. The chrome says
+// which tab and where its row is in the window. Main decides what the card shows and where it goes.
+export interface TabPreviewRequest {
+  tabId: string;
+  row: Rect;
+  // Moving over from the last tab's card, along the tabs.
+  slide: boolean;
+}
+
+// What the preview view draws. The picture is the tab's own, kept in main, and sent nowhere but here.
+export interface TabPreviewShown {
+  tabId: string;
+  title: string;
+  site: string;
+  // A small JPEG as a data address, or null where there's no picture yet.
+  picture: string | null;
+  // The name of the mascot working in the tab, if one is.
+  working: string | null;
+  // Keep Berry still, so the pips hold.
+  still: boolean;
+  // Where the card goes in the view, from the layout owner. Its height is what it draws.
+  card: Rect;
+  slide: boolean;
+}
+
 // Where find in page has got to. `active` counts from 1.
 export interface FindResult {
   active: number;
@@ -513,6 +538,9 @@ export interface InvokeChannels {
   // A tooltip over the page, in a view of its own that never takes the keyboard. The chrome decides when and where.
   "tooltip:show": { region: "chrome"; args: [request: TooltipRequest]; result: void };
   "tooltip:hide": { region: "chrome" | "tooltip"; args: []; result: void };
+  // A tab's preview card over the page, in a view of its own that never takes the keyboard. The chrome decides when.
+  "preview:show": { region: "chrome" | "overlay"; args: [request: TabPreviewRequest]; result: void };
+  "preview:hide": { region: "chrome" | "overlay" | "preview"; args: []; result: void };
   "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
   "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
@@ -536,7 +564,7 @@ export interface InvokeChannels {
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "overlay:open-popover": { region: "chrome"; args: [popover: Popover]; result: void };
   "overlay:close-popover": { region: "chrome" | "overlay"; args: [refocus: boolean]; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   // Moves a saved site on top as a tile, or into the bookmarks, at a place in that list. Dragging and the menu both use it.
@@ -745,6 +773,8 @@ export interface EventChannels {
   "address:picked": AddressSuggestion;
   // To the tooltip view: what to draw, or null when it's hidden.
   "tooltip:shown": TooltipShown | null;
+  // To the preview view: the card to draw, or null when it's hidden.
+  "preview:shown": TabPreviewShown | null;
   "overlay:visibility": boolean;
   "overlay:popover": PopoverState;
   "recording:updated": RecordingState;
@@ -883,6 +913,12 @@ export interface TooltipAPI {
   show: (request: TooltipRequest) => Promise<void>;
   hide: () => Promise<void>;
   onShown: (callback: (shown: TooltipShown | null) => void) => Unsubscribe;
+}
+
+export interface TabPreviewAPI {
+  show: (request: TabPreviewRequest) => Promise<void>;
+  hide: () => Promise<void>;
+  onShown: (callback: (shown: TabPreviewShown | null) => void) => Unsubscribe;
 }
 
 export interface FindAPI {
@@ -1044,6 +1080,7 @@ export interface ChromeAPI {
   find: FindAPI;
   address: AddressAPI;
   tooltip: TooltipAPI;
+  preview: TabPreviewAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
   memory: MemoryAPI;

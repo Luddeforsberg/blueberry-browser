@@ -141,6 +141,11 @@ const chromeAPI: ChromeAPI = {
     hide: () => invoke("tooltip:hide"),
     onShown: (callback) => subscribe("tooltip:shown", callback),
   },
+  preview: {
+    show: (request) => invoke("preview:show", request),
+    hide: () => invoke("preview:hide"),
+    onShown: (callback) => subscribe("preview:shown", callback),
+  },
   find: {
     search: (text) => invoke("find:search", text),
     step: (forward) => invoke("find:step", forward),

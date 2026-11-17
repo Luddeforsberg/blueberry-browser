@@ -35,6 +35,7 @@ import { createChromeView, type ChromeView } from "./chromeView";
 import { FindBar } from "./FindBar";
 import { AddressSuggestions } from "./AddressSuggestions";
 import { TooltipView } from "./TooltipView";
+import { TabPreviews } from "./TabPreviews";
 import { attachPageMenu, printPage } from "./pageMenu";
 import { SiteZoom } from "./siteZoom";
 import type { Downloads } from "./Downloads";
@@ -127,6 +128,7 @@ export class Window {
   readonly findBar: FindBar;
   readonly addressSuggestions: AddressSuggestions;
   readonly tooltip: TooltipView;
+  readonly previews: TabPreviews;
   readonly siteZoom: SiteZoom;
   private floatingSidebarVisible = false;
   // What's open over the page from the horizontal toolbar, in the overlay view. Null when nothing is.
@@ -230,6 +232,14 @@ export class Window {
     this.openLinksInTabs(this.addressSuggestions.chromeView.view.webContents);
     this.tooltip = new TooltipView(this._baseWindow.contentView);
     this.openLinksInTabs(this.tooltip.chromeView.view.webContents);
+    this.previews = new TabPreviews(this._baseWindow.contentView, {
+      tab: (id) => this.tabsMap.get(id) ?? null,
+      layout: () => this.layout,
+      window: () => this._baseWindow.getContentBounds(),
+      mascotName: (id) => this.mascotStore.find(id ?? BERRY.id)?.name ?? "A lost mascot",
+      keepStill: () => this.settings.keepBerryStill,
+    });
+    this.openLinksInTabs(this.previews.chromeView.view.webContents);
     this.siteZoom = new SiteZoom({
       levels: () => this.settings.siteZoom,
       save: (siteZoom) => {
@@ -572,6 +582,7 @@ export class Window {
       this.findBar.destroy();
       this.addressSuggestions.destroy();
       this.tooltip.destroy();
+      this.previews.destroy();
     });
   }
 
@@ -1130,6 +1141,7 @@ export class Window {
     if (tab instanceof Tab && tab.existingView) this._baseWindow.contentView.removeChildView(tab.existingView);
     tab.destroy();
     this.tabsMap.delete(tabId);
+    this.previews.forget(tabId);
     this.backgroundTabs.delete(tabId);
     this.unvisitedTabs.delete(tabId);
     this.chats.tabClosed(tabId);
@@ -1161,6 +1173,10 @@ export class Window {
     if (tabId !== this.activeTabId) this.findBar.closeUnlessOn(null);
     this.addressSuggestions.close();
     this.tooltip.hide();
+    this.previews.hide();
+    // How the page looked as the user left it, for its card. Started before it's hidden, and not waited for.
+    const leaving = this.activeTab;
+    if (leaving && tabId !== this.activeTabId) void this.previews.keep(leaving);
     // Opening anything from Chats or a card is done with it, even the tab already in front.
     this.closePopover(false);
     this.activeTabId = tabId;
@@ -1735,6 +1751,7 @@ export class Window {
     this.findBar.setBounds(layout.findBar);
     // Whatever it hung from may have moved.
     this.tooltip.hide();
+    this.previews.hide();
     this.broadcast("layout:updated", layout);
     this.permissionPrompt.sync();
   }
@@ -1756,6 +1773,7 @@ export class Window {
     this.findBar.notifyTheme(this.theme);
     this.addressSuggestions.notifyTheme(this.theme);
     this.tooltip.notifyTheme(this.theme);
+    this.previews.notifyTheme(this.theme);
     this.desktopBerry.notifyTheme();
     sendToRenderer(this.permissionPrompt.chrome.view.webContents, "theme:updated", this.theme);
   }

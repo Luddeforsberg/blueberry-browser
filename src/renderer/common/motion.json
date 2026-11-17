@@ -9,5 +9,6 @@
     "panel": 280,
     "switch": 420
   },
-  "tipRestMs": 350
+  "tipRestMs": 350,
+  "previewRestMs": 500
 }

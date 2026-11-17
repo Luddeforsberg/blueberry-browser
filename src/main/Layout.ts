@@ -88,6 +88,50 @@ export const tooltipRect = (pill: Rect, window: { width: number; height: number 
   };
 };
 
+// A tab's preview card (DESIGN.md section 8): 280px wide, its picture 16:10, then up to two lines of title, its site
+// and, while a mascot works there, a line saying so. Its words take at most `words` and the working line `working`.
+export const TAB_PREVIEW = { width: 280, picture: 175, words: 77, working: 22 };
+// From the sidebar's edge, under the tab row, and from the window's edges.
+const TAB_PREVIEW_GAP = { sidebar: 8, row: 6, edge: 8 };
+// Room in the view for the card's `lift` shadow, which falls mostly downwards.
+const TAB_PREVIEW_SHADOW = { side: 24, below: 40 };
+
+// The tallest the card can be, counting its title as two lines.
+const tabPreviewHeight = (card: { picture: boolean; working: boolean }): number =>
+  (card.picture ? TAB_PREVIEW.picture : 0) + TAB_PREVIEW.words + (card.working ? TAB_PREVIEW.working : 0);
+
+// Where a tab's card goes, for a tab whose row is at `row` in the window. Its view starts at the sidebar's edge or the tab
+// row's, so it never covers a tab, and it's one strip along the tabs, the window's height beside the sidebar and its width
+// under the row, so following the pointer from tab to tab moves the card inside it and never the native view.
+export const tabPreviewRect = (
+  layout: Pick<Layout, "mode" | "sidebarOpen" | "sidebarWidth" | "tabStrip">,
+  row: Rect,
+  card: { picture: boolean; working: boolean },
+  window: { width: number; height: number }
+): { view: Rect; card: Rect } => {
+  const { edge } = TAB_PREVIEW_GAP;
+  const height = tabPreviewHeight(card);
+  const width = TAB_PREVIEW.width;
+  if (layout.mode === "vertical") {
+    // The sidebar's edge, or the floating sidebar's card's when it's collapsed.
+    const sidebarEdge = layout.sidebarOpen ? layout.sidebarWidth : FLOATING_INSET + layout.sidebarWidth;
+    const viewWidth = Math.max(Math.min(TAB_PREVIEW_GAP.sidebar + width + TAB_PREVIEW_SHADOW.side, window.width - sidebarEdge), 0);
+    const x = Math.max(Math.min(TAB_PREVIEW_GAP.sidebar, window.width - edge - width - sidebarEdge), 0);
+    const y = clamp(Math.round(row.y), edge, window.height - edge - height);
+    return {
+      view: { x: sidebarEdge, y: 0, width: viewWidth, height: Math.max(window.height, 0) },
+      card: { x, y, width, height },
+    };
+  }
+  const rowBottom = layout.tabStrip.y + layout.tabStrip.height;
+  const tallest = tabPreviewHeight({ picture: true, working: true });
+  const viewHeight = Math.max(Math.min(TAB_PREVIEW_GAP.row + tallest + TAB_PREVIEW_SHADOW.below, window.height - rowBottom), 0);
+  return {
+    view: { x: 0, y: rowBottom, width: Math.max(window.width, 0), height: viewHeight },
+    card: { x: clamp(Math.round(row.x), edge, window.width - edge - width), y: TAB_PREVIEW_GAP.row, width, height },
+  };
+};
+
 // The bird on the edge of the screen. Its window keeps one size wherever it stands, so nothing resizes while it moves or
 // speaks, and the bird tucks by being moved past the side of the window that lies along the edge.
 export const DESKTOP_BIRD_SIZE = 72;
