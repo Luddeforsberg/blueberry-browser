@@ -517,7 +517,7 @@ export const GalleryPage: React.FC = () => {
                 </Section>
 
                 <Section title="Routine runs">
-                    <ol className="max-w-xl rounded-sheet bg-sheet shadow-up">
+                    <ol className="max-w-xl">
                         {SAMPLE_RUNS.map((run, at) => (
                             <RoutineRunRow key={run.id} run={run} open={at === 0} onStop={() => undefined} onRunAgain={() => undefined} />
                         ))}

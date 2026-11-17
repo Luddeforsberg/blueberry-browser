@@ -22,16 +22,17 @@ describe('groupByDay', () => {
             [at(2026, 10, 31, 0), at(2026, 10, 30, 23), at(2026, 10, 30, 0), at(2026, 10, 29, 23)],
             NOW
         )
-        expect(days.map((day) => [day.label, day.entries.length])).toEqual([
-            ['Today', 1],
-            ['Yesterday', 2],
-            ['Thursday 29 October', 1]
+        expect(days.map((day) => [day.label, day.date, day.entries.length])).toEqual([
+            ['Today', 'Saturday 31 October', 1],
+            ['Yesterday', 'Friday 30 October', 2],
+            ['Thursday', '29 October', 1]
         ])
     })
 
     it('shows the year only for another year', () => {
         const [day] = groupByDay([at(2025, 12, 31)], NOW)
-        expect(day.label).toContain('2025')
+        expect(day.date).toBe('31 December 2025')
+        expect(groupByDay([at(2026, 10, 1)], NOW)[0].date).toBe('1 October')
     })
 
     it('knows yesterday across a month boundary', () => {

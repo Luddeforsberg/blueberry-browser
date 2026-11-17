@@ -11,7 +11,7 @@ import { LABEL, StatusPill } from '@common/components/StatusPill'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry, BerrySpot } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { BETWEEN } from '../components/SettingsRow'
+import { BETWEEN } from '../components/PageFrame'
 import { FIELD, PartNav, SiteChips, StepCard, StepNav } from '../components/StepCard'
 import { blankMascot, keepTabDraft, mascotForm, NEW_MASCOT_EVENT, openMascots, sitesFrom, surprise, tabDraft, takeStartedMascot, toMascotDraft, withPart, type MascotFormValues } from '../flockView'
 

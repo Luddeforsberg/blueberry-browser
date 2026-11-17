@@ -1,33 +1,21 @@
 import React, { useId, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
-import type { RoutineRun, RoutineStatus } from '@shared/library'
+import type { RoutineRun, RoutineRunStatus } from '@shared/library'
 import { Pips } from '@common/components/Pips'
 import { Button } from '@common/components/Button'
-import { StatusPill, type PillTone } from '@common/components/StatusPill'
 import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
-import { ChatApprovalCard, ChatError, Markdown, StatusLine, StepTrail } from './ChatMessage'
+import { ChatApprovalCard, Markdown, StatusLine, StepTrail } from './ChatMessage'
 import { MemoryOffers, RememberedLine } from './MemoryInChat'
-import { BETWEEN } from './SettingsRow'
 
-// A state is a pill, and its colour always comes with words, so colour is never the only signal.
-const STATUS: Record<RoutineStatus, { label: string; tone: PillTone }> = {
-    running: { label: 'Running now', tone: 'on' },
-    finished: { label: 'Finished', tone: 'off' },
-    'needs-approval': { label: 'Needs you', tone: 'ask' },
-    failed: { label: 'Failed', tone: 'ask' },
-    stopped: { label: 'Stopped', tone: 'off' },
-    interrupted: { label: 'Interrupted', tone: 'ask' },
-    queued: { label: 'Waiting to start', tone: 'off' },
-    paused: { label: 'Paused', tone: 'off' },
-    idle: { label: 'Scheduled', tone: 'off' }
+// How it went, in words, so colour is never the only signal.
+const WENT: Record<RoutineRunStatus, string> = {
+    running: 'Running',
+    'needs-approval': 'Needs you',
+    finished: 'Finished',
+    failed: 'Went wrong',
+    stopped: 'Stopped',
+    interrupted: 'Interrupted'
 }
-
-export const RoutineStatusLabel: React.FC<{ status: RoutineStatus }> = ({ status }) => (
-    <StatusPill tone={STATUS[status].tone} lead={status === 'running' ? <Pips pattern="think" /> : undefined}>
-        {STATUS[status].label}
-    </StatusPill>
-)
 
 export const formatTime = (at: number) =>
     new Date(at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -41,9 +29,28 @@ export const tookWords = ({ startedAt, endedAt }: Pick<RoutineRun, 'startedAt' |
     return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
 
-// One run, as a row in the Runs group: when it started, its state and how long it took. It opens in place to show
-// what was done at each step, what it reported and how it ended, as a finished reply's steps do. A run that's going has
-// Stop, and one that failed, was stopped or was interrupted has Run again.
+// Why one that went wrong, was stopped or was interrupted ended, in one line.
+const whyItEnded = (run: RoutineRun): string => {
+    if (run.status === 'stopped') return 'You stopped it.'
+    if (run.status === 'interrupted') {
+        return run.approval
+            ? `The app closed while this was waiting for your OK, so it wasn’t done: “${run.approval.text}”`
+            : 'The app closed before this finished, so it stopped there.'
+    }
+    return run.error ?? 'It couldn’t finish.'
+}
+
+// Its mark on the thread: the pips while it's going, filled `ink` for the one that's open, `ask` for one that went
+// wrong, was stopped or was interrupted, and a ring for the rest.
+const Mark: React.FC<{ run: RoutineRun; open: boolean; ended: boolean }> = ({ run, open, ended }) => {
+    if (run.status === 'running') return <Pips pattern="think" className="text-ink" />
+    if (run.status === 'needs-approval') return <Pips pattern="waiting" className="text-ask" />
+    return <i className={cn('block size-[9px] rounded-full', ended ? 'bg-ask' : open ? 'bg-ink' : 'bg-sheet shadow-[inset_0_0_0_1.5px_rgb(var(--faint))]')} />
+}
+
+// One run on a routine's thread: when it started, how it went and how long it took. It opens in place to show its report
+// and its steps, folded as a finished reply's are. A run that's going has Stop, and one that went wrong, was stopped or
+// was interrupted says why in one line and has Run again.
 export const RoutineRunRow: React.FC<{
     run: RoutineRun
     open?: boolean
@@ -62,54 +69,49 @@ export const RoutineRunRow: React.FC<{
     const took = tookWords(run)
 
     return (
-        <li aria-label={`Run from ${formatTime(run.startedAt)}`} className={cn(BETWEEN, 'before:left-4')}>
-            <div className="relative min-h-[52px] py-[11px] pl-4 pr-3.5 flex items-center gap-3 rounded-[inherit] transition-colors hover:bg-hover has-[>button:first-child:active]:bg-press">
+        <li
+            aria-label={`Run from ${formatTime(run.startedAt)}`}
+            className="relative pb-4 flex gap-3.5 before:content-[''] before:absolute before:left-1 before:top-3 before:-bottom-1.5 before:w-px before:bg-line last:before:hidden"
+        >
+            <span className="relative z-[1] w-[9px] h-5 shrink-0 grid place-items-center bg-sheet">
+                <Mark run={run} open={open} ended={ended} />
+            </span>
+            <div className="flex-1 min-w-0">
                 <button
                     type="button"
                     aria-expanded={open}
                     aria-controls={open ? id : undefined}
-                    aria-label={`Run from ${formatTime(run.startedAt)}, ${STATUS[run.status].label}`}
+                    aria-label={`Run from ${formatTime(run.startedAt)}, ${WENT[run.status]}`}
                     onClick={() => setOpen(!opened)}
-                    className="absolute inset-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-                />
-                <span className="flex-1 min-w-0 pointer-events-none">
-                    <span className="block text-14 font-medium text-ink tabular-nums">{formatTime(run.startedAt)}</span>
-                    {(took || run.lateFor !== null) && (
-                        <span className="block mt-0.5 text-13 text-ink-2">
-                            {[took && `Took ${took}`, run.lateFor !== null && 'Ran late'].filter(Boolean).join(' · ')}
-                        </span>
-                    )}
-                </span>
-                <span className="pointer-events-none"><RoutineStatusLabel status={run.status} /></span>
-                {going && <Button size="sm" variant="raised" className="relative" onClick={onStop}>Stop</Button>}
-                {ended && onRunAgain && <Button size="sm" variant="raised" className="relative" onClick={onRunAgain}>Run again</Button>}
-                <ChevronDown aria-hidden className={cn('size-3.5 shrink-0 -ml-1 text-faint transition-transform duration-fast pointer-events-none', open && 'rotate-180')} strokeWidth={1.75} />
+                    className="group/run w-full min-h-5 flex items-baseline gap-[9px] rounded-row text-left outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-sheet"
+                >
+                    <span className="text-14 font-medium text-ink tabular-nums group-hover/run:underline decoration-line underline-offset-[3px]">{formatTime(run.startedAt)}</span>
+                    <span className={cn('flex-1 min-w-0 truncate text-13', ended ? 'text-ask' : 'text-ink-2')}>
+                        {[WENT[run.status], run.lateFor !== null && 'ran late'].filter(Boolean).join(', ')}
+                    </span>
+                    {took && <span className="shrink-0 font-mono text-11.5 text-ink-3 tabular-nums">{took}</span>}
+                </button>
+                {ended && <p className="mt-1.5 text-14 text-ink-2 [overflow-wrap:anywhere]">{whyItEnded(run)}</p>}
+                {open && (
+                    <div id={id} className="mt-2 flex flex-col items-start gap-3">
+                        {run.lateFor !== null && (
+                            <p className="text-14 text-ink-2">
+                                This ran late. It was due {formatTime(run.lateFor)}, when the app was closed or the computer was asleep.
+                            </p>
+                        )}
+                        {(run.memoryIds?.length ?? 0) > 0 && <RememberedLine ids={run.memoryIds} />}
+                        {going && run.statusLine && <StatusLine text={run.statusLine} />}
+                        {run.steps.length > 0 && <StepTrail steps={run.steps} running={going} cutShort={ended} />}
+                        {run.status === 'needs-approval' && run.approval && <div className="self-stretch"><ChatApprovalCard chatId={run.id} approval={run.approval} mascot={mascot} /></div>}
+                        {run.result && <Markdown content={run.result} className="text-15" />}
+                        {run.status === 'finished' && <div className="self-stretch empty:hidden"><MemoryOffers sourceId={run.id} mascot={mascot} /></div>}
+                        {run.status === 'finished' && !run.result && <p className="text-14 text-ink-2">It finished with nothing to report.</p>}
+                        {run.status === 'running' && run.steps.length === 0 && !run.statusLine && <p className="text-14 text-ink-2">It’s starting.</p>}
+                    </div>
+                )}
+                {going && <Button size="sm" variant="raised" className="mt-2.5" onClick={onStop}>Stop</Button>}
+                {ended && onRunAgain && <Button size="sm" variant="raised" className="mt-2.5" onClick={onRunAgain}>Run again</Button>}
             </div>
-            {open && (
-                <div id={id} className="pl-4 pr-3.5 pb-4 flex flex-col gap-3">
-                    {run.lateFor !== null && (
-                        <p className="text-14 text-ask">
-                            This ran late. It was due {formatTime(run.lateFor)}, when the app was closed or the computer was asleep.
-                        </p>
-                    )}
-                    {(run.memoryIds?.length ?? 0) > 0 && <RememberedLine ids={run.memoryIds} />}
-                    {going && run.statusLine && <StatusLine text={run.statusLine} />}
-                    {run.steps.length > 0 && <StepTrail steps={run.steps} running={going} cutShort={ended} />}
-                    {run.status === 'needs-approval' && run.approval && <ChatApprovalCard chatId={run.id} approval={run.approval} mascot={mascot} />}
-                    {run.result && <Markdown content={run.result} />}
-                    {run.status === 'finished' && <div className="empty:hidden"><MemoryOffers sourceId={run.id} mascot={mascot} /></div>}
-                    {run.status === 'finished' && !run.result && <p className="text-14 text-ink-2">It finished with nothing to report.</p>}
-                    {run.error && <ChatError message={run.error} />}
-                    {run.status === 'interrupted' && (
-                        <p className="text-14">
-                            {run.approval
-                                ? `The app closed while this was waiting for your OK, so it wasn’t done: “${run.approval.text}”`
-                                : 'The app closed before this finished, so it stopped there.'}
-                        </p>
-                    )}
-                    {run.status === 'running' && run.steps.length === 0 && !run.statusLine && <p className="text-14 text-ink-2">It’s starting.</p>}
-                </div>
-            )}
         </li>
     )
 }

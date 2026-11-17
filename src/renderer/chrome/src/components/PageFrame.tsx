@@ -1,51 +1,89 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 import { cn } from '@common/lib/utils'
 
 // DESIGN.md section 10, A page in a tab: every page of Blueberry's own that opens in a tab is built from these, so they
-// can't drift apart. The well with no dot grid, one column 620px wide that scrolls as a whole, a title with the page's
-// own actions on its right, and groups as sheets (`SettingsGroup`). One step in is `BackButton` or `StepInHeader`.
+// can't drift apart. The page is the sheet, as a chat is (the shell draws it under `PageFrame`), in one column 620px
+// wide that scrolls as a whole, with a title and the page's own actions on its right, and lists straight on the page:
+// a group is a label and its rows (`SettingsGroup`), with no sheet. One step in is `BackButton` or `StepInHeader`.
 
-// The gutter stays when nothing scrolls, so the column doesn't move between a short page and a long one.
+// The gutter stays when nothing scrolls, so the column doesn't move between a short page and a long one. The column is
+// at least as tall as the page, so nothing to show can stand in its middle.
 export const PageFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="h-full overflow-y-auto [scrollbar-gutter:stable_both-edges]">
-        <div className="w-[620px] max-w-[calc(100%-32px)] mx-auto pt-[26px] pb-12">{children}</div>
+        <div data-page-column className="w-[620px] max-w-[calc(100%-32px)] min-h-full mx-auto pt-[26px] pb-12 flex flex-col">{children}</div>
     </div>
 )
 
-// The title at 20px semibold, its actions on the right, raised and at most one filled, and one line under it in `ink-2`.
-export const PageHeader: React.FC<{ title: string; actions?: React.ReactNode; children?: React.ReactNode }> = ({ title, actions, children }) => (
+// The title at 20px semibold, with the page's search and its actions on the right, and one line under it in `ink-2`.
+export const PageHeader: React.FC<{ title: string; search?: React.ReactNode; actions?: React.ReactNode; children?: React.ReactNode }> = ({ title, search, actions, children }) => (
     <>
-        <div className={cn('mx-3 flex items-center gap-2', children ? 'mb-3' : 'mb-4')}>
+        <div className="min-h-[34px] flex items-center gap-2">
             <h1 className="flex-1 min-w-0 text-20 font-semibold [overflow-wrap:anywhere]">{title}</h1>
+            {search}
             {actions}
         </div>
-        {children && <p className="-mt-1 mx-3 mb-4 max-w-[520px] text-14 text-ink-2">{children}</p>}
+        {children && <p className="mt-1 max-w-[520px] text-14 text-ink-2">{children}</p>}
     </>
 )
 
-// Nothing to show: one sheet with one sentence, and the mascot where the page is about it. Never an empty page with a
-// heading.
-export const EmptySheet: React.FC<{ face?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ face, className, children }) => (
-    <div className={cn('rounded-sheet bg-sheet shadow-up px-6 py-7 flex flex-col items-center gap-3 text-center', className)}>
+// A row on the page has 8px inside each end and an 11px radius, so the row you're on fills from edge to edge.
+export const ROW = 'relative px-2 rounded-[11px]'
+// The row you're on, by pointer or by keyboard: it fills with `hover`, and the hairline above it goes. `group/row` lets
+// what's on it show (`ON_ROW_SHOW`), and `row-on` the hairline under it go (`LINE_BETWEEN`).
+export const ON_ROW = 'row-on group/row transition-colors hover:bg-hover focus-visible:bg-hover has-[:focus-visible]:bg-hover hover:before:hidden focus-visible:before:hidden has-[:focus-visible]:before:hidden'
+// What shows only on the row you're on. It's still there to the keyboard, which is what brings it out.
+export const ON_ROW_SHOW = 'opacity-0 transition-opacity group-hover/row:opacity-100 group-has-[:focus-visible]/row:opacity-100'
+// And what it takes the place of.
+export const OFF_ROW_HIDE = 'transition-opacity group-hover/row:opacity-0 group-has-[:focus-visible]/row:opacity-0'
+// The hairline between two rows starts where the text does, after an icon when the rows have one, so a row that leads
+// with something sets `before:left-*` to where its text starts.
+export const BETWEEN = "relative before:content-[''] before:absolute before:right-0 before:top-0 before:h-px before:bg-line first:before:hidden"
+// Between rows of two lines on the page, the hairline stops 8px from the end, as the row's words do, and goes from
+// under the row you're on as well as from above it (`ON_ROW`).
+export const LINE_BETWEEN = cn(BETWEEN, 'before:right-2 [.row-on:hover+&]:before:hidden [.row-on:focus-visible+&]:before:hidden [.row-on:has(:focus-visible)+&]:before:hidden')
+
+// Nothing to show: the mascot where the page is about it, and one sentence, in the middle of the page with no sheet.
+// Never an empty page with a heading.
+export const EmptyPage: React.FC<{ face?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ face, className, children }) => (
+    <div className={cn('flex-1 min-h-[220px] pb-[8vh] flex flex-col items-center justify-center gap-3 text-center', className)}>
         {face}
         <p className="max-w-[420px] text-14 text-ink-2">{children}</p>
     </div>
 )
 
-// A page's search, 36px on `tray` with a hairline, as wide as the column, between the line and the first group.
-export const SearchField: React.FC<{ label: string; value: string; onChange: (value: string) => void; autoFocus?: boolean }> = ({ label, value, onChange, autoFocus }) => (
-    <label className="h-9 mb-1 px-3 flex items-center gap-[9px] rounded-[11px] bg-tray shadow-[inset_0_0_0_1px_var(--line)] focus-within:ring-2 focus-within:ring-focus">
-        <Search aria-hidden className="size-4 shrink-0 text-ink-2" strokeWidth={1.75} />
-        <input
-            type="search"
-            aria-label={label}
-            placeholder={label}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            spellCheck={false}
-            autoFocus={autoFocus}
-            className="flex-1 min-w-0 h-full bg-transparent text-14 text-ink outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
-        />
-    </label>
-)
+const editable = (target: EventTarget | null) =>
+    target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')
+
+// A page's search, beside the title's actions: 32px, round, on `sheet-2`, and wider while it has the keyboard. It doesn't
+// take the keyboard when the page opens, so no ring is lit before the user has done anything, but the first key typed
+// anywhere that isn't a field goes to it, so searching is still just typing.
+export const SearchField: React.FC<{ label: string; value: string; onChange: (value: string) => void }> = ({ label, value, onChange }) => {
+    const input = useRef<HTMLInputElement>(null)
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
+            // A character, not Space, which presses the button it's on or scrolls.
+            if (event.key.length !== 1 || event.key === ' ' || editable(event.target)) return
+            // Focused while the key is down, so the key itself lands in the field.
+            input.current?.focus()
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [])
+    return (
+        <label className="h-8 w-[190px] shrink min-w-[120px] px-3 flex items-center gap-[7px] rounded-full bg-sheet-2 transition-[width] duration-fast focus-within:w-[260px] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus">
+            <Search aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
+            <input
+                ref={input}
+                type="search"
+                aria-label={label}
+                placeholder="Search"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                spellCheck={false}
+                className="flex-1 min-w-0 h-full bg-transparent text-13 text-ink outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
+            />
+        </label>
+    )
+}

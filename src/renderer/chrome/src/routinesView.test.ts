@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyRecordedValue, askForRecordedValue, blankForm, changeRecordedValue, howOften, nextInWords, readBack, recordedForm, scheduleSentence, sentenceText, toDraft, WEEKDAYS, withHowOften, withRoutinePart } from './routinesView'
+import type { Routine, RoutineRun } from '@shared/library'
+import { applyRecordedValue, askForRecordedValue, blankForm, changeRecordedValue, groupRoutines, howOften, nextInWords, readBack, recordedForm, routineLine, scheduleSentence, sentenceText, toDraft, WEEKDAYS, withHowOften, withRoutinePart } from './routinesView'
 
 const form = (instructions: string, value: string) =>
     recordedForm({ name: 'Job', instructions, sites: [], changes: [{ label: 'Search', value }] })
@@ -77,7 +78,7 @@ describe('when, in words', () => {
         expect(nextInWords(new Date(2026, 10, 16, 17, 0).getTime(), now)).toBe('today 17:00')
         expect(nextInWords(new Date(2026, 10, 17, 9, 0).getTime(), now)).toBe('tomorrow 09:00')
         expect(nextInWords(new Date(2026, 10, 19, 9, 0).getTime(), now)).toBe('Thu 09:00')
-        expect(nextInWords(new Date(2026, 10, 30, 9, 0).getTime(), now)).toBe('30 Nov')
+        expect(nextInWords(new Date(2026, 10, 30, 9, 0).getTime(), now)).toBe('30 Nov 09:00')
     })
 })
 
@@ -93,5 +94,62 @@ describe('changing one part', () => {
         const values = { ...blankForm('', 'Look'), sites: ['svt.se'] }
         expect(toDraft(values).sites).toEqual([])
         expect(toDraft({ ...values, onlySomeSites: true }).sites).toEqual(['svt.se'])
+    })
+})
+
+describe('the list', () => {
+    const NOW = new Date(2026, 10, 16, 12, 0).getTime()
+    const run = (patch: Partial<RoutineRun>): RoutineRun => ({
+        id: 'run', routineId: 'r', status: 'finished', startedAt: NOW, endedAt: NOW, lateFor: null, steps: [], result: null, error: null, approval: null, tokens: null, seen: true, ...patch
+    })
+    const routine = (id: string, patch: Partial<Routine> = {}): Routine => ({
+        id, name: id, instructions: 'Read SVT', scheduleSpec: { kind: 'daily', time: '09:00' }, mascotId: null, sites: [], inCloud: false, schedule: '', paused: false,
+        nextRunAt: NOW + 3_600_000, lastResult: 'Not run yet', status: 'idle', latestRun: null, unseen: false, ...patch
+    })
+    const keys = (routines: Routine[]) => groupRoutines(routines).map((group) => [group.key, group.routines.map(({ id }) => id)])
+
+    it('has no groups for no routines', () => {
+        expect(groupRoutines([])).toEqual([])
+    })
+
+    it('groups by what matters, in order, leaving out the empty ones', () => {
+        expect(keys([
+            routine('manual', { scheduleSpec: { kind: 'manual' }, nextRunAt: null }),
+            routine('paused', { paused: true, status: 'paused', nextRunAt: null }),
+            routine('later', { nextRunAt: NOW + 7_200_000 }),
+            routine('sooner', { nextRunAt: NOW + 60_000 }),
+            routine('running', { status: 'running' }),
+            routine('queued', { status: 'queued' }),
+            routine('asking', { status: 'needs-approval' })
+        ])).toEqual([
+            ['needs-you', ['asking']],
+            ['running', ['running', 'queued']],
+            ['scheduled', ['sooner', 'later']],
+            ['paused', ['paused']],
+            ['manual', ['manual']]
+        ])
+        expect(keys([routine('one')])).toEqual([['scheduled', ['one']]])
+    })
+
+    it('puts what needs you first, even while paused, and a one-off that has run with those only run when asked', () => {
+        expect(keys([
+            routine('done-once', { scheduleSpec: { kind: 'once', at: NOW - 1000 }, nextRunAt: null }),
+            routine('paused-asking', { paused: true, status: 'needs-approval' }),
+            routine('failed', { status: 'failed' })
+        ])).toEqual([
+            ['needs-you', ['paused-asking']],
+            ['scheduled', ['failed']],
+            ['manual', ['done-once']]
+        ])
+    })
+
+    it('says what one waiting for you wants, where a running one is, and what went wrong in ask', () => {
+        const approval = { id: 'a', text: 'Open https://www.klm.com/orders/123' }
+        expect(routineLine(routine('a', { status: 'needs-approval', latestRun: run({ status: 'needs-approval', approval }) }))).toEqual({ words: 'Open klm.com', last: null })
+        expect(routineLine(routine('b', { status: 'running', latestRun: run({ status: 'running', statusLine: 'Scanning fares..' }) }))).toEqual({ words: 'Scanning fares..', last: null })
+        expect(routineLine(routine('c', { status: 'running', latestRun: run({ status: 'running', steps: [{ text: 'Opened tap.pt', done: true }] }) }))).toEqual({ words: 'Opened tap.pt', last: null })
+        expect(routineLine(routine('d', { status: 'failed', lastResult: 'Today: couldn’t finish', latestRun: run({ status: 'failed' }) }))).toEqual({ words: 'Every day at 09:00', last: { text: 'Today: couldn’t finish', ask: true } })
+        expect(routineLine(routine('e', { scheduleSpec: { kind: 'manual' }, nextRunAt: null }))).toEqual({ words: null, last: { text: 'Not run yet', ask: false } })
+        expect(routineLine(routine('f', { cloudNote: 'Moving back to this Mac…' }))).toEqual({ words: 'Every day at 09:00', last: { text: 'Moving back to this Mac…', ask: false } })
     })
 })

@@ -7,7 +7,8 @@ import { cn } from '@common/lib/utils'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { BerrySpot, useAssistantName } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { BETWEEN, SettingsGroup, StepInHeader } from '../components/SettingsRow'
+import { SettingsGroup, StepInHeader } from '../components/SettingsRow'
+import { EmptyPage, LINE_BETWEEN, ROW } from '../components/PageFrame'
 
 // DESIGN.md section 10, Your mascots: what one mascot remembers, one step in from its page. Everything it knows is on
 // this page, and nothing else is. An offer waiting for an answer sits on top until it gets one.
@@ -29,7 +30,7 @@ export const FactRow: React.FC<{ fact: Pick<MemoryFact, 'text'>; onEdit: (text: 
 
     if (editing !== null) {
         return (
-            <li className={cn(BETWEEN, 'before:left-4 py-[9px] pl-4 pr-3.5')}>
+            <li className={cn(ROW, LINE_BETWEEN, 'before:left-2 py-[9px]')}>
                 <form onSubmit={(event) => void save(event)}>
                     <textarea
                         autoFocus
@@ -53,7 +54,7 @@ export const FactRow: React.FC<{ fact: Pick<MemoryFact, 'text'>; onEdit: (text: 
         )
     }
     return (
-        <li className={cn(BETWEEN, 'before:left-4 min-h-12 py-[9px] pl-4 pr-3.5 flex items-center gap-3')}>
+        <li className={cn(ROW, LINE_BETWEEN, 'before:left-2 min-h-12 py-[9px] flex items-center gap-3')}>
             <p className="flex-1 min-w-0 text-14 leading-[1.45] text-ink [overflow-wrap:anywhere]">{fact.text}</p>
             <Button size="sm" variant="raised" aria-label={`Change: ${fact.text}`} onClick={() => setEditing(fact.text)}>Change</Button>
             <Button size="sm" variant="raised" aria-label={`Forget: ${fact.text}`} onClick={onForget}>Forget</Button>
@@ -102,7 +103,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
     }
     const places = [...groups.keys()].sort((a, b) => (a === ANYWHERE ? -1 : b === ANYWHERE ? 1 : a.localeCompare(b)))
     return (
-        <section aria-label={`What ${name} remembers`}>
+        <section aria-label={`What ${name} remembers`} className="flex-1 flex flex-col">
             <StepInHeader back={name} onBack={onBack} title={`What ${name} remembers`}>
                 Only what you’ve said yes to. It’s kept on this computer and goes into a job when it fits.
             </StepInHeader>
@@ -113,10 +114,11 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
             )}
             {/* Nothing kept says so, but not under an offer, which is already the news. */}
             {facts.length === 0 ? (
-                offers.length === 0 && <div className="mt-4 rounded-sheet bg-sheet shadow-up px-4 py-[26px] text-center text-14 leading-[1.5] text-ink-2">
-                    <div className="mb-2.5 flex justify-center"><BerrySpot size={40} mascot={mascot} /></div>
-                    <p className="mx-auto max-w-[440px]">Nothing yet. After a job it may ask to remember how you like something done, and it’s kept only if you say yes.</p>
-                </div>
+                offers.length === 0 && (
+                    <EmptyPage face={<BerrySpot size={40} mascot={mascot} />}>
+                        Nothing yet. After a job it may ask to remember how you like something done, and it’s kept only if you say yes.
+                    </EmptyPage>
+                )
             ) : (
                 <>
                     {places.map((place) => (
@@ -136,7 +138,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
                             </ul>
                         </SettingsGroup>
                     ))}
-                    <Button size="sm" variant="ghost" className="mt-5 text-ask hover:text-ask" onClick={() => void api().clear(mascot.id)}>Forget everything</Button>
+                    <Button size="sm" variant="ghost" className="self-start mt-5 text-ask hover:text-ask" onClick={() => void api().clear(mascot.id)}>Forget everything</Button>
                 </>
             )}
         </section>

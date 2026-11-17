@@ -13,8 +13,8 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Berry, useAssistantName } from '../components/Berry'
 import { ChatError } from '../components/ChatMessage'
-import { PageFrame, PageHeader } from '../components/PageFrame'
-import { BackButton, BETWEEN, SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
+import { EmptyPage, LINE_BETWEEN, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, PageFrame, PageHeader, ROW } from '../components/PageFrame'
+import { BackButton, SettingsGroup, SettingsLink, SettingsRow } from '../components/SettingsRow'
 import { useMascotState } from '../components/Sidebar'
 import { firstSentence, limitsInBrief, narrowerLimits } from '../shortWords'
 import { useAccount } from '../useAccount'
@@ -65,8 +65,9 @@ const chatWith = (choose: (id: string) => void, mascot: MascotProfile) => {
     void window.chromeAPI.browser.createTab()
 }
 
-// One row per mascot. The whole row opens its page, and Chat, above it, starts a new chat with it. Chat shows on the row
-// you're on, by pointer or keyboard, in place of its limits.
+// One row per mascot, straight on the page. The whole row opens its page, and Chat, above it, starts a new chat with it.
+// Chat and a faint arrow show on the row you're on, by pointer or keyboard, in place of its limits, which are plain
+// words. Waiting for you, a Needs you pill takes their place: the only pill on the page.
 export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
     const { choose } = useFlock()
     const stateOf = useMascotState()
@@ -76,34 +77,38 @@ export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
     const site = mood === 'fetching' ? siteOf(mascot) : null
     const limits = narrowerLimits(mascot)
     return (
-        <li className={cn(BETWEEN, 'group before:left-[66px] relative min-h-16 py-[13px] pl-4 pr-3.5 flex items-center gap-3.5 transition-colors hover:bg-sheet-2/50 focus-within:bg-sheet-2/50 first:rounded-t-sheet last:rounded-b-sheet')}>
-            {/* Still, as only the words beside its pips move on this page. */}
-            <Berry mood={mood} size={36} mascot={mascot} still />
-            <div className="flex-1 min-w-0">
-                <button
-                    type="button"
-                    onClick={() => openMascots({ page: 'mascot', id: mascot.id })}
-                    className={cn("block max-w-full truncate text-left text-14 font-medium text-ink before:content-[''] before:absolute before:inset-0 before:rounded-[inherit]", FOCUS, 'focus-visible:ring-0 focus-visible:before:ring-2 focus-visible:before:ring-focus')}
-                >
-                    {name}
-                </button>
-                <p className="mt-0.5 truncate text-13 text-ink-2">{mascot.id === BERRY_ID ? BERRY_LINE : firstSentence(mascot.instructions)}</p>
-            </div>
-            {mood === 'fetching' && (
-                <span className="flex items-center gap-[7px] font-mono text-11.5 text-ink-2 whitespace-nowrap">
-                    <Pips pattern="think" className="text-ink" />
-                    {site ? `on ${site}` : 'working'}
+        <li className={cn(ROW, ON_ROW, LINE_BETWEEN, 'before:left-14 min-h-[62px] py-[11px] flex items-center gap-3 has-[>button:first-child:active]:bg-press')}>
+            <button
+                type="button"
+                aria-label={name}
+                onClick={() => openMascots({ page: 'mascot', id: mascot.id })}
+                className={cn('absolute inset-0 rounded-[inherit]', FOCUS)}
+            />
+            <span className="contents pointer-events-none">
+                {/* Still, as only the words beside its pips move on this page. */}
+                <Berry mood={mood} size={36} mascot={mascot} still />
+                <span className="flex-1 min-w-0">
+                    <span className="block truncate text-14 font-medium text-ink">{name}</span>
+                    <span className="block truncate text-13 text-ink-2">{mascot.id === BERRY_ID ? BERRY_LINE : firstSentence(mascot.instructions)}</span>
                 </span>
-            )}
+                {mood === 'fetching' && (
+                    <span className="flex items-center gap-[7px] font-mono text-11.5 text-ink-2 whitespace-nowrap">
+                        <Pips pattern="think" className="text-ink" />
+                        {site ? `on ${site}` : 'working'}
+                    </span>
+                )}
+            </span>
             <span className="shrink-0 grid justify-items-end items-center [&>*]:[grid-area:1/1]">
                 {mood === 'asking' ? (
-                    <StatusPill tone="ask" className="transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">Needs you</StatusPill>
+                    <StatusPill tone="ask" className={cn('pointer-events-none', OFF_ROW_HIDE)}>Needs you</StatusPill>
                 ) : (
-                    limits && <StatusPill className="transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">{limits}</StatusPill>
+                    limits && <span className={cn('text-13 text-ink-3 whitespace-nowrap pointer-events-none', OFF_ROW_HIDE)}>{limits}</span>
                 )}
-                <Button size="sm" variant="raised" className="relative opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
+                <span className={cn('relative flex items-center gap-1', ON_ROW_SHOW)}>
+                    <Button size="sm" variant="raised" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
+                    <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint pointer-events-none" strokeWidth={1.75} />
+                </span>
             </span>
-            <ChevronRight aria-hidden className="size-3.5 shrink-0 -ml-1 text-faint" strokeWidth={1.75} />
         </li>
     )
 }
@@ -126,7 +131,7 @@ const List: React.FC = () => {
             >
                 Each has its own job and its own limits. They all ask before anything risky.
             </PageHeader>
-            <ul aria-label="Your mascots" className="rounded-sheet bg-sheet shadow-up">
+            <ul aria-label="Your mascots" className="mt-4">
                 {flock.map((mascot) => <MascotRow key={mascot.id} mascot={mascot} />)}
             </ul>
         </>
@@ -165,7 +170,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
     return (
         <>
             <BackButton back="Your mascots" onBack={() => openMascots({ page: 'list' })} />
-            <section aria-label={name} className="rounded-sheet bg-sheet shadow-up pt-5 pr-[18px] pb-5 pl-[22px] flex items-start gap-5">
+            <section aria-label={name} className="flex items-start gap-5">
                 <Berry mood={stateOf(mascot).mood} size={64} mascot={mascot} className="mt-0.5" still />
                 <div className="flex-1 min-w-0">
                     <h1 className="mb-1 text-20 font-semibold [overflow-wrap:anywhere]">{name}</h1>
@@ -218,7 +223,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
             {error && <div className="mt-3 mx-3"><ChatError message={error} /></div>}
 
             {!isBerry && (
-                <Button size="sm" variant="ghost" className="mt-5 text-ask hover:text-ask" onClick={() => void remove()}>
+                <Button size="sm" variant="ghost" className="self-start mt-5 text-ask hover:text-ask" onClick={() => void remove()}>
                     Delete {mascot.name}
                 </Button>
             )}
@@ -247,7 +252,7 @@ const Publish: React.FC<{ tabId: string; mascotId: string }> = ({ tabId, mascotI
 const Gone: React.FC = () => (
     <>
         <BackButton back="Your mascots" onBack={() => openMascots({ page: 'list' })} />
-        <p className="mx-3 text-14 text-ink-2">This mascot isn’t here any more.</p>
+        <EmptyPage>This mascot isn’t here any more.</EmptyPage>
     </>
 )
 
