@@ -23,6 +23,7 @@ import { Account } from "./Account";
 import { AiKey, KEY_PAGES } from "./AiKey";
 import { isAiService } from "../shared/aiKey";
 import { PLAIN_WORDS, type FirstJob } from "../shared/firstRun";
+import { galleryParam } from "../shared/galleryPlaces";
 import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
@@ -1685,7 +1686,7 @@ export class Window {
     const { open, forward } = this.linkThrottle(id);
     if (!open) return;
     if (forward) this.bringForward();
-    this.openPage("mascot-gallery", { param: id });
+    this.openPage("mascot-gallery", { param: galleryParam({ page: "linked", id }) });
     sendToRenderer(this.chrome.view.webContents, "gallery:linked", id);
   }
 
