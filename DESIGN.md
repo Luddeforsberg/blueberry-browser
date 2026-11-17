@@ -487,7 +487,7 @@ No page yet, so no sheet: the well, with its dot grid, and in the upper middle:
 
 - **Its states:** at rest it's plain; hovered or focused it's a sheet with `chip`, and focused it also has the standard ring; and **used**, while the box holds what it put there, it stays a sheet with `chip`, until the box is emptied or changed.
 - **A suggestion can be dismissed:** a × at the row's end, its own button beside the row's, shows on hover and while the row has the keyboard. Chats to pick up and mascots to try have none.
-- **With the sidebar collapsed,** a row of quiet buttons under the suggestions leads to Needs you, Routines, your mascots and Settings. The horizontal layout has none, since Chats, the dock and the menu are in its toolbar.
+- **With the sidebar collapsed,** the new tab is the same page. It has no row of links to Needs you, Routines, your mascots and Settings: under the suggestions they read as more suggestions, and each is one step away already, in the menu and in the sidebar when it slides in. What's waiting for you still shows over the suggestions, and in the toolbar.
 
 `Enter` opens anything that looks like an address and asks the mascot about everything else. `⌘Enter` (`Ctrl+Enter` on Windows) always asks. The chat panel doesn't open here, because this page has its own box.
 

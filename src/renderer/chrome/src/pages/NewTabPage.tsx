@@ -198,7 +198,7 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
     const browser = window.chromeAPI.browser
     const library = useLibrary()
-    const { layout, settings } = useShell()
+    const { settings } = useShell()
     const { chosen, choose, flock } = useFlock()
     // Who was chosen as the page opened, so choosing one from a row doesn't reorder the rows.
     const [chosenAtOpen] = useState(chosen.id)
@@ -391,15 +391,6 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                     ))}
                                 </ul>
                             </section>
-                        )}
-                        {/* With the sidebar collapsed, the pages it leads to are here. The horizontal layout has Chats and the
-                            dock in its toolbar instead. */}
-                        {layout.mode === 'vertical' && !layout.sidebarOpen && (
-                            <nav aria-label="Places" className="flex flex-wrap justify-center gap-1">
-                                {([['needs-you', 'Needs you'], ['routines', 'Routines'], ['flock', 'Your mascots'], ['settings', 'Settings']] as const).map(([page, words]) => (
-                                    <Button key={page} variant="ghost" size="sm" onClick={() => void browser.openPage(page)}>{words}</Button>
-                                ))}
-                            </nav>
                         )}
                     </div>
                 </div>
