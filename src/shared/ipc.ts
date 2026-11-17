@@ -2,6 +2,7 @@
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
 import type { AiKeyState, AiKeyTried, AiService } from "./aiKey";
+import type { AppIconGround } from "./appIcon";
 import type { FileChip, TabChoice } from "./attachments";
 import type { FirstJob, FirstRunStep } from "./firstRun";
 import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
@@ -72,6 +73,9 @@ export interface Settings {
   relayOnMac: boolean;
   // What the account menu and Account call you. Only ever on this computer: never sent, prompted or published.
   accountName: string | null;
+  // Whose face is on the app's icon, null for Berry, and what's behind it.
+  appIconMascotId: string | null;
+  appIconGround: AppIconGround;
 }
 
 export type DesktopEdge = "bottom" | "top" | "left" | "right";
@@ -528,6 +532,9 @@ export interface InvokeChannels {
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
   // Light, dark or system, from the account menu, which can open in the overlay. It is all the overlay may change.
   "settings:set-appearance": { region: "chrome" | "overlay"; args: [appearance: Appearance]; result: void };
+  // The app's icon as the chrome drew it, a PNG data address, for the mascot and ground it was drawn for. Main refuses
+  // it unless those are what's chosen and it's a PNG of the right size, and says whether it took it.
+  "settings:app-icon": { region: "chrome"; args: [png: string, mascotId: string | null, ground: AppIconGround]; result: boolean };
   // Whether the shortcut couldn't be had, because another app holds it, so Settings can say so.
   "desktop:shortcut-taken": { region: "chrome"; args: []; result: boolean };
   "desktop:state": { region: "desktop"; args: []; result: DesktopBerryState };
@@ -791,6 +798,7 @@ export interface SettingsAPI {
   getSettings: () => Promise<Settings>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
   setAppearance: (appearance: Appearance) => Promise<void>;
+  setAppIcon: (png: string, mascotId: string | null, ground: AppIconGround) => Promise<boolean>;
   // The native menu for right-clicking Berry, with Keep Berry still and Hide Berry.
   showBerryMenu: () => Promise<void>;
   onSettingsUpdated: (callback: (settings: Settings) => void) => Unsubscribe;

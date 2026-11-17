@@ -3,12 +3,16 @@ import { Cloud, Plug, Smartphone, Brain } from 'lucide-react'
 import type { ActionApproval, Appearance, ImportSource, LayoutMode, StartupChoice, TabInfo } from '@shared/ipc'
 import { SETTINGS_SECTIONS, settingsPlace, type SettingsPage as StepInPage, type SettingsSection } from '@shared/settingsPlaces'
 import { shortcutWords, SHORTCUTS } from '@shared/shortcuts'
+import { iconMascotId, type AppIconGround } from '@shared/appIcon'
+import { BERRY_ID } from '@shared/mascots'
 import { Choice, Switch } from '@common/components/Controls'
 import { useShell } from '../contexts/ShellContext'
 import { More, RowTile, SettingsGroup, SettingsLink, SettingsRow, StepInHeader } from '../components/SettingsRow'
 import { SegmentSwitch } from '../components/SegmentSwitch'
 import { PageFrame, PageHeader } from '../components/PageFrame'
 import { WindowPicture } from '../components/WindowPicture'
+import { AppIcon } from '../components/AppIcon'
+import { useFlock } from '../contexts/LibraryContext'
 import { BringInHistory } from '../components/HistoryImport'
 import { AiKeyForm, aiServiceName, useAiKey, useKeyTry } from '../components/AiKeyForm'
 import { ServiceMark } from '../components/ServiceMark'
@@ -71,6 +75,53 @@ const LOOK_SETTINGS: Record<Look, { showBerry: boolean; keepBerryStill?: boolean
     hidden: { showBerry: false }
 }
 
+const GROUND_NAMES: Record<AppIconGround, string> = { paper: 'Paper', night: 'Night', colour: 'Its colour', glow: 'Glow' }
+
+// Who's on the app's icon and what's behind it. It's outside the window, so it stays when the mascots are hidden.
+const AppIconRow: React.FC = () => {
+    const { settings, updateSettings, theme } = useShell()
+    const { flock } = useFlock()
+    const mascotId = iconMascotId(settings.appIconMascotId, flock) ?? BERRY_ID
+    const look = flock.find((mascot) => mascot.id === mascotId)?.look
+    const ground = settings.appIconGround
+    const mac = theme.platform === 'mac'
+    const label = 'mt-3.5 mb-2 text-12 font-medium text-ink-2'
+    return (
+        <SettingsRow
+            id="setting-app-icon"
+            title="App icon"
+            description={`The mascot on Blueberry’s icon in your ${mac ? 'Dock' : 'taskbar'}, and what’s behind it.`}
+            below={
+                <>
+                    <div className={label}>Who</div>
+                    <Choice<string>
+                        label="Who"
+                        value={mascotId}
+                        onChange={(id) => updateSettings({ appIconMascotId: id === BERRY_ID ? null : id })}
+                        className="flex-wrap gap-x-1.5 gap-y-3"
+                        pictureClassName="size-14 rounded-[25%]"
+                        options={flock.map((mascot) => ({ value: mascot.id, label: mascot.name, picture: <AppIcon look={mascot.look} ground={ground} size={56} /> }))}
+                    />
+                    <div className={label}>Behind it</div>
+                    <Choice<AppIconGround>
+                        label="Behind it"
+                        value={ground}
+                        onChange={(appIconGround) => updateSettings({ appIconGround })}
+                        className="flex-wrap gap-x-1.5 gap-y-3"
+                        pictureClassName="size-11 rounded-[25%]"
+                        options={(Object.keys(GROUND_NAMES) as AppIconGround[]).map((value) => ({ value, label: GROUND_NAMES[value], picture: <AppIcon look={look} ground={value} size={44} /> }))}
+                    />
+                    <p className="mt-3.5 text-13 text-ink-2">
+                        {mac ? 'While Blueberry is closed, the Dock shows its usual icon.' : 'A pinned shortcut, and the icon while Blueberry is closed, stay the usual one.'}
+                    </p>
+                </>
+            }
+        >
+            <AppIcon look={look} ground={ground} size={72} />
+        </SettingsRow>
+    )
+}
+
 const General: React.FC = () => {
     const { settings, updateSettings } = useShell()
     return (
@@ -99,6 +150,7 @@ const General: React.FC = () => {
                         ]}
                     />
                 </SettingsRow>
+                <AppIconRow />
             </SettingsGroup>
             <SettingsGroup label="Browsing">
                 <SettingsRow id="setting-startup" title="When Blueberry opens" {...STARTUP_DESCRIPTIONS[settings.onStartup]}>

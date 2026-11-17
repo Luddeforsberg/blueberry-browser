@@ -81,6 +81,7 @@ const chromeAPI: ChromeAPI = {
     getSettings: () => invoke("settings:get"),
     updateSettings: (patch) => invoke("settings:update", patch),
     setAppearance: (appearance) => invoke("settings:set-appearance", appearance),
+    setAppIcon: (png, mascotId, ground) => invoke("settings:app-icon", png, mascotId, ground),
     showBerryMenu: () => invoke("berry:context-menu"),
     onSettingsUpdated: (callback) => subscribe("settings:updated", callback),
   },

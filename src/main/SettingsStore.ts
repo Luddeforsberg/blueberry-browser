@@ -5,6 +5,8 @@ import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "./Layout";
 import { sanitizeSiteZoom } from "./siteZoom";
 import { cleanAccountName } from "../shared/accountName";
 import { FIRST_JOBS, FIRST_RUN_STEPS, knownOnly } from "../shared/firstRun";
+import { APP_ICON_GROUNDS } from "../shared/appIcon";
+import { BERRY_ID } from "../shared/mascots";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -32,6 +34,8 @@ export const DEFAULT_SETTINGS: Settings = {
   desktopBerrySpot: null,
   relayOnMac: false,
   accountName: null,
+  appIconMascotId: null,
+  appIconGround: "paper",
 };
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -46,6 +50,12 @@ const width = (value: unknown, range: { min: number; max: number }, fallback: nu
 const folder = (value: unknown, fallback: string | null): string | null => {
   if (value === null) return null;
   return typeof value === "string" && isAbsolute(value) && !value.includes("\0") ? value : fallback;
+};
+
+// A mascot's id, or null for Berry. Whether it's still in the flock is asked where the icon is drawn and set.
+const mascotId = (value: unknown, fallback: string | null): string | null => {
+  if (value === null || value === BERRY_ID) return null;
+  return typeof value === "string" && /^[\w-]{1,64}$/.test(value) ? value : fallback;
 };
 
 const spot = (value: unknown, fallback: DesktopBerrySpot | null): DesktopBerrySpot | null => {
@@ -90,6 +100,8 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     desktopBerrySpot: spot(input.desktopBerrySpot, base.desktopBerrySpot),
     relayOnMac: bool(input.relayOnMac, base.relayOnMac),
     accountName: cleanAccountName(input.accountName, base.accountName),
+    appIconMascotId: mascotId(input.appIconMascotId, base.appIconMascotId),
+    appIconGround: pick(input.appIconGround, APP_ICON_GROUNDS, base.appIconGround),
   };
 }
 
