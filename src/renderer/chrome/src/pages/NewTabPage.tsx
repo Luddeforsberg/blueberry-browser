@@ -27,6 +27,7 @@ import { Favicon } from '../components/Favicon'
 import { startingSites } from '../startingSites'
 import { FIRST_JOB_PROMPT, FirstJobs } from '../components/FirstJobs'
 import { setGalleryView } from '../galleryView'
+import { galleryParam } from '@shared/galleryPlaces'
 import { openSettings } from '../openSettings'
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
@@ -272,8 +273,8 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             choose(BERRY_ID)
             fill('first-job-try', null, FIRST_JOB_PROMPT)
         } else {
-            setGalleryView({ reviewing: PLAIN_WORDS, linked: null, query: '', category: null })
-            void browser.openPage('mascot-gallery')
+            setGalleryView({ query: '', category: null })
+            void browser.openPage('mascot-gallery', { param: galleryParam({ page: 'mascot', id: PLAIN_WORDS }) })
         }
     }
 

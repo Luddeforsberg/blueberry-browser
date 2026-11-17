@@ -32,7 +32,7 @@ import { LimitTags } from './MascotSteps'
 import { StepCard } from '../components/StepCard'
 import { MascotMemoryView } from './MascotMemory'
 import { MemoryOffersLine, RememberedFacts } from '../components/MemoryInChat'
-import { GalleryCard } from './MascotGalleryPage'
+import { GalleryTile } from './MascotGalleryPage'
 import { ACCESSORIES, BERRY, BERRY_ID, PALETTES } from '@shared/mascots'
 import { FindBarCard } from '../components/FindBarCard'
 import { ZoomButton } from '../components/Toolbar'
@@ -310,13 +310,12 @@ export const GalleryPage: React.FC = () => {
                         <MascotPerch selectedId={BERRY_ID} onChoose={() => undefined} />
                     </div>
                     <ul className="mt-6 max-w-[620px] rounded-sheet bg-sheet shadow-rim"><MascotRow mascot={SAMPLE_MASCOT} /></ul>
-                    <ul className="mt-6 border-t">
-                        <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={null} onReview={() => undefined} />
-                        <GalleryCard entry={SAMPLE_GALLERY_ENTRY} copy={SAMPLE_MASCOT} onReview={() => undefined} />
-                        <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, author: 'Ana', addCount: 12, publishedAt: 1 }} copy={null} onReview={() => undefined} />
-                        <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: ['visit', 'click', 'type'] } }} copy={null} onReview={() => undefined} />
-                        <GalleryCard entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, sites: [], tools: [] } }} copy={null} onReview={() => undefined} />
-                    </ul>
+                    <div className="mt-6 max-w-[620px] grid grid-cols-4 gap-x-3.5 gap-y-[22px]">
+                        <GalleryTile entry={SAMPLE_GALLERY_ENTRY} onPick={() => undefined} />
+                        <GalleryTile entry={SAMPLE_GALLERY_ENTRY} yours onPick={() => undefined} />
+                        <GalleryTile entry={{ ...SAMPLE_GALLERY_ENTRY, author: 'Ana', addCount: 12, publishedAt: 1, draft: { ...SAMPLE_MASCOT, look: { palette: 'parakeet', accessory: 'cap' } } }} onPick={() => undefined} />
+                        <GalleryTile entry={{ ...SAMPLE_GALLERY_ENTRY, draft: { ...SAMPLE_MASCOT, look: { palette: 'jackdaw', accessory: 'glasses' } } }} narrow onPick={() => undefined} />
+                    </div>
                     <div className="mt-6 py-6 rounded-tile bg-well">
                         <StepCard
                             mascot={SAMPLE_MASCOT}

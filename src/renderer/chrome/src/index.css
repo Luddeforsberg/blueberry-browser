@@ -55,6 +55,40 @@
     @apply relative after:absolute after:inset-x-0 after:top-full after:h-1.5;
   }
 
+  /* In the Gallery a mascot is told apart by its berry's colour alone (DESIGN.md section 10, Gallery): mixed 24% into
+     the sheet behind it, and 62% into ink for the berry's name. `data-tint` names the berry, on the element or above it. */
+  [data-tint="blueberry"] {
+    --berry: var(--berry-blueberry);
+  }
+
+  [data-tint="lingon"] {
+    --berry: var(--berry-lingon);
+  }
+
+  [data-tint="cloudberry"] {
+    --berry: var(--berry-cloudberry);
+  }
+
+  [data-tint="gooseberry"] {
+    --berry: var(--berry-gooseberry);
+  }
+
+  [data-tint="raspberry"] {
+    --berry: var(--berry-raspberry);
+  }
+
+  [data-tint="currant"] {
+    --berry: var(--berry-currant);
+  }
+
+  .berry-tint {
+    background-color: color-mix(in srgb, var(--berry) 24%, rgb(var(--sheet)));
+  }
+
+  .berry-ink {
+    color: color-mix(in srgb, var(--berry) 62%, rgb(var(--ink)));
+  }
+
   /* A row's arrow leans towards where it goes while the row is pointed at. */
   .leans {
     @apply transition-transform duration-fast ease-crisp;
