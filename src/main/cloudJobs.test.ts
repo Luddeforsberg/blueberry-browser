@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { actionApprovalFromRow, approvalFromRow, fitJobUpdate, historyFromRow, mascotFromSnapshot, mascotSnapshot } from "./cloudJobs";
+import { actionApprovalFromRow, approvalFromRow, fitJobUpdate, historyFromRow, mascotFromSnapshot, mascotSnapshot, stepsFromRow } from "./cloudJobs";
+import type { ChatStep } from "../shared/library";
 import { BERRY } from "../shared/mascots";
 
 const SCOUT = { id: "m-1", name: "Scout", instructions: "Find flights.", sites: ["sas.se"], tools: ["visit"], fromGallery: false };
@@ -104,6 +105,44 @@ describe("what a job writes to its row", () => {
     expect(fitted[0].text).toBe("Earlier steps (cut short)");
     expect(fitted.at(-1)!.text.startsWith("499 ")).toBe(true);
     expect(fitted.slice(1).every(({ text }) => length(text) === 300 && text.endsWith(" (cut short)"))).toBe(true);
+  });
+
+  it("keeps a step's kind, and never what the chat shows in its place", () => {
+    const steps: ChatStep[] = [
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click", shown: "Clicked “Add to cart, 49 kr”" },
+      { text: "Stopped here", done: true },
+    ];
+    expect(fitJobUpdate({ steps }).steps).toEqual([
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click" },
+      { text: "Stopped here", done: true },
+    ]);
+  });
+
+  it("reads back a step's kind only when it's one there is, and nothing else of the step", () => {
+    const row = [
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click", shown: "Clicked “Add to cart, 49 kr”" },
+      { text: "Did something", done: true, kind: "constructor" },
+      { text: "Waited", done: false, kind: 3, extra: "page text" },
+    ];
+    expect(stepsFromRow(row)).toEqual([
+      { text: "Opened shop.example", done: true, kind: "open" },
+      { text: "Clicked Add to cart", done: true, kind: "click" },
+      { text: "Did something", done: true },
+      { text: "Waited", done: false },
+    ]);
+  });
+
+  it("counts a step's kind in what fits", () => {
+    // 500 steps that fit with no kinds, but not with them.
+    const steps: ChatStep[] = Array.from({ length: 500 }, (_, index) => ({ text: `${index} ${"a".repeat(160)}`, done: true, kind: "search" }));
+    expect(stepsBytes(steps.map(({ text, done }) => ({ text, done })))).toBeLessThanOrEqual(100_000);
+    const fitted = fitJobUpdate({ steps }).steps!;
+    expect(stepsBytes(fitted)).toBeLessThanOrEqual(100_000);
+    expect(fitted[0].text).toBe("Earlier steps (cut short)");
+    expect(fitted.at(-1)).toEqual(steps.at(-1));
   });
 
   it("leaves out what wasn't in the update", () => {
