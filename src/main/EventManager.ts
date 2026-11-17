@@ -170,7 +170,8 @@ export class EventManager {
 
     this.handle("settings:get", () => this.mainWindow.settings);
 
-    this.handle("settings:update", (patch) => this.mainWindow.updateSettings(patch));
+    // First jobs are done by what main sees happen, so a renderer can't say so.
+    this.handle("settings:update", (patch) => this.mainWindow.updateSettings({ ...patch, firstJobsDone: this.mainWindow.settings.firstJobsDone }));
     this.handle("settings:set-appearance", (appearance) => {
       if (appearance === "system" || appearance === "light" || appearance === "dark") this.mainWindow.updateSettings({ appearance });
     });
