@@ -216,6 +216,51 @@ const WORK_SAMPLES: Array<{ label: string; view: WorkView; asking?: boolean }> =
     { label: 'Stopped', view: sampleWork([sampleTab('picture')], { outcome: 'stopped' }) },
 ]
 
+// Every berry in every mood, at each size where its detail changes, and in everything it can wear (DESIGN.md section 9).
+const BERRY_SIZES = [112, 64, 48, 40, 28, 22, 18, 14]
+const BerryGrid: React.FC<{ dark: boolean; still: boolean }> = ({ dark, still }) => (
+    <div data-berry-grid={dark ? 'dark' : 'light'} className={cn('mt-4 p-5 rounded-tile bg-ground text-ink overflow-x-auto', dark ? 'dark' : 'light')}>
+        <p className={LABEL}>Every berry, {dark ? 'dark' : 'light'}</p>
+        <table className="mt-3 border-separate border-spacing-x-1.5 border-spacing-y-1">
+            <thead>
+                <tr>
+                    <th />
+                    {MOODS.map((mood) => (
+                        <th key={mood} className="font-mono text-11 font-normal text-ink-3">{mood}</th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody>
+                {PALETTES.map(({ id, label }) => (
+                    <tr key={id}>
+                        <th className="pr-2 text-left text-12 font-normal text-ink-2">{label}</th>
+                        {MOODS.map((mood) => (
+                            <td key={mood} className="text-center">
+                                <Mascot look={{ palette: id, accessory: 'none' }} name={label} mood={mood} size={48} still={still} className="inline-block" />
+                            </td>
+                        ))}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+        <div className="mt-5 flex flex-col gap-3">
+            {PALETTES.map(({ id, label }) => (
+                <div key={id} className="flex flex-wrap items-end gap-3">
+                    {BERRY_SIZES.map((size) => (
+                        <Mascot key={size} look={{ palette: id, accessory: 'none' }} name={label} size={size} still={still} />
+                    ))}
+                    {ACCESSORIES.filter(({ id: accessory }) => accessory !== 'none').map(({ id: accessory }) => (
+                        <Mascot key={accessory} look={{ palette: id, accessory }} name={label} size={48} still={still} />
+                    ))}
+                    {ACCESSORIES.filter(({ id: accessory }) => accessory !== 'none').map(({ id: accessory }) => (
+                        <Mascot key={accessory} look={{ palette: id, accessory }} name={label} size={18} still={still} />
+                    ))}
+                </div>
+            ))}
+        </div>
+    </div>
+)
+
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <section className="mt-10">
         <h2 className="text-20 font-semibold">{title}</h2>
@@ -284,6 +329,9 @@ export const GalleryPage: React.FC = () => {
                     <div className="mt-4 flex items-center gap-3 text-13 text-ink-2">
                         <Mascot size={24} hidden /> Hide Berry replaces it with a plain icon.
                     </div>
+                    {[false, true].map((dark) => (
+                        <BerryGrid key={String(dark)} dark={dark} still={still} />
+                    ))}
                 </Section>
 
                 <Section title="Pips">
