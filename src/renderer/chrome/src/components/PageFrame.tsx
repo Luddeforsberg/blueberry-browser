@@ -44,11 +44,13 @@ export const BETWEEN = "relative before:content-[''] before:absolute before:righ
 export const LINE_BETWEEN = cn(BETWEEN, 'before:right-2 [.row-on:hover+&]:before:hidden [.row-on:focus-visible+&]:before:hidden [.row-on:has(:focus-visible)+&]:before:hidden')
 
 // Nothing to show: the mascot where the page is about it, and one sentence, in the middle of the page with no sheet.
-// Never an empty page with a heading.
-export const EmptyPage: React.FC<{ face?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ face, className, children }) => (
+// Never an empty page with a heading. Where something went wrong, a title at 20px says what, and the way on is under it.
+export const EmptyPage: React.FC<{ face?: React.ReactNode; title?: string; actions?: React.ReactNode; className?: string; children: React.ReactNode }> = ({ face, title, actions, className, children }) => (
     <div className={cn('flex-1 min-h-[220px] pb-[8vh] flex flex-col items-center justify-center gap-3 text-center', className)}>
         {face}
+        {title && <h2 className="-mb-1.5 text-20 font-semibold">{title}</h2>}
         <p className="max-w-[420px] text-14 text-ink-2">{children}</p>
+        {actions && <div className="mt-1.5 flex flex-wrap justify-center gap-2">{actions}</div>}
     </div>
 )
 

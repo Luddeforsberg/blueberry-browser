@@ -413,6 +413,11 @@ export class Window {
         if (this.tabCount === 1) this.openPage("new-tab");
         this.closeTab(review.id, false);
       },
+      // The new tab says what to do while watching is on, so one already in front is used.
+      openStart: () => {
+        const front = this.activeEntry;
+        if (!(front instanceof InternalTab && front.page === "new-tab")) this.openPage("new-tab");
+      },
       hasModel,
       // Page labels go in this, and a careless page may have put a code from the phone in one.
       write: (system, data) => writeWithCheapModel(system, this.chats.withoutCodes(data)),

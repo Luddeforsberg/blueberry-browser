@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import type { TabInfo } from '@shared/ipc'
+import { Search } from 'lucide-react'
+import type { TabInfo, Visit } from '@shared/ipc'
 import type { MascotProfile, NeedsYouItem, Suggestion } from '@shared/library'
 import { BERRY_ID, permissionsInWords } from '@shared/mascots'
 import { firstJobRows, PLAIN_WORDS, type FirstJob } from '@shared/firstRun'
@@ -22,11 +23,85 @@ import { suggestionRows, type SuggestionRow } from '../newTabSuggestions'
 import { useAttachments } from '../useAttachments'
 import { BoxChips, useAddMenu } from '../components/BoxAttachments'
 import { useRecording } from '../components/ShowBerry'
+import { Favicon } from '../components/Favicon'
+import { startingSites } from '../startingSites'
 import { FIRST_JOB_PROMPT, FirstJobs } from '../components/FirstJobs'
 import { setGalleryView } from '../galleryView'
 import { openSettings } from '../openSettings'
 
 // DESIGN.md section 10, New tab: no page yet, so no sheet. The well, the greeting, the prompt box, and what's real under it.
+
+// The well's dot grid, which never sits behind text: it fades out in a round towards the middle, wide enough to clear the
+// box and the lists, so it shows in the corners and softly along the edges.
+const WELL_DOTS = (
+    <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_66%_84%_at_50%_54%,transparent_0,transparent_48%,#000_86%)]"
+    />
+)
+
+// DESIGN.md section 10, Show Berry how: started from one of our own pages, which aren't watched, a new tab says what to
+// do while watching is on, in place of the greeting, the box and the lists, so nothing on it offers to ask anything.
+// Going somewhere from it is going there from the address field, and this tab becomes the page the job starts on.
+const ShowMeHow: React.FC<{ tab: TabInfo }> = ({ tab }) => {
+    const [text, setText] = useState('')
+    const [visits, setVisits] = useState<Visit[]>([])
+    const { pinned } = useLibrary()
+    const isBerry = useAssistantName() !== 'Assistant'
+    useEffect(() => {
+        void window.chromeAPI.browser.searchHistory({}).then(({ entries }) => setVisits(entries))
+    }, [])
+    const go = (url: string) => void window.chromeAPI.browser.navigateTab(tab.id, url)
+    const sites = startingSites(pinned, visits)
+
+    return (
+        <div className="relative h-full">
+            {WELL_DOTS}
+            <div className="absolute inset-0 overflow-y-auto [container-type:size]">
+                <div className="min-h-full flex flex-col items-center px-6 pt-[max(48px,calc(43cqh-150px))] pb-12 text-center">
+                    <Berry mood="curious" size={56} />
+                    <h1 className="mt-3 text-20 font-semibold text-ink">{isBerry ? 'Show me how.' : 'Record a routine.'}</h1>
+                    <p className="mt-2 max-w-[400px] text-14 text-ink-2">
+                        {isBerry
+                            ? 'Go to where the job starts and do it once. I note what you click and type as steps, and never a password.'
+                            : 'Go to where the job starts and do it once. What you click and type is noted as steps, never a password.'}
+                    </p>
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault()
+                            if (text.trim()) go(toUrl(text))
+                        }}
+                        className="mt-4 w-full max-w-[420px] h-11 px-3.5 flex items-center gap-2.5 rounded-[14px] bg-sheet shadow-chip text-left focus-within:ring-2 focus-within:ring-focus"
+                    >
+                        <Search aria-hidden className="size-[15px] shrink-0 text-ink-3" strokeWidth={1.75} />
+                        <input
+                            aria-label="Where does it start?"
+                            placeholder="Where does it start?"
+                            value={text}
+                            onChange={(event) => setText(event.target.value)}
+                            spellCheck={false}
+                            autoFocus
+                            className="flex-1 min-w-0 h-full bg-transparent text-15 text-ink caret-ink outline-none placeholder:text-faint"
+                        />
+                    </form>
+                    {sites.length > 0 && (
+                        <ul aria-label="Places to start" className="mt-3 flex flex-wrap justify-center gap-2">
+                            {sites.map(({ site, url, favicon }) => (
+                                <li key={site}>
+                                    <Button variant="raised" size="sm" className="text-13" onClick={() => go(url)}>
+                                        <Favicon src={favicon} site={site} />
+                                        {site}
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <p className="mt-3 text-13 text-ink-3">Or go to a tab you already have open.</p>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 // DESIGN.md section 10, Choosing a mascot: the old one's eyes shut, the new one pops in at 120ms with the pips for a
 // face, and its eyes open at 420ms. Held still, it's a short fade. Choosing again partway starts over from there.
@@ -234,14 +309,11 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const asking = new Set(library.needsYou.map(({ id }) => id))
     const rows = suggestionRows({ chats: library.chats, asking, suggestions, flock, examples, chosenAtOpen })
 
+    if (recording) return <ShowMeHow tab={tab} />
+
     return (
         <div className="relative h-full">
-            {/* The well's dot grid, which never sits behind text: it fades out in a round towards the middle, wide enough
-                to clear the box and the lists, so it shows in the corners and softly along the edges. */}
-            <div
-                aria-hidden
-                className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,var(--dot)_1px,transparent_1.3px)] bg-[length:14px_14px] [mask-image:radial-gradient(ellipse_66%_84%_at_50%_54%,transparent_0,transparent_48%,#000_86%)]"
-            />
+            {WELL_DOTS}
             {/* Placed by the page area's own height, not the window's: the box's middle at 43% of it, and the greeting
                 never nearer the top than 48px. 127px is from the greeting's top to the middle of the empty box. The lists
                 flow on under it. */}

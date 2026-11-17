@@ -16,6 +16,8 @@ interface RecordingsDeps {
   activeTab: () => Tab | null;
   openReview: () => void;
   closeReview: () => void;
+  // Somewhere to begin, for a start from one of our own pages, where nothing can be watched.
+  openStart: () => void;
   hasModel: () => boolean;
   write: (system: string, data: string) => Promise<string>;
 }
@@ -65,6 +67,7 @@ export class Recordings {
 
   start(): boolean {
     if (this.isRecording) return false;
+    const fromOurPage = !this.deps.activeTab();
     // An earlier trail still being gone through goes now, along with its page.
     this.deps.closeReview();
     this.drafting++;
@@ -76,6 +79,12 @@ export class Recordings {
     this.current = null;
     this.onOurPage = false;
     this.timer = setTimeout(() => void this.stop("time"), MAX_RECORDING_MS);
+    // Otherwise nothing seems to happen, and closing the review may have brought forward a tab the job isn't in.
+    // Watching is on before it opens, so it opens saying what to do.
+    if (fromOurPage) {
+      this.publish();
+      this.deps.openStart();
+    }
     const tab = this.deps.activeTab();
     this.sync();
     // Where it starts from is where the job starts from.
