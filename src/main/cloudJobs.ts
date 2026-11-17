@@ -1,6 +1,6 @@
 import type { ReplyMessage } from "./agent";
 import type { ActionApproval } from "../shared/ipc";
-import type { ChatApproval, ChatStep, MascotProfile } from "../shared/library";
+import { STEP_KINDS, type ChatApproval, type ChatStep, type MascotProfile, type StepKind } from "../shared/library";
 import { BERRY, BERRY_ID, normaliseSite, parseMascotDraft } from "../shared/mascots";
 import { fitHistory, type MascotSnapshot } from "../shared/phone";
 
@@ -39,11 +39,16 @@ export const mascotFromSnapshot = (input: unknown): MascotProfile | null => {
 // The chat before the newest message, in the words the model got it, trimmed to fit the row. Anything else is dropped.
 export const historyFromRow = (input: unknown): ReplyMessage[] => fitHistory(input);
 
+// A step's kind picks its pips on the phone and in a runner chat. Only a kind there is goes along, and nothing else of a
+// step does: `shown` has page text in it, so it never leaves the computer.
+const isStepKind = (kind: unknown): kind is StepKind => STEP_KINDS.some((known) => known === kind);
+const kindOf = (kind: unknown): { kind?: StepKind } => (isStepKind(kind) ? { kind } : {});
+
 export const stepsFromRow = (input: unknown): ChatStep[] =>
   (Array.isArray(input) ? input : [])
     .filter((step) => typeof step?.text === "string")
     .slice(-MAX_STEPS)
-    .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true }));
+    .map((step) => ({ text: String(step.text).slice(0, MAX_STEP_TEXT), done: step.done === true, ...kindOf(step.kind) }));
 
 // The database's own limits on what a job writes: `reply_shape`, `error_shape` and `steps_shape` in the migrations. A
 // write over any of them is refused whole, so every one is cut to fit here, and says so, and how a job ended is always
@@ -62,11 +67,11 @@ const fitText = (text: string, max: number): string => {
 };
 
 // A step's bytes as Postgres writes the array out, which puts a space after each colon and comma, with its separator.
-const stepBytes = (step: ChatStep) => utf8.encode(JSON.stringify(step)).length + 5;
+const stepBytes = (step: ChatStep) => utf8.encode(JSON.stringify(step)).length + 2 * Object.keys(step).length - 1 + 2;
 
 // The latest steps that fit, after a note that earlier ones were left out.
 const fitSteps = (steps: ChatStep[]): ChatStep[] => {
-  const fitted = steps.map(({ text, done }) => ({ text: fitText(text, MAX_STEP_TEXT), done }));
+  const fitted = steps.map(({ text, done, kind }) => ({ text: fitText(text, MAX_STEP_TEXT), done, ...kindOf(kind) }));
   const sizes = fitted.map(stepBytes);
   let bytes = 2 + sizes.reduce((sum, size) => sum + size, 0);
   if (fitted.length <= MAX_STEPS && bytes <= MAX_STEPS_BYTES) return fitted;

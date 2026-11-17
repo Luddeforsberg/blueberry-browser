@@ -15,7 +15,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
 | `pnpm exec electron-builder --dir` | Package an unsigned app into `dist/` |
 | `pnpm run eval` | Run Berry on real websites with the real model, which costs money. See `evals/README.md` |
-| `pnpm run site:build` | Regenerate what comes from the app: in `site/`, the drawings, the phone page's poses, permission wording and checks on a row, and `src/main/pageActorArt.ts`, the bird drawn on pages. Run it after changing any of them |
+| `pnpm run site:build` | Regenerate what comes from the app: in `site/`, the drawings, the phone page's poses, pips and fonts, permission wording and checks on a row, and `src/main/pageActorArt.ts`, the bird drawn on pages. Run it after changing any of them |
 | `pnpm run icon:build` | Redraw `resources/icon.png`, the icon the app ships with, from `AppIcon.tsx`, in Electron. Run it after changing the icon's drawing or Berry's |
 | `pnpm run site:deploy` | Deploy `site/` to Netlify, as it is, with `netlify.toml`. Needs `npx netlify login` and a linked site first |
 | `pnpm run push:keys` | Print a new VAPID key pair for notifications on the phone page. See `runner/README.md` |
@@ -27,7 +27,7 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. It doesn't r
 ## How we build
 
 - **One branch and one PR per working feature, from the latest `main`.** Don't stack PRs. Each runs in its own worktree.
-- **Every PR goes through `self-check`, proof and `file-pr`.** One `review-loop` round only for changes that touch what Berry may do, permissions or secrets.
+- **Every PR goes through `self-check`, proof and `file-pr`.** `review-loop` only for changes that touch what Berry may do, permissions or secrets, for as many rounds as the size of the change calls for.
 - **Run `pnpm run verify` before filing.** It runs what CI runs on macOS. Put the result in the PR.
 - **The project manager agent merges.** It merges PRs one at a time and reruns `verify` on anything `main` has moved under.
 - **The user merges anything that lets Berry do more without asking.** Say so at the top of the PR.

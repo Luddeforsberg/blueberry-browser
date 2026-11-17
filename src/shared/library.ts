@@ -28,7 +28,9 @@ export interface ChatStep {
   kind?: StepKind;
 }
 
-export type StepKind = "open" | "read" | "scan" | "search" | "click" | "type" | "ask" | "wait";
+// Every kind there is, so a step read back from somewhere else keeps only one of these.
+export const STEP_KINDS = ["open", "read", "scan", "search", "click", "type", "ask", "wait"] as const;
+export type StepKind = (typeof STEP_KINDS)[number];
 
 // Words a mascot wrote on the way to its answer, in a message that went on to use tools, after `after` of its steps.
 // Only for the screen, like a step's `shown`: the model, history, the cloud and other apps never get them.

@@ -1,222 +1,462 @@
-/* The phone page. Only tokens from tokens.css. It's an app on the phone, not a picture of the window, so there's no
-   frame and no card: an app bar on top, the screen on `canvas` with 20px gutters, plain lines split by `border`, and any
-   bar that sends pinned to the bottom. See On the phone in DESIGN.md. */
+/* The phone page (On the phone in DESIGN.md), from tokens.css only. One column, at most 430px and centred, every
+   control 44px or taller, clear of the notch and the home indicator. Home, signing in and a page taken over are on
+   `ground`, a job is on `sheet`, and sheets rise from the bottom. */
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/geist-latin-wght-normal.woff2") format("woff2-variations"), url("../fonts/geist-latin-wght-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/geist-mono-latin-wght-normal.woff2") format("woff2-variations"), url("../fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+}
+
+/* What this page needs beyond the tokens, made of them. The glass is the pill on a web page (Over a web page in
+   DESIGN.md), dark with light words in either look. */
+:root {
+  --column: 430px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --veil: rgb(var(--ink) / .38);
+  --glass: rgb(var(--ink) / .72);
+  --on-glass: rgb(var(--ground));
+  --on-tile: rgb(var(--sheet));
+  --knob: rgb(var(--sheet));
+}
+.dark {
+  --veil: rgb(var(--ground) / .72);
+  --glass: rgb(var(--ground) / .78);
+  --on-glass: rgb(var(--ink));
+  --on-tile: rgb(var(--ink));
+  --knob: rgb(var(--ink));
+}
+
 * { box-sizing: border-box; }
-:root { --gutter: 20px; --column: 560px; }
-html { background: rgb(var(--ground)); color: rgb(var(--ink)); }
+html { background: rgb(var(--ground)); }
 body {
   margin: 0;
   min-height: 100dvh;
   background: rgb(var(--ground));
-  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
+  color: rgb(var(--ink));
+  font-family: "Geist", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 21px;
+  letter-spacing: -0.006em;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
-#app { min-height: 100dvh; display: flex; flex-direction: column; }
-p, h1, h2, h3, ol, ul { margin: 0; }
+h1, h2, h3, p, ol, ul { margin: 0; }
 ol, ul { padding: 0; list-style: none; }
-button, input, textarea { font: inherit; color: inherit; }
-svg { display: block; overflow: visible; }
+button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; }
+a { color: inherit; }
+[hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }
+.mono, .t, .fold, .exact, .ask-count { font-family: "Geist Mono", ui-monospace, monospace; letter-spacing: 0; }
 
-/* The app bar: the page's own, the width of the screen, with its contents on the column's edges, under the status bar
-   and clear of the notch. */
-.top {
-  position: sticky; top: 0; z-index: 2;
-  display: flex; align-items: center; gap: 8px;
-  min-height: calc(52px + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) max(var(--gutter) - 8px, env(safe-area-inset-right), calc((100% - var(--column)) / 2 + var(--gutter) - 8px)) 0 max(var(--gutter) - 8px, env(safe-area-inset-left), calc((100% - var(--column)) / 2 + var(--gutter) - 8px));
-  background: rgb(var(--ground) / 0.88);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid var(--line);
+.icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.w { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sep { display: inline-block; flex: none; width: 3px; height: 3px; margin: 0 7px; border-radius: 50%; background: currentColor; opacity: .5; vertical-align: 3px; }
+.pips.ask, .mk.ask { color: rgb(var(--ask)); }
+
+/* Mascots, drawn from poses.js at these sizes. */
+.bird { display: block; flex: none; }
+.bird svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.s28 { width: 28px; height: 28px; }
+.s32 { width: 32px; height: 32px; }
+.s40 { width: 40px; height: 40px; }
+.s48 { width: 48px; height: 48px; }
+.s52 { width: 52px; height: 52px; }
+.s72 { width: 72px; height: 72px; }
+.s84 { width: 84px; height: 84px; }
+.s96 { width: 96px; height: 96px; }
+
+/* The dot grid, fading down from the top. It's a mask, so the black here is only how much shows. */
+.dots {
+  position: absolute; inset: 0 0 auto 0; height: 330px; pointer-events: none;
+  background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px);
+  background-size: 18px 18px; background-position: 9px 9px;
+  -webkit-mask-image: linear-gradient(#000 10%, transparent 96%); mask-image: linear-gradient(#000 10%, transparent 96%);
 }
-.top .title { flex: 1; min-width: 0; padding-left: 8px; font-size: 16px; font-weight: 600; }
-/* After a way back, the title is centred on the bar, as an app's is, so it never reads on from "Jobs". */
-.top .back + .title { position: absolute; left: 88px; right: 88px; padding: 0; text-align: center; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.top .title ~ .button { margin-left: auto; }
-/* An action on the bar is a word, like the way back, so its text keeps to the gutter instead of a pill sitting past it. */
-.top .button.outline { border-color: transparent; padding: 0 8px; color: rgb(var(--ink)); font-weight: 600; }
-.top .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgb(var(--ink-2)); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--ink-2)); }
-.status-dot.off { background: rgb(var(--ink-2)); }
-.icon { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dots.tall { height: 620px; }
 
-/* The screen itself, straight on the page, in one column that also works on a desktop. The class keeps its old name
-   only because app.js draws it. */
-.card {
-  flex: 1;
-  width: 100%;
-  max-width: var(--column);
-  margin: 0 auto;
-  padding: 20px max(var(--gutter), env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+/* --- Buttons (DESIGN.md section 8). Anything drawn under 44px reaches 44px with an edge nobody sees. --- */
+.btn {
+  position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 15px; border: 0; border-radius: 999px; white-space: nowrap;
+  font-size: 15px; font-weight: 500; color: rgb(var(--ink)); background: none; text-decoration: none;
+}
+.btn.sm { height: 34px; padding: 0 14px; font-size: 14px; }
+.btn.big { height: 52px; font-size: 16px; font-weight: 600; }
+.btn.wide { width: 100%; }
+.btn.fill { background: rgb(var(--ink)); color: rgb(var(--ground)); box-shadow: var(--shadow-filled); }
+.btn.raised { background: rgb(var(--card)); box-shadow: var(--shadow-chip); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.sm::after, .send::after, .chip::after, .who::after, .site::after, .live-grow::after, .switch::before { content: ""; position: absolute; inset: -5px; }
+.site::after { inset: -6px; }
+.live-grow::after, .switch::before { inset: -7px; }
+.round {
+  flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%;
+  background: rgb(var(--card)); box-shadow: var(--shadow-chip); color: rgb(var(--ink));
+}
+.round.soft { background: rgb(var(--sheet-2)); box-shadow: none; color: rgb(var(--ink-2)); }
+.round.soft .icon { width: 16px; height: 16px; }
+.ghost {
+  display: inline-flex; align-items: center; gap: 5px; height: 44px; padding: 0 9px; border: 0; border-radius: 999px;
+  background: none; font-size: 13.5px; color: rgb(var(--ink-2));
+}
+.ghost .icon { width: 14px; height: 14px; }
+.ghost .swap { display: contents; }
+.stop-square { display: block; width: 9px; height: 9px; border-radius: 2.5px; background: rgb(var(--ink)); }
+.btn, .round, .send, .chip, .who, .ghost, .face, .stand, .askcard, .site, .switch, .pic {
+  transition: transform 100ms var(--ease), background-color 100ms var(--ease);
+}
+.btn:active:not(:disabled), .round:active, .send:active, .chip:active, .who:active, .ghost:active, .face:active, .stand:active, .askcard:active, .site:active, .pic:active { transform: scale(.96); }
+@media (hover: hover) {
+  .btn.raised:hover, .round:hover, .chip:hover, .site:hover { background: linear-gradient(var(--hover), var(--hover)), rgb(var(--card)); }
+  .ghost:hover, .row:hover { background: var(--hover); }
 }
 
-h1 { font-size: 28px; font-weight: 600; line-height: 1.15; letter-spacing: -0.015em; }
-h2 { font-size: 14px; font-weight: 600; padding: 32px 0 8px; }
-h2:first-child { padding-top: 0; }
-.muted { font-size: 14px; color: rgb(var(--ink-2)); }
-.small { font-size: 12px; color: rgb(var(--ink-2)); }
-.warning { color: rgb(var(--ask)); }
-.gap { margin-top: 16px; }
-.answer { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.answer .actions { margin-top: 4px; }
-
-/* Buttons: full radius, filled only for a decision or the main action. */
-.button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid transparent;
-  background: rgb(var(--ink)); color: rgb(var(--ground));
-  font-size: 16px; cursor: pointer; text-decoration: none;
-  transition: background-color 100ms cubic-bezier(.32, .72, 0, 1), filter 100ms;
+/* --- The prompt box: a card set into a shell. --- */
+.shell { padding: 4px; border-radius: 30px; background: rgb(var(--tray)); }
+.box {
+  display: flex; align-items: center; gap: 8px; min-height: 54px; padding: 8px 8px 8px 10px;
+  border-radius: 26px; background: rgb(var(--card)); box-shadow: var(--shadow-card-lift);
 }
-.button:active { filter: brightness(0.9); }
-.button.outline { background: transparent; color: rgb(var(--ink)); border-color: var(--line); }
-.button.outline:hover { background: rgb(var(--sheet-2)); }
-.button.quiet { background: transparent; color: rgb(var(--ink-2)); padding: 0 8px; }
-.button.quiet.small { min-height: 28px; font-size: 12px; }
-.button.quiet:hover { background: rgb(var(--sheet-2)); color: rgb(var(--ink)); }
-.button.wide { width: 100%; min-height: 44px; font-size: 16px; }
-.button.icon-only { width: 44px; padding: 0; }
-.button.back { gap: 2px; padding-left: 4px; color: rgb(var(--ink)); font-size: 16px; }
-.button:focus-visible, a:focus-visible, .row:focus-visible, .perch button:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
-.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-
-/* Birds. The drawing comes from poses.js with its palette set on it. */
-.bird svg { width: 100%; height: 100%; }
-.bird { flex-shrink: 0; }
-.bird.s24 { width: 28px; height: 28px; margin-top: -2px; }
-.bird.s28 { width: 32px; height: 32px; margin-top: -4px; }
-
-/* Signing in: Berry standing on a wire over the heading, in the top third, where the keyboard leaves it in view. */
-.signin { flex: 1; display: flex; flex-direction: column; }
-.signin .card { flex: none; padding-top: calc(max(48px, 10dvh) + env(safe-area-inset-top)); }
-.signin .perched { height: calc(104px * 113 / 120); margin-bottom: 28px; border-bottom: 1.5px solid rgb(var(--ink-2) / 0.45); }
-.signin .perched .bird { display: block; width: 104px; height: 104px; }
-.signin .lead { margin-top: 8px; font-size: 16px; }
-form { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
-label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
-.field {
-  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid var(--line); background: rgb(var(--sheet)); font-size: 16px; outline: none;
+.who {
+  position: relative; flex: none; display: flex; align-items: center; gap: 1px; height: 38px; padding: 0 5px;
+  border: 0; border-radius: 999px; background: rgb(var(--card-2)); color: rgb(var(--ink-3));
 }
-.field:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 0; }
-form label { font-weight: 600; }
-form .button.wide { margin-top: 8px; }
-.signin .foot { margin-top: 16px; }
-
-/* The composer on the list: the bird you'd send stands on its top edge. Pressing it starts a job. */
-.composer-wrap { position: relative; padding-top: 40px; }
-.composer-wrap .perched { position: absolute; top: 0; right: 24px; width: 56px; height: 56px; }
-.composer {
-  display: flex; align-items: flex-end; gap: 4px; width: 100%; padding: 8px 8px 8px 16px;
-  border-radius: 26px; border: 1px solid var(--line); background: rgb(var(--sheet)); box-shadow: var(--shadow-rim);
-  text-align: left; cursor: text; color: inherit; text-decoration: none;
+.who.lone { background: none; padding: 0 2px; }
+.who .icon { width: 13px; height: 13px; }
+.box-words {
+  flex: 1; min-width: 0; height: 38px; padding: 0 0 0 4px; border: 0; background: none; text-align: left;
+  font-size: 16px; color: rgb(var(--faint)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.composer .placeholder { flex: 1; padding: 6px 0; color: rgb(var(--ink-2)); }
-.composer textarea { flex: 1; min-height: 96px; padding: 6px 0; border: 0; background: transparent; resize: none; outline: none; font-size: 16px; }
-.composer textarea::placeholder { color: rgb(var(--ink-2)); }
+.box-words.typed { color: rgb(var(--ink)); }
 .send {
-  width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  border-radius: 999px; border: 0; background: rgb(var(--ink)); color: rgb(var(--ground));
+  position: relative; flex: none; display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%;
+  background: rgb(var(--ink)); color: rgb(var(--ground)); box-shadow: var(--shadow-filled);
 }
-.send.off { background: rgb(var(--sheet-2)); color: rgb(var(--ink-2)); }
-
-/* Lists: plain rows split by lines, like Needs you. */
-.rows > li { border-top: 1px solid var(--line); }
-.rows > li:last-child { border-bottom: 1px solid var(--line); }
-.row { display: flex; gap: 12px; min-height: 56px; padding: 14px 0; color: inherit; text-decoration: none; }
-.row .body { flex: 1; min-width: 0; }
-.row .ask { font-size: 16px; }
-.row .prompt { font-size: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.row .meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: rgb(var(--ink-2)); }
-.row .meta.warning { color: rgb(var(--ask)); }
-.row .chev { align-self: center; color: rgb(var(--ink-2)); }
-
-/* Exactly what will happen, in full, never cut. */
-.exactly { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgb(var(--tray)); font-size: 13px; color: rgb(var(--ink-2)); white-space: pre-wrap; }
-
-/* A job. */
-.bubble { max-width: 85%; margin-left: auto; padding: 10px 16px; border-radius: 22px; background: rgb(var(--sheet-2)); white-space: pre-wrap; }
-.who { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
-.who b { font-weight: 600; }
-.says { display: flex; gap: 12px; margin-top: 16px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.says .body { flex: 1; min-width: 0; }
-.says h3 { font-size: 16px; font-weight: 400; }
-.says .note { margin-top: 4px; font-size: 13px; color: rgb(var(--ink-2)); }
-
-.runner-head { display: flex; align-items: center; gap: 8px; margin-top: 24px; font-size: 13px; }
-.runner-head b { font-weight: 600; }
-.live { position: relative; margin-top: 8px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; border: 1px solid var(--line); background: rgb(var(--tray)); }
-.live.yours { aspect-ratio: 3 / 4; box-shadow: 0 0 0 2px rgb(var(--ask)); border-color: transparent; }
-.live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.live iframe.locked { pointer-events: none; }
-.live-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 13px; color: rgb(var(--ink-2)); }
-.lockline { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.lockline p { flex: 1; min-width: 0; font-size: 13px; color: rgb(var(--ink-2)); }
-.lockline .icon { color: rgb(var(--ink-2)); }
-
-/* Steps: a footprint for each done, the berry on the one it's on now. */
-.steps { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; font-size: 14px; color: rgb(var(--ink-2)); }
-.steps li { display: flex; align-items: center; gap: 12px; }
-.steps .foot { width: 16px; height: 16px; color: rgb(var(--ink)); fill: currentColor; }
-.steps .now { color: rgb(var(--ink)); }
-.dot { width: 10px; height: 10px; margin: 3px; border-radius: 50%; background: var(--berry-blueberry); }
-.shimmer {
-  background: linear-gradient(90deg, rgb(var(--ink-2) / 0.55) 20%, rgb(var(--ink)) 38%, rgb(var(--ink)) 50%, rgb(var(--ink)) 62%, rgb(var(--ink-2) / 0.55) 80%);
-  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: shimmer 1300ms linear infinite;
+.send.off { background: rgb(var(--card-2)); color: rgb(var(--faint)); box-shadow: none; }
+.box.tall { align-items: flex-end; min-height: 128px; padding: 14px 8px 8px 16px; }
+.start-box, .follow-box {
+  flex: 1; min-width: 0; padding: 0; border: 0; outline: none; resize: none; background: none;
+  font-size: 16px; line-height: 22px; color: rgb(var(--ink));
 }
-@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
-.reply { margin-top: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.reply a { color: rgb(var(--ink)); text-decoration: underline; text-underline-offset: 2px; }
-/* A conversation: each job's exchange in turn, and the box to go on under the last once it's over. */
-.exchange + .exchange { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--line); }
-/* Going on: the box sits at the bottom of the screen, as a messaging app's does, over a bar the width of the screen. */
-.follow {
-  position: sticky; bottom: 0; gap: 8px;
-  margin: 32px calc(-1 * max(var(--gutter), env(safe-area-inset-right))) calc(-32px - env(safe-area-inset-bottom)) calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
-  padding: 12px max(var(--gutter), env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-  background: rgb(var(--ground));
-  border-top: 1px solid var(--line);
+.start-box { align-self: stretch; min-height: 98px; max-height: 40dvh; }
+.follow-box { align-self: center; padding: 8px 0 8px 4px; max-height: 30dvh; }
+.start-box::placeholder, .follow-box::placeholder, .field::placeholder { color: rgb(var(--faint)); }
+
+/* Words of ours that say what went wrong, what's needed, or what just happened. */
+.problem { margin: 8px 6px 0; font-size: 14px; line-height: 20px; color: rgb(var(--ask)); }
+.note, .dock-note { margin: 0 6px 12px; font-size: 13px; line-height: 18px; color: rgb(var(--ink-2)); }
+.dock-note { margin: 8px 8px 0; text-align: center; }
+.said { margin: 16px 16px 0; text-align: center; font-size: 14px; color: rgb(var(--ink-2)); }
+
+/* --- Home --- */
+.screen { position: relative; max-width: var(--column); margin: 0 auto; }
+.home { min-height: 100dvh; padding: env(safe-area-inset-top) 0 calc(170px + env(safe-area-inset-bottom)); }
+.home-top { position: relative; }
+.hello { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px 0 22px; }
+.hello.bare { justify-content: flex-end; }
+h1 { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -0.025em; }
+.status { margin-top: 3px; font-size: 15px; line-height: 21px; color: rgb(var(--ink-2)); }
+.status.problem { margin: 3px 0 0; color: rgb(var(--ask)); }
+.askc { color: rgb(var(--ask)); font-weight: 500; }
+.me { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin-top: -5px; padding: 0; border: 0; border-radius: 50%; background: none; }
+.me span, .acct-me {
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  background: rgb(var(--card)); box-shadow: var(--shadow-chip); font-size: 14px; font-weight: 600; color: rgb(var(--ink));
 }
-.follow .composer { box-shadow: none; }
-.follow textarea { min-height: 44px; }
+.acct-me { flex: none; width: 46px; height: 46px; background: rgb(var(--sheet-2)); box-shadow: none; font-size: 17px; }
 
-/* Settings: plain sections split by lines, as in the window. */
-.setting { padding: 20px 0; }
-.setting + .setting { border-top: 1px solid var(--line); }
-.setting:first-child { padding-top: 4px; }
-.setting h2 { padding: 0 0 12px; }
-.setting .lockline { margin-top: 0; }
-.segmented { display: flex; padding: 2px; border-radius: 999px; background: rgb(var(--sheet-2)); }
-.segmented button { flex: 1; min-height: 40px; border: 0; border-radius: 999px; background: none; font-size: 14px; color: rgb(var(--ink-2)); cursor: pointer; }
-.segmented [aria-checked="true"] { background: rgb(var(--sheet)); color: rgb(var(--ink)); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
-.segmented button:focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
-
-/* Starting a job: the flock stands on a wire, and the one going stands up. */
-.perch { position: relative; display: flex; gap: 4px; overflow-x: auto; padding: 8px 0 0; margin: 0 calc(-1 * var(--gutter)); padding-inline: var(--gutter); scrollbar-width: none; }
-.perch::after { content: ""; position: absolute; left: 0; right: 0; top: 72px; height: 1.5px; background: rgb(var(--ink-2) / 0.45); }
-.perch button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; flex-shrink: 0; padding: 0 0 6px; border: 0; border-radius: 12px; background: none; cursor: pointer; }
-.perch .bird { width: 64px; height: 64px; }
-.perch .name { font-size: 13px; color: rgb(var(--ink-2)); padding-bottom: 2px; border-bottom: 2px solid transparent; }
-.perch [aria-pressed="true"] .name { color: rgb(var(--ink)); font-weight: 600; border-bottom-color: rgb(var(--ink)); }
-.can { margin-top: 12px; }
-.can li { font-size: 14px; padding: 1px 0; }
-/* Starting a job: the box first, the flock under it, and Send pinned at the bottom within reach of a thumb. */
-.start { display: flex; flex-direction: column; padding-bottom: 0; }
-.start .composer { margin-top: 0; }
-.start .foot { margin-top: 12px; }
-.send-bar {
-  position: sticky; bottom: 0;
-  margin: auto calc(-1 * max(var(--gutter), env(safe-area-inset-right))) 0 calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
-  padding: 12px max(var(--gutter), env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
-  background: rgb(var(--ground));
-  border-top: 1px solid var(--line);
+/* The flock: each face in its mood, the chosen one ringed with a gap. More than fit scroll sideways. */
+.flock { position: relative; display: flex; gap: 6px; padding: 18px 16px 4px; overflow-x: auto; scrollbar-width: none; }
+.flock::-webkit-scrollbar { display: none; }
+.face {
+  flex: none; display: flex; flex-direction: column; align-items: center; gap: 5px; width: 68px; padding: 0; border: 0;
+  background: none; font-size: 12.5px; line-height: 16px; color: rgb(var(--ink-2));
 }
+.face .ring { display: block; padding: 4px; border-radius: 50%; }
+.face-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.face[aria-checked="true"] { color: rgb(var(--ink)); font-weight: 600; }
+.face[aria-checked="true"] .ring { box-shadow: inset 0 0 0 1.5px rgb(var(--ink)); }
 
+.lab { position: relative; display: flex; align-items: baseline; gap: 8px; margin: 20px 0 6px; padding: 0 22px; font-size: 13.5px; font-weight: 500; color: rgb(var(--ink-2)); }
+.lab span { font: 400 12px/1 "Geist Mono", ui-monospace, monospace; color: rgb(var(--ink-3)); }
+.lab.ask, .lab.ask span { color: rgb(var(--ask)); }
+
+.cards { display: flex; flex-direction: column; gap: 8px; padding: 0 12px; }
+.askcard {
+  position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 14px 14px 12px;
+  border: 0; border-radius: 22px; background: rgb(var(--card)); box-shadow: var(--shadow-up); text-align: left;
+}
+.askcard-title { font-size: 15px; line-height: 20px; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.askcard.in-job { width: auto; margin: 14px 16px 0; }
+
+.rows { padding: 0 12px; }
+.row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 10px 10px 12px; border-radius: 16px; text-decoration: none; }
+.row + .row::before { content: ""; position: absolute; left: 64px; right: 10px; top: 0; height: 1px; background: var(--line); }
+.row-title { font-size: 15px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row.dim .row-title { font-weight: 400; color: rgb(var(--ink-2)); -webkit-line-clamp: 1; }
+.row-sub { display: flex; align-items: center; min-width: 0; margin-top: 2px; font-size: 13px; line-height: 18px; color: rgb(var(--ink-3)); }
+.row-sub.now { gap: 8px; color: rgb(var(--ink-2)); }
+.row-sub.bad { color: rgb(var(--ask)); }
+.row-step, .row-how { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t { flex: none; font-size: 12px; line-height: 1; color: rgb(var(--ink-3)); }
+
+/* With nothing going on: the flock standing together over the greeting. */
+.quiet { position: relative; display: flex; flex-direction: column; align-items: center; padding: 28px 34px 8px; text-align: center; }
+.quiet.alone { justify-content: center; min-height: calc(100dvh - 58px - 170px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+.quiet .status { margin-top: 8px; font-size: 16px; line-height: 23px; }
+.stage { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 2px; margin-bottom: 22px; }
+.stage.wings { align-self: stretch; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 0; }
+.wing { display: flex; align-items: flex-end; gap: 2px; }
+.wing.left { justify-content: flex-end; }
+.stand { display: block; padding: 0; border: 0; background: none; }
+.stage .side { margin-bottom: 2px; opacity: .9; }
+.stage .side.edge { transform: scale(.8); transform-origin: 50% 100%; opacity: .75; }
+.stage .front { margin: 0 6px; }
+
+/* The box docked at the bottom, with jobs sent before over it. The list fades out behind it. */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; max-width: var(--column); margin: 0 auto;
+  padding: 26px 12px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(rgb(var(--ground) / 0), rgb(var(--ground)) 34%);
+}
+.chips {
+  display: flex; gap: 8px; margin: 0 -12px 10px; padding: 5px 14px; overflow-x: auto; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent);
+}
+.chips::-webkit-scrollbar { display: none; }
+.chips:empty { display: none; }
+.chip {
+  position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 240px; height: 34px;
+  padding: 0 13px 0 10px; border: 0; border-radius: 999px; background: rgb(var(--card)); box-shadow: var(--shadow-chip);
+  font-size: 14px; white-space: nowrap;
+}
+.chip .icon { width: 14px; height: 14px; color: rgb(var(--ink-3)); }
+.chip-words { overflow: hidden; text-overflow: ellipsis; }
+
+/* --- Sheets --- */
+.veil { position: fixed; inset: 0; z-index: 39; background: var(--veil); opacity: 0; transition: opacity 280ms var(--ease); }
+.veil.in { opacity: 1; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: var(--keyboard, 0px); z-index: 40; display: flex; flex-direction: column;
+  max-width: var(--column); max-height: calc(100dvh - var(--keyboard, 0px) - env(safe-area-inset-top) - 12px); margin: 0 auto;
+  border-radius: 34px 34px 0 0; background: rgb(var(--sheet)); box-shadow: var(--shadow-lift); outline: none;
+  transform: translateY(100%); transition: transform 280ms var(--ease);
+}
+.sheet.in { transform: none; }
+.sheet.dragging { transition: none; }
+.sheet-top { position: relative; flex: none; padding: 9px 0 6px; touch-action: none; cursor: grab; }
+.grab { display: block; width: 38px; height: 5px; margin: 0 auto; border-radius: 3px; background: var(--press); }
+.sheet-close { position: absolute; top: 10px; right: 10px; z-index: 2; }
+.sheet-body { position: relative; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px calc(20px + env(safe-area-inset-bottom)); }
+
+/* Being asked: the dot grid across its top, the mascot asking, what it wants, what it sees, the exact words. */
+.sheet.ask::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 210px; border-radius: 34px 34px 0 0; pointer-events: none;
+  background-image: radial-gradient(circle, var(--dot) 1px, transparent 1.3px); background-size: 18px 18px; background-position: 9px 9px;
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 0, #000 20%, transparent 78%); mask-image: radial-gradient(120% 100% at 50% 0, #000 20%, transparent 78%);
+}
+.ask-count { text-align: center; font-size: 12px; line-height: 16px; color: rgb(var(--ink-3)); }
+.asker { display: flex; justify-content: center; margin-top: 6px; }
+.ask-lead { margin-top: 12px; text-align: center; font-size: 15px; color: rgb(var(--ink-2)); }
+.ask-title { margin-top: 2px; padding: 0 18px; text-align: center; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.ask-note { margin-top: 10px; padding: 0 6px; text-align: center; font-size: 15px; line-height: 21px; color: rgb(var(--ink-2)); }
+.exact {
+  margin-top: 10px; padding: 11px 13px; border-radius: 12px; background: rgb(var(--card-2)); box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 12.5px; line-height: 18px; color: rgb(var(--ink-2)); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.two { display: flex; gap: 8px; margin-top: 14px; }
+.two .btn { flex: 1; min-width: 0; }
+.two .btn.wider { flex: 1.25; }
+.ask-for { display: block; margin-top: 2px; min-height: 44px; line-height: 44px; text-align: center; text-decoration: none; font-size: 13px; color: rgb(var(--ink-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-form { display: flex; flex-direction: column; margin-top: 16px; }
+.field.answer { height: auto; min-height: 48px; padding: 13px 14px; line-height: 22px; resize: none; max-height: 30dvh; }
+.ask-said { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 0 28px; }
+
+/* Starting a job. */
+.sheet.start .sheet-body { padding: 0 12px calc(12px + env(safe-area-inset-bottom)); }
+.sheet.start .lab { margin: 2px 0 0; padding: 0 10px; }
+.sheet.start .flock { padding: 8px 0 2px; }
+.sheet.start .face { width: 74px; }
+.can { display: flex; flex-direction: column; gap: 7px; margin: 12px 6px 14px; padding: 12px 14px; border-radius: 16px; background: rgb(var(--sheet-2)); font-size: 14px; line-height: 20px; color: rgb(var(--ink-2)); }
+.can li { display: flex; align-items: center; gap: 9px; }
+.can .icon { width: 15px; height: 15px; color: rgb(var(--ink-3)); }
+
+/* Settings. */
+.sheet.settings .sheet-body { padding: 0 18px calc(24px + env(safe-area-inset-bottom)); }
+.acct { display: flex; align-items: center; gap: 12px; margin-top: 6px; padding-right: 48px; }
+.acct-name { font-size: 17px; line-height: 22px; font-weight: 600; overflow-wrap: anywhere; }
+.acct-sub { font-size: 14px; color: rgb(var(--ink-2)); }
+.group h3 { margin-top: 24px; padding-bottom: 9px; border-bottom: 1px solid var(--line); font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.pics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding-top: 14px; }
+.pic { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px 0; border: 0; background: none; font-size: 14px; color: rgb(var(--ink-2)); }
+.pic[aria-checked="true"] { color: rgb(var(--ink)); font-weight: 600; }
+/* A small drawing of the page in each look, in that look's own tokens. */
+.pic-face { position: relative; display: flex; width: 100%; height: 62px; overflow: hidden; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--line); }
+.pic[aria-checked="true"] .pic-face { outline: 1.5px solid rgb(var(--ink)); outline-offset: 2px; }
+.pic-face i { position: relative; flex: 1; background: rgb(var(--ground)); }
+.pic-face i::after { content: ""; position: absolute; bottom: 9px; height: 16px; background: rgb(var(--card)); box-shadow: var(--shadow-chip); }
+.pic-face i:first-child::after { left: 12px; right: 0; border-radius: 8px 0 0 8px; }
+.pic-face i:last-child::after { left: 0; right: 12px; border-radius: 0 8px 8px 0; }
+.pic-face i:first-child::before { content: ""; position: absolute; left: 12px; top: 11px; width: 34px; height: 6px; border-radius: 3px; background: rgb(var(--ink) / .8); }
+.srow { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); }
+.group h3 + .srow { border-top: 0; }
+.srow-name { font-size: 15px; line-height: 20px; font-weight: 500; }
+.srow-sub { margin-top: 1px; font-size: 13.5px; line-height: 19px; color: rgb(var(--ink-2)); }
+.tile { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: rgb(var(--sheet-2)); color: rgb(var(--ink-2)); }
+.pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: rgb(var(--sheet-2)); font-size: 13px; font-weight: 500; color: rgb(var(--ink-2)); }
+.pill.on { color: rgb(var(--ink)); }
+.pill.on::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--focus)); }
+.switch {
+  position: relative; flex: none; width: 50px; height: 30px; padding: 0; border: 0; border-radius: 999px;
+  background: rgb(var(--sheet-2)); box-shadow: inset 0 0 0 1px var(--line);
+}
+.switch::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--knob); box-shadow: var(--shadow-chip); transition: transform 150ms var(--ease); }
+.switch[aria-checked="true"] { background: rgb(var(--focus)); box-shadow: none; }
+.switch[aria-checked="true"]::after { transform: translateX(20px); }
+.sign-out { margin-top: 20px; }
+
+/* --- The live page. Its slot is a place in what's drawn; the box over it is in #live, see live.js. --- */
+.live-slot { position: relative; overflow: hidden; border-radius: 22px; background: rgb(var(--sheet-2)); }
+.live-slot.job { height: min(262px, 38svh); margin: 2px 12px 0; box-shadow: var(--shadow-card-lift); }
+.live-slot.ask { height: 204px; margin-top: 16px; border-radius: 18px; box-shadow: 0 0 0 1px var(--line); }
+.live-slot.full { flex: 1; margin: 0 8px; }
+.live-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; font-size: 14px; line-height: 20px; color: rgb(var(--ink-2)); }
+.live-box { position: fixed; left: 0; top: 0; z-index: 5; overflow: hidden; border-radius: 22px; pointer-events: none; background: rgb(var(--sheet-2)); }
+.live-box[data-layer="2"] { z-index: 41; }
+.live-box[data-place="ask"] { border-radius: 18px; }
+.live-box.hidden { visibility: hidden; }
+.live-box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.live-box iframe[inert] { pointer-events: none; }
+.live-box.yours { pointer-events: auto; }
+.live-box.yours::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px rgb(var(--focus)); pointer-events: none; }
+.live-tag {
+  position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 9px;
+  border-radius: 999px; background: var(--glass); color: var(--on-glass); font-size: 12.5px;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.live-tag-icon { display: contents; }
+.live-tag .icon { width: 13px; height: 13px; }
+.live-grow {
+  position: absolute; right: 10px; top: 10px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0;
+  border-radius: 50%; background: var(--glass); color: var(--on-glass); pointer-events: auto;
+}
+.live-grow .icon { width: 14px; height: 14px; }
+
+/* --- A job, on a sheet: the top, the live page, the conversation, and the bar at the bottom. --- */
+.screen.job, .screen.full {
+  position: fixed; inset: 0 0 var(--keyboard, 0px) 0; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top);
+}
+.screen.job { background: rgb(var(--sheet)); }
+.screen.full { background: rgb(var(--ground)); }
+.top { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px 10px 12px; }
+.top .round { margin-right: 2px; }
+.top-name { font-size: 16px; line-height: 20px; font-weight: 600; }
+.top-sub { display: flex; align-items: center; gap: 5px; font-size: 13px; line-height: 17px; color: rgb(var(--ink-3)); }
+.top-sub.bad { color: rgb(var(--ask)); }
+.top-sub .icon { width: 13px; height: 13px; }
+.live-area { flex: none; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.talk { display: flex; flex-direction: column; padding-bottom: 16px; }
+.empty { margin: 32px 22px; text-align: center; color: rgb(var(--ink-2)); }
+.bubble {
+  align-self: flex-end; max-width: 75%; margin: 18px 16px 0; padding: 11px 15px; border-radius: 22px 22px 6px 22px;
+  background: rgb(var(--sheet-2)); font-size: 16px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.steps { position: relative; margin: 16px 20px 0; }
+.steps::before { content: ""; position: absolute; left: 7.5px; top: 14px; bottom: 14px; width: 1px; background: var(--line); }
+.step { display: flex; align-items: center; gap: 12px; min-height: 34px; padding: 3px 0; font-size: 15px; line-height: 20px; color: rgb(var(--ink-2)); }
+.mk { position: relative; flex: none; display: grid; place-items: center; width: 16px; height: 22px; background: rgb(var(--sheet)); color: rgb(var(--ink-2)); }
+.step.now .mk { color: rgb(var(--ink)); }
+.step.now .mk.ask { color: rgb(var(--ask)); }
+.st { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* The live step's words shimmer with its pips (DESIGN.md section 7). */
+.step.now .st {
+  font-weight: 500; color: transparent;
+  background: linear-gradient(90deg, rgb(var(--ink)) 40%, rgb(var(--ink-3)) 50%, rgb(var(--ink)) 60%) 100% 0 / 300% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  animation: shimmer 2.4s linear infinite;
+}
+@keyframes shimmer { to { background-position: 0 0; } }
+.fold {
+  display: flex; align-items: center; align-self: flex-start; gap: 10px; min-height: 44px; margin: 6px 20px 0; padding: 0;
+  border: 0; background: none; font-size: 12.5px; line-height: 1; color: rgb(var(--ink-3));
+}
+.fold .sep { margin: 0 -3px; }
+.fold .icon { width: 13px; height: 13px; margin-left: -4px; }
+.reply { display: flex; align-items: flex-start; gap: 10px; margin: 10px 16px 0 14px; }
+.reply .bird { margin-top: -2px; }
+.reply-words { font-size: 16px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.reply-words a { color: rgb(var(--ink)); text-decoration: underline; text-underline-offset: 2px; }
+.reply-words strong { font-weight: 600; }
+.how { margin-top: 2px; font-size: 15px; line-height: 22px; color: rgb(var(--ink-2)); }
+.how.bad { color: rgb(var(--ask)); }
+.sites { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.site {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; height: 32px; padding: 0 12px 0 8px;
+  border-radius: 999px; background: rgb(var(--card)); box-shadow: var(--shadow-chip); font-size: 13.5px; text-decoration: none;
+}
+.site span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A site's letter on a tile in a colour of its own (DESIGN.md section 8), since the phone page fetches no icons. */
+.fv { flex: none; width: 16px; height: 16px; border-radius: 4px; color: var(--on-tile); font-size: 9px; line-height: 16px; font-weight: 600; text-align: center; }
+.fv.t1 { background: var(--site-1); } .fv.t2 { background: var(--site-2); } .fv.t3 { background: var(--site-3); } .fv.t4 { background: var(--site-4); }
+.fv.t5 { background: var(--site-5); } .fv.t6 { background: var(--site-6); } .fv.t7 { background: var(--site-7); } .fv.t8 { background: var(--site-8); }
+.acts { display: flex; align-items: center; gap: 2px; margin: 6px 0 0 -9px; }
+
+.screen.job .dock { position: static; flex: none; max-width: none; margin: 0; padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); background: rgb(var(--sheet)); }
+.box.work { gap: 11px; padding: 8px 8px 8px 12px; }
+.work-title { font-size: 15px; line-height: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-sub { font-size: 13px; line-height: 17px; color: rgb(var(--ink-3)); }
+
+/* The live page full screen, and a page taken over: the user's to type in, with a ring to say so. */
+.yours-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 12px 10px; }
+.addr {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-radius: 999px;
+  background: rgb(var(--card)); box-shadow: var(--shadow-chip); font-size: 15px; font-weight: 500;
+}
+.addr .icon { width: 15px; height: 15px; color: rgb(var(--ink-3)); }
+.addr-site { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.addr em { margin-left: auto; padding-left: 8px; font-style: normal; font-weight: 400; font-size: 13px; color: rgb(var(--ink-3)); white-space: nowrap; }
+.live-area.full { flex: 1; display: flex; min-height: 0; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+.hand { flex: none; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 30px 30px 0 0; background: rgb(var(--sheet)); box-shadow: var(--shadow-lift); }
+.hand:empty { display: none; }
+.screen.full:has(.hand:not(:empty)) .live-area.full { padding-bottom: 8px; }
+.handrow { display: flex; align-items: flex-start; gap: 12px; }
+.hand-title { font-size: 16px; line-height: 21px; font-weight: 600; overflow-wrap: anywhere; }
+.hand-sub { margin-top: 3px; font-size: 13.5px; line-height: 19px; color: rgb(var(--ink-2)); }
+
+/* --- Signing in --- */
+.screen.signin { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; padding: calc(64px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
+.signin h1 { position: relative; padding: 0 20px; }
+.signin .lead { position: relative; margin: 8px 0 26px; padding: 0 22px; font-size: 16px; line-height: 23px; color: rgb(var(--ink-2)); }
+.signin .shell { position: relative; width: 100%; }
+.form { display: flex; flex-direction: column; gap: 6px; padding: 18px 16px 16px; border-radius: 26px; background: rgb(var(--card)); box-shadow: var(--shadow-card-lift); text-align: left; }
+.form label { margin-top: 8px; font-size: 14px; font-weight: 500; }
+.form label:first-child { margin-top: 0; }
+.field { width: 100%; height: 48px; padding: 0 14px; border: 0; border-radius: 14px; outline: none; background: rgb(var(--card-2)); font-size: 16px; color: rgb(var(--ink)); }
+.field:focus { background: rgb(var(--card)); box-shadow: 0 0 0 2px rgb(var(--focus)); }
+.field-wrap { position: relative; }
+.field-wrap .field { padding-right: 52px; }
+.eye { position: absolute; right: 2px; top: 2px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: none; color: rgb(var(--ink-3)); }
+.form .problem { margin: 4px 2px 0; }
+.form .btn { margin-top: 14px; }
+.signin .foot { position: relative; margin-top: 16px; font-size: 13px; color: rgb(var(--ink-3)); }
+
+/* Less motion: sheets appear and go, and the live step's words stop shimmering. tokens.css cuts every animation and
+   transition short, which leaves the pips on their first frame. */
 @media (prefers-reduced-motion: reduce) {
-  .shimmer { animation: none; color: rgb(var(--ink)); background: none; }
+  .step.now .st { animation: none; background: none; color: rgb(var(--ink)); }
 }

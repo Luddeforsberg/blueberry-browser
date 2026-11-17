@@ -1,4 +1,5 @@
 import React from "react";
+import type { StepKind } from "@shared/library";
 import { cn } from "../lib/utils";
 import { useFrame, useStill } from "./motion";
 
@@ -60,6 +61,26 @@ const PIP_OFF = 0.16;
 export const pipFrames = (pattern: PipPattern): { frames: Frame[]; ms: number } => ({ frames: MOVING[pattern], ms: SPEED_MS[pattern] });
 
 const strength = (value: number, off: number) => off + (1 - off) * value;
+
+// How strong each dot is in each frame, as drawn, for the phone page, which draws them without React. A mark has one.
+export const pipOpacities = (pattern: PipPattern | PipMark): { frames: number[][]; ms: number } => {
+  const moving = pattern in MOVING ? MOVING[pattern as PipPattern] : null;
+  return { frames: (moving ?? [MARKS[pattern as PipMark]]).map((frame) => frame.map((value) => strength(value, PIP_OFF))), ms: moving ? SPEED_MS[pattern as PipPattern] : 0 };
+};
+
+// Which pips a step has: the pattern while it's the live one, and its kind's still mark once it's done (DESIGN.md
+// section 6). A step from before steps had kinds, or one no tool made, such as Stopped here, is plain.
+export const STEP_PIPS: Record<StepKind | "plain", { live: PipPattern; done: PipMark }> = {
+  open: { live: "think", done: "opened" },
+  read: { live: "reading", done: "read" },
+  scan: { live: "scanning", done: "read" },
+  search: { live: "searching", done: "read" },
+  click: { live: "clicking", done: "clicked" },
+  type: { live: "typing", done: "typed" },
+  ask: { live: "waiting", done: "done" },
+  wait: { live: "think", done: "done" },
+  plain: { live: "think", done: "done" },
+};
 
 // In the colour of the words beside it. Still, as Keep Berry still and reduced motion ask, it holds its first frame.
 export const Pips: React.FC<{ pattern: PipPattern | PipMark; still?: boolean; className?: string }> = ({ pattern, still, className }) => {
