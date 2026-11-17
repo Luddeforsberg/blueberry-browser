@@ -196,18 +196,18 @@ test("bookmarked pages show a filled star in ink, in both layouts and themes", a
     for (const appearance of ["light", "dark"] as const) {
       await chrome.evaluate((settings) => window.chromeAPI.settings.updateSettings(settings), { layoutMode, appearance });
       const emptyStar = chrome.getByRole("button", { name: "Bookmark this page", exact: true });
-      await expect(emptyStar.locator("svg")).toHaveCSS("fill", "none");
+      await expect(emptyStar.locator("[data-shown] svg")).toHaveCSS("fill", "none");
       await emptyStar.click();
       const savedStar = chrome.getByRole("button", { name: "Remove bookmark", exact: true });
       // Colour belongs to the mascots, so a saved page is marked in `ink`.
       const color = appearance === "light" ? "rgb(20, 20, 22)" : "rgb(238, 237, 232)";
-      await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
-      await expect(savedStar.locator("svg")).toHaveCSS("stroke", color);
+      await expect(savedStar.locator("[data-shown] svg")).toHaveCSS("fill", color);
+      await expect(savedStar.locator("[data-shown] svg")).toHaveCSS("stroke", color);
       await savedStar.hover();
-      await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
+      await expect(savedStar.locator("[data-shown] svg")).toHaveCSS("fill", color);
       await chrome.screenshot({ path: `/tmp/blueberry-star-${layoutMode}-${appearance}.png` });
       await savedStar.click();
-      await expect(emptyStar.locator("svg")).toHaveCSS("fill", "none");
+      await expect(emptyStar.locator("[data-shown] svg")).toHaveCSS("fill", "none");
     }
   }
 });

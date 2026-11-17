@@ -56,7 +56,7 @@ export const FirstJobs: React.FC<{ onPress: (job: FirstJob) => void }> = ({ onPr
                         </>
                     )
                     return (
-                        <li key={job} className={cn('group flex rounded-[14px] transition-[background-color,box-shadow]', !done && 'hover:bg-sheet hover:shadow-chip focus-within:bg-sheet focus-within:shadow-chip')}>
+                        <li key={job} className={cn('bridged group flex rounded-[14px] transition-[background-color,box-shadow]', !done && 'hover:bg-sheet hover:shadow-chip focus-within:bg-sheet focus-within:shadow-chip')}>
                             {done ? (
                                 <div className="flex-1 min-w-0 py-[9px] pl-3 pr-2 flex items-center gap-[13px]">
                                     {words}

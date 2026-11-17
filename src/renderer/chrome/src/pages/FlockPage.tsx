@@ -106,7 +106,7 @@ export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
                 )}
                 <span className={cn('relative flex items-center gap-1', ON_ROW_SHOW)}>
                     <Button size="sm" variant="raised" aria-label={`Chat with ${name}`} onClick={() => chatWith(choose, mascot)}>Chat</Button>
-                    <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint pointer-events-none" strokeWidth={1.75} />
+                    <ChevronRight aria-hidden className="leans size-3.5 shrink-0 text-faint pointer-events-none" strokeWidth={1.75} />
                 </span>
             </span>
         </li>

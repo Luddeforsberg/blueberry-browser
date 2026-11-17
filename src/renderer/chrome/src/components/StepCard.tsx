@@ -9,6 +9,7 @@ import { useStill } from '@common/components/motion'
 import { LABEL } from '@common/components/StatusPill'
 import { cn } from '@common/lib/utils'
 import { BerrySpot } from './Berry'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, Your mascots and Routines: making one is questions asked one at a time, each a card set into a
 // shell like the prompt box, with the mascot standing on it. Changing one part later is the same card, alone. Making a
@@ -87,7 +88,9 @@ export const StepNav: React.FC<{ step: number; steps: number; onBack?: () => voi
 export const PartNav: React.FC<{ off: string | null; saving: boolean; onCancel: () => void; onSave: () => void }> = ({ off, saving, onCancel, onSave }) => (
     <div className="h-[46px] px-1.5 flex items-center justify-between">
         <Button variant="raised" onClick={onCancel}>Cancel</Button>
-        <Button disabled={!!off || saving} title={off ?? undefined} onClick={onSave}>Save</Button>
+        <Tooltip words={off}>
+            <Button disabled={!!off || saving} onClick={onSave}>Save</Button>
+        </Tooltip>
     </div>
 )
 

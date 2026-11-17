@@ -12,7 +12,7 @@ import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, Mascot
 // nothing else can answer it. The desktop view is the bird on the edge of the screen, in a window of its own, and the
 // composer view is its prompt box, in another. The suggestions view is the list under the address field while it's
 // being edited, over the page.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions";
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -392,6 +392,18 @@ export interface AddressSuggestionsShown {
   sheet: Rect;
 }
 
+// A tooltip the chrome can't draw itself, because it hangs over a web page: its words, its shortcut's keys, and where it
+// goes in the window. `slide` moves it over from where the last one was.
+export interface TooltipRequest {
+  words: string;
+  keys: string[];
+  box: Rect;
+  slide: boolean;
+}
+
+// What the tooltip view draws, placed in the view by the layout owner.
+export type TooltipShown = TooltipRequest;
+
 // Where find in page has got to. `active` counts from 1.
 export interface FindResult {
   active: number;
@@ -498,6 +510,9 @@ export interface InvokeChannels {
   "address:close": { region: "chrome"; args: []; result: void };
   // A row pressed in the list, by its place in what's shown. Main hands that row back to the chrome to act on.
   "address:pick": { region: "suggestions"; args: [index: number]; result: void };
+  // A tooltip over the page, in a view of its own that never takes the keyboard. The chrome decides when and where.
+  "tooltip:show": { region: "chrome"; args: [request: TooltipRequest]; result: void };
+  "tooltip:hide": { region: "chrome" | "tooltip"; args: []; result: void };
   "tab:navigate": { region: "chrome"; args: [tabId: string, url: string]; result: boolean };
   "tab:back": { region: "chrome"; args: [tabId: string]; result: boolean };
   "tab:forward": { region: "chrome"; args: [tabId: string]; result: boolean };
@@ -521,7 +536,7 @@ export interface InvokeChannels {
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "overlay:open-popover": { region: "chrome"; args: [popover: Popover]; result: void };
   "overlay:close-popover": { region: "chrome" | "overlay"; args: [refocus: boolean]; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   // Moves a saved site on top as a tile, or into the bookmarks, at a place in that list. Dragging and the menu both use it.
@@ -728,6 +743,8 @@ export interface EventChannels {
   "address:suggestions": AddressSuggestionsShown | null;
   // To the chrome: the row pressed in the list.
   "address:picked": AddressSuggestion;
+  // To the tooltip view: what to draw, or null when it's hidden.
+  "tooltip:shown": TooltipShown | null;
   "overlay:visibility": boolean;
   "overlay:popover": PopoverState;
   "recording:updated": RecordingState;
@@ -860,6 +877,12 @@ export interface AddressAPI {
   pick: (index: number) => Promise<void>;
   onSuggestions: (callback: (shown: AddressSuggestionsShown | null) => void) => Unsubscribe;
   onPicked: (callback: (row: AddressSuggestion) => void) => Unsubscribe;
+}
+
+export interface TooltipAPI {
+  show: (request: TooltipRequest) => Promise<void>;
+  hide: () => Promise<void>;
+  onShown: (callback: (shown: TooltipShown | null) => void) => Unsubscribe;
 }
 
 export interface FindAPI {
@@ -1020,6 +1043,7 @@ export interface ChromeAPI {
   recording: RecordingAPI;
   find: FindAPI;
   address: AddressAPI;
+  tooltip: TooltipAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
   memory: MemoryAPI;

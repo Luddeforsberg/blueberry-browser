@@ -35,6 +35,7 @@ import {
     type HowOften,
     type RoutineFormValues
 } from '../routinesView'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, Routines: making one is four questions, one at a time, in the voice of the mascot that will do
 // it, on the same card as making a mascot. The name is never asked for: main names it from what it does. Changing one
@@ -446,9 +447,11 @@ export const NewRoutine: React.FC<{ tabId: string; routines: Routine[] }> = ({ t
             from={making.from}
             nav={
                 <StepNav step={step} steps={STEPS.length} onBack={step > 0 ? () => { setError(null); setMaking({ ...making, step: step - 1, from: 'back' }) } : undefined}>
-                    <Button disabled={!!off || saving} title={off ?? undefined} onClick={() => void next()}>
-                        {last ? 'Save routine' : 'Continue'}
-                    </Button>
+                    <Tooltip words={off}>
+                        <Button disabled={!!off || saving} onClick={() => void next()}>
+                            {last ? 'Save routine' : 'Continue'}
+                        </Button>
+                    </Tooltip>
                 </StepNav>
             }
         >

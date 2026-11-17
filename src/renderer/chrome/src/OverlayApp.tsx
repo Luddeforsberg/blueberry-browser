@@ -6,6 +6,7 @@ import { ShellProvider, useShell } from './contexts/ShellContext'
 import { ChatsFace, MascotCard, Sidebar } from './components/Sidebar'
 import { AccountMenu } from './components/AccountMenu'
 import { cn } from '@common/lib/utils'
+import { TooltipProvider } from '@common/components/Tooltip'
 
 // Matches `duration-panel`, so the view only hides once the card has slid away.
 const SLIDE_MS = 280
@@ -136,8 +137,10 @@ const OverPage: React.FC<{ popover: Popover }> = ({ popover }) => {
 // The collapsed sidebar in the vertical layout, or what the horizontal toolbar opened. Main decides which is showing.
 const Overlay: React.FC = () => {
     const [popover, setPopover] = useState<Popover | null>(null)
+    const mac = useShell().theme.platform === 'mac'
     useEffect(() => window.chromeAPI.layout.onPopover(({ shown }) => setPopover(shown)), [])
-    return popover ? <OverPage popover={popover} /> : <FloatingSidebar />
+    // Tooltips here stay inside this view, which is above the page.
+    return <TooltipProvider mac={mac}>{popover ? <OverPage popover={popover} /> : <FloatingSidebar />}</TooltipProvider>
 }
 
 export const OverlayApp: React.FC = () => (

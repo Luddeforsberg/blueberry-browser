@@ -1231,9 +1231,9 @@ test("the chrome renderers run sandboxed", async () => {
       .map((contents) => metrics.find((metric) => metric.pid === contents.getOSProcessId())?.sandboxed);
   });
 
-  // The chrome view, the overlay view for the floating sidebar, the find bar, the address field's suggestions and the site
-  // permission prompt.
-  expect(sandboxed).toEqual([true, true, true, true, true]);
+  // The chrome view, the overlay view for the floating sidebar, the find bar, the address field's suggestions, the tooltip
+  // over the page and the site permission prompt.
+  expect(sandboxed).toEqual([true, true, true, true, true, true]);
 });
 
 test("the chrome renderer can't be navigated away from its own page", async () => {
@@ -1361,6 +1361,8 @@ test("in the tab row at the smallest window, the active tab has as much room for
     );
 
   await expect.poll(async () => (await titles()).length).toBe(6);
+  // New tabs open from nothing, so the row is measured once they have.
+  await expect(row.locator("li[style*='max-width']")).toHaveCount(0);
   const six = await titles();
   const others = six.filter((tab) => !tab.active).map((tab) => tab.title);
   // The bird perches on the active tab and its close button always shows, so it's wider to make up for them.

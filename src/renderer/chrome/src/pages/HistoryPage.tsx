@@ -8,6 +8,7 @@ import { Favicon } from '../components/Favicon'
 import { EmptyPage, OFF_ROW_HIDE, ON_ROW, ON_ROW_SHOW, PageFrame, PageHeader, ROW, SearchField } from '../components/PageFrame'
 import { SettingsGroup } from '../components/SettingsRow'
 import { foldVisits, groupByDay, siteOf, type VisitRun } from './historyDays'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, History: a page in a tab, with a group for each day, newest first, and a row of one line for
 // each visit, with no hairlines.
@@ -41,16 +42,17 @@ export const HistoryRow: React.FC<{
             </span>
             <span className="shrink-0 grid justify-items-end items-center [&>*]:[grid-area:1/1]">
                 <span className={cn(TIME, 'pointer-events-none', OFF_ROW_HIDE)}>{timeOf(entry.visitedAt)}</span>
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={`Remove ${title} from history`}
-                    title="Remove"
-                    onClick={onDelete}
-                    className={cn('relative size-7 -mr-1 text-ink-3', ON_ROW_SHOW)}
-                >
-                    <X strokeWidth={1.75} />
-                </Button>
+                <Tooltip words="Remove">
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`Remove ${title} from history`}
+                        onClick={onDelete}
+                        className={cn('relative size-7 -mr-1 text-ink-3', ON_ROW_SHOW)}
+                    >
+                        <X strokeWidth={1.75} />
+                    </Button>
+                </Tooltip>
             </span>
         </li>
     )

@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from 'react'
 import { cn } from '@common/lib/utils'
 
 // DESIGN.md section 8, Menus: a sheet with a 22px radius and `lift`. The prompt box's menus, the mascot pill's and the +,
-// are this, with the same keys: up and down through the rows, Home and End, Escape back to what opened it.
+// are this, with the same keys: up and down through the rows, Home and End, Escape back to what opened it. It grows from
+// the corner nearest its button, and `leaving` takes it back there, out of reach while it goes (see `usePresence`).
 
 const ITEMS = '[role=menuitemradio],[role=menuitem]'
 
@@ -19,21 +20,25 @@ export const MenuSheet: React.FC<{
     // Changes when the rows are replaced, so the keyboard goes to the first of the new ones, or `focusFirst`'s.
     view?: string
     focusFirst?: string
+    leaving?: boolean
     children: React.ReactNode
-}> = ({ label, above, align, className, onClose, onKey, view, focusFirst, children }) => {
+}> = ({ label, above, align, className, onClose, onKey, view, focusFirst, leaving = false, children }) => {
     const menu = useRef<HTMLDivElement>(null)
     const items = () => [...(menu.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])]
 
     useEffect(() => {
+        if (leaving) return
         const first = (focusFirst && menu.current?.querySelector<HTMLElement>(focusFirst)) || menu.current?.querySelector<HTMLElement>('[aria-checked=true]') || items()[0]
         first?.focus({ preventScroll: true })
-    }, [view, focusFirst])
+    }, [view, focusFirst, leaving])
 
     return (
         <div
             ref={menu}
             role="menu"
             aria-label={label}
+            inert={leaving}
+            aria-hidden={leaving || undefined}
             onKeyDown={(event) => {
                 if (onKey?.(event)) return
                 const all = items()
@@ -53,7 +58,7 @@ export const MenuSheet: React.FC<{
             }}
             className={cn(
                 'absolute z-30 max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-14 text-ink shadow-lift cursor-default',
-                'animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)]',
+                leaving ? (above ? 'animate-menu-out-above' : 'animate-menu-out') : above ? 'animate-menu-in-above' : 'animate-menu-in',
                 align === 'box' ? 'inset-x-1' : align === 'right' ? 'right-0' : 'left-0',
                 above ? 'bottom-full mb-2' : 'top-full mt-2',
                 above ? (align === 'right' ? 'origin-bottom-right' : 'origin-bottom-left') : align === 'right' ? 'origin-top-right' : 'origin-top-left',

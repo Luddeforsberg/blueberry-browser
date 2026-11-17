@@ -7,6 +7,7 @@ import { cn } from '@common/lib/utils'
 import { useShell } from '../contexts/ShellContext'
 import { useAssistantName } from './Berry'
 import { Favicon } from './Favicon'
+import { Tooltip } from '@common/components/Tooltip'
 
 const IDLE: RecordingState = { status: 'idle', startedAt: null, steps: [], cut: null, error: null }
 
@@ -87,17 +88,18 @@ export const ShowHowButton: React.FC<{ className?: string; variant?: 'raised' | 
     const { status } = useRecording()
     const name = useAssistantName()
     return (
-        <Button
-            variant={variant}
-            size={size}
-            className={className}
-            disabled={status === 'recording'}
-            title={status === 'recording' ? 'It’s already watching' : undefined}
-            onClick={() => void window.chromeAPI.recording.start()}
-        >
-            <span aria-hidden className="size-2 rounded-full bg-ask" />
-            {name === 'Assistant' ? 'Record a routine' : `Show ${name} how`}
-        </Button>
+        <Tooltip words={status === 'recording' ? 'It’s already watching' : undefined}>
+            <Button
+                variant={variant}
+                size={size}
+                className={className}
+                disabled={status === 'recording'}
+                onClick={() => void window.chromeAPI.recording.start()}
+            >
+                <span aria-hidden className="size-2 rounded-full bg-ask" />
+                {name === 'Assistant' ? 'Record a routine' : `Show ${name} how`}
+            </Button>
+        </Tooltip>
     )
 }
 

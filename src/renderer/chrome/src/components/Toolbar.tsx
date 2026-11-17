@@ -6,6 +6,7 @@ import { AddressBar } from './AddressBar'
 import { DownloadsButton } from './DownloadsButton'
 import { HorizontalToolbar } from './HorizontalToolbar'
 import { ToolBarButton } from './ToolBarButton'
+import { SHORTCUTS } from '@shared/shortcuts'
 import { NeedsYouNotice } from './NeedsYouNotice'
 import { RoutineNotice } from './RoutineNotice'
 import { WorkingNotice } from './WorkingNotice'
@@ -42,14 +43,14 @@ const VerticalToolbar: React.FC = () => {
             <div className="relative h-12 shrink-0 grid grid-cols-[minmax(max-content,1fr)_minmax(0,584px)_minmax(max-content,1fr)] items-center app-region-drag has-[input:focus]:[-webkit-app-region:no-drag]">
                 <div className="flex items-center gap-0.5" style={{ paddingLeft: leftClear }}>
                 {!layout.sidebarOpen && (
-                    <ToolBarButton Icon={PanelLeft} label="Show sidebar" onClick={toggleSidebar} />
+                    <ToolBarButton Icon={PanelLeft} label="Show sidebar" shortcut={SHORTCUTS.sidebar} onClick={toggleSidebar} />
                 )}
-                <ToolBarButton Icon={ChevronLeft} label="Back" onClick={goBack} active={activeTab?.canGoBack ?? false} />
-                <ToolBarButton Icon={ChevronRight} label="Forward" onClick={goForward} active={activeTab?.canGoForward ?? false} />
+                <ToolBarButton Icon={ChevronLeft} label="Back" shortcut={SHORTCUTS.back} onClick={goBack} active={activeTab?.canGoBack ?? false} />
+                <ToolBarButton Icon={ChevronRight} label="Forward" shortcut={SHORTCUTS.forward} onClick={goForward} active={activeTab?.canGoForward ?? false} />
                 {activeTab?.isLoading ? (
                     <ToolBarButton Icon={X} label="Stop loading" onClick={stop} />
                 ) : (
-                    <ToolBarButton Icon={RotateCw} label="Reload" onClick={reload} active={activeTab !== null && !activeTab.page} />
+                    <ToolBarButton Icon={RotateCw} label="Reload" shortcut={SHORTCUTS.reload} onClick={reload} active={activeTab !== null && !activeTab.page} />
                 )}
                 </div>
 
@@ -73,6 +74,7 @@ const VerticalToolbar: React.FC = () => {
                     <ToolBarButton
                         Icon={PanelRight}
                         label={layout.chatOpen ? 'Hide Berry' : 'Show Berry'}
+                        shortcut={SHORTCUTS.chat}
                         onClick={toggleChat}
                         toggled={layout.chatOpen}
                     />

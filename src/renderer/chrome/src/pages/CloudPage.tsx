@@ -98,7 +98,7 @@ export const CloudPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
             <div ref={area} className="relative flex-1 min-h-0">
                 {view?.kind === 'live' && (
                     <iframe
-                        title={`Live view of ${tab.title}`}
+                        aria-label={`Live view of ${tab.title}`}
                         src={view.url}
                         sandbox="allow-same-origin allow-scripts"
                         allow="clipboard-read; clipboard-write"

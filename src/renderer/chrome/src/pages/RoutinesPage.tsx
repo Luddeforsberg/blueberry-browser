@@ -17,6 +17,7 @@ import { RoutineRunRow } from '../components/RoutineRunRow'
 import { forgetTabDraftElsewhere } from '../flockView'
 import { formFor, groupRoutines, nextInWords, openRoutines, routineLine, scheduleSentence, sentenceText, startRoutine, toDraft, withRoutinePart } from '../routinesView'
 import { ChangeRoutinePart, NewRoutine, PART_NAMES } from './RoutineSteps'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, Routines: a page in a tab, with the list, each routine's own page, making one in four steps,
 // and changing one part. Where it is lives in the tab's param (routinePlaces.ts).
@@ -81,7 +82,7 @@ const RoutineRow: React.FC<{ routine: Routine }> = ({ routine }) => {
                         <Button size="sm" variant="raised" aria-label={`${going(routine) ? 'Stop' : 'Run now'}: ${routine.name}`} onClick={() => runOrStop(routine)}>
                             {going(routine) ? 'Stop' : 'Run now'}
                         </Button>
-                        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-faint pointer-events-none" strokeWidth={1.75} />
+                        <ChevronRight aria-hidden className="leans size-3.5 shrink-0 text-faint pointer-events-none" strokeWidth={1.75} />
                     </span>
                 </span>
             )}
@@ -145,14 +146,15 @@ const RoutineName: React.FC<{ routine: Routine }> = ({ routine }) => {
     if (typed === null) {
         return (
             <h1 className="text-20 font-semibold">
-                <button
-                    type="button"
-                    title="Rename"
-                    onClick={() => setTyped(routine.name)}
-                    className={cn('-mx-1 px-1 rounded-row text-left [overflow-wrap:anywhere] hover:bg-hover', FOCUS)}
-                >
-                    {routine.name}
-                </button>
+                <Tooltip words="Rename">
+                    <button
+                        type="button"
+                        onClick={() => setTyped(routine.name)}
+                        className={cn('-mx-1 px-1 rounded-row text-left [overflow-wrap:anywhere] hover:bg-hover', FOCUS)}
+                    >
+                        {routine.name}
+                    </button>
+                </Tooltip>
             </h1>
         )
     }
@@ -231,9 +233,11 @@ const RoutineView: React.FC<{ routine: Routine }> = ({ routine }) => {
                     {routine.scheduleSpec.kind !== 'manual' && (
                         <Button variant="raised" onClick={() => void api().setPaused(routine.id, !routine.paused)}>{routine.paused ? 'Resume' : 'Pause'}</Button>
                     )}
-                    <Button disabled={queued} title={queued ? 'It’s waiting to start' : undefined} onClick={() => runOrStop(routine)}>
-                        {going(routine) ? 'Stop' : 'Run now'}
-                    </Button>
+                    <Tooltip words={queued ? 'It’s waiting to start' : undefined}>
+                        <Button disabled={queued} onClick={() => runOrStop(routine)}>
+                            {going(routine) ? 'Stop' : 'Run now'}
+                        </Button>
+                    </Tooltip>
                 </div>
             </section>
 

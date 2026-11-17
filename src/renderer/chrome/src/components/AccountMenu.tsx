@@ -10,6 +10,7 @@ import { openSettings } from '../openSettings'
 import { openMascots } from '../flockView'
 import { useAccount } from '../useAccount'
 import { Berry } from './Berry'
+import { Tooltip } from '@common/components/Tooltip'
 
 // DESIGN.md section 10, The account menu: who you are, the theme, and the one way in to those pages that's always on
 // screen. Beside the dock in the sidebar, after it in the horizontal toolbar.
@@ -46,29 +47,30 @@ export const AccountButton: React.FC<{ open: boolean; onPress: (button: HTMLButt
     const signedIn = account.status === 'signed-in'
     const label = signedIn ? `Account, ${settings.accountName ?? account.email}` : account.status === 'signed-out' ? 'Account, not signed in' : 'Settings and more'
     return (
-        <button
-            type="button"
-            aria-label={label}
-            title={signedIn ? (settings.accountName ?? account.email ?? undefined) : undefined}
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            data-account-button
-            onClick={(event) => onPress(event.currentTarget)}
-            className={cn(
-                'shrink-0 rounded-full flex items-center justify-center app-region-no-drag transition-[box-shadow,transform] duration-fast active:scale-[.96]',
-                small ? 'size-7' : 'size-[30px]',
-                open && 'shadow-[0_0_0_2px_rgb(var(--ground)),0_0_0_3.5px_rgb(var(--ink))]',
-                FOCUS
-            )}
-        >
-            {signedIn ? (
-                <span className="size-full rounded-full flex items-center justify-center bg-sheet shadow-rim text-13 font-medium text-ink">
-                    {initialOf(settings.accountName, account.email)}
-                </span>
-            ) : (
-                <PersonGlyph className="size-full hover:text-ink transition-colors" />
-            )}
-        </button>
+        <Tooltip words={signedIn ? (settings.accountName ?? account.email) : 'Settings and more'}>
+            <button
+                type="button"
+                aria-label={label}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                data-account-button
+                onClick={(event) => onPress(event.currentTarget)}
+                className={cn(
+                    'shrink-0 rounded-full flex items-center justify-center app-region-no-drag transition-[box-shadow,transform] duration-fast active:scale-[.96]',
+                    small ? 'size-7' : 'size-[30px]',
+                    open && 'shadow-[0_0_0_2px_rgb(var(--ground)),0_0_0_3.5px_rgb(var(--ink))]',
+                    FOCUS
+                )}
+            >
+                {signedIn ? (
+                    <span className="size-full rounded-full flex items-center justify-center bg-sheet shadow-rim text-13 font-medium text-ink">
+                        {initialOf(settings.accountName, account.email)}
+                    </span>
+                ) : (
+                    <PersonGlyph className="size-full hover:text-ink transition-colors" />
+                )}
+            </button>
+        </Tooltip>
     )
 }
 
@@ -126,7 +128,8 @@ const Who: React.FC<{ account: AccountState; name: string | null; onClose: (refo
 
 // What opens from the button. `onClose` closes it, and `refocus` gives the keyboard back to the button, as after Escape
 // or a press outside. Choosing a row closes it and leaves the keyboard with what the row opened.
-export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; className?: string }> = ({ onClose, className }) => {
+// In the sidebar it opens above its button, and over the page under it. `leaving` takes it back into the button.
+export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; className?: string; above?: boolean; leaving?: boolean }> = ({ onClose, className, above = false, leaving = false }) => {
     const [account] = useAccount()
     const { settings, theme } = useShell()
     const menu = useRef<HTMLDivElement>(null)
@@ -166,7 +169,14 @@ export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; classN
             role="dialog"
             aria-label="Account"
             onKeyDown={onKeyDown}
-            className={cn('p-1.5 rounded-sheet bg-sheet text-14 text-ink shadow-lift animate-[menu-in_150ms_cubic-bezier(.2,.8,.2,1)] app-region-no-drag', className)}
+            inert={leaving}
+            aria-hidden={leaving || undefined}
+            className={cn(
+                'p-1.5 rounded-sheet bg-sheet text-14 text-ink shadow-lift app-region-no-drag',
+                above ? 'origin-bottom-right' : 'origin-top-right',
+                leaving ? (above ? 'animate-menu-out-above' : 'animate-menu-out') : above ? 'animate-menu-in-above' : 'animate-menu-in',
+                className
+            )}
         >
             {account.status !== 'not-set-up' && <Who account={account} name={settings.accountName} onClose={onClose} />}
             <Choice<Appearance>
@@ -175,7 +185,7 @@ export const AccountMenu: React.FC<{ onClose: (refocus: boolean) => void; classN
                 onChange={(appearance) => void window.chromeAPI.settings.setAppearance(appearance)}
                 fill
                 // In dark, a strip a step below the sheet, as sheet-2 on it would read as raised.
-                className="mx-0.5 mb-1.5 rounded-[11px] [&>button]:rounded-[9px] dark:bg-ground dark:[&>button[aria-checked=true]]:bg-sheet-2"
+                className="mx-0.5 mb-1.5 rounded-[11px] [&>button]:rounded-[9px] dark:bg-ground dark:[&>[data-sheet]]:bg-sheet-2"
                 options={[
                     { value: 'light', label: 'Light', Icon: Sun },
                     { value: 'dark', label: 'Dark', Icon: Moon },

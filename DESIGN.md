@@ -84,6 +84,7 @@ Rules:
 - **One layout owner** in the main process calculates every region. Nothing else hard-codes a size.
 - **Anything over a page needs an overlay view,** because the chrome view is underneath tab views. The one exception is what's drawn in the page while a mascot works there (see Over a web page).
 - **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks. The one exception is what opens from the horizontal toolbar: its view covers everything under the toolbar's own row, so a press anywhere outside the panel closes it, as with a menu.
+- **A tooltip over the page has a view of its own,** a strip as wide as the window and as tall as the tooltip, so moving along a row of controls slides the tooltip inside it and never moves the native view. It's there only while the pointer or the keyboard is on its control, goes the moment the pointer leaves, and never takes the keyboard. Tooltips anywhere the chrome draws stay in the chrome.
 
 ## 3. Surfaces
 
@@ -127,6 +128,7 @@ Components use tokens only, never raw colours.
 | `ask` | `#C62B31` | `#FF6B6B` | Something needs you |
 | `ask-bg` | `#FBE4E3` | `#3A1F1F` | Behind `ask` text, where it needs a fill |
 | `focus` | `#3F51DC` | `#8FA0FF` | Blueberry blue: the focus ring, and a switch that's on. Nothing else in the chrome |
+| `tip` | `#141416` | `#0B0B0B` | A tooltip, near-black in both modes, with white words |
 
 **The light paper is a light, neutral grey, a shade towards cool.** A warm grey was the first choice, and was tried in the running app beside a neutral grey of the same lightness and this lighter one, which was chosen. Every neutral in light mode has the same faint tint, so nothing looks tinted against its neighbour. Dark mode keeps its own greys.
 

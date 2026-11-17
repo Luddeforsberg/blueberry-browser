@@ -6,6 +6,7 @@ import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { Mascot } from '@common/components/Mascot'
 import { cn } from '@common/lib/utils'
+import { SHORTCUTS } from '@shared/shortcuts'
 import { toUrl } from '@common/lib/url'
 import { useAssistantName } from './Berry'
 import { useRecorderNeedsRoom } from './ShowBerry'
@@ -13,6 +14,8 @@ import { TabIcon } from './TabIcon'
 import { useAddressSuggestions } from './useAddressSuggestions'
 import { openRoutines } from '../routinesView'
 import { BERRY_ID } from '@shared/mascots'
+import { Tooltip } from '@common/components/Tooltip'
+import { IconSwap } from '@common/components/IconSwap'
 
 // DESIGN.md section 10, Toolbar and the address field. The field is also where a mascot's status is, for the tab in
 // front: at rest, a mascot working here, waiting for you, your turn, and the address being edited.
@@ -218,16 +221,20 @@ export const AddressBar: React.FC = () => {
                 )}
             </button>
             {web && !recorderNeedsRoom && (
-                <button
-                    type="button"
-                    aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-                    aria-pressed={bookmarked}
-                    title={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
-                    onClick={() => void window.chromeAPI.library.toggleBookmark()}
-                    className={cn('mr-1 size-6 shrink-0 flex items-center justify-center rounded-[7px] hover:bg-hover hover:text-ink', bookmarked && 'text-ink', FOCUS)}
-                >
-                    <Star className={cn('size-[13px]', bookmarked && 'fill-current')} strokeWidth={1.75} />
-                </button>
+                <Tooltip words={bookmarked ? 'Remove bookmark' : 'Bookmark this page'} shortcut={SHORTCUTS.bookmark}>
+                    <button
+                        type="button"
+                        aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                        aria-pressed={bookmarked}
+                        onClick={() => void window.chromeAPI.library.toggleBookmark()}
+                        className={cn('press mr-1 size-6 shrink-0 flex items-center justify-center rounded-[7px] hover:bg-hover hover:text-ink', bookmarked && 'text-ink', FOCUS)}
+                    >
+                        <IconSwap
+                        shown={bookmarked ? 'on' : 'off'}
+                        icons={{ off: <Star className="size-[13px]" strokeWidth={1.75} />, on: <Star className="size-[13px] fill-current" strokeWidth={1.75} /> }}
+                    />
+                    </button>
+                </Tooltip>
             )}
         </div>
     )

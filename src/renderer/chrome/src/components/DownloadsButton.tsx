@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import type { DownloadInfo } from '@shared/ipc'
 import { fractionDone, isActive } from './downloadStatus'
 import { ToolBarButton } from './ToolBarButton'
+import { SHORTCUTS } from '@shared/shortcuts'
 import { cn } from '@common/lib/utils'
 import { useDownloads } from './useDownloads'
 
@@ -24,7 +25,7 @@ export const DownloadsProgress: React.FC<{ downloads: DownloadInfo[]; onClick?: 
         : 'Downloads'
 
     return (
-        <ToolBarButton label={label} onClick={onClick} className={small ? 'relative size-7' : 'relative'}>
+        <ToolBarButton label={label} tip="Downloads" shortcut={SHORTCUTS.downloads} onClick={onClick} className={small ? 'relative size-7' : 'relative'}>
             <Download className={active.length > 0 ? 'size-3' : 'size-4'} aria-hidden />
             {active.length > 0 && (
                 <svg viewBox="0 0 24 24" className={cn('absolute size-6 -rotate-90', small ? 'inset-0.5' : 'inset-1')} aria-hidden>

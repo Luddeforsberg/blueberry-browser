@@ -27,6 +27,8 @@ import { RememberedLine } from './MemoryInChat'
 import type { RoutineFormValues } from '../routinesView'
 import { SaveAsRoutineCard } from './SaveAsRoutine'
 import { openSettings } from '../openSettings'
+import { Tooltip } from '@common/components/Tooltip'
+import { IconSwap } from '@common/components/IconSwap'
 
 const FOLLOW_DISTANCE = 120
 const FOCUS = 'outline-none focus-visible:ring-2 focus-visible:ring-focus'
@@ -316,33 +318,35 @@ const PageChips: React.FC<{ pages: UsedPage[] }> = ({ pages }) => (
     <ul aria-label="Pages it used" className="flex flex-wrap gap-1.5">
         {pages.map((page) => (
             <li key={page.url} className="min-w-0 max-w-full flex">
-                <button
-                    type="button"
-                    title={page.url}
-                    onClick={() => void window.chromeAPI.browser.createTab(page.url)}
-                    className={cn('h-[30px] max-w-full pl-[7px] pr-2 inline-flex items-center gap-2 rounded-[10px] bg-sheet dark:bg-sheet-2 text-13 text-ink shadow-chip whitespace-nowrap transition-[background-color,transform] duration-fast hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:scale-[.96]', FOCUS)}
-                >
-                    <Favicon src={siteIcon(page.url)} site={page.url} />
-                    <span className="min-w-0 truncate max-w-56">{page.title || page.url}</span>
-                    {linkSite(page.url) && <span className="shrink-0 text-ink-2">{linkSite(page.url)}</span>}
-                    <ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
-                </button>
+                <Tooltip words={page.url}>
+                    <button
+                        type="button"
+                        onClick={() => void window.chromeAPI.browser.createTab(page.url)}
+                        className={cn('h-[30px] max-w-full pl-[7px] pr-2 inline-flex items-center gap-2 rounded-[10px] bg-sheet dark:bg-sheet-2 text-13 text-ink shadow-chip whitespace-nowrap transition-[background-color,transform] duration-fast hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:scale-[.96]', FOCUS)}
+                    >
+                        <Favicon src={siteIcon(page.url)} site={page.url} />
+                        <span className="min-w-0 truncate max-w-56">{page.title || page.url}</span>
+                        {linkSite(page.url) && <span className="shrink-0 text-ink-2">{linkSite(page.url)}</span>}
+                        <ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-faint" strokeWidth={1.75} />
+                    </button>
+                </Tooltip>
             </li>
         ))}
     </ul>
 )
 
-// A reply's action: an icon with its name as a tooltip, and no outline, so the reply stays the thing to read.
+// A reply's action: an icon with its name in a tooltip, and no outline, so the reply stays the thing to read.
 const ReplyAction: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({ label, onClick, children }) => (
-    <button
-        type="button"
-        aria-label={label}
-        title={label}
-        onClick={onClick}
-        className={cn('size-7 shrink-0 grid place-items-center rounded-row text-ink-3 transition-[background-color,color,transform] duration-fast hover:bg-hover hover:text-ink active:bg-press active:scale-[.96]', FOCUS)}
-    >
-        {children}
-    </button>
+    <Tooltip words={label}>
+        <button
+            type="button"
+            aria-label={label}
+            onClick={onClick}
+            className={cn('size-7 shrink-0 grid place-items-center rounded-row text-ink-3 transition-[background-color,color,transform] duration-fast hover:bg-hover hover:text-ink active:bg-press active:scale-[.96]', FOCUS)}
+        >
+            {children}
+        </button>
+    </Tooltip>
 )
 
 const CopyAction: React.FC<{ content: string }> = ({ content }) => {
@@ -354,7 +358,7 @@ const CopyAction: React.FC<{ content: string }> = ({ content }) => {
     }, [copied])
     return (
         <ReplyAction label={copied ? 'Copied' : 'Copy'} onClick={() => void navigator.clipboard.writeText(content).then(() => setCopied(true))}>
-            {copied ? <Check aria-hidden className="size-[15px]" strokeWidth={1.75} /> : <Copy aria-hidden className="size-[15px]" strokeWidth={1.75} />}
+            <IconSwap shown={copied ? 'copied' : 'copy'} icons={{ copy: <Copy className="size-[15px]" strokeWidth={1.75} />, copied: <Check className="size-[15px]" strokeWidth={1.75} /> }} />
         </ReplyAction>
     )
 }
@@ -530,27 +534,24 @@ type SpokenProps = { chatId: string; approval: ChatApproval; mascot?: MascotProf
 
 const LETTERS = ['A', 'B', 'C']
 
-// What never goes through a question, behind a ? at the end of the shell so the card stays the question. It shows
-// beside the mark, in the shell, so it never covers an answer, while the pointer or the keyboard is on the mark.
+// What never goes through a question, behind a ? at the end of the shell so the card stays the question. Its tooltip
+// says it, under the mark, so it never covers an answer, and a screen reader hears it as the mark's description.
+const SECRETS = 'Passwords and codes go in the page, never here.'
 const SecretsHint: React.FC = () => {
     const id = useId()
     return (
-        <span className="group/hint relative flex shrink-0">
-            <button
-                type="button"
-                aria-label="About passwords and codes"
-                aria-describedby={id}
-                className={cn('size-7 grid place-items-center rounded-row text-ink-3 transition-colors duration-fast hover:bg-hover hover:text-ink', FOCUS)}
-            >
-                <CircleHelp aria-hidden className="size-4" strokeWidth={1.75} />
-            </button>
-            <span
-                id={id}
-                role="tooltip"
-                className="pointer-events-none absolute right-full top-1/2 z-30 mr-1.5 w-max max-w-[calc(100cqi-40px)] -translate-y-1/2 rounded-row bg-sheet px-2.5 py-1.5 text-13 text-ink shadow-lift opacity-0 transition-opacity duration-fast group-hover/hint:opacity-100 group-focus-within/hint:opacity-100"
-            >
-                Passwords and codes go in the page, never here.
-            </span>
+        <span className="flex shrink-0">
+            <Tooltip words={SECRETS}>
+                <button
+                    type="button"
+                    aria-label="About passwords and codes"
+                    aria-describedby={id}
+                    className={cn('press size-7 grid place-items-center rounded-row text-ink-3 hover:bg-hover hover:text-ink', FOCUS)}
+                >
+                    <CircleHelp aria-hidden className="size-4" strokeWidth={1.75} />
+                </button>
+            </Tooltip>
+            <span id={id} className="sr-only">{SECRETS}</span>
         </span>
     )
 }
@@ -578,8 +579,7 @@ export const QuestionCard: React.FC<{
             label={`${name} is asking`}
             region={region}
             note={
-                // A container, so the hint can be as wide as this row and no wider, and wraps in the narrow panel.
-                <span className="flex min-w-0 flex-1 items-center gap-2.5 [container-type:inline-size]">
+                <span className="flex min-w-0 flex-1 items-center gap-2.5">
                     <Button variant="ghost" size="sm" className="-ml-2 px-2" onClick={onSkip}>Skip</Button>
                     <span className="flex-1" />
                     {more}
