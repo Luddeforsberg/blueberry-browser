@@ -261,7 +261,10 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     // Opened for one in particular, from the sidebar or a notification.
     useEffect(() => setChosen(tab.pageParam ?? null), [tab.pageParam])
 
-    const waiting = needsYou.filter((item) => !answeredIds.includes(item.approval.id)).sort((a, b) => a.askedAt - b.askedAt)
+    // Only the one whose card is saying what happened is held back. An answer that didn't take, as when the cloud
+    // couldn't be reached, comes back as waiting once that card has gone.
+    const waiting = needsYou.filter((item) => item.approval.id !== justAnswered?.item.approval.id).sort((a, b) => a.askedAt - b.askedAt)
+    const answered = answeredIds.filter((id) => !waiting.some((item) => item.approval.id === id)).length
     const open = justAnswered ? null : (waiting.find((item) => item.approval.id === chosen) ?? waiting[0] ?? null)
     const rest = waiting.filter((item) => item !== open)
 
@@ -285,7 +288,7 @@ export const NeedsYouPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                 </>
             )}
             <div className="mt-3 mx-1 min-h-7 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                {answeredIds.length > 0 || waiting.length > 0 ? <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answeredIds.length, waiting.length)}</span> : <span />}
+                {answered > 0 || waiting.length > 0 ? <span className="font-mono text-11.5 text-ink-2 tabular-nums">{tallyWords(answered, waiting.length)}</span> : <span />}
                 <PhoneLine />
             </div>
             <p className="mt-6 mx-1 text-13 text-ink-2">Passwords and codes go in the page, not through the model.</p>

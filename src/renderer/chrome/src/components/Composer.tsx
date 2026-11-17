@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ARM_MS } from '@common/components/cardKeys'
 import { ArrowUp, Check, ChevronDown, Cloud, Laptop, Lock, Plus } from 'lucide-react'
 import type { MascotProfile } from '@shared/library'
 import type { Mood } from '@common/components/Mascot'
@@ -481,11 +482,18 @@ export const ChatComposer: React.FC<{
         onDraftTaken?.()
     }, [draft, onDraftTaken])
 
+    // A question that has only just arrived isn't answered by a send already on its way, as a card's keys aren't.
+    const answeringSince = useRef(0)
+    useLayoutEffect(() => {
+        if (answering) answeringSince.current = performance.now()
+    }, [answering])
+
     // What was typed and attached stays in the box until main has taken it, so a refused message can be sent again.
     const sending = useRef(false)
     const send = async () => {
         const message = value.trim()
         if (!message || disabled || sending.current) return
+        if (answering && performance.now() - answeringSince.current < ARM_MS) return
         sending.current = true
         const sent = await onSend(message, box.sendable()).finally(() => (sending.current = false))
         if (!sent) return
@@ -504,7 +512,8 @@ export const ChatComposer: React.FC<{
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
-                    void send()
+                    // A key held down never sends, so it can't answer a question that arrives while it's held.
+                    if (!event.repeat) void send()
                 }
             }}
             attachment={box.empty && !attachment ? undefined : <BoxChips box={box} before={attachment} />}

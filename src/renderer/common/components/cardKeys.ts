@@ -13,6 +13,45 @@ export const keyCounts = ({ inside, repeat, at, armedAt }: { inside: boolean; re
 // Where in the card the keyboard is, which decides what Enter does and which keycaps are true.
 export type KeysOn = "none" | "card" | "allow" | "field" | "other";
 
+const LETTERS = "abc";
+
+// What one key press on a card does: nothing of ours ("ignore"), nothing at all ("stop", which also keeps a focused
+// button from being pressed), or an answer. A key that could press a button is judged before anything else about it,
+// so a modifier never gets one past the guard.
+export const keyAction = ({
+  key,
+  modified,
+  field,
+  onCard,
+  picks,
+  canEnter,
+  canEscape,
+  ...timing
+}: {
+  key: string;
+  // Ctrl, Alt or the command key is down.
+  modified: boolean;
+  field: boolean;
+  onCard: boolean;
+  picks: number;
+  canEnter: boolean;
+  canEscape: boolean;
+  inside: boolean;
+  repeat: boolean;
+  at: number;
+  armedAt: number;
+}): "ignore" | "stop" | "enter" | "escape" | number => {
+  const letter = key.length === 1 ? LETTERS.indexOf(key.toLowerCase()) : -1;
+  const pick = !modified && !field && letter >= 0 && letter < picks ? letter : -1;
+  if (!["Enter", "Escape", " "].includes(key) && pick < 0) return "ignore";
+  if (key === " " && field) return "ignore";
+  if (!keyCounts(timing)) return "stop";
+  if (modified) return "ignore";
+  if (key === "Escape" && canEscape) return "escape";
+  if (key === "Enter" && canEnter && onCard) return "enter";
+  return pick >= 0 ? pick : "ignore";
+};
+
 export interface CardKeys {
   // Enter, with the keyboard on the card itself. On a button, Enter presses that button, as it always does.
   onEnter?: () => void;
@@ -35,8 +74,6 @@ export interface CardRegion {
 
 const isField = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable);
-
-const LETTERS = "abc";
 
 export const useCardKeys = (keys: CardKeys): { region: CardRegion; on: KeysOn } => {
   const ref = useRef<HTMLElement>(null);
@@ -72,28 +109,26 @@ export const useCardKeys = (keys: CardKeys): { region: CardRegion; on: KeysOn } 
       if (!ref.current?.contains(event.relatedTarget as Node | null)) setOn("none");
     },
     onKeyDown: (event) => {
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      const field = isField(event.target);
-      const letter = event.key.length === 1 ? LETTERS.indexOf(event.key.toLowerCase()) : -1;
-      const pick = !field && letter >= 0 && letter < (keys.picks ?? 0) && keys.onPick ? letter : -1;
-      if (!["Enter", "Escape", " "].includes(event.key) && pick < 0) return;
-      if (event.key === " " && field) return;
-      const inside = !!ref.current?.contains(event.target as Node);
-      if (!keyCounts({ inside, repeat: event.repeat, at: performance.now(), armedAt: armedAt.current })) {
-        stop(event);
+      const action = keyAction({
+        key: event.key,
+        modified: event.ctrlKey || event.metaKey || event.altKey,
+        field: isField(event.target),
+        onCard: where(event.target) === "card",
+        picks: keys.onPick ? (keys.picks ?? 0) : 0,
+        canEnter: !!keys.onEnter,
+        canEscape: !!keys.onEscape,
+        inside: !!ref.current?.contains(event.target as Node),
+        repeat: event.repeat,
+        at: performance.now(),
+        armedAt: armedAt.current,
+      });
+      if (action === "ignore") return;
+      stop(event);
+      if (action === "stop") {
         if (event.key === " ") stoppedSpace.current = true;
-        return;
-      }
-      if (event.key === "Escape" && keys.onEscape) {
-        stop(event);
-        keys.onEscape();
-      } else if (event.key === "Enter" && keys.onEnter && where(event.target) === "card") {
-        stop(event);
-        keys.onEnter();
-      } else if (pick >= 0) {
-        stop(event);
-        keys.onPick?.(pick);
-      }
+      } else if (action === "escape") keys.onEscape?.();
+      else if (action === "enter") keys.onEnter?.();
+      else keys.onPick?.(action);
     },
     onKeyUp: (event) => {
       if (event.key !== " " || !stoppedSpace.current) return;
