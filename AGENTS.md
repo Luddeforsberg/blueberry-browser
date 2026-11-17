@@ -27,7 +27,7 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. It doesn't r
 ## How we build
 
 - **One branch and one PR per working feature, from the latest `main`.** Don't stack PRs. Each runs in its own worktree.
-- **Every PR goes through `self-check`, proof and `file-pr`.** One `review-loop` round only for changes that touch what Berry may do, permissions or secrets.
+- **Every PR goes through `self-check`, proof and `file-pr`.** `review-loop` only for changes that touch what Berry may do, permissions or secrets, for as many rounds as the size of the change calls for.
 - **Run `pnpm run verify` before filing.** It runs what CI runs on macOS. Put the result in the PR.
 - **The project manager agent merges.** It merges PRs one at a time and reruns `verify` on anything `main` has moved under.
 - **The user merges anything that lets Berry do more without asking.** Say so at the top of the PR.

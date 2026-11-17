@@ -1,6 +1,6 @@
 import { followUpHistory, mascotSnapshot } from "../shared.js";
 import * as api from "./api.js";
-import { decide, openAsk } from "./ask.js";
+import { decide, hold, openAsk } from "./ask.js";
 import { bird, copyButton, el, grow, icon, patch, pips, replyText, stepPips, stopSquare } from "./dom.js";
 import { nowStep } from "./home.js";
 import { liveSlot } from "./live.js";
@@ -304,12 +304,12 @@ export const mountFull = (app, id, taking) => {
       if (!yours) return [];
       const problem = el("div", { className: "problem-slot" });
       const answer = async (event, allow, said) => {
-        const button = event.currentTarget;
-        button.disabled = true;
+        const row = event.currentTarget.closest(".two");
+        hold(row, true);
         const result = await decide({ ask }, allow, null, said);
-        if (typeof result === "string") {
-          problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: result }));
-          button.disabled = false;
+        if (result === null || typeof result === "string") {
+          if (result) problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: result }));
+          hold(row, false);
           return;
         }
         saying(result.words);

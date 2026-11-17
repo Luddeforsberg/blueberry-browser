@@ -62,10 +62,11 @@ const stage = () => {
   const right = others.filter((_, at) => at % 2 === 0);
   const side = (mascot, at, edge) =>
     el("button", { type: "button", className: `stand side ${edge ? "edge" : ""}`, ariaLabel: `Choose ${mascot.name}`, dataKey: `stand-${mascot.id}`, onclick: () => pick(mascot) }, bird(mascot, "rest", 52, { named: false }));
-  return el("div", { className: "stage" },
-    ...left.map((mascot, at) => side(mascot, at, at === 0 && left.length === 2)),
+  // The chosen one stands in the middle of the screen however many are on each side.
+  return el("div", { className: "stage wings" },
+    el("div", { className: "wing left" }, ...left.map((mascot, at) => side(mascot, at, at === 0 && left.length === 2))),
     el("span", { className: "stand front" }, bird(current, "rest", 96)),
-    ...right.map((mascot, at) => side(mascot, at, at === 1)));
+    el("div", { className: "wing" }, ...right.map((mascot, at) => side(mascot, at, at === 1))));
 };
 
 // One ask, as a card: anywhere on it opens the ask.
@@ -86,23 +87,24 @@ export const nowStep = (job) => {
   return { pattern: "think", words: "Thinking.." };
 };
 
-const workingRow = ({ id, latest }) => {
+// A conversation goes by what it began with, as a chat does.
+const workingRow = ({ id, jobs, latest }) => {
   const now = nowStep(latest);
   return el("a", { className: "row", href: `#job/${id}`, dataKey: `row-${id}` },
     bird(mascotOf(latest), moodOf(latest), 40),
     el("span", { className: "w" },
-      el("span", { className: "row-title", textContent: latest.prompt }),
+      el("span", { className: "row-title", textContent: jobs[0].prompt }),
       el("span", { className: "row-sub now" }, pips(now.pattern, now.ask ? "ask" : ""), el("span", { className: "row-step", textContent: now.words }))),
     el("span", { className: "t", dataSince: latest.created_at, textContent: lasted(latest.created_at) }));
 };
 
-const earlierRow = ({ id, latest }) => {
+const earlierRow = ({ id, jobs, latest }) => {
   const failed = latest.status === "failed";
   const how = latest.status === "done" ? "Done" : failed ? latest.error || "Didn’t finish" : "Stopped";
   return el("a", { className: "row dim", href: `#job/${id}`, dataKey: `row-${id}` },
     bird(mascotOf(latest), moodOf(latest), 40),
     el("span", { className: "w" },
-      el("span", { className: "row-title", textContent: latest.prompt }),
+      el("span", { className: "row-title", textContent: jobs[0].prompt }),
       el("span", { className: `row-sub ${failed ? "bad" : ""}` }, el("span", { className: "row-how", textContent: how }), sep(), el("span", { className: "mono", textContent: ago(latest.updated_at) }))));
 };
 
@@ -182,8 +184,8 @@ export const mountHome = (app) => {
     const signature = JSON.stringify([
       greeting(), quiet, state.problem, state.linked, mascot.id, state.flock, state.jobs === null,
       asks.map(({ ask, mascot: who }) => [ask, who.name]),
-      working.map(({ id, latest }) => [id, latest.prompt, latest.status, stepsOf(latest).at(-1), latest.mascot?.id]),
-      earlier.map(({ id, latest }) => [id, latest.prompt, latest.status, latest.error, latest.updated_at, latest.mascot?.id]),
+      working.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, stepsOf(latest).at(-1), latest.mascot?.id]),
+      earlier.map(({ id, jobs, latest }) => [id, jobs[0].prompt, latest.status, latest.error, latest.updated_at, latest.mascot?.id]),
       // Times like "12m" move on.
       Math.floor(Date.now() / 60_000),
     ]);

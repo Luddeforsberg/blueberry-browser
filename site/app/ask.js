@@ -14,49 +14,67 @@ const SAID_MS = 1_500;
 // Which ask is up, and whether it's saying what just happened.
 let up = null;
 
-// Writes an answer as the user. What to say about it, or what went wrong, in words.
+// Answers on their way, by approval id. An ask takes one answer, and until it's back the ask stays as it is.
+const deciding = new Set();
+
+// Writes an answer as the user. What to say about it, what went wrong in words, or null if this ask has an answer on
+// its way or written already.
 export const decide = async (entry, allow, answer, said) => {
   const { ask } = entry;
-  state.answered.add(ask.approval_id);
-  let words = said;
+  if (deciding.has(ask.approval_id) || state.answered.has(ask.approval_id)) return null;
+  deciding.add(ask.approval_id);
   try {
     const written = await api.rpc("decide_cloud_approval", { p_approval: ask.approval_id, p_allow: allow, p_answer: answer });
-    if (!written) words = "That was already answered.";
+    state.answered.add(ask.approval_id);
+    return { words: written ? said : "That was already answered." };
   } catch (error) {
-    state.answered.delete(ask.approval_id);
     return problemWords(error);
+  } finally {
+    deciding.delete(ask.approval_id);
   }
-  return { words };
 };
 
-// After an answer: what happened, then the next oldest or nothing.
-const answered = async (entry, result, problem) => {
-  if (typeof result === "string") {
-    problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: result }));
-    return false;
-  }
-  up = { id: entry.ask.approval_id, saying: true };
-  sheetBody()?.replaceChildren(
+// The answers to one ask go off together while one is on its way, and come back if it didn't go.
+export const hold = (row, on) => {
+  for (const button of row.querySelectorAll("button")) button.disabled = on;
+};
+
+// What happened to the ask that's up, said in its place for a moment, then the next oldest or nothing. Only in the
+// sheet showing that ask: one put away meanwhile, or another sheet, is left alone.
+const say = (id, mascot, words) => {
+  if (sheetKind() !== "ask" || up?.id !== id) return;
+  up = { id, saying: true };
+  sheetBody().replaceChildren(
     el("div", { className: "ask-said", role: "status" },
-      bird(entry.mascot, "rest", 72, { named: false }),
-      el("p", { className: "ask-title", textContent: result.words })));
+      bird(mascot, "rest", 72, { named: false }),
+      el("p", { className: "ask-title", textContent: words })));
   placeLive();
-  void hooks.load();
   setTimeout(() => {
-    if (sheetKind() !== "ask" || up?.id !== entry.ask.approval_id) return;
+    if (sheetKind() !== "ask" || up?.id !== id || !up.saying) return;
     const [next] = waiting();
     if (next) draw(next);
     else closeSheet();
   }, SAID_MS);
+};
+
+// After an answer: whether it went.
+const answered = (entry, result, problem) => {
+  if (result === null) return false;
+  if (typeof result === "string") {
+    problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: result }));
+    return false;
+  }
+  say(entry.ask.approval_id, entry.mascot, result.words);
+  void hooks.load();
   return true;
 };
 
 const buttons = (...children) => el("div", { className: "two" }, ...children);
-// A button that answers: it can't be pressed twice while it's on its way, and can be again if it didn't go.
+// A button that answers.
 const answering = (entry, problem, allow, said) => async (event) => {
-  const button = event.currentTarget;
-  button.disabled = true;
-  if (!(await answered(entry, await decide(entry, allow, null, said), problem))) button.disabled = false;
+  const row = event.currentTarget.closest(".two");
+  hold(row, true);
+  if (!answered(entry, await decide(entry, allow, null, said), problem)) hold(row, false);
 };
 const big = (text, kind, onClick, type = "button") => el("button", { type, className: `btn big ${kind}`, textContent: text, onclick: onClick });
 
@@ -91,8 +109,9 @@ const question = (entry, problem) => {
         problem.replaceChildren(el("p", { className: "problem", role: "alert", textContent: "That looks like a code, so it wasn’t sent. Codes only go into the page itself, never through Blueberry." }));
         return;
       }
-      form.querySelector("button[type=submit]").disabled = true;
-      if (!(await answered(entry, await decide(entry, true, words, `Answered. ${mascot.name} carries on.`), problem))) form.querySelector("button[type=submit]").disabled = false;
+      const row = form.querySelector(".two");
+      hold(row, true);
+      if (!answered(entry, await decide(entry, true, words, `Answered. ${mascot.name} carries on.`), problem)) hold(row, false);
     },
   },
   box,
@@ -128,7 +147,7 @@ const draw = (entry) => {
   if (!body) return;
   const all = waiting();
   const at = all.findIndex((one) => one.ask.approval_id === entry.ask.approval_id);
-  up = { id: entry.ask.approval_id, saying: false, signature: signatureOf(entry) };
+  up = { id: entry.ask.approval_id, saying: false, signature: signatureOf(entry), mascot: entry.mascot };
   state.seen.add(entry.ask.approval_id);
   const problem = el("div", { className: "problem-slot" });
   const hadKeyboard = body.contains(document.activeElement);
@@ -172,12 +191,12 @@ const mayRise = () => !sheetKind() && !typing() && !/\/(yours|live)$/.test(locat
 export const refreshAsk = () => {
   const all = waiting();
   if (sheetKind() === "ask") {
-    if (!up || up.saying) return;
+    if (!up || up.saying || deciding.has(up.id)) return;
     const still = all.find((one) => one.ask.approval_id === up.id);
     if (!still) {
-      // Answered somewhere else, or the job ended.
-      if (all[0]) draw(all[0]);
-      else closeSheet();
+      // Answered somewhere else, or the job ended. It says so before the next one comes, so the next ask's buttons
+      // never arrive under a finger that was on this one's.
+      say(up.id, up.mascot, "This isn’t waiting any more. It was answered somewhere else, or its job ended.");
       return;
     }
     // Never over an answer being typed.

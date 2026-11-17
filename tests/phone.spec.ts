@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { homedir } from "node:os";
-import { extname, join, normalize } from "node:path";
+import { extname, join } from "node:path";
+import { normalize } from "node:path/posix";
 import webpush from "web-push";
 import { mascotFromSnapshot, mascotSnapshot } from "../src/main/cloudJobs";
 import type { MascotProfile } from "../src/shared/library";
@@ -45,7 +46,9 @@ const PENNY: MascotProfile = { ...SCOUT, id: "m-penny", name: "Penny", look: { p
 const SHOP = `<!doctype html><title>Shop</title><style>body{font:16px system-ui;margin:24px;color:#222;background:#fff}input{display:block;margin:8px 0;padding:8px;width:80%}</style>
 <h1>shop.example</h1><p>Sign in to go on.</p><label>Email<input id="email"></label><label>Code<input id="code" autocomplete="one-time-code"></label><button>Sign in</button>`;
 
-test.skip(process.platform !== "darwin" || !existsSync(CHROME), "Needs Google Chrome");
+// Chrome on a Mac, and on Windows Edge, which comes with it.
+const BROWSER = process.platform === "win32" ? { channel: "msedge" } : { executablePath: CHROME };
+test.skip(process.platform !== "win32" && !existsSync(CHROME), "Needs Google Chrome, or Edge on Windows");
 
 test("the phone page signs in, shows a job, allows it, follows it up, starts one, and never sends a code", async () => {
   test.setTimeout(120_000);
@@ -91,7 +94,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     return text ? JSON.parse(text) : null;
   };
 
-  const browser = await chromium.launch({ executablePath: CHROME });
+  const browser = await chromium.launch(BROWSER);
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: "light", reducedMotion: "reduce" });
   await context.route("https://www.browserbase.com/**", (route) => route.fulfill({ contentType: "text/html", body: SHOP }));
   const page = await context.newPage();
@@ -156,10 +159,18 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
     await shoot(page, "home");
 
-    // 3. Allow, and the decision is written as the user.
+    // 3. Allow, and the decision is written as the user, once: Don't allow pressed in the same moment sends nothing.
     await card.click();
-    await sheet.getByRole("button", { name: "Allow", exact: true }).click();
+    let decisions = 0;
+    page.on("request", (request) => {
+      if (/rpc\/decide_cloud_approval/.test(request.url())) decisions += 1;
+    });
+    await sheet.getByRole("button", { name: "Allow", exact: true }).evaluate((allow) => {
+      (allow as HTMLButtonElement).click();
+      [...allow.parentElement!.querySelectorAll("button")].find((button) => button !== allow)!.click();
+    });
     await expect(page.getByText("Allowed. Scout carries on.")).toBeVisible();
+    expect(decisions).toBe(1);
     expect(await supabase.cloudRows(`select decision from public.cloud_approvals where id = '${approval}'`)).toEqual([{ decision: "allow" }]);
     expect(await rpc(runner, "runner_decision", { p_approval: approval })).toEqual([{ decision: "allow", answer: null }]);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -178,7 +189,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     const handoff = await rpc(runner, "runner_ask", { p_job: first, p_kind: "handoff", p_text: "Sign in on shop.example", p_need: "sign-in", p_site: "shop.example" });
     await expect(page.getByRole("dialog", { name: "Scout needs you to sign in on shop.example" })).toBeVisible();
     await page.getByRole("button", { name: "Take over" }).click();
-    await expect(page.getByText("It’s yours")).toBeVisible();
+    await expect(page.locator(".addr").getByText("It’s yours")).toBeVisible();
     await expect(page.locator("#live iframe")).not.toHaveAttribute("inert", "");
     expect(await page.locator("#live iframe").evaluate((node, before) => node === before, frameBefore)).toBe(true);
     await expect(page.locator("#app input, #app textarea, #sheets input, #sheets textarea")).toHaveCount(0);
@@ -336,7 +347,9 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await page.getByLabel("Email").fill("bo@example.com");
     await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText("Nothing’s running.", { exact: false })).toBeVisible();
+    // Bo has no cloud set up, and none of Ana’s jobs.
+    await expect(page.getByText("Nothing can run in the cloud yet.", { exact: false })).toBeVisible();
+    await expect(page.locator("a.row")).toHaveCount(0);
     await page.getByRole("button", { name: "Settings" }).click();
     await expect(settings.getByText("bo@example.com")).toBeVisible();
     await expect(settings.getByRole("switch", { name: "Notifications" })).toHaveAttribute("aria-checked", "false");

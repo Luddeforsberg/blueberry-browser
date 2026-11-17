@@ -11,7 +11,7 @@ export const state = {
   push: "unavailable",
   // Handoffs this phone has taken over, by approval id, so the live page is unlocked for them.
   taken: new Set(),
-  // Answered here and on their way, so a poll that crosses them doesn't bring them back.
+  // Answered here, so a poll that crossed the answer doesn't bring them back.
   answered: new Set(),
   // Asks that have been up as a sheet already, so one put away doesn't come back by itself.
   seen: new Set(),
@@ -89,7 +89,7 @@ const isLiveView = (url) => {
 export const liveOf = (job) => (typeof job.live_view_url === "string" && isLiveView(job.live_view_url) ? job.live_view_url : null);
 
 const MOOD_FOR = { queued: "fetching", running: "fetching", waiting: "asking", done: "delivered", failed: "oops", stopped: "rest" };
-// One answered here and on its way is working again, whatever the row still says.
+// One answered here is working again, whatever the row still says.
 export const moodOf = (job) => (askOf(job) ? "asking" : job.status === "waiting" ? "fetching" : (MOOD_FOR[job.status] ?? "rest"));
 
 // --- Words ---
