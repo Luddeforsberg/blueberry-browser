@@ -1,20 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Check, ExternalLink } from 'lucide-react'
-import type { PublishChoices } from '@shared/library'
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Lock, LockOpen } from 'lucide-react'
+import type { MascotDraft, MascotExample, PublishChoices } from '@shared/library'
 import { GALLERY_CATEGORIES, MAX_AUTHOR, MAX_DESCRIPTION, MAX_EXAMPLE_ANSWER, MAX_EXAMPLE_PROMPT, parsePublicDraft, parsePublishChoices, publishWarnings } from '@shared/publishing'
-import { ACCESSORIES, PALETTES } from '@shared/mascots'
+import { ACCESSORIES, PALETTES, permissionsInWords } from '@shared/mascots'
 import { Button } from '@common/components/Button'
 import { QuietChoice } from '@common/components/Controls'
 import { cn } from '@common/lib/utils'
 import { AccountForm } from '../components/AccountForm'
 import { Berry } from '../components/Berry'
 import { CopyLink } from '../components/CopyLink'
-import { ChatError } from '../components/ChatMessage'
+import { ChatError, Markdown } from '../components/ChatMessage'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
 import { lastExchange, type PublishValues } from '../flockView'
 import { useAccount } from '../useAccount'
-import { ExampleText, GalleryCard, Permissions } from './MascotGalleryPage'
+import { GalleryTile } from './MascotGalleryPage'
 
 const INPUT = "w-full px-3 rounded-tile border bg-sheet text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
 const ROW = "py-5 border-b"
@@ -39,6 +39,32 @@ const Line: React.FC<{ term: string; children: React.ReactNode }> = ({ term, chi
 
 // A radio or a checkbox in our own colours. The real one lies over its whole line, unseen, so the pointer, the keyboard
 // and labels work as ever.
+// What it may do, in words, read from its real limits. Open means it isn't limited.
+const Permissions: React.FC<{ draft: Pick<MascotDraft, 'sites' | 'tools'> }> = ({ draft }) => (
+    <ul aria-label="What it’s allowed to do" className="flex flex-wrap gap-x-4 gap-y-0.5 text-13 text-ink-2">
+        {permissionsInWords(draft).map(({ text, open }) => {
+            const Icon = open ? LockOpen : Lock
+            return (
+                <li key={text} className="flex items-start gap-1.5 [overflow-wrap:anywhere]">
+                    <Icon aria-hidden className="shrink-0 mt-[2px] size-3" />
+                    {text}
+                </li>
+            )
+        })}
+    </ul>
+)
+
+// The example as it will go: the question as typed, and the answer as it reads in the Gallery, which can't fetch an
+// image or dress up a link.
+const ExampleText: React.FC<{ example: MascotExample }> = ({ example }) => (
+    <>
+        <h3 className="text-13 text-ink-2">I asked this</h3>
+        <p className="mt-1 text-14 whitespace-pre-wrap [overflow-wrap:anywhere]">{example.prompt}</p>
+        <h3 className="mt-4 text-13 text-ink-2">And here’s what it gave me</h3>
+        <Markdown content={example.answer} fromStranger className="mt-1 text-14 [overflow-wrap:anywhere]" />
+    </>
+)
+
 const REAL_INPUT = "peer absolute inset-0 m-0 size-full opacity-0"
 const Mark: React.FC<{ round?: boolean }> = ({ round = false }) => (
     <span aria-hidden className={cn(
@@ -227,8 +253,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                 {listed && (
                     <section aria-label="How it looks" className="pt-5">
                         <h2 className="text-14 font-medium">How it looks in the Gallery</h2>
-                        <ul aria-label="Preview of the Gallery" className="mt-1 border-b-0 [&>li:last-child]:border-b">
-                            <GalleryCard
+                        <div aria-label="Preview of the Gallery" role="group" className="mt-3 w-[170px]">
+                            <GalleryTile
                                 entry={{
                                     id: mascot.publishedId,
                                     draft: mascot,
@@ -238,9 +264,8 @@ export const PublishMascot: React.FC<{ mascotId: string; values: PublishValues; 
                                     example: listed.example ?? undefined,
                                     addCount
                                 }}
-                                copy={null}
                             />
-                        </ul>
+                        </div>
                     </section>
                 )}
 

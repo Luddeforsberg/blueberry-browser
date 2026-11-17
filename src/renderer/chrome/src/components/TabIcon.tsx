@@ -1,6 +1,6 @@
 import React from 'react'
 import type { InternalPage, TabInfo } from '@shared/ipc'
-import { CircleAlert, Cloud, Compass, Download, Eye, Feather, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings, type LucideIcon } from 'lucide-react'
+import { CircleAlert, Cloud, Compass, Component, Download, Eye, Hand, History, LayoutGrid, MessageCircle, RefreshCw, Settings, type LucideIcon } from 'lucide-react'
 import { Pips } from '@common/components/Pips'
 import { useFlock } from '../contexts/LibraryContext'
 import { Berry } from './Berry'
@@ -13,9 +13,9 @@ const PAGE_ICONS: Record<Exclude<InternalPage, 'flock'>, LucideIcon> = {
     routines: RefreshCw,
     settings: Settings,
     downloads: Download,
-    gallery: LayoutGrid,
+    gallery: Component,
     history: History,
-    'mascot-gallery': Feather,
+    'mascot-gallery': LayoutGrid,
     'needs-you': Hand,
     recording: Eye,
     cloud: Cloud
