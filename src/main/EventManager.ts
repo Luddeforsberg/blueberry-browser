@@ -232,6 +232,7 @@ export class EventManager {
     this.handle("recording:discard", () => this.mainWindow.recordings.discard());
     this.handle("recording:draft", () => this.mainWindow.recordings.draft());
     this.handle("chat:stop", (chatId) => this.mainWindow.chats.stop(chatId));
+    this.handle("chat:panel-shows", (chatId) => this.mainWindow.panelShows(typeof chatId === "string" ? chatId : null));
     this.handle("chat:decide", (chatId, approvalId, allow, answer) =>
       this.mainWindow.chats.decide(chatId, approvalId, allow, answer)
     );

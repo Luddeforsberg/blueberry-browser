@@ -126,6 +126,8 @@ export class Window {
   private popover: Popover | null = null;
   private sidebarOpen = true;
   private chatOpen = false;
+  // The chat the chat panel has, which the chrome tells us, since a panel chat has no tab to be in front.
+  private panelChatId: string | null = null;
   private windowClosed = false;
   // Tabs Berry opened behind the chat. Where it goes in them isn't the user's history until they go there too.
   private readonly backgroundTabs = new Set<string>();
@@ -723,7 +725,22 @@ export class Window {
 
   private isChatInFront(chatId: string): boolean {
     const entry = this.activeEntry;
-    return entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId;
+    return (entry instanceof InternalTab && entry.page === "chat" && entry.param === chatId) || this.panelChatShowing === chatId;
+  }
+
+  // Null while the panel is closed or has no place, as on the new tab.
+  private get panelChatShowing(): string | null {
+    return this.chatOpen && this.chatAvailable ? this.panelChatId : null;
+  }
+
+  private seePanelChat(): void {
+    const chatId = this.panelChatShowing;
+    if (chatId) this.chats.markSeen(chatId);
+  }
+
+  panelShows(chatId: string | null): void {
+    this.panelChatId = chatId;
+    this.seePanelChat();
   }
 
   get activeEntry(): BrowserTab | null {
@@ -1113,6 +1130,7 @@ export class Window {
     this.closePopover(false);
     this.activeTabId = tabId;
     if (tab instanceof InternalTab && tab.page === "chat" && tab.param) this.chats.markSeen(tab.param);
+    this.seePanelChat();
     if (tab instanceof Tab) tab.webContents.setAudioMuted(false);
     const unvisited = this.unvisitedTabs.delete(tabId);
     if ((this.backgroundTabs.delete(tabId) || unvisited) && tab instanceof Tab) {
@@ -1527,6 +1545,7 @@ export class Window {
   toggleChat(): void {
     if (!this.chatAvailable) return;
     this.chatOpen = !this.layout.chatOpen;
+    this.seePanelChat();
     this.updateAllBounds();
     this.saveSessionSoon();
   }

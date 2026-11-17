@@ -1022,6 +1022,32 @@ test("a chat that finishes behind another tab is Done until it's opened, and one
   await expect(earlier.getByRole("button", { name: /^Plan a weekend/ })).toBeVisible();
 });
 
+test("a chat that finishes in the open chat panel isn't Done, and one that finishes with the panel closed is until the panel shows it", async () => {
+  const chatsFace = chrome.getByRole("tabpanel", { name: "Chats" });
+  const done = chatsFace.getByRole("region", { name: /^Done/ });
+  const earlier = chatsFace.getByRole("region", { name: /^Earlier/ });
+
+  await openFixture();
+  await openChat();
+  const message = chrome.getByRole("complementary", { name: "Berry" }).getByRole("textbox", { name: "Message" });
+  await message.fill("What is this page");
+  await message.press("Enter");
+  await showChats();
+  await expect(earlier.getByRole("button", { name: /^What is this page/ })).toBeVisible();
+  await expect(done).toHaveCount(0);
+
+  const finish = model.holdBeforeFirstToken();
+  await message.fill("And then?");
+  await message.press("Enter");
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
+  expect((await chrome.evaluate(() => window.chromeAPI.layout.getLayout())).chatOpen).toBe(false);
+  finish();
+  await expect(done).toContainText("1 new");
+
+  await chrome.evaluate(() => window.chromeAPI.layout.toggleChat());
+  await expect(done).toHaveCount(0);
+});
+
 for (const change of ["renamed", "generated"] as const) {
   test(`reopening a closed chat uses its ${change} title`, async () => {
     await startChat("Original title");

@@ -545,6 +545,8 @@ export interface InvokeChannels {
   // The user's tabs that could go with a message in this chat, or a new one as this mascot, each with why not if it can't.
   "attachments:tabs": { region: "chrome"; args: [chatId: string | null, mascotId: string | null]; result: TabChoice[] };
   "chat:stop": { region: "chrome"; args: [chatId: string]; result: void };
+  // Which chat the chat panel has, or null for a new one, so a reply that ends in the open panel counts as seen.
+  "chat:panel-shows": { region: "chrome"; args: [chatId: string | null]; result: void };
   // A routine's run answers its approvals here too, under the run's id.
   "chat:decide": {
     region: "chrome" | "overlay";
@@ -774,6 +776,7 @@ export interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
   send: (chatId: string | null, text: string, options: ChatSendOptions) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
+  panelShows: (chatId: string | null) => Promise<void>;
   decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => Promise<boolean>;
   rename: (chatId: string, title: string) => Promise<boolean>;
   showMenu: (chatId: string) => Promise<"rename" | null>;
