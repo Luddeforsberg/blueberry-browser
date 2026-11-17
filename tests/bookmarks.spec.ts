@@ -200,7 +200,7 @@ test("bookmarked pages show a filled star in ink, in both layouts and themes", a
       await emptyStar.click();
       const savedStar = chrome.getByRole("button", { name: "Remove bookmark", exact: true });
       // Colour belongs to the mascots, so a saved page is marked in `ink`.
-      const color = appearance === "light" ? "rgb(21, 21, 20)" : "rgb(238, 237, 232)";
+      const color = appearance === "light" ? "rgb(20, 20, 22)" : "rgb(238, 237, 232)";
       await expect(savedStar.locator("svg")).toHaveCSS("fill", color);
       await expect(savedStar.locator("svg")).toHaveCSS("stroke", color);
       await savedStar.hover();
