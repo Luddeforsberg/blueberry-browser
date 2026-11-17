@@ -37,6 +37,7 @@ export class EventManager {
       find: endpoint(this.mainWindow.findBar.chromeView),
       suggestions: endpoint(this.mainWindow.addressSuggestions.chromeView),
       tooltip: endpoint(this.mainWindow.tooltip.chromeView),
+      preview: endpoint(this.mainWindow.previews.chromeView),
       prompt: endpoint(this.mainWindow.permissionPrompt.chrome),
       // There's no such view while the feature is off, so nothing can claim to be it.
       desktop: this.mainWindow.desktopBerry.chromeView && endpoint(this.mainWindow.desktopBerry.chromeView),
@@ -99,6 +100,8 @@ export class EventManager {
     this.handle("address:pick", (index) => this.mainWindow.pickAddressSuggestion(index));
     this.handle("tooltip:show", (request) => this.mainWindow.showTooltip(request));
     this.handle("tooltip:hide", () => this.mainWindow.tooltip.hide());
+    this.handle("preview:show", (request) => this.mainWindow.previews.show(request));
+    this.handle("preview:hide", () => this.mainWindow.previews.hide());
 
     this.handle("history:recent", () => this.mainWindow.recentVisits);
 

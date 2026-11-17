@@ -505,16 +505,21 @@ export class Tab implements PageTarget {
     else this.actor.shown();
   }
 
-  // A small picture of the page, with the bird in it, for the working view in the chrome and for nothing else. Tools use
-  // `screenshot`, which is separate and keeps the bird out. It's asked again after the capture, because the user may have
-  // been handed the tab while that was on its way, and may even have finished and given it back, so that counts too.
-  async picture(width: number): Promise<Buffer | null> {
+  // A small picture of the page, with the bird in it, for the working view in the chrome and the tab's preview card, and
+  // for nothing else. Tools use `screenshot`, which is separate and keeps the bird out. It's asked again after the
+  // capture, because the user may have been handed the tab while that was on its way, and may even have finished and
+  // given it back, so that counts too. `cut` keeps only the top left of the page, in that shape, as a height to width.
+  async picture(width: number, cut?: number): Promise<Buffer | null> {
     const view = this.webContentsView;
     if (!view || !this.canBePictured) return null;
     const { holdsStarted } = this;
     const image = await this.fromPage(() => view.webContents.capturePage()).catch(() => null);
     if (!image || image.isEmpty() || !this.canBePictured || holdsStarted !== this.holdsStarted) return null;
-    return image.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
+    const size = image.getSize();
+    const top = cut
+      ? image.crop({ x: 0, y: 0, width: Math.min(size.width, Math.round(size.height / cut)), height: Math.min(size.height, Math.round(size.width * cut)) })
+      : image;
+    return top.resize({ width, quality: "good" }).toJPEG(PICTURE_QUALITY);
   }
 
   private get canBePictured(): boolean {

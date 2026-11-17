@@ -85,6 +85,7 @@ Rules:
 - **Anything over a page needs an overlay view,** because the chrome view is underneath tab views. The one exception is what's drawn in the page while a mascot works there (see Over a web page).
 - **Overlay views are only as large as what they show.** Assume a transparent area blocks clicks. The one exception is what opens from the horizontal toolbar: its view covers everything under the toolbar's own row, so a press anywhere outside the panel closes it, as with a menu.
 - **A tooltip over the page has a view of its own,** a strip as wide as the window and as tall as the tooltip, so moving along a row of controls slides the tooltip inside it and never moves the native view. It's there only while the pointer or the keyboard is on its control, goes the moment the pointer leaves, and never takes the keyboard. Tooltips anywhere the chrome draws stay in the chrome.
+- **A tab's preview has a view of its own too,** for the same reason: beside the sidebar it's over the page, and under the tab row it reaches past the toolbar. It's a strip along the tabs, as tall as the window beside the sidebar and as wide as it under the tab row, starting at the sidebar's edge or the row's, so it never covers a tab, and following the pointer from tab to tab moves the card inside it, never the native view. It's there only while the pointer or the keyboard is on a tab, and goes the moment the pointer reaches it.
 
 ## 3. Surfaces
 

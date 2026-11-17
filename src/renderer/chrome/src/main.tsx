@@ -5,6 +5,7 @@ import { OverlayApp } from './OverlayApp'
 import { FindApp } from './FindApp'
 import { SuggestionsApp } from './SuggestionsApp'
 import { TooltipApp } from './TooltipApp'
+import { TabPreviewApp } from './TabPreviewApp'
 import { PromptApp } from './PromptApp'
 import { DesktopApp, DesktopComposerApp } from './DesktopApp'
 import { DarkMarkFilter } from './components/Favicon'
@@ -26,6 +27,6 @@ const view = new URLSearchParams(window.location.search).get('view')
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <DarkMarkFilter />
-        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'suggestions' ? <SuggestionsApp /> : view === 'tooltip' ? <TooltipApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
+        {view === 'overlay' ? <OverlayApp /> : view === 'find' ? <FindApp /> : view === 'suggestions' ? <SuggestionsApp /> : view === 'tooltip' ? <TooltipApp /> : view === 'preview' ? <TabPreviewApp /> : view === 'prompt' ? <PromptApp /> : view === 'desktop' ? <DesktopApp /> : view === 'composer' ? <DesktopComposerApp /> : <ChromeApp />}
     </React.StrictMode>
 )

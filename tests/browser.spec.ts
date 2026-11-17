@@ -1232,8 +1232,8 @@ test("the chrome renderers run sandboxed", async () => {
   });
 
   // The chrome view, the overlay view for the floating sidebar, the find bar, the address field's suggestions, the tooltip
-  // over the page and the site permission prompt.
-  expect(sandboxed).toEqual([true, true, true, true, true, true]);
+  // over the page, a tab's preview card and the site permission prompt.
+  expect(sandboxed).toEqual([true, true, true, true, true, true, true]);
 });
 
 test("the chrome renderer can't be navigated away from its own page", async () => {

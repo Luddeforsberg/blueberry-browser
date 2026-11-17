@@ -12,6 +12,7 @@ import { useComings, useRowMotion } from '@common/components/motion'
 import type { DrawnRow } from '@common/components/comings'
 import { SHORTCUTS } from '@shared/shortcuts'
 import { Tooltip } from '@common/components/Tooltip'
+import { TabPreviewProvider, useTabPreview } from './TabPreview'
 
 // A tab in the row at its widest, and the space between two.
 const ROW_TAB_MAX = 196
@@ -55,6 +56,7 @@ const TabItem: React.FC<{
     const folding = phase === 'folding'
     const iconOnly = useIconOnly(item, row, folding)
     useRowMotion(item, phase, row ? 'width' : 'height')
+    const preview = useTabPreview(tab, folding)
     return (
     <li
         ref={item}
@@ -81,12 +83,14 @@ const TabItem: React.FC<{
         )}
     >
         <Tooltip
-            words={tab.berryWorking ? `${find(tab.workingMascotId).name} is working here` : tab.title || 'New tab'}
+            // Its card says all this and more, where it gets one.
+            words={preview ? null : tab.berryWorking ? `${find(tab.workingMascotId).name} is working here` : tab.title || 'New tab'}
             // Its name in full where it's cut, or always where the row only has room for its icon.
             whenCut={!tab.berryWorking && !iconOnly}
         >
             <button
                 type="button"
+                {...preview}
                 aria-current={tab.isActive ? 'page' : undefined}
                 onClick={onActivate}
                 onKeyDown={(e) => {
@@ -126,6 +130,12 @@ const TabItem: React.FC<{
         </Tooltip>
     </li>
     )
+}
+
+// A job's tab gets its card in place of its tooltip too, where it gets one.
+const JobTabTip: React.FC<{ tab: TabInfo; children: (preview: ReturnType<typeof useTabPreview>) => React.ReactElement }> = ({ tab, children }) => {
+    const preview = useTabPreview(tab)
+    return <Tooltip words={preview ? null : tab.title || 'New tab'} whenCut>{children(preview)}</Tooltip>
 }
 
 // A job's tabs aren't the user's. While one runs, its chat is a row with its mascot's face, on a tray, and the tabs it
@@ -168,9 +178,10 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
             <ul aria-label={`Pages ${mascot.name} opened`} className="ml-[15px] pl-2 border-l border-dotted border-faint">
                 {tabs.map((tab) => (
                     <li key={tab.id}>
-                        <Tooltip words={tab.title || 'New tab'} whenCut>
+                        <JobTabTip tab={tab}>{(preview) => (
                             <button
                                 type="button"
+                                {...preview}
                                 aria-current={tab.isActive ? 'page' : undefined}
                                 onClick={() => !tab.isActive && void switchTab(tab.id)}
                                 className={cn(row, "h-[30px] text-14", tab.isActive ? "bg-sheet text-ink shadow-up" : "text-ink hover:bg-hover")}
@@ -179,7 +190,7 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
                                 <span className={LEADING_SLOT}><TabIcon tab={tab} still large /></span>
                                 <span className="flex-1 truncate">{tab.title || 'New tab'}</span>
                             </button>
-                        </Tooltip>
+                        )}</JobTabTip>
                     </li>
                 ))}
             </ul>
@@ -216,9 +227,10 @@ const JobGroupRow: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs
             <ul aria-label={`Pages ${mascot.name} opened`} className="min-w-0 flex items-center gap-0.5">
                 {tabs.map((tab) => (
                     <li key={tab.id} className="min-w-9 flex-[0_1_136px]">
-                        <Tooltip words={tab.title || 'New tab'} whenCut>
+                        <JobTabTip tab={tab}>{(preview) => (
                             <button
                                 type="button"
+                                {...preview}
                                 aria-current={tab.isActive ? 'page' : undefined}
                                 onClick={() => !tab.isActive && void switchTab(tab.id)}
                                 className={cn("w-full h-[30px] px-2.5 flex items-center gap-2 rounded-row text-14", tab.isActive ? "bg-sheet text-ink shadow-rim" : "text-ink-2 hover:bg-hover hover:text-ink", focus)}
@@ -227,7 +239,7 @@ const JobGroupRow: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs
                                 <span className={LEADING_SLOT}><TabIcon tab={tab} still /></span>
                                 <span className="flex-1 min-w-0 truncate">{tab.title || 'New tab'}</span>
                             </button>
-                        </Tooltip>
+                        )}</JobTabTip>
                     </li>
                 ))}
             </ul>
@@ -268,7 +280,7 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
     }, [order])
 
     return (
-        <>
+        <TabPreviewProvider>
             <ul
                 aria-labelledby={labelledBy}
                 aria-label={label}
@@ -348,6 +360,6 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                     </button>
                 </Tooltip>
             )}
-        </>
+        </TabPreviewProvider>
     )
 }
