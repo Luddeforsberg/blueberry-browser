@@ -49,7 +49,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const form = chrome.getByRole("form", { name: "Sign in" });
     await form.getByRole("radio", { name: "Create account" }).click();
     await form.getByLabel("Email").fill(EMAIL);
-    await form.getByLabel("Password").fill(PASSWORD);
+    await form.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await form.getByRole("button", { name: "Create account" }).click();
 
     // The author name starts empty, and never as anything from the account.

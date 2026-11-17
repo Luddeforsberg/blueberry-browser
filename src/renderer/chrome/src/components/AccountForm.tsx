@@ -2,8 +2,10 @@ import React, { useState } from 'react'
 import type { AccountState } from '@shared/ipc'
 import { Button } from '@common/components/Button'
 import { Choice } from '@common/components/Controls'
+import { cn } from '@common/lib/utils'
+import { PasswordInput } from './PasswordInput'
 
-const FIELD = "block w-full h-9 mt-1 px-3 rounded-tile border bg-sheet text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
+const FIELD = "block w-full h-9 px-3 rounded-tile border bg-sheet text-14 outline-none focus-visible:ring-2 focus-visible:ring-focus"
 
 // Typed here, in our own page and never in a tab. The password goes to main once, and this forgets it as soon as it has.
 export const AccountForm: React.FC<{ problem: string | null; onResult: (state: AccountState) => void }> = ({ problem, onResult }) => {
@@ -24,14 +26,17 @@ export const AccountForm: React.FC<{ problem: string | null; onResult: (state: A
 
     return (
         <form aria-label="Sign in" onSubmit={(event) => void submit(event)} className="max-w-sm flex flex-col gap-3">
-            <Choice label="Have an account?" value={mode} onChange={setMode} options={[{ value: 'in', label: 'Sign in' }, { value: 'up', label: 'Create account' }]} />
+            {/* As wide as its two choices, not the form. */}
+            <Choice className="self-start" label="Have an account?" value={mode} onChange={setMode} options={[{ value: 'in', label: 'Sign in' }, { value: 'up', label: 'Create account' }]} />
             <label className="text-14">
                 Email
-                <input type="email" autoComplete="username" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} className={FIELD} />
+                <input type="email" autoComplete="username" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} className={cn(FIELD, 'mt-1')} />
             </label>
             <label className="text-14">
                 Password
-                <input type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} value={password} onChange={(event) => setPassword(event.target.value)} className={FIELD} />
+                <span className="mt-1 block">
+                    <PasswordInput value={password} onChange={setPassword} isNew={mode === 'up'} className={FIELD} />
+                </span>
             </label>
             {problem && <p role="alert" className="text-14 text-ask">{problem}</p>}
             <div>

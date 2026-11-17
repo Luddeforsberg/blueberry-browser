@@ -254,8 +254,9 @@ export const NewTabPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 <Berry size={40} mascot={shown} mood={face.mood} shut={face.shut} />
                             </span>
                         </span>
-                        {/* A long name is cut, never wrapped, at the box's width. */}
-                        <span className="min-w-0 truncate">{greeting ? `Where to, ${greeting}?` : 'Where to?'}</span>
+                        {/* A long name is cut, never wrapped, at the box's width. Cutting clips at the line box, which is
+                            shorter than a g or a comma hangs, so the box is given room it doesn't take up. */}
+                        <span className="min-w-0 truncate py-1.5 -my-1.5">{greeting ? `Where to, ${greeting}?` : 'Where to?'}</span>
                     </h1>
 
                     <div className="w-full max-w-[640px]">

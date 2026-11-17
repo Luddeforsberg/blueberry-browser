@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Check, Eye, EyeOff, Lock, X } from 'lucide-react'
+import { Check, Eye, Lock, X } from 'lucide-react'
+import { PasswordInput } from './PasswordInput'
 import type { ActionApproval, Appearance, LayoutMode } from '@shared/ipc'
 import { BERRY } from '@shared/mascots'
 import { firstJobsFor, firstRunStart, firstRunSteps, type FirstRunStep } from '@shared/firstRun'
@@ -70,24 +71,6 @@ const Field: React.FC<{ label: string; problem?: string | null; hint?: string; c
 )
 
 const INPUT = cn(FIELD, 'h-10 px-3 text-14 shadow-[inset_0_0_0_1px_var(--line)]')
-
-const Password: React.FC<{ value: string; onChange: (value: string) => void; isNew: boolean }> = ({ value, onChange, isNew }) => {
-    const [shown, setShown] = useState(false)
-    const Icon = shown ? EyeOff : Eye
-    return (
-        <span className="relative block">
-            <input type={shown ? 'text' : 'password'} autoComplete={isNew ? 'new-password' : 'current-password'} value={value} onChange={(event) => onChange(event.target.value)} className={cn(INPUT, 'pr-10')} />
-            <button
-                type="button"
-                aria-label={shown ? 'Hide the password' : 'Show the password'}
-                onClick={() => setShown(!shown)}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 size-7 grid place-items-center rounded-row text-ink-3 hover:bg-hover hover:text-ink outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-                <Icon aria-hidden className="size-4" strokeWidth={1.75} />
-            </button>
-        </span>
-    )
-}
 
 // A small drawing of the window as it is now, beside Make it yours. It follows the real window, which changes too.
 const MiniWindow: React.FC<{ tabs: LayoutMode }> = ({ tabs }) => {
@@ -312,7 +295,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
                     <input type="email" autoFocus autoComplete="username" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} className={INPUT} />
                 </Field>
                 <Field label="Password" problem={problem && problem.about !== 'email' ? problem.text : null}>
-                    <Password value={password} onChange={setPassword} isNew={false} />
+                    <PasswordInput value={password} onChange={setPassword} isNew={false} className={INPUT} />
                 </Field>
             </StepCard>
         )
@@ -333,7 +316,7 @@ const Steps: React.FC<{ start: Start }> = ({ start }) => {
                     <input type="email" autoComplete="username" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} className={INPUT} />
                 </Field>
                 <Field label="Password" problem={problem && problem.about !== 'email' ? problem.text : null} hint="At least 8 characters.">
-                    <Password value={password} onChange={setPassword} isNew />
+                    <PasswordInput value={password} onChange={setPassword} isNew className={INPUT} />
                 </Field>
             </StepCard>
         )
