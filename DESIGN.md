@@ -295,48 +295,57 @@ Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell
 
 Berry is a blueberry, and the others are its cousins. Every mascot is one small flat drawing: a body, two eyes, and whatever grows on top. Berry is "it", and it refers to itself as "I". In the UI the word is **mascot**, and together they're **your mascots**. "Bird" and "flock" are gone from what the user reads.
 
-Mock: [mascots-and-pips.html](./docs/design/mocks/mascots-and-pips.html), which also holds the exact shapes.
+Mock: [mascots-and-pips.html](./docs/design/mocks/mascots-and-pips.html) for the pips, and [berries.html](./docs/design/mocks/berries.html) for the berries as they're drawn now, which also holds the exact shapes.
 
 ### The six
 
-Each is drawn on a 48-unit square, body bottom at 46 so it stands on whatever is under it.
+Each is drawn on a 48-unit square, body bottom at 46 so it stands on whatever is under it. Its outline and what grows on top are what say which berry it is, so they have to read at 18px.
 
-| Berry | Body | Eyes | On top | Replaces |
+| Berry | Body | On top | Texture | Replaces |
 |---|---|---|---|---|
-| Blueberry | `#3F51DC`, a round square | White | A small crown, `#2A39B0` | Kingfisher |
-| Lingon | `#DF4B3B`, a round square | Ink `#1D1E27` | A stem and one green leaf | Robin |
-| Cloudberry | `#F2AE35`, seven large bumps | Ink | A leaf star | Canary |
-| Gooseberry | `#86BF4E`, round, two pale stripes | Ink | A dry tuft | Parakeet |
-| Raspberry | `#E86A9B`, ten small bumps | Ink | A leaf star | Flamingo |
-| Currant | `#262433`, and `#6C6792` in dark mode | White | A dry tuft | Jackdaw |
+| Blueberry | `#3F51DC`, a little wider than tall | Its five-pointed crown, open, `#2A39B0` with a darker hollow | A pale bloom across the top | Kingfisher |
+| Lingon | `#DF4B3B`, round | A short stem with a dark leaf, and a smaller one tucked beside it | A bright shine, so it looks glossy | Robin |
+| Cloudberry | `#F2AE35`, built from big beads | Three broad sepals | One soft highlight on each bead | Canary |
+| Gooseberry | `#86BF4E`, a little taller than wide | A stem | Fine pale veins from top to bottom, and a lighter core | Parakeet |
+| Raspberry | `#E86A9B`, rows of small beads, wide at the top and narrowing down | A green star of sepals and a stalk | A rim and a glint on each bead | Flamingo |
+| Currant | `#262433`, and `#6C6792` in dark mode, round | A short stalk with a second small currant close by, and a dry tuft | A purple bloom | Jackdaw |
 
+- **Every body** has a soft shine at its top left and a soft shade underneath, so it looks round.
+- **Texture fades to about a third** over the face, an ellipse round the eyes and mouth, so it never crowds them. Beads under the face have no rim or glint at all.
+- **By size:** at 48px and up, everything. From 28px, no texture, but the shine and the mouth. Under 28px, only the outline, what grows on top, and the eyes, which are a little heavier there, 4.8 by 9.6 units.
 - **Berry is the blueberry,** with nothing on. Its saved look changes from Jackdaw to Blueberry.
-- **"Replaces"** is how a look saved under the old names carries over, keeping each mascot near the colour its owner chose. *To confirm when it's built.*
+- **"Replaces"** is how a look saved under the old names carries over, keeping each mascot near the colour its owner chose.
 - **No colour picker,** because every body has to work in both modes and beside the others.
-- **The eyes** are two upright bars, 3.8 by 9 units, 12 apart. Against their body they measure at least 4.1:1 (lingon) and up to 15.2:1 (currant).
-- **A body's colour isn't required to stand out from the ground.** Cloudberry is 1.6:1 on the light ground and the currant 3.5:1 on the dark one. So nothing relies on a body alone: the eyes carry the shape, a name is always beside it, and every mood has words. A hairline round the paler bodies in light mode is *to tune*.
+- **The eyes** are two upright bars, 4 by 8.4 units, 12 apart: white on the blueberry and the currant, ink on the four pale bodies, in both modes.
+- **A body's colour isn't required to stand out from the ground.** Cloudberry is 1.6:1 on the light ground and the currant 3.5:1 on the dark one. So nothing relies on a body alone: the eyes carry the shape, a name is always beside it, and every mood has words.
+- **No blush** and nothing pink on the face. The face is the eyes and the mouth.
 
 ### Accessories
 
-Nothing, a crown, a cap, glasses, headphones or a bow, as before. Each sits on the body and covers what grows there. They read down to 14px.
+Nothing, a crown, a cap, glasses, headphones or a bow, as before. None hides what grows on top of the berry, so the berry still reads.
+
+- **Crown and bow** are small and worn at an angle, beside the top: on the right, or on the left on the lingon and the currant, whose stem leans right.
+- **Cap:** what grows on top sits on the cap's crown, like its button.
+- **Headphones:** the band goes behind what grows on top.
+- **Glasses** are ink, and light on the currant. They come off while it works, since they'd sit on the pips.
 
 ### Moods
 
-Every mood has a text label for assistive technology. The mood names in the code don't change.
+Every mood has a text label for assistive technology. The mood names in the code don't change. From 28px, a small mouth carries half the mood.
 
-| Mood | Meaning | The face |
-|---|---|---|
-| At rest, sitting | Present, nothing happening | Two bars |
-| Curious | Looking at something you asked about | Tilted 10°, eyes up and to one side |
-| Thinking, fetching | Working | The eyes become the pips, one dot chasing round |
-| Asking | Needs your decision | Round eyes, and a dot in `ask` at its top right |
-| Delivered | Finished | Two small arcs |
-| Oops | Something went wrong | Two bars slanted down and outwards |
-| Off duty | Nothing to do for a long time | Two dashes, at half strength |
+| Mood | Meaning | Eyes | Mouth |
+|---|---|---|---|
+| At rest, sitting | Present, nothing happening | Two bars | A small smile |
+| Curious | Looking at something you asked about | Tilted 10°, eyes up and to one side | A small "o" |
+| Thinking, fetching | Working | The eyes become the pips, one dot chasing round | None. The body goes plain: no shine, shade or texture, so the pips are the one thing on it. Its outline and top stay |
+| Asking | Needs your decision | Round eyes, and a dot in `ask` at its top right | A short flat line |
+| Delivered | Finished | Two small arcs | Open |
+| Oops | Something went wrong | Two bars slanted down and outwards | A wobble |
+| Off duty | Nothing to do for a long time | Two dashes, at half strength | A short line |
 
 ### Sizes
 
-One drawing at every size, from 14px in a row to 52px. A row uses 18 to 22px, the pill 20px, the dock 26px, and the one beside the greeting 40px.
+One drawing at every size, from 14px in a row to 112px on a Gallery card, with less detail as it gets smaller (The six). A row uses 18 to 22px, the pill 20px, the dock 26px, and the one beside the greeting 40px.
 
 ### Personality and voice
 
