@@ -14,12 +14,12 @@ import { BERRY_KIND, Mascot } from '@common/components/Mascot'
 const BERRY_LOOK: MascotLook = { palette: 'kingfisher', accessory: 'none' }
 const FACE = 66.7
 
-export const AppIcon: React.FC<{ look?: MascotLook; ground: AppIconGround; size: number; className?: string }> = ({ look = BERRY_LOOK, ground, size, className }) => {
+export const AppIcon: React.FC<{ look?: MascotLook; ground: AppIconGround; size: number }> = ({ look = BERRY_LOOK, ground, size }) => {
     const id = useId().replace(/[^\w-]/g, '')
     const body = `var(--berry-${BERRY_KIND[look.palette]})`
     const dots = ground === 'paper' || ground === 'night'
     return (
-        <svg aria-hidden viewBox="0 0 100 100" width={size} height={size} className={`${ground === 'night' ? 'dark' : 'light'} shrink-0 ${className ?? ''}`}>
+        <svg aria-hidden viewBox="0 0 100 100" width={size} height={size} className={`${ground === 'night' ? 'dark' : 'light'} shrink-0`}>
             <defs>
                 <clipPath id={`${id}-shape`}>
                     <rect width={100} height={100} rx={25} />
