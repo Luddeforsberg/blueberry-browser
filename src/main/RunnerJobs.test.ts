@@ -83,7 +83,7 @@ const setUp = () => {
     5
   );
   const signIn = (email: string | null) => {
-    account.state = email ? { status: "signed-in", email, problem: null } : { status: "signed-out", email: null, problem: null };
+    account.state = email ? { status: "signed-in", email, problem: null, problemAbout: null } : { status: "signed-out", email: null, problem: null, problemAbout: null };
     runner.accountChanged();
   };
   // As `Chats` sends: the history read from the chat when it goes, and the message saved once the runner has it.
@@ -356,7 +356,7 @@ describe("the flock shared with the phone", () => {
     flock.push({ ...SCOUT, id: "m-2", name: "Penny" });
     await runner.flockChanged();
     expect(syncCloudFlock).toHaveBeenCalledTimes(2);
-    account.state = { status: "signed-out", email: null, problem: null };
+    account.state = { status: "signed-out", email: null, problem: null, problemAbout: null };
     runner.accountChanged();
     flock.pop();
     await runner.flockChanged();

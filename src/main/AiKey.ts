@@ -10,6 +10,12 @@ import { tryAiKey, type TryOutcome } from "./aiKeyTry";
 // through `inUse`. A key is only kept once the service has answered with it. Where this computer can't encrypt, it isn't
 // kept at all, as with the cloud's key.
 
+// Where each service makes keys.
+export const KEY_PAGES: Record<SavedKey["service"], string> = {
+  openai: "https://platform.openai.com/api-keys",
+  anthropic: "https://console.anthropic.com/settings/keys",
+};
+
 export class AiKey {
   private saved: SavedKey | null;
   // Counts every try and removal, so only the newest try may save, and never one a removal overtook.

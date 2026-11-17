@@ -1,4 +1,4 @@
-import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, systemPreferences, type WebContents } from "electron";
+import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, shell, systemPreferences, type WebContents } from "electron";
 import { release } from "os";
 import { TAB_WEB_PREFERENCES, Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -20,10 +20,13 @@ import { Routines } from "./Routines";
 import { confirmClearMemory, confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
 import { Account } from "./Account";
+import { AiKey, KEY_PAGES } from "./AiKey";
+import { isAiService } from "../shared/aiKey";
+import { PLAIN_WORDS, type FirstJob } from "../shared/firstRun";
 import { Gallery } from "./Gallery";
 import { GalleryServer, serverConfig } from "./galleryServer";
 import { linkThrottle } from "./mascotLink";
-import { generateTitle, hasModel, streamReply, writeWithCheapModel } from "./agent";
+import { generateTitle, hasModel, streamReply, useSavedKey, writeWithCheapModel } from "./agent";
 import { join } from "path";
 import { Suggestions } from "./Suggestions";
 import { MemoryStore } from "./MemoryStore";
@@ -144,6 +147,7 @@ export class Window {
   private knownWaiting = new Set<string>();
   readonly telegram: TelegramChannel;
   readonly account: Account;
+  readonly aiKey: AiKey;
   readonly gallery: Gallery;
   private readonly phone: Phone;
   readonly chats: Chats;
@@ -243,6 +247,12 @@ export class Window {
       this.runnerJobs?.accountChanged();
       this.macJobs?.sync();
     });
+    // Only the service and the last four characters go to the chrome. The key itself goes to the model and nowhere else.
+    this.aiKey = new AiKey(join(app.getPath("userData"), "ai-key.json"), () => {
+      sendToRenderer(this.chrome.view.webContents, "ai-key:updated", this.aiKey.state);
+      if (this.aiKey.inUse) this.firstJobDone("key");
+    });
+    useSavedKey(() => this.aiKey.inUse);
     this.gallery = new Gallery(server, this.account, mascotStore, join(app.getPath("userData"), "gallery.json"), process.env.BLUEBERRY_SITE_URL, () => {
       this.broadcast("library:updated", this.librarySnapshot);
     });
@@ -1036,6 +1046,7 @@ export class Window {
     if (!visits) return { ok: false };
     try {
       const added = this.history.importVisits(visits);
+      this.firstJobDone("history");
       if (added > 0) {
         this.suggestions.historyImported();
         this.publishSuggestions();
@@ -1458,6 +1469,26 @@ export class Window {
     this.sidebarOpen = !this.layout.sidebarOpen;
     this.updateAllBounds();
     this.saveSessionSoon();
+  }
+
+  // A row of First jobs on the new tab, done by what really happened.
+  firstJobDone(job: FirstJob): void {
+    const done = this.settings.firstJobsDone;
+    if (!done.includes(job)) this.updateSettings({ firstJobsDone: [...done, job] });
+  }
+
+  // A message the user sent from Blueberry's own composer: a first job, and meeting Plain Words if it's the one asked.
+  sentFromChrome({ mascotId }: ChatThread): void {
+    this.firstJobDone("try");
+    if (mascotId && this.mascotStore.find(mascotId)?.galleryId === PLAIN_WORDS) this.firstJobDone("meet");
+  }
+
+  // The service's own page for making a key. During the first run there are no tabs to show it in, so it opens in the
+  // system's browser, where the user is likely signed in to the service already.
+  findKey(service: unknown): void {
+    if (!isAiService(service)) return;
+    if (this.settings.onboarded) this.createTab(KEY_PAGES[service]);
+    else void shell.openExternal(KEY_PAGES[service]);
   }
 
   updateSettings(patch: Partial<Settings>): Settings {

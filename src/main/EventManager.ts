@@ -174,6 +174,12 @@ export class EventManager {
       if (appearance === "system" || appearance === "light" || appearance === "dark") this.mainWindow.updateSettings({ appearance });
     });
 
+    this.handle("ai-key:state", () => this.mainWindow.aiKey.state);
+    this.handle("ai-key:try", (service, key) => this.mainWindow.aiKey.try(service, key));
+    this.handle("ai-key:remove", () => this.mainWindow.aiKey.remove());
+    this.handle("ai-key:find", (service) => this.mainWindow.findKey(service));
+    this.handle("edit:paste", () => this.mainWindow.chromeView.view.webContents.paste());
+
     this.handle("phone:state", () => this.mainWindow.telegram.state);
     this.handle("phone:connect", (token) => this.mainWindow.telegram.connect(token));
     this.handle("phone:new-link", () => this.mainWindow.telegram.newLink());
@@ -214,7 +220,10 @@ export class EventManager {
       const files = attachments.peek(fileIds);
       if (!files) return null;
       const thread = chats.send(chatId, text, { ...options, files, tabs, userPresent: true });
-      if (thread) attachments.drop(fileIds);
+      if (thread) {
+        attachments.drop(fileIds);
+        this.mainWindow.sentFromChrome(thread);
+      }
       return thread;
     });
     this.handle("attachments:choose-files", (kept) => this.mainWindow.attachments.chooseFiles(kept));

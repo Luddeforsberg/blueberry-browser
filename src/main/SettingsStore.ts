@@ -4,6 +4,7 @@ import type { DesktopBerrySpot, Settings } from "../shared/ipc";
 import { CHAT_WIDTH, clampWidth, SIDEBAR_WIDTH } from "./Layout";
 import { sanitizeSiteZoom } from "./siteZoom";
 import { cleanAccountName } from "../shared/accountName";
+import { FIRST_JOBS, FIRST_RUN_STEPS, knownOnly } from "../shared/firstRun";
 
 export const DEFAULT_SETTINGS: Settings = {
   layoutMode: "vertical",
@@ -18,6 +19,9 @@ export const DEFAULT_SETTINGS: Settings = {
   askWhereToSave: false,
   onStartup: "restore",
   onboarded: false,
+  firstRun: [],
+  firstJobs: [],
+  firstJobsDone: [],
   startersAdded: false,
   siteZoom: {},
   suggestions: true,
@@ -73,6 +77,9 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     askWhereToSave: bool(input.askWhereToSave, base.askWhereToSave),
     onStartup: pick(input.onStartup, ["restore", "fresh"] as const, base.onStartup),
     onboarded: bool(input.onboarded, base.onboarded),
+    firstRun: knownOnly(input.firstRun, FIRST_RUN_STEPS, base.firstRun),
+    firstJobs: knownOnly(input.firstJobs, FIRST_JOBS, base.firstJobs),
+    firstJobsDone: knownOnly(input.firstJobsDone, FIRST_JOBS, base.firstJobsDone),
     startersAdded: bool(input.startersAdded, base.startersAdded),
     siteZoom: sanitizeSiteZoom(input.siteZoom, base.siteZoom),
     suggestions: bool(input.suggestions, base.suggestions),

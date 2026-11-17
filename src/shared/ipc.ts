@@ -1,7 +1,9 @@
 // The one IPC contract between main and the chrome renderer.
 // Types only: sandboxed preloads can't load shared runtime code, so nothing here may survive compilation.
 
+import type { AiKeyState, AiKeyTried, AiService } from "./aiKey";
 import type { FileChip, TabChoice } from "./attachments";
+import type { FirstJob, FirstRunStep } from "./firstRun";
 import type { ChatThread, GalleryLinked, GalleryListing, LibrarySnapshot, MascotDraft, MascotLook, MemoryResult, PublishChoices, PublishedMascot, PublishResult, RecordedDraftResult, RecordingState, RoutineDraft, RoutineRun, SavedSiteList, Suggestion, WorkFrame, WorkView } from "./library";
 
 // The chrome view under the tabs, the overlay view that floats the collapsed sidebar over a page, and the
@@ -41,8 +43,15 @@ export interface Settings {
   downloadFolder: string | null;
   askWhereToSave: boolean;
   onStartup: StartupChoice;
-  // False until the first-launch steps are finished or skipped.
+  // False until the first run is finished.
   onboarded: boolean;
+  // First run steps already passed, so leaving part way starts again at the first one that isn't done.
+  firstRun: FirstRunStep[];
+  // The rows First jobs shows on the new tab, set when the first run ends. Empty once hidden, and for anyone whose first
+  // run came before it.
+  firstJobs: FirstJob[];
+  // What main has seen really happen: a key saved, history brought in, a message sent, a chat with Plain Words.
+  firstJobsDone: FirstJob[];
   // Whether this profile has had its starter mascots, or never needed them. Once true, they never come back.
   startersAdded: boolean;
   // Page zoom in percent, by site. Sites at 100% aren't listed.
@@ -172,6 +181,8 @@ export interface AccountState {
   status: "not-set-up" | "signed-out" | "signed-in";
   email: string | null;
   problem: string | null;
+  // The field the problem is about, so it's said under that one.
+  problemAbout: "email" | "password" | null;
 }
 
 export type DownloadState = "progressing" | "paused" | "completed" | "cancelled" | "interrupted";
@@ -243,6 +254,7 @@ export interface HistoryEntry extends Visit {
 export interface ImportSource {
   id: string;
   name: string;
+  profiles: number;
 }
 
 export type HistoryImportResult = { ok: true; added: number } | { ok: false };
@@ -606,6 +618,14 @@ export interface InvokeChannels {
   "account:sign-in": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
   "account:sign-up": { region: "chrome"; args: [email: string, password: string]; result: AccountState };
   "account:sign-out": { region: "chrome" | "overlay"; args: []; result: AccountState };
+  "ai-key:state": { region: "chrome"; args: []; result: AiKeyState };
+  // The key goes this way only, and is kept only if the service answers with it. Nothing gives it back.
+  "ai-key:try": { region: "chrome"; args: [service: AiService, key: string]; result: { outcome: AiKeyTried; state: AiKeyState } };
+  "ai-key:remove": { region: "chrome"; args: []; result: AiKeyState };
+  // Opens the service's own page for making a key.
+  "ai-key:find": { region: "chrome"; args: [service: AiService]; result: void };
+  // Pastes into the chrome's focused field, as the Edit menu's Paste does, so the chrome never reads the clipboard.
+  "edit:paste": { region: "chrome"; args: []; result: void };
   "suggestions:list": { region: "chrome"; args: []; result: Suggestion[] };
   "suggestions:dismiss": { region: "chrome"; args: [id: string]; result: Suggestion[] };
   "suggestions:used": { region: "chrome"; args: [id: string]; result: Suggestion[] };
@@ -676,6 +696,7 @@ export type InvokeChannel = keyof InvokeChannels;
 export interface EventChannels {
   "tabs:updated": TabInfo[];
   "account:updated": AccountState;
+  "ai-key:updated": AiKeyState;
   "phone:updated": PhoneState;
   "phone:answered": PhoneAnswered;
   "mcp:updated": McpState;
@@ -870,6 +891,15 @@ export interface MemoryAPI {
   clear: (mascotId: string) => Promise<boolean>;
 }
 
+export interface AiKeyAPI {
+  state: () => Promise<AiKeyState>;
+  tryKey: (service: AiService, key: string) => Promise<{ outcome: AiKeyTried; state: AiKeyState }>;
+  remove: () => Promise<AiKeyState>;
+  find: (service: AiService) => Promise<void>;
+  paste: () => Promise<void>;
+  onUpdated: (callback: (state: AiKeyState) => void) => Unsubscribe;
+}
+
 export interface AccountAPI {
   state: () => Promise<AccountState>;
   signIn: (email: string, password: string) => Promise<AccountState>;
@@ -983,6 +1013,7 @@ export interface ChromeAPI {
   mascots: MascotsAPI;
   memory: MemoryAPI;
   account: AccountAPI;
+  aiKey: AiKeyAPI;
   suggestions: SuggestionsAPI;
   downloads: DownloadsAPI;
   permissions: PermissionsAPI;
