@@ -69,7 +69,7 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     try {
       let body: Buffer | string = await readFile(join(SITE, path));
       if (path === "/app/index.html") body = body.toString().replace("connect-src https:", `connect-src https: ${base}`);
-      const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+      const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2" };
       response.setHeader("content-type", types[extname(path)] ?? "application/octet-stream");
       response.end(body);
     } catch {
@@ -124,59 +124,65 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     // A job sent from the Mac, which the runner has started and is now asking about.
     const first = await rpc(owner, "start_cloud_job", { p_prompt: FIRST_PROMPT, p_history: [], p_mascot: mascotSnapshot(SCOUT), p_action_approval: "risky", p_context_id: "ctx-ana" });
     expect((await rpc(runner, "runner_claim_job"))[0].id).toBe(first);
-    const steps = [{ text: "Opened shop.example", done: true }, { text: "Compared 14 cables by price", done: true }];
+    const steps = [{ text: "Opened shop.example", done: true, kind: "open" }, { text: "Compared 14 cables by price", done: true, kind: "read" }];
     await rpc(runner, "runner_update_job", { p_job: first, p_steps: steps, p_live_view: LIVE });
     const approval = await rpc(runner, "runner_ask", { p_job: first, p_kind: "approval", p_text: ASKED });
 
     // 1. Sign in.
     await page.goto(app);
-    await expect(page.getByRole("heading", { name: "Your flock, from your phone" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your mascots, from your phone" })).toBeVisible();
     await shoot(page, "signin");
     await page.getByLabel("Email").fill(OWNER);
-    await page.getByLabel("Password").fill("wrong");
+    await page.getByLabel("Password", { exact: true }).fill("wrong");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByText("That email and password don’t match an account.")).toBeVisible();
     // That refusal is the one error the console may show.
     problems.length = 0;
-    await page.getByLabel("Password").fill(OWNER_PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    // 2. See the job, waiting on the user, with the shared bird's name.
-    const row = page.getByRole("link", { name: /Scout wants to click the button “Place order” on shop\.example/ });
-    await expect(row).toBeVisible();
-    await expect(page.getByText("Ready")).toBeVisible();
-    // Only the composer and the conversations: notifications and the account are in Settings.
-    await expect(page.getByRole("button", { name: "Turn on" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-    await shoot(page, "list");
-
-    // 3. Allow, with the exact words in full, and the decision is written as the user.
-    await row.click();
-    const card = page.getByRole("region", { name: "Approval needed" });
-    await expect(card.getByText(ASKED, { exact: true })).toBeVisible();
-    await expect(page.locator(".live iframe")).toHaveAttribute("inert", "");
+    // 2. The job is waiting on the user, so its ask rises by itself, as the shared mascot, with the exact words in
+    // full and the live page locked inside it.
+    const sheet = page.getByRole("dialog", { name: /Scout wants to click the button “Place order” on shop\.example/ });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText(ASKED, { exact: true })).toBeVisible();
+    await expect(page.locator("#live iframe")).toHaveAttribute("inert", "");
+    await expect(page.locator("#live .live-box")).toHaveAttribute("data-place", "ask");
     await shoot(page, "approval");
-    await card.getByRole("button", { name: "Allow", exact: true }).click();
+    // Put away, it waits on home as its card. Notifications and the account are in Settings, not here.
+    await page.keyboard.press("Escape");
+    const card = page.getByRole("button", { name: /Scout wants to click the button “Place order” on shop\.example/ });
+    await expect(card).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+    await shoot(page, "home");
+
+    // 3. Allow, and the decision is written as the user.
+    await card.click();
+    await sheet.getByRole("button", { name: "Allow", exact: true }).click();
     await expect(page.getByText("Allowed. Scout carries on.")).toBeVisible();
     expect(await supabase.cloudRows(`select decision from public.cloud_approvals where id = '${approval}'`)).toEqual([{ decision: "allow" }]);
     expect(await rpc(runner, "runner_decision", { p_approval: approval })).toEqual([{ decision: "allow", answer: null }]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    // Running again, its steps as they're written, and the live view locked.
-    await rpc(runner, "runner_update_job", { p_job: first, p_status: "running", p_steps: [...steps, { text: "Adding it to the cart", done: false }] });
+    // Running again, its steps as they're written, and the live page locked at the top of the job.
+    await rpc(runner, "runner_update_job", { p_job: first, p_status: "running", p_steps: [...steps, { text: "Adding it to the cart", done: false, kind: "click" }] });
+    await page.getByRole("link", { name: new RegExp(FIRST_PROMPT) }).click();
     await expect(page.getByText("Adding it to the cart")).toBeVisible();
-    await expect(page.getByText(/Locked while Scout works/)).toBeVisible();
+    await expect(page.getByText("Locked while Scout works")).toBeVisible();
+    await expect(page.locator("#live iframe")).toHaveAttribute("inert", "");
     await shoot(page, "job");
 
-    // 5. A sign-in handed to the user: taken over in the live view, where the code goes, and nothing here can take it.
+    // 5. A sign-in handed to the user: taken over full screen, where the code goes into the page, and nothing here can
+    // take it. The page is the same frame all the way, never reloaded.
+    const frameBefore = await page.locator("#live iframe").elementHandle();
     const handoff = await rpc(runner, "runner_ask", { p_job: first, p_kind: "handoff", p_text: "Sign in on shop.example", p_need: "sign-in", p_site: "shop.example" });
-    await expect(page.getByText("Scout needs you to sign in on shop.example")).toBeVisible();
-    const frameBefore = await page.locator(".live iframe").elementHandle();
+    await expect(page.getByRole("dialog", { name: "Scout needs you to sign in on shop.example" })).toBeVisible();
     await page.getByRole("button", { name: "Take over" }).click();
-    await expect(page.locator(".live iframe")).not.toHaveAttribute("inert", "");
-    // The same frame, never reloaded, and no field of the page's own anywhere.
-    expect(await page.locator(".live iframe").evaluate((node, before) => node === before, frameBefore)).toBe(true);
-    await expect(page.locator("main input, main textarea")).toHaveCount(0);
-    const live = page.frameLocator(".live iframe");
+    await expect(page.getByText("It’s yours")).toBeVisible();
+    await expect(page.locator("#live iframe")).not.toHaveAttribute("inert", "");
+    expect(await page.locator("#live iframe").evaluate((node, before) => node === before, frameBefore)).toBe(true);
+    await expect(page.locator("#app input, #app textarea, #sheets input, #sheets textarea")).toHaveCount(0);
+    const live = page.frameLocator("#live iframe");
     await live.getByLabel("Email").fill(OWNER);
     await live.getByLabel("Code").fill(CODE);
     await shoot(page, "handoff");
@@ -189,15 +195,15 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     const question = await rpc(runner, "runner_ask", { p_job: first, p_kind: "question", p_text: "Which colour, black or white?" });
     const answer = page.getByLabel("Your answer");
     await answer.fill(CODE);
-    await page.getByRole("button", { name: "Answer" }).click();
+    await page.getByRole("button", { name: "Answer", exact: true }).click();
     await expect(page.getByText("That looks like a code, so it wasn’t sent.")).toBeVisible();
     expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([{ decision: null, answer: null }]);
     await answer.fill("Black, please");
-    await page.getByRole("button", { name: "Answer" }).click();
+    await page.getByRole("button", { name: "Answer", exact: true }).click();
     await expect(page.getByText("Answered. Scout carries on.")).toBeVisible();
     expect(await supabase.cloudRows(`select decision, answer from public.cloud_approvals where id = '${question}'`)).toEqual([{ decision: "allow", answer: "Black, please" }]);
 
-    // Done, and then followed up from here: a new job in the same conversation, as the same bird, carrying the first
+    // Done, and then followed up from here: a new job in the same conversation, as the same mascot, carrying the first
     // exchange as its history.
     const doneSteps = [...steps, { text: "Added it to the cart", done: true }];
     await rpc(runner, "runner_update_job", { p_job: first, p_status: "done", p_steps: doneSteps, p_reply: FIRST_REPLY });
@@ -226,13 +232,13 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     // Sources are links that open outside the page, a full stop isn't part of a bare address, and nothing but the web is.
     await expect(page.getByRole("link", { name: "the shop" })).toHaveAttribute("href", "https://shop.example/cable");
     await expect(page.getByRole("link", { name: "https://shop.example/2m" })).toHaveAttribute("target", "_blank");
-    await expect(page.locator(".reply a[href^='javascript']")).toHaveCount(0);
+    await expect(page.locator(".reply-words a[href^='javascript']")).toHaveCount(0);
     await expect(page.getByLabel("Follow up")).toBeVisible();
     await shoot(page, "conversation");
 
-    // Sent from the Mac and over while a follow-up is typed here, with the page still showing the conversation as it
-    // was. The server refuses that follow-up as built on an older job, and the page reads the conversation again and
-    // sends it once more, carrying the Mac's exchange.
+    // Sent from the computer and over while a follow-up is typed here, with the page still showing the conversation as
+    // it was. The server refuses that follow-up as built on an older job, and the page reads the conversation again and
+    // sends it once more, carrying the computer's exchange.
     let frozen: { body: string; headers: Record<string, string> } | null = null;
     let freeze = true;
     await page.route(/\/rest\/v1\/cloud_jobs\?select=id,conversation_id,prompt/, async (route) => {
@@ -271,18 +277,26 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     expect((await rpc(runner, "runner_claim_job"))[0].prompt).toBe(THIRD);
     await rpc(runner, "runner_update_job", { p_job: (await supabase.cloudRows(`select id from public.cloud_jobs where prompt = '${THIRD}'`))[0].id, p_status: "done", p_reply: "Ordered." });
     await expect(page.getByText("Ordered.", { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Jobs" }).click();
-    await expect(page.locator(".rows li")).toHaveCount(1);
-    await expect(page.getByRole("link", { name: new RegExp(`${FIRST_PROMPT}.*Scout · Done`) })).toBeVisible();
-    await shoot(page, "list-conversation");
+    await page.getByRole("link", { name: "Back to home" }).click();
+    await expect(page.locator("a.row")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: new RegExp(`${FIRST_PROMPT}.*Done`) })).toBeVisible();
+    await shoot(page, "home-conversation");
 
-    // 4. Start a job as a shared bird, with the snapshot the runner accepts.
-    await page.getByRole("link", { name: "Give a bird a job" }).click();
-    await page.getByRole("button", { name: /Penny/ }).click();
-    await expect(page.getByText("Only visits news.example")).toBeVisible();
-    await page.getByLabel("The job").fill("What changed on news.example today?");
+    // A chip puts a job sent before back in the box, and never sends it.
+    const [{ n: jobsBefore }] = await supabase.cloudRows("select count(*)::int as n from public.cloud_jobs");
+    await page.getByRole("button", { name: `Put “${THIRD}” in the box, for Scout` }).click();
+    await expect(page.locator(".box-words")).toHaveText(THIRD);
+    await page.waitForTimeout(500);
+    expect((await supabase.cloudRows("select count(*)::int as n from public.cloud_jobs"))[0].n).toBe(jobsBefore);
+
+    // 4. Start a job as a shared mascot, from the sheet the box raises, with the snapshot the runner accepts.
+    await page.getByRole("button", { name: /^Who goes/ }).click();
+    const start = page.getByRole("dialog", { name: "Give a mascot a job" });
+    await start.getByRole("radio", { name: "Penny" }).click();
+    await expect(start.getByText("Only visits news.example")).toBeVisible();
+    await start.getByLabel("The job").fill("What changed on news.example today?");
     await shoot(page, "start");
-    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await start.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.locator(".bubble")).toHaveText("What changed on news.example today?");
     const [sent] = await supabase.cloudRows("select mascot, context_id, status from public.cloud_jobs where prompt = 'What changed on news.example today?'");
     expect(sent).toMatchObject({ context_id: "ctx-ana", status: "queued" });
@@ -292,42 +306,46 @@ test("the phone page signs in, shows a job, allows it, follows it up, starts one
     await page.getByRole("button", { name: "Stop" }).click();
     await expect.poll(async () => (await supabase.cloudRows("select status from public.cloud_jobs where prompt = 'What changed on news.example today?'"))[0].status).toBe("stopped");
 
-    // Settings: appearance, notifications and the account. A choice of Dark holds over the system's light, after a reload.
-    await page.getByRole("link", { name: "Jobs" }).click();
-    await expect(page.locator(".rows li")).toHaveCount(2);
-    await page.getByRole("link", { name: "Settings" }).click();
-    await expect(page.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
-    await expect(page.getByText(`Signed in as ${OWNER}`)).toBeVisible();
-    await page.getByRole("radio", { name: "Light" }).click();
+    // Settings: the look, notifications, the cloud and the account. A choice of Dark holds over the system's light, after
+    // a reload.
+    await page.getByRole("link", { name: "Back to home" }).click();
+    await expect(page.locator("a.row")).toHaveCount(2);
+    await page.getByRole("button", { name: "Settings" }).click();
+    const settings = page.getByRole("dialog", { name: "Settings" });
+    await expect(settings.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
+    await expect(settings.getByRole("switch", { name: "Notifications" })).toHaveAttribute("aria-checked", "false");
+    await expect(settings.getByText(OWNER)).toBeVisible();
+    await expect(settings.getByText("Ready")).toBeVisible();
+    await settings.getByRole("radio", { name: "Light" }).click();
     await page.waitForTimeout(200);
     await page.screenshot({ path: join(SHOTS, "settings-light.png"), fullPage: true });
-    await page.getByRole("radio", { name: "Dark" }).click();
+    await settings.getByRole("radio", { name: "Dark" }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
     await page.waitForTimeout(200);
     await page.screenshot({ path: join(SHOTS, "settings-dark.png"), fullPage: true });
     await page.reload();
-    await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
     await expect(page.locator("html")).toHaveClass(/dark/);
-    await page.getByRole("radio", { name: "System" }).click();
+    await page.getByRole("button", { name: "Settings" }).click();
+    await expect(settings.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    await settings.getByRole("radio", { name: "System" }).click();
     await expect(page.locator("html")).not.toHaveClass(/dark/);
 
     // Signed out and in as someone else, nothing of Ana's comes back, and notifications are this account's to turn on.
     await supabase.addAccount("bo@example.com", OWNER_PASSWORD);
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await settings.getByRole("button", { name: "Sign out" }).click();
     await page.getByLabel("Email").fill("bo@example.com");
-    await page.getByLabel("Password").fill(OWNER_PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(OWNER_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText("Nothing in the cloud yet.", { exact: false })).toBeVisible();
-    await page.getByRole("link", { name: "Settings" }).click();
-    await expect(page.getByText("Signed in as bo@example.com")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    await expect(page.getByText("Nothing’s running.", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Settings" }).click();
+    await expect(settings.getByText("bo@example.com")).toBeVisible();
+    await expect(settings.getByRole("switch", { name: "Notifications" })).toHaveAttribute("aria-checked", "false");
     const polled = page.waitForResponse((response) => response.url().includes("/rest/v1/cloud_jobs?"));
-    await page.getByRole("link", { name: "Jobs" }).click();
+    await page.keyboard.press("Escape");
     await polled;
     await expect(page.getByText(/Scout|Penny|shop\.example/)).toHaveCount(0);
 
-    // Nothing the user typed into the live view, or the code-shaped answer, ever reached the server.
+    // Nothing the user typed into the live page, or the code-shaped answer, ever reached the server.
     expect(supabase.received.filter(({ body, path }) => body.includes(CODE) || path.includes(CODE))).toEqual([]);
     expect(problems).toEqual([]);
   } finally {

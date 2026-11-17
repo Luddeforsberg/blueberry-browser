@@ -225,7 +225,7 @@ They are always beside words, so nothing depends on reading a pattern.
 | A click, a hover, a drag, a choice | Clicking | The plus |
 | Typing, a key | Typing | The bottom row |
 | Asking you, or handing you a tab | Waiting for you, in `ask` | The tick |
-| Waiting a moment, and a step with no kind, from before kinds or from the cloud | Thinking | The tick |
+| Waiting a moment, and a step with no kind, from before kinds | Thinking | The tick |
 
 ## 7. Motion
 

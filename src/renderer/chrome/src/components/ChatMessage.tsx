@@ -2,7 +2,7 @@ import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'reac
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, StepKind, UsedPage } from '@shared/library'
+import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, UsedPage } from '@shared/library'
 import { linkSite } from '@shared/publishing'
 import { NO_KEY } from '@shared/aiKey'
 import { ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Cloud, Copy, Lock, Repeat } from 'lucide-react'
@@ -14,7 +14,7 @@ import { useShell } from '../contexts/ShellContext'
 import { asContinuation, withSiteNames } from '../siteNames'
 import { STOPPED_STEP, trailFor } from '../stepTrail'
 import { Button } from '@common/components/Button'
-import { Pips, type PipMark, type PipPattern } from '@common/components/Pips'
+import { Pips, STEP_PIPS, type PipMark, type PipPattern } from '@common/components/Pips'
 import { useStill } from '@common/components/motion'
 import { cn } from '@common/lib/utils'
 import { useBrowser } from '../contexts/BrowserContext'
@@ -118,20 +118,6 @@ export const LiveWords: React.FC<{ className?: string; children: React.ReactNode
 export const StatusLine: React.FC<{ text: string }> = ({ text }) => (
     <p role="status" className="text-14 text-ink-2 line-clamp-2">{text}</p>
 )
-
-// Which pips a step has: the pattern while it's the live one, and its kind's still mark once it's done (DESIGN.md
-// section 6). A step from before steps had kinds, or one no tool made, such as Stopped here, is plain.
-const STEP_PIPS: Record<StepKind | 'plain', { live: PipPattern; done: PipMark }> = {
-    open: { live: 'think', done: 'opened' },
-    read: { live: 'reading', done: 'read' },
-    scan: { live: 'scanning', done: 'read' },
-    search: { live: 'searching', done: 'read' },
-    click: { live: 'clicking', done: 'clicked' },
-    type: { live: 'typing', done: 'typed' },
-    ask: { live: 'waiting', done: 'done' },
-    wait: { live: 'think', done: 'done' },
-    plain: { live: 'think', done: 'done' },
-}
 
 // One line of what a mascot did or is doing, in its words, after a pip mark. The live one has moving pips and its
 // words shimmer, and finished ones are `ink-3`.
