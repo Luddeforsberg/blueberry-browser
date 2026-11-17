@@ -259,7 +259,7 @@ export const HorizontalToolbar: React.FC = () => {
                 <div data-flex="address" className="flex-1 min-w-0 mx-1.5">
                     <AddressBar />
                 </div>
-                <RecordingNotice />
+                <RecordingNotice className="mx-1 app-region-no-drag" />
                 {activeTab && activeTab.zoomPercent !== 100 && (
                     <ZoomButton percent={activeTab.zoomPercent} onReset={() => void window.chromeAPI.browser.resetZoom(activeTab.id)} />
                 )}

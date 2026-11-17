@@ -633,7 +633,6 @@ export const GalleryPage: React.FC = () => {
                         <Button variant="raised">Raised</Button>
                         <Button variant="ghost" className="text-ink-2">Quiet</Button>
                         <Button disabled>Disabled</Button>
-                        <Button variant="destructive">Stop recording</Button>
                     </div>
                 </Section>
 

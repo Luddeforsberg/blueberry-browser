@@ -49,7 +49,7 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
       await browser.closeTab(newTab.id);
     });
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
-    const notice = chrome.getByRole("status").filter({ hasText: "Berry’s watching" });
+    const notice = chrome.getByRole("status").filter({ hasText: "Watching" });
     await expect(notice).toBeVisible();
 
     // From Routines, through the address bar. Nothing on a page can answer this view's channels.
@@ -116,14 +116,14 @@ test("show Berry a job once, see the notes, and it becomes a routine that runs",
       await browser.closeTab(tabs.find(({ page }) => page === "settings")!.id);
     });
 
-    // Left in the field when Stop is pressed, and not forgotten.
+    // Left in the field when Done is pressed, and not forgotten.
     await page.getByRole("textbox", { name: "Plain box" }).click();
     await page.keyboard.type("left over");
 
-    await notice.getByRole("button", { name: "Stop" }).click();
+    await notice.getByRole("button", { name: "Done" }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toBeVisible();
     await expect(notice).toHaveCount(0);
-    // Nothing's left watching in the page once Stop is pressed.
+    // Nothing's left watching in the page once Done is pressed.
     const stillThere = await app.evaluate(({ webContents }, url) => {
       const tab = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(url));
       return tab?.executeJavaScriptInIsolatedWorld(1001, [{ code: "typeof globalThis.__watching" }]);
@@ -282,7 +282,7 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("shown-secret");
     await page.getByRole("textbox", { name: "Password", exact: true }).click();
 
-    await chrome.getByRole("button", { name: "Stop" }).click();
+    await chrome.getByRole("button", { name: "Done" }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toBeVisible();
     const notes = chrome.locator("ol li");
     await expect(notes.filter({ hasText: "Copied “Anna Svensson”" })).toHaveCount(1);
@@ -314,7 +314,7 @@ test("with nothing to go through, there's nothing to send", async () => {
     await expect(chrome.getByRole("button", { name: "Show Berry how" })).toHaveCount(0);
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("routines"));
     await chrome.getByRole("button", { name: "Show Berry how" }).click();
-    await chrome.getByRole("button", { name: "Stop" }).click();
+    await chrome.getByRole("button", { name: "Done" }).click();
     await expect(chrome.getByRole("button", { name: "Turn this into a routine" })).toBeDisabled();
     await chrome.getByRole("button", { name: "Close", exact: true }).click();
     await expect(chrome.getByRole("heading", { name: "What I watched" })).toHaveCount(0);

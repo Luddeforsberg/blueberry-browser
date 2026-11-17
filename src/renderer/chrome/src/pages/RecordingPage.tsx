@@ -1,20 +1,23 @@
 import React, { useState } from 'react'
 import type { TabInfo } from '@shared/ipc'
 import { Button } from '@common/components/Button'
-import { Berry, useAssistantName } from '../components/Berry'
+import { Pips } from '@common/components/Pips'
+import { useAssistantName } from '../components/Berry'
 import { ChatError, LiveWords } from '../components/ChatMessage'
-import { TrailNotes, useRecording } from '../components/ShowBerry'
+import { PageFrame, PageHeader } from '../components/PageFrame'
+import { RecordingNotice, stepCount, TrailNotes, useRecording } from '../components/ShowBerry'
 import { recordedForm, startRoutine } from '../routinesView'
 
 const api = () => window.chromeAPI.recording
 
-// What it saw, for the user to go through. Nothing has left the computer until they press the button here.
+// What it saw, for the user to go through: the recorder on top while it watches, and the steps under the sites they
+// were on. Nothing has left the computer until they press the button under them, after Done.
 export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     const { status, steps, cut, error } = useRecording()
-    const name = useAssistantName()
-    const isBerry = name !== 'Assistant'
+    const isBerry = useAssistantName() !== 'Assistant'
     const browser = window.chromeAPI.browser
     const [failed, setFailed] = useState<string | null>(null)
+    const watching = status === 'recording'
     const drafting = status === 'drafting'
     const empty = steps.length === 0
 
@@ -37,36 +40,27 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
     }
 
     return (
-        <div className="h-full flex flex-col">
-            <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="max-w-[672px] mx-auto px-8 pt-10 pb-8">
-                    <div className="flex items-end justify-between gap-6 border-b">
-                        <div className="min-w-0 pb-4">
-                            <h1 className="text-20 font-semibold">{isBerry ? 'What I watched' : 'What was recorded'}</h1>
-                            <p className="mt-1 text-14 text-ink-2">
-                                {empty
-                                    ? 'Nothing here. Scrolling and looking around don’t leave notes.'
-                                    : `${steps.length === 1 ? 'One note' : `${steps.length} notes`} on ${[...new Set(steps.map(({ site }) => site))].join(', ')}. None of it has left this computer, and none of it is saved.`}
-                            </p>
-                            {cut && (
-                                <p className="mt-2 text-14 text-ask">
-                                    {cut === 'full' ? 'That’s as much as can be kept in one go, so recording stopped there.' : 'It’s been half an hour, so recording stopped by itself.'}
-                                </p>
-                            )}
-                        </div>
-                        <Berry mood={drafting ? 'thinking' : 'curious'} size={88} className="shrink-0 -mb-px" />
-                    </div>
+        <PageFrame>
+            <PageHeader title={isBerry ? 'What I watched' : 'What was recorded'}>
+                {empty
+                    ? `${watching ? 'Nothing yet' : 'Nothing here'}. Scrolling and looking around don’t leave steps.`
+                    : `${stepCount(steps.length).replace(/^1 /, 'One ')} on ${[...new Set(steps.map(({ site }) => site))].join(', ')}. None of it has left this computer, and none of it is saved.`}
+            </PageHeader>
+            <RecordingNotice inPage className="mx-3 mb-6" />
+            {cut && (
+                <p className="mx-3 mb-4 text-14 text-ask">
+                    {cut === 'full' ? 'That’s as much as can be kept in one go, so recording stopped there.' : 'It’s been half an hour, so recording stopped by itself.'}
+                </p>
+            )}
 
-                    {!empty && <TrailNotes steps={steps} onRemove={drafting ? undefined : (id) => void api().removeStep(id)} />}
-                    {(failed || error) && <ChatError message={failed || error || ''} />}
-                </div>
-            </div>
+            {!empty && <TrailNotes steps={steps} onRemove={status === 'review' ? (id) => void api().removeStep(id) : undefined} />}
+            {(failed || error) && <div className="mx-3 mt-4"><ChatError message={failed || error || ''} /></div>}
 
-            {/* Its line is as wide as the column, like the lines above it. */}
-            <div className="shrink-0 px-8 pb-4">
-                <div className="max-w-[608px] mx-auto border-t pt-4">
+            {!watching && (
+                <div className="mx-3 mt-8">
                     {drafting ? (
-                        <p role="status" className="h-9 flex items-center gap-2 text-14">
+                        <p role="status" className="h-8 flex items-center gap-2.5 text-14">
+                            <Pips pattern="think" />
                             <LiveWords>Writing it up as a routine</LiveWords>
                         </p>
                     ) : (
@@ -80,14 +74,14 @@ export const RecordingPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
                                 </Button>
                             </div>
                             {!empty && (
-                                <p className="mt-2 text-13 text-ink-2">
-                                    This sends these notes as words to the model that writes it up, and you check what comes back before anything runs. It never gets pictures, or anything typed in a password, code or card field.
+                                <p className="mt-2 max-w-[520px] text-13 text-ink-2">
+                                    This sends these steps as words to the model that writes it up, and you check what comes back before anything runs. It never gets pictures, or anything typed in a password, code or card field.
                                 </p>
                             )}
                         </>
                     )}
                 </div>
-            </div>
-        </div>
+            )}
+        </PageFrame>
     )
 }
