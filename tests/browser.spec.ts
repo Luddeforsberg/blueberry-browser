@@ -1344,6 +1344,33 @@ test("horizontal tabs put a tab row above the toolbar, with the same tabs", asyn
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
 });
 
+test("a tab closed in the row folds away without squeezing the tabs beside it", async () => {
+  await setContentSize(1200, 700);
+  await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));
+  await openFixture("/a");
+  await openFixture("/b");
+  await openFixture("/c");
+  const row = chrome.getByRole("list", { name: "Tabs" });
+  await expect(row.getByRole("listitem")).toHaveCount(4);
+  await expect(row.locator("li[style*='max-width']")).toHaveCount(0);
+
+  // Every frame from the press until the tab has folded: how wide the tabs that stay are.
+  const narrowest = await row.evaluate(async (list) => {
+    const staying = () => [...list.querySelectorAll("li:not([data-folding])")].map((item) => item.getBoundingClientRect().width);
+    const before = Math.min(...staying());
+    list.querySelectorAll("li")[1].querySelector<HTMLElement>("button[aria-label^='Close']")!.click();
+    let least = before;
+    const until = performance.now() + 400;
+    while (performance.now() < until) {
+      await new Promise(requestAnimationFrame);
+      least = Math.min(least, ...staying());
+    }
+    return { before, least };
+  });
+  await expect(row.getByRole("listitem")).toHaveCount(3);
+  expect(narrowest.least).toBeGreaterThanOrEqual(narrowest.before - 1);
+});
+
 test("in the tab row at the smallest window, the active tab has as much room for its title, and a crowded row shows icons", async () => {
   await setContentSize(900, 600);
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal" }));

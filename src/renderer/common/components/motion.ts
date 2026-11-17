@@ -85,7 +85,8 @@ export const useComings = <T>(items: T[], keyOf: (item: T) => string): DrawnRow<
 
 // Moves a row from `useComings`: opening from nothing, or folding to nothing from wherever it is, so one closed while
 // still opening folds from there. `axis` is its height in a column and its width in a row, and the gap before it goes
-// with it, so nothing jumps when it's gone. It only ever leaves inline styles on a row that's folding away.
+// with it, and so does its padding along that axis, which its size can't go under, so nothing jumps when it's gone.
+// It only ever leaves inline styles on a row that's folding away.
 export const useRowMotion = (row: RefObject<HTMLElement | null>, phase: DrawnRow<unknown>["phase"], axis: "height" | "width"): void => {
   const settle = useRef<number>(undefined);
   useLayoutEffect(() => {
@@ -99,21 +100,25 @@ export const useRowMotion = (row: RefObject<HTMLElement | null>, phase: DrawnRow
     const before = element.previousElementSibling !== null;
     const marginName = axis === "height" ? (before ? "margin-top" : "margin-bottom") : before ? "margin-left" : "margin-right";
     const opening = phase === "opening";
-    const set = (at: { size: number; margin: number; opacity: number }) => {
+    const padNames = axis === "height" ? ["padding-top", "padding-bottom"] : ["padding-left", "padding-right"];
+    const computed = getComputedStyle(element);
+    const pads = padNames.map((name) => parseFloat(computed.getPropertyValue(name)) || 0);
+    const set = (at: { size: number; margin: number; opacity: number; padded: number }) => {
       style.setProperty(sizeName, `${at.size}px`);
       style.setProperty(marginName, `${at.margin}px`);
+      padNames.forEach((name, index) => style.setProperty(name, `${pads[index] * at.padded}px`));
       style.opacity = `${at.opacity}`;
     };
     style.transition = "none";
     style.overflow = "hidden";
     if (axis === "width") style.minWidth = "0px";
-    set(opening ? { size: 0, margin: -gap, opacity: 0 } : { size, margin: parseFloat(style.getPropertyValue(marginName)) || 0, opacity: parseFloat(getComputedStyle(element).opacity) });
+    set(opening ? { size: 0, margin: -gap, opacity: 0, padded: 0 } : { size, margin: parseFloat(style.getPropertyValue(marginName)) || 0, opacity: parseFloat(computed.opacity), padded: 1 });
     void element.offsetWidth;
-    style.transition = [sizeName, marginName, "opacity"].map((name) => `${name} ${MOTION.slide}ms ${motion.ease}`).join(", ");
-    set(opening ? { size, margin: 0, opacity: 1 } : { size: 0, margin: -gap, opacity: 0 });
+    style.transition = [sizeName, marginName, ...padNames, "opacity"].map((name) => `${name} ${MOTION.slide}ms ${motion.ease}`).join(", ");
+    set(opening ? { size, margin: 0, opacity: 1, padded: 1 } : { size: 0, margin: -gap, opacity: 0, padded: 0 });
     if (opening) {
       settle.current = window.setTimeout(() => {
-        for (const name of ["transition", "overflow", "min-width", sizeName, marginName, "opacity"]) style.removeProperty(name);
+        for (const name of ["transition", "overflow", "min-width", sizeName, marginName, ...padNames, "opacity"]) style.removeProperty(name);
       }, MOTION.slide);
     }
   }, [row, phase, axis]);

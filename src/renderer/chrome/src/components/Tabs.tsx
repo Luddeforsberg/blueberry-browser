@@ -21,15 +21,17 @@ const ROW_TAB_GAP = 2
 const ICON_ONLY_WIDTH = 72
 
 // A tab's width comes from the row, never from what's in it, so hiding the title can't change it back.
-const useIconOnly = (ref: React.RefObject<HTMLElement | null>, row: boolean): boolean => {
+// A tab folding away keeps the look it went with, `held`, so its title doesn't drop out half way.
+const useIconOnly = (ref: React.RefObject<HTMLElement | null>, row: boolean, held: boolean): boolean => {
     const [iconOnly, setIconOnly] = useState(false)
     useLayoutEffect(() => {
+        if (held) return
         const item = ref.current
         if (!row || !item) return setIconOnly(false)
         const observer = new ResizeObserver(([entry]) => setIconOnly(entry.borderBoxSize[0].inlineSize < ICON_ONLY_WIDTH))
         observer.observe(item)
         return () => observer.disconnect()
-    }, [ref, row])
+    }, [ref, row, held])
     return iconOnly
 }
 
@@ -50,9 +52,9 @@ const TabItem: React.FC<{
     const { find } = useFlock()
     const row = mode === 'horizontal'
     const item = useRef<HTMLLIElement>(null)
-    const iconOnly = useIconOnly(item, row)
-    useRowMotion(item, phase, row ? 'width' : 'height')
     const folding = phase === 'folding'
+    const iconOnly = useIconOnly(item, row, folding)
+    useRowMotion(item, phase, row ? 'width' : 'height')
     return (
     <li
         ref={item}
@@ -271,8 +273,10 @@ export const Tabs: React.FC<{ mode: LayoutMode; labelledBy?: string; label?: str
                 aria-labelledby={labelledBy}
                 aria-label={label}
                 // In the row, as wide as its tabs at their widest, and narrower with less room, so + follows the last tab.
+                // Its room changes at the pace a tab opens or folds, so the tabs beside one that's going are never
+                // squeezed while it goes, and + slides with them.
                 style={vertical ? undefined : { flexBasis: tabs.length * (ROW_TAB_MAX + ROW_TAB_GAP) }}
-                className={cn("flex gap-0.5", vertical ? "flex-col" : "tab-row min-w-0 shrink grow-0 items-center")}
+                className={cn("flex gap-0.5", vertical ? "flex-col" : "tab-row min-w-0 shrink grow-0 items-center transition-[flex-basis] duration-slide")}
             >
                 {drawn.map(({ key, item: tab, phase }) => phase === 'folding' ? (
                     <TabItem key={key} tab={tab} mode={mode} phase={phase} onActivate={() => undefined} onClose={() => undefined} onPress={() => undefined} onNudge={() => undefined} dragged={false} shifting={false} />
