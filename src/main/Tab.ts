@@ -1,5 +1,6 @@
 import { NativeImage, WebContentsView, type WebContents, type WebFrameMain } from "electron";
 import type { Layout, TabLoadError, TabTrouble } from "../shared/ipc";
+import { TabIcons } from "./tabIcons";
 import { PageActor, type ActorOptions } from "./PageActor";
 import { savedEntries, type SavedWebTab } from "./Session";
 import type { PageTarget } from "./pageTarget";
@@ -90,6 +91,7 @@ export class Tab implements PageTarget {
   private _title: string;
   private _url: string;
   private _favicon: string | null = null;
+  private readonly icons = new TabIcons();
   private _isVisible: boolean = false;
   private _berryWorking = false;
   private workingStyle: Promise<string | null> | null = null;
@@ -187,8 +189,9 @@ export class Tab implements PageTarget {
 
     contents.on("did-navigate", (_, url) => {
       this._hasLoaded = true;
+      // Back, Forward and Reload report no icon, so the tab gives the page the one it had (`tabIcons.ts`).
+      this._favicon = this.icons.after(this._url, url, this._favicon);
       this._url = url;
-      this._favicon = null;
       // A restored page in the back list already has its title, so the page doesn't report it again.
       const { navigationHistory } = contents;
       this._title = navigationHistory.getEntryAtIndex(navigationHistory.getActiveIndex())?.title || this._title;
@@ -203,6 +206,7 @@ export class Tab implements PageTarget {
 
     contents.on("page-favicon-updated", (_, favicons) => {
       this._favicon = favicons[0] ?? null;
+      this.icons.remember(this._url, this._favicon);
       this.events.onDetails();
       this.events.onChange();
     });
