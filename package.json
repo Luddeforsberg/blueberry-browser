@@ -19,6 +19,7 @@
     "test:e2e": "playwright test",
     "eval": "electron-vite build && playwright test -c evals/playwright.config.ts",
     "site:build": "node scripts/buildSite.mjs",
+    "icon:build": "electron scripts/appIcon.mjs",
     "site:deploy": "npx netlify deploy --prod --dir site",
     "push:keys": "node scripts/pushKeys.mjs",
     "runner:build": "esbuild runner/src/index.ts --bundle --platform=node --target=node22 --format=cjs --packages=external --outfile=runner/dist/index.cjs",
