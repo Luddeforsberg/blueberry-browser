@@ -633,23 +633,6 @@ A chat sent to the cloud runner is an ordinary chat in the list, with "In the cl
 - **Ask before acting** is never less than the default there, because nobody is watching: Never ask still asks before anything risky.
 - **No answer** in 30 minutes stops the job, and the chat says so as its error. Stop in the composer stops it on the runner.
 
-### On the phone
-
-`site/app/`, a page on the public site the user adds to their Home Screen: the jobs their birds are doing in the cloud, answered while the computer is off. It's an app on the phone, not the window in small, so it follows The public site and the phone page: everything straight on `canvas`, plain rows split by `border`, and the bird standing on real edges. Words say "in the cloud", never "runner". The column is at most 560px with 20px gutters, so it works on a desktop too.
-
-- **The app bar:** the width of the screen and sticky, under the status bar, `canvas` at 88% with a blur and a `border` line under it, its contents on the column's edges. The title is 16px semibold, centred once there's a way back on its left, **‹ Jobs** in `accent-ink`, so the two never read as one phrase. Any action, such as **Stop**, is on the right.
-- **Bars at the bottom:** **Send** on Start, and the box to go on in a conversation, sit on a `canvas` bar the width of the screen with a `border` line over it, pinned to the bottom above the home indicator, as a messaging app's are. No rounded corners but the controls' own.
-- **Signing in:** in the top third, where the keyboard leaves it in view. Berry stands at 104px on a wire over "Your flock, from your phone" at 28px, one line on what it's for, email, password and **Sign in**. The same account as Settings.
-- **The list:** "Blueberry" in the app bar with one quiet status, a 6px dot in `success` and "Ready", or a grey one and "Not set up" with a line in `warning` saying where to set it up, and a quiet gear for Settings. Below it, only the composer with Berry standing on it, which opens Start, and the conversations: **Needs you**, each row the asking sentence in 16px, and **In the cloud**, one row per conversation, its first prompt cut to two lines, with the bird at 28px in its newest job's mood and its name and status in 12px. A failed job's reason is in `warning`.
-- **A conversation:** each job in turn, as the chat lays it out: the prompt as the user's bubble, the bird's name, then what it's asking, its steps as footprints with the berry on the one it's on, and the reply. While the newest goes, **In the cloud** with a cloud icon over the live view in a `tray` box with a 16px radius, and **Stop** in the app bar. Once it's over, a composer like the chat's, "Ask Scout to go on", sends a follow-up as the same bird, which must still be in the flock.
-- **Asking:** the sentence, with sites for addresses, then the exact `describe` words in full in a `tray` block, never cut, with **Allow** filled and **Don't allow**. A question has an answer field, **Answer** and **Skip**, and an answer shaped like a code isn't sent: it says codes only go into the page itself.
-- **Handed to the user:** "Scout needs you to sign in on shop.example", with **Take over** and **Not now**. Take over unlocks the live view, which gets taller and the periwinkle reading ring, and the line under it says a code goes into the page itself, straight to the site. Then **I'm done** gives it back. There's no field on the page for a password or code.
-- **Locked:** otherwise the live view takes no touch, and the line under it says so with a lock: if the bird needs the user there, it asks.
-- **Starting a job:** the prompt box first and focused, then **Who goes**, the flock standing on a wire, the chosen one's name in semibold over a 2px `accent-ink` line, and its limits in words, all muted. One line says whose flock it is and when the Mac last shared it, or that only Berry is here until it does. **Send** is pinned to the bottom of the screen, within reach of a thumb.
-- **After an answer,** one quiet line says what happened, such as "Allowed. Scout carries on.", for a few seconds.
-- **Notifications:** "Berry needs you" or "Berry finished", and nothing else, ever. Settings says that beside **Turn on**. On an iPhone not yet on the Home Screen, it says to add it there first.
-- **Settings:** from the gear, plain sections split by `border` lines: **Appearance**, System, Light or Dark in one segmented control, System by default and kept in this browser; **Notifications**; and **Account**, who's signed in, with **Sign out**.
-
 ### Cloud tab
 
 A page in the cloud browser opens as a tab behind the user, with a cloud icon and the page's title. The chrome draws it.
