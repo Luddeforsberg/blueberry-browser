@@ -863,6 +863,30 @@ It answers through `chat:decide`, like the card in a chat, and the job goes on b
 
 Not built yet, and each needs more than this page: a ring on the live page round the button a mascot wants to press, which needs its place from the cloud, the time of each step, which isn't saved, and the user's name in the greeting, which isn't on the server.
 
+### On your desktop
+
+A mascot on the edge of the screen while you're in other apps: it shows what the mascots are doing, takes a job from any app, and lets you answer without going back to Blueberry. Mock: [desktop.html](./docs/design/mocks/desktop.html). **It's off until it's turned on**, in Settings under Mascots, because a thing above every app and a key taken from every app are for the user to ask for.
+
+- **The drop.** One near-black shape, `tip`, in light and dark alike, that pours out of the screen's edge: round where it faces the screen, flat against the edge, and with a 10px fillet on each side where it meets the edge, so it reads as part of the edge and not as a window. The mascot sits inside it whole. A soft shadow, and a faint light rim so it shows on a dark wallpaper. Everything it says is in that one shape, which grows towards the middle of the screen and shrinks back.
+- **At rest it's small:** 32px along the edge and 28px out of it, around the chosen mascot at 20px. Nothing in it moves. It has to be easy to forget.
+- **Where it is.** It starts on the right edge, a little below the middle, where no taskbar or Dock is under it. Dragging it moves it along its edge or to another one: left, right, top, where it hangs, or bottom, where it stands on the edge of the work area. A saved place is an edge and how far along it, so it's on screen on any display.
+- **Only while you're elsewhere.** While Blueberry's window is the one in use there's no drop. Going to another app, it pours out after a moment, and coming back it goes. There's no flight.
+- **Pointed at,** it grows to 36px and says what a press does, "Give Berry a job", with the shortcut's keys on chips, as a tooltip does. It shrinks back 0.7 seconds after the pointer leaves.
+- **Working, left alone:** the mascot in its working face and the pips moving beside it, the one loop here, only while work is really happening. Pointed at, it adds "Working on" and the chat's name, and how long in mono. Never a step or a site.
+- **Needs you:** it comes out by itself, 44px, with the mascot asking, who and what kind of thing it is, "Scout needs your OK", and **Answer**, a white pill. It stays until it's answered.
+- **Finished:** the mascot delivered, the first sentence of the reply in at most two lines, **Open**, and a cross. It stays 5 to 12 seconds by length and shrinks back by itself. Only what ends while you're away gets one, and a job you stopped doesn't.
+- **Several at once:** up to three faces stacked at 18px, whoever has the most to say in front, in the order asking, finished, working. Pointed at, it counts them: "2 working", "1 finished".
+- **What comes out by itself never has a site, a step or the exact words in it,** only who and what kind of thing, and a finished reply's own first sentence. It's on the screen, so someone sharing theirs is sharing that too.
+- **The prompt box is the drop, grown.** `Alt+Space` (`⌥Space` on a Mac), or a press on the drop with nothing going on. 52px tall and 440px long, still attached to the edge: the mascot on a pill with a small arrow, which chooses who goes, then "Give Berry a job", then This PC and Cloud where the chosen mascot can work in the cloud, then send, round, white once there are words. Longer words wrap and the drop grows taller, to five lines. Over it, up to three jobs sent before as chips, which put their words in the box. Under it, the keys: Enter sends, Tab goes to the next mascot, Esc closes. The keyboard goes to it without Blueberry coming forward. After Enter the drop shrinks back with the pips moving, and the keyboard is back in your app. Esc, or a click anywhere else, closes it and keeps what was typed. On the top or bottom edge it grows along the edge instead, and is always wholly on screen.
+- **The tray.** A press on the drop while anything is going, waiting or finished today opens a sheet beside it, 324px wide with a 22px radius and `lift`, which follows the theme: the flock in a row with each in its mood, then **Needs you** as cards with Answer, **Working** with the step and how long, and **Finished today**, each row opening its chat in Blueberry. At its foot, the prompt box as one row, which grows the drop. Open Blueberry is at its top.
+- **Answering here.** Answer, on the drop or in the tray, opens the ask as a sheet beside the drop, 324px wide with a 24px radius: the dot grid across its top, the mascot asking at 56px, "Scout wants to", what it wants at 18px semibold with addresses cut to their site, then the exact words from the tool in mono in a well on `card-2`, never cut, which are what's being allowed. Then **Allow**, filled and the wider, and **Don't allow**, raised. Under them what job it's for, and See the page, which opens it in Blueberry. A question has a field with Answer and Skip, and an answer shaped like a code isn't sent. A handoff has no way to do it here: it says what's needed and **Open the page** takes you to the tab in Blueberry. The exact words only ever show after that press, never by themselves.
+- **Pressing it** with nothing going on opens the prompt box. Right-clicking offers Not Now on a result, Open Blueberry, Keep Mascots Still, Hide Mascots and Take Off the Desktop.
+- **Motion.** The drop's size changes over 200ms with the usual easing, with no overshoot, and what's in it fades over 120ms. With reduced motion or mascots kept still it's simply the other size, and the pips hold their first frame.
+- **With mascots hidden,** the drop holds the pips glyph in place of a face, and the words say "Assistant".
+- **It stays out of the way:** it never takes the keyboard unless the prompt box is opened, only what's drawn takes the pointer, and it never covers more of the screen than it shows.
+- **What it can't do:** it doesn't read the screen, the clipboard, selected text or anything in another app, and needs no Screen Recording or Accessibility permission. A job from here is exactly a new chat with no page, and an answer here is exactly the answer on Needs you.
+- **Needing Blueberry open:** the jobs live in the window. Closing it stops what's running, so the drop and the shortcut go with it. Hide Blueberry hides only the window while this is on.
+
 ## 11. Not redrawn yet
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
@@ -874,7 +898,6 @@ These aren't drawn. Until one is, it works as it does today, which [the old docu
 - The cloud tab
 - A chat on the runner
 - Site permissions
-- On your desktop
 - The public site
 
 **To redraw one:** design what would be best, from the parts in sections 3 to 9, look at it in the running app in light and dark, write its section here in the same PR, and delete it from the old document. Don't copy the old look or the old flow to match its neighbours.
