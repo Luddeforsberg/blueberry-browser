@@ -9,6 +9,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm install` | Install dependencies |
 | `pnpm dev` | Run the app with hot reload |
 | `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
+| `pnpm run format` | Format everything with Prettier (`.prettierrc.json`). `pnpm run format:check` fails on any file that isn't |
 | `pnpm run lint` | Lint. Warnings are allowed, errors fail CI |
 | `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
@@ -22,9 +23,9 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run site:deploy` | Deploy `site/` to Netlify, as it is, with `netlify.toml`. Needs `npx netlify login` and a linked site first |
 | `pnpm run push:keys` | Print a new VAPID key pair for notifications on the phone page. See `runner/README.md` |
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it. See `runner/README.md` |
-| `pnpm run verify` | Typecheck, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
+| `pnpm run verify` | Typecheck, format check, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
 
-CI runs typecheck, lint, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
+CI runs typecheck, the format check, lint, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
 
 ## How we build
 
@@ -120,4 +121,3 @@ CI runs typecheck, lint, unit tests and build on macOS and Windows. It doesn't r
 - **Real input isn't checked by Electron:** `sendInputEvent` goes wherever the coordinates are, or nowhere. It doesn't reach a frame from another origin, and pages move after a scroll, so aim after they settle. `aimClick` watches for the press and stops one landing on anything but the named element.
 - **Native drags and pickers:** real input on a `draggable` element starts a Mac drag that would catch the user's pointer, and a real click on a dropdown or file field opens a native menu or file picker. Those are scripted.
 - **The bird changes when a click happens:** `aimClick` runs again after the flight, so the watch on the press is set where the element is now, and a press on anything else is still stopped. Nothing the bird draws can be hit, so it never needs telling apart. Anything new that waits for it must end through `PageActor`'s waits, or it holds up a job after the bird has gone.
-- **Formatting:** existing files aren't Prettier-clean, which is most of the lint warnings. Don't run `pnpm format` over files you aren't otherwise rewriting.
