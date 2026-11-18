@@ -279,9 +279,9 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
     await page.mouse.down();
     await page.mouse.move(name!.x + name!.width - 1, name!.y + name!.height / 2, { steps: 5 });
     await page.mouse.up();
-    await page.keyboard.press("Meta+c");
+    await page.keyboard.press("ControlOrMeta+c");
     await page.getByRole("textbox", { name: "Name" }).click();
-    await page.keyboard.press("Meta+v");
+    await page.keyboard.press("ControlOrMeta+v");
     await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("Anna Svensson");
 
     await page.frameLocator("#sheet").getByRole("textbox", { name: "Cell A2" }).click();
@@ -293,19 +293,19 @@ test("copying from a page and pasting it in is noted, and a secret is copied wit
 
     await page.getByRole("textbox", { name: "Password", exact: true }).click();
     await page.keyboard.type(PASSWORD);
-    await page.keyboard.press("Meta+a");
-    await page.keyboard.press("Meta+c");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+c");
     // A revealed password can be copied, and it's still a password.
     await page.getByRole("textbox", { name: "Shown password" }).click();
     await page.keyboard.type("shown-secret");
     await page.getByRole("button", { name: "Show password" }).click();
     await page.getByRole("textbox", { name: "Shown password" }).click();
-    await page.keyboard.press("Meta+a");
-    await page.keyboard.press("Meta+c");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+c");
     // Pasted somewhere plain, it's still a secret.
     await page.getByRole("textbox", { name: "Name" }).click();
-    await page.keyboard.press("Meta+a");
-    await page.keyboard.press("Meta+v");
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+v");
     await expect(page.getByRole("textbox", { name: "Name" })).toHaveValue("shown-secret");
     await page.getByRole("textbox", { name: "Password", exact: true }).click();
 
