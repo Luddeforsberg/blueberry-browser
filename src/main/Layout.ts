@@ -89,6 +89,68 @@ export const tooltipRect = (pill: Rect, window: { width: number; height: number 
   };
 };
 
+// Our menus (DESIGN.md section 8). A menu opens 4px under its button, or at the pointer, and a submenu 4px beside its
+// row, with its first row level with it. All of them stay 8px inside the area, moving in, or opening upward when there's
+// no room below. The view holds the sheets and room for their `lift` shadow, which falls mostly downwards and is darkest
+// in dark mode, so it fades out before the view's edge even over a white page.
+const MENU = { gap: 4, edge: 8, padding: 6, room: { side: 32, above: 16, below: 48 } };
+
+export interface MenuSheetBox {
+  // "" for the menu, and a submenu by its row's place: "3", "3.1".
+  path: string;
+  width: number;
+  height: number;
+  // Where its row starts in the sheet above it.
+  rowTop: number;
+}
+
+const parentPath = (path: string): string | null => (path === "" ? null : path.split(".").slice(0, -1).join("."));
+
+// Where each sheet goes in the view, and the view in the area. Anchors and the area are in the same coordinates: the
+// window's, or the screen's for the desktop. Null without the menu itself, or with a submenu whose row isn't placed.
+export const menuPlacement = (anchor: Rect, sheets: MenuSheetBox[], area: Rect): { view: Rect; sheets: Record<string, Point> } | null => {
+  const { gap, edge, padding, room } = MENU;
+  const right = area.x + area.width - edge;
+  const bottom = area.y + area.height - edge;
+  const fit = (sheet: MenuSheetBox) => ({
+    width: Math.round(Math.min(sheet.width, area.width - 2 * edge)),
+    height: Math.round(Math.min(sheet.height, area.height - 2 * edge)),
+  });
+  const placed = new Map<string, Rect>();
+
+  const root = sheets.find(({ path }) => path === "");
+  if (!root) return null;
+  const { width, height } = fit(root);
+  const point = anchor.width === 0 && anchor.height === 0;
+  const below = point ? anchor.y : anchor.y + anchor.height + gap;
+  const above = point ? anchor.y - height : anchor.y - gap - height;
+  const y = below + height <= bottom ? below : above >= area.y + edge ? above : clamp(below, area.y + edge, bottom - height);
+  placed.set("", { x: Math.round(clamp(anchor.x, area.x + edge, right - width)), y: Math.round(y), width, height });
+
+  // Parents before their submenus.
+  const nested = sheets.filter(({ path }) => path !== "").sort((a, b) => a.path.split(".").length - b.path.split(".").length);
+  for (const sheet of nested) {
+    const parent = placed.get(parentPath(sheet.path) ?? "");
+    if (!parent) return null;
+    const { width, height } = fit(sheet);
+    const toRight = parent.x + parent.width + gap;
+    const toLeft = parent.x - gap - width;
+    const x = toRight + width <= right ? toRight : toLeft >= area.x + edge ? toLeft : right - toRight > toLeft - area.x ? clamp(toRight, area.x + edge, right - width) : area.x + edge;
+    const y = clamp(parent.y + sheet.rowTop - padding, area.y + edge, bottom - height);
+    placed.set(sheet.path, { x: Math.round(x), y: Math.round(y), width, height });
+  }
+
+  const rects = [...placed.values()];
+  const left = Math.max(Math.min(...rects.map((rect) => rect.x)) - room.side, area.x);
+  const top = Math.max(Math.min(...rects.map((rect) => rect.y)) - room.above, area.y);
+  const viewRight = Math.min(Math.max(...rects.map((rect) => rect.x + rect.width)) + room.side, area.x + area.width);
+  const viewBottom = Math.min(Math.max(...rects.map((rect) => rect.y + rect.height)) + room.below, area.y + area.height);
+  return {
+    view: { x: left, y: top, width: viewRight - left, height: viewBottom - top },
+    sheets: Object.fromEntries([...placed].map(([path, rect]) => [path, { x: rect.x - left, y: rect.y - top }])),
+  };
+};
+
 // A tab's preview card (DESIGN.md section 8): 280px wide, its picture 16:10, then up to two lines of title, its site
 // and, while a mascot works there, a line saying so. Its words take at most `words` and the working line `working`.
 export const TAB_PREVIEW = { width: 280, picture: 175, words: 77, working: 22 };

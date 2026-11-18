@@ -179,13 +179,14 @@ test("the drop takes a job from any app, comes out when it asks without saying w
   }
 });
 
-test("closing Blueberry's window takes the drop, the panel and the shortcut with it", async () => {
+test("closing Blueberry's window takes the drop, the panel, its menu and the shortcut with it", async () => {
   const app = await launchApp();
   try {
     const chrome = await findView(app, "view=chrome");
     await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ desktopBerry: true }));
     await findView(app, "view=desktop");
-    expect(await windowCount(app)).toBe(3);
+    // Blueberry's, the drop's, the panel's and the menu's.
+    expect(await windowCount(app)).toBe(4);
     await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().find((window) => window.contentView.children.length > 1)?.close());
     await expect.poll(() => windowCount(app)).toBe(0);
     expect(await registered(app)).toEqual([]);

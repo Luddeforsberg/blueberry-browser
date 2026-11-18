@@ -296,6 +296,7 @@ Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell
   - **A submenu** opens beside its row, on the side with room, when the pointer rests on it or on → and Enter. A row with one has a chevron in `faint` on its right. ← or Esc closes only the submenu.
   - **Keys:** ↑ ↓ through the rows, Home and End, Enter to press, and Esc back to what opened it. A menu from a right-click opens at the pointer, moved in so it stays inside the window.
   - **Over a page:** a menu that reaches over a web page is drawn in an overlay view (section 1), never in the page, so nothing a site runs can see or press it.
+  - **Right-clicking a web page** offers what was clicked: spelling suggestions, a link, an image, editing, or back, forward and reload on a plain page with Show Berry how, and it always ends in Inspect. With text selected, Ask Berry About This puts that text in the chat panel's prompt box, and it's never sent by itself.
 - **Asking first** is our own dialog, never the system's. It's for anything that can't be undone: deleting a chat, a mascot or a routine, Clear history, Forget what it remembers, and Unpublish.
   - **The card:** 400px wide in the middle of the window over a dim of `ink` at 28% (black at 50% in dark), a sheet with a 22px radius and a deeper `lift`, and 22px inside.
   - **The words:** the question at 16px semibold with the thing's name in curly quotes ("Delete “Hej”?"), then what happens at 13.5px in `ink-2`.
@@ -741,7 +742,7 @@ Mock: [gallery.html](./docs/design/mocks/gallery.html). Mascots made for one job
 - **The kinds of job** as a row of words under that, each with its count in mono in `faint`, **All** first and only the kinds that have any. The chosen one is in `ink` with a 1.5px `ink` line under it, sitting on a hairline that runs the column's width.
 - **From people** and **From Blueberry,** each a label with its count, and the first with "Written by people using Blueberry, and not checked by us." on its right. People's are in order of adds, most first.
 - **A tile** has a stage 4:3, on `sheet-2` with a 14px radius, and the mascot in the middle at 64px at rest. Under the stage are its name at 13.5px medium and its line in two lines at most at 12.5px in `ink-2`. For a person's, a third line in mono in `faint` has the author and the adds ("Sam K. · 1 204 adds"). Four to a row, with 18px between them and 26px between rows, three as the page narrows, and two at the narrowest.
-- **Pointed at,** the stage steps up to `sheet-2` mixed 4% with `ink`. Nothing moves, there's no shadow, and nothing appears on it, so a tile is only ever a way into its page. The keyboard's ring is the usual one. One already in your flock has a check and **Yours** in mono in `ink-3` at its stage's top left.
+- **Pointed at,** the stage steps up to `sheet-2` mixed 4% with `ink`. Nothing moves, there's no shadow, and nothing appears on it, so a tile is only ever a way into its page. The keyboard's ring is the usual one. One already among your mascots has a check and **Yours** in mono in `ink-3` at its stage's top left.
 
 **Picking one** opens its page in the same tab, in place of the tiles: one step in, like Settings. Where the page is, and which one, lives in its tab, so Back, the toolbar's Back and a restored session find it. On top is a quiet crumb, ‹ **Gallery** / its name, which goes back with the tile you came from keeping the keyboard, as Esc does.
 
@@ -753,7 +754,7 @@ Mock: [gallery.html](./docs/design/mocks/gallery.html). Mascots made for one job
 - **What it's told, word for word,** under the stage, with "word for word, as the model reads it" on its label's right: on `sheet-2` with a 12px radius, in mono at 12.5px, always in full and never cut, as plain text, because it's exactly what the model reads.
 - **The right column** stays in view as the page scrolls, so **Add** is never out of reach. From top to bottom:
   - "From people" or "From Blueberry" in mono in `faint`, then its name at 26px semibold and its line at 14.5px in `ink-2`.
-  - **Add to your flock,** filled, 38px tall and the column's width.
+  - **Add to your mascots,** filled, 38px tall and the column's width.
   - **Who wrote it,** at 12.5px in `ink-2`. For a person's: "*Author* wrote this, not Blueberry, and nobody has checked it. Its limits are real either way: they're set by Blueberry, not by what it says about itself." For Blueberry's: "You get your own copy. It asks before anything risky, like all of yours, and you can change it any time."
   - **Its facts as rows** between hairlines, a label in `ink-3` and its value: **Made by** with the author, **Added** with how many times in mono (a person's only, since a starter has none), **Visits** and **Can** in the words of `permissionsInWords`, read from the sites and tools the tool layer enforces, never from what the entry says about itself, and **Kind of job.** Only a real limit has a padlock, so one with no limits can't look like one with some.
   - **An example,** from a real run, and none without one: the question as the user's bubble, and the answer beside the mascot's face, its first lines fading out, with **Read the whole answer** opening the rest in place. The answer is markdown, as in a chat, but nothing in it can load or go anywhere: no raw HTML, an image is only its description, and a link is its words and its site as text.
@@ -961,7 +962,7 @@ A mascot on the edge of the screen while you're in other apps: it shows what the
 
 These aren't drawn. Until one is, it works as it does today, which [the old document](./docs/design/DESIGN-bloom.md) describes under the same headings. When it's redrawn, anything about it may change, not only its look.
 
-- Find in page, zoom and printing, the page menu
+- Find in page, zoom and printing
 - Publishing
 - Answering from the phone
 - Restoring tabs, A page in trouble, Damaged saved data

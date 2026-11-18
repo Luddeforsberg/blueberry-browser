@@ -100,6 +100,29 @@ export async function launchApp(
   return app;
 }
 
+// Our menus and Asking first are drawn in the menu view, over the window (DESIGN.md section 8). Tests press in it as a
+// person would, since nothing else can answer it.
+const menuRow = (view: Page, label: string) =>
+  view.getByRole("menuitem", { name: label, exact: true }).or(view.getByRole("menuitemcheckbox", { name: label, exact: true }));
+
+export async function chooseFromMenu(app: ElectronApplication, label: string): Promise<void> {
+  await menuRow(await findView(app, "view=menu"), label).click();
+}
+
+// The rows of the menu that's open, in order, with "-" for a hairline.
+export async function openMenuRows(app: ElectronApplication): Promise<string[]> {
+  const view = await findView(app, "view=menu");
+  return view
+    .locator('[role=menu]:not([aria-hidden="true"])')
+    .first()
+    .evaluate((menu) => [...menu.children].map((child) => child.getAttribute("aria-label") ?? "-"));
+}
+
+export async function answerAsk(app: ElectronApplication, button: string): Promise<void> {
+  const view = await findView(app, "view=menu");
+  await view.getByRole("alertdialog").getByRole("button", { name: button, exact: true }).click();
+}
+
 // Each WebContentsView shows up as its own Playwright window. A window can exist before it reaches
 // its address, and no event says when it does, so this keeps looking.
 export async function findView(

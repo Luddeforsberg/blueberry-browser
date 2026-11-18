@@ -2,6 +2,7 @@ import { clipboard, ipcMain } from "electron";
 import { isAiService, looksLikeAiKey } from "../shared/aiKey";
 import type { Window } from "./Window";
 import type { Tab } from "./Tab";
+import type { MenuView } from "./MenuView";
 import { CHANNEL_REGIONS, chatSendOptions, isTrustedSender, type ChromeEndpoint } from "./ipc";
 import { starterExamplePrompts } from "./mascotCatalog";
 import type { ChromeRegion, InvokeChannel, InvokeChannels } from "../shared/ipc";
@@ -42,6 +43,8 @@ export class EventManager {
       // There's no such view while the feature is off, so nothing can claim to be it.
       desktop: this.mainWindow.desktopBerry.chromeView && endpoint(this.mainWindow.desktopBerry.chromeView),
       composer: this.mainWindow.desktopBerry.composerView && endpoint(this.mainWindow.desktopBerry.composerView),
+      menu: endpoint(this.mainWindow.menus.chromeView),
+      "drop-menu": this.mainWindow.desktopBerry.menuView && endpoint(this.mainWindow.desktopBerry.menuView.chromeView),
     };
   }
 
@@ -49,18 +52,31 @@ export class EventManager {
     channel: C,
     listener: (...args: InvokeChannels[C]["args"]) => Result<C>
   ): void {
+    this.handleFrom(channel, (_, ...args) => listener(...args));
+  }
+
+  // The same, for a call that needs to know which of its views made it.
+  private handleFrom<C extends InvokeChannel>(
+    channel: C,
+    listener: (region: InvokeChannels[C]["region"], ...args: InvokeChannels[C]["args"]) => Result<C>
+  ): void {
     ipcMain.handle(channel, (event, ...args) => {
       const endpoints = this.endpoints;
-      const trusted = CHANNEL_REGIONS[channel].some((region) => {
-        const endpoint = endpoints[region];
+      const region = CHANNEL_REGIONS[channel].find((candidate) => {
+        const endpoint = endpoints[candidate];
         return endpoint !== null && isTrustedSender(event, endpoint);
       });
-      if (!trusted) {
+      if (!region) {
         throw new Error(`Rejected ${channel} from ${event.senderFrame?.url ?? "an unknown frame"}`);
       }
-      return listener(...(args as InvokeChannels[C]["args"]));
+      return listener(region, ...(args as InvokeChannels[C]["args"]));
     });
     this.handledChannels.push(channel);
+  }
+
+  // The menu view that called: the window's, or the desktop's.
+  private menuView(region: "menu" | "drop-menu"): MenuView | null {
+    return region === "menu" ? this.mainWindow.menus : this.mainWindow.desktopBerry.menuView;
   }
 
   private withTab(tabId: string, action: (tab: Tab) => unknown): boolean {
@@ -149,6 +165,12 @@ export class EventManager {
 
     this.handle("layout:app-menu", () => this.mainWindow.showAppMenu());
 
+    this.handleFrom("menu:current", (region) => this.menuView(region)?.state ?? null);
+    this.handleFrom("menu:place", (region, menuId, sheets) => this.menuView(region)?.place(menuId, sheets) ?? null);
+    this.handleFrom("menu:choose", (region, menuId, rowId) => this.menuView(region)?.choose(menuId, rowId));
+    this.handleFrom("menu:dismiss", (region, menuId) => this.menuView(region)?.dismiss(menuId));
+    this.handle("menu:answer", (askId, yes) => this.mainWindow.menus.answer(askId, yes));
+
     this.handle("overlay:show-sidebar", () => this.mainWindow.showFloatingSidebar());
 
     this.handle("overlay:hide", () => this.mainWindow.hideFloatingSidebar());
@@ -170,7 +192,7 @@ export class EventManager {
       this.mainWindow.placeSavedSite(id, list, index);
     });
 
-    this.handle("bookmarks:menu", (id) => this.mainWindow.showBookmarkMenu(id));
+    this.handleFrom("bookmarks:menu", (region, id, anchor) => this.mainWindow.showBookmarkMenu(id, anchor, region));
 
     this.handle("library:chat", (chatId) => this.mainWindow.chats.thread(chatId));
 
@@ -263,13 +285,13 @@ export class EventManager {
       typeof title === "string" ? this.mainWindow.chats.rename(chatId, title) : false
     );
 
-    this.handle("chat:menu", (chatId) => this.mainWindow.showChatMenu(chatId));
+    this.handleFrom("chat:menu", (region, chatId, anchor) => this.mainWindow.showChatMenu(chatId, anchor, region));
 
     this.handle("chat:page-access", () => this.mainWindow.chats.canSeePage);
 
     this.handle("chat:set-page-access", (enabled) => this.mainWindow.chats.setPageAccess(enabled));
 
-    this.handle("berry:context-menu", () => this.mainWindow.showBerryMenu());
+    this.handle("berry:context-menu", (anchor) => this.mainWindow.showBerryMenu(anchor));
 
     this.handle("page:text", async () => {
       const tab = this.mainWindow.activeTab;

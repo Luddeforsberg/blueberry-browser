@@ -5,7 +5,7 @@ import { expect, test, type Locator } from "@playwright/test";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 
 // The mascots a group shows, by name, in order.
@@ -89,10 +89,10 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     const rename = page.getByLabel("You already have a Meeting Prep, so this one needs another name.");
     await expect(rename).toHaveValue("Meeting Prep 2");
     await rename.fill("meeting prep");
-    await page.getByRole("button", { name: "Add Meeting Prep to your flock" }).click();
+    await page.getByRole("button", { name: "Add Meeting Prep to your mascots" }).click();
     await expect(page.getByRole("alert")).toContainText("Give this one its own name");
     await rename.fill("Briefer");
-    await page.getByRole("button", { name: "Add Meeting Prep to your flock" }).click();
+    await page.getByRole("button", { name: "Add Meeting Prep to your mascots" }).click();
     await expect(page.getByRole("status")).toHaveText("Added. It’s your own copy, so nothing in the Gallery can change it.");
     // Added, the mascot on the stage looks pleased, and its page is a press away.
     await expect(page.getByRole("img", { name: "Briefer, finished", exact: true })).toHaveCount(1);
@@ -122,19 +122,18 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     // The Gallery tab still has its page, which says it's yours and offers no Add. Back on the tiles, its tile says Yours.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
     await expect(page.getByRole("button", { name: "Chat with Briefer" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add Meeting Prep to your flock" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add Meeting Prep to your mascots" })).toHaveCount(0);
     await crumb.getByRole("button", { name: "Gallery" }).click();
     await expect(blueberry.getByRole("button", { name: "Meeting Prep, yours" })).toContainText("Yours");
 
     // Deleted, it can be added again.
     const id = String(copy?.id);
-    await app.evaluate(({ dialog }) => {
-      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
-    });
-    expect(await chrome.evaluate((mascot) => window.chromeAPI.mascots.delete(mascot), id)).toBe(true);
+    const deleted = chrome.evaluate((mascot) => window.chromeAPI.mascots.delete(mascot), id);
+    await answerAsk(app, "Delete");
+    expect(await deleted).toBe(true);
     await expect(blueberry.getByRole("button", { name: "Meeting Prep", exact: true })).not.toContainText("Yours");
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
-    await expect(page.getByRole("button", { name: "Add Meeting Prep to your flock" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Meeting Prep to your mascots" })).toBeVisible();
   } finally {
     await app.close();
     model.close();

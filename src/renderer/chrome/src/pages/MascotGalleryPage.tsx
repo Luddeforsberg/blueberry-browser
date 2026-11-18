@@ -241,9 +241,9 @@ const Actions: React.FC<{ name: string; copy: MascotProfile | null; onAdd: () =>
     const { choose } = useFlock()
     if (!copy) {
         return (
-            <Button aria-label={`Add ${name} to your flock`} className="w-full h-[38px] text-14" onClick={onAdd}>
+            <Button aria-label={`Add ${name} to your mascots`} className="w-full h-[38px] text-14" onClick={onAdd}>
                 <Plus aria-hidden strokeWidth={1.75} />
-                Add to your flock
+                Add to your mascots
             </Button>
         )
     }

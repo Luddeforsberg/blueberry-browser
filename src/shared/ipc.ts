@@ -11,8 +11,9 @@ import type { ChatThread, GalleryLinked, GalleryListing, HandoffNeed, LibrarySna
 // find bar, which floats over a page in a view of its own. The prompt view asks about what a site requested, and
 // nothing else can answer it. The desktop view is the drop on the edge of the screen, in a window of its own, and the
 // composer view is the window beside it that can take the keyboard: the prompt box, the tray and the ask. The suggestions view is the list under the address field while it's
-// being edited, over the page.
-export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview";
+// being edited, over the page. The menu view draws our menus and the Asking first card over the window, and the desktop
+// menu view the mascot's menu on the desktop, in a window of its own. Only they can answer either.
+export type ChromeRegion = "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview" | "menu" | "drop-menu";
 
 export type LayoutMode = "vertical" | "horizontal";
 
@@ -470,6 +471,65 @@ export interface TooltipRequest {
 // What the tooltip view draws, placed in the view by the layout owner.
 export type TooltipShown = TooltipRequest;
 
+// DESIGN.md section 8, Menus. The icon a row may lead with, drawn by the menu view.
+export type MenuIcon =
+  | "rename" | "delete" | "back" | "forward" | "reload" | "copy" | "cut" | "paste" | "undo" | "redo" | "select-all"
+  | "link" | "new-tab" | "save" | "berry" | "show-how" | "print" | "inspect" | "pin" | "bookmark" | "open";
+
+// A menu as main sends it to the menu view: words, icons and state only. Main keeps what each row does, by its id, for
+// this one menu, so the view answers with nothing but the id that was pressed.
+export type MenuEntry =
+  | { kind: "rule" }
+  | {
+      kind: "row";
+      id: string;
+      label: string;
+      icon: MenuIcon | null;
+      enabled: boolean;
+      // Null for a row that isn't a switch.
+      checked: boolean | null;
+      // Deletes or removes: in `ask`, last, after a hairline.
+      danger: boolean;
+      // As this computer writes it: "Ctrl C", or "⌘C" on a Mac.
+      shortcut: string | null;
+      submenu: MenuEntry[] | null;
+    };
+
+// What opens a menu, in the view that asked: a button's box, or the pointer as a box with no size.
+export type MenuAnchor = Rect;
+
+export interface MenuShown {
+  id: string;
+  label: string;
+  entries: MenuEntry[];
+  // With mascots hidden, a row with a mascot for its icon shows the plain glyph.
+  mascotsHidden: boolean;
+}
+
+// The size of each sheet the view drew: the menu itself at "", and a submenu at the place of its row among the entries,
+// such as "3" or "3.1". `rowTop` is where that row starts in the sheet it's on.
+export interface MenuSheetSize {
+  path: string;
+  width: number;
+  height: number;
+  rowTop: number;
+}
+
+// Where each sheet goes in the view, by its path, once main has placed them in the window.
+export type MenuPlacement = Record<string, Point>;
+
+// The Asking first card (DESIGN.md section 8). With no `action` it's a warning with only OK.
+export interface AskCard {
+  id: string;
+  question: string;
+  detail: string;
+  action: string | null;
+  // A mascot's own delete shows its face.
+  mascot: { name: string; look: MascotLook; hidden: boolean } | null;
+}
+
+export type MenuViewState = { kind: "menu"; menu: MenuShown } | { kind: "ask"; ask: AskCard } | null;
+
 // A tab's preview card, which hangs beside or under its tab and so over the page, in a view of its own. The chrome says
 // which tab and where its row is in the window. Main decides what the card shows and where it goes.
 export interface TabPreviewRequest {
@@ -626,16 +686,24 @@ export interface InvokeChannels {
   "layout:resize": { region: "chrome"; args: [panel: ResizablePanel, width: number]; result: void };
   // Off a Mac, the menu button opens the app's own menu under itself, since the window has no menu bar.
   "layout:app-menu": { region: "chrome"; args: []; result: void };
+  // The menu views: what they show, where main put each sheet once the view says how big they are, and their answers.
+  // Only the view drawing a menu or a card may answer it, by the ids main gave, and main acts on each id once.
+  "menu:current": { region: "menu" | "drop-menu"; args: []; result: MenuViewState };
+  "menu:place": { region: "menu" | "drop-menu"; args: [menuId: string, sheets: MenuSheetSize[]]; result: MenuPlacement | null };
+  "menu:choose": { region: "menu" | "drop-menu"; args: [menuId: string, rowId: string]; result: void };
+  "menu:dismiss": { region: "menu" | "drop-menu"; args: [menuId: string]; result: void };
+  "menu:answer": { region: "menu"; args: [askId: string, yes: boolean]; result: void };
   "overlay:show-sidebar": { region: "chrome"; args: []; result: void };
   "overlay:hide": { region: "overlay"; args: []; result: void };
   "overlay:open-popover": { region: "chrome"; args: [popover: Popover]; result: void };
   "overlay:close-popover": { region: "chrome" | "overlay"; args: [refocus: boolean]; result: void };
-  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview"; args: []; result: ThemeState };
+  "theme:get": { region: "chrome" | "overlay" | "find" | "prompt" | "desktop" | "composer" | "suggestions" | "tooltip" | "preview" | "menu" | "drop-menu"; args: []; result: ThemeState };
   "library:get": { region: "chrome" | "overlay"; args: []; result: LibrarySnapshot };
   "bookmarks:toggle": { region: "chrome"; args: []; result: void };
   // Moves a saved site on top as a tile, or into the bookmarks, at a place in that list. Dragging and the menu both use it.
   "bookmarks:place": { region: "chrome" | "overlay"; args: [bookmarkId: string, list: SavedSiteList, index: number]; result: void };
-  "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string]; result: void };
+  // Settles once the menu has closed.
+  "bookmarks:menu": { region: "chrome" | "overlay"; args: [bookmarkId: string, anchor: MenuAnchor]; result: void };
   "library:chat": { region: "chrome"; args: [chatId: string]; result: ChatThread | null };
   "settings:get": { region: "chrome" | "overlay"; args: []; result: Settings };
   "settings:update": { region: "chrome"; args: [patch: Partial<Settings>]; result: Settings };
@@ -696,12 +764,12 @@ export interface InvokeChannels {
     result: boolean;
   };
   "chat:rename": { region: "chrome" | "overlay"; args: [chatId: string, title: string]; result: boolean };
-  // The native menu for a chat in the sidebar. Delete happens in main, so only Rename comes back.
-  "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string]; result: "rename" | null };
+  // The menu for a chat in the sidebar. Delete asks first and happens in main, so only Rename comes back.
+  "chat:menu": { region: "chrome" | "overlay"; args: [chatId: string, anchor: MenuAnchor]; result: "rename" | null };
   "page:text": { region: "chrome"; args: []; result: string | null };
   "chat:page-access": { region: "chrome"; args: []; result: boolean };
   "chat:set-page-access": { region: "chrome"; args: [enabled: boolean]; result: boolean };
-  "berry:context-menu": { region: "chrome"; args: []; result: void };
+  "berry:context-menu": { region: "chrome"; args: [anchor: MenuAnchor]; result: void };
   // Showing Berry how. Only the chrome can start, stop or read one, so no page, tool or mascot can.
   "recording:state": { region: "chrome"; args: []; result: RecordingState };
   "recording:start": { region: "chrome"; args: []; result: boolean };
@@ -867,6 +935,8 @@ export interface EventChannels {
   "downloads:updated": DownloadInfo[];
   "permissions:saved-updated": SavedSitePermission[];
   "permissions:prompt": PermissionPrompt | null;
+  // To a menu view: the menu or card to draw, or null when it's hidden.
+  "menu:shown": MenuViewState;
 }
 
 export type Unsubscribe = () => void;
@@ -922,8 +992,8 @@ export interface SettingsAPI {
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
   setAppearance: (appearance: Appearance) => Promise<void>;
   setAppIcon: (png: string, mascotId: string | null, ground: AppIconGround) => Promise<boolean>;
-  // The native menu for right-clicking Berry, with Keep Berry still and Hide Berry.
-  showBerryMenu: () => Promise<void>;
+  // The menu for right-clicking Berry, with Keep Berry still and Hide Berry.
+  showBerryMenu: (anchor: MenuAnchor) => Promise<void>;
   onSettingsUpdated: (callback: (settings: Settings) => void) => Unsubscribe;
 }
 
@@ -934,7 +1004,7 @@ export interface ChatAPI {
   panelShows: (chatId: string | null) => Promise<void>;
   decide: (chatId: string, approvalId: string, allow: boolean, answer?: string) => Promise<boolean>;
   rename: (chatId: string, title: string) => Promise<boolean>;
-  showMenu: (chatId: string) => Promise<"rename" | null>;
+  showMenu: (chatId: string, anchor: MenuAnchor) => Promise<"rename" | null>;
   getPageText: () => Promise<string | null>;
   getPageAccess: () => Promise<boolean>;
   setPageAccess: (enabled: boolean) => Promise<boolean>;
@@ -954,7 +1024,7 @@ export interface AttachmentsAPI {
 export interface LibraryAPI {
   toggleBookmark: () => Promise<void>;
   placeSavedSite: (bookmarkId: string, list: SavedSiteList, index: number) => Promise<void>;
-  showBookmarkMenu: (bookmarkId: string) => Promise<void>;
+  showBookmarkMenu: (bookmarkId: string, anchor: MenuAnchor) => Promise<void>;
   getLibrary: () => Promise<LibrarySnapshot>;
   getChat: (chatId: string) => Promise<ChatThread | null>;
   onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;
@@ -995,6 +1065,16 @@ export interface TabPreviewAPI {
   show: (request: TabPreviewRequest) => Promise<void>;
   hide: () => Promise<void>;
   onShown: (callback: (shown: TabPreviewShown | null) => void) => Unsubscribe;
+}
+
+// Only the menu views may call these.
+export interface MenuAPI {
+  current: () => Promise<MenuViewState>;
+  place: (menuId: string, sheets: MenuSheetSize[]) => Promise<MenuPlacement | null>;
+  choose: (menuId: string, rowId: string) => Promise<void>;
+  dismiss: (menuId: string) => Promise<void>;
+  answer: (askId: string, yes: boolean) => Promise<void>;
+  onShown: (callback: (state: MenuViewState) => void) => Unsubscribe;
 }
 
 export interface FindAPI {
@@ -1162,6 +1242,7 @@ export interface ChromeAPI {
   address: AddressAPI;
   tooltip: TooltipAPI;
   preview: TabPreviewAPI;
+  menu: MenuAPI;
   routines: RoutinesAPI;
   mascots: MascotsAPI;
   memory: MemoryAPI;

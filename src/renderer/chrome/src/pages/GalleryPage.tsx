@@ -28,6 +28,9 @@ import { HistoryRow } from './HistoryPage'
 import { ChatRow } from '../components/Sidebar'
 import { MascotPerch } from '../components/MascotPerch'
 import { MascotRow } from './FlockPage'
+import { AskSheet, leadsWithGlyph, MenuEntryRow } from '../MenuApp'
+import { MenuRule, MenuSheet } from '../components/MenuSheet'
+import type { AskCard, MenuEntry } from '@shared/ipc'
 import { LimitTags } from './MascotSteps'
 import { StepCard } from '../components/StepCard'
 import { MascotMemoryView } from './MascotMemory'
@@ -269,6 +272,32 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
 )
 
 // Every shared component in its states. Switch appearance in Settings to check light and dark.
+// Our menus as main sends them, with what each kind of row can be, and the three kinds of Asking first.
+const sampleRow = (id: string, label: string, more: Partial<Extract<MenuEntry, { kind: 'row' }>> = {}): MenuEntry => ({
+    kind: 'row', id, label, icon: null, enabled: true, checked: null, danger: false, shortcut: null, submenu: null, ...more,
+})
+const MENU_SAMPLES: Array<{ label: string; entries: MenuEntry[] }> = [
+    { label: 'A chat', entries: [sampleRow('1', 'Rename', { icon: 'rename' }), { kind: 'rule' }, sampleRow('2', 'Delete…', { icon: 'delete', danger: true })] },
+    {
+        label: 'A page',
+        entries: [
+            sampleRow('1', 'Back', { icon: 'back', shortcut: 'Ctrl ←' }),
+            sampleRow('2', 'Forward', { icon: 'forward', shortcut: 'Ctrl →', enabled: false }),
+            sampleRow('3', 'Reload', { icon: 'reload', shortcut: 'Ctrl R' }),
+            { kind: 'rule' },
+            sampleRow('4', 'Ask Berry About This', { icon: 'berry' }),
+            sampleRow('5', 'Inspect', { icon: 'inspect' }),
+        ],
+    },
+    { label: 'Berry', entries: [sampleRow('1', 'Keep Berry Still', { checked: true }), sampleRow('2', 'Hide Berry', { checked: false })] },
+    { label: 'Menu', entries: [sampleRow('1', 'File', { submenu: [] }), sampleRow('2', 'View', { submenu: [] })] },
+]
+const ASK_SAMPLES: AskCard[] = [
+    { id: 'chat', question: 'Delete “Hej”?', detail: 'This chat will be permanently removed from this computer.', action: 'Delete', mascot: null },
+    { id: 'mascot', question: 'Delete “Scout”?', detail: 'It leaves your mascots, and what it remembers is forgotten.', action: 'Delete', mascot: { name: 'Scout', look: { palette: 'robin', accessory: 'glasses' }, hidden: false } },
+    { id: 'notice', question: 'Some saved data couldn’t be used', detail: 'Your routines couldn’t be opened. The file wasn’t changed.', action: null, mascot: null },
+]
+
 export const GalleryPage: React.FC = () => {
     const [on, setOn] = useState(true)
     const [choice, setChoice] = useState<'one' | 'two'>('one')
@@ -421,6 +450,25 @@ export const GalleryPage: React.FC = () => {
                     </div>
                 </Section>
 
+                <Section title="Our menus and Asking first">
+                    <div className="flex flex-wrap items-start gap-8">
+                        {MENU_SAMPLES.map(({ label, entries }) => (
+                            <MenuSheet key={label} label={label} at={{ x: 0, y: 0 }} autoFocus={false} onClose={() => undefined} className="static w-max min-w-[180px] max-w-[360px]">
+                                {entries.map((entry, index) =>
+                                    entry.kind === 'rule' ? <MenuRule key={index} /> : <MenuEntryRow key={entry.id} row={entry} path={String(index)} lead={leadsWithGlyph(entries)} plain={false} open={entry.submenu !== null} onPress={() => undefined} />
+                                )}
+                            </MenuSheet>
+                        ))}
+                    </div>
+                    <div className="mt-6 flex flex-wrap items-start gap-6">
+                        {ASK_SAMPLES.map((ask) => (
+                            <div key={ask.id} className="p-6 rounded-menu bg-dim">
+                                <AskSheet ask={ask} onAnswer={() => undefined} focusCancel={false} />
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+
                 <Section title="The + menu">
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-x-6 gap-y-[300px] p-6 pb-[300px] rounded-tile bg-well">
                         <div className="relative h-0"><AddMenu {...sampleAdd({ showHow: { label: 'Show Berry how', note: 'makes a routine', problem: null, onStart: () => undefined } })} above={false} onClose={() => undefined} /></div>
@@ -548,7 +596,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Memory">
                     <div className="max-w-xl flex flex-col gap-6">
                         <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} onAnswer={() => undefined} />
-                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one on its page first.' }} onAnswer={() => undefined} />
                         <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
                         <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
                         <RememberedFacts used={SAMPLE_FACTS} />

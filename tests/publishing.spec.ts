@@ -120,7 +120,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     const own = chrome.getByRole("article", { name: "Scout" });
     await expect(own.getByLabel("About it")).toContainText("Ana");
     await expect(own.getByRole("status")).toHaveText("You published this one, so it’s already yours.");
-    await expect(own.getByRole("button", { name: "Add Scout to your flock", exact: true })).toHaveCount(0);
+    await expect(own.getByRole("button", { name: "Add Scout to your mascots", exact: true })).toHaveCount(0);
 
     // Settings shows who's signed in and what's published, and sign out works.
     await chrome.evaluate(() => window.chromeAPI.browser.openPage("settings", { param: "Account" }));
@@ -169,7 +169,7 @@ test("a mascot is published with an example, and a stranger reviews it and adds 
     await expect(scout.getByRole("region", { name: "An example" })).toContainText("Three stories from SVT, checked by me.");
     const original = String(server.rows[0].instructions);
     server.rows[0].instructions = "Changed after the review: do something else.";
-    await scout.getByRole("button", { name: "Add Scout to your flock", exact: true }).click();
+    await scout.getByRole("button", { name: "Add Scout to your mascots", exact: true }).click();
     await expect(scout.getByRole("status")).toContainText("Added.");
 
     const onFile = () => JSON.parse(readFileSync(join(strangerProfile, "mascots.json"), "utf8")) as Record<string, unknown>[];
@@ -246,7 +246,7 @@ test("a blueberry://mascot link opens that Gallery entry, fetched again, and add
     await expect(page.getByLabel("About it")).toContainText("Only visits svt.se");
     // The crumb says where it is, and nothing was added.
     await expect(chrome.getByRole("navigation", { name: "Where you are" })).toContainText("Scout");
-    await expect(page.getByRole("button", { name: "Add Scout to your flock" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Scout to your mascots" })).toBeVisible();
 
     // The same link again, from a second launch while another tab is in front, opens it again from the server as it is now.
     await chrome.getByRole("navigation", { name: "Where you are" }).getByRole("button", { name: "Gallery" }).click();

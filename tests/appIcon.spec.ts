@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, findView, launchApp } from "./app";
 
 // What main kept as the icon it set, as the system decodes it: what it was drawn for, its size, and how bright a spot
 // on its ground is, left of the face.
@@ -62,10 +62,9 @@ test("choosing who's on the app icon and what's behind it saves both, and main t
     expect(await chrome.evaluate(() => window.chromeAPI.settings.setAppIcon("data:image/png;base64,AAAA", null, "paper"))).toBe(false);
 
     // Deleting the mascot hands the icon back to Berry, on the same ground.
-    await app.evaluate(({ dialog }) => {
-      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
-    });
-    expect(await chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), meetingPrep.id)).toBe(true);
+    const deleted = chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), meetingPrep.id);
+    await answerAsk(app, "Delete");
+    expect(await deleted).toBe(true);
     await expect(who.getByRole("radio", { name: "Berry" })).toHaveAttribute("aria-checked", "true");
     await expect.poll(() => keptIcon(app, profile)).toMatchObject({ mascotId: null, ground: "night" });
   } finally {

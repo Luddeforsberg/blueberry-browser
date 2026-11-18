@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 
 const startSite = async () => {
@@ -136,11 +136,10 @@ test("a new profile starts with four mascots beside Berry, once, and a deleted o
     await box.fill("");
 
     const plainWords = (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).mascots.find((mascot) => mascot.name === "Plain Words")!;
-    // Deleting asks first, in a dialog nothing here can press.
-    await app.evaluate(({ dialog }) => {
-      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
-    });
-    expect(await chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id)).toBe(true);
+    // Deleting asks first, in our own card, which only the person at the computer can press.
+    const deleted = chrome.evaluate((id) => window.chromeAPI.mascots.delete(id), plainWords.id);
+    await answerAsk(app, "Delete");
+    expect(await deleted).toBe(true);
     await app.close();
     app = await launchApp(profile, { starters: true });
     chrome = await findView(app, "view=chrome");

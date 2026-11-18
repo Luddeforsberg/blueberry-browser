@@ -15,6 +15,8 @@ const buttonVariants = cva(
                 default: "bg-ink text-ground shadow-filled hover:bg-ink/85 disabled:bg-tray disabled:text-faint disabled:shadow-none",
                 raised: "bg-sheet dark:bg-sheet-2 text-ink shadow-chip hover:[background-image:linear-gradient(var(--hover),var(--hover))] active:[background-image:linear-gradient(var(--press),var(--press))] disabled:bg-tray disabled:text-faint disabled:shadow-none",
                 ghost: "text-ink-2 hover:bg-hover hover:text-ink active:bg-press disabled:text-faint",
+                // The one decision when it can't be undone, in Asking first.
+                danger: "bg-ask text-ground shadow-filled hover:bg-ask/85 disabled:bg-tray disabled:text-faint disabled:shadow-none",
             },
             // 32px, or 28px where the button belongs to a row.
             size: {

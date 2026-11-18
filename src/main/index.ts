@@ -1,4 +1,4 @@
-import { app, BaseWindow, dialog, globalShortcut, session, shell } from "electron";
+import { app, BaseWindow, globalShortcut, session, shell } from "electron";
 import { electronApp } from "@electron-toolkit/utils";
 import { Window } from "./Window";
 import { AppMenu } from "./Menu";
@@ -56,13 +56,10 @@ const storeNotice = (what: string, isAre: "is" | "are") => ({ movedTo }: StorePr
       : `${what} couldn't be opened. The file wasn't changed, but anything new won't be kept after you quit.`
   );
 
+// Our own card with only OK, once the window's chrome has drawn.
 const showStoreNotices = (window: Window): void => {
   if (storeNotices.length === 0) return;
-  void dialog.showMessageBox(window.baseWindow, {
-    type: "warning",
-    message: "Some saved data couldn't be used",
-    detail: storeNotices.join("\n\n"),
-  });
+  void window.notice("Some saved data couldn't be used", storeNotices.join("\n\n"));
   storeNotices = [];
 };
 

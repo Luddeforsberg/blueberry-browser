@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { chooseFromMenu, findView, launchApp, openMenuRows } from "./app";
 
 const clickMenu = (app: ElectronApplication, label: string) =>
   app.evaluate(({ Menu }, name) => {
@@ -71,26 +71,10 @@ test("find, zoom and the page menu on a web page", async () => {
     await input.press("Escape");
     await expect.poll(() => findBarVisible(app)).toBe(false);
 
-    // Right-click: the real event builds the menu, with the native popup caught so nothing blocks.
-    await app.evaluate(({ Menu }) => {
-      const scope = globalThis as unknown as { lastMenu: Electron.Menu | null };
-      scope.lastMenu = null;
-      Menu.prototype.popup = function (this: Electron.Menu) {
-        scope.lastMenu = this;
-      };
-    });
-    const openedMenu = () =>
-      app.evaluate(() =>
-        (globalThis as unknown as { lastMenu: Electron.Menu | null }).lastMenu?.items.map((item) => item.label)
-      );
-    const clickOpened = (label: string) =>
-      app.evaluate((_, name) => {
-        (globalThis as unknown as { lastMenu: Electron.Menu }).lastMenu.items.find((item) => item.label === name)?.click();
-      }, label);
-
+    // Right-click: the real event builds the menu, which is ours, drawn over the page.
     await page.locator("#link").click({ button: "right" });
-    await expect.poll(openedMenu).toContain("Open Link in New Tab");
-    await clickOpened("Open Link in New Tab");
+    await expect.poll(() => openMenuRows(app)).toContain("Open Link in New Tab");
+    await chooseFromMenu(app, "Open Link in New Tab");
     await expect.poll(() => chrome.evaluate(() => window.chromeAPI.browser.getTabs().then((tabs) => tabs.at(-1)?.url))).toBe(
       `${origin}/next`
     );
@@ -102,8 +86,8 @@ test("find, zoom and the page menu on a web page", async () => {
     // Ask Berry: the selected text waits in the composer, and nothing is sent.
     await page.locator("p").selectText();
     await page.locator("p").click({ button: "right", position: { x: 5, y: 5 } });
-    await expect.poll(openedMenu).toContain("Ask Berry About This");
-    await clickOpened("Ask Berry About This");
+    await expect.poll(() => openMenuRows(app)).toContain("Ask Berry About This");
+    await chooseFromMenu(app, "Ask Berry About This");
     const composer = chrome.getByPlaceholder("Tell Berry something", { exact: true });
     await expect(composer).toHaveValue("jackdaw one, jackdaw two, jackdaw three");
     await expect(composer).toBeFocused();
