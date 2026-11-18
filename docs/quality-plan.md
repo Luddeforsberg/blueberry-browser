@@ -50,3 +50,44 @@ Every PR goes through `self-check`, proof against the baseline, `pnpm run verify
 - **Size:** 24 source files over 400 lines. The biggest are `Window.ts` (1,799), `Chats.ts` (1,450), `browserTools.ts` (1,327) and `ipc.ts` (1,176). `src/main` has 149 files in one folder.
 - **Old names:** about 730 uses of "bird" and "flock", and 13 file names.
 - **AGENTS.md:** about 9,400 words.
+
+## The audit (2026-11-18)
+
+This is the `foundations` audit of the preview branch at `581637f`. The full report is in the T3 thread "Foundations audit of the redesign".
+
+**Scores:** 0 of the 12 items fully hold.
+- **Partly:** folders, types, dead code, `verify`, tests and the UI kit.
+- **Missing:** lint, fences, size limits, formatting, the feature map and a short AGENTS.md.
+
+**Findings that change the plan:**
+- **Formatting depends on the machine.** With no config, the Prettier warning count differs by machine (24k to 42k). The format-all change touches 435 of 471 code files: +50,504 and −40,408 lines.
+- **About 1,350 lines of page code are never checked.** They're JavaScript in template strings in `pageScripts.ts`, `pageActorScript.ts` and `recorderScript.ts`. They become typed modules, bundled at build (step 13).
+- **The end-to-end tests ran on GitHub's macOS and Windows runners** in November. 15 failed, which points at reduced motion on the runner images rather than a missing screen. `tests/background.cjs` isn't loaded in CI, so CI runs a different app than a local run.
+- **`noImplicitAny` is off**, inherited from the electron-toolkit tsconfig. Turning it on costs 0 errors.
+- **`main` has no branch protection.**
+- **Saved and public names:** the public site `blueberry-flock.netlify.app` would break shared links if renamed, so it needs the user's call. The palette ids become the berry names (`blueberry`, `lingon`, `cloudberry`, `gooseberry`, `raspberry`, `currant`).
+
+**Order after the merge.** Each step is a PR, risk in brackets.
+1. Prettier config and `format:check` (low).
+2. The format-all commit (low).
+3. Remove the 35 triple-slash disables (low).
+4. Zero warnings, and inline disables are errors (medium).
+5. Compiler flags that cost 0 errors (low).
+6. `knip` (low).
+7. Size and complexity limits, with a list of exceptions that only shrinks (low).
+8. Code-only rename, plus a check against "bird" and "flock" (low).
+9. Renames in saved formats, with migrations (medium).
+10. Server and model-facing renames (high, Codex).
+11. `src/main` into folders (medium).
+12. Boundary rules (low).
+13. Page code out of template strings (high).
+14. Split `browserTools.ts` (high, Codex).
+15. Split `Chats.ts` (high, Codex).
+16. Split `Window.ts` (medium).
+17. Split `ipc.ts` (low).
+18. The other files over 400 lines.
+19. `exactOptionalPropertyTypes`, then `noUncheckedIndexedAccess` (medium).
+20. Type-aware lint, one rule at a time (medium).
+21. Fences: SQL, `fetch`, effects and timers, the UI kit (medium).
+22. End-to-end tests in CI, and protect `main` (medium).
+23. AGENTS.md down to about 60 lines (low).
