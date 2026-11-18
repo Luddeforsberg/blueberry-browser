@@ -134,7 +134,7 @@ test.describe("Berry on real websites", () => {
         if (job.galleryMascot) {
           await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascot-gallery"));
           await chrome.getByRole("button", { name: `Add ${job.galleryMascot}` }).click();
-          await chrome.getByRole("button", { name: "Add to flock" }).click();
+          await chrome.getByRole("button", { name: `Add ${job.galleryMascot} to your mascots` }).click();
           await chrome.getByRole("button", { name: `Start a chat with ${job.galleryMascot}` }).click();
           // Start a chat opens the new tab page with the mascot chosen.
           textbox = chrome.getByRole("textbox", {

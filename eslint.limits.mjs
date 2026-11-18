@@ -47,9 +47,9 @@ export const linesOver = {
   "src/renderer/common/components/Mascot.tsx": 563,
   "src/shared/ipc.ts": 1348,
   "src/shared/library.ts": 466,
-  "tests/birdOnPage.spec.ts": 681,
   "tests/browser.spec.ts": 1894,
   "tests/features/map.ts": 1025,
+  "tests/mascotOnPage.spec.ts": 681,
   "tests/phone.spec.ts": 473,
   "tests/publishing.spec.ts": 423,
 };

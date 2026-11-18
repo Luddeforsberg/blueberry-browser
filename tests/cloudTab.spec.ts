@@ -27,7 +27,7 @@ const shoot = async (chrome: Page, name: string) => {
 
 test.skip(process.platform !== "darwin" || !existsSync(CHROME), "Needs Google Chrome");
 
-test("a bird does a job in a cloud tab, asking before it clicks, and the user can take over", async () => {
+test("a mascot does a job in a cloud tab, asking before it clicks, and the user can take over", async () => {
   test.setTimeout(60_000);
   const server = createServer((_, response) => {
     response.setHeader("content-type", "text/html");
@@ -122,7 +122,7 @@ test("a cloud job shows in the working view beside its chat, and pressing the pi
     const view = chrome.getByRole("complementary", { name: /working on/ });
     const goThere = view.getByRole("button", { name: "Go to the tab on 127.0.0.1" });
     await expect(goThere).toBeVisible({ timeout: 20_000 });
-    // The local test browser's own pictures, and the bird on the window's edge, as there's none in a cloud page.
+    // The local test browser's own pictures, and the mascot on the window's edge, as there's none in a cloud page.
     await expect(view.locator("img[src^='data:image/jpeg']")).toBeVisible({ timeout: 10_000 });
     await expect(view.getByRole("status")).toHaveText("Berry is on 127.0.0.1");
     await expect(chrome.getByText(/Opened/).first()).toBeVisible();

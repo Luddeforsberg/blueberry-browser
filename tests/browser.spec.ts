@@ -888,7 +888,7 @@ test("by default Berry acts without asking unless it's risky, and Settings can t
   expect(await clicked()).toBe("Delete");
 });
 
-test("with the bird off, a tab Berry is using glows and shimmers until the reply ends", async () => {
+test("with the mascot off, a tab Berry is using glows and shimmers until the reply ends", async () => {
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ birdOnPages: false }));
   const page = await openFixture();
   await openChat();
@@ -1400,7 +1400,7 @@ test("in the tab row at the smallest window, the active tab has as much room for
   await expect(row.locator("li[style*='max-width']")).toHaveCount(0);
   const six = await titles();
   const others = six.filter((tab) => !tab.active).map((tab) => tab.title);
-  // The bird perches on the active tab and its close button always shows, so it's wider to make up for them.
+  // The mascot perches on the active tab and its close button always shows, so it's wider to make up for them.
   expect(six.find((tab) => tab.active)!.title).toBeGreaterThanOrEqual(Math.min(...others) - 1);
   expect(Math.min(...others)).toBeGreaterThan(40);
 
@@ -1874,9 +1874,9 @@ test("bookmarks are in the sidebar when vertical, and in a bar under the toolbar
 });
 
 test("right-clicking Berry beside the greeting opens its menu", async () => {
-  const bird = chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
-  await expect(bird).toBeVisible();
-  await bird.click({ button: "right", timeout: 2000 });
+  const berry = chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
+  await expect(berry).toBeVisible();
+  await berry.click({ button: "right", timeout: 2000 });
   await expect.poll(() => openMenuRows(app)).toEqual(["Keep Berry Still", "Hide Berry"]);
   await chooseFromMenu(app, "Keep Berry Still");
   await expect

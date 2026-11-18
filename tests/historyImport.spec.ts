@@ -8,7 +8,7 @@ import { chromeHistoryFile, writeChromiumHistory } from "./chromiumHistory";
 import { startFakeModel } from "./fakeModel";
 import { DEMO_LINES, demoProposals } from "./suggestionReplies";
 
-test("the first run brings in another browser's history, and the birds speak about it on the new tab", async () => {
+test("the first run brings in another browser's history, and the mascots speak about it on the new tab", async () => {
   test.setTimeout(60_000);
   const browsers = mkdtempSync(join(tmpdir(), "blueberry-browsers-"));
   writeChromiumHistory(chromeHistoryFile(browsers), demoVisits()).close();

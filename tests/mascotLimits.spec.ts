@@ -46,7 +46,7 @@ test.afterEach(async () => {
 
 test("a mascot chats inside its limits, and is still itself after a restart", async () => {
   model.reset();
-  const profile = mkdtempSync(join(tmpdir(), "blueberry-flock-"));
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-mascot-limits-"));
   app = await launchApp(profile, { modelEnv: model.env });
   let chrome = await findView(app, "view=chrome");
 

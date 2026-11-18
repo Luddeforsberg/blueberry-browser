@@ -37,7 +37,7 @@ const PAGES: Record<string, { body: string; csp?: string }> = {
   },
   // A button with words right up against it, and clear space below.
   "/crowded": {
-    body: `<title>Crowded</title><body style="margin:0;font:16px/22px sans-serif"><p id="words" style="position:absolute;left:150px;top:190px;width:460px;margin:0">Words someone might be reading, a good few of them, set out over several lines so they fill all of the space directly above the button and around where the bird will stand. They carry on for a while yet, so that nothing above it is clear.</p><button id="go" style="position:absolute;left:300px;top:300px;width:160px;height:44px" onclick="document.title='Pressed'">Press me now</button>`,
+    body: `<title>Crowded</title><body style="margin:0;font:16px/22px sans-serif"><p id="words" style="position:absolute;left:150px;top:190px;width:460px;margin:0">Words someone might be reading, a good few of them, set out over several lines so they fill all of the space directly above the button and around where the mascot will stand. They carry on for a while yet, so that nothing above it is clear.</p><button id="go" style="position:absolute;left:300px;top:300px;width:160px;height:44px" onclick="document.title='Pressed'">Press me now</button>`,
   },
   "/two": {
     body: `<title>Two</title><body style="margin:0"><button id="a" style="position:absolute;left:60px;top:80px;width:120px;height:40px">First</button><button id="b" style="position:absolute;left:500px;top:420px;width:160px;height:44px" onclick="document.title='Placed'">Place order</button>`,
@@ -111,7 +111,7 @@ const setup = async (settings: object = {}) => {
         )
         .toBe(true);
     };
-    // The first message loads LangChain and sends the page, about 3s before the model is first asked, and then the bird
+    // The first message loads LangChain and sends the page, about 3s before the model is first asked, and then the mascot
     // flies to each step, so these jobs take 4 to 6s alone: past the default 5s, and more under load.
     return {
       chatId,
@@ -128,7 +128,7 @@ const setup = async (settings: object = {}) => {
   return { app, chrome, model, origin, open, job, close };
 };
 
-test("the bird clicks without changing what's clicked, and nothing it draws reaches the agent", async () => {
+test("the mascot clicks without changing what's clicked, and nothing it draws reaches the agent", async () => {
   const { app, open, job, close } = await setup();
   try {
     const page = await open("/plain");
@@ -141,11 +141,11 @@ test("the bird clicks without changing what's clicked, and nothing it draws reac
     ]);
     await allAsked();
 
-    // A real click, not a scripted one, which is what it would be if the bird had got in the way.
+    // A real click, not a scripted one, which is what it would be if the mascot had got in the way.
     await expect(page).toHaveTitle("Pressed by true");
     await expect.poll(() => stateIn(app, "/plain")).toMatchObject({ attached: true });
     const state = (await stateIn(app, "/plain"))!;
-    // The bird says what the inset glow said, so there's only the ring around the card.
+    // The mascot says what the inset glow said, so there's only the ring around the card.
     expect(await page.evaluate(() => getComputedStyle(document.documentElement, "::after").boxShadow)).toBe("none");
 
     // It's there, and the page can't see inside it or hit it.
@@ -171,7 +171,7 @@ test("the bird clicks without changing what's clicked, and nothing it draws reac
   }
 });
 
-test("the bird isn't in a screenshot", async () => {
+test("the mascot isn't in a screenshot", async () => {
   const { app, open, job, close, model } = await setup();
   try {
     await open("/green");
@@ -185,14 +185,14 @@ test("the bird isn't in a screenshot", async () => {
     await expect.poll(async () => (await stateIn(app, "/green"))?.hidden).toBe(false);
     const image = JSON.stringify(model.requests.at(-1)?.messages).match(/data:image\/jpeg;base64,[A-Za-z0-9+/=]+/)?.[0];
     expect(image).toBeTruthy();
-    // Nothing but the page's green, on which the bird and its line would show.
+    // Nothing but the page's green, on which the mascot and its line would show.
     const strays = await app.evaluate(({ nativeImage }, url) => {
       const picture = nativeImage.createFromDataURL(url);
       const { width, height } = picture.getSize();
       const bitmap = picture.toBitmap();
       let dark = 0;
       for (let at = 0; at < width * height * 4; at += 4) {
-        // BGRA. The bird and the line are dark or white, and the page isn't either.
+        // BGRA. The mascot and the line are dark or white, and the page isn't either.
         if (bitmap[at + 1] < 100 || (bitmap[at] > 150 && bitmap[at + 2] > 150)) dark++;
       }
       return dark;
@@ -204,7 +204,7 @@ test("the bird isn't in a screenshot", async () => {
   }
 });
 
-test("a page that moves things under the bird still can't get the click", async () => {
+test("a page that moves things under the mascot still can't get the click", async () => {
   const { open, job, close } = await setup();
   try {
     const page = await open("/trap");
@@ -460,7 +460,7 @@ test("on a zoomed page it stands in the right place and the click lands, and bet
   }
 });
 
-test("Stop ends the job while the bird is on its way, so the click never happens", async () => {
+test("Stop ends the job while the mascot is on its way, so the click never happens", async () => {
   const { app, chrome, open, job, close } = await setup();
   try {
     const page = await open("/plain");
@@ -482,7 +482,7 @@ test("Stop ends the job while the bird is on its way, so the click never happens
   }
 });
 
-test("a key press as the very first thing still shows the bird, not only its words", async () => {
+test("a key press as the very first thing still shows the mascot, not only its words", async () => {
   const { app, open, job, close } = await setup();
   try {
     await open("/plain");
@@ -494,7 +494,7 @@ test("a key press as the very first thing still shows the bird, not only its wor
   }
 });
 
-test("turning off page access while the bird is on its way means the click never happens", async () => {
+test("turning off page access while the mascot is on its way means the click never happens", async () => {
   const { app, chrome, open, job, close } = await setup();
   try {
     const page = await open("/plain");
@@ -586,7 +586,7 @@ test("it works on a page with the strictest CSP, follows a scroll and types at a
   }
 });
 
-test("a background tab pays nothing, and the bird appears when the user goes there", async () => {
+test("a background tab pays nothing, and the mascot appears when the user goes there", async () => {
   const { app, chrome, open, job, close, origin, model } = await setup();
   try {
     await open("/plain");

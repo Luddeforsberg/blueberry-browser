@@ -34,7 +34,7 @@ test.afterEach(async () => {
   await app?.close();
 });
 
-test("a bird offers to remember after a job, keeps it only on Remember, uses it next time and can forget it", async () => {
+test("a mascot offers to remember after a job, keeps it only on Remember, uses it next time and can forget it", async () => {
   model.reset();
   const profile = mkdtempSync(join(tmpdir(), "blueberry-memory-"));
   app = await launchApp(profile, { modelEnv: model.env });
@@ -86,7 +86,7 @@ test("a bird offers to remember after a job, keeps it only on Remember, uses it 
   expect(system).toContain(`On 127.0.0.1: ${KEPT}`);
   expect(model.memoryRequests.length).toBe(askedSoFar);
 
-  // Another bird never gets it.
+  // Another mascot never gets it.
   await chrome.evaluate(() =>
     window.chromeAPI.mascots.save(null, {
       name: "Scout",

@@ -35,7 +35,7 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     await expect.poll(() => names(blueberry)).toEqual(["Competitor Watch", "Newsletter Builder", "Plain Words"]);
     await chrome.getByRole("button", { name: /^All/ }).click();
 
-    // Its name is taken, so the page asks for another. Nothing is in the flock until Add is pressed.
+    // Its name is taken, so the page asks for another. Nothing is added until Add is pressed.
     await chrome.evaluate(() =>
       window.chromeAPI.mascots.save(null, {
         name: "Meeting Prep",

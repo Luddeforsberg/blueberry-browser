@@ -149,7 +149,7 @@ export const startFakeModel = async () => {
     suggestFrom(next: (digest: string) => string) {
       suggest = next;
     },
-    // What the cheap model proposes for a bird to remember.
+    // What the cheap model proposes for a mascot to remember.
     proposeMemory(...facts: Array<{ text: string; site: string | null }>) {
       memory = JSON.stringify({ facts });
     },

@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { mascotSnapshot } from "../../src/main/cloudJobs";
 import type { MascotProfile } from "../../src/shared/library";
 import type { InternalPage, Settings } from "../../src/shared/ipc";
-import { flockRows } from "../../src/shared/phone";
+import { sharedMascotRows } from "../../src/shared/phone";
 import { join } from "node:path";
 import { chooseFromMenu, findView } from "../app";
 import type { Drive } from "./driver";
@@ -30,7 +30,7 @@ export interface Needs {
   cloudBrowser?: boolean;
   // Starts with the first run instead of skipping it.
   firstRun?: boolean;
-  // Starts with the starter mascots in the flock.
+  // Starts with the starter mascots.
   starters?: boolean;
   settings?: Partial<Settings>;
   // Files to put in the profile, at the moment drive's clock starts at.
@@ -288,7 +288,7 @@ const SCOUT: MascotProfile = {
 const PROMPT = "Find the cheapest USB-C cable on shop.example and put it in my cart";
 
 const jobOnRunner = async (phone: PhoneDrive, end: "asks" | "done") => {
-  await phone.owner("sync_cloud_flock", { p_birds: flockRows([SCOUT]) });
+  await phone.owner("sync_cloud_flock", { p_birds: sharedMascotRows([SCOUT]) });
   const job = await phone.owner("start_cloud_job", {
     p_prompt: PROMPT,
     p_history: [],

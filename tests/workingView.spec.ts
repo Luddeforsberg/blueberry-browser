@@ -61,14 +61,14 @@ test.describe("the working view", () => {
   const view = () => chrome.getByRole("complementary", { name: /working on/ });
   const picture = () => view().locator("img[src^='data:image/jpeg']");
 
-  test("shows the job's tab with the bird in it, saves no picture, and only other views are refused", async () => {
+  test("shows the job's tab with the mascot in it, saves no picture, and only other views are refused", async () => {
     // A tab of the user's own, which the job isn't using.
     await chrome.evaluate((url) => window.chromeAPI.browser.createTab(url), `${site.origin}/mine`);
     const { chatId, finish } = await startJob(chrome, model, `${site.origin}/job`);
     await expect(picture()).toBeVisible();
     await expect(view().getByRole("button", { name: /Go to the tab/ })).toHaveCount(1);
 
-    // It counts as watched, so the bird really is in the page behind the chat.
+    // It counts as watched, so the mascot really is in the page behind the chat.
     model.callTools({ name: "list_elements", args: {} });
     await expect
       .poll(() =>
