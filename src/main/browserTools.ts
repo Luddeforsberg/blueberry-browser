@@ -233,9 +233,8 @@ const writtenHost = (host: string, address: URL): string | undefined =>
 
 // Whether a search that goes out to a search service is an ordinary one, by the same measures as an address: short, and
 // with nothing in it that looks like data.
-export const MAX_SEARCH_LENGTH = 500;
-export const plainSearch = (query: string): boolean =>
-  query.trim().length > 0 && query.length <= MAX_SAFE_TYPED_LENGTH && !looksLikeData(query);
+const MAX_SEARCH_LENGTH = 500;
+const plainSearch = (query: string): boolean => query.trim().length > 0 && query.length <= MAX_SAFE_TYPED_LENGTH && !looksLikeData(query);
 
 // Sites the user's own words name, such as "bücher.de", or the site of an address they pasted, which may be local. Only
 // whole names count, marks and all, so "bücher.de" never names "cher.de", and each is the host the browser would go to.

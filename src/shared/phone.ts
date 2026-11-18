@@ -5,7 +5,7 @@ import { BERRY, BERRY_ID, parseMascotDraft } from "./mascots";
 // and the phone sends a job as one of them with the same snapshot the app would. Plain data, used by the app and, bundled
 // into site/shared.js, by the phone page, so both read a row the same way.
 
-export const MAX_SHARED_BIRDS = 100;
+const MAX_SHARED_BIRDS = 100;
 
 export interface FlockRow {
   id: string;
@@ -72,7 +72,7 @@ export const mascotSnapshot = ({ id, name, instructions, sites, tools, galleryId
 // A follow-up is a new job in the same conversation, carrying the messages before it, the same from the app and the phone.
 
 export const MAX_HISTORY = 40;
-export const MAX_HISTORY_TEXT = 8000;
+const MAX_HISTORY_TEXT = 8000;
 // Under the row's limit of 100,000 bytes, with room for the JSON around each message.
 const MAX_HISTORY_BYTES = 90_000;
 
@@ -132,7 +132,7 @@ export const followUpHistory = (last: ConversationJob): HistoryMessage[] => {
   ]);
 };
 
-export const conversationIdOf = (job: Pick<ConversationJob, "id" | "conversation_id">): string => job.conversation_id || job.id;
+const conversationIdOf = (job: Pick<ConversationJob, "id" | "conversation_id">): string => job.conversation_id || job.id;
 
 // One per conversation, the newest first, each with its jobs oldest first. A job from before conversations is one alone.
 export const conversationsOf = <T extends ConversationJob>(jobs: readonly T[]): { id: string; jobs: T[]; latest: T }[] => {

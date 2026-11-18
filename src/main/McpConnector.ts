@@ -73,7 +73,7 @@ const NOT_SAFE = "This computer has no safe place to keep the token, so the serv
 const NOT_SAVED = "On for now, but this couldn't be saved, so it will be off after a restart.";
 
 // The name of the app calling, from what the snippet told it to send, or from what it says it is.
-export const clientName = (header: string | string[] | undefined, userAgent: string | undefined): string => {
+const clientName = (header: string | string[] | undefined, userAgent: string | undefined): string => {
   const given = (Array.isArray(header) ? header[0] : header)?.trim().slice(0, 40);
   if (given) return given;
   if (/claude-code/i.test(userAgent ?? "")) return "Claude Code";
@@ -82,17 +82,16 @@ export const clientName = (header: string | string[] | undefined, userAgent: str
 };
 
 // The token is compared without telling by how long it took how much of it was right.
-export const tokenMatches = (header: string | undefined, token: string): boolean => {
+const tokenMatches = (header: string | undefined, token: string): boolean => {
   const given = Buffer.from(header?.replace(/^Bearer\s+/i, "") ?? "");
   const wanted = Buffer.from(token);
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 };
 
 // Only addresses on this computer, so a web page can't reach the server through a name that points here.
-export const hostAllowed = (host: string | undefined, port: number): boolean =>
-  host === `127.0.0.1:${port}` || host === `localhost:${port}`;
+const hostAllowed = (host: string | undefined, port: number): boolean => host === `127.0.0.1:${port}` || host === `localhost:${port}`;
 
-export const snippets = (url: string, token: string, bridge: string, binary: string): McpSnippet[] => [
+const snippets = (url: string, token: string, bridge: string, binary: string): McpSnippet[] => [
   {
     app: "Claude Code",
     where: "Run this in a terminal.",

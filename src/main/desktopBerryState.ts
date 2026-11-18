@@ -75,7 +75,7 @@ export const firstLine = (reply: string, max = MAX_LINE_LENGTH): string => {
 export const readingTime = (line: string): number => Math.min(Math.max(3000 + line.length * 70, MIN_READING_MS), MAX_READING_MS);
 
 // Who, and what kind of thing it's waiting for, as a notification says it: never the question, the site or the words.
-export const askingWords = (who: string, { approval }: Pick<NeedsYouItem, "approval">): string =>
+const askingWords = (who: string, { approval }: Pick<NeedsYouItem, "approval">): string =>
   approval.handoff
     ? `${who} needs you to ${HANDOFF_WORDS[approval.handoff.need]}`
     : approval.question

@@ -114,7 +114,7 @@ const sameAddress = (a: string, b: string) => {
 const at = (time: number | null) => (time === null ? null : new Date(time).toISOString());
 
 // Page text goes in a tag a page can't close early, so where it ends is never up to the page.
-export const pageContent = (url: string, text: string): string =>
+const pageContent = (url: string, text: string): string =>
   `${UNTRUSTED_NOTE}\n\n<untrusted-page-content url="${url.replace(/"/g, "%22")}">\n${text.replace(/<\/?untrusted-page-content/gi, "[tag removed]")}\n</untrusted-page-content>`;
 
 type TaskStatus =

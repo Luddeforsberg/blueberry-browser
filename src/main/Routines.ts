@@ -53,10 +53,7 @@ interface ActiveRun {
 const prompt = (routine: StoredRoutine, now: number): string => routinePrompt(routine, `at ${new Date(now).toString()}`);
 
 // What a run is told. A run in the cloud is written before it's due, so it says where rather than when.
-export const routinePrompt = (
-  { name, instructions, sites }: Pick<StoredRoutine, "name" | "instructions" | "sites">,
-  when: string,
-): string =>
+const routinePrompt = ({ name, instructions, sites }: Pick<StoredRoutine, "name" | "instructions" | "sites">, when: string): string =>
   `This is a routine the user set up earlier, running by itself ${when}. ` +
   "Nobody is watching right now, so don't ask questions in words: anything you need from the user goes through ask_user or hand_to_user, which wait for them. Do what it says in your own tabs, " +
   "then end with a short report of what you found and did, and anything you couldn't do.\n\n" +

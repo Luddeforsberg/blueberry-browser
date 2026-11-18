@@ -167,7 +167,7 @@ export const feedbackOf = (proposal: { card: SuggestionWords; sites: string[] },
 });
 
 // The same as one they turned down, by its sites or its words.
-export const repeatsDismissed = (proposal: { card: SuggestionWords; sites: string[] }, feedback: Feedback[]): boolean => {
+const repeatsDismissed = (proposal: { card: SuggestionWords; sites: string[] }, feedback: Feedback[]): boolean => {
   const own = wordsOf(`${proposal.card.title} ${textOf(proposal.card)}`);
   return feedback.some(
     (old) =>
@@ -193,7 +193,7 @@ export const alreadyThere = (proposal: Proposal, { routines, mascots }: Existing
   return false;
 };
 
-export const proposalId = (card: { kind: string; title: string }) =>
+const proposalId = (card: { kind: string; title: string }) =>
   `ai-${createHash("sha1").update(`${card.kind}:${card.title}`).digest("hex").slice(0, 10)}`;
 
 const mascotDraft = (raw: Record<string, unknown>, name: string, instructions: string, sites: string[]): MascotDraft | null => {

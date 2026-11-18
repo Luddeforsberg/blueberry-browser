@@ -146,14 +146,14 @@ export const parseLogins = (data: unknown): CloudLogin[] => {
 };
 
 // Bringing a site along again starts its check over.
-export const withLogin = (logins: CloudLogin[], site: string, now = Date.now()): CloudLogin[] => {
+const withLogin = (logins: CloudLogin[], site: string, now = Date.now()): CloudLogin[] => {
   const added: CloudLogin = { site, addedAt: now, checkedAt: null, status: "brought" };
   return [added, ...logins.filter((login) => login.site !== site)];
 };
 
-export const withoutLogin = (logins: CloudLogin[], site: string): CloudLogin[] => logins.filter((login) => login.site !== site);
+const withoutLogin = (logins: CloudLogin[], site: string): CloudLogin[] => logins.filter((login) => login.site !== site);
 
-export const withCheck = (logins: CloudLogin[], site: string, signedIn: boolean, now = Date.now()): CloudLogin[] =>
+const withCheck = (logins: CloudLogin[], site: string, signedIn: boolean, now = Date.now()): CloudLogin[] =>
   logins.map(
     (login): CloudLogin => (login.site === site ? { ...login, checkedAt: now, status: signedIn ? "checked" : "signed-out" } : login),
   );

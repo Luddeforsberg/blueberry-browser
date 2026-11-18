@@ -236,7 +236,7 @@ export interface DesktopPanelState {
 
 // An answer from the ask, with the key of the showing it was pressed on. Main applies it to the ask it showed under
 // that key, and only once.
-export interface DesktopDecision {
+interface DesktopDecision {
   key: string;
   allow: boolean;
   answer?: string;
@@ -284,7 +284,7 @@ export interface McpState {
   activity: McpActivity[];
 }
 
-export interface PhoneAnswered {
+interface PhoneAnswered {
   approvalId: string;
   said: string;
 }
@@ -411,7 +411,7 @@ export type Popover =
   | { kind: "account"; anchor: Rect };
 
 // What's open over the page, and when it closed, whether the keyboard goes back to what opened it.
-export interface PopoverState {
+interface PopoverState {
   shown: Popover | null;
   refocus: boolean;
 }
@@ -573,7 +573,7 @@ export interface MenuShown {
 
 // The size of each sheet the view drew: the menu itself at "", and a submenu at the place of its row among the entries,
 // such as "3" or "3.1". `rowTop` is where that row starts in the sheet it's on.
-export interface MenuSheetSize {
+interface MenuSheetSize {
   path: string;
   width: number;
   height: number;
@@ -626,12 +626,12 @@ export interface FindResult {
   total: number;
 }
 
-export interface ChatChunk {
+interface ChatChunk {
   chatId: string;
   content: string;
 }
 
-export type RoutineSaveResult = { ok: true; id: string } | { ok: false; error: string };
+type RoutineSaveResult = { ok: true; id: string } | { ok: false; error: string };
 
 export type MascotSaveResult = { ok: true; id: string } | { ok: false; error: string };
 
@@ -692,7 +692,7 @@ export type CloudView =
   | { kind: "frames"; takenOver: boolean; checking: string | null }
   | { kind: "gone" };
 
-export interface CloudFrame {
+interface CloudFrame {
   tabId: string;
   // A JPEG, base64.
   data: string;
@@ -1030,9 +1030,9 @@ export interface EventChannels {
   "menu:shown": MenuViewState;
 }
 
-export type Unsubscribe = () => void;
+type Unsubscribe = () => void;
 
-export interface BrowserAPI {
+interface BrowserAPI {
   getTabs: () => Promise<TabInfo[]>;
   createTab: (url?: string) => Promise<TabInfo>;
   closeTab: (tabId: string) => Promise<boolean>;
@@ -1058,7 +1058,7 @@ export interface BrowserAPI {
   onFocusAddress: (callback: () => void) => Unsubscribe;
 }
 
-export interface LayoutAPI {
+interface LayoutAPI {
   getLayout: () => Promise<Layout>;
   toggleSidebar: () => Promise<void>;
   toggleChat: () => Promise<void>;
@@ -1073,12 +1073,12 @@ export interface LayoutAPI {
   onLayoutUpdated: (callback: (layout: Layout) => void) => Unsubscribe;
 }
 
-export interface ThemeAPI {
+interface ThemeAPI {
   getTheme: () => Promise<ThemeState>;
   onThemeUpdated: (callback: (theme: ThemeState) => void) => Unsubscribe;
 }
 
-export interface SettingsAPI {
+interface SettingsAPI {
   getSettings: () => Promise<Settings>;
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>;
   setAppearance: (appearance: Appearance) => Promise<void>;
@@ -1088,7 +1088,7 @@ export interface SettingsAPI {
   onSettingsUpdated: (callback: (settings: Settings) => void) => Unsubscribe;
 }
 
-export interface ChatAPI {
+interface ChatAPI {
   // Starts a chat when `chatId` is null. The reply arrives through the events.
   send: (chatId: string | null, text: string, options: ChatSendOptions) => Promise<ChatThread | null>;
   stop: (chatId: string) => Promise<void>;
@@ -1105,14 +1105,14 @@ export interface ChatAPI {
   onDraft: (callback: (text: string) => void) => Unsubscribe;
 }
 
-export interface AttachmentsAPI {
+interface AttachmentsAPI {
   chooseFiles: (kept: string[]) => Promise<FileChip[]>;
   addFiles: (files: { name: string; bytes: Uint8Array }[], kept: string[]) => Promise<FileChip[]>;
   discard: (id: string) => Promise<void>;
   tabs: (chatId: string | null, mascotId: string | null) => Promise<TabChoice[]>;
 }
 
-export interface LibraryAPI {
+interface LibraryAPI {
   toggleBookmark: () => Promise<void>;
   placeSavedSite: (bookmarkId: string, list: SavedSiteList, index: number) => Promise<void>;
   showBookmarkMenu: (bookmarkId: string, anchor: MenuAnchor) => Promise<void>;
@@ -1121,13 +1121,13 @@ export interface LibraryAPI {
   onLibraryUpdated: (callback: (library: LibrarySnapshot) => void) => Unsubscribe;
 }
 
-export interface WorkAPI {
+interface WorkAPI {
   watch: (chatId: string | null, pictureWidth: number) => Promise<void>;
   onUpdated: (callback: (view: WorkView | null) => void) => Unsubscribe;
   onFrame: (callback: (frame: WorkFrame) => void) => Unsubscribe;
 }
 
-export interface RecordingAPI {
+interface RecordingAPI {
   state: () => Promise<RecordingState>;
   start: () => Promise<boolean>;
   stop: () => Promise<void>;
@@ -1137,7 +1137,7 @@ export interface RecordingAPI {
   onUpdated: (callback: (state: RecordingState) => void) => Unsubscribe;
 }
 
-export interface AddressAPI {
+interface AddressAPI {
   suggestHistory: (text: string) => Promise<VisitedPage[]>;
   show: (request: AddressSuggestionsRequest) => Promise<void>;
   close: () => Promise<void>;
@@ -1146,20 +1146,20 @@ export interface AddressAPI {
   onPicked: (callback: (row: AddressSuggestion) => void) => Unsubscribe;
 }
 
-export interface TooltipAPI {
+interface TooltipAPI {
   show: (request: TooltipRequest) => Promise<void>;
   hide: () => Promise<void>;
   onShown: (callback: (shown: TooltipShown | null) => void) => Unsubscribe;
 }
 
-export interface TabPreviewAPI {
+interface TabPreviewAPI {
   show: (request: TabPreviewRequest) => Promise<void>;
   hide: () => Promise<void>;
   onShown: (callback: (shown: TabPreviewShown | null) => void) => Unsubscribe;
 }
 
 // Only the menu views may call these.
-export interface MenuAPI {
+interface MenuAPI {
   current: () => Promise<MenuViewState>;
   place: (menuId: string, sheets: MenuSheetSize[]) => Promise<MenuPlacement | null>;
   choose: (menuId: string, rowId: string) => Promise<void>;
@@ -1168,7 +1168,7 @@ export interface MenuAPI {
   onShown: (callback: (state: MenuViewState) => void) => Unsubscribe;
 }
 
-export interface FindAPI {
+interface FindAPI {
   search: (text: string) => Promise<void>;
   step: (forward: boolean) => Promise<void>;
   close: () => Promise<void>;
@@ -1176,7 +1176,7 @@ export interface FindAPI {
   onResult: (callback: (result: FindResult) => void) => Unsubscribe;
 }
 
-export interface RoutinesAPI {
+interface RoutinesAPI {
   save: (id: string | null, draft: RoutineDraft) => Promise<RoutineSaveResult>;
   setPaused: (id: string, paused: boolean) => Promise<boolean>;
   delete: (id: string) => Promise<boolean>;
@@ -1186,7 +1186,7 @@ export interface RoutinesAPI {
   markSeen: () => Promise<void>;
 }
 
-export interface MascotsAPI {
+interface MascotsAPI {
   save: (id: string | null, draft: MascotDraft & { worksInCloud?: boolean }) => Promise<MascotSaveResult>;
   delete: (id: string) => Promise<boolean>;
   gallery: () => Promise<GalleryListing>;
@@ -1201,14 +1201,14 @@ export interface MascotsAPI {
   onLinked: (callback: (galleryId: string) => void) => Unsubscribe;
 }
 
-export interface MemoryAPI {
+interface MemoryAPI {
   decide: (offerId: string, keep: boolean) => Promise<MemoryResult>;
   edit: (factId: string, text: string) => Promise<MemoryResult>;
   forget: (factId: string) => Promise<boolean>;
   clear: (mascotId: string) => Promise<boolean>;
 }
 
-export interface AiKeyAPI {
+interface AiKeyAPI {
   state: () => Promise<AiKeyState>;
   tryKey: (service: AiService, key: string) => Promise<{ outcome: AiKeyTried; state: AiKeyState }>;
   remove: () => Promise<AiKeyState>;
@@ -1217,7 +1217,7 @@ export interface AiKeyAPI {
   onUpdated: (callback: (state: AiKeyState) => void) => Unsubscribe;
 }
 
-export interface AccountAPI {
+interface AccountAPI {
   state: () => Promise<AccountState>;
   signIn: (email: string, password: string) => Promise<AccountState>;
   signUp: (email: string, password: string) => Promise<AccountState>;
@@ -1225,7 +1225,7 @@ export interface AccountAPI {
   onUpdated: (callback: (state: AccountState) => void) => Unsubscribe;
 }
 
-export interface SuggestionsAPI {
+interface SuggestionsAPI {
   list: () => Promise<Suggestion[]>;
   dismiss: (id: string) => Promise<Suggestion[]>;
   // Its prompt was sent or its form saved.
@@ -1233,7 +1233,7 @@ export interface SuggestionsAPI {
   onUpdated: (callback: (suggestions: Suggestion[]) => void) => Unsubscribe;
 }
 
-export interface DownloadsAPI {
+interface DownloadsAPI {
   list: () => Promise<DownloadInfo[]>;
   act: (id: string, action: DownloadAction) => Promise<boolean>;
   chooseFolder: () => Promise<void>;
@@ -1241,7 +1241,7 @@ export interface DownloadsAPI {
   onUpdated: (callback: (downloads: DownloadInfo[]) => void) => Unsubscribe;
 }
 
-export interface PermissionsAPI {
+interface PermissionsAPI {
   saved: () => Promise<SavedSitePermission[]>;
   set: (origin: string, permission: SitePermission, decision: SiteDecision | null) => Promise<boolean>;
   onSavedUpdated: (callback: (saved: SavedSitePermission[]) => void) => Unsubscribe;
@@ -1252,7 +1252,7 @@ export interface PermissionsAPI {
   onPrompt: (callback: (prompt: PermissionPrompt | null) => void) => Unsubscribe;
 }
 
-export interface PhoneAPI {
+interface PhoneAPI {
   state: () => Promise<PhoneState>;
   connect: (token: string) => Promise<PhoneState>;
   newLink: () => Promise<PhoneState>;
@@ -1262,7 +1262,7 @@ export interface PhoneAPI {
   onAnswered: (callback: (answered: PhoneAnswered) => void) => Unsubscribe;
 }
 
-export interface McpAPI {
+interface McpAPI {
   state: () => Promise<McpState>;
   setOn: (on: boolean) => Promise<McpState>;
   revoke: () => Promise<McpState>;
@@ -1270,7 +1270,7 @@ export interface McpAPI {
   onUpdated: (callback: (state: McpState) => void) => Unsubscribe;
 }
 
-export interface CloudAPI {
+interface CloudAPI {
   state: () => Promise<CloudState>;
   save: (apiKey: string, projectId: string) => Promise<CloudState>;
   forget: () => Promise<CloudState>;
@@ -1295,7 +1295,7 @@ export interface CloudAPI {
   onFrame: (callback: (frame: CloudFrame) => void) => Unsubscribe;
 }
 
-export interface DesktopAPI {
+interface DesktopAPI {
   // For Settings. The chrome can't call the rest.
   shortcutTaken: () => Promise<boolean>;
   state: () => Promise<DesktopDropState>;
