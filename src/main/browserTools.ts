@@ -106,7 +106,7 @@ const TOOL_NEEDS: Record<string, MascotTool | "reading" | "asking"> = {
   type_text: "type",
   press_key: "type",
   web_search: "visit",
-  // It reaches an address the bird isn't on, as opening a tab does, so it needs the same.
+  // It reaches an address the mascot isn't on, as opening a tab does, so it needs the same.
   fetch_page: "visit",
 };
 
@@ -368,7 +368,7 @@ export interface PageToolAccess<T extends PageTarget = PageTarget> {
   beenTo?: Iterable<string>;
   // Tabs the user attached to this chat. They're the user's, so they're reached and never closed.
   attached?: (id: string) => boolean;
-  // Whether this job has been stopped. A tool already running only hears of it here, and the bird gives it time to.
+  // Whether this job has been stopped. A tool already running only hears of it here, and the mascot gives it time to.
   stopped?: () => boolean;
   // A web search service. Without one there's no web_search tool.
   search?: WebSearch | null;
@@ -535,7 +535,7 @@ export const createPageTools = <T extends PageTarget>({
     await onRef<string>(tab, ref, scriptedEnter);
   };
 
-  // The bird, if anyone's there to see it. With none, every tool does just what it would do anyway, at the same speed.
+  // The mascot, if anyone's there to see it. With none, every tool does just what it would do anyway, at the same speed.
   const actorOn = (tab: T): PageActor | null => (tab.actor?.showing ? tab.actor : null);
   const unnamed = (name: string | undefined, fallback: string) => clipWords(name) || fallback;
 
@@ -554,7 +554,7 @@ export const createPageTools = <T extends PageTarget>({
     const spot = await tab.runInPage<Spot | null>(spotOf(ref)).catch(() => null);
     return spot && { spot, name: spot.name, ref };
   };
-  // The bird goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
+  // The mascot goes there first, so what's seen is what happens. Says whether to go on, since the job may have been stopped
   // or the tab taken over while it flew, and an action must not follow that.
   const flyToRef = async (tab: T, ref: string, words: (name: string | undefined) => string, kind: Landing): Promise<boolean> => {
     const actor = actorOn(tab);
@@ -589,7 +589,7 @@ export const createPageTools = <T extends PageTarget>({
       return "user-in-field";
     };
     if (usersFields.has(field)) return "user-in-field";
-    // Whether or not a bird is drawn, a field the user is in the middle of isn't typed over.
+    // Whether or not a mascot is drawn, a field the user is in the middle of isn't typed over.
     if (tab.actor?.touchedLately && tab.actor.touchedSince(jobStarted) && (await onRef<boolean>(tab, ref, hasFocus).catch(() => false)))
       return stepAside();
     const touched = () => !!tab.actor?.touchedSince(started);
@@ -671,7 +671,7 @@ export const createPageTools = <T extends PageTarget>({
       if (!(await flyToRef(tab, ref, (name) => `${doing} in ${name}`, "look"))) return leftOff(tab);
       return finish(await scripted(), SCRIPTED);
     }
-    // With a bird on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
+    // With a mascot on the way nothing watches for the press until it lands, because the user may press somewhere meanwhile.
     const arm = !actorOn(tab);
     const aimAgain = async () => {
       await pause(SCROLL_SETTLE_MS);
@@ -683,7 +683,7 @@ export const createPageTools = <T extends PageTarget>({
     if (aim.status === "disabled") return finish("disabled");
     if (!arm) {
       if (!(await flyToRef(tab, ref, (name) => `${doing} ${unnamed(name, "something")}`, "land"))) return leftOff(tab);
-      // Where it is now, as the page may have moved while the bird flew, and now the watch goes on.
+      // Where it is now, as the page may have moved while the mascot flew, and now the watch goes on.
       if (aim.status === "aimed") aim = await tab.runInPage<Aim | null>(aimClick(ref, false));
       if (aim === null) return STALE_ELEMENT;
     }
@@ -795,7 +795,7 @@ export const createPageTools = <T extends PageTarget>({
           return `The page at ${url} couldn't be fetched. Open it with open_tab if you still need it.`;
         }
         if (!canSee()) return NO_ACCESS;
-        // A redirect is the site's doing, and a bird's sites hold wherever it ends.
+        // A redirect is the site's doing, and a mascot's sites hold wherever it ends.
         if (!allowed(page.url)) return `${offLimits(page.url).message} ${siteOf(url)} sent it there by itself.`;
         been.add(siteOf(url));
         const refused = page.status !== null && page.status >= 400;

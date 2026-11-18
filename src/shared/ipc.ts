@@ -103,13 +103,13 @@ export interface Settings {
   siteZoom: Record<string, number>;
   // Whether the new tab page offers what it noticed you repeat. Off means no model call.
   suggestions: boolean;
-  // Whether a bird may offer to remember something after a job. Off means no model call. What's kept stays in use.
+  // Whether a mascot may offer to remember something after a job. Off means no model call. What's kept stays in use.
   memoryOffers: boolean;
   // Send to the phone even while the user is at the computer, for filming and trying it out.
   phoneAlways: boolean;
   // Who the next new chat runs as. Null is Berry.
   chosenMascotId: string | null;
-  // The bird on the edge of the screen, and the shortcut that opens its composer.
+  // The mascot on the edge of the screen, and the shortcut that opens its composer.
   desktopBerry: boolean;
   // Where along the edge it stands, from 0 to 1. Null until it's been dragged.
   desktopBerrySpot: DesktopBerrySpot | null;
@@ -186,7 +186,7 @@ export type DesktopDropPart = "drop" | "answer" | "open" | "dismiss";
 // The prompt box: who goes, where, and jobs sent before, whose words go in the box.
 export interface DesktopBox {
   chosen: { id: string; name: string; look: MascotLook };
-  flock: Array<{ id: string; name: string; look: MascotLook }>;
+  mascots: Array<{ id: string; name: string; look: MascotLook }>;
   // This computer or the cloud, where the chosen mascot can work there, and which it starts on.
   cloud: { fits: boolean; on: boolean };
   recent: Array<{ label: string; prompt: string }>;
@@ -195,7 +195,7 @@ export interface DesktopBox {
 
 // The tray's rows carry a key main made for this one showing, never a chat's or an approval's id.
 export interface DesktopTray {
-  flock: Array<DesktopFace & { chosen: boolean }>;
+  mascots: Array<DesktopFace & { chosen: boolean }>;
   asks: Array<DesktopFace & { key: string; words: string; since: number }>;
   working: Array<DesktopFace & { key: string; title: string; step: string | null; since: number | null }>;
   finished: Array<DesktopFace & { key: string; title: string; problem: string | null; at: number }>;
@@ -654,7 +654,7 @@ export interface RunnerState {
   status: "not-set-up" | "signed-out" | "none" | "waiting" | "linked";
   email: string | null;
   problem: string | null;
-  // Where ChatGPT or Claude can connect to the flock in the cloud, once linked and if the runner serves it.
+  // Where ChatGPT or Claude can connect to the mascots in the cloud, once linked and if the runner serves it.
   relayUrl: string | null;
 }
 

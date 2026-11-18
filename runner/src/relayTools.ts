@@ -3,11 +3,11 @@ import { approvalFromRow, stepsFromRow, type CloudJobStatus } from "../../src/ma
 import { UNTRUSTED_NOTE, type McpTool, type McpToolResult } from "../../src/main/mcpTools";
 import type { MascotProfile } from "../../src/shared/library";
 import { BERRY, NOWHERE, narrowSites } from "../../src/shared/mascots";
-import { agentSummary, sitesFromApp } from "../../src/main/mcpFlock";
+import { agentSummary, sitesFromApp } from "../../src/main/mcpMascots";
 import { mascotSnapshot } from "../../src/shared/phone";
 import type { RelayWhere } from "./db";
 
-// What ChatGPT and Claude can ask of the flock, through the relay, in the cloud or in Blueberry on the user's Mac. Each
+// What ChatGPT and Claude can ask of the mascots, through the relay, in the cloud or in Blueberry on the user's Mac. Each
 // call is a `relay_*` function, as the runner with the grant the user made when they signed in, which acts as the user
 // for that one thing. A job is the same row the phone sends, so the runner takes it and checks it like any other. Nothing here answers anything: questions,
 // approvals and sign-ins are the user's, in Blueberry or on the phone, and there's no database function for the relay
@@ -29,7 +29,7 @@ const NOT_YOURS =
 
 // Everything the tools need, for one connection. The database keeps it to the jobs this connection started.
 export interface RelayHost {
-  flock: () => Promise<MascotProfile[]>;
+  mascots: () => Promise<MascotProfile[]>;
   // The database adds the Context of the user's newest job that has one, as the phone does, and decides where it goes.
   // Null when it was for the Mac and the Mac isn't there.
   startJob: (prompt: string, mascot: object, where: RelayWhere) => Promise<string | null>;
@@ -42,10 +42,10 @@ const json = (data: unknown) => JSON.stringify(data, null, 2);
 const fromWeb = (data: unknown) => `${UNTRUSTED_NOTE}\n\n${json(data)}`;
 const failed = (text: string, summary: string): McpToolResult => ({ text, isError: true, summary });
 
-const findBird = (flock: MascotProfile[], wanted: string | undefined) => {
+const findMascot = (mascots: MascotProfile[], wanted: string | undefined) => {
   const name = wanted?.trim().toLowerCase();
   if (!name) return BERRY;
-  return flock.find((bird) => bird.id.toLowerCase() === name || bird.name.toLowerCase() === name) ?? null;
+  return mascots.find((mascot) => mascot.id.toLowerCase() === name || mascot.name.toLowerCase() === name) ?? null;
 };
 
 const onMac = (row: Record<string, unknown>) => row.target === "mac";
@@ -99,8 +99,8 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const birds = (await host.flock()).map(agentSummary);
-        return { text: json(birds), summary: `${birds.length} birds` };
+        const agents = (await host.mascots()).map(agentSummary);
+        return { text: json(agents), summary: `${agents.length} mascots` };
       },
     },
     {
@@ -129,26 +129,26 @@ export const createRelayTools = (host: RelayHost): McpTool[] => {
           .trim()
           .slice(0, MAX_TASK_LENGTH);
         if (!prompt) return failed("Say what the job is.", "Empty task");
-        const bird = findBird(await host.flock(), typeof agent === "string" ? agent : undefined);
-        if (!bird) return failed(`There's no bird called ${String(agent)}. list_agents names them.`, "No such bird");
+        const mascot = findMascot(await host.mascots(), typeof agent === "string" ? agent : undefined);
+        if (!mascot) return failed(`There's no bird called ${String(agent)}. list_agents names them.`, "No such mascot");
         const parsed = sitesFromApp(sites);
         if ("bad" in parsed) return failed(`“${parsed.bad}” doesn't look like a site. Try something like example.com.`, "Bad site");
-        // Only ever narrower: a bird kept to some sites can't be sent anywhere else.
-        const narrowed = narrowSites(bird.sites, parsed.sites);
+        // Only ever narrower: a mascot kept to some sites can't be sent anywhere else.
+        const narrowed = narrowSites(mascot.sites, parsed.sites);
         if (narrowed.includes(NOWHERE))
           return failed(
-            `${bird.name} may only use ${bird.sites.join(", ")}, and none of those sites are among them.`,
+            `${mascot.name} may only use ${mascot.sites.join(", ")}, and none of those sites are among them.`,
             "Sites outside its limits",
           );
         const wanted: RelayWhere = where === "mac" || where === "cloud" ? where : "auto";
-        const id = await host.startJob(prompt, { ...mascotSnapshot(bird), sites: narrowed }, wanted);
+        const id = await host.startJob(prompt, { ...mascotSnapshot(mascot), sites: narrowed }, wanted);
         if (!id) return failed(MAC_OFF, "Mac not available");
         const [row] = await host.jobs([id]);
         const mac = !!row && onMac(row);
         return {
           text: json({
             jobId: id,
-            agent: bird.name,
+            agent: mascot.name,
             where: mac ? "mac" : "cloud",
             status: "queued",
             note: mac

@@ -13,7 +13,7 @@ const spot = (over: Partial<Spot> = {}): Spot => ({
   ...over,
 });
 
-describe("where the bird lands", () => {
+describe("where the mascot lands", () => {
   it("stands on a short target's top edge, beside the point", () => {
     const { x, y, turn } = landingFor(spot(), "land", 56);
     expect(turn).toBe(1);
@@ -75,7 +75,7 @@ describe("typing in pieces", () => {
 });
 
 describe("when the tab is taken away mid-draw", () => {
-  it("doesn't put the bird back on a tab held for the user", async () => {
+  it("doesn't put the mascot back on a tab held for the user", async () => {
     const sent: string[] = [];
     const tab = {
       isVisible: true,
@@ -84,7 +84,7 @@ describe("when the tab is taken away mid-draw", () => {
       existingView: {
         webContents: {
           isDestroyed: () => false,
-          // The page has no bird yet, and the tab is handed over while that answer is on its way.
+          // The page has no mascot yet, and the tab is handed over while that answer is on its way.
           executeJavaScriptInIsolatedWorld: async (_world: number, [{ code }]: Array<{ code: string }>) => {
             sent.push(code);
             tab.heldForUser = true;

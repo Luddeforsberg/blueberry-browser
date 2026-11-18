@@ -136,7 +136,7 @@ describe("search queries", () => {
   });
 });
 
-describe("chats, routines, the flock and feedback", () => {
+describe("chats, routines, the mascots and feedback", () => {
   it("sends feedback as the line and kind only, and leaves out a private line", () => {
     const sent = JSON.stringify(
       data({
@@ -158,7 +158,7 @@ describe("chats, routines, the flock and feedback", () => {
     expect(sent).not.toContain("bank");
   });
 
-  it("puts a routine's and a bird's names and sites through the same filters", () => {
+  it("puts a routine's and a mascot's names and sites through the same filters", () => {
     const digest = digestOf({
       routines: [
         { id: "a", name: "Move money at the bank", schedule: "Daily at 07:00", sites: ["prisjakt.nu"], runs: [] },

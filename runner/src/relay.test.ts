@@ -289,13 +289,13 @@ describe("the MCP endpoint", () => {
     for (const tool of tools) expect(tool.annotations?.readOnlyHint).toBe(["get_job", "list_agents", "list_jobs"].includes(tool.name));
   });
 
-  it("lists the flock as the Mac shared it", async () => {
-    const birds = dataOf(await client.callTool({ name: "list_agents", arguments: {} }));
-    expect(birds.map(({ name }: { name: string }) => name)).toEqual(["Berry", "Scout"]);
-    expect(birds[1].sites).toEqual(["shop.example"]);
+  it("lists the mascots as the Mac shared them", async () => {
+    const agents = dataOf(await client.callTool({ name: "list_agents", arguments: {} }));
+    expect(agents.map(({ name }: { name: string }) => name)).toEqual(["Berry", "Scout"]);
+    expect(agents[1].sites).toEqual(["shop.example"]);
   });
 
-  it("only narrows a bird's sites", async () => {
+  it("only narrows a mascot's sites", async () => {
     const outside = await client.callTool({ name: "start_job", arguments: { task: "Look", agent: "Scout", sites: ["other.example"] } });
     expect(outside.isError).toBe(true);
     const bad = await client.callTool({ name: "start_job", arguments: { task: "Look", sites: ["not a site"] } });

@@ -26,7 +26,7 @@ export const mascotNote = ({ name, instructions, sites, galleryId }: MascotProfi
     : "") +
   `\n\n<user_instructions>\n${inTags(instructions)}\n</user_instructions>`;
 
-// Goes after everything else, for any bird, Berry too. The user read each of these and chose to keep it, but it's data all
+// Goes after everything else, for any mascot, Berry too. The user read each of these and chose to keep it, but it's data all
 // the same: limits and approvals are in code and never read this.
 export const memoryNote = (facts: Pick<MemoryFact, "text" | "site">[]): string =>
   facts.length === 0

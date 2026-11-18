@@ -26,7 +26,7 @@ const WORKING_CSS = `
 `;
 
 const PICTURE_QUALITY = 72;
-// A job has let go of a tab with a picture on screen, and that picture gets to show the bird leaving.
+// A job has let go of a tab with a picture on screen, and that picture gets to show the mascot leaving.
 const LEAVING_MS = 720;
 
 // How long a click gets to start loading something, and that load to end.
@@ -69,7 +69,7 @@ export interface TabEvents {
   onStoppedLeaving: () => void;
   // The user clicked or typed in the page, or went back or forward in it. Berry's own input doesn't count.
   onUserInput: () => void;
-  // What the bird on this page looks like and may do, read each time so a setting reaches it straight away.
+  // What the mascot on this page looks like and may do, read each time so a setting reaches it straight away.
   actorOptions: () => ActorOptions;
   // The page closed itself, as a sign-in popup does when it's done.
   onClosedByPage: () => void;
@@ -425,8 +425,8 @@ export class Tab implements PageTarget {
     }
   }
 
-  // A tab with nothing loaded yet gets its style when it navigates. The bird says all this does and more, so it's only for
-  // anyone who has turned the bird off, and a capture for the model has one less thing in it.
+  // A tab with nothing loaded yet gets its style when it navigates. The mascot says all this does and more, so it's only for
+  // anyone who has turned the mascot off, and a capture for the model has one less thing in it.
   private addWorkingStyle(): void {
     if (!this.webContentsView || this.actor.enabled) return;
     this.workingStyle = this.webContentsView.webContents.insertCSS(WORKING_CSS).catch(() => null);
@@ -487,7 +487,7 @@ export class Tab implements PageTarget {
     if (this._pictureScale === null) this.actor.hidden();
   }
 
-  // How much smaller the picture of this tab on the main chat is, while there is one on screen. To the bird that's as
+  // How much smaller the picture of this tab on the main chat is, while there is one on screen. To the mascot that's as
   // good as someone looking at the tab, with the same pacing.
   get pictureScale(): number | null {
     return this._pictureScale;
@@ -501,8 +501,8 @@ export class Tab implements PageTarget {
     else this.actor.shown();
   }
 
-  // A small picture of the page, with the bird in it, for the working view in the chrome and the tab's preview card, and
-  // for nothing else. Tools use `screenshot`, which is separate and keeps the bird out. It's asked again after the
+  // A small picture of the page, with the mascot in it, for the working view in the chrome and the tab's preview card, and
+  // for nothing else. Tools use `screenshot`, which is separate and keeps the mascot out. It's asked again after the
   // capture, because the user may have been handed the tab while that was on its way, and may even have finished and
   // given it back, so that counts too. `cut` keeps only the top left of the page, in that shape, as a height to width.
   async picture(width: number, cut?: number): Promise<Buffer | null> {
@@ -534,7 +534,7 @@ export class Tab implements PageTarget {
     return (this._berryWorking || this.isLeaving) && !this._isVisible;
   }
 
-  // The job has ended here, and a picture of the tab is still showing the bird on its way out.
+  // The job has ended here, and a picture of the tab is still showing the mascot on its way out.
   get isLeaving(): boolean {
     return this.leavingTimer !== null;
   }

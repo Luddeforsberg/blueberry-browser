@@ -485,7 +485,7 @@ button{margin-top:16px;width:100%;font:inherit;font-weight:600;padding:9px;borde
 .problem{color:#b45309;opacity:1}
 </style></head><body><main>
 <h1>Connect to Blueberry</h1>
-<p>${escape(app)} wants to give jobs to your flock in the cloud. They still ask you, in Blueberry or on your phone, before anything risky, and it can't answer for you.</p>
+<p>${escape(app)} wants to give jobs to your mascots in the cloud. They still ask you, in Blueberry or on your phone, before anything risky, and it can't answer for you.</p>
 ${problem ? `<p class="problem" role="alert">${escape(problem)}</p>` : ""}
 ${
   request

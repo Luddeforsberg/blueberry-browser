@@ -8,7 +8,7 @@ import { ACCOUNT_NAME_MAX } from "../shared/accountName";
 const tempFile = () => join(mkdtempSync(join(tmpdir(), "blueberry-settings-")), "settings.json");
 
 describe("sanitizeSettings", () => {
-  it("keeps the bird on pages on unless it's really turned off", () => {
+  it("keeps the mascot on pages on unless it's really turned off", () => {
     expect(DEFAULT_SETTINGS.birdOnPages).toBe(true);
     expect(sanitizeSettings({ birdOnPages: false }).birdOnPages).toBe(false);
     expect(sanitizeSettings({ birdOnPages: "no" }).birdOnPages).toBe(true);
@@ -124,7 +124,7 @@ describe("SettingsStore", () => {
     expect(new SettingsStore(file).get()).toMatchObject({ layoutMode: "horizontal", sidebarWidth: 300 });
   });
 
-  it("keeps the desktop bird on the edge, and refuses anything that isn't a place", () => {
+  it("keeps the desktop mascot on the edge, and refuses anything that isn't a place", () => {
     const spot = (desktopBerrySpot: unknown) => sanitizeSettings({ desktopBerrySpot }).desktopBerrySpot;
     expect(spot({ displayId: 1, edge: "top", fraction: 0 })).toEqual({ displayId: 1, edge: "top", fraction: 0 });
     expect(spot({ displayId: 1, edge: "left", fraction: 1 })).toEqual({ displayId: 1, edge: "left", fraction: 1 });

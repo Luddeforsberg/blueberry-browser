@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { mascotFromSnapshot } from "../main/cloudJobs";
 import type { MascotProfile } from "./library";
 import { BERRY } from "./mascots";
-import { conversationsOf, fitHistory, flockFromRows, flockRows, followUpHistory, MAX_HISTORY, mascotSnapshot } from "./phone";
+import {
+  conversationsOf,
+  fitHistory,
+  mascotsFromSharedRows,
+  sharedMascotRows,
+  followUpHistory,
+  MAX_HISTORY,
+  mascotSnapshot,
+} from "./phone";
 
 const SCOUT: MascotProfile = {
   id: "m-1",
@@ -16,9 +24,9 @@ const SCOUT: MascotProfile = {
   publishedId: "p-1",
 };
 
-describe("the flock on the phone", () => {
-  it("shares every bird but Berry and the deleted ones, with nothing beyond its name, look and limits", () => {
-    const rows = flockRows([BERRY, SCOUT, { ...SCOUT, id: "m-2", deletedAt: 1 }]);
+describe("the mascots on the phone", () => {
+  it("shares every mascot but Berry and the deleted ones, with nothing beyond its name, look and limits", () => {
+    const rows = sharedMascotRows([BERRY, SCOUT, { ...SCOUT, id: "m-2", deletedAt: 1 }]);
     expect(rows).toEqual([
       {
         id: "m-1",
@@ -31,14 +39,14 @@ describe("the flock on the phone", () => {
         from_gallery: true,
       },
     ]);
-    expect(flockRows([])).toEqual([]);
+    expect(sharedMascotRows([])).toEqual([]);
   });
 
   it("reads back what it shared, with Berry first, and sends a snapshot the runner accepts", () => {
-    const birds = flockFromRows(flockRows([BERRY, SCOUT]));
-    expect(birds.map(({ id }) => id)).toEqual(["berry", "m-1"]);
-    expect(mascotFromSnapshot(mascotSnapshot(birds[0]))).toEqual(BERRY);
-    expect(mascotFromSnapshot(mascotSnapshot(birds[1]))).toMatchObject({
+    const mascots = mascotsFromSharedRows(sharedMascotRows([BERRY, SCOUT]));
+    expect(mascots.map(({ id }) => id)).toEqual(["berry", "m-1"]);
+    expect(mascotFromSnapshot(mascotSnapshot(mascots[0]))).toEqual(BERRY);
+    expect(mascotFromSnapshot(mascotSnapshot(mascots[1]))).toMatchObject({
       id: "m-1",
       sites: ["webhallen.com"],
       tools: ["visit", "click"],
@@ -47,8 +55,8 @@ describe("the flock on the phone", () => {
   });
 
   it("leaves out a row the app couldn't have made, and only ever has one Berry", () => {
-    const [row] = flockRows([SCOUT]);
-    const birds = flockFromRows([
+    const [row] = sharedMascotRows([SCOUT]);
+    const mascots = mascotsFromSharedRows([
       { ...row, id: "berry" },
       { ...row, id: "bad id!" },
       { ...row, sites: ["not a site"] },
@@ -58,10 +66,10 @@ describe("the flock on the phone", () => {
       row,
       null,
     ]);
-    expect(birds.map(({ id }) => id)).toEqual(["berry", "m-1"]);
-    expect(flockFromRows(undefined)).toEqual([BERRY]);
-    // A tool it doesn't know is dropped, so the bird can only do less.
-    expect(flockFromRows([{ ...row, tools: ["visit", "pay"] }])[1].tools).toEqual(["visit"]);
+    expect(mascots.map(({ id }) => id)).toEqual(["berry", "m-1"]);
+    expect(mascotsFromSharedRows(undefined)).toEqual([BERRY]);
+    // A tool it doesn't know is dropped, so the mascot can only do less.
+    expect(mascotsFromSharedRows([{ ...row, tools: ["visit", "pay"] }])[1].tools).toEqual(["visit"]);
   });
 });
 
@@ -102,7 +110,7 @@ describe("conversations in the cloud", () => {
     expect(followUpHistory({ ...job("a", "00"), reply: "", steps: [] })).toEqual([{ role: "user", content: "Prompt a" }]);
   });
 
-  it("never carries anything but the user's and the bird's words, or more than a row can hold", () => {
+  it("never carries anything but the user's and the mascot's words, or more than a row can hold", () => {
     expect(
       followUpHistory({
         ...job("a", "00"),

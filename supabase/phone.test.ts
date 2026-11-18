@@ -49,7 +49,8 @@ describe("the phone page's database rules", () => {
     await as(owner, `select public.link_cloud_runner('${`user${Number(runner.slice(-12))}@example.com`}')`);
     await as(runner, `select public.accept_cloud_runner_link('${`user${Number(owner.slice(-12))}@example.com`}')`);
   };
-  const sync = (uid: string | null, birds: unknown) => as(uid, `select public.sync_cloud_flock('${JSON.stringify(birds)}'::jsonb) as kept`);
+  const sync = (uid: string | null, mascots: unknown) =>
+    as(uid, `select public.sync_cloud_flock('${JSON.stringify(mascots)}'::jsonb) as kept`);
   const subscribe = (uid: string | null, endpoint = ENDPOINT) =>
     as(uid, `select public.save_push_subscription('${endpoint}', ${KEYS}) as ok`);
 
@@ -68,7 +69,7 @@ describe("the phone page's database rules", () => {
   });
   afterAll(() => db.close());
 
-  it("keeps each flock to its owner, replaced whole on every sync", async () => {
+  it("keeps each owner's mascots to that owner, replaced whole on every sync", async () => {
     expect(await sync(ALICE, [SCOUT, { ...SCOUT, id: "m-2", name: "Penny" }])).toEqual([{ kept: 2 }]);
     expect(await sync(ALICE, [SCOUT])).toEqual([{ kept: 1 }]);
     expect(await as(ALICE, "select id, name, position, sites, tools from public.cloud_flock")).toEqual([
@@ -92,7 +93,7 @@ describe("the phone page's database rules", () => {
     expect(await as(ALICE, "select id from public.cloud_flock")).toEqual([{ id: "m-1" }]);
   });
 
-  it("refuses a bird that couldn't have come from the app", async () => {
+  it("refuses a mascot that couldn't have come from the app", async () => {
     await expect(sync(ALICE, [{ ...SCOUT, tools: ["visit", "pay"] }])).rejects.toThrow(/tools_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, id: "berry" }])).rejects.toThrow(/id_shape/);
     await expect(sync(ALICE, [{ ...SCOUT, palette: "red" }])).rejects.toThrow(/look_shape/);

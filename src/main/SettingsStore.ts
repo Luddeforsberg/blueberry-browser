@@ -50,7 +50,7 @@ const folder = (value: unknown, fallback: string | null): string | null => {
   return typeof value === "string" && isAbsolute(value) && !value.includes("\0") ? value : fallback;
 };
 
-// A mascot's id, or null for Berry. Whether it's still in the flock is asked where the icon is drawn and set.
+// A mascot's id, or null for Berry. Whether it's still one of the mascots is asked where the icon is drawn and set.
 const mascotId = (value: unknown, fallback: string | null): string | null => {
   if (value === null || value === BERRY_ID) return null;
   return typeof value === "string" && /^[\w-]{1,64}$/.test(value) ? value : fallback;

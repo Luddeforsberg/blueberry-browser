@@ -1,7 +1,7 @@
 import type { Browser, BrowserContext, Page, Request, Route } from "playwright-core";
 import { CdpTab, type CdpTabEvents } from "./CdpTab";
 
-// A browser somewhere else, reached over CDP, for a bird to work in. Plain Node, like `CdpTab`, so a runner without a
+// A browser somewhere else, reached over CDP, for a mascot to work in. Plain Node, like `CdpTab`, so a runner without a
 // window can use the same code. One session at a time, and one job in it at a time.
 
 // A running browser, from whichever provider.

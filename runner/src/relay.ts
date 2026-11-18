@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { GalleryServer } from "../../src/main/galleryServer";
-import { flockFromRows } from "../../src/shared/phone";
+import { mascotsFromSharedRows } from "../../src/shared/phone";
 import { DbError, type RelayDb } from "./db";
 import { RelayAuth } from "./relayAuth";
 import { createRelayTools, type RelayHost } from "./relayTools";
@@ -61,7 +61,7 @@ export const relayConfig = (env: Record<string, string | undefined>): RelayConfi
 const grantHost = (auth: RelayAuth, grantId: string, db: RelayDb): RelayHost => {
   const secret = () => auth.secretOf(grantId);
   return {
-    flock: async () => flockFromRows(await db.relayFlock(secret())),
+    mascots: async () => mascotsFromSharedRows(await db.relayMascots(secret())),
     startJob: (prompt, mascot, where) => db.relayStartJob(secret(), prompt, mascot, where),
     jobs: (ids) => db.relayJobs(secret(), ids),
     stop: (id) => db.relayStopJob(secret(), id),

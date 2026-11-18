@@ -31,7 +31,7 @@ const hangs: Answer = (_, init) =>
 
 const API = new URL("../../site/app/api.js", import.meta.url).href;
 const api = (await import(/* @vite-ignore */ API)) as {
-  flock: () => Promise<unknown[]>;
+  mascots: () => Promise<unknown[]>;
   signedIn: () => { email: string } | null;
 };
 
@@ -44,7 +44,7 @@ describe("the phone page's calls", () => {
   it("lets go of a token refresh that hangs, stays signed in, and refreshes afresh on the next call", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     answer = hangs;
-    const first = api.flock();
+    const first = api.mascots();
     const failed = expect(first).rejects.toMatchObject({ status: 0 });
     await vi.advanceTimersByTimeAsync(CALL_DEADLINE_MS);
     await failed;
@@ -62,7 +62,7 @@ describe("the phone page's calls", () => {
             }),
           )
         : new Response(JSON.stringify([{ id: "m-1" }]));
-    expect(await api.flock()).toEqual([{ id: "m-1" }]);
+    expect(await api.mascots()).toEqual([{ id: "m-1" }]);
     expect(asked.slice(1)).toEqual(["/auth/v1/token?grant_type=refresh_token", expect.stringMatching(/^\/rest\/v1\/cloud_flock/)]);
   });
 });

@@ -6,7 +6,7 @@ import type { Settings } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
 import { MascotStore } from "./MascotStore";
 import { DEFAULT_SETTINGS, sanitizeSettings } from "./SettingsStore";
-import { addStarterFlock, STARTER_FLOCK } from "./starterFlock";
+import { addStarters, STARTER_IDS } from "./starters";
 
 const store = () => new MascotStore(join(mkdtempSync(join(tmpdir(), "blueberry-starters-")), "mascots.json"));
 const settingsOf = (start: Partial<Settings> = {}) => {
@@ -22,21 +22,21 @@ const names = (mascots: MascotStore) =>
     .filter((mascot) => mascot.deletedAt === null)
     .map(({ name }) => name);
 
-describe("addStarterFlock", () => {
+describe("addStarters", () => {
   it("gives a profile with only Berry four mascots of other berries, as Gallery copies, and marks it done", () => {
     const mascots = store();
     const settings = settingsOf();
-    addStarterFlock(mascots, settings);
+    addStarters(mascots, settings);
     expect(names(mascots)).toEqual(["Berry", "Plain Words", "Competitor Watch", "Meeting Prep", "Newsletter Builder"]);
     const starters = mascots.all().slice(1);
-    expect(starters.map(({ galleryId }) => galleryId)).toEqual([...STARTER_FLOCK]);
+    expect(starters.map(({ galleryId }) => galleryId)).toEqual([...STARTER_IDS]);
     expect(new Set(starters.map(({ look }) => look.palette))).toEqual(new Set(["canary", "jackdaw", "robin", "flamingo"]));
     expect(settings.get().startersAdded).toBe(true);
   });
 
   it("gives them nothing Berry can't do", () => {
     const mascots = store();
-    addStarterFlock(mascots, settingsOf());
+    addStarters(mascots, settingsOf());
     for (const starter of mascots.all().slice(1)) {
       expect(starter.tools.every((tool) => BERRY.tools.includes(tool))).toBe(true);
       expect(starter.worksInCloud).toBeUndefined();
@@ -46,9 +46,9 @@ describe("addStarterFlock", () => {
   it("happens once: deleting them, or every mascot, never brings them back", () => {
     const mascots = store();
     const settings = settingsOf();
-    addStarterFlock(mascots, settings);
+    addStarters(mascots, settings);
     for (const starter of mascots.all().slice(1)) mascots.delete(starter.id);
-    addStarterFlock(mascots, settings);
+    addStarters(mascots, settings);
     expect(names(mascots)).toEqual(["Berry"]);
   });
 
@@ -62,18 +62,18 @@ describe("addStarterFlock", () => {
       tools: ["visit"],
     });
     const settings = settingsOf();
-    addStarterFlock(mascots, settings);
+    addStarters(mascots, settings);
     expect(names(mascots)).toEqual(["Berry", "Scout"]);
     expect(settings.get().startersAdded).toBe(true);
   });
 
   it("adds nothing once marked done, even with only Berry", () => {
     const mascots = store();
-    addStarterFlock(mascots, settingsOf({ startersAdded: true }));
+    addStarters(mascots, settingsOf({ startersAdded: true }));
     expect(names(mascots)).toEqual(["Berry"]);
   });
 
-  it("counts a flock whose own mascots were all deleted as only Berry", () => {
+  it("counts a profile whose own mascots were all deleted as only Berry", () => {
     const mascots = store();
     const saved = mascots.save(null, {
       name: "Plain Words",
@@ -84,7 +84,7 @@ describe("addStarterFlock", () => {
     });
     if (!saved.ok) throw new Error(saved.error);
     mascots.delete(saved.id);
-    addStarterFlock(mascots, settingsOf());
+    addStarters(mascots, settingsOf());
     expect(names(mascots)).toEqual(["Berry", "Plain Words", "Competitor Watch", "Meeting Prep", "Newsletter Builder"]);
   });
 });

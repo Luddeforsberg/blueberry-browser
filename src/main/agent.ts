@@ -38,7 +38,7 @@ export interface ReplyOptions {
   // Added after the system prompt: who this chat runs as, in the user's own words. Set for a mascot other than Berry.
   mascotNote?: string;
   // The user typed this in Blueberry's own composer and is there to answer, so a reply may ask or plan first. Never for a
-  // routine, the cloud, another app or the desktop bird, where nobody may be looking.
+  // routine, the cloud, another app or the desktop mascot, where nobody may be looking.
   userPresent?: boolean;
 }
 

@@ -2,20 +2,20 @@ import type { WebContentsView } from "electron";
 import { actorCommand, ifThere, installActor, type ActorLook } from "./pageActorScript";
 import type { MascotLook } from "../shared/library";
 
-// The bird on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
+// The mascot on the page. It only shows what a job is doing and when: it never decides where input goes or whether it
 // happens. Every call here is a no-op unless the user can see this tab, in front of them or as the picture of it in the
 // chat, so a job nobody's watching pays nothing, not even the waiting. `browserTools.ts` asks `showing` first, and takes
 // the path it always took if the answer is no.
 
 // Drawing size on screen. `.pose` is positioned from where the feet are, which is what everything here measures.
-const BIRD_SIZE = 56;
-// Its size in a picture of the page, which is much smaller than the page, so it's drawn larger there to still be a bird.
-const BIRD_SIZE_IN_PICTURE = 42;
-// How long the picture is worth updating quickly after the bird last did anything. The longest thing it does is a flight.
+const MASCOT_SIZE = 56;
+// Its size in a picture of the page, which is much smaller than the page, so it's drawn larger there to still be a mascot.
+const MASCOT_SIZE_IN_PICTURE = 42;
+// How long the picture is worth updating quickly after the mascot last did anything. The longest thing it does is a flight.
 const LIVELY_MS = 760;
 const FEET_X = 57 / 120;
 
-// How long a page gets to answer. Being late only means the bird is out of step, so nothing ever waits on a stuck page.
+// How long a page gets to answer. Being late only means the mascot is out of step, so nothing ever waits on a stuck page.
 const PAGE_ANSWER_MS = 400;
 
 // Flight time grows with distance, within what a fraction of a second allows.
@@ -36,15 +36,15 @@ const READ_MS = 320;
 const TYPE_TICK_MS = 34;
 const TYPE_MAX_MS = 1300;
 
-// After the user's own click or key, the bird stays away this long, even in a page a job can go on reading.
+// After the user's own click or key, the mascot stays away this long, even in a page a job can go on reading.
 const QUIET_AFTER_USER_MS = 5000;
-// A job between steps is mostly waiting for the model, and that's the bird working something out.
+// A job between steps is mostly waiting for the model, and that's the mascot working something out.
 const IDLE_AFTER_MS = 650;
 
 export interface ActorOptions {
   // The setting: off means nothing is ever drawn in a page.
   on: boolean;
-  // Show Berry off: a plain pointer, no bird.
+  // Show Berry off: a plain pointer, no mascot.
   plain: boolean;
   // Keep Berry still, or Reduce Motion: a small marker that fades between spots.
   still: boolean;
@@ -87,7 +87,7 @@ interface Place {
 
 // Where the feet go. Over a short target it stands on the top edge, so it hides none of the label, and leans in to peck.
 // Over a tall one, near the point. It faces into the page wherever the left side is too tight.
-export const landingFor = ({ left, top, width, height, x, y, viewWidth }: Spot, kind: Landing, size = BIRD_SIZE): Place => {
+export const landingFor = ({ left, top, width, height, x, y, viewWidth }: Spot, kind: Landing, size = MASCOT_SIZE): Place => {
   if (kind === "perch") {
     // Sat on the edge at the far end, clear of the letters coming in from the start.
     const seat = left + width - Math.min(width * 0.25, size);
@@ -135,13 +135,13 @@ export class PageActor {
   private lastTouched = 0;
   // A job has stopped to ask, so it's facing the user, not working anything out.
   private waiting = false;
-  // What the waiting card is about, so the bird stands on it whenever the tab comes back into view.
+  // What the waiting card is about, so the mascot stands on it whenever the tab comes back into view.
   private asked: FindAsked | null = null;
   private idleTimer: NodeJS.Timeout | null = null;
   private livelyUntil = 0;
   // What the line says now, for the chrome to say beside a picture, where the line itself would be too small to read.
   private _saying = "";
-  // Waits to end early, because the bird has gone. What happens next is the tools' to decide.
+  // Waits to end early, because the mascot has gone. What happens next is the tools' to decide.
   private readonly waits = new Set<() => void>();
 
   constructor(
@@ -164,7 +164,7 @@ export class PageActor {
     return this.showing ? this._saying : "";
   }
 
-  // The bird is in the middle of something, so a picture of it needs to keep up.
+  // The mascot is in the middle of something, so a picture of it needs to keep up.
   get lively(): boolean {
     return Date.now() < this.livelyUntil;
   }
@@ -190,7 +190,7 @@ export class PageActor {
   // Every size in the page is divided by this. It takes out the page's zoom, and in a picture, how much smaller that is.
   private get drawZoom(): number {
     const { pictureScale } = this.tab;
-    const inPicture = this.pictured && pictureScale ? Math.min(1, (pictureScale * BIRD_SIZE) / BIRD_SIZE_IN_PICTURE) : 1;
+    const inPicture = this.pictured && pictureScale ? Math.min(1, (pictureScale * MASCOT_SIZE) / MASCOT_SIZE_IN_PICTURE) : 1;
     return this.zoom() * inPicture;
   }
 
@@ -201,7 +201,7 @@ export class PageActor {
 
   private get look(): ActorLook {
     const { plain, still, look, dark } = this.options();
-    return { ...look, plain, still, dark, zoom: this.drawZoom, size: BIRD_SIZE, pictured: this.pictured };
+    return { ...look, plain, still, dark, zoom: this.drawZoom, size: MASCOT_SIZE, pictured: this.pictured };
   }
 
   private ask(code: string): Promise<unknown> {
@@ -217,7 +217,7 @@ export class PageActor {
     );
   }
 
-  // Whether the user clicked or typed in this tab since then. The tools ask this whether or not any bird is showing.
+  // Whether the user clicked or typed in this tab since then. The tools ask this whether or not any mascot is showing.
   touchedSince(time: number): boolean {
     return this.lastTouched >= time;
   }
@@ -235,7 +235,7 @@ export class PageActor {
     let answer = await this.ask(command);
     if (answer === "absent") {
       // The tab may have been held or touched while that was on its way, and nothing comes back after that. Whatever
-      // takes the bird away is sent after anything sent here, so it's only this one that can come too late.
+      // takes the mascot away is sent after anything sent here, so it's only this one that can come too late.
       if (!this.showing) return false;
       await this.ask(installActor(this.key, this.look, this.position));
       if (!this.showing) return false;
@@ -284,7 +284,7 @@ export class PageActor {
       return false;
     const { still, plain } = this.options();
     const unit = 1 / this.drawZoom;
-    const size = (still ? 28 : BIRD_SIZE) * unit;
+    const size = (still ? 28 : MASCOT_SIZE) * unit;
     // A pointer's tip is the thing that's meant to be on the point.
     const place: Place = plain && kind !== "perch" ? { x: spot.x, y: spot.y, turn: 1 } : landingFor(spot, kind, size);
     const then = kind === "perch" ? "sitting" : kind === "look" ? "looking" : asking ? "asking" : "rest";
@@ -387,7 +387,7 @@ export class PageActor {
     return found as Spot | null;
   }
 
-  // What a capture sees has no bird in it. Anything going wrong here mustn't get in the way of the capture.
+  // What a capture sees has no mascot in it. Anything going wrong here mustn't get in the way of the capture.
   async whileHidden<T>(capture: () => Promise<T>): Promise<T> {
     const there = (this.tab.isVisible || this.pictured) && (await this.ask(ifThere("hide")));
     try {

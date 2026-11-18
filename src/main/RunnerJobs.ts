@@ -16,7 +16,7 @@ import {
 import { ServerError, type GalleryServer } from "./galleryServer";
 import type { RunnerState } from "../shared/ipc";
 import type { ChatStep, MascotProfile } from "../shared/library";
-import { flockRows } from "../shared/phone";
+import { sharedMascotRows } from "../shared/phone";
 
 // Chats whose jobs went to the cloud runner, which keeps going with this computer off. The jobs, their steps and their
 // approvals are rows in Supabase, read as the signed-in user, so nobody else's can come back. Only the user's own answer
@@ -75,9 +75,9 @@ export interface RunnerJobsHooks {
   // The user's Browserbase Context, so the sites they brought along are signed in there too.
   contextId: () => string | null;
   runnerUpdated?: (state: RunnerState) => void;
-  // The flock, shared with the phone page while a linked runner has accepted, so a job can be sent from there as any bird.
-  flock?: () => MascotProfile[];
-  // A conversation started elsewhere becomes a chat here, as the bird its first job ran as. Says the chat's id.
+  // The mascots, shared with the phone page while a linked runner has accepted, so a job can be sent from there as any mascot.
+  mascots?: () => MascotProfile[];
+  // A conversation started elsewhere becomes a chat here, as the mascot its first job ran as. Says the chat's id.
   adopt?: (first: { prompt: string; mascotId: string | null }) => string | null;
   // A message sent in that chat from elsewhere, saved as the user's.
   followedUp?: (chatId: string, prompt: string) => void;
@@ -128,8 +128,8 @@ export class RunnerJobs implements ChatRunner {
   private link: { email: string; accepted: boolean; relayUrl: string | null } | null = null;
   private linkProblem: string | null = null;
   private linkTimer: ReturnType<typeof setTimeout> | null = null;
-  // What was last shared, and by whom, so an unchanged flock isn't sent again.
-  private sharedFlock: string | null = null;
+  // What was last shared, and by whom, so an unchanged list isn't sent again.
+  private sharedMascots: string | null = null;
   // What was last sent of each routine, by key, and for which account. Its first time isn't part of it, as the server
   // owns when it's due. `reconciled` is the set of keys last checked against the server's, null until that's worked.
   private sharedRoutines: { account: string; rows: Map<string, string>; reconciled: string | null } | null = null;
@@ -140,8 +140,8 @@ export class RunnerJobs implements ChatRunner {
   // Routines whose last send failed.
   private readonly routinesFailed = new Set<string>();
   private routinesAgain = false;
-  private flockSending: Promise<void> | null = null;
-  private flockAgain = false;
+  private mascotsSending: Promise<void> | null = null;
+  private mascotsAgain = false;
   // Quitting. Nothing that comes back after it is used, and nothing is asked again.
   private destroyed = false;
 
@@ -207,7 +207,7 @@ export class RunnerJobs implements ChatRunner {
     }
     if (this.link) this.linkTimer = setTimeout(() => void this.refreshLink(), this.link.accepted ? LINKED_POLL_MS : LINK_POLL_MS);
     this.hooks.runnerUpdated?.(this.runnerState);
-    void this.flockChanged();
+    void this.mascotsChanged();
     void this.routinesChanged();
     void this.discover();
     return this.runnerState;
@@ -240,9 +240,9 @@ export class RunnerJobs implements ChatRunner {
     return this.refreshLink();
   }
 
-  // Shares the flock with the phone page, only while signed in with a runner that has accepted, and only if it changed.
-  // A bird's name, look, instructions and limits go, and nothing it remembers. One send at a time, and a change that
-  // comes in meanwhile is sent after it, so an older flock never lands after a newer one.
+  // Shares the mascots with the phone page, only while signed in with a runner that has accepted, and only if it changed.
+  // A mascot's name, look, instructions and limits go, and nothing it remembers. One send at a time, and a change that
+  // comes in meanwhile is sent after it, so an older list never lands after a newer one.
   // Keeps the routines that run in the cloud there, one call per routine that changed or went, one round at a time.
   async routinesChanged(): Promise<void> {
     if (this.routinesSending) {
@@ -324,32 +324,32 @@ export class RunnerJobs implements ChatRunner {
     return this.routinesFailed.has(key);
   }
 
-  async flockChanged(): Promise<void> {
-    if (this.flockSending) {
-      this.flockAgain = true;
-      return this.flockSending;
+  async mascotsChanged(): Promise<void> {
+    if (this.mascotsSending) {
+      this.mascotsAgain = true;
+      return this.mascotsSending;
     }
-    this.flockSending = (async () => {
+    this.mascotsSending = (async () => {
       do {
-        this.flockAgain = false;
-        await this.shareFlock();
-      } while (this.flockAgain);
+        this.mascotsAgain = false;
+        await this.shareMascots();
+      } while (this.mascotsAgain);
     })().finally(() => {
-      this.flockSending = null;
+      this.mascotsSending = null;
     });
-    return this.flockSending;
+    return this.mascotsSending;
   }
 
-  private async shareFlock(): Promise<void> {
+  private async shareMascots(): Promise<void> {
     const account = this.signedIn;
-    if (!account || !this.link?.accepted || !this.hooks.flock) return;
-    const birds = flockRows(this.hooks.flock());
-    const shared = JSON.stringify([account, birds]);
-    if (shared === this.sharedFlock) return;
-    this.sharedFlock = shared;
-    const sent = await this.withToken(account, (token) => this.server!.syncCloudFlock(token, birds).then(() => true));
+    if (!account || !this.link?.accepted || !this.hooks.mascots) return;
+    const rows = sharedMascotRows(this.hooks.mascots());
+    const shared = JSON.stringify([account, rows]);
+    if (shared === this.sharedMascots) return;
+    this.sharedMascots = shared;
+    const sent = await this.withToken(account, (token) => this.server!.syncCloudMascots(token, rows).then(() => true));
     // Tried again on the next change or the next look at the link.
-    if (!sent && this.sharedFlock === shared) this.sharedFlock = null;
+    if (!sent && this.sharedMascots === shared) this.sharedMascots = null;
   }
 
   has(chatId: string): boolean {

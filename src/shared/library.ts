@@ -62,7 +62,7 @@ interface ChatHandoff {
   site: string;
 }
 
-// One thing the flock is waiting on the user for, from any chat or routine run.
+// One thing the mascots are waiting on the user for, from any chat or routine run.
 export interface NeedsYouItem {
   // The chat's or run's id, which is what `chat:decide` takes.
   id: string;
@@ -85,7 +85,7 @@ export interface ChatThreadMessage {
   role: "user" | "assistant";
   content: string;
   steps?: ChatStep[];
-  // What its bird remembered going into this reply, by id, so forgetting one takes it off here too.
+  // What its mascot remembered going into this reply, by id, so forgetting one takes it off here too.
   memoryIds?: string[];
   // The pages its job opened, which close when it ends, so the user can open any of them again.
   pages?: UsedPage[];
@@ -106,7 +106,7 @@ export interface ChatThreadSummary {
   id: string;
   title: string;
   updatedAt: number;
-  // Who the chat runs as. Null is Berry, which every chat from before the flock stays.
+  // Who the chat runs as. Null is Berry, which every chat from before there were other mascots stays.
   mascotId: string | null;
   // The app that started it from outside Blueberry, such as "Claude Code". Null for one the user started here.
   from: string | null;
@@ -170,7 +170,7 @@ export interface WorkView {
   chatId: string;
   mascotId: string;
   tabs: WorkTab[];
-  // What it's doing now, in the bird's words. Null between steps, with nothing to say.
+  // What it's doing now, in the mascot's words. Null between steps, with nothing to say.
   doing: string | null;
   startedAt: number;
   endedAt: number | null;
@@ -230,7 +230,7 @@ export interface RoutineRun {
   tokens: number | null;
   // False until the user has opened Routines since it ended.
   seen: boolean;
-  // What its bird remembered going into this run, by id.
+  // What its mascot remembered going into this run, by id.
   memoryIds?: string[];
   // While it runs, what it said it's doing, until its answer starts. Only on the Routines page, and never saved.
   statusLine?: string;
@@ -306,7 +306,7 @@ export interface MemoryFact {
   savedAt: number;
 }
 
-// What a bird would like to remember, waiting for the user. It's not memory, and nothing reads it but the screen it's on.
+// What a mascot would like to remember, waiting for the user. It's not memory, and nothing reads it but the screen it's on.
 export interface MemoryOffer {
   id: string;
   mascotId: string;
@@ -458,7 +458,7 @@ export interface LibrarySnapshot {
   bookmarks: Bookmark[];
   chats: ChatThreadSummary[];
   routines: Routine[];
-  // Berry first, then the rest of the flock, including deleted mascots that chats still point at.
+  // Berry first, then the rest of the mascots, including deleted mascots that chats still point at.
   mascots: MascotProfile[];
   // Oldest first.
   needsYou: NeedsYouItem[];

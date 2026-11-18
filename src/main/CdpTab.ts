@@ -5,7 +5,7 @@ import type { AgentInput, PageFrame, PageTarget } from "./pageTarget";
 // A page in a browser reached over the Chrome DevTools Protocol, such as one in the cloud, behind the same interface as
 // the window's own tabs, so Berry's tools work on it unchanged. Plain Node: no Electron, so a runner without a window can
 // use it too. Playwright keeps the connection and the frames, and everything the tools need goes through one CDP session
-// of our own. There's no bird here, and nothing on this side can tell the user's input from Berry's, so taking over is
+// of our own. There's no mascot here, and nothing on this side can tell the user's input from Berry's, so taking over is
 // the caller's to notice.
 
 const WORLD_NAME = "blueberry-agent";

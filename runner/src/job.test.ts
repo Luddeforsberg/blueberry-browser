@@ -180,7 +180,7 @@ describe("a job on the runner", () => {
     expect(sent).toEqual(["needs-you"]);
   });
 
-  it("doesn't run as a bird it can't read", async () => {
+  it("doesn't run as a mascot it can't read", async () => {
     const { db, final } = fakeDb();
     const { seen, browser } = fakeBrowser();
     const job = { ...JOB, mascot: { id: "scout", name: "Scout", instructions: "", sites: [], tools: [] } };

@@ -1,7 +1,7 @@
 import { SECRET_SHAPES } from "./publishing";
 import { siteAllowed } from "./mascots";
 
-// What a bird may remember, checked in plain code wherever a fact comes from: the model, the user's own edit or the file.
+// What a mascot may remember, checked in plain code wherever a fact comes from: the model, the user's own edit or the file.
 // Runtime code shared by main and the chrome renderer, so preloads may only `import type` from here.
 
 export const MAX_FACT_LENGTH = 140;
@@ -25,7 +25,7 @@ const AMOUNT = /\d[\d\s.,]*\s*(?:kr|kronor|sek|eur|euros?|usd|dollars?|gbp|pound
 const LONG_NUMBER = /\d(?:[\s-]?\d){3,}/;
 const CODE_SHAPED = /(?<![\p{L}\p{N}])(?=(?:[^\d\s]*\d){2})(?=[^\s]*\p{L})[\p{L}\p{N}-]{5,}(?![\p{L}\p{N}])/u;
 
-// A preference is how someone likes things. Nothing here may be about what a bird is allowed to do, because that's
+// A preference is how someone likes things. Nothing here may be about what a mascot is allowed to do, because that's
 // decided by limits and approvals, which don't read this, and a sentence like these is what a fooled model would write.
 const NOT_A_PREFERENCE = [
   /<|>/,

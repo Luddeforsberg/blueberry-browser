@@ -127,7 +127,7 @@ describe("Chats", () => {
       expect(propose).not.toHaveBeenCalled();
     });
 
-    it("a bird deleted while it worked offers nothing, as there's no one left to remember it", async () => {
+    it("a mascot deleted while it worked offers nothing, as there's no one left to remember it", async () => {
       let deletedAt: number | null = null;
       const ask = async (tools: PageTool[]) => {
         await tools.find((tool) => tool.name === "ask_user")!.run({ question: "Which size?" });
@@ -459,7 +459,7 @@ describe("Chats", () => {
     }
   });
 
-  describe("the page sent with a message, for a bird with sites", () => {
+  describe("the page sent with a message, for a mascot with sites", () => {
     const SCOUT: MascotProfile = {
       ...BERRY,
       id: "scout",
@@ -1688,7 +1688,7 @@ describe("Chats", () => {
       return { chats, seen, release: () => release() };
     };
 
-    it("never gets a tool or a laxer ask than both the bird here and what it was sent with allow", async () => {
+    it("never gets a tool or a laxer ask than both the mascot here and what it was sent with allow", async () => {
       const { chats, seen, release } = narrowing();
       chats.send(null, "Look", {
         seePage: false,
@@ -1712,7 +1712,7 @@ describe("Chats", () => {
       expect(seen[1].asks).toBe("never");
     });
 
-    it("refuses a bird that isn't in the flock here", () => {
+    it("refuses a mascot that isn't here", () => {
       const { chats } = narrowing();
       expect(chats.send(null, "Look", { seePage: false, mascotId: "gone", from: "ChatGPT or Claude" })).toBeNull();
     });

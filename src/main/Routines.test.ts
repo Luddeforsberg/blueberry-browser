@@ -105,7 +105,7 @@ describe("the scheduler", () => {
     expect(store.routine(id)?.nextRunAt).toBe(NOW + 60 * MINUTE);
     expect(routines.list()[0]).toMatchObject({ nextRunAt: NOW + 60 * MINUTE + DAY, status: "idle" });
 
-    // What goes to the cloud: its bird narrowed to the routine's sites, and no next time once it's paused.
+    // What goes to the cloud: its mascot narrowed to the routine's sites, and no next time once it's paused.
     const scout = (): MascotProfile => ({
       id: "m-1",
       name: "Scout",

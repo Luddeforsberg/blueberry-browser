@@ -5,7 +5,7 @@ import type { WaitingRun } from "./Chats";
 import type { Bookmark, ChatThread, ChatThreadSummary, MascotProfile, MemoryFact, Routine, RoutineRun } from "../shared/library";
 import type { HistoryEntry, Visit } from "../shared/ipc";
 import { BERRY } from "../shared/mascots";
-import { agentSummary, sitesFromApp } from "./mcpFlock";
+import { agentSummary, sitesFromApp } from "./mcpMascots";
 
 // What Claude and other apps on this computer can ask of Blueberry, over MCP. Every job goes through `Chats.send` or a
 // routine's run, exactly as the user's own would, so a mascot's limits and every approval apply unchanged. An app can
@@ -192,10 +192,10 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
   // be reached: a routine's own id names runs the user or the schedule started. Memory only, newest last.
   const routineTasks = new Map<string, { routineId: string; runId: string | null; cancelled: boolean }>();
 
-  const flock = () => host.mascots().filter((mascot) => mascot.deletedAt === null);
+  const liveMascots = () => host.mascots().filter((mascot) => mascot.deletedAt === null);
   const findAgent = (name: string) => {
     const wanted = name.trim().toLowerCase();
-    return flock().find((mascot) => mascot.id === name.trim() || mascot.name.toLowerCase() === wanted) ?? null;
+    return liveMascots().find((mascot) => mascot.id === name.trim() || mascot.name.toLowerCase() === wanted) ?? null;
   };
   const nameOf = (mascotId: string | null) =>
     host.mascots().find((mascot) => mascot.id === (mascotId ?? BERRY.id))?.name ?? "A mascot that was deleted";
@@ -309,8 +309,8 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
       shape: {},
       readOnly: true,
       run: async () => {
-        const agents = flock().map(agentSummary);
-        return { text: json(agents), summary: `${count(agents.length, "bird")} in the flock` };
+        const agents = liveMascots().map(agentSummary);
+        return { text: json(agents), summary: count(agents.length, "mascot") };
       },
     },
     {
@@ -620,7 +620,7 @@ export const createMcpTools = (host: McpHost): McpTool[] => {
       readOnly: true,
       run: async () => {
         const facts = host.facts();
-        const byAgent = flock()
+        const byAgent = liveMascots()
           .map((mascot) => ({
             agent: mascot.name,
             remembers: facts.filter((fact) => fact.mascotId === mascot.id).map(({ text, site }) => ({ text, ...(site ? { site } : {}) })),

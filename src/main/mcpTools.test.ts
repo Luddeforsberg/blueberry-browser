@@ -100,7 +100,7 @@ const taskOf = async (call: ReturnType<typeof setup>["call"], taskId: string) =>
 };
 
 describe("MCP tools", () => {
-  it("starts a job as a chat from the app, and only lists birds still in the flock", async () => {
+  it("starts a job as a chat from the app, and only lists mascots that weren't deleted", async () => {
     const { call, store, replyEnded } = setup(scripted(async () => "Found two cables"));
     const agents = JSON.parse((await call("list_agents")).text);
     expect(agents.map(({ name }: { name: string }) => name)).toEqual(["Berry", "Scout"]);
@@ -342,7 +342,7 @@ describe("MCP tools", () => {
     expect((await call("cancel_task", { taskId })).isError).toBe(true);
   });
 
-  it("reads what the flock remembers, leaving out birds that were deleted", async () => {
+  it("reads what the mascots remember, leaving out mascots that were deleted", async () => {
     const facts: MemoryFact[] = [
       { id: "1", mascotId: "scout", text: "Prefers black cables", site: "webhallen.com", savedAt: 0 },
       { id: "2", mascotId: "gone", text: "Old habit", site: null, savedAt: 0 },

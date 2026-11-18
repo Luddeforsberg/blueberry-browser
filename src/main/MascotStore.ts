@@ -20,7 +20,7 @@ const publishedIdOf = (publishedId: unknown) => (typeof publishedId === "string"
 const worksInCloudOf = (input: unknown) =>
   (input as { worksInCloud?: unknown } | null)?.worksInCloud === true ? { worksInCloud: true } : {};
 
-// The flock, in a JSON file. Berry isn't in it: it's always there and can't be changed.
+// The mascots, in a JSON file. Berry isn't in it: it's always there and can't be changed.
 export class MascotStore {
   private mascots: MascotProfile[] = [];
 

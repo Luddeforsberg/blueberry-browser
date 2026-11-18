@@ -43,7 +43,7 @@ export class MemoryStore {
   private facts: MemoryFact[] = [];
   private offers: MemoryOffer[] = [];
   private readonly declined = new Map<string, KnownFact[]>();
-  // Counts each bird's clearing, so an answer that was on its way when it happened isn't offered afterwards.
+  // Counts each mascot's clearing, so an answer that was on its way when it happened isn't offered afterwards.
   private readonly cleared = new Map<string, number>();
 
   constructor(
@@ -121,7 +121,7 @@ export class MemoryStore {
     this.sources.onChanged();
   }
 
-  // A bird asks once, right after the job it's about.
+  // A mascot asks once, right after the job it's about.
   dropOffers(sourceId: string): void {
     if (!this.offers.some((offer) => offer.sourceId === sourceId)) return;
     this.offers = this.offers.filter((offer) => offer.sourceId !== sourceId);
@@ -145,7 +145,7 @@ export class MemoryStore {
     return true;
   }
 
-  // Everything about one bird, waiting offers too. Also what deleting that bird does.
+  // Everything about one mascot, waiting offers too. Also what deleting that mascot does.
   clear(mascotId: string): void {
     this.cleared.set(mascotId, (this.cleared.get(mascotId) ?? 0) + 1);
     this.offers = this.offers.filter((offer) => offer.mascotId !== mascotId);
