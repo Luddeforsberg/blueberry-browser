@@ -6,6 +6,8 @@ import eslintPluginReactRefresh from "eslint-plugin-react-refresh";
 
 export default tseslint.config(
   { ignores: ["**/node_modules", "**/dist", "**/out", "site/**", "src/main/pageActorArt.ts"] },
+  // A rule that's wrong for some code is changed here, where it can be seen, never turned off in a comment.
+  { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
   tseslint.configs.recommended,
   eslintPluginReact.configs.flat.recommended,
   eslintPluginReact.configs.flat["jsx-runtime"],
@@ -55,7 +57,8 @@ export default tseslint.config(
     rules: { "@typescript-eslint/explicit-function-return-type": "off" },
   },
   {
-    files: ["**/*.cjs"],
+    // Tailwind's config is CommonJS too, with a `.js` name, which is the one Tailwind looks for.
+    files: ["**/*.cjs", "tailwind.config.js"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   eslintConfigPrettier,

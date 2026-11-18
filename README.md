@@ -138,7 +138,7 @@ That's the whole browser, with Berry, the flock, routines, Suggestions, Show Ber
 | `pnpm install` | Install dependencies |
 | `pnpm dev` | Run the app with hot reload |
 | `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
-| `pnpm run lint` | Lint. Warnings are allowed, errors fail CI |
+| `pnpm run lint` | Lint. Any warning or error fails, and a comment can't turn a rule off: change it in `eslint.config.mjs` |
 | `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
