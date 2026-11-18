@@ -143,3 +143,6 @@ evals/results/*/
 
 # Netlify's local state, from `netlify link` or `netlify dev`.
 .netlify
+
+# Pictures from `pnpm run drive` and `pnpm run baseline`, kept on disk only.
+baselines/

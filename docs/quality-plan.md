@@ -12,8 +12,8 @@ Agreed with the user on 2026-11-18. The bar is the `foundations` skill. Each fix
 ## Phases
 0. **Freeze and record a baseline** on `t3/pips-all-next`, after Build 25:
    - Fix `showBerry.spec.ts:252` and the flaky `browser.spec.ts:471` and `:543`, and `desktopBerry.spec.ts`.
-   - Add a feature map (every feature as data) and a `drive` command that screenshots each one in light and dark, in both layouts.
-   - Record the baseline: those screenshots and a full end-to-end run.
+   - Add a feature map (every feature as data) and a `drive` command that screenshots each one in light and dark, in both layouts. Done: `tests/features/map.ts`, `pnpm run drive -- <feature>`, and `tests/featureMap.spec.ts`, which opens each feature once.
+   - Record the baseline: those screenshots and a full end-to-end run. `pnpm run baseline` writes them to `baselines/<commit>` (kept out of git), and every later PR runs it again and shows `pnpm run baseline:compare <old> <new>` reporting no differences, or only the ones it meant.
    - Run `pnpm run verify` on a Mac, and have the user check the app.
 1. **Merge** `redesign/pips-preview` into `main` as one PR, with a merge commit. The user merges it.
 2. **Make lint mean something:**

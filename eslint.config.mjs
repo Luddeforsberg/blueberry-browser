@@ -43,5 +43,14 @@ export default tseslint.config(
       ]
     }
   },
+  {
+    // Plain JavaScript can't write a return type, and a CommonJS file loads with `require`.
+    files: ['**/*.{js,cjs,mjs}'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' }
+  },
+  {
+    files: ['**/*.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' }
+  },
   eslintConfigPrettier
 )
