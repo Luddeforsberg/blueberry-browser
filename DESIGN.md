@@ -288,7 +288,23 @@ Mock: the controls at the end of [shell-and-chat.html](./docs/design/mocks/shell
 - **What gets a tooltip:** every control that's only an icon, a control whose words don't say what pressing it does, such as the mascot in the prompt box ("Choose a mascot") and the two sides of This PC and Cloud, and words cut with an ellipsis, which it gives in full. A button whose words already say it gets none. A tooltip says what the control does in two or three words, in the state it's in: "Bookmark this page", then "Remove bookmark". The system's own tooltip isn't used anywhere in the chrome.
 - **A tab's preview.** Resting the pointer on a tab that isn't the one in front, in the sidebar or in the tab row, shows a card of it: a picture of the page as it was when you last left it, 16:10 and cut from its top, then its title at 13.5px semibold in at most two lines, then its site in `ink-3` at 12.5px. A sheet, 280px wide, with a 14px radius and `lift`. In the sidebar it's beside the row, 8px from the sidebar's edge and level with the row's top. In the tab row it's under the tab, 6px below the row. It's always wholly in the window. It takes the place of the tab's tooltip, so the title is there in full, and where a mascot is working in the tab the card says so under the site, with the pips moving. A page with no picture yet, such as a tab restored and not opened since, gets the card without one. Blueberry's own pages get no card, since their name is whole in the row.
 - **When a preview shows:** after the pointer has rested on the tab for 500ms, longer than a tooltip, because it's bigger. Along the tabs it's one card that follows the pointer with no wait, and its picture crosses over to the next. It fades in over the tooltip's time, and goes when the pointer leaves the tabs, on a press, when a tab is dragged, when a menu opens and when the tab in front changes. It never takes the keyboard and can't be pressed, so it never keeps a click from the page under it. The picture is kept in memory only and goes to nothing but the card.
-- **Menus** are sheets with a 22px radius and `lift`. Rows are 40px, or 46px with a second line, and the hovered row gets a 14px-radius `sheet-2` fill.
+- **Menus** are sheets with a 22px radius and `lift`. Rows are 40px, or 46px with a second line, and the hovered row gets a 14px-radius `sheet-2` fill. Mock: [menus.html](./docs/design/mocks/menus.html).
+- **Every menu is ours, never the system's.** That covers a chat's ⋯ menu, a bookmark's menu, Keep Berry still and Hide Berry, the ☰ menu off a Mac, right-clicking a web page, and right-clicking the mascot on the desktop. Only the Mac's menu bar is the system's.
+  - **A row:** a 15px icon in `ink-2` where the action has one, its words, and a shortcut on the right in `faint` (Ctrl C, or ⌘C on a Mac). A row that can't be used now is `faint`, icon too.
+  - **Groups** are split by a hairline inset 10px. A row that deletes or removes is in `ask`, icon too, last, after a hairline, and ends in "…" when it asks first.
+  - **A checked row** leads with a check where its icon would be.
+  - **A submenu** opens beside its row, on the side with room, when the pointer rests on it or on → and Enter. A row with one has a chevron in `faint` on its right. ← or Esc closes only the submenu.
+  - **Keys:** ↑ ↓ through the rows, Home and End, Enter to press, and Esc back to what opened it. A menu from a right-click opens at the pointer, moved in so it stays inside the window.
+  - **Over a page:** a menu that reaches over a web page is drawn in an overlay view (section 1), never in the page, so nothing a site runs can see or press it.
+- **Asking first** is our own dialog, never the system's. It's for anything that can't be undone: deleting a chat, a mascot or a routine, Clear history, Forget what it remembers, and Unpublish.
+  - **The card:** 400px wide in the middle of the window over a dim of `ink` at 28% (black at 50% in dark), a sheet with a 22px radius and a deeper `lift`, and 22px inside.
+  - **The words:** the question at 16px semibold with the thing's name in curly quotes ("Delete “Hej”?"), then what happens at 13.5px in `ink-2`.
+  - **Buttons** on the right: **Cancel**, raised, then the action in its own words, such as **Delete** or **Clear history**, filled in `ask`.
+  - **A mascot's own delete** shows its face in Oops at 38px on a 52px `sheet-2` tile above the question.
+  - **Keys:** the keyboard starts on Cancel, so Enter never deletes by accident. Esc or a press on the dim cancels, and Tab stays inside the card.
+  - **It covers the whole window,** chrome and page, in an overlay view. Only the window that asked is dimmed.
+  - **A warning with nothing to choose,** such as saved data that couldn't be read or couldn't be saved, is the same card with one filled **OK**.
+  - **Still the system's:** picking a file or a folder, and the confirm before a sign-in is brought into the cloud browser, which is Touch ID or the system's dialog on purpose, so nothing in the app can answer it.
 - **Favicons:** a page with no icon shows the first letter of its site on a small coloured tile.
 
 ## 9. The mascots
@@ -853,7 +869,7 @@ Opens as a tab with `⌘Y` (`Ctrl+Y` on Windows) and from the menu, with only on
 - **Visits in a row to the same site fold into one row,** with the site's name, how many pages, an arrow, and the time of the newest, which opens in place to show them. A search shows every match unfolded, since folding would hide what was found.
 - **Show more** loads the next hundred, and search covers titles and addresses. A search with nothing found says so in one sentence where the list was.
 
-Clear… asks first, in a native dialog, because it can't be undone. Deleting history also takes those pages out of tabs' back and forward lists, Reopen Closed Tab and the saved session, and an open tab keeps the page it's showing. Reloading a page isn't a new visit, and neither is coming back to one after a restart. Pages a mascot opens behind the chat stay out of history, and out of the address field's suggestions, until you go to that tab.
+Clear… asks first (Asking first, section 8), because it can't be undone. Deleting history also takes those pages out of tabs' back and forward lists, Reopen Closed Tab and the saved session, and an open tab keeps the page it's showing. Reloading a page isn't a new visit, and neither is coming back to one after a restart. Pages a mascot opens behind the chat stay out of history, and out of the address field's suggestions, until you go to that tab.
 
 ### Downloads
 
