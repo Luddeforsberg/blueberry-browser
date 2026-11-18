@@ -5,6 +5,8 @@
 // - `Math.random` in main and every page starts from the same seed, so a new mascot's look is the same every time.
 // - Pages ask for reduced motion, and are drawn at a scale of 1 whatever the screen, so pictures are the same size.
 // - BLUEBERRY_DRIVE_HOSTS maps made-up hosts onto the local test server, so its random port never shows in an address.
+// - Nothing loses focus. Nobody is at the computer during a drive, so a blur only comes from another program, or another
+//   drive running beside this one, and it would close an open menu or panel before its picture is taken.
 const { mkdtempSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
@@ -50,3 +52,12 @@ electron.app.commandLine.appendSwitch("force-prefers-reduced-motion");
 electron.app.commandLine.appendSwitch("force-device-scale-factor", "1");
 electron.app.commandLine.appendSwitch("force-color-profile", "srgb");
 if (process.env.BLUEBERRY_DRIVE_HOSTS) electron.app.commandLine.appendSwitch("host-resolver-rules", process.env.BLUEBERRY_DRIVE_HOSTS);
+
+const withoutBlur = (on) =>
+  function (event, listener) {
+    return event === "blur" ? this : on.call(this, event, listener);
+  };
+electron.BaseWindow.prototype.on = withoutBlur(electron.BaseWindow.prototype.on);
+electron.app.on("web-contents-created", (_, contents) => {
+  contents.on = withoutBlur(contents.on);
+});

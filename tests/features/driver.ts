@@ -81,7 +81,7 @@ export async function driveFeature(feature: Feature, stateName: string, look: Lo
     return await captureWindow(app, { view: state.window ?? feature.window ?? "chrome", theme: look.theme });
   } finally {
     await app?.close();
-    cloud?.close();
+    await cloud?.close();
     model.close();
     site.close();
     supabase?.close();

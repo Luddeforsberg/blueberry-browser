@@ -853,8 +853,8 @@ export const FEATURES: Feature[] = [
     states: {
       working: {
         open: async (drive) => {
+          // Only opening the page: a step after it would show its line or not, by whether the tab was in front yet.
           drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example") } });
-          drive.model.callTools({ name: "list_elements", args: {} });
           drive.model.holdBeforeFirstToken();
           await startChat(drive, "Find the cheapest USB-C cable on shop.example");
           await drive.chrome.getByRole("complementary", { name: /working on/ }).locator("img").first().waitFor();

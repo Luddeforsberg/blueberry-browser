@@ -8,7 +8,7 @@ import type { Site } from "./site";
 // The cloud browser for a cloud tab: a headless Chrome on this computer, as tests/cloudTab.spec.ts uses, started here
 // rather than by the app so it gets the same host rules and its addresses read shop.example. The app is pointed at it
 // with BLUEBERRY_CLOUD_LOCAL, which only an unpackaged app reads.
-export async function startCloudBrowser(site: Site): Promise<{ env: Record<string, string>; close: () => void }> {
+export async function startCloudBrowser(site: Site): Promise<{ env: Record<string, string>; close: () => Promise<void> }> {
   const chrome = findChrome();
   if (!chrome) throw new Error("A cloud tab needs Google Chrome on this computer.");
   const profile = mkdtempSync(join(tmpdir(), "blueberry-drive-cloud-"));
@@ -17,9 +17,14 @@ export async function startCloudBrowser(site: Site): Promise<{ env: Record<strin
     ["--headless=new", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--window-size=1280,800", "--force-device-scale-factor=1", "--hide-scrollbars", `--host-resolver-rules=${site.hostRules}`, "about:blank"],
     { stdio: ["ignore", "ignore", "pipe"] }
   );
-  const close = () => {
-    child.kill();
-    setTimeout(() => rmSync(profile, { recursive: true, force: true }), 1000).unref();
+  // Its profile can only go once Chrome has let go of its files.
+  const close = async () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = new Promise((resolve) => child.once("exit", resolve));
+      child.kill();
+      await exited;
+    }
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   };
   const endpoint = await new Promise<string>((resolve, reject) => {
     let said = "";
@@ -33,8 +38,8 @@ export async function startCloudBrowser(site: Site): Promise<{ env: Record<strin
       child.stderr.resume();
       resolve(found[1]);
     });
-  }).catch((error) => {
-    close();
+  }).catch(async (error) => {
+    await close();
     throw error;
   });
   return { env: { BLUEBERRY_CLOUD_LOCAL: endpoint }, close };
