@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AppWindow, ChevronLeft, ChevronRight, CircleDot, Paperclip } from "lucide-react";
 import type { TabChoice } from "@shared/attachments";
 import { cn } from "@common/lib/utils";
@@ -90,10 +90,12 @@ export const AddMenu: React.FC<AddMenuOptions & { above: boolean; leaving?: bool
   };
   // Asked for as the + is pressed. The menu opens once they're here, so it opens whole, with the keyboard on its first row.
   const [choices, setChoices] = useState<TabChoice[] | null>(null);
+  // Once, as the menu opens, with what it opened with.
+  const load = useRef(tabs.load);
   useEffect(() => {
     let live = true;
     const show = (list: TabChoice[]) => live && setChoices(list);
-    void tabs.load().then(show, () => show([]));
+    void load.current().then(show, () => show([]));
     return () => {
       live = false;
     };

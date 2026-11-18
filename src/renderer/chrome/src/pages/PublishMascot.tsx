@@ -134,31 +134,35 @@ export const PublishMascot: React.FC<{
   const latest = useRef(values);
   latest.current = values;
   const mascot = flock.find(({ id }) => id === mascotId);
+  // What the fill below starts from, as it starts. It runs only when it's first possible, whatever's typed by then.
+  const startedWith = useRef({ publishedId: mascot?.publishedId, loadFailed, onChange });
+  startedWith.current = { publishedId: mascot?.publishedId, loadFailed, onChange };
   const set = (patch: Partial<PublishValues>) => onChange({ ...values, ...patch });
   const own = chats.filter((chat) => chat.mascotId === mascotId);
 
   // Once, from what's already published, or the name they last used. It never starts from the account.
   useEffect(() => {
     if (values.filledIn || account.status !== "signed-in") return;
+    const { publishedId, loadFailed: failedBefore, onChange: fill } = startedWith.current;
     let left = false;
     void (async () => {
       const [mine, author] = await Promise.all([window.chromeAPI.mascots.published(), window.chromeAPI.mascots.lastAuthor()]);
       if (left) return;
       // Blank defaults here would take what's public away on the next update, so it waits until it knows.
-      if (mine === null && mascot?.publishedId) {
+      if (mine === null && publishedId) {
         setLoadFailed(true);
         setError("Couldn’t get what’s already public, so it can’t be updated yet.");
         return;
       }
-      if (loadFailed) setError(null);
+      if (failedBefore) setError(null);
       setLoadFailed(false);
-      const current = mine?.find(({ id }) => id === mascot?.publishedId);
+      const current = mine?.find(({ id }) => id === publishedId);
       if (current?.link) setLink(current.link);
       if (current?.addCount !== undefined) setAddCount(current.addCount);
       // Whatever was typed or picked while this was on its way stays.
       const now = latest.current;
       const keepExample = now.exampleChatId !== null;
-      onChange({
+      fill({
         ...now,
         filledIn: true,
         author: now.author || (current?.author ?? author),
@@ -173,8 +177,6 @@ export const PublishMascot: React.FC<{
     return () => {
       left = true;
     };
-    // Only when it's first possible, whatever's typed by then.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values.filledIn, account.status, loadTries]);
 
   useEffect(() => {

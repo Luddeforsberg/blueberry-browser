@@ -25,25 +25,27 @@ export const useWorkView = (chatId: string | null, pictureWidth: number): { view
 
   useEffect(() => {
     const { work } = window.chromeAPI;
+    // The same map for as long as the hook lives, so the one this effect fills is the one it empties.
+    const shown = pictures.current;
     const tell = () => listeners.current.forEach((listener) => listener());
     const offUpdated = work.onUpdated((next) => {
       setView(next);
       // Nothing of a tab that's stopped being pictured stays here, not even out of sight.
       const allowed = new Set(next?.tabs.filter(({ state }) => state === "picture").map(({ id }) => id));
-      pictures.current.forEach((_, tabId) => {
-        if (!allowed.has(tabId)) pictures.current.delete(tabId);
+      shown.forEach((_, tabId) => {
+        if (!allowed.has(tabId)) shown.delete(tabId);
       });
       tell();
     });
     const offFrame = work.onFrame(({ chatId: id, tabId, picture }) => {
       if (id !== chatId) return;
-      pictures.current.set(tabId, picture);
+      shown.set(tabId, picture);
       tell();
     });
     return () => {
       offUpdated();
       offFrame();
-      pictures.current.clear();
+      shown.clear();
     };
   }, [chatId]);
 

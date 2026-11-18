@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { MascotProfile } from "@shared/library";
-import { ATTACHMENT_WORDS } from "@shared/attachments";
+import { ATTACHMENT_WORDS, type TabChoice } from "@shared/attachments";
 import { permissionsInWords, siteAllowed } from "@shared/mascots";
 import type { AttachmentBox, JobPlace } from "../useAttachments";
 import type { AddMenuOptions } from "./AddMenu";
@@ -25,12 +25,17 @@ export const useAddMenu = (
   // Choosing another mascot can rule out a tab already in the box. Main says so again as the message goes.
   const note = sitesNote(mascot);
   const tabCount = box.tabs.length;
+  // The check as this render has it. The effect takes it as it starts, and runs again only for another chat, mascot or
+  // number of tabs, not each time the library sends the same mascot anew.
+  const recheck = (choices: TabChoice[]) =>
+    box.recheckTabs(choices, (tab) => (siteAllowed(`https://${tab.site}`, mascot.sites) ? null : note));
+  const latest = useRef(recheck);
+  latest.current = recheck;
   useEffect(() => {
     if (tabCount === 0) return;
+    const recheckTabs = latest.current;
     let live = true;
-    void window.chromeAPI.attachments
-      .tabs(chatId, mascot.id)
-      .then((choices) => live && box.recheckTabs(choices, (tab) => (siteAllowed(`https://${tab.site}`, mascot.sites) ? null : note)));
+    void window.chromeAPI.attachments.tabs(chatId, mascot.id).then((choices) => live && recheckTabs(choices));
     return () => {
       live = false;
     };
