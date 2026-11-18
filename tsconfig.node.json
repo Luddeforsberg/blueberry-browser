@@ -12,7 +12,8 @@
     "supabase/**/*",
     "runner/**/*",
     "playwright.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "knip.config.ts"
   ],
   "compilerOptions": {
     "composite": true,
