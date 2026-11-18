@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, chooseFromMenu, findView, launchApp, openMenuRows } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
 
 declare global {
@@ -964,24 +964,6 @@ const startChat = async (text: string) => {
   await expect(chrome.getByText("A reply from the model")).toBeVisible();
 };
 
-// Native menus can't be driven, so popup keeps the menu to click its items by label.
-const captureMenus = () =>
-  app.evaluate(({ Menu }) => {
-    Menu.prototype.popup = function () {
-      Menu.setApplicationMenu(this);
-    };
-    Menu.setApplicationMenu(null);
-  });
-
-const menuLabels = () =>
-  app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label));
-
-const clickMenuItem = (label: string) =>
-  app.evaluate(({ Menu, BaseWindow, webContents }, label) => {
-    const item = Menu.getApplicationMenu()?.items.find((candidate) => candidate.label === label);
-    item?.click(undefined, BaseWindow.getAllWindows()[0], webContents.getAllWebContents()[0]);
-  }, label);
-
 test("a chat is named once it has a topic, and keeps its first message until then", async () => {
   await startChat("hey");
   await expect.poll(() => model.titleRequests.length).toBe(1);
@@ -1087,7 +1069,6 @@ for (const change of ["renamed", "generated"] as const) {
 test("a chat can be renamed from its menu, and is never renamed for you after that", async () => {
   await startChat("hey");
   await expect.poll(() => model.titleRequests.length).toBe(1);
-  await captureMenus();
   await showChats();
 
   const options = chrome.getByRole("button", { name: "More options for hey" });
@@ -1095,8 +1076,8 @@ test("a chat can be renamed from its menu, and is never renamed for you after th
   await chatInSidebar("hey").hover();
   await expect(options).toHaveCSS("opacity", "1");
   await options.click();
-  await expect.poll(menuLabels).toEqual(["Rename", "Delete…"]);
-  await clickMenuItem("Rename");
+  await expect.poll(() => openMenuRows(app)).toEqual(["Rename", "-", "Delete…"]);
+  await chooseFromMenu(app, "Rename");
 
   const name = chrome.getByRole("textbox", { name: "Chat name" });
   await expect(name).toBeFocused();
@@ -1104,7 +1085,7 @@ test("a chat can be renamed from its menu, and is never renamed for you after th
   await expect(chatInSidebar("hey")).toBeVisible();
 
   await options.click();
-  await clickMenuItem("Rename");
+  await chooseFromMenu(app, "Rename");
   await name.fill("My own name");
   await name.press("Enter");
   await expect(chatInSidebar("My own name")).toBeVisible();
@@ -1119,30 +1100,55 @@ test("a chat can be renamed from its menu, and is never renamed for you after th
   expect(model.titleRequests).toHaveLength(1);
 });
 
-test("deleting a chat asks first, then removes it and its tab", async () => {
+test("our own menus: a chat's asks before it deletes, a page's copies, and Clear history asks too", async () => {
   await startChat("Delete me");
-  await captureMenus();
-  await app.evaluate(({ dialog }) => {
-    const answers = [1, 0];
-    dialog.showMessageBox = (async () => ({ response: answers.shift(), checkboxChecked: false })) as never;
-  });
   const options = chrome.getByRole("button", { name: "More options for Delete me" });
+  const menu = await findView(app, "view=menu");
+  const card = menu.getByRole("alertdialog");
 
+  // Delete… asks first, with the keyboard on Cancel, and Escape keeps the chat.
   await showChats();
   await chatInSidebar("Delete me").hover();
   await options.click();
-  await clickMenuItem("Delete…");
+  await expect.poll(() => openMenuRows(app)).toEqual(["Rename", "-", "Delete…"]);
+  await chooseFromMenu(app, "Delete…");
+  await expect(card.getByRole("heading")).toHaveText("Delete “Delete me”?");
+  await expect(card.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await menu.keyboard.press("Escape");
+  await expect(card).toHaveCount(0);
   await expect.poll(async () => (await activeTab()).page).toBe("chat");
   await expect(chatInSidebar("Delete me")).toBeVisible();
 
+  // Pressing Delete in the card deletes it.
   await chatInSidebar("Delete me").hover();
   await options.click();
-  await clickMenuItem("Delete…");
+  await chooseFromMenu(app, "Delete…");
+  await answerAsk(app, "Delete");
   await expect(chatInSidebar("Delete me")).toHaveCount(0);
-
   // It was the only tab, and the window stays open on a new one.
   await expect.poll(async () => (await getTabs()).map((tab) => tab.page)).toEqual(["new-tab"]);
   expect(await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ chats }) => chats.length))).toBe(0);
+
+  // Right-clicking a page opens our menu over it, and Copy copies what's selected there. The clipboard is put back after.
+  const kept = await app.evaluate(({ clipboard }) => clipboard.readText());
+  try {
+    const page = await openFixture();
+    await page.locator("body").selectText();
+    await page.locator("body").click({ button: "right", position: { x: 10, y: 10 } });
+    await expect.poll(() => openMenuRows(app)).toEqual(["Ask Berry About This", "-", "Copy", "-", "Print…", "Inspect"]);
+    await chooseFromMenu(app, "Copy");
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe("hello from the page");
+  } finally {
+    await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), kept);
+  }
+
+  // Clear history asks with the same card, and Cancel clears nothing.
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("history"));
+  await chrome.getByRole("button", { name: "Clear…" }).click();
+  await expect(card.getByRole("heading")).toHaveText("Clear all browsing history?");
+  await answerAsk(app, "Cancel");
+  await expect(card).toHaveCount(0);
+  expect(await chrome.evaluate(() => window.chromeAPI.browser.getRecent())).not.toEqual([]);
 });
 
 test("deleting the panel's chat starts it fresh", async () => {
@@ -1153,15 +1159,12 @@ test("deleting the panel's chat starts it fresh", async () => {
   await askInPanel("Delete me");
   await expect(panel.getByText("A reply from the model")).toBeVisible();
   await expect(chrome.getByRole("navigation", { name: "Sidebar" })).toBeVisible();
-  await captureMenus();
-  await app.evaluate(({ dialog }) => {
-    dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
-  });
 
   await showChats();
   await chatInSidebar("Delete me").hover();
   await chrome.getByRole("button", { name: "More options for Delete me" }).click();
-  await clickMenuItem("Delete…");
+  await chooseFromMenu(app, "Delete…");
+  await answerAsk(app, "Delete");
   await expect(panel.getByText("A reply from the model")).toHaveCount(0);
 
   await askInPanel("A new start");
@@ -1232,8 +1235,8 @@ test("the chrome renderers run sandboxed", async () => {
   });
 
   // The chrome view, the overlay view for the floating sidebar, the find bar, the address field's suggestions, the tooltip
-  // over the page, a tab's preview card and the site permission prompt.
-  expect(sandboxed).toEqual([true, true, true, true, true, true, true]);
+  // over the page, a tab's preview card, the site permission prompt, and our menus and Asking first.
+  expect(sandboxed).toEqual([true, true, true, true, true, true, true, true]);
 });
 
 test("the chrome renderer can't be navigated away from its own page", async () => {
@@ -1410,12 +1413,18 @@ test("in the tab row at the smallest window, the active tab has as much room for
 test("off a Mac, the menu button opens the app's own menu just under itself", async () => {
   const button = chrome.getByRole("button", { name: "Menu", exact: true });
   if (process.platform === "darwin") return void (await expect(button).toHaveCount(0));
-  await app.evaluate(({ Menu }) => {
-    const menu = Menu.getApplicationMenu()!;
-    menu.popup = (options) => {
-      (globalThis as { popped?: unknown }).popped = { x: options?.x, y: options?.y, window: !!options?.window };
-    };
-  });
+  const menu = await findView(app, "view=menu");
+  // Where the open menu's sheet is in the window: the view's place, and the sheet's in the view.
+  const sheetInWindow = async () => {
+    const view = await app.evaluate(({ BaseWindow }) => {
+      const found = BaseWindow.getAllWindows()[0].contentView.children.find(
+        (child) => "webContents" in child && (child as Electron.WebContentsView).webContents.getURL().includes("view=menu")
+      );
+      return found?.getBounds();
+    });
+    const sheet = await menu.locator('[role=menu]:not([aria-hidden="true"])').first().boundingBox();
+    return view && sheet && { x: view.x + sheet.x, y: view.y + sheet.y, right: view.x + sheet.x + sheet.width };
+  };
 
   for (const layoutMode of ["vertical", "horizontal"] as const) {
     await chrome.evaluate((layoutMode) => window.chromeAPI.settings.updateSettings({ layoutMode }), layoutMode);
@@ -1428,11 +1437,22 @@ test("off a Mac, the menu button opens the app's own menu just under itself", as
       expect(menuButton.y).toBeGreaterThanOrEqual(addressRow.y);
       expect(menuButton.y + menuButton.height).toBeLessThanOrEqual(addressRow.y + addressRow.height);
     }
-    await app.evaluate(() => void ((globalThis as { popped?: unknown }).popped = null));
     await button.click();
-    await expect
-      .poll(() => app.evaluate(() => (globalThis as { popped?: unknown }).popped))
-      .toEqual({ x: menuButton.x, y: menuButton.y + menuButton.height, window: true });
+    await expect.poll(() => openMenuRows(app)).toEqual(["File", "Edit", "View", "Go"]);
+    // 4px under the button, moved in from the window's edge.
+    await expect.poll(async () => (await sheetInWindow())?.y).toBe(menuButton.y + menuButton.height + 4);
+    const { width } = await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].getContentBounds());
+    expect((await sheetInWindow())!.right).toBeLessThanOrEqual(width - 8);
+    // A submenu opens beside its row, on the side with room, and Escape closes only it, then the menu.
+    await menu.getByRole("menuitem", { name: "View", exact: true }).focus();
+    await menu.keyboard.press("ArrowRight");
+    await expect(menu.getByRole("menuitemcheckbox", { name: "Horizontal Tabs" })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: "Reload", exact: true })).toBeFocused();
+    await menu.keyboard.press("Escape");
+    await expect(menu.getByRole("menuitemcheckbox", { name: "Horizontal Tabs" })).toBeHidden();
+    await expect(menu.getByRole("menuitem", { name: "View", exact: true })).toBeFocused();
+    await menu.keyboard.press("Escape");
+    await expect(menu.getByRole("menu")).toHaveCount(0);
   }
 });
 
@@ -1847,16 +1867,12 @@ test("bookmarks are in the sidebar when vertical, and in a bar under the toolbar
 });
 
 test("right-clicking Berry beside the greeting opens its menu", async () => {
-  // Capture the native menu without opening a popup outside Playwright's renderer.
-  await app.evaluate(({ Menu }) => {
-    Menu.prototype.popup = function () { Menu.setApplicationMenu(this); };
-  });
   const bird = chrome.locator("[data-berry-perched]").getByRole("img", { name: "Berry, at rest" });
   await expect(bird).toBeVisible();
-  await app.evaluate(({ Menu }) => Menu.setApplicationMenu(null));
   await bird.click({ button: "right", timeout: 2000 });
-  await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.items.map((item) => item.label)))
-    .toEqual(["Keep Berry Still", "Hide Berry"]);
+  await expect.poll(() => openMenuRows(app)).toEqual(["Keep Berry Still", "Hide Berry"]);
+  await chooseFromMenu(app, "Keep Berry Still");
+  await expect.poll(() => chrome.evaluate(() => window.chromeAPI.settings.getSettings().then(({ keepBerryStill }) => keepBerryStill))).toBe(true);
 });
 
 test("the component gallery shows Berry in every mood", async () => {

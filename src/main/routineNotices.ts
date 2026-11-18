@@ -1,6 +1,7 @@
-import { dialog, Notification, type BaseWindow } from "electron";
+import { Notification } from "electron";
 import { HANDOFF_WORDS } from "./browserTools";
-import type { ChatApproval } from "../shared/library";
+import type { AskCard } from "../shared/ipc";
+import type { ChatApproval, MascotLook } from "../shared/library";
 
 const WORDS = {
   finished: { title: "finished", body: "See what it found in Routines." },
@@ -31,39 +32,30 @@ export const notifyNeedsYou = (name: string, { question, handoff }: ChatApproval
   notify(`${name} needs you`, body, onClick);
 };
 
-export const confirmDeleteRoutine = async (window: BaseWindow, name: string): Promise<boolean> => {
-  const { response } = await dialog.showMessageBox(window, {
-    type: "warning",
-    message: `Delete “${name}”?`,
-    detail: "This routine and its run history will be permanently removed from this computer. If it’s running, it stops.",
-    buttons: ["Delete", "Cancel"],
-    defaultId: 1,
-    cancelId: 1,
-  });
-  return response === 0;
-};
+// What Asking first says (DESIGN.md section 8) before deleting a routine, forgetting what a mascot remembers, or deleting
+// a mascot, which shows its face.
+type AskWords = Omit<AskCard, "id">;
 
-export const confirmClearMemory = async (window: BaseWindow, name: string, count: number): Promise<boolean> => {
-  const { response } = await dialog.showMessageBox(window, {
-    type: "warning",
-    message: `Forget everything ${name} remembers?`,
-    detail: `${count === 1 ? "The one thing it remembers goes" : `All ${count} things it remembers go`}, and it can’t be undone. Other birds aren’t affected, because they never had it.`,
-    buttons: ["Forget Everything", "Cancel"],
-    defaultId: 1,
-    cancelId: 1,
-  });
-  return response === 0;
-};
+export const deleteRoutineWords = (name: string): AskWords => ({
+  question: `Delete “${name}”?`,
+  detail: "This routine and its run history will be permanently removed from this computer. If it’s running, it stops.",
+  action: "Delete",
+  mascot: null,
+});
 
-export const confirmDeleteMascot = async (window: BaseWindow, name: string, routines: number, published = false): Promise<boolean> => {
+export const clearMemoryWords = (name: string, count: number): AskWords => ({
+  question: `Forget everything ${name} remembers?`,
+  detail: `${count === 1 ? "The one thing it remembers goes" : `All ${count} things it remembers go`}, and it can’t be undone. Other birds aren’t affected, because they never had it.`,
+  action: "Forget everything",
+  mascot: null,
+});
+
+export const deleteMascotWords = (mascot: { name: string; look: MascotLook }, routines: number, published: boolean, hidden: boolean): AskWords => {
   const paused = routines === 0 ? "" : ` ${routines === 1 ? "The routine it runs pauses" : `The ${routines} routines it runs pause`}, and stay${routines === 1 ? "s" : ""} limited to what it could do.`;
-  const { response } = await dialog.showMessageBox(window, {
-    type: "warning",
-    message: `Delete “${name}”?`,
+  return {
+    question: `Delete “${mascot.name}”?`,
     detail: `It leaves your flock, and what it remembers is forgotten. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,
-    buttons: ["Delete", "Cancel"],
-    defaultId: 1,
-    cancelId: 1,
-  });
-  return response === 0;
+    action: "Delete",
+    mascot: { name: mascot.name, look: mascot.look, hidden },
+  };
 };

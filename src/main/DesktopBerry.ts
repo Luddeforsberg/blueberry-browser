@@ -1,5 +1,7 @@
-import { BaseWindow, globalShortcut, Menu, screen, type Display, type WebContents } from "electron";
+import { BaseWindow, globalShortcut, screen, type Display, type WebContents } from "electron";
 import { createChromeView, type ChromeView } from "./chromeView";
+import { MenuView } from "./MenuView";
+import type { OwnMenuItem } from "./ownMenu";
 import { sendToRenderer } from "./ipc";
 import {
   DESKTOP_DEFAULT_SPOT,
@@ -108,6 +110,11 @@ export class DesktopBerry {
   private view: ChromeView | null = null;
   private panelWindow: BaseWindow | null = null;
   private panel: ChromeView | null = null;
+  // Right-clicking the drop: our menu, in a panel of its own, so it can take the keyboard without bringing Blueberry
+  // forward, and stays inside the screen it opened on.
+  private menuWindow: BaseWindow | null = null;
+  private menus: MenuView | null = null;
+  private menuArea: Rect | null = null;
   private outside = false;
   private dragging = false;
   private frame = 0;
@@ -160,6 +167,10 @@ export class DesktopBerry {
     return this.panel;
   }
 
+  get menuView(): MenuView | null {
+    return this.menus;
+  }
+
   get shortcutTaken(): boolean {
     return this._shortcutTaken;
   }
@@ -191,6 +202,7 @@ export class DesktopBerry {
     this.spot = this.host.settings().desktopBerrySpot;
     this.createWindow();
     this.createPanel();
+    this.createMenu();
     this.registerShortcut();
     screen.on("display-metrics-changed", this.onDisplays);
     screen.on("display-added", this.onDisplays);
@@ -215,13 +227,16 @@ export class DesktopBerry {
     this.results = [];
     this.finished = [];
     this.heightWaiters.splice(0).forEach((resolve) => resolve());
-    const { window, view, panelWindow, panel } = this;
-    this.window = this.panelWindow = null;
+    const { window, view, panelWindow, panel, menuWindow, menus } = this;
+    this.window = this.panelWindow = this.menuWindow = null;
     this.view = this.panel = null;
+    this.menus = null;
     view?.view.webContents.close();
     panel?.view.webContents.close();
+    menus?.destroy();
     if (window && !window.isDestroyed()) window.destroy();
     if (panelWindow && !panelWindow.isDestroyed()) panelWindow.destroy();
+    if (menuWindow && !menuWindow.isDestroyed()) menuWindow.destroy();
   }
 
   destroy(): void {
@@ -298,6 +313,32 @@ export class DesktopBerry {
     this.panelWindow = window;
     this.panel = chrome;
     window.hide();
+  }
+
+  // A clear window as big as the menu, which closes when anything else takes the keyboard.
+  private createMenu(): void {
+    const window = new BaseWindow({ ...this.panelOptions, width: 1, height: 1 });
+    this.floatEverywhere(window);
+    this.menus = new MenuView(
+      "drop-menu",
+      (view) => {
+        window.contentView.addChildView(view);
+        return {
+          area: () => this.menuArea ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea,
+          show: (rect) => {
+            window.setBounds(rect);
+            view.setBounds({ x: 0, y: 0, width: rect.width, height: rect.height });
+            window.showInactive();
+            window.focus();
+          },
+          // Hiding it gives the keyboard back to the app in front, which never stopped being the one in front.
+          hide: () => window.hide(),
+        };
+      },
+      { mascotsHidden: () => !this.host.settings().showBerry, refocus: false }
+    );
+    window.on("blur", () => this.menus?.closeMenu());
+    this.menuWindow = window;
   }
 
   private registerShortcut(): void {
@@ -514,11 +555,12 @@ export class DesktopBerry {
     this.host.update({ desktopBerrySpot: this.spot });
   }
 
+  // At the pointer, on the screen it's on.
   showMenu(): void {
-    if (!this.window) return;
+    if (!this.window || !this.menus) return;
     const { keepBerryStill, showBerry } = this.host.settings();
     const result = this.announcing ?? this.results.at(-1)?.chatId ?? null;
-    Menu.buildFromTemplate([
+    const items: OwnMenuItem[] = [
       ...(result
         ? [
             {
@@ -531,12 +573,15 @@ export class DesktopBerry {
             { type: "separator" as const },
           ]
         : []),
-      { label: "Open Blueberry", click: () => this.host.showBlueberry() },
+      { label: "Open Blueberry", icon: "open", click: () => this.host.showBlueberry() },
       { type: "separator" },
       { label: "Keep Mascots Still", type: "checkbox", checked: keepBerryStill, click: () => this.host.update({ keepBerryStill: !keepBerryStill }) },
       { label: "Hide Mascots", type: "checkbox", checked: !showBerry, click: () => this.host.update({ showBerry: !showBerry }) },
       { label: "Take Off the Desktop", click: () => this.host.update({ desktopBerry: false }) },
-    ]).popup({ window: this.window });
+    ];
+    const point = screen.getCursorScreenPoint();
+    this.menuArea = screen.getDisplayNearestPoint(point).workArea;
+    this.menus.open(items, { ...point, width: 0, height: 0 }, { label: "Mascots", mac: process.platform === "darwin" });
   }
 
   // --- The panel: the prompt box, the tray and the ask ---
@@ -929,5 +974,6 @@ export class DesktopBerry {
     const theme = this.host.theme();
     if (this.view) sendToRenderer(this.view.view.webContents, "theme:updated", theme);
     if (this.panel) sendToRenderer(this.panel.view.webContents, "theme:updated", theme);
+    this.menus?.notifyTheme(theme);
   }
 }

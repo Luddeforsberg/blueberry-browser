@@ -5,7 +5,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { chooseFromMenu, findView, launchApp } from "./app";
 
 const SIZE = 64 * 1024;
 let slow: ServerResponse | null = null;
@@ -111,11 +111,9 @@ test("a download saves without a dialog and can be followed, paused, cancelled a
   expect(readFileSync(join(folder, "report.txt"), "utf8")).toBe("finished");
 
   // Save Image in the page's right-click menu arrives through the same handler.
-  await app.evaluate(({ Menu }) => {
-    Menu.prototype.popup = function () { this.items.find((item) => item.label.startsWith("Save Image"))?.click(); };
-  });
   await switchToFiles();
   await page.click("#pixel", { button: "right" });
+  await chooseFromMenu(app, "Save Image");
   await expect.poll(() => existsSync(join(folder, "pixel.gif"))).toBe(true);
 
   await chrome.evaluate(() => window.chromeAPI.browser.openPage("downloads"));

@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
 
 let server: Server;
@@ -113,10 +113,8 @@ test("a restart brings tabs back without loading them all, and history is kept",
 
   await chrome.getByRole("searchbox", { name: "Search history" }).fill("");
   await expect(today.getByRole("button", { name: /4 pages/ })).toBeVisible();
-  await app.evaluate(({ dialog }) => {
-    dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
-  });
   await chrome.getByRole("button", { name: "Clear…" }).click();
+  await answerAsk(app, "Clear history");
   await expect(chrome.getByText(/^Nothing here yet\./)).toBeVisible();
   expect(await chrome.evaluate(() => window.chromeAPI.browser.getRecent())).toEqual([]);
   await app.close();

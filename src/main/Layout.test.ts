@@ -7,6 +7,7 @@ import { computeLayout, MIN_PAGE_WIDTH, promptRect, PROMPT_WIDTH, suggestionsRec
   desktopRestingDrop,
   desktopSheetsPlace,
   desktopSpotAt,
+  menuPlacement,
   tabPreviewRect,
   TAB_PREVIEW,
 } from "./Layout";
@@ -421,5 +422,68 @@ describe("tabPreviewRect", () => {
     const row = { x: 300, y: 5, width: 196, height: 32 };
     expect(tabPreviewRect(tabRow, row, { picture: false, working: false }, window).view).toEqual(tabPreviewRect(tabRow, row, { picture: true, working: true }, window).view);
     expect(tabPreviewRect(sidebar, row, { picture: false, working: false }, window).view).toEqual(tabPreviewRect(sidebar, { ...row, y: 600 }, full, window).view);
+  });
+});
+
+describe("menuPlacement", () => {
+  const area = { x: 0, y: 0, width: 1000, height: 700 };
+  const sheet = (path: string, width = 200, height = 100, rowTop = 0) => ({ path, width, height, rowTop });
+  const button = (x: number, y: number) => ({ x, y, width: 24, height: 24 });
+  const point = (x: number, y: number) => ({ x, y, width: 0, height: 0 });
+  // Where a sheet ended up in the area.
+  const where = (placed: ReturnType<typeof menuPlacement>, path: string) => {
+    if (!placed) throw new Error("Not placed");
+    const at = placed.sheets[path];
+    return { x: placed.view.x + at.x, y: placed.view.y + at.y };
+  };
+
+  it("opens 4px under its button, in a view only as big as the menu and its shadow", () => {
+    const placed = menuPlacement(button(100, 40), [sheet("")], area);
+    expect(where(placed, "")).toEqual({ x: 100, y: 68 });
+    expect(placed?.view).toEqual({ x: 68, y: 52, width: 264, height: 164 });
+  });
+
+  it("opens at the pointer, moved in from the right edge", () => {
+    expect(where(menuPlacement(point(300, 200), [sheet("")], area), "")).toEqual({ x: 300, y: 200 });
+    expect(where(menuPlacement(point(950, 200), [sheet("")], area), "")).toEqual({ x: 792, y: 200 });
+  });
+
+  it("opens upward when there's no room below, from the pointer or over the button", () => {
+    expect(where(menuPlacement(point(300, 650), [sheet("")], area), "").y).toBe(550);
+    expect(where(menuPlacement(button(100, 640), [sheet("")], area), "").y).toBe(536);
+  });
+
+  it("keeps a menu taller than the room inside it, cut to the area", () => {
+    const short = { ...area, height: 200 };
+    const placed = menuPlacement(point(10, 100), [sheet("", 200, 300)], short);
+    expect(where(placed, "").y).toBe(8);
+    expect(placed?.view.y).toBe(0);
+    expect((placed?.view.y ?? 0) + (placed?.view.height ?? 0)).toBeLessThanOrEqual(200);
+  });
+
+  it("opens a submenu beside its row, on the side with room", () => {
+    const right = menuPlacement(button(100, 40), [sheet(""), sheet("2", 150, 80, 46)], area);
+    expect(where(right, "2")).toEqual({ x: 304, y: 108 });
+    const left = menuPlacement(button(790, 40), [sheet(""), sheet("2", 150, 80, 46)], area);
+    expect(where(left, "")).toEqual({ x: 790, y: 68 });
+    expect(where(left, "2")).toEqual({ x: 636, y: 108 });
+  });
+
+  it("holds every sheet in one view that never leaves the area", () => {
+    const placed = menuPlacement(point(0, 0), [sheet(""), sheet("0", 150, 80, 6)], area);
+    expect(placed?.view.x).toBe(0);
+    expect(placed?.view.y).toBe(0);
+    expect(where(placed, "")).toEqual({ x: 8, y: 0 });
+  });
+
+  it("works in screen coordinates, on a display that doesn't start at 0", () => {
+    const display = { x: 1920, y: 0, width: 1280, height: 1040 };
+    expect(where(menuPlacement(point(3150, 500), [sheet("")], display), "")).toEqual({ x: 2992, y: 500 });
+  });
+
+  it("places nothing without the menu itself, or for a submenu whose row isn't placed", () => {
+    expect(menuPlacement(point(10, 10), [], area)).toBeNull();
+    expect(menuPlacement(point(10, 10), [sheet("2")], area)).toBeNull();
+    expect(menuPlacement(point(10, 10), [sheet(""), sheet("3.1")], area)).toBeNull();
   });
 });

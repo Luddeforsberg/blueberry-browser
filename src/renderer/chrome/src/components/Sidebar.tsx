@@ -2,6 +2,9 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Cloud, Ellipsis, PanelLeft, Plus } from 'lucide-react'
 import { Favicon, siteIcon } from './Favicon'
 import type { Bookmark, ChatThreadSummary, MascotProfile, Routine } from '@shared/library'
+import type { MenuAnchor } from '@shared/ipc'
+import { atPointer, underBox } from './MenuSheet'
+import { holdWhile } from '../menuHold'
 import { useBrowser } from '../contexts/BrowserContext'
 import { useFlock, useLibrary } from '../contexts/LibraryContext'
 import { useShell } from '../contexts/ShellContext'
@@ -78,7 +81,7 @@ export const sameSite = (a: string, b: string) => {
 
 export const savedSiteMenu = (event: React.MouseEvent, site: Bookmark) => {
     event.preventDefault()
-    void window.chromeAPI.library.showBookmarkMenu(site.id)
+    void holdWhile(window.chromeAPI.library.showBookmarkMenu(site.id, atPointer(event)))
 }
 
 export type SiteDragging = ReturnType<typeof useSiteDrag>
@@ -264,8 +267,8 @@ export const ChatRow: React.FC<{
     const mascot = find(chat.mascotId)
     const name = useAssistantName(mascot)
 
-    const showMenu = async () => {
-        if ((await api.showMenu(chat.id)) === 'rename') {
+    const showMenu = async (anchor: MenuAnchor) => {
+        if ((await holdWhile(api.showMenu(chat.id, anchor))) === 'rename') {
             finished.current = false
             setEditing(true)
         }
@@ -303,7 +306,7 @@ export const ChatRow: React.FC<{
             className="group/chat relative"
             onContextMenu={(event) => {
                 event.preventDefault()
-                void showMenu()
+                void showMenu(atPointer(event))
             }}
         >
             <Tooltip words={chat.title} whenCut>
@@ -329,7 +332,7 @@ export const ChatRow: React.FC<{
                 <button
                     type="button"
                     aria-label={`More options for ${chat.title}`}
-                    onClick={() => void showMenu()}
+                    onClick={(event) => void showMenu(underBox(event.currentTarget))}
                     className={cn(
                         'press absolute right-1 top-1 size-6 flex items-center justify-center rounded-[7px] text-ink-3 app-region-no-drag',
                         'opacity-0 group-hover/chat:opacity-100 group-focus-within/chat:opacity-100 hover:bg-hover hover:text-ink',

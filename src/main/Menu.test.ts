@@ -17,7 +17,7 @@ vi.mock("electron", () => ({
     setApplicationMenu: () => {},
   },
 }));
-vi.mock("./Window", () => ({ HORIZONTAL_TABS_MENU_ID: "horizontal-tabs" }));
+vi.mock("./Window", () => ({ HORIZONTAL_TABS_MENU_ID: "horizontal-tabs", WEB_PAGE_MENU_IDS: ["print"] }));
 
 const { AppMenu } = await import("./Menu");
 

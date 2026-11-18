@@ -7,6 +7,7 @@ import { ChatsFace, MascotCard, Sidebar } from './components/Sidebar'
 import { AccountMenu } from './components/AccountMenu'
 import { cn } from '@common/lib/utils'
 import { TooltipProvider } from '@common/components/Tooltip'
+import { isHeld } from './menuHold'
 
 // Matches `duration-panel`, so the view only hides once the card has slid away.
 const SLIDE_MS = 280
@@ -25,6 +26,7 @@ const FloatingSidebar: React.FC = () => {
     }, [])
 
     const slideOut = () => {
+        if (isHeld()) return
         setSlide('out')
         hideTimer.current = window.setTimeout(() => void window.chromeAPI.layout.hideFloatingSidebar(), SLIDE_MS)
     }

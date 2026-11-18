@@ -5,7 +5,7 @@ import { expect, test, type Locator } from "@playwright/test";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { answerAsk, findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 
 // The mascots a group shows, by name, in order.
@@ -128,10 +128,9 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
 
     // Deleted, it can be added again.
     const id = String(copy?.id);
-    await app.evaluate(({ dialog }) => {
-      dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as typeof dialog.showMessageBox;
-    });
-    expect(await chrome.evaluate((mascot) => window.chromeAPI.mascots.delete(mascot), id)).toBe(true);
+    const deleted = chrome.evaluate((mascot) => window.chromeAPI.mascots.delete(mascot), id);
+    await answerAsk(app, "Delete");
+    expect(await deleted).toBe(true);
     await expect(blueberry.getByRole("button", { name: "Meeting Prep", exact: true })).not.toContainText("Yours");
     await blueberry.getByRole("button", { name: /^Meeting Prep/ }).click();
     await expect(page.getByRole("button", { name: "Add Meeting Prep to your flock" })).toBeVisible();

@@ -433,10 +433,6 @@ The moment an AI browser is most impressive is when it acts on a page, and a flo
 
 `⌘+`, `⌘-` and `⌘0` zoom the web page, per site and across restarts. Other open tabs on the site follow. Away from 100%, the toolbar shows the level beside the bookmark star, and pressing it goes back to 100%. Internal pages don't zoom, and `⌘P` prints web pages only, so those menu items are disabled there.
 
-### Page menu
-
-Right-clicking a web page opens a native menu with what was clicked in mind: spelling suggestions, link, image, editing, or back, forward and reload on a plain page, always ending in Inspect. With text selected, Ask Berry About This opens the chat panel with that text added to the composer. It is never sent by itself.
-
 ### Main chat
 
 A full page for talking to Berry about anything, not about a particular web page. A chat starts from the new tab page and then lives as a tab, which the sidebar shows only as the chat's row under Chats, with past chats. There's no empty chat page.

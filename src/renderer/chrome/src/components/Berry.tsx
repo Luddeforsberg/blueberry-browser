@@ -3,6 +3,7 @@ import type { MascotProfile } from '@shared/library'
 import { BERRY_ID } from '@shared/mascots'
 import { Mascot, type Mood } from '@common/components/Mascot'
 import { useShell } from '../contexts/ShellContext'
+import { atPointer } from './MenuSheet'
 
 // Berry, or one of the flock, as the settings say: hidden, still, or itself. Right-clicking it offers both switches.
 // `still` holds it still whatever the settings say, where something else in its area already moves.
@@ -18,7 +19,7 @@ export const Berry: React.FC<{ mood?: Mood; size: number; className?: string; ma
             lively
             onContextMenu={(event) => {
                 event.preventDefault()
-                void window.chromeAPI.settings.showBerryMenu()
+                void window.chromeAPI.settings.showBerryMenu(atPointer(event))
             }}
         />
     )

@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findView, launchApp } from "./app";
+import { chooseFromMenu, findView, launchApp } from "./app";
 
 let app: ElectronApplication;
 let chrome: Page;
@@ -28,16 +28,6 @@ async function visit(address = url, title = "Saved page"): Promise<void> {
   await (await findView(app, address)).waitForLoadState();
   await expect.poll(async () => (await active()).title).toBe(title);
 }
-
-// Answers the next native menu with the item of that label, without opening it outside Playwright.
-const answerMenu = (label: string) =>
-  app.evaluate(({ Menu }, label) => {
-    Menu.prototype.popup = function () {
-      const item = this.items.find((item) => item.label === label);
-      if (!item) throw new Error(`Missing menu item: ${label}`);
-      item.click();
-    };
-  }, label);
 
 // A real press, moved in steps so the drag starts, released where it's asked to be.
 const drag = async (from: Locator, to: { x: number; y: number }, whileOver?: () => Promise<void>) => {
@@ -98,8 +88,8 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   await expect(saved).toBeVisible();
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "vertical", appearance: "light" }));
   await chrome.screenshot({ path: "/tmp/blueberry-bookmarks-vertical.png" });
-  await answerMenu("Remove Bookmark");
   await saved.click({ button: "right" });
+  await chooseFromMenu(app, "Remove Bookmark");
   await expect(saved).toHaveCount(0);
   await app.close();
   app = await launchApp(profile);
@@ -129,8 +119,8 @@ test("a bookmark kept on top is a tile, by its menu or by dragging, and the side
   await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
   const row = () => bookmarks().getByRole("button", { name: "Saved page" });
   const tile = () => favourites().getByRole("button", { name: "Saved page" });
-  await answerMenu("Keep on Top");
   await row().click({ button: "right" });
+  await chooseFromMenu(app, "Keep on Top");
   await expect(tile()).toBeVisible();
   await expect(row()).toHaveCount(0);
   await expect(chrome.getByRole("button", { name: "Remove bookmark", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -165,16 +155,16 @@ test("a bookmark kept on top is a tile, by its menu or by dragging, and the side
   // Tiles reorder among themselves.
   await visit(`${url}second`, "Second page");
   await chrome.getByRole("button", { name: "Bookmark this page", exact: true }).click();
-  await answerMenu("Keep on Top");
   await bookmarks().getByRole("button", { name: "Second page" }).click({ button: "right" });
+  await chooseFromMenu(app, "Keep on Top");
   const order = async () => (await chrome.evaluate(() => window.chromeAPI.library.getLibrary())).pinned.map(({ title }) => title);
   await expect.poll(order).toEqual(["Saved page", "Second page"]);
   await drag(favourites().getByRole("button", { name: "Second page" }), await leftOf(tile()));
   await expect.poll(order).toEqual(["Second page", "Saved page"]);
 
   // A tile's menu moves it to the bookmarks, and the app's menu keeps the page in front on top.
-  await answerMenu("Move to Bookmarks");
   await tile().click({ button: "right" });
+  await chooseFromMenu(app, "Move to Bookmarks");
   await expect(row()).toBeVisible();
   await expect(tile()).toHaveCount(0);
   await visit();

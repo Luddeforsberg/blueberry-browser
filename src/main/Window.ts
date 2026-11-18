@@ -1,4 +1,7 @@
 import { BaseWindow, Menu, app, dialog, nativeTheme, powerMonitor, session, shell, systemPreferences, type WebContents } from "electron";
+import { MenuView } from "./MenuView";
+import type { OwnMenuItem } from "./ownMenu";
+import { appMenuItems } from "./Menu";
 import { release } from "os";
 import { TAB_WEB_PREFERENCES, Tab } from "./Tab";
 import { InternalTab } from "./InternalTab";
@@ -17,7 +20,7 @@ import { Phone } from "./Phone";
 import { TelegramChannel } from "./TelegramChannel";
 import type { RoutineStore } from "./RoutineStore";
 import { Routines } from "./Routines";
-import { confirmClearMemory, confirmDeleteMascot, confirmDeleteRoutine, notifyNeedsYou, notifyRoutine } from "./routineNotices";
+import { clearMemoryWords, deleteMascotWords, deleteRoutineWords, notifyNeedsYou, notifyRoutine } from "./routineNotices";
 import type { MascotStore } from "./MascotStore";
 import { Account } from "./Account";
 import { AiKey, KEY_PAGES } from "./AiKey";
@@ -60,6 +63,7 @@ import {
 } from "./Layout";
 import { sendToRenderer } from "./ipc";
 import type {
+  ChromeRegion,
   EventChannels,
   HistoryCursor,
   HistoryImportResult,
@@ -67,6 +71,7 @@ import type {
   ImportSource,
   InternalPage,
   LayoutMode,
+  MenuAnchor,
   Popover,
   ResizablePanel,
   MascotSaveResult,
@@ -102,8 +107,6 @@ const CAPTION_SYMBOL = { light: "#1b1b1e", dark: "#f2f2f3" };
 // macOS draws its window buttons 14px tall, so this centres them in the top row.
 const MAC_BUTTONS_HEIGHT = 14;
 
-// macOS can report a menu closed before it runs the clicked item, so this waits well past that.
-const MENU_CLICK_GRACE_MS = 1000;
 // Plenty for a habit to show, and few enough to look through on every new tab.
 // How long with no input before the phone gets what's waiting, even with the window in front.
 const AWAY_AFTER_IDLE_SECONDS = 60;
@@ -130,6 +133,8 @@ export class Window {
   readonly addressSuggestions: AddressSuggestions;
   readonly tooltip: TooltipView;
   readonly previews: TabPreviews;
+  // Our menus and Asking first, over everything else in the window.
+  readonly menus: MenuView;
   readonly siteZoom: SiteZoom;
   private floatingSidebarVisible = false;
   // What's open over the page from the horizontal toolbar, in the overlay view. Null when nothing is.
@@ -241,6 +246,23 @@ export class Window {
       keepStill: () => this.settings.keepBerryStill,
     });
     this.openLinksInTabs(this.previews.chromeView.view.webContents);
+    const { contentView } = this._baseWindow;
+    this.menus = new MenuView("menu", (view) => {
+      contentView.addChildView(view);
+      return {
+        area: () => {
+          const { width, height } = this._baseWindow.getContentBounds();
+          return { x: 0, y: 0, width, height };
+        },
+        show: (rect) => {
+          // Adding a view again moves it to the top, above tabs and other views opened since.
+          contentView.addChildView(view);
+          view.setBounds(rect);
+          view.setVisible(true);
+        },
+        hide: () => view.setVisible(false),
+      };
+    }, { mascotsHidden: () => !this.settings.showBerry, refocus: true });
     this.siteZoom = new SiteZoom({
       levels: () => this.settings.siteZoom,
       save: (siteZoom) => {
@@ -583,6 +605,8 @@ export class Window {
       this.runnerJobs.destroy();
       this.macJobs.destroy();
       this.permissionPrompt.destroy();
+      // A question still waiting is answered no.
+      this.menus.destroy();
       session.defaultSession.off("will-download", onDownload);
       offDownloads();
       offSaved();
@@ -1035,7 +1059,13 @@ export class Window {
           this.placeTab(withView, this.layout);
           this.openLinksInTabs(withView.webContents);
           this.siteZoom.track(withView);
-          attachPageMenu(withView, this._baseWindow, {
+          // Added on top, so a question asking first goes back over it.
+          this.menus.raise();
+          attachPageMenu(withView, {
+            openMenu: (items, at, page) => {
+              const view = withView.existingView?.getBounds();
+              if (view) this.menus.open(items, { x: view.x + at.x, y: view.y + at.y, width: 0, height: 0 }, { label: "Page", mac: this.mac, page });
+            },
             openTab: (address) => this.createTab(address),
             askBerry: (text) => this.askBerryAbout(text),
             recording: () => this.recordings.isRecording,
@@ -1110,15 +1140,13 @@ export class Window {
   }
 
   async clearHistory(): Promise<boolean> {
-    const { response } = await dialog.showMessageBox(this._baseWindow, {
-      type: "warning",
-      message: "Clear all browsing history?",
+    const yes = await this.menus.ask({
+      question: "Clear all browsing history?",
       detail: "It will be permanently removed from this computer. Open tabs stay open, but lose their back and forward pages.",
-      buttons: ["Clear History", "Cancel"],
-      defaultId: 1,
-      cancelId: 1,
+      action: "Clear history",
+      mascot: null,
     });
-    if (response !== 0) return false;
+    if (!yes) return false;
     this.history.clear();
     this.forgetPages();
     this.publishSuggestions();
@@ -1191,6 +1219,7 @@ export class Window {
     this.addressSuggestions.close();
     this.tooltip.hide();
     this.previews.hide();
+    this.menus.closeMenu();
     // How the page looked as the user left it, for its card. Started before it's hidden, and not waited for.
     const leaving = this.activeTab;
     if (leaving && tabId !== this.activeTabId) void this.previews.keep(leaving);
@@ -1294,30 +1323,42 @@ export class Window {
     if (stale.length > 0) this.notifyTabs();
   }
 
-  showChatMenu(chatId: string): Promise<"rename" | null> {
+  private get mac(): boolean {
+    return process.platform === "darwin";
+  }
+
+  // A menu opened from a view, at its button or at the pointer, in the window. The chrome fills the window, and the
+  // overlay is wherever it is now.
+  private openMenu(items: OwnMenuItem[], anchor: unknown, from: ChromeRegion, label: string, onClosed?: () => void): void {
+    const { x, y, width, height } = (anchor ?? {}) as Record<string, unknown>;
+    if (!finite(x) || !finite(y) || !finite(width) || !finite(height) || width < 0 || height < 0) return onClosed?.();
+    const origin = from === "overlay" ? this.overlay.view.getBounds() : { x: 0, y: 0 };
+    const at: MenuAnchor = { x: origin.x + x, y: origin.y + y, width, height };
+    this.menus.open(items, at, { label, mac: this.mac, onClosed });
+  }
+
+  showChatMenu(chatId: string, anchor: unknown, from: ChromeRegion): Promise<"rename" | null> {
+    if (!this.chats.thread(chatId)) return Promise.resolve(null);
     return new Promise((resolve) => {
-      Menu.buildFromTemplate([
-        { label: "Rename", click: () => resolve("rename") },
-        { label: "Delete…", click: () => void this.confirmDeleteChat(chatId) },
-      ]).popup({
-        window: this._baseWindow,
-        callback: () => setTimeout(() => resolve(null), MENU_CLICK_GRACE_MS),
-      });
+      const items: OwnMenuItem[] = [
+        { label: "Rename", icon: "rename", click: () => resolve("rename") },
+        { type: "separator" },
+        { label: "Delete…", icon: "delete", danger: true, click: () => void this.confirmDeleteChat(chatId) },
+      ];
+      this.openMenu(items, anchor, from, "Chat", () => resolve(null));
     });
   }
 
   private async confirmDeleteChat(chatId: string): Promise<void> {
     const chat = this.chats.thread(chatId);
     if (!chat) return;
-    const { response } = await dialog.showMessageBox(this._baseWindow, {
-      type: "warning",
-      message: `Delete “${chat.title}”?`,
+    const yes = await this.menus.ask({
+      question: `Delete “${chat.title}”?`,
       detail: "This chat will be permanently removed from this computer.",
-      buttons: ["Delete", "Cancel"],
-      defaultId: 1,
-      cancelId: 1,
+      action: "Delete",
+      mascot: null,
     });
-    if (response !== 0 || !this.chats.delete(chatId)) return;
+    if (!yes || !this.chats.delete(chatId)) return;
 
     // Closing the last tab closes the window, and deleting a chat shouldn't do that.
     const tabs = this.chatTabs(chatId);
@@ -1341,7 +1382,7 @@ export class Window {
 
   async confirmDeleteRoutine(id: string): Promise<boolean> {
     const routine = this.routines.list().find((candidate) => candidate.id === id);
-    if (!routine || !(await confirmDeleteRoutine(this._baseWindow, routine.name))) return false;
+    if (!routine || !(await this.menus.ask(deleteRoutineWords(routine.name)))) return false;
     return this.routines.delete(id);
   }
 
@@ -1358,15 +1399,13 @@ export class Window {
   }
 
   async confirmUnpublish(id: string): Promise<PublishResult> {
-    const { response } = await dialog.showMessageBox(this._baseWindow, {
-      type: "warning",
-      message: "Take this mascot out of the Gallery?",
+    const yes = await this.menus.ask({
+      question: "Take this mascot out of the Gallery?",
       detail: "Its public page and its count go. Your own mascot stays, and so do copies other people have already added, because nothing here can reach them.",
-      buttons: ["Unpublish", "Cancel"],
-      defaultId: 1,
-      cancelId: 1,
+      action: "Unpublish",
+      mascot: null,
     });
-    return response === 0 ? this.gallery.unpublish(id) : { ok: false, error: "" };
+    return yes ? this.gallery.unpublish(id) : { ok: false, error: "" };
   }
 
   // Its routines pause rather than move to Berry, which could do more than the user set them up to.
@@ -1374,7 +1413,8 @@ export class Window {
     const mascot = this.mascotStore.find(id);
     if (!mascot || mascot.id === BERRY.id || mascot.deletedAt !== null) return false;
     const runs = this.routines.list().filter((routine) => routine.mascotId === id);
-    if (!(await confirmDeleteMascot(this._baseWindow, mascot.name, runs.length, Boolean(mascot.publishedId)))) return false;
+    const words = deleteMascotWords(mascot, runs.length, Boolean(mascot.publishedId), !this.settings.showBerry);
+    if (!(await this.menus.ask(words))) return false;
     if (!this.mascotStore.delete(id)) return false;
     this.memory.clear(id);
     runs.forEach((routine) => this.routines.setPaused(routine.id, true));
@@ -1391,7 +1431,7 @@ export class Window {
 
   async confirmClearMemory(mascotId: string): Promise<boolean> {
     const count = this.memory.factsOf(mascotId).length;
-    if (count === 0 || !(await confirmClearMemory(this._baseWindow, this.mascotName(mascotId), count))) return false;
+    if (count === 0 || !(await this.menus.ask(clearMemoryWords(this.mascotName(mascotId), count)))) return false;
     this.memory.clear(mascotId);
     return true;
   }
@@ -1427,22 +1467,27 @@ export class Window {
     });
   }
 
-  showBookmarkMenu(id: string): void {
+  // Settles once the menu has closed.
+  showBookmarkMenu(id: string, anchor: unknown, from: ChromeRegion): Promise<void> {
     const pin = this.pinnedStore.get().find((candidate) => candidate.id === id);
     const site = pin ?? this.bookmarkStore.get().find((candidate) => candidate.id === id);
-    if (!site) return;
-    Menu.buildFromTemplate([
+    if (!site) return Promise.resolve();
+    const items: OwnMenuItem[] = [
       pin
-        ? { label: "Move to Bookmarks", click: () => this.placeSavedSite(id, "bookmarks", 0) }
-        : { label: "Keep on Top", click: () => this.placeSavedSite(id, "favourites", this.pinnedStore.get().length) },
+        ? { label: "Move to Bookmarks", icon: "bookmark", click: () => this.placeSavedSite(id, "bookmarks", 0) }
+        : { label: "Keep on Top", icon: "pin", click: () => this.placeSavedSite(id, "favourites", this.pinnedStore.get().length) },
+      { type: "separator" },
       {
         label: "Remove Bookmark",
+        icon: "delete",
+        danger: true,
         click: () => this.saveBookmarks(() => {
           this.bookmarkStore.removeUrl(site.url);
           this.pinnedStore.removeUrl(site.url);
         }),
       },
-    ]).popup({ window: this._baseWindow });
+    ];
+    return new Promise((resolve) => this.openMenu(items, anchor, from, "Bookmark", resolve));
   }
 
   private saveBookmarks(save: () => void): void {
@@ -1453,11 +1498,7 @@ export class Window {
       this.updateAllBounds();
     } catch (error) {
       console.error("Failed to save pinned sites and bookmarks:", error);
-      void dialog.showMessageBox(this._baseWindow, {
-        type: "error",
-        message: "Could not save your pinned sites and bookmarks",
-        detail: "Check that there is space on your disk and try again.",
-      });
+      void this.notice("Could not save your pinned sites and bookmarks", "Check that there is space on your disk and try again.");
     }
   }
 
@@ -1480,29 +1521,27 @@ export class Window {
     if (!canceled && filePaths[0]) this.updateSettings({ downloadFolder: filePaths[0] });
   }
 
-  // The window has no menu bar off a Mac, so the menu button opens the same menu, just under itself.
+  // The window has no menu bar off a Mac, so the menu button opens the same menu, just under itself, read again so it
+  // says what's true now.
   showAppMenu(): void {
     const { menuButton } = this.layout;
     if (menuButton.width === 0) return;
-    Menu.getApplicationMenu()?.popup({ window: this._baseWindow, x: menuButton.x, y: menuButton.y + menuButton.height });
+    this.menus.open(appMenuItems(this), menuButton, { label: "Menu", mac: this.mac });
   }
 
-  showBerryMenu(): void {
+  showBerryMenu(anchor: unknown): void {
     const { keepBerryStill, showBerry } = this.settings;
-    Menu.buildFromTemplate([
-      {
-        label: "Keep Berry Still",
-        type: "checkbox",
-        checked: keepBerryStill,
-        click: () => this.updateSettings({ keepBerryStill: !keepBerryStill }),
-      },
-      {
-        label: "Hide Berry",
-        type: "checkbox",
-        checked: !showBerry,
-        click: () => this.updateSettings({ showBerry: !showBerry }),
-      },
-    ]).popup({ window: this._baseWindow });
+    const items: OwnMenuItem[] = [
+      { label: "Keep Berry Still", type: "checkbox", checked: keepBerryStill, click: () => this.updateSettings({ keepBerryStill: !keepBerryStill }) },
+      { label: "Hide Berry", type: "checkbox", checked: !showBerry, click: () => this.updateSettings({ showBerry: !showBerry }) },
+    ];
+    this.openMenu(items, anchor, "chrome", "Berry");
+  }
+
+  // A warning with only OK, over the window once its chrome has drawn, as at startup.
+  async notice(question: string, detail: string): Promise<void> {
+    await Promise.all([this.chrome.view.webContents, this.menus.chromeView.view.webContents].map(loaded));
+    if (!this._baseWindow.isDestroyed()) await this.menus.notice(question, detail);
   }
 
   // A web tab goes back in its history. Settings and the mascots' page go back from a page one step in.
@@ -1753,6 +1792,7 @@ export class Window {
     // Whatever it hung from may have moved.
     this.tooltip.hide();
     this.previews.hide();
+    this.menus.fit();
     this.broadcast("layout:updated", layout);
     this.permissionPrompt.sync();
   }
@@ -1776,6 +1816,7 @@ export class Window {
     this.tooltip.notifyTheme(this.theme);
     this.previews.notifyTheme(this.theme);
     this.desktopBerry.notifyTheme();
+    this.menus.notifyTheme(this.theme);
     sendToRenderer(this.permissionPrompt.chrome.view.webContents, "theme:updated", this.theme);
   }
 
@@ -1784,6 +1825,9 @@ export class Window {
     sendToRenderer(this.overlay.view.webContents, channel, payload);
   }
 }
+
+const loaded = (contents: WebContents): Promise<void> =>
+  contents.isDestroyed() || !contents.isLoading() ? Promise.resolve() : new Promise((resolve) => contents.once("did-finish-load", () => resolve()));
 
 // What a renderer asked to open, checked: a known kind, a mascot named by a string, and a rect of finite numbers.
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);

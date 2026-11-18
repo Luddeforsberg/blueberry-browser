@@ -28,6 +28,8 @@
     --dot: rgb(20 20 22 / 0.16);
     --hover: rgb(20 20 22 / 0.05);
     --press: rgb(20 20 22 / 0.09);
+    /* Behind Asking first, over the whole window (DESIGN.md section 8). */
+    --dim: rgb(20 20 22 / 0.28);
 
     --shadow-rim: 0 0 0 1px rgb(20 20 22 / 0.07), 0 1px 2px rgb(20 20 22 / 0.06);
     /* A raised button, the chosen side of a switch, a hovered row on the well. */
@@ -38,6 +40,8 @@
     --shadow-filled: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(20 20 22 / 0.25);
     --shadow-card-lift: 0 0 0 1px rgb(20 20 22 / 0.07), 0 1px 2px rgb(20 20 22 / 0.06), 0 10px 24px -12px rgb(20 20 22 / 0.2);
     --shadow-lift: 0 0 0 1px rgb(20 20 22 / 0.06), 0 1px 2px rgb(20 20 22 / 0.05), 0 14px 34px -10px rgb(20 20 22 / 0.16);
+    /* A deeper lift, for the Asking first card over the dim. */
+    --shadow-ask: 0 0 0 1px rgb(20 20 22 / 0.06), 0 24px 60px -16px rgb(20 20 22 / 0.35);
     --shadow-tip: 0 4px 14px -4px rgb(0 0 0 / 0.35);
 
     /* A site with no icon shows its letter on one of these, picked by its name (DESIGN.md section 8). */
@@ -106,6 +110,7 @@
     --dot: rgb(255 255 255 / 0.13);
     --hover: rgb(255 255 255 / 0.06);
     --press: rgb(255 255 255 / 0.1);
+    --dim: rgb(0 0 0 / 0.5);
 
     --shadow-rim: 0 0 0 1px rgb(255 255 255 / 0.08);
     --shadow-chip: 0 0 0 1px rgb(255 255 255 / 0.1), 0 1px 2px rgb(0 0 0 / 0.4);
@@ -114,6 +119,7 @@
     --shadow-filled: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-card-lift: 0 0 0 1px rgb(255 255 255 / 0.09), 0 10px 24px -12px rgb(0 0 0 / 0.55);
     --shadow-lift: 0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 34px -10px rgb(0 0 0 / 0.6);
+    --shadow-ask: 0 0 0 1px rgb(255 255 255 / 0.07), 0 24px 60px -16px rgb(0 0 0 / 0.8);
     /* A ring, so it shows on the ground. */
     --shadow-tip: 0 0 0 1px rgb(255 255 255 / 0.12), 0 6px 16px -4px rgb(0 0 0 / 0.6);
 
