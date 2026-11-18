@@ -13,7 +13,7 @@ interface Sources {
   // Chats waiting for an answer, which are above the list already.
   asking: ReadonlySet<string>;
   suggestions: readonly Suggestion[];
-  flock: readonly MascotProfile[];
+  mascots: readonly MascotProfile[];
   // A starter's example prompt, by its Gallery id. Only real runs are there.
   examples: Readonly<Record<string, string>>;
   // Who was chosen when the page opened. Try rows from others come first, and choosing one later doesn't reorder them.
@@ -21,13 +21,13 @@ interface Sources {
 }
 
 // The newest finished chat to pick up, then the suggestions as they come, then mascots to try with a real example.
-export const suggestionRows = ({ chats, asking, suggestions, flock, examples, chosenAtOpen }: Sources): SuggestionRow[] => {
+export const suggestionRows = ({ chats, asking, suggestions, mascots, examples, chosenAtOpen }: Sources): SuggestionRow[] => {
   const finished = chats
     .filter((chat) => !chat.running && !asking.has(chat.id) && !chat.from)
     .reduce<ChatThreadSummary | null>((newest, chat) => (!newest || chat.updatedAt > newest.updatedAt ? chat : newest), null);
   const pickUp: SuggestionRow[] = finished ? [{ kind: "pick-up", key: `chat-${finished.id}`, chat: finished }] : [];
   const ideas: SuggestionRow[] = suggestions.map((suggestion) => ({ kind: "suggestion", key: `suggestion-${suggestion.id}`, suggestion }));
-  const withExamples = flock.flatMap((mascot): SuggestionRow[] => {
+  const withExamples = mascots.flatMap((mascot): SuggestionRow[] => {
     const prompt = mascot.deletedAt === null && mascot.galleryId ? examples[mascot.galleryId] : undefined;
     return prompt ? [{ kind: "try", key: `try-${mascot.id}`, mascot, prompt }] : [];
   });

@@ -12,7 +12,7 @@ import { SegmentSwitch } from "../components/SegmentSwitch";
 import { PageFrame, PageHeader } from "../components/PageFrame";
 import { WindowPicture } from "../components/WindowPicture";
 import { AppIcon } from "../components/AppIcon";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { BringInHistory } from "../components/HistoryImport";
 import { AiKeyForm } from "../components/AiKeyForm";
 import { aiServiceName, useAiKey, useKeyTry } from "../components/useAiKey";
@@ -88,9 +88,9 @@ const GROUND_NAMES: Record<AppIconGround, string> = { paper: "Paper", night: "Ni
 // Who's on the app's icon and what's behind it. It's outside the window, so it stays when the mascots are hidden.
 const AppIconRow: React.FC = () => {
   const { settings, updateSettings, theme } = useShell();
-  const { flock } = useFlock();
-  const mascotId = iconMascotId(settings.appIconMascotId, flock) ?? BERRY_ID;
-  const look = flock.find((mascot) => mascot.id === mascotId)?.look;
+  const { mascots } = useMascots();
+  const mascotId = iconMascotId(settings.appIconMascotId, mascots) ?? BERRY_ID;
+  const look = mascots.find((mascot) => mascot.id === mascotId)?.look;
   const ground = settings.appIconGround;
   const mac = theme.platform === "mac";
   const label = "mt-3.5 mb-2 text-12 font-medium text-ink-2";
@@ -108,7 +108,7 @@ const AppIconRow: React.FC = () => {
             onChange={(id) => updateSettings({ appIconMascotId: id === BERRY_ID ? null : id })}
             className="flex-wrap gap-x-1.5 gap-y-3"
             pictureClassName="size-14 rounded-[25%]"
-            options={flock.map((mascot) => ({
+            options={mascots.map((mascot) => ({
               value: mascot.id,
               label: mascot.name,
               picture: <AppIcon look={mascot.look} ground={ground} size={56} />,
@@ -214,13 +214,13 @@ const Mascots: React.FC = () => {
           />
         </SettingsRow>
         <SettingsRow
-          id="setting-bird-on-pages"
+          id="setting-mascot-on-pages"
           title="On the page they work in"
           description="While a mascot works in the page you’re looking at, it’s drawn there doing it."
           more="Turn this off if a site reacts badly. Mascots work the same either way."
         >
           <Switch
-            labelledBy="setting-bird-on-pages"
+            labelledBy="setting-mascot-on-pages"
             checked={settings.birdOnPages}
             onChange={(birdOnPages) => updateSettings({ birdOnPages })}
           />

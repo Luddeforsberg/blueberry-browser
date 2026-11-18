@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Pips } from "@common/components/Pips";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { Berry } from "./Berry";
 import { Favicon } from "./Favicon";
 
@@ -50,7 +50,7 @@ export const TabIcon: React.FC<{
     loadError?: TabInfo["loadError"];
   };
 }> = ({ tab, still, large }) => {
-  const { find } = useFlock();
+  const { find } = useMascots();
   if (tab.trouble)
     return (
       <CircleAlert

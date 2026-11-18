@@ -1,6 +1,6 @@
 import type { ChatThread, MascotAccessory, MascotDraft, MascotPalette, MascotProfile, MascotTool } from "@shared/library";
 import { ACCESSORIES, BERRY, MASCOT_TOOLS, PALETTES } from "@shared/mascots";
-import { flockParam, type FlockPlace, type MascotPart } from "@shared/flockPlaces";
+import { mascotsParam, type MascotsPlace, type MascotPart } from "@shared/mascotsPlaces";
 
 export interface MascotFormValues {
   // Null for a new mascot.
@@ -71,7 +71,7 @@ export const blankMascot = (): MascotFormValues => ({
   worksInCloud: false,
 });
 
-// A new look and name, never one someone else in the flock already has.
+// A new look and name, never one another mascot already has.
 export const surprise = (values: MascotFormValues, taken: string[]): MascotFormValues => ({
   ...values,
   ...randomLook(),
@@ -121,23 +121,23 @@ export const withPart = (current: MascotFormValues, changed: MascotFormValues, p
   ...Object.fromEntries(PART_FIELDS[part].map((field) => [field, changed[field]])),
 });
 
-// Who the dock shows when the flock doesn't fit in `room` faces: as many as fit beside a count of the rest. One that's
+// Who the dock shows when the mascots don't fit in `room` faces: as many as fit beside a count of the rest. One that's
 // asking or working is never among the hidden, so it takes the place of the last one at rest, after the first.
-export const dockFaces = <T>(flock: T[], room: number, busy: (mascot: T) => boolean): { shown: T[]; more: number } => {
-  if (flock.length <= room) return { shown: flock, more: 0 };
-  const shown = flock.slice(0, Math.max(1, room - 1));
-  for (const mascot of flock.slice(shown.length)) {
+export const dockFaces = <T>(mascots: T[], room: number, busy: (mascot: T) => boolean): { shown: T[]; more: number } => {
+  if (mascots.length <= room) return { shown: mascots, more: 0 };
+  const shown = mascots.slice(0, Math.max(1, room - 1));
+  for (const mascot of mascots.slice(shown.length)) {
     if (!busy(mascot)) continue;
     let at = shown.length - 1;
     while (at > 0 && busy(shown[at])) at--;
     if (at > 0) shown[at] = mascot;
   }
-  return { shown, more: flock.length - shown.length };
+  return { shown, more: mascots.length - shown.length };
 };
 
 // The mascots' page at a place. It moves around itself this way too, so where it is lives in its tab's param, which is
 // how Back and a restored session find it.
-export const openMascots = (place: FlockPlace) => void window.chromeAPI.browser.openPage("flock", { param: flockParam(place) });
+export const openMascots = (place: MascotsPlace) => void window.chromeAPI.browser.openPage("flock", { param: mascotsParam(place) });
 
 // What's being typed on the mascots' page, by tab, for the one place it was typed in. It lasts while the tab is away, so
 // going to another tab and back loses nothing, and goes once the page has moved anywhere else, so leaving keeps nothing.

@@ -3,7 +3,7 @@ import type { RoutineRun, RoutineRunStatus } from "@shared/library";
 import { Pips } from "@common/components/Pips";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { ChatApprovalCard, Markdown, StatusLine, StepTrail } from "./ChatMessage";
 import { MemoryOffers, RememberedLine } from "./MemoryInChat";
 import { formatTime } from "./formatTime";
@@ -63,7 +63,7 @@ export const RoutineRunRow: React.FC<{
   onRunAgain?: () => void;
 }> = ({ run, open: openAtFirst = false, onStop, onRunAgain }) => {
   const { routines } = useLibrary();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const id = useId();
   const mascot = find(routines.find((routine) => routine.id === run.routineId)?.mascotId ?? null);
   const going = run.status === "running" || run.status === "needs-approval";

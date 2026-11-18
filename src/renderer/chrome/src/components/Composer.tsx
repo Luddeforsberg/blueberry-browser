@@ -5,12 +5,12 @@ import type { MascotProfile } from "@shared/library";
 import type { Mood } from "@common/components/moods";
 import { cn } from "@common/lib/utils";
 import { SHELL } from "@common/components/cardShell";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Berry } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
 import { limitsInBrief } from "../shortWords";
-import { startMascot } from "../flockView";
+import { startMascot } from "../mascotsView";
 import { MenuRule, MenuSheet } from "./MenuSheet";
 import { menuRowClass } from "./menuRows";
 import { AddMenu, type AddMenuOptions } from "./AddMenu";
@@ -43,10 +43,10 @@ const MascotMenu: React.FC<{
   onChoose: (id: string) => void;
   onClose: (refocus: boolean) => void;
 }> = ({ chosenId, above, leaving, onChoose, onClose }) => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   return (
     <MenuSheet label="Choose who to ask" above={above} align="right" className="w-[316px]" leaving={leaving} onClose={onClose}>
-      {flock.map((mascot) => (
+      {mascots.map((mascot) => (
         <MenuRow key={mascot.id} mascot={mascot} checked={mascot.id === chosenId} onChoose={() => onChoose(mascot.id)} />
       ))}
       <MenuRule />

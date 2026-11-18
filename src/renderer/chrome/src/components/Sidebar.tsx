@@ -7,7 +7,7 @@ import type { MenuAnchor } from "@shared/ipc";
 import { atPointer, underBox } from "./menuAnchors";
 import { holdWhile } from "../menuHold";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Tabs } from "./Tabs";
 import { useSiteDrag } from "./useSiteDrag";
@@ -20,7 +20,7 @@ import { Berry } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
 import { limitsInBrief, rowTime } from "../shortWords";
 import { openRoutines } from "../routinesView";
-import { dockFaces, openMascots } from "../flockView";
+import { dockFaces, openMascots } from "../mascotsView";
 import { AccountButton, AccountMenu } from "./AccountMenu";
 import { SegmentSwitch } from "./SegmentSwitch";
 import { usePresence } from "@common/components/motion";
@@ -284,7 +284,7 @@ export const ChatRow: React.FC<{
   // Enter and Escape end editing before the input's blur arrives, and that blur mustn't save again.
   const finished = useRef(false);
   const api = window.chromeAPI.chat;
-  const { find } = useFlock();
+  const { find } = useMascots();
   const mascot = find(chat.mascotId);
   const name = useAssistantName(mascot);
 
@@ -376,7 +376,7 @@ export const ChatRow: React.FC<{
 // so what needs you sits on `sheet-2` rather than a sheet of its own. A group with nothing in it isn't shown.
 export const ChatsFace: React.FC<{ onSheet?: boolean }> = ({ onSheet = false }) => {
   const library = useLibrary();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const { activeTab, createTab } = useBrowser();
   const [allEarlier, setAllEarlier] = useState(false);
   const browser = window.chromeAPI.browser;
@@ -570,7 +570,7 @@ export const MascotCard: React.FC<{ mascot: MascotProfile; onClose: () => void; 
   const { mood, asking, running, recent } = stateOf(mascot);
   useTick(running.length > 0);
   const name = useAssistantName(mascot);
-  const { choose } = useFlock();
+  const { choose } = useMascots();
   const { createTab } = useBrowser();
   const card = useRef<HTMLDivElement>(null);
 
@@ -667,7 +667,7 @@ const DOCK_GAP = 7;
 // Every mascot with its mood for a face. It's how you see who is doing what at a glance. Those that don't fit become a
 // count that opens the mascots' page, so no face is ever cut in half.
 const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = ({ open, onPress }) => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const stateOf = useMascotState();
   const list = useRef<HTMLUListElement>(null);
   const [room, setRoom] = useState(Infinity);
@@ -683,7 +683,7 @@ const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = (
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const faces = dockFaces(flock, room, (mascot) => stateOf(mascot).mood !== "rest");
+  const faces = dockFaces(mascots, room, (mascot) => stateOf(mascot).mood !== "rest");
 
   return (
     <div className="flex-1 min-w-0 h-[46px] px-2 flex items-center rounded-tile bg-tray">
@@ -720,11 +720,11 @@ const Dock: React.FC<{ open: string | null; onPress: (id: string) => void }> = (
 type FootOpen = { kind: "mascot"; id: string } | { kind: "account" } | null;
 
 const SidebarFoot: React.FC = () => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   const [open, setOpen] = useState<FootOpen>(null);
   const foot = useRef<HTMLDivElement>(null);
   const mascotId = open?.kind === "mascot" ? open.id : null;
-  const shown = flock.find((mascot) => mascot.id === mascotId);
+  const shown = mascots.find((mascot) => mascot.id === mascotId);
   const accountMenu = usePresence(open?.kind === "account");
 
   useEffect(() => {

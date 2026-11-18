@@ -4,7 +4,7 @@ import { MAX_FACT_LENGTH } from "@shared/memory";
 import { Button } from "@common/components/Button";
 import { CardInShell } from "@common/components/ApprovalCard";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { BerrySpot } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
@@ -189,7 +189,7 @@ export const MascotMemoryView: React.FC<{ mascot: MascotProfile; facts: MemoryFa
 };
 
 export const MascotMemory: React.FC<{ mascotId: string; onBack: () => void }> = ({ mascotId, onBack }) => {
-  const { find } = useFlock();
+  const { find } = useMascots();
   const { facts, offers } = useLibrary().memory;
   return (
     <MascotMemoryView

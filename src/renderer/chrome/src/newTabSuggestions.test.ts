@@ -20,14 +20,14 @@ const mascot = (id: string, galleryId?: string, deletedAt: number | null = null)
   ...(galleryId ? { galleryId } : {}),
 });
 const examples = { "meeting-prep": "Prep me for a call.", "competitor-watch": "What changed on Linear?" };
-const none = { chats: [], asking: new Set<string>(), suggestions: [], flock: [BERRY], examples, chosenAtOpen: BERRY.id };
+const none = { chats: [], asking: new Set<string>(), suggestions: [], mascots: [BERRY], examples, chosenAtOpen: BERRY.id };
 const keys = (rows: ReturnType<typeof suggestionRows>) => rows.map(({ key }) => key);
 
 describe("suggestionRows", () => {
   it("is empty with nothing real to show", () => {
     expect(suggestionRows(none)).toEqual([]);
     // A mascot from the Gallery with no example on file has nothing to try.
-    expect(suggestionRows({ ...none, flock: [BERRY, mascot("w", "plain-words")] })).toEqual([]);
+    expect(suggestionRows({ ...none, mascots: [BERRY, mascot("w", "plain-words")] })).toEqual([]);
   });
 
   it("picks up only the newest finished chat the user started here, and nothing running or waiting", () => {
@@ -46,15 +46,15 @@ describe("suggestionRows", () => {
       ...none,
       chats: [chat("done", 1)],
       suggestions: [idea("b"), idea("a")],
-      flock: [BERRY, mascot("prep", "meeting-prep"), mascot("watch", "competitor-watch")],
+      mascots: [BERRY, mascot("prep", "meeting-prep"), mascot("watch", "competitor-watch")],
     });
     expect(keys(rows)).toEqual(["chat-done", "suggestion-b", "suggestion-a", "try-prep"]);
   });
 
   it("tries the mascots not chosen when the page opened first, and leaves out deleted ones", () => {
-    const flock = [BERRY, mascot("prep", "meeting-prep"), mascot("watch", "competitor-watch"), mascot("gone", "competitor-watch", 5)];
-    expect(keys(suggestionRows({ ...none, flock, chosenAtOpen: "prep" }))).toEqual(["try-watch", "try-prep"]);
-    const [first] = suggestionRows({ ...none, flock });
+    const mascots = [BERRY, mascot("prep", "meeting-prep"), mascot("watch", "competitor-watch"), mascot("gone", "competitor-watch", 5)];
+    expect(keys(suggestionRows({ ...none, mascots, chosenAtOpen: "prep" }))).toEqual(["try-watch", "try-prep"]);
+    const [first] = suggestionRows({ ...none, mascots });
     expect(first).toMatchObject({ kind: "try", prompt: "Prep me for a call." });
   });
 

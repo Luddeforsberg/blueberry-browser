@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import type { LayoutMode, TabInfo } from "@shared/ipc";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { LEADING_SLOT, TabIcon } from "./TabIcon";
 import { nudgeTarget, useTabDrag } from "./useTabDrag";
 import { Berry } from "./Berry";
@@ -51,7 +51,7 @@ const TabItem: React.FC<{
   // width in the row. A folding one is only a picture of the tab that was.
   phase: DrawnRow<TabInfo>["phase"];
 }> = ({ tab, mode, onActivate, onClose, onPress, onNudge, dragged, shifting, style, phase }) => {
-  const { find } = useFlock();
+  const { find } = useMascots();
   const row = mode === "horizontal";
   const item = useRef<HTMLLIElement>(null);
   const folding = phase === "folding";
@@ -163,7 +163,7 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
   onClose,
 }) => {
   const { chats, needsYou } = useLibrary();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const { switchTab } = useBrowser();
   const chat = chats.find(({ id }) => id === chatId);
   const mascot = find(chat?.mascotId ?? null);
@@ -235,7 +235,7 @@ const JobGroup: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: T
 // and the waiting pips in `ask` at its end while it needs you. Pressing the face or the name opens the chat.
 const JobGroupRow: React.FC<{ chatId: string; chatTab: TabInfo | undefined; tabs: TabInfo[] }> = ({ chatId, chatTab, tabs }) => {
   const { chats, needsYou } = useLibrary();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const { switchTab } = useBrowser();
   const chat = chats.find(({ id }) => id === chatId);
   const mascot = find(chat?.mascotId ?? null);

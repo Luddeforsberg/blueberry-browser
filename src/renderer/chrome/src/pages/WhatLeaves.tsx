@@ -2,7 +2,7 @@ import React from "react";
 import { StatusPill } from "@common/components/StatusPill";
 import { useShell } from "../contexts/useShell";
 import { SettingsGroup, SettingsLink, SettingsRow } from "../components/SettingsRow";
-import { openMascots } from "../flockView";
+import { openMascots } from "../mascotsView";
 
 // Settings > Privacy > What leaves this computer: everything Settings says about what goes where, in one place. It only
 // says. The switches are in Mascots. The longer words have to match `buildDigest` in suggestionDigest.ts and

@@ -29,7 +29,7 @@ import { TabIcon } from "../components/TabIcon";
 import { HistoryRow } from "./HistoryPage";
 import { ChatRow } from "../components/Sidebar";
 import { MascotPerch } from "../components/MascotPerch";
-import { MascotRow } from "./FlockPage";
+import { MascotRow } from "./MascotsPage";
 import { AskSheet, MenuEntryRow } from "../MenuApp";
 import { leadsWithGlyph } from "../components/menuRows";
 import { MenuRule, MenuSheet } from "../components/MenuSheet";

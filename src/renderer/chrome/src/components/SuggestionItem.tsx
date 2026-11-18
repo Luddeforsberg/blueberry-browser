@@ -5,7 +5,7 @@ import type { Mood } from "@common/components/moods";
 import { BERRY } from "@shared/mascots";
 import { buttonVariants } from "@common/components/buttonVariants";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { Berry } from "./Berry";
 import { finishedWhen, firstSentence } from "../shortWords";
 import type { SuggestionRow } from "../newTabSuggestions";
@@ -60,7 +60,7 @@ export const SuggestionItem: React.FC<{ row: SuggestionRow; used?: boolean; onPr
   onPress,
   onDismiss,
 }) => {
-  const { find } = useFlock();
+  const { find } = useMascots();
   const { mascot, mood, title, reason, action } = looksOf(row, find);
   return (
     <li

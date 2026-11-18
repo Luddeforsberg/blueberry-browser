@@ -5,7 +5,7 @@ import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
 import { useLibrary } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
-import { openMascots } from "../flockView";
+import { openMascots } from "../mascotsView";
 import { Berry } from "./Berry";
 import { useAssistantName } from "./useAssistantName";
 
@@ -25,7 +25,7 @@ const ChangeIt: React.FC<{ mascotId: string; children: React.ReactNode }> = ({ m
 
 // What this reply went in knowing. It says what the model was given, so it's "keeping in mind" and never a claim that it
 // made a difference. Words about a difference are the reply's own. Up to two show, and more fold into one quiet line.
-// Change goes to the bird that holds the facts, which an old routine run's current bird may not be.
+// Change goes to the mascot that holds the facts, which an old routine run's current mascot may not be.
 export const RememberedFacts: React.FC<{ used: MemoryFact[] }> = ({ used }) => {
   const [open, setOpen] = useState(false);
   const line = (fact: MemoryFact) => (
@@ -156,13 +156,13 @@ export const MemoryOffersLine: React.FC<{
   );
 };
 
-// What a finished job's bird could keep, under its reply or run. Nothing is kept until Remember is pressed, and it only ever
+// What a finished job's mascot could keep, under its reply or run. Nothing is kept until Remember is pressed, and it only ever
 // sits here, so a job nobody was watching says nothing about it until they look, and then only this.
 export const MemoryOffers: React.FC<{ sourceId: string | null; mascot: MascotProfile }> = ({ sourceId, mascot }) => {
   const {
     memory: { offers },
   } = useLibrary();
-  // Whose it went to, which an old routine run's current bird may not be.
+  // Whose it went to, which an old routine run's current mascot may not be.
   const [keptBy, setKeptBy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const waiting = offers.filter((offer) => offer.sourceId === sourceId);

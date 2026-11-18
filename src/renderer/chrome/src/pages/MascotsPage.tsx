@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import type { TabInfo } from "@shared/ipc";
 import type { MascotProfile } from "@shared/library";
-import { flockParam, flockPlace, type MascotPart } from "@shared/flockPlaces";
+import { mascotsParam, mascotsPlace, type MascotPart } from "@shared/mascotsPlaces";
 import { ACCESSORIES, BERRY_ID, PALETTES } from "@shared/mascots";
 import { Pips } from "@common/components/Pips";
 import { StatusPill } from "@common/components/StatusPill";
@@ -10,7 +10,7 @@ import { Button } from "@common/components/Button";
 import { Switch } from "@common/components/Controls";
 import { cn } from "@common/lib/utils";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { Berry } from "../components/Berry";
 import { useAssistantName } from "../components/useAssistantName";
 import { ChatError } from "../components/ChatMessage";
@@ -35,11 +35,11 @@ import {
   tabDraft,
   toMascotDraft,
   type PublishValues,
-} from "../flockView";
+} from "../mascotsView";
 import { blankForm, startRoutine } from "../routinesView";
 
 // DESIGN.md section 10, Your mascots: a page in a tab, built like Settings, with the list, each mascot's own page, making
-// one in steps, changing one part, and what each remembers. Where it is lives in the tab's param (flockPlaces.ts).
+// one in steps, changing one part, and what each remembers. Where it is lives in the tab's param (mascotsPlaces.ts).
 
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const BERRY_LINE = "Does whatever you ask, wherever you let it.";
@@ -81,7 +81,7 @@ const chatWith = (choose: (id: string) => void, mascot: MascotProfile) => {
 // Chat and a faint arrow show on the row you're on, by pointer or keyboard, in place of its limits, which are plain
 // words. Waiting for you, a Needs you pill takes their place: the only pill on the page.
 export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
-  const { choose } = useFlock();
+  const { choose } = useMascots();
   const stateOf = useMascotState();
   const siteOf = useWorkingSite();
   const name = useAssistantName(mascot);
@@ -139,7 +139,7 @@ export const MascotRow: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
 };
 
 const List: React.FC = () => {
-  const { flock } = useFlock();
+  const { mascots } = useMascots();
   return (
     <>
       <PageHeader
@@ -159,7 +159,7 @@ const List: React.FC = () => {
         Each has its own job and its own limits. They all ask before anything risky.
       </PageHeader>
       <ul aria-label="Your mascots" className="mt-4">
-        {flock.map((mascot) => (
+        {mascots.map((mascot) => (
           <MascotRow key={mascot.id} mascot={mascot} />
         ))}
       </ul>
@@ -175,7 +175,7 @@ const lookInWords = ({ look }: MascotProfile) => {
 
 // A mascot's own page: who it is, a row for each part you can change, its things, and Delete.
 const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
-  const { choose } = useFlock();
+  const { choose } = useMascots();
   const stateOf = useMascotState();
   const name = useAssistantName(mascot);
   const { routines, remembers } = useOwn(mascot);
@@ -291,7 +291,7 @@ const MascotPage: React.FC<{ mascot: MascotProfile }> = ({ mascot }) => {
 
 // Publishing keeps what's typed while the tab is away, as the steps do.
 const Publish: React.FC<{ tabId: string; mascotId: string }> = ({ tabId, mascotId }) => {
-  const param = flockParam({ page: "publish", id: mascotId });
+  const param = mascotsParam({ page: "publish", id: mascotId });
   const [values, setValues] = useState<PublishValues>(() => tabDraft(tabId, param, blankPublish));
   return (
     <PublishMascot
@@ -314,17 +314,17 @@ const Gone: React.FC = () => (
   </>
 );
 
-export const FlockPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
-  const place = flockPlace(tab.pageParam);
-  const param = flockParam(place);
-  const { flock } = useFlock();
+export const MascotsPage: React.FC<{ tab: TabInfo }> = ({ tab }) => {
+  const place = mascotsPlace(tab.pageParam);
+  const param = mascotsParam(place);
+  const { mascots } = useMascots();
 
   // Leaving part way keeps nothing: what was typed belongs to the place it was typed in.
   useEffect(() => forgetTabDraftElsewhere(tab.id, param), [tab.id, param]);
 
-  const mascot = place.page === "list" || place.page === "new" ? null : (flock.find((each) => each.id === place.id) ?? null);
+  const mascot = place.page === "list" || place.page === "new" ? null : (mascots.find((each) => each.id === place.id) ?? null);
   // Berry is always there once the library has come, so with nobody there it hasn't yet.
-  if (flock.length === 0) return null;
+  if (mascots.length === 0) return null;
   const missing = place.page !== "list" && place.page !== "new" && !mascot;
 
   if (place.page === "publish" && mascot) {

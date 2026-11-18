@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const load = async () => {
   vi.resetModules();
   vi.stubGlobal("window", new EventTarget());
-  return import("./flockView");
+  return import("./mascotsView");
 };
 
 describe("what's typed on the mascots' page", () => {
@@ -50,7 +50,7 @@ describe("changing one part of a mascot", () => {
 
 describe("who the dock shows", () => {
   const busy = (name: string) => name.endsWith("!");
-  const faces = async (flock: string[], room: number) => (await load()).dockFaces(flock, room, busy);
+  const faces = async (mascots: string[], room: number) => (await load()).dockFaces(mascots, room, busy);
 
   it("shows everyone while they fit, and at exactly the room there is", async () => {
     expect(await faces([], 5)).toEqual({ shown: [], more: 0 });

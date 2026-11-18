@@ -3,7 +3,7 @@ import type { InternalPage, TabInfo } from "@shared/ipc";
 import type { ChatThread, NeedsYouItem } from "@shared/library";
 import { Lock, Star } from "lucide-react";
 import { useBrowser } from "../contexts/useBrowser";
-import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useMascots, useLibrary } from "../contexts/useLibrary";
 import { Mascot } from "@common/components/Mascot";
 import { cn } from "@common/lib/utils";
 import { SHORTCUTS } from "@shared/shortcuts";
@@ -85,7 +85,7 @@ const useWorkWords = (chatId: string | null): string | null => {
 // The job working in the tab in front, if any: who, which chat, and whether it's waiting on an answer here.
 const useJobHere = (tab: TabInfo | null) => {
   const { chats, needsYou } = useLibrary();
-  const { find } = useFlock();
+  const { find } = useMascots();
   const working = !!tab?.berryWorking;
   // A job's own tab names its chat. On one of the user's tabs, it's the one running chat of that mascot, if there's one.
   const running = chats.filter((chat) => chat.running && (chat.mascotId ?? BERRY_ID) === (tab?.workingMascotId ?? BERRY_ID));

@@ -172,14 +172,14 @@ const GrownBox: React.FC<{ state: DesktopPanelState; mac: boolean; draft: string
   const final = dropAt(edge, anchor, { width: DESKTOP_BOX.long, height: thick }, room);
   const name = box.chosen.name;
   const words = draft.trim();
-  const others = box.flock.length > 1;
+  const others = box.mascots.length > 1;
 
   const send = async () => {
     if (words && (await desktop().send(words, inCloud))) setDraft("");
   };
   const next = (by: number) => {
-    const at = box.flock.findIndex(({ id }) => id === box.chosen.id);
-    const mascot = box.flock[(at + by + box.flock.length) % box.flock.length];
+    const at = box.mascots.findIndex(({ id }) => id === box.chosen.id);
+    const mascot = box.mascots[(at + by + box.mascots.length) % box.mascots.length];
     if (mascot && mascot.id !== box.chosen.id) void desktop().choose(mascot.id);
   };
 
@@ -199,7 +199,7 @@ const GrownBox: React.FC<{ state: DesktopPanelState; mac: boolean; draft: string
     grown && !closing ? "opacity-100" : "opacity-0 pointer-events-none",
   );
   const chips = picking
-    ? box.flock.map((mascot) => (
+    ? box.mascots.map((mascot) => (
         <button
           key={mascot.id}
           type="button"
@@ -346,7 +346,7 @@ const ROW = cn(
 const TraySheet: React.FC<{ tray: DesktopTray; state: DesktopPanelState; mac: boolean }> = ({ tray, state, mac }) => {
   const now = useNow(1000);
   const { showBerry, still, box } = state;
-  const chosen = tray.flock.find((face) => face.chosen);
+  const chosen = tray.mascots.find((face) => face.chosen);
   return (
     <section
       data-desktop-tray
@@ -356,7 +356,7 @@ const TraySheet: React.FC<{ tray: DesktopTray; state: DesktopPanelState; mac: bo
       <div data-sheet-content className="p-2">
         <div className="flex items-center justify-between pl-1.5 pr-2 pt-1.5 pb-0.5">
           <div className="flex gap-1">
-            {tray.flock.map((face, index) => (
+            {tray.mascots.map((face, index) => (
               <span key={index} className={cn("p-[3px] rounded-full", face.chosen && "shadow-[inset_0_0_0_1.5px_rgb(var(--ink))]")}>
                 <Face face={face} size={22} showBerry={showBerry} still />
               </span>

@@ -1,7 +1,7 @@
 import React from "react";
 import { SquarePen, X } from "lucide-react";
 import { useChat } from "../contexts/useChat";
-import { useFlock } from "../contexts/useLibrary";
+import { useMascots } from "../contexts/useLibrary";
 import { useShell } from "../contexts/useShell";
 import { Chat } from "./Chat";
 import { Berry } from "./Berry";
@@ -17,7 +17,7 @@ const ICON_BUTTON =
 export const ChatPanel: React.FC = () => {
   const { clearChat, messages, chatId, title, mascotId, approval } = useChat();
   const { toggleChat } = useShell();
-  const { find, chosen } = useFlock();
+  const { find, chosen } = useMascots();
   const mascot = chatId ? find(mascotId) : chosen;
   const name = useAssistantName(mascot);
 

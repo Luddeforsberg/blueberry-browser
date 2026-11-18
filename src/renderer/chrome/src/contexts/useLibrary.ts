@@ -21,15 +21,15 @@ export const ChosenContext = createContext<{ chosenId: string; choose: (id: stri
   choose: () => undefined,
 });
 
-// The flock, and who the next new chat runs as. Chosen on any composer, and shown on all of them.
-export const useFlock = () => {
+// The mascots, and who the next new chat runs as. Chosen on any composer, and shown on all of them.
+export const useMascots = () => {
   const { mascots } = useLibrary();
   const { chosenId, choose } = useContext(ChosenContext);
   return useMemo(() => {
-    const flock = mascots.filter((mascot) => mascot.deletedAt === null);
+    const current = mascots.filter((mascot) => mascot.deletedAt === null);
     // Only for showing who something runs as. What it may do is decided in main.
     const find = (id: string | null): MascotProfile =>
       mascots.find((mascot) => mascot.id === (id ?? BERRY_ID)) ?? { ...BERRY, id: id ?? BERRY_ID, name: "A lost mascot" };
-    return { flock, find, choose, chosen: flock.find((mascot) => mascot.id === chosenId) ?? BERRY };
+    return { mascots: current, find, choose, chosen: current.find((mascot) => mascot.id === chosenId) ?? BERRY };
   }, [mascots, chosenId, choose]);
 };

@@ -34,7 +34,7 @@ const MOVES: Partial<Record<Reaction, { frames: string[]; offsets?: number[]; ms
   nudge: { frames: ["none", "scale(1.04, 0.94)", "none"], ms: MS.nudge },
 };
 
-// What a click gets next. Only a bird with nothing to say swaps pose, so a mood that means something stays on screen.
+// What a click gets next. Only a mascot with nothing to say swaps pose, so a mood that means something stays on screen.
 const CYCLES: Record<string, Reaction[]> = {
   rest: ["hop", "look", "toss", "ruffle"],
   sitting: ["hop", "ruffle"],
