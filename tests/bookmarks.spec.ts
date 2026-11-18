@@ -81,13 +81,13 @@ test("bookmarking a page saves it across restarts and both layouts, and the star
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "horizontal", appearance: "dark", keepBerryStill: true }));
   await chrome.emulateMedia({ reducedMotion: "reduce" });
   await expect(saved).toBeVisible();
-  await chrome.screenshot({ path: "/tmp/blueberry-bookmarks-horizontal.png" });
+  await chrome.screenshot({ path: test.info().outputPath("blueberry-bookmarks-horizontal.png") });
   await chrome.getByRole("button", { name: "Remove bookmark", exact: true }).click();
   await expect(saved).toHaveCount(0);
   await menuAction("Bookmark This Page");
   await expect(saved).toBeVisible();
   await chrome.evaluate(() => window.chromeAPI.settings.updateSettings({ layoutMode: "vertical", appearance: "light" }));
-  await chrome.screenshot({ path: "/tmp/blueberry-bookmarks-vertical.png" });
+  await chrome.screenshot({ path: test.info().outputPath("blueberry-bookmarks-vertical.png") });
   await saved.click({ button: "right" });
   await chooseFromMenu(app, "Remove Bookmark");
   await expect(saved).toHaveCount(0);
@@ -195,7 +195,7 @@ test("bookmarked pages show a filled star in ink, in both layouts and themes", a
       await expect(savedStar.locator("[data-shown] svg")).toHaveCSS("stroke", color);
       await savedStar.hover();
       await expect(savedStar.locator("[data-shown] svg")).toHaveCSS("fill", color);
-      await chrome.screenshot({ path: `/tmp/blueberry-star-${layoutMode}-${appearance}.png` });
+      await chrome.screenshot({ path: test.info().outputPath(`blueberry-star-${layoutMode}-${appearance}.png`) });
       await savedStar.click();
       await expect(emptyStar.locator("[data-shown] svg")).toHaveCSS("fill", "none");
     }

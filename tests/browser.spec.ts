@@ -898,7 +898,7 @@ test("with the bird off, a tab Berry is using glows and shimmers until the reply
   await expect(row.getByText("Berry is working here")).toBeAttached();
   expect((await getTabs()).find((tab) => tab.url.startsWith(origin))?.berryWorking).toBe(true);
   await chrome.waitForTimeout(600);
-  await chrome.screenshot({ path: "/tmp/working-chrome.png" });
+  await chrome.screenshot({ path: test.info().outputPath("working-chrome.png") });
 
   release();
   await expect.poll(glow).toBe("none");
