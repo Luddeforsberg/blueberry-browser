@@ -7,7 +7,7 @@ Agreed with the user on 2026-11-18. The bar is the `foundations` skill. Each fix
 - **Style:** one Prettier style for the whole repo: 2 spaces, double quotes, semicolons, 140 columns. It's applied in one formatting-only commit, listed in `.git-blame-ignore-revs`.
 - **Size:** at most 400 lines per file. Today's larger files start on a list of exceptions in the lint config that only shrinks.
 - **CI:** CI runs exactly `pnpm run verify`, end-to-end tests included, and it's required on `main`.
-- **Old names:** "bird" and "flock" go everywhere. That includes saved settings keys, the look's palette ids and the Supabase names, each through a migration that still reads the old names.
+- **Old names:** "bird" and "flock" go everywhere. That includes the public site address `blueberry-flock.netlify.app`, with a redirect from the old one so shared links keep working. It also includes saved settings keys, the look's palette ids and the Supabase names, each through a migration that still reads the old names.
 
 ## Phases
 0. **Freeze and record a baseline** on `t3/pips-all-next`, after Build 25:
