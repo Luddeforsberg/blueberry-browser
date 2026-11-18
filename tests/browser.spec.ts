@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, chooseFromMenu, findView, launchApp, openMenuRows } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { ARM_MS } from "../src/renderer/common/components/cardKeys";
 
 declare global {
   interface Window {
@@ -499,6 +500,9 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
 
   const question = chrome.getByRole("region", { name: "Berry is asking" });
   await expect(question.getByText("Which colour?")).toBeVisible();
+  // The prompt box ignores Enter for ARM_MS after a question arrives, so a send already on its way can't answer it.
+  // The question is on screen, so the box has been answering since before this.
+  const askedAt = await chrome.evaluate(() => performance.now());
   // The answers to press arrive with it, without the one shaped like a code.
   const asked = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval));
   expect(asked).toMatchObject({ text: "Which colour?", question: true, answers: ["Blue", "Green"] });
@@ -509,6 +513,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   const answer = chrome.getByRole("textbox", { name: "Message" });
   await expect(answer).toHaveAttribute("placeholder", "Answer Berry, or pick one above");
   await answer.fill("Blue");
+  await chrome.waitForFunction(([since, arm]) => performance.now() - since >= arm, [askedAt, ARM_MS]);
   await answer.press("Enter");
 
   await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("The user answered: Blue");
