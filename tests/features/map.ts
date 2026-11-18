@@ -109,9 +109,13 @@ const threeTabs = async (drive: Drive) => {
   await seen(drive.chrome, "Morning News");
 };
 
-// A chat sent from the new tab, as typing in the box does, and opened.
+// A chat sent and opened, as the new tab's box does. The box opens the chat's tab only once the send returns, so a job
+// that opens a tab at once can put it above or below the chat's. The model thinks first, as a real one does, so the
+// chat's tab is always there first.
+const THINK_MS = 1000;
 const startChat = async (drive: Drive, text: string, { title = "NONE", cloud = false }: { title?: string; cloud?: boolean } = {}) => {
   drive.model.titleWith(title);
+  drive.model.thinkFor(THINK_MS);
   const sent = await drive.chrome.evaluate(([text, cloud]) => window.chromeAPI.chat.send(null, text, { seePage: false, cloud }), [text, cloud] as const);
   if (!sent) throw new Error("The chat wasn't sent");
   await openPage(drive, "chat", sent.id);
