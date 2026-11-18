@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Locator, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdtempSync } from "node:fs";

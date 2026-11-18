@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../src/preload/chrome.d.ts" />
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import type { WebContentsView } from "electron";
 import { createServer } from "node:http";
@@ -9,7 +6,6 @@ import { findView, launchApp } from "./app";
 import { startFakeModel } from "./fakeModel";
 
 declare global {
-  // eslint-disable-next-line no-var
   var fakeShortcuts: Map<string, () => void>;
 }
 

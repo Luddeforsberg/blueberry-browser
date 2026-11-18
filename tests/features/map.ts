@@ -1,6 +1,3 @@
-// Preload types live beside a .ts file of the same name, so TypeScript skips them unless asked.
-/* eslint-disable @typescript-eslint/triple-slash-reference */
-/// <reference path="../../src/preload/chrome.d.ts" />
 import type { Page } from "@playwright/test";
 import { mascotSnapshot } from "../../src/main/cloudJobs";
 import type { MascotProfile } from "../../src/shared/library";

@@ -1,5 +1,7 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  // chrome.d.ts sits beside chrome.ts, so the include globs skip it. Tests and evals need it for window.chromeAPI.
+  "files": ["src/preload/chrome.d.ts"],
   "include": [
     "electron.vite.config.*",
     "src/main/**/*",

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
 // Tests mustn't take a key away from whoever is at the computer, so a global shortcut only goes in this list, and
 // `globalThis.fakeShortcuts` is how a test presses one.
 const Module = require("node:module");

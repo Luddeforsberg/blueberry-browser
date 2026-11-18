@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type */
 // Writes what comes from the app: in site/, so the public page has the same drawing, the same words for permissions and
 // the same checks on a row, and src/main/pageActorArt.ts, for the bird on web pages. Run with `pnpm run site:build` after
 // changing any of them.
