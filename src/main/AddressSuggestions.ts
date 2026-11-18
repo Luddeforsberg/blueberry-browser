@@ -4,7 +4,7 @@ import { sendToRenderer } from "./ipc";
 import { suggestionsRect } from "./Layout";
 import type { AddressSuggestion, AddressSuggestionsRequest, Rect, ThemeState } from "../shared/ipc";
 import type { MascotLook } from "../shared/library";
-import { ACCESSORIES, paletteOf } from "../shared/mascots";
+import { ACCESSORIES, PALETTES } from "../shared/mascots";
 
 const MAX_ROWS = 6;
 const MAX_TEXT = 2048;
@@ -74,7 +74,7 @@ const icon = (value: unknown): string | null => (text(value) && /^https?:\/\//i.
 
 const validLook = (value: unknown): MascotLook | null => {
   const { palette, accessory } = (value ?? {}) as Record<string, unknown>;
-  const look = { palette: paletteOf(palette), accessory: ACCESSORIES.find(({ id }) => id === accessory)?.id };
+  const look = { palette: PALETTES.find(({ id }) => id === palette)?.id, accessory: ACCESSORIES.find(({ id }) => id === accessory)?.id };
   return look.palette && look.accessory ? { palette: look.palette, accessory: look.accessory } : null;
 };
 
