@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { answerAsk, chooseFromMenu, findView, launchApp, openMenuRows } from "./app";
 import { startFakeModel, type FakeModel } from "./fakeModel";
+import { ARM_MS } from "../src/renderer/common/components/cardKeys";
 
 declare global {
   interface Window {
@@ -499,6 +500,9 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
 
   const question = chrome.getByRole("region", { name: "Berry is asking" });
   await expect(question.getByText("Which colour?")).toBeVisible();
+  // The prompt box ignores Enter for ARM_MS after a question arrives, so a send already on its way can't answer it.
+  // The question is on screen, so the box has been answering since before this.
+  const askedAt = await chrome.evaluate(() => performance.now());
   // The answers to press arrive with it, without the one shaped like a code.
   const asked = await chrome.evaluate(() => window.chromeAPI.library.getLibrary().then(({ needsYou }) => needsYou[0]?.approval));
   expect(asked).toMatchObject({ text: "Which colour?", question: true, answers: ["Blue", "Green"] });
@@ -509,6 +513,7 @@ test("real input in a tab behind the chat, a card naming another site's frame, a
   const answer = chrome.getByRole("textbox", { name: "Message" });
   await expect(answer).toHaveAttribute("placeholder", "Answer Berry, or pick one above");
   await answer.fill("Blue");
+  await chrome.waitForFunction(([since, arm]) => performance.now() - since >= arm, [askedAt, ARM_MS]);
   await answer.press("Enter");
 
   await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain("The user answered: Blue");
@@ -563,7 +568,9 @@ test("real keys, going back, and closing only a tab Berry opened", async () => {
   const finish = model.holdBeforeFirstToken();
   await panel.getByRole("textbox", { name: "Message" }).fill("Go");
   await panel.getByRole("textbox", { name: "Message" }).press("Enter");
-  await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages)).toContain('"name":"go_back"');
+  // Each click and key in this job waits Tab.settled's 300ms for a load to start, and the first message loads LangChain,
+  // so the job takes about 4.5s alone: too close to the default 5s, and past it under load.
+  await expect.poll(() => JSON.stringify(model.requests.at(-1)?.messages), { timeout: 15_000 }).toContain('"name":"go_back"');
 
   const said = JSON.stringify(model.requests.at(-1)?.messages);
   expect(said).toContain("You didn't open that tab");
@@ -891,7 +898,7 @@ test("with the bird off, a tab Berry is using glows and shimmers until the reply
   await expect(row.getByText("Berry is working here")).toBeAttached();
   expect((await getTabs()).find((tab) => tab.url.startsWith(origin))?.berryWorking).toBe(true);
   await chrome.waitForTimeout(600);
-  await chrome.screenshot({ path: "/tmp/working-chrome.png" });
+  await chrome.screenshot({ path: test.info().outputPath("working-chrome.png") });
 
   release();
   await expect.poll(glow).toBe("none");
@@ -913,6 +920,8 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
 
   const before = (await getTabs()).length;
   model.callTools({ name: "open_tab", args: { url: `${origin}/form` } });
+  // Held, since its tab closes once it's done.
+  const finish = model.holdBeforeFirstToken();
   await askInPanel("Open the form");
   await expect(card.locator("p").getByText(`Open ${origin}/form in a new tab`)).toBeVisible();
   expect(await getTabs()).toHaveLength(before);
@@ -921,6 +930,8 @@ test("Berry opens an address only once allowed, and never a non-web one", async 
   // It opens behind the user, who stays where they were.
   await expect.poll(async () => (await getTabs()).at(-1)?.title).toBe("Form");
   expect((await activeTab()).title).toBe("Fixture");
+  finish();
+  await expect(panel.getByText("A reply from the model")).toHaveCount(2);
 });
 
 test("chats are still there after a restart", async () => {

@@ -199,6 +199,8 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
       )
     )
     .toBe(false);
+  // A crash while the reload is still loading is only a load that goes on in a new process, so it has to have finished.
+  await expect.poll(async () => (await tabs(chrome)).find((tab) => tab.id === doomed.id)?.isLoading).toBe(false);
 
   // A crashed tab still closes like any other.
   await crash();

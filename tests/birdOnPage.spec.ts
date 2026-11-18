@@ -93,7 +93,9 @@ const setup = async (settings: object = {}) => {
       release();
       await expect.poll(() => chrome.evaluate((id) => window.chromeAPI.library.getChat(id).then((chat) => chat?.messages.some(({ role }) => role === "assistant")), chatId)).toBe(true);
     };
-    return { chatId, toolResults, finished, allAsked: () => expect.poll(() => model.requests.length).toBeGreaterThan(calls.length) };
+    // The first message loads LangChain and sends the page, about 3s before the model is first asked, and then the bird
+    // flies to each step, so these jobs take 4 to 6s alone: past the default 5s, and more under load.
+    return { chatId, toolResults, finished, allAsked: () => expect.poll(() => model.requests.length, { timeout: 15_000 }).toBeGreaterThan(calls.length) };
   };
   const close = async () => {
     await app.close();

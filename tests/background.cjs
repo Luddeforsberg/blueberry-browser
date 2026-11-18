@@ -8,9 +8,14 @@ const electron = require("electron");
 
 const OFF_SCREEN = { x: -20000, y: -20000 };
 
+// On Windows, `webContents.focus()` activates a window without calling its `focus`, so a test app took the keyboard
+// from whatever was in front, and lost it again when another app or test took it back. The windows then saw focus and
+// blur that nobody caused, and the app thought it was in front. A window that can't be focused never gets either.
+const UNFOCUSABLE = process.platform === "win32" ? { focusable: false } : {};
+
 class BackgroundWindow extends electron.BaseWindow {
   constructor(options) {
-    super({ ...options, ...OFF_SCREEN, enableLargerThanScreen: true, show: false });
+    super({ ...options, ...OFF_SCREEN, ...UNFOCUSABLE, enableLargerThanScreen: true, show: false });
     this.showInactive();
   }
 

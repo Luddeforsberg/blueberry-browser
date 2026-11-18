@@ -187,9 +187,15 @@ test("closing Blueberry's window takes the drop, the panel, its menu and the sho
     await findView(app, "view=desktop");
     // Blueberry's, the drop's, the panel's and the menu's.
     expect(await windowCount(app)).toBe(4);
-    await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().find((window) => window.contentView.children.length > 1)?.close());
-    await expect.poll(() => windowCount(app)).toBe(0);
-    expect(await registered(app)).toEqual([]);
+    // Off a Mac the app quits once its last window has gone, so what's left is read as that happens, not after.
+    const left = await app.evaluate(
+      ({ app, BaseWindow }) =>
+        new Promise<{ windows: number; shortcuts: string[] }>((resolve) => {
+          app.once("window-all-closed", () => resolve({ windows: BaseWindow.getAllWindows().length, shortcuts: [...globalThis.fakeShortcuts.keys()] }));
+          BaseWindow.getAllWindows().find((window) => window.contentView.children.length > 1)?.close();
+        })
+    );
+    expect(left).toEqual({ windows: 0, shortcuts: [] });
   } finally {
     await app.close();
   }
