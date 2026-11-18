@@ -101,7 +101,7 @@ export class MemoryStore {
       return { ok: true };
     }
     if (this.factsOf(offer.mascotId).length >= MAX_FACTS_PER_MASCOT) {
-      return { ok: false, error: `This bird already remembers ${MAX_FACTS_PER_MASCOT} things. Forget one in Flock first.` };
+      return { ok: false, error: `This mascot already remembers ${MAX_FACTS_PER_MASCOT} things. Forget one on its page first.` };
     }
     const { text, site, mascotId } = offer;
     if (!this.factsOf(mascotId).some((fact) => covers(fact, text, site))) {

@@ -100,6 +100,8 @@ describe("toElectronMenu", () => {
         ],
       },
     ]);
+    // Electron drops the submenu of an item typed "normal", and with it the menu bar and every shortcut in it.
+    expect(edit.type).toBe("submenu");
     expect(edit.submenu).toEqual([
       expect.objectContaining({ label: "Copy", role: "copy", accelerator: "CmdOrCtrl+C" }),
       { type: "separator" },

@@ -67,12 +67,13 @@ export const MenuSheet: React.FC<Placement & {
                     onClose(false)
                 }
             }}
-            style={at && { left: at.x, top: at.y }}
+            // Main fits a sheet inside the window, so one taller than that scrolls rather than running out of its view.
+            style={at && { left: at.x, top: at.y, maxHeight: `calc(100vh - ${at.y}px)` }}
             className={cn(
                 'absolute z-30 max-w-[calc(100vw-32px)] p-1.5 rounded-menu bg-sheet text-14 text-ink shadow-lift cursor-default',
                 hidden && 'invisible',
                 at
-                    ? cn('origin-top-left', !hidden && 'animate-menu-in')
+                    ? cn('origin-top-left overflow-y-auto', !hidden && 'animate-menu-in')
                     : cn(
                           leaving ? (above ? 'animate-menu-out-above' : 'animate-menu-out') : above ? 'animate-menu-in-above' : 'animate-menu-in',
                           align === 'box' ? 'inset-x-1' : align === 'right' ? 'right-0' : 'left-0',

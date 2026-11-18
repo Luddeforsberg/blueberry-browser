@@ -105,7 +105,10 @@ export const MenuEntryRow: React.FC<{
         aria-disabled={!row.enabled || undefined}
         aria-haspopup={row.submenu ? 'menu' : undefined}
         aria-expanded={row.submenu ? open : undefined}
-        onPointerEnter={onPointerEnter}
+        onPointerEnter={(event) => {
+            event.currentTarget.focus({ preventScroll: true })
+            onPointerEnter?.()
+        }}
         onClick={(event) => onPress(event.detail === 0)}
         className={cn(menuRowClass(false, !row.enabled), row.danger && row.enabled && 'text-ask', open && 'bg-sheet-2')}
     >
@@ -234,6 +237,9 @@ const Ask: React.FC<{ ask: AskCard }> = ({ ask }) => {
 // The card itself. `focusCancel` is off only where it's shown as a sample, in the component gallery.
 export const AskSheet: React.FC<{ ask: AskCard; onAnswer: (yes: boolean) => void; focusCancel?: boolean }> = ({ ask, onAnswer: answer, focusCancel = true }) => {
     const card = useRef<HTMLDivElement>(null)
+    // The keyboard starts on Cancel, but its ring only shows once a key is used, so a card opened with the pointer has none.
+    const [keys, setKeys] = useState(false)
+    const ring = keys ? undefined : 'focus-visible:ring-0'
     const ids = { question: `ask-${ask.id}-question`, detail: `ask-${ask.id}-detail` }
     return (
         <div
@@ -243,6 +249,7 @@ export const AskSheet: React.FC<{ ask: AskCard; onAnswer: (yes: boolean) => void
             aria-labelledby={ids.question}
             aria-describedby={ids.detail}
             onKeyDown={(event) => {
+                setKeys(true)
                 if (event.key === 'Escape') {
                     event.preventDefault()
                     answer(false)
@@ -264,10 +271,10 @@ export const AskSheet: React.FC<{ ask: AskCard; onAnswer: (yes: boolean) => void
             <p id={ids.detail} className="text-[13.5px] leading-[1.5] text-ink-2 whitespace-pre-line [overflow-wrap:anywhere]">{ask.detail}</p>
             <div className="mt-5 flex justify-end gap-2">
                 {ask.action === null ? (
-                    <Button autoFocus={focusCancel} onClick={() => answer(false)}>OK</Button>
+                    <Button autoFocus={focusCancel} className={ring} onClick={() => answer(false)}>OK</Button>
                 ) : (
                     <>
-                        <Button variant="raised" autoFocus={focusCancel} onClick={() => answer(false)}>Cancel</Button>
+                        <Button variant="raised" autoFocus={focusCancel} className={ring} onClick={() => answer(false)}>Cancel</Button>
                         <Button variant="danger" onClick={() => answer(true)}>{ask.action}</Button>
                     </>
                 )}

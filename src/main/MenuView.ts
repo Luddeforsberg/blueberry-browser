@@ -47,6 +47,7 @@ export class MenuView {
   private stopWatchingPage: (() => void) | null = null;
   // Where the view is while it shows.
   private at: Rect | null = null;
+  private loaded = false;
 
   constructor(
     region: "menu" | "drop-menu",
@@ -59,6 +60,25 @@ export class MenuView {
     this.hide();
     // A press anywhere else, another window or another app takes the keyboard, which closes a menu. A question stays.
     this.contents.on("blur", () => this.closeMenu());
+    // The view crashed or its page loaded again: nothing there can answer what was shown, so it goes, and a question is no.
+    // Its first load doesn't count, since a question can be asked before the view has finished loading.
+    this.contents.once("did-finish-load", () => (this.loaded = true));
+    this.contents.on("did-start-navigation", ({ isMainFrame, isSameDocument }) => {
+      if (this.loaded && isMainFrame && !isSameDocument) this.lost();
+    });
+    this.contents.on("render-process-gone", () => {
+      this.lost();
+      if (!this.contents.isDestroyed()) this.contents.reload();
+    });
+  }
+
+  private lost(): void {
+    this.closeMenu();
+    if (this.shown === null) return;
+    this.asks.cancel();
+    this.shown = null;
+    this.hide();
+    this.giveBack();
   }
 
   private get contents(): WebContents {

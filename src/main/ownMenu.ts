@@ -83,7 +83,8 @@ export const toElectronMenu = (items: OwnMenuItem[]): MenuItemConstructorOptions
     return {
       id: item.id,
       label: item.label,
-      type: item.type ?? "normal",
+      // Electron reads a submenu only from an item whose type is "submenu" or left out, never "normal".
+      type: item.type ?? (item.submenu ? "submenu" : "normal"),
       checked: item.checked,
       enabled: item.enabled,
       visible: item.visible,

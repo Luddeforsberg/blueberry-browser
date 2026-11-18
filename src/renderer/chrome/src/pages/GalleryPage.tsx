@@ -294,7 +294,7 @@ const MENU_SAMPLES: Array<{ label: string; entries: MenuEntry[] }> = [
 ]
 const ASK_SAMPLES: AskCard[] = [
     { id: 'chat', question: 'Delete “Hej”?', detail: 'This chat will be permanently removed from this computer.', action: 'Delete', mascot: null },
-    { id: 'mascot', question: 'Delete “Scout”?', detail: 'It leaves your flock, and what it remembers is forgotten.', action: 'Delete', mascot: { name: 'Scout', look: { palette: 'robin', accessory: 'glasses' }, hidden: false } },
+    { id: 'mascot', question: 'Delete “Scout”?', detail: 'It leaves your mascots, and what it remembers is forgotten.', action: 'Delete', mascot: { name: 'Scout', look: { palette: 'robin', accessory: 'glasses' }, hidden: false } },
     { id: 'notice', question: 'Some saved data couldn’t be used', detail: 'Your routines couldn’t be opened. The file wasn’t changed.', action: null, mascot: null },
 ]
 
@@ -596,7 +596,7 @@ export const GalleryPage: React.FC = () => {
                 <Section title="Memory">
                     <div className="max-w-xl flex flex-col gap-6">
                         <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} onAnswer={() => undefined} />
-                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one in Flock first.' }} onAnswer={() => undefined} />
+                        <MemoryOffersLine offers={SAMPLE_FACTS} mascot={SAMPLE_MASCOT} kept={false} errors={{ 'gallery-fact-1': 'This mascot already remembers 30 things. Forget one on its page first.' }} onAnswer={() => undefined} />
                         <MemoryOffersLine offers={[]} mascot={SAMPLE_MASCOT} kept onAnswer={() => undefined} />
                         <RememberedFacts used={SAMPLE_FACTS.slice(0, 1)} />
                         <RememberedFacts used={SAMPLE_FACTS} />

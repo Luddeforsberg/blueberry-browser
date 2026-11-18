@@ -54,7 +54,7 @@ export const deleteMascotWords = (mascot: { name: string; look: MascotLook }, ro
   const paused = routines === 0 ? "" : ` ${routines === 1 ? "The routine it runs pauses" : `The ${routines} routines it runs pause`}, and stay${routines === 1 ? "s" : ""} limited to what it could do.`;
   return {
     question: `Delete “${mascot.name}”?`,
-    detail: `It leaves your flock, and what it remembers is forgotten. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,
+    detail: `It leaves your mascots, and what it remembers is forgotten. Chats it had keep it, with the same limits.${paused}${published ? " It stays in the Gallery until you unpublish it, in Settings under Account." : ""}`,
     action: "Delete",
     mascot: { name: mascot.name, look: mascot.look, hidden },
   };
