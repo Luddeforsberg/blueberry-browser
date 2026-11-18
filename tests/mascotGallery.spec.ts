@@ -17,7 +17,7 @@ test("a Gallery tile opens its page, which shows its moods, adds a limited copy,
     const chrome = await findView(app, "view=chrome");
     const param = () =>
       chrome.evaluate(async () => (await window.chromeAPI.browser.getTabs()).find((tab) => tab.isActive)?.pageParam ?? null);
-    await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+    await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots"));
     await chrome.getByRole("button", { name: "Gallery", exact: true }).click();
 
     // The whole Gallery: with no server there's nothing from people.

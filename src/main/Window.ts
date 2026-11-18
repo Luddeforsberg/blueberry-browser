@@ -88,7 +88,7 @@ const SINGLE_INSTANCE_PAGES: InternalPage[] = [
   "settings",
   "downloads",
   "history",
-  "flock",
+  "mascots",
   "mascot-gallery",
   "needs-you",
   "recording",

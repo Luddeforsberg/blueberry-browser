@@ -115,7 +115,7 @@ export const appMenuItems = (mainWindow: Window): OwnMenuItem[] => {
         { type: "separator" },
         { label: "History", accelerator: SHORTCUTS.history, click: () => mainWindow.openPage("history") },
         { label: "Routines", click: () => mainWindow.openPage("routines") },
-        { label: "Your Mascots", click: () => mainWindow.openPage("flock") },
+        { label: "Your Mascots", click: () => mainWindow.openPage("mascots") },
         { label: "Gallery", click: () => mainWindow.openPage("mascot-gallery") },
         {
           label: "Show Berry How",

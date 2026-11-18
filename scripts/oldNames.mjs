@@ -28,7 +28,6 @@ const external = (text, why, ...files) => entries(10, text, why, files);
 // test only. Kept for good, since old data can turn up at any time.
 const migrated = (text, why, ...files) => entries(null, text, why, files);
 
-const PAGE_ID = "The internal page's id, saved with each tab in session.json.";
 const SERVER = "A Supabase name, in the migrations and on the server.";
 const MODEL = "Read by the model, or by ChatGPT, Claude or another app over MCP.";
 const ROW = "An error written to a job's row on the server, which ChatGPT and Claude read through get_job.";
@@ -37,31 +36,19 @@ const COPY = "The public site's own words, deployed with its address.";
 
 // The exact text that may stay in each file, case and all.
 const ALLOWED = [
-  ...migrated("birdOnPages", "The old key in settings.json.", "src/main/SettingsStore.ts", "src/main/SettingsStore.test.ts"),
-  ...saved(
-    '"flock"',
-    PAGE_ID,
-    "src/main/InternalTab.ts",
-    "src/main/Menu.ts",
-    "src/main/Session.ts",
-    "src/main/Window.ts",
-    "src/renderer/chrome/src/components/TabIcon.tsx",
-    "src/renderer/chrome/src/mascotsView.ts",
-    "src/renderer/chrome/src/pages/InternalPageView.tsx",
-    "src/shared/ipc.ts",
-    "tests/features/map.ts",
-    "tests/mascotGallery.spec.ts",
-    "tests/mascotLimits.spec.ts",
-    "tests/mascotsPage.spec.ts",
-    "tests/memory.spec.ts",
-    "tests/publishing.spec.ts",
+  ...migrated(
+    "birdOnPages",
+    "The old key in settings.json.",
+    "src/main/SettingsStore.ts",
+    "src/main/SettingsStore.test.ts",
+    "tests/session.spec.ts",
   ),
-  ...saved(
-    'flock: "Your mascots"',
-    PAGE_ID,
-    "src/main/InternalTab.ts",
-    "src/renderer/chrome/src/addressSuggestions.ts",
-    "src/renderer/chrome/src/components/AddressBar.tsx",
+  ...migrated(
+    '"flock"',
+    "The mascots' page's old id, saved with its tab in session.json.",
+    "src/main/Session.ts",
+    "src/main/Session.test.ts",
+    "tests/session.spec.ts",
   ),
   ...saved('"blueberry.bird"', "The phone page's key in the browser's localStorage.", "site/app/state.js"),
 

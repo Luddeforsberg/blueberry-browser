@@ -225,6 +225,18 @@ test("a crashed page stays in its tab, tells Berry so, and reloads; damaged data
   await app.close();
 });
 
+test("files saved before the mascots were called mascots open as they did", async () => {
+  const profile = mkdtempSync(join(tmpdir(), "blueberry-test-"));
+  writeFileSync(join(profile, "settings.json"), JSON.stringify({ onboarded: true, startersAdded: true, birdOnPages: false }));
+  writeFileSync(join(profile, "session.json"), JSON.stringify({ tabs: [{ page: "flock", param: null, title: "" }], active: 0 }));
+  const { app, chrome } = await launch(profile);
+
+  await expect.poll(async () => (await tabs(chrome)).map((tab) => tab.page)).toEqual(["mascots"]);
+  await expect(chrome.getByRole("list", { name: "Your mascots" }).first()).toBeVisible();
+  expect((await chrome.evaluate(() => window.chromeAPI.settings.getSettings())).mascotOnPages).toBe(false);
+  await app.close();
+});
+
 test("pages Berry opens behind the chat stay out of history until the user goes there", async () => {
   const { app, chrome } = await launch(mkdtempSync(join(tmpdir(), "blueberry-test-")), model.env);
   model.reset();

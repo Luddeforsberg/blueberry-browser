@@ -21,7 +21,7 @@ import { Berry } from "./Berry";
 import { Favicon } from "./Favicon";
 
 // Your mascots has no icon here: its tab shows Berry.
-const PAGE_ICONS: Record<Exclude<InternalPage, "flock">, LucideIcon> = {
+const PAGE_ICONS: Record<Exclude<InternalPage, "mascots">, LucideIcon> = {
   "new-tab": Compass,
   chat: MessageCircle,
   routines: RefreshCw,
@@ -70,7 +70,7 @@ export const TabIcon: React.FC<{
     );
   if (!tab.page)
     return <Favicon src={tab.favicon} site={tab.url} className={large ? "size-[18px] rounded-[5px] text-[10px]" : undefined} />;
-  if (tab.page === "flock") return <Berry size={18} className="-m-px" still />;
+  if (tab.page === "mascots") return <Berry size={18} className="-m-px" still />;
   const Icon = PAGE_ICONS[tab.page];
   return <Icon className="size-4 shrink-0 text-ink-2" strokeWidth={1.75} />;
 };

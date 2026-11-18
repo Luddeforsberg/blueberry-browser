@@ -59,7 +59,7 @@ export type InternalPage =
   | "downloads"
   | "gallery"
   | "history"
-  | "flock"
+  | "mascots"
   | "mascot-gallery"
   | "needs-you"
   | "recording"

@@ -60,7 +60,7 @@ test("a mascot chats inside its limits, and is still itself after a restart", as
       tools: ["visit", "click", "type"],
     }),
   );
-  await chrome.evaluate(() => window.chromeAPI.browser.openPage("flock"));
+  await chrome.evaluate(() => window.chromeAPI.browser.openPage("mascots"));
 
   // In a chat as Scout, an address off its site is refused with no card, and never loads.
   const offLimits = `http://localhost:${port}/secret`;

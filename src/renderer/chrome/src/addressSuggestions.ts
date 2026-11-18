@@ -34,7 +34,7 @@ const OWN_PAGES: Partial<Record<InternalPage, string>> = {
   history: "History",
   downloads: "Downloads",
   routines: "Routines",
-  flock: "Your mascots",
+  mascots: "Your mascots",
   "needs-you": "Needs you",
   "mascot-gallery": "Gallery",
 };

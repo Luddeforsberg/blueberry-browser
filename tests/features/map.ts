@@ -214,7 +214,7 @@ const saveScout = async (drive: Drive) =>
 
 const makingStep = async (drive: Drive, steps: number) => {
   const { chrome } = drive;
-  await openPage(drive, "flock", "new");
+  await openPage(drive, "mascots", "new");
   await seen(chrome, "1 / 4");
   if (steps < 2) return;
   await chrome.getByRole("button", { name: "Lingon" }).click();
@@ -676,28 +676,28 @@ export const FEATURES: Feature[] = [
     states: {
       list: {
         open: async (drive) => {
-          await openPage(drive, "flock");
+          await openPage(drive, "mascots");
           await drive.chrome.getByRole("button", { name: "New mascot" }).waitFor();
         },
       },
       mascot: {
         open: async (drive) => {
           const scout = await saveScout(drive);
-          await openPage(drive, "flock", scout);
+          await openPage(drive, "mascots", scout);
           await heading(drive.chrome, "Scout");
         },
       },
       limits: {
         open: async (drive) => {
           const scout = await saveScout(drive);
-          await openPage(drive, "flock", `${scout}/limits`);
+          await openPage(drive, "mascots", `${scout}/limits`);
           await drive.chrome.getByRole("radio", { name: "Any site" }).waitFor();
         },
       },
       memory: {
         open: async (drive) => {
           const scout = await saveScout(drive);
-          await openPage(drive, "flock", `${scout}/memory`);
+          await openPage(drive, "mascots", `${scout}/memory`);
           await heading(drive.chrome, "What Scout remembers");
         },
       },

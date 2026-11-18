@@ -41,7 +41,7 @@ const PAGES: readonly InternalPage[] = [
   "downloads",
   "gallery",
   "history",
-  "flock",
+  "mascots",
   "mascot-gallery",
   "needs-you",
 ];
@@ -70,11 +70,13 @@ export const savedEntries = (
 
 const sanitizeTab = (raw: unknown): SavedTab | null => {
   const tab = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  if (PAGES.includes(tab.page as InternalPage)) {
+  // The mascots' page was saved as "flock" before the mascots were called mascots.
+  const page = tab.page === "flock" ? "mascots" : tab.page;
+  if (PAGES.includes(page as InternalPage)) {
     // From when a chat could be open before it began. Chats start on the new tab page now.
-    if (tab.page === "chat" && typeof tab.param !== "string") return null;
+    if (page === "chat" && typeof tab.param !== "string") return null;
     return {
-      page: tab.page as InternalPage,
+      page: page as InternalPage,
       param: typeof tab.param === "string" ? tab.param : null,
       title: text(tab.title),
     };
