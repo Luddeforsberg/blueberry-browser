@@ -174,6 +174,8 @@ const OwnMenu: React.FC<{ menu: MenuShown }> = ({ menu }) => {
                         className="w-max min-w-[180px] max-w-[360px]"
                         onClose={dismiss}
                         onKey={(event) => {
+                            // A key wins over the pointer: a submenu waiting on the pointer's rest doesn't open after it.
+                            window.clearTimeout(rest.current)
                             const target = event.target instanceof HTMLElement ? event.target.dataset.path : undefined
                             if (path !== '' && (event.key === 'ArrowLeft' || event.key === 'Escape')) {
                                 event.preventDefault()

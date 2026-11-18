@@ -66,6 +66,9 @@ export class MenuView {
     this.contents.on("did-start-navigation", ({ isMainFrame, isSameDocument }) => {
       if (this.loaded && isMainFrame && !isSameDocument) this.lost();
     });
+    this.contents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => {
+      if (isMainFrame) this.lost();
+    });
     this.contents.on("render-process-gone", () => {
       this.lost();
       if (!this.contents.isDestroyed()) this.contents.reload();
