@@ -900,7 +900,8 @@ export const FEATURES: Feature[] = [
           drive.model.callTools({ name: "open_tab", args: { url: drive.site.url("shop.example") } });
           drive.model.holdBeforeFirstToken();
           await startChat(drive, "Open shop.example", { cloud: true });
-          await until(drive, async () => (await window.chromeAPI.browser.getTabs()).some((tab) => tab.page === "cloud" && tab.title === "Cheap Cables"), 30_000);
+          // Loaded, and shown under its chat as the job's.
+          await until(drive, async () => (await window.chromeAPI.browser.getTabs()).some((tab) => tab.page === "cloud" && tab.title === "Cheap Cables" && !!tab.jobChatId), 30_000);
           await switchTo(drive, (tab) => tab.page === "cloud");
           await seen(drive.chrome, "In the cloud");
           await drive.chrome.locator("img").last().waitFor();
