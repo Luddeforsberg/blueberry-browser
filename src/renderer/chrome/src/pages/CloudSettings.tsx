@@ -5,10 +5,10 @@ import { Button } from "@common/components/Button";
 import { Switch } from "@common/components/Controls";
 import { CopyLink } from "../components/CopyLink";
 import { cn } from "@common/lib/utils";
-import { LINE_BETWEEN, ROW } from "../components/PageFrame";
+import { LINE_BETWEEN, ROW } from "../components/pageRows";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
 import { openSettings } from "../openSettings";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { useCloud } from "../useCloud";
 import { useRunner } from "../useRunner";
 

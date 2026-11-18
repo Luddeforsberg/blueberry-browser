@@ -1,8 +1,8 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import type { LayoutMode, TabInfo } from "@shared/ipc";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
+import { useBrowser } from "../contexts/useBrowser";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
 import { LEADING_SLOT, TabIcon } from "./TabIcon";
 import { nudgeTarget, useTabDrag } from "./useTabDrag";
 import { Berry } from "./Berry";
@@ -12,7 +12,8 @@ import { useComings, useRowMotion } from "@common/components/motion";
 import type { DrawnRow } from "@common/components/comings";
 import { SHORTCUTS } from "@shared/shortcuts";
 import { Tooltip } from "@common/components/Tooltip";
-import { TabPreviewProvider, useTabPreview } from "./TabPreview";
+import { TabPreviewProvider } from "./TabPreview";
+import { useTabPreview } from "./useTabPreview";
 
 // A tab in the row at its widest, and the space between two.
 const ROW_TAB_MAX = 196;

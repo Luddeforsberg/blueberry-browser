@@ -2,33 +2,15 @@ import React, { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import type { RecordingState, TrailKind, TrailStep } from "@shared/library";
 import { Button } from "@common/components/Button";
-import { Pips, type PipMark } from "@common/components/Pips";
+import { Pips } from "@common/components/Pips";
+import type { PipMark } from "@common/components/pipPatterns";
 import { cn } from "@common/lib/utils";
-import { useShell } from "../contexts/ShellContext";
-import { useAssistantName } from "./Berry";
+import { useShell } from "../contexts/useShell";
+import { useAssistantName } from "./useAssistantName";
 import { Favicon } from "./Favicon";
 import { Tooltip } from "@common/components/Tooltip";
+import { NARROW_PAGE, useRecording } from "./useRecording";
 
-const IDLE: RecordingState = { status: "idle", startedAt: null, steps: [], cut: null, error: null };
-
-// The chrome always listens (`ChromeApp`), so a page that opens while it watches, as the new tab does, starts from this.
-let lastHeard = IDLE;
-
-export const useRecording = (): RecordingState => {
-  const [state, setState] = useState(lastHeard);
-  useEffect(() => {
-    const { state: read, onUpdated } = window.chromeAPI.recording;
-    const hear = (next: RecordingState) => {
-      lastHeard = next;
-      setState(next);
-    };
-    void read().then(hear);
-    return onUpdated(hear);
-  }, []);
-  return state;
-};
-
-export const NARROW_PAGE = 640;
 const ROOM_FOR_COUNT = 860;
 
 const clock = (ms: number) => {
@@ -92,12 +74,6 @@ export const RecordingNotice: React.FC<{ state?: RecordingState; inPage?: boolea
       </Button>
     </div>
   );
-};
-
-// The bookmark star gives way to the recorder beside the chat panel on a narrow page.
-export const useRecorderNeedsRoom = () => {
-  const { layout } = useShell();
-  return useRecording().status === "recording" && layout.page.width < NARROW_PAGE;
 };
 
 // Starts it from wherever this is. What it says stays the same everywhere, so it's one thing to learn.

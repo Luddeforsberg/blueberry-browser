@@ -1,24 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { TabInfo } from "@shared/ipc";
-import { useChatThread } from "../contexts/ChatContext";
-import {
-  AssistantMessage,
-  ChatApprovalCard,
-  UserMessage,
-  WentWrong,
-  didWork,
-  useFollowReply,
-  type ReplyActions,
-  type ReplyOrigin,
-} from "../components/ChatMessage";
+import { useChatThread } from "../contexts/useChat";
+import { AssistantMessage, ChatApprovalCard, UserMessage, WentWrong, type ReplyActions, type ReplyOrigin } from "../components/ChatMessage";
+import { didWork } from "../components/didWork";
+import { useFollowReply } from "../components/useFollowReply";
 import { chatRoutine } from "../routinesView";
-import { useAssistantName } from "../components/Berry";
+import { useAssistantName } from "../components/useAssistantName";
 import { MemoryOffers } from "../components/MemoryInChat";
 import { ChatComposer } from "../components/Composer";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
-import { useWorkView, WorkingStrip, WorkingView } from "../components/WorkingView";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { WorkingStrip, WorkingView } from "../components/WorkingView";
+import { useWorkView } from "../components/useWorkView";
 import { RunnerView } from "../components/RunnerView";
-import { answerInBox } from "../components/Composer";
+import { answerInBox } from "../components/answerInBox";
 
 // DESIGN.md section 2: the working view is 420px, with 18px either side of the picture, and goes beside the conversation
 // only while that keeps room to read.

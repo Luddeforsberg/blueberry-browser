@@ -1,6 +1,6 @@
 import React from "react";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useLibrary } from "../contexts/LibraryContext";
+import { useBrowser } from "../contexts/useBrowser";
+import { useLibrary } from "../contexts/useLibrary";
 
 // What routines want the user to know, if anything. Berry never speaks up about anything else.
 const useRoutineNews = () => {

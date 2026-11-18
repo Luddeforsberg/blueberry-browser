@@ -1,9 +1,10 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/LibraryContext";
+import { useFlock } from "../contexts/useLibrary";
 import { BERRY_ID } from "@shared/mascots";
-import { Berry, useAssistantName } from "./Berry";
+import { Berry } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
 import { startMascot } from "../flockView";
 
 // Your mascots in a row, to choose who runs a routine. In the flow rather than floating, so it fits in the form.

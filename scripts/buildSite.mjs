@@ -45,10 +45,11 @@ await build({
     contents: `
       import { createElement } from "react";
       import { renderToStaticMarkup } from "react-dom/server";
-      import { BERRY_KIND, Mascot } from "./src/renderer/common/components/Mascot";
+      import { Mascot } from "./src/renderer/common/components/Mascot";
+      import { BERRY_KIND } from "./src/renderer/common/components/berryKinds";
       import { ACCESSORIES } from "./src/shared/mascots";
       export { BERRY_KIND };
-      export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/Pips";
+      export { PIP_MARKS, PIP_PATTERNS, pipOpacities, STEP_PIPS } from "./src/renderer/common/components/pipPatterns";
       const pose = (mood, accessory, size = 120) => renderToStaticMarkup(createElement(Mascot, { mood, size, still: true, anyLook: true, look: { palette: "jackdaw", accessory } }));
       // What the bird on a web page is drawn from, by \`src/main/pageActorScript.ts\`.
       export const actorArt = Object.fromEntries(ACCESSORIES.map(({ id }) => [id, {

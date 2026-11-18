@@ -1,11 +1,11 @@
 import type React from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AddressSuggestion } from "@shared/ipc";
-import { useBrowser } from "../contexts/BrowserContext";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
-import { useShell } from "../contexts/ShellContext";
+import { useBrowser } from "../contexts/useBrowser";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
+import { useShell } from "../contexts/useShell";
 import { addressSuggestions } from "../addressSuggestions";
-import { useAssistantName } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
 
 // The list under the address field while it's being edited (DESIGN.md, Toolbar and the address field). The rows come
 // from this computer only: open tabs, saved sites and the history. Main draws them in a view over the page, and the

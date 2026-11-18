@@ -4,7 +4,8 @@ import { AppWindow, ArrowRight, Clock, Search, Star } from "lucide-react";
 import { Mascot } from "@common/components/Mascot";
 import { cn } from "@common/lib/utils";
 import { Favicon } from "./components/Favicon";
-import { MenuRule, menuRowClass } from "./components/MenuSheet";
+import { MenuRule } from "./components/MenuSheet";
+import { menuRowClass } from "./components/menuRows";
 import { shownAddress } from "./addressSuggestions";
 
 // The list under the address field, over the page in its own view. Main places it from the layout and says what to

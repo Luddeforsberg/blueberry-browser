@@ -1,68 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 import { Check } from "lucide-react";
-import type { HistoryImportResult, ImportSource } from "@shared/ipc";
+import type { ImportSource } from "@shared/ipc";
 import { Button } from "@common/components/Button";
 import { Pips } from "@common/components/Pips";
 import { StatusPill } from "@common/components/StatusPill";
 import { cn } from "@common/lib/utils";
 import { Favicon } from "./Favicon";
 import { More, SettingsGroup, SettingsRow } from "./SettingsRow";
+import { useHistoryImport } from "./useHistoryImport";
 
 // What happens, in the one place both screens say it. The detail has to match `buildDigest` in suggestionDigest.ts.
-export const IMPORT_NOTES = [
+const IMPORT_NOTES = [
   "Only addresses, page titles and visit times from the last 90 days come across, from every profile, never passwords or cookies.",
   "It stays on this computer, apart from a summary Suggestions sends to the AI service.",
 ];
 export const IMPORT_DETAIL =
   "That summary covers the last two weeks: site names and page titles in the order you visited them, what you searched for, and your chat and routine titles. Never page text or full addresses. Local addresses, and sites it recognises as banks or mail, are left out. You can turn Suggestions off in Settings.";
-
-const cameAcross = (added: number) =>
-  added === 0 ? "Nothing new came across" : `${added.toLocaleString()} ${added === 1 ? "visit came" : "visits came"} across`;
-
-export const useHistoryImport = () => {
-  const [sources, setSources] = useState<ImportSource[] | null>(null);
-  const [chosenId, setChosenId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [outcome, setOutcome] = useState<{ result: HistoryImportResult; name: string } | null>(null);
-  const source = sources?.find(({ id }) => id === chosenId) ?? sources?.[0] ?? null;
-
-  useEffect(() => {
-    void window.chromeAPI.browser.importSources().then(setSources);
-  }, []);
-
-  const choose = (id: string) => {
-    // What's coming across is the chosen browser's, so the choice holds until it's in.
-    if (busy) return;
-    setChosenId(id);
-    setOutcome(null);
-  };
-
-  const bringIn = async () => {
-    if (!source || busy) return;
-    setBusy(true);
-    const result = await window.chromeAPI.browser.importHistory(source.id).catch((): HistoryImportResult => ({ ok: false }));
-    setOutcome({ result, name: source.name });
-    setBusy(false);
-  };
-
-  const message = !outcome
-    ? null
-    : !outcome.result.ok
-      ? `I couldn’t read ${outcome.name}’s history. Close ${outcome.name} and try again.`
-      : `${cameAcross(outcome.result.added)} from ${outcome.name}.`;
-
-  return {
-    sources,
-    source,
-    choose,
-    busy,
-    bringIn,
-    message,
-    // What the chosen row says once it's in.
-    added: outcome?.result.ok ? cameAcross(outcome.result.added) : null,
-    done: outcome?.result.ok ?? false,
-  };
-};
 
 export type HistoryImport = ReturnType<typeof useHistoryImport>;
 

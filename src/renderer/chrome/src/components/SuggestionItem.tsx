@@ -1,11 +1,11 @@
 import React from "react";
 import { ChevronRight, X } from "lucide-react";
 import type { MascotProfile } from "@shared/library";
-import type { Mood } from "@common/components/Mascot";
+import type { Mood } from "@common/components/moods";
 import { BERRY } from "@shared/mascots";
-import { buttonVariants } from "@common/components/Button";
+import { buttonVariants } from "@common/components/buttonVariants";
 import { cn } from "@common/lib/utils";
-import { useFlock } from "../contexts/LibraryContext";
+import { useFlock } from "../contexts/useLibrary";
 import { Berry } from "./Berry";
 import { finishedWhen, firstSentence } from "../shortWords";
 import type { SuggestionRow } from "../newTabSuggestions";

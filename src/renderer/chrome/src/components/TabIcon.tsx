@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Pips } from "@common/components/Pips";
-import { useFlock } from "../contexts/LibraryContext";
+import { useFlock } from "../contexts/useLibrary";
 import { Berry } from "./Berry";
 import { Favicon } from "./Favicon";
 

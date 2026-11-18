@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Button } from "@common/components/Button";
 import { Switch } from "@common/components/Controls";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRow";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { usePhone } from "../usePhone";
 
 const WHO_READS =

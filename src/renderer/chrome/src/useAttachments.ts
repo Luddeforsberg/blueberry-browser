@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ATTACHMENT_WORDS, MAX_FILE_BYTES, type FileChip, type TabChoice } from "@shared/attachments";
-import { useBrowser } from "./contexts/BrowserContext";
+import { useBrowser } from "./contexts/useBrowser";
 
 // What a prompt box has been given to read. Main decides what each file is and whether it may go, and decides again as
 // the message goes: this only keeps the chips and says, for the place the job will run, what can't go along.

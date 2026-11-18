@@ -3,9 +3,10 @@ import type { RoutineRun, RoutineRunStatus } from "@shared/library";
 import { Pips } from "@common/components/Pips";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
 import { ChatApprovalCard, Markdown, StatusLine, StepTrail } from "./ChatMessage";
 import { MemoryOffers, RememberedLine } from "./MemoryInChat";
+import { formatTime } from "./formatTime";
 
 // How it went, in words, so colour is never the only signal.
 const WENT: Record<RoutineRunStatus, string> = {
@@ -17,11 +18,8 @@ const WENT: Record<RoutineRunStatus, string> = {
   interrupted: "Interrupted",
 };
 
-export const formatTime = (at: number) =>
-  new Date(at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-
 // How long a run took, in a few words. A run still going has no length yet.
-export const tookWords = ({ startedAt, endedAt }: Pick<RoutineRun, "startedAt" | "endedAt">): string | null => {
+const tookWords = ({ startedAt, endedAt }: Pick<RoutineRun, "startedAt" | "endedAt">): string | null => {
   if (endedAt === null) return null;
   const seconds = Math.max(0, Math.round((endedAt - startedAt) / 1000));
   if (seconds < 60) return `${seconds} s`;

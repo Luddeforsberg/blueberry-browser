@@ -1,26 +1,27 @@
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import type { ChatApproval, ChatStep, HandoffNeed, MascotProfile, SaidOnTheWay, UsedPage } from "@shared/library";
+import type { ChatApproval, ChatStep, MascotProfile, SaidOnTheWay, UsedPage } from "@shared/library";
 import { linkSite } from "@shared/publishing";
 import { NO_KEY } from "@shared/aiKey";
 import { ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Cloud, Copy, Lock, Repeat } from "lucide-react";
 import { ApprovalCard, CardInShell, Keycap, WhyLine } from "@common/components/ApprovalCard";
 import { useCardKeys } from "@common/components/cardKeys";
-import { whyWords } from "../askingWords";
 import { clock, foldedWords, keptWhenFolded, latestEntries, stepsWord, workEntries, type WorkEntry } from "../workLine";
-import { useShell } from "../contexts/ShellContext";
-import { asContinuation, withSiteNames } from "../siteNames";
+import { useShell } from "../contexts/useShell";
 import { STOPPED_STEP, trailFor } from "../stepTrail";
 import { Button } from "@common/components/Button";
-import { Pips, STEP_PIPS, type PipMark, type PipPattern } from "@common/components/Pips";
+import { Pips } from "@common/components/Pips";
+import { STEP_PIPS, type PipMark, type PipPattern } from "@common/components/pipPatterns";
 import { useStill } from "@common/components/motion";
 import { cn } from "@common/lib/utils";
-import { useBrowser } from "../contexts/BrowserContext";
-import { Berry, useAssistantName } from "./Berry";
-import type { Mood } from "@common/components/Mascot";
-import { Favicon, siteIcon } from "./Favicon";
+import { useBrowser } from "../contexts/useBrowser";
+import { Berry } from "./Berry";
+import { useAssistantName } from "./useAssistantName";
+import type { Mood } from "@common/components/moods";
+import { Favicon } from "./Favicon";
+import { siteIcon } from "./siteIcon";
 import { SentAttachments } from "./AttachmentChips";
 import type { SentAttachment } from "@shared/attachments";
 import { RememberedLine } from "./MemoryInChat";
@@ -29,26 +30,8 @@ import { SaveAsRoutineCard } from "./SaveAsRoutine";
 import { openSettings } from "../openSettings";
 import { Tooltip } from "@common/components/Tooltip";
 import { IconSwap } from "@common/components/IconSwap";
-
-const FOLLOW_DISTANCE = 120;
-const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-focus";
-
-// Keeps the newest words in view while a reply streams, unless the reader has scrolled up to read.
-// Sending a message always comes back down to it.
-export const useFollowReply = (sentCount: number, partial: string | null | undefined, stepCount: number) => {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const lastSentCount = useRef(0);
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    const nearEnd = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < FOLLOW_DISTANCE;
-    if (sentCount !== lastSentCount.current || nearEnd) scroller.scrollTop = scroller.scrollHeight;
-    lastSentCount.current = sentCount;
-  }, [sentCount, partial, stepCount]);
-
-  return scrollerRef;
-};
+import { FOCUS } from "./chipClass";
+import { approvalWords, HANDOFF_TITLE } from "./approvalWords";
 
 // `fromStranger` is for what someone else wrote: nothing in it can load anything or take you anywhere. An image is
 // only its description, a link is its words and its site as text, and raw HTML shows as text, which ReactMarkdown does
@@ -393,17 +376,6 @@ const FoldedLine: React.FC<{ steps: ChatStep[]; said: SaidOnTheWay[]; took?: num
   );
 };
 
-// A chip, as under a finished reply and under the working view's picture. `bare` ones are outlined, for actions. A
-// `tray` one keeps its fill and takes `hover` over it, so it darkens on a sheet as it does on the ground.
-export const chipClass = (bare = false) =>
-  cn(
-    "h-7 max-w-full pl-[7px] pr-2.5 shrink-0 inline-flex items-center gap-[7px] rounded-row text-13 whitespace-nowrap transition-[background-color,color,transform] duration-fast active:scale-[.96]",
-    bare
-      ? "shadow-[inset_0_0_0_1px_var(--line)] text-ink-2 hover:bg-hover hover:text-ink active:bg-press"
-      : "relative bg-tray text-ink-2 hover:text-ink after:absolute after:inset-0 after:rounded-[inherit] after:pointer-events-none after:bg-hover after:opacity-0 hover:after:opacity-100 active:after:bg-press",
-    FOCUS,
-  );
-
 // What a job found: each page it used as a chip on `sheet` with `chip`, its icon, title and site. Each opens as the
 // user's own tab.
 const PageChips: React.FC<{ pages: UsedPage[] }> = ({ pages }) => (
@@ -463,10 +435,6 @@ const CopyAction: React.FC<{ content: string }> = ({ content }) => {
     </ReplyAction>
   );
 };
-
-// Whether a mascot has done something in this chat, so it has something to repeat.
-export const didWork = (messages: Array<{ role: string; steps?: ChatStep[] }>) =>
-  messages.some((message) => message.role === "assistant" && (message.steps?.length ?? 0) > 0);
 
 // What the last reply in a chat can do next, which an earlier one doesn't offer again.
 export interface ReplyActions {
@@ -757,12 +725,6 @@ const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =
   return <QuestionCard approval={approval} name={name} onAnswer={(words) => send(true, words)} onSkip={() => send(false)} />;
 };
 
-export const HANDOFF_TITLE: Record<HandoffNeed, string> = {
-  "sign-in": "Sign in on",
-  code: "Enter the code on",
-  captcha: "Solve the captcha on",
-};
-
 // What the user can do about a tab they've been handed. Words are never typed here, so there's nowhere for a secret to go.
 export const HandoffActions: React.FC<{
   tabId?: string;
@@ -829,19 +791,6 @@ const ChatHandoffCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =>
   const name = useAssistantName(mascot);
   const send = (allow: boolean) => void window.chromeAPI.chat.decide(chatId, approval.id, allow);
   return <HandoffCard approval={approval} name={name} onDone={() => send(true)} onNotNow={() => send(false)} />;
-};
-
-// What an approval card says: the sentence, which names the sites, and the exact words under it in full, because
-// that's what's being allowed. With no address to shorten and nothing marked, the sentence is them. Why it asks comes
-// from the reason's code alone.
-export const approvalWords = (approval: ChatApproval, name: string, showBerry: boolean) => {
-  const mark = approval.why?.mark;
-  return {
-    question: `${showBerry ? "I’d like to " : `${name} wants to `}${withSiteNames(asContinuation(approval.text))}`,
-    exactly: withSiteNames(approval.text) === approval.text && !mark ? undefined : approval.text,
-    mark,
-    why: approval.why ? whyWords(approval.why) : null,
-  };
 };
 
 // An action a mascot wants to take, which waits here until the user answers. The keyboard is never put on it here, so

@@ -28,7 +28,8 @@ import type { AskCard, MenuEntry, MenuIcon, MenuPlacement, MenuShown, MenuViewSt
 import { Button } from "@common/components/Button";
 import { Mascot } from "@common/components/Mascot";
 import { cn } from "@common/lib/utils";
-import { MenuRule, MenuSheet, menuRowClass } from "./components/MenuSheet";
+import { MenuRule, MenuSheet } from "./components/MenuSheet";
+import { leadsWithGlyph, menuRowClass } from "./components/menuRows";
 
 const api = () => window.chromeAPI.menu;
 
@@ -86,10 +87,6 @@ const RowGlyph: React.FC<{ row: Row; plain: boolean }> = ({ row, plain }) => {
     <span aria-hidden className="size-[15px] shrink-0" />
   );
 };
-
-// With an icon or a check on any row, every row keeps room for one, so the words line up.
-export const leadsWithGlyph = (entries: MenuEntry[]) =>
-  entries.some((entry) => entry.kind === "row" && (entry.icon !== null || entry.checked !== null));
 
 // One row: its icon or check, its words, and its shortcut or a submenu's chevron. Its name is its words alone.
 export const MenuEntryRow: React.FC<{

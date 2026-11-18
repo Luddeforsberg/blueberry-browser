@@ -5,7 +5,7 @@ import { SHORTCUTS, shortcutWords } from "@shared/shortcuts";
 import { Choice } from "@common/components/Controls";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { openSettings } from "../openSettings";
 import { openMascots } from "../flockView";
 import { useAccount } from "../useAccount";

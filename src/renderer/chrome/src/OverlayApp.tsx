@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Popover } from "@shared/ipc";
 import { BrowserProvider } from "./contexts/BrowserContext";
-import { LibraryProvider, useFlock } from "./contexts/LibraryContext";
-import { ShellProvider, useShell } from "./contexts/ShellContext";
+import { LibraryProvider } from "./contexts/LibraryContext";
+import { useFlock } from "./contexts/useLibrary";
+import { ShellProvider } from "./contexts/ShellContext";
+import { useShell } from "./contexts/useShell";
 import { ChatsFace, MascotCard, Sidebar } from "./components/Sidebar";
 import { AccountMenu } from "./components/AccountMenu";
 import { cn } from "@common/lib/utils";

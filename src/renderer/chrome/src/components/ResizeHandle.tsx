@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import type { ResizablePanel } from "@shared/ipc";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { cn } from "@common/lib/utils";
 
 const LABELS: Record<ResizablePanel, string> = {

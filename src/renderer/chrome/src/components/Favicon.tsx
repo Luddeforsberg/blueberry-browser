@@ -11,15 +11,6 @@ interface FaviconProps {
   site?: string;
 }
 
-// A saved site's own icon. It only ever asks that site, never a third-party icon service.
-export const siteIcon = (url: string) => {
-  try {
-    return `${new URL(url).origin}/favicon.ico`;
-  } catch {
-    return null;
-  }
-};
-
 // The first letter of the site's name, so sites with no icon still look different from each other, on a tile in a colour
 // of its own (DESIGN.md section 8). The colour is the site's, from its name, never the chrome's.
 const LETTER_TILES = 8;
@@ -33,7 +24,7 @@ const hostOf = (site: string) => {
 };
 const tileOf = (site: string) => `var(--site-${([...hostOf(site)].reduce((sum, char) => sum + char.charCodeAt(0), 0) % LETTER_TILES) + 1})`;
 
-export const siteLetter = (site: string) => hostOf(site).charAt(0).toUpperCase();
+const siteLetter = (site: string) => hostOf(site).charAt(0).toUpperCase();
 
 // What dark mode puts a site's icon through. An icon that's dark all over, such as a black mark on nothing, comes out
 // as the same shape in `ink`, which is light there. Any other icon comes out exactly as it went in. A page's icon can't

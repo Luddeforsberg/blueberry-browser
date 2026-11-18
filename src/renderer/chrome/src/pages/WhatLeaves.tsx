@@ -1,6 +1,6 @@
 import React from "react";
 import { StatusPill } from "@common/components/StatusPill";
-import { useShell } from "../contexts/ShellContext";
+import { useShell } from "../contexts/useShell";
 import { SettingsGroup, SettingsLink, SettingsRow } from "../components/SettingsRow";
 import { openMascots } from "../flockView";
 

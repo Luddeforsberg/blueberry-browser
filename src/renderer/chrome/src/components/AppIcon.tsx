@@ -1,7 +1,8 @@
 import React, { useId } from "react";
 import type { MascotLook } from "@shared/library";
 import type { AppIconGround } from "@shared/appIcon";
-import { BERRY_KIND, Mascot } from "@common/components/Mascot";
+import { Mascot } from "@common/components/Mascot";
+import { BERRY_KIND } from "@common/components/berryKinds";
 
 // The app's icon (DESIGN.md section 10, Settings, App icon): a square with corners a quarter of its width, and the
 // mascot's face at about two thirds of it. Paper and Night carry the dot grid, fading towards the middle. Its colour is

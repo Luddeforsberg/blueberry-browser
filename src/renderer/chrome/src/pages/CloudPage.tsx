@@ -3,8 +3,9 @@ import type { TabInfo } from "@shared/ipc";
 import { Cloud } from "lucide-react";
 import { Button } from "@common/components/Button";
 import { cn } from "@common/lib/utils";
-import { Berry, useAssistantName } from "../components/Berry";
-import { useFlock, useLibrary } from "../contexts/LibraryContext";
+import { Berry } from "../components/Berry";
+import { useAssistantName } from "../components/useAssistantName";
+import { useFlock, useLibrary } from "../contexts/useLibrary";
 import { liveFrameLock, useCloudView } from "../cloudView";
 
 const api = () => window.chromeAPI.cloud;

@@ -29,8 +29,6 @@ export default tseslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
       // `node` is destructured out of react-markdown props so it isn't spread onto the DOM.
       "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
-      // Contexts export a provider and its hook from one file on purpose.
-      "react-refresh/only-export-components": "warn",
     },
   },
   {

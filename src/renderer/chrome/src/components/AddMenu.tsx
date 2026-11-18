@@ -4,7 +4,8 @@ import type { TabChoice } from "@shared/attachments";
 import { cn } from "@common/lib/utils";
 import { LABEL } from "@common/components/StatusPill";
 import { Favicon } from "./Favicon";
-import { MenuRule, MenuSheet, menuRowClass } from "./MenuSheet";
+import { MenuRule, MenuSheet } from "./MenuSheet";
+import { menuRowClass } from "./menuRows";
 
 // DESIGN.md section 10, The prompt box: what the + adds. As wide as the card, with the open tabs in it, so adding one is
 // a single press: This page in the chat panel while the page in front isn't a chip, the tabs, a hairline, A file, and
