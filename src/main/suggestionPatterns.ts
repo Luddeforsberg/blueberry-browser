@@ -1,5 +1,6 @@
 import type { RoutineSchedule, SuggestionKind } from "../shared/library";
 import { normaliseSite } from "../shared/mascots";
+import { replaceControlCharacters } from "./controlCharacters";
 
 // What the user repeats, found with plain code. The bar is "you've done this three times", so a short session is enough.
 const MIN_TIMES = 3;
@@ -94,12 +95,7 @@ export const isShareable = (url: string): boolean => {
 };
 
 // One line of text, with nothing in it that could pass for formatting.
-export const plainText = (text: string): string =>
-  text
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+export const plainText = (text: string): string => replaceControlCharacters(text, " ").replace(/\s+/g, " ").trim();
 
 export const titleToShare = (title: string): string | null => {
   const clean = plainText(title);
