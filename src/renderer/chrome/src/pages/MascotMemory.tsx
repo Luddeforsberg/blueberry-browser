@@ -19,7 +19,7 @@ const api = () => window.chromeAPI.memory;
 const ANYWHERE = "anywhere";
 
 // A row per thing it remembers, with Change and Forget. Change makes the row a field, checked by the same rules as ever.
-export const FactRow: React.FC<{
+const FactRow: React.FC<{
   fact: Pick<MemoryFact, "text">;
   onEdit: (text: string) => Promise<string | null>;
   onForget: () => void;

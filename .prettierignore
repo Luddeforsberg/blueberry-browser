@@ -16,6 +16,7 @@ site/birds.js
 site/app/pips.css
 site/app/pips.js
 site/app/poses.js
+site/shared.js
 
 # Pages tests and evals load as they are, and design mocks made by their own scripts.
 evals/fixtures

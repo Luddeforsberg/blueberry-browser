@@ -13,7 +13,7 @@ const CLOSE_TIMEOUT_MS = 10_000;
 
 // Now and then on Windows CI the app starts and Playwright connects to it, and then the launch never
 // finishes. We don't know why yet, and the next launch works. This line in a log means it happened again.
-export async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> {
+async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> {
   try {
     return await launch();
   } catch (error) {
@@ -26,7 +26,7 @@ export async function retryStuckLaunch<T>(launch: () => Promise<T>): Promise<T> 
 // Now and then on Windows CI the app is told to quit and its process never exits, which used to fail the
 // test, hold up the worker for another 30 seconds and leave the app running. This line in a log means it
 // happened again.
-export async function closeWithin(close: () => Promise<void>, kill: () => void, timeoutMs = CLOSE_TIMEOUT_MS) {
+async function closeWithin(close: () => Promise<void>, kill: () => void, timeoutMs = CLOSE_TIMEOUT_MS) {
   let timer: NodeJS.Timeout | undefined;
   const timedOut = new Promise<boolean>((resolve) => {
     timer = setTimeout(() => resolve(true), timeoutMs);
@@ -50,7 +50,7 @@ const isRunning = (pid: number): boolean => {
 
 // Windows needs the whole tree named, or the app's helper processes stay behind. taskkill fails when part of the tree has
 // already ended while it worked, which is only a failure if the app is still running.
-export const killApp = (app: ElectronApplication) => {
+const killApp = (app: ElectronApplication) => {
   const { pid } = app.process();
   if (process.platform !== "win32" || !pid) {
     app.process().kill("SIGKILL");

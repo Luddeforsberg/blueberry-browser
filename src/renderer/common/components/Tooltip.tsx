@@ -10,7 +10,7 @@ import { GRACE_MS, IDLE, REST_MS, placeTip, slidesFrom, stepTip, type Box, type 
 // follows it along a row of controls. The system's own tooltip isn't used anywhere in the chrome, and a lint rule
 // keeps `title` off the DOM.
 
-export interface TipWords {
+interface TipWords {
   words: string;
   // The shortcut's keys, as this computer writes them.
   keys: string[];

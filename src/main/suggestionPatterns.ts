@@ -42,7 +42,7 @@ export interface PatternChat {
   updatedAt: number;
 }
 
-export interface PatternSite {
+interface PatternSite {
   host: string;
   label: string;
 }

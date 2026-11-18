@@ -56,7 +56,7 @@ export interface ChatApproval {
 // What only the user can do on a page. Berry can't see the tab while they do it.
 export type HandoffNeed = "sign-in" | "code" | "captcha";
 
-export interface ChatHandoff {
+interface ChatHandoff {
   need: HandoffNeed;
   tabId: string;
   site: string;
@@ -425,7 +425,7 @@ export interface TrailStep {
   submitted?: boolean;
 }
 
-export type RecordingStatus = "idle" | "recording" | "review" | "drafting";
+type RecordingStatus = "idle" | "recording" | "review" | "drafting";
 
 export interface RecordingState {
   status: RecordingStatus;

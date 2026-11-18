@@ -4,7 +4,7 @@ import { forgetGone, goneSince, rowsToDraw, type DrawnRow, type GoneRow, type Ro
 
 // DESIGN.md section 7's durations, in ms, for timers that wait for something to finish moving. Tailwind's `duration-*`
 // classes come from the same file.
-export const MOTION = motion.ms;
+const MOTION = motion.ms;
 
 // Keep Berry still, from the settings. The chrome provides it, so anything that moves can ask without being told.
 export const StillContext = createContext(false);
@@ -19,7 +19,7 @@ const subscribe = (changed: () => void) => {
 
 // Whether the system asks for less motion. The chrome's own motion follows this alone, and Keep Berry still only
 // holds the mascots and the pips. Drawn outside a browser, as the site's pictures are, it's still.
-export const useReducedMotion = (): boolean =>
+const useReducedMotion = (): boolean =>
   useSyncExternalStore(
     subscribe,
     () => window.matchMedia(REDUCED).matches,

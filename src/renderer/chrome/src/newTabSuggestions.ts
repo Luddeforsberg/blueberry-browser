@@ -1,7 +1,7 @@
 import type { ChatThreadSummary, MascotProfile, Suggestion } from "@shared/library";
 
 // DESIGN.md section 10, New tab: one list under the box, of at most four rows, each from something real.
-export const MOST_SUGGESTIONS = 4;
+const MOST_SUGGESTIONS = 4;
 
 export type SuggestionRow =
   | { kind: "pick-up"; key: string; chat: ChatThreadSummary }

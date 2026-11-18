@@ -15,7 +15,7 @@ const RESULTS = 5;
 const TIMEOUT_MS = 20_000;
 
 // Errors are ours, worded so nothing from the request goes with them.
-export class WebSearchError extends Error {}
+class WebSearchError extends Error {}
 
 // Null with no key, so the tool isn't offered at all.
 export const firecrawlSearch = (env: Record<string, string | undefined> = process.env): WebSearch | null => {

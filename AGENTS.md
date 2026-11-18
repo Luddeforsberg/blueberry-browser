@@ -11,6 +11,7 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run typecheck` | Typecheck main, preload, tests and renderers |
 | `pnpm run format` | Format everything with Prettier (`.prettierrc.json`). `pnpm run format:check` fails on any file that isn't |
 | `pnpm run lint` | Lint. Any warning or error fails, and a comment can't turn a rule off: change it in `eslint.config.mjs` |
+| `pnpm run knip` | Fail on unused files, exports and dependencies. `knip.config.ts` says where the entry points are |
 | `pnpm run test` | Run unit tests in `src/` with Vitest |
 | `pnpm exec electron-vite build` | Build into `out/` |
 | `pnpm run test:e2e` | Run Playwright against `out/`, so build first |
@@ -23,9 +24,9 @@ An AI browser built with Electron, React and TypeScript. [DESIGN.md](./DESIGN.md
 | `pnpm run site:deploy` | Deploy `site/` to Netlify, as it is, with `netlify.toml`. Needs `npx netlify login` and a linked site first |
 | `pnpm run push:keys` | Print a new VAPID key pair for notifications on the phone page. See `runner/README.md` |
 | `pnpm run runner:build` | Bundle the cloud runner into `runner/dist/`. `pnpm run runner:start` runs it. See `runner/README.md` |
-| `pnpm run verify` | Typecheck, format check, lint, unit tests, build and end-to-end tests, the same as CI on macOS |
+| `pnpm run verify` | Typecheck, format check, lint, knip, unit tests, build and end-to-end tests, the same as CI on macOS |
 
-CI runs typecheck, the format check, lint, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
+CI runs typecheck, the format check, lint, knip, unit tests and build on macOS and Windows. It doesn't run the end-to-end tests, because 15 of them need a real screen and GitHub's runners have none, and it doesn't package the app. The end-to-end tests run on a Mac with `pnpm run verify`, and nothing checks them on Windows yet.
 
 ## How we build
 

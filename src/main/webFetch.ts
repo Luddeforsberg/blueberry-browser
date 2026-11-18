@@ -26,7 +26,7 @@ const MAX_MARKDOWN = 500_000;
 const BUSY_WAITS_MS = [20_000, 40_000];
 
 // Errors are ours, worded so nothing from the request goes with them.
-export class WebFetchError extends Error {}
+class WebFetchError extends Error {}
 
 // Null with no key, so the tool isn't offered at all.
 export const firecrawlFetch = (env: Record<string, string | undefined> = process.env): WebFetch | null => {

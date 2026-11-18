@@ -32,7 +32,7 @@ interface SavedSuggestions {
   seen: number;
 }
 
-export type SuggestionChat = PatternChat & { outcome: DigestChat["outcome"] };
+type SuggestionChat = PatternChat & { outcome: DigestChat["outcome"] };
 
 export interface SuggestionSources {
   enabled: () => boolean;

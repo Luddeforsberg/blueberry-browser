@@ -102,19 +102,6 @@ export const searchIn = (url: string, typed: string | null, fromAddressBar: bool
   return null;
 };
 
-// What the script in the page reports. It can't be faked by the page, but what's in it can be anything the page chose.
-export type PageNote =
-  | { type: "click"; label: string; role: string }
-  | { type: "typed"; label: string; value: string }
-  | { type: "secret"; secret: string; copied?: boolean }
-  | { type: "copied"; value: string }
-  | { type: "pasted"; label: string }
-  | { type: "enter"; label?: string; secret?: string }
-  | { type: "chose"; label: string; value: string }
-  | { type: "ticked"; label: string; checked: boolean }
-  | { type: "file"; label: string }
-  | { type: "frame"; host: string };
-
 const SECRET_WORDS: Record<string, string> = {
   password: "password field",
   card: "card field",

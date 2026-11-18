@@ -41,7 +41,7 @@ export const isPushEndpoint = (endpoint: string): boolean => {
   }
 };
 
-export const pushPayload = (kind: PushKind): string => JSON.stringify({ kind });
+const pushPayload = (kind: PushKind): string => JSON.stringify({ kind });
 
 // The keys from `pnpm run push:keys`, or null with none set. Words say what's wrong, never a value.
 export const pushConfig = (env: Record<string, string | undefined>): PushConfig | null | string => {

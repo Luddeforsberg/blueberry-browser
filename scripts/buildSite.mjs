@@ -18,7 +18,7 @@ await build({
       `export { BERRY_ID, permissionsInWords } from "./src/shared/mascots";`,
       // The phone page: the flock as the app shares it, conversations and their history, the words for an approval, and what
       // counts as a code.
-      `export { conversationIdOf, conversationsOf, flockFromRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
+      `export { conversationsOf, flockFromRows, followUpHistory, mascotSnapshot } from "./src/shared/phone";`,
       // How it calls the server: a deadline on every call, one poll at a time, and how often to ask about the link.
       `export { fetchWithin, oneAtATime, runnerLinkDue } from "./src/shared/phoneCalls";`,
       `export { asContinuation, withSiteNames } from "./src/renderer/chrome/src/siteNames";`,

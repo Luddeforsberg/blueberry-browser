@@ -2,7 +2,7 @@
 // tab's param, so main's Back can step out of a page, and a restored session or another page lands in the same place.
 
 // The parts of a routine that are changed one at a time, each from its own row, in the order the steps ask them.
-export const ROUTINE_PARTS = ["does", "when", "who", "where", "name"] as const;
+const ROUTINE_PARTS = ["does", "when", "who", "where", "name"] as const;
 export type RoutinePart = (typeof ROUTINE_PARTS)[number];
 
 export type RoutinePlace =

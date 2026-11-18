@@ -63,7 +63,7 @@ const ALWAYS_ALLOWED = new Set([
 const ASK_EVERY_TIME: readonly SitePermission[] = ["screen", "open-external"];
 
 // Null for anything that isn't a real site, such as our own pages, file:, data: and srcdoc frames.
-export const siteOrigin = (url: string | undefined): string | null => {
+const siteOrigin = (url: string | undefined): string | null => {
   try {
     const parsed = new URL(url ?? "");
     const origin = parsed.origin;

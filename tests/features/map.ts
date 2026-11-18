@@ -41,7 +41,7 @@ export interface Needs {
   model?: (model: FakeModel) => void;
 }
 
-export interface FeatureState {
+interface FeatureState {
   // Opens the feature in this state and waits until it's there.
   open: (drive: Drive) => Promise<void>;
   // On top of the feature's own needs.
@@ -59,7 +59,7 @@ interface FeatureBase {
 }
 
 // A feature of the app, opened in the built app with the fakes behind it.
-export interface AppFeature extends FeatureBase {
+interface AppFeature extends FeatureBase {
   surface?: "app";
   // The window to picture, by a view it holds. The browser window, by its chrome view, unless it says otherwise.
   window?: string;
@@ -69,7 +69,7 @@ export interface AppFeature extends FeatureBase {
 }
 
 // The phone page in site/app/, in a browser at a phone's size against the fake Supabase.
-export interface PhoneFeature extends FeatureBase {
+interface PhoneFeature extends FeatureBase {
   surface: "phone";
   layouts: "none";
   states: Record<string, { open: (phone: PhoneDrive) => Promise<void> }>;

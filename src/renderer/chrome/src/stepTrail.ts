@@ -12,7 +12,7 @@ const WORTH_KEEPING = /^(Asked you|Stayed off|Left the tab you took over|Stopped
 
 export const worthKeeping = (step: ChatStep): boolean => WORTH_KEEPING.test(step.text);
 
-export type TrailStep = { step: ChatStep; index: number };
+type TrailStep = { step: ChatStep; index: number };
 
 export interface Trail {
   // The steps showing, in order.

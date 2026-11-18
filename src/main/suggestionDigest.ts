@@ -7,7 +7,7 @@ import { isShareable, shareableTitle, titleToShare, type PatternVisit } from "./
 // short id, and a suggestion has to cite the ids it's based on, so code can check each one against what's really here.
 
 const DAY_MS = 86_400_000;
-export const DIGEST_WINDOW_MS = 14 * DAY_MS;
+const DIGEST_WINDOW_MS = 14 * DAY_MS;
 const SESSION_GAP_MS = 30 * 60_000;
 const MAX_SESSIONS = 60;
 const MAX_PAGES_PER_SESSION = 15;
@@ -58,7 +58,7 @@ export interface DigestChat {
   outcome: "done" | "failed" | "stopped" | "no reply";
 }
 
-export interface DigestRoutine {
+interface DigestRoutine {
   id: string;
   name: string;
   schedule: string;
@@ -67,7 +67,7 @@ export interface DigestRoutine {
   runs: Array<{ status: RoutineRunStatus; startedAt: number }>;
 }
 
-export interface DigestMascot {
+interface DigestMascot {
   name: string;
   sites: string[];
 }
@@ -117,7 +117,7 @@ export interface Digest {
   newest: number;
 }
 
-export const when = (at: number): string => {
+const when = (at: number): string => {
   const date = new Date(at);
   return `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 };

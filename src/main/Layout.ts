@@ -1,7 +1,7 @@
 import type { DesktopBerrySpot, DesktopEdge, Layout, LayoutMode, Point, Rect } from "../shared/ipc";
 import { DESKTOP_BOX, DESKTOP_DROP, DESKTOP_DROP_MOST, DESKTOP_FILLET, DESKTOP_SHADOW } from "../shared/desktopSizes";
 
-export type { Layout, LayoutMode, Rect };
+export type { Layout, Rect };
 
 // DESIGN.md section 2, to tune.
 export const SIDEBAR_WIDTH = { default: 248, min: 200, max: 360 };
@@ -14,10 +14,10 @@ export const TAB_ROW_HEIGHT = 42;
 const HORIZONTAL_TOOLBAR_HEIGHT = 44;
 const BOOKMARKS_BAR_HEIGHT = 40;
 // The gutter: the ground showing between the page's sheet and the window's right and bottom edges, and between sheets.
-export const PAGE_INSET = 8;
-export const FLOATING_INSET = 8;
+const PAGE_INSET = 8;
+const FLOATING_INSET = 8;
 // The find bar's card with 12px on every side, for its shadow.
-export const FIND_BAR = { width: 384, height: 72 };
+const FIND_BAR = { width: 384, height: 72 };
 export const MIN_PAGE_WIDTH = 480;
 export const PROMPT_WIDTH = 408;
 export const PROMPT_DEFAULT_HEIGHT = 200;
@@ -226,7 +226,7 @@ export interface DesktopPlace {
 
 const clamp = (value: number, low: number, high: number): number => Math.min(Math.max(value, low), Math.max(low, high));
 
-export const sideEdge = (edge: DesktopEdge): boolean => edge === "left" || edge === "right";
+const sideEdge = (edge: DesktopEdge): boolean => edge === "left" || edge === "right";
 
 // From its middle to the end of a fillet, along the edge, so that at rest it's wholly on screen however far along it is.
 const DESKTOP_REACH = DESKTOP_FILLET + DESKTOP_DROP.along / 2;

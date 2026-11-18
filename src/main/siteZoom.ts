@@ -1,5 +1,5 @@
 // The steps a normal browser uses, as percentages.
-export const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
+const ZOOM_LEVELS = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
 export type SiteZoomLevels = Record<string, number>;
 

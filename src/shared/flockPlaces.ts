@@ -4,7 +4,7 @@
 import { BERRY_ID } from "./mascots";
 
 // The parts of a mascot that are changed one at a time, each from its own row.
-export const MASCOT_PARTS = ["look", "name", "purpose", "limits"] as const;
+const MASCOT_PARTS = ["look", "name", "purpose", "limits"] as const;
 export type MascotPart = (typeof MASCOT_PARTS)[number];
 
 export type FlockPlace =

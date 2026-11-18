@@ -84,13 +84,13 @@ const unsigned = (keys: Keys, text: unknown): Record<string, unknown> | null => 
   }
 };
 
-export const seal = (keys: Keys, text: string): string => {
+const seal = (keys: Keys, text: string): string => {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", keys.seal, iv);
   const sealed = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
   return b64(Buffer.concat([iv, cipher.getAuthTag(), sealed]));
 };
-export const unseal = (keys: Keys, text: string): string | null => {
+const unseal = (keys: Keys, text: string): string | null => {
   try {
     const all = Buffer.from(text, "base64url");
     const decipher = createDecipheriv("aes-256-gcm", keys.seal, all.subarray(0, 12));
@@ -124,7 +124,7 @@ interface Code {
 }
 
 // The two calls the grants need: one as the owner, once, and one as the runner.
-export interface RelayGrants {
+interface RelayGrants {
   create(ownerAccessToken: string): Promise<string>;
   revoke(secret: string): Promise<void>;
 }
@@ -470,7 +470,7 @@ export class RelayAuth implements OAuthServerProvider {
 const escape = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // A plain page with nothing but the form. Everything put in it is escaped.
-export const signInPage = ({ app, request, problem }: { app: string; request: string | null; problem?: string }): string => `<!doctype html>
+const signInPage = ({ app, request, problem }: { app: string; request: string | null; problem?: string }): string => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connect to Blueberry</title>
 <style>

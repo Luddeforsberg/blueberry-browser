@@ -363,7 +363,7 @@ export const nextInWords = (at: number, now = Date.now()): string => {
 // Grouped by what matters, in this order. A one-off that has run waits with those that only run when asked.
 export type RoutineGroupKey = "needs-you" | "running" | "scheduled" | "paused" | "manual";
 
-export const ROUTINE_GROUPS: { key: RoutineGroupKey; label: string }[] = [
+const ROUTINE_GROUPS: { key: RoutineGroupKey; label: string }[] = [
   { key: "needs-you", label: "Needs you" },
   { key: "running", label: "Running" },
   { key: "scheduled", label: "Scheduled" },

@@ -49,7 +49,7 @@ export const publicPageLink = (site: string | undefined, id: string): string | n
 };
 
 // The relay's address as the runner wrote it, only if it's an https one ending in /mcp, and nothing else about it.
-export const relayAddress = (input: unknown): string | null => {
+const relayAddress = (input: unknown): string | null => {
   if (typeof input !== "string" || input.length > 300) return null;
   try {
     const url = new URL(input);

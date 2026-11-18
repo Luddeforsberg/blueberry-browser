@@ -14,7 +14,7 @@ const IMPORT_NOTES = [
   "Only addresses, page titles and visit times from the last 90 days come across, from every profile, never passwords or cookies.",
   "It stays on this computer, apart from a summary Suggestions sends to the AI service.",
 ];
-export const IMPORT_DETAIL =
+const IMPORT_DETAIL =
   "That summary covers the last two weeks: site names and page titles in the order you visited them, what you searched for, and your chat and routine titles. Never page text or full addresses. Local addresses, and sites it recognises as banks or mail, are left out. You can turn Suggestions off in Settings.";
 
 export type HistoryImport = ReturnType<typeof useHistoryImport>;

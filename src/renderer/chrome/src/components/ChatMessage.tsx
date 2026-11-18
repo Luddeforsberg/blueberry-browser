@@ -726,7 +726,7 @@ const ChatQuestionCard: React.FC<SpokenProps> = ({ chatId, approval, mascot }) =
 };
 
 // What the user can do about a tab they've been handed. Words are never typed here, so there's nowhere for a secret to go.
-export const HandoffActions: React.FC<{
+const HandoffActions: React.FC<{
   tabId?: string;
   onDone: () => void;
   onNotNow: () => void;

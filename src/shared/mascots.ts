@@ -123,20 +123,6 @@ export const parseMascotDraft = (input: unknown): { draft: MascotDraft } | { err
   };
 };
 
-// What it can do, in words, for its card and the live preview.
-export const sitesInWords = (sites: readonly string[]): string => {
-  if (sites.length === 0) return "Any site";
-  return sites.length === 1 ? `Only ${sites[0]}` : `Only ${sites[0]} and ${sites.length - 1} more`;
-};
-
-const TOOL_VERBS: Record<MascotTool, string> = { visit: "visits", click: "clicks", type: "types" };
-
-export const toolsInWords = (tools: readonly MascotTool[]): string => {
-  const can = MASCOT_TOOLS.filter(({ id }) => tools.includes(id));
-  if (can.length === 0) return "Only reads";
-  return `Reads, ${can.map(({ id }) => TOOL_VERBS[id]).join(", ")}`;
-};
-
 const inList = (items: readonly string[]): string =>
   items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 

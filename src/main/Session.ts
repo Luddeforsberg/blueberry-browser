@@ -16,7 +16,7 @@ export interface SavedWebTab {
   index: number;
 }
 
-export interface SavedPageTab {
+interface SavedPageTab {
   page: InternalPage;
   param: string | null;
   title: string;
